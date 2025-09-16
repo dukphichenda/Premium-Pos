@@ -5,43 +5,112 @@
 {% endblock %}
 
 {% block content %}
-<div class="inflow-adj-wrapper no-print">
-    <!-- 1. Top Action Toolbar (Matching inFlow Cloud screenshot) -->
-    <div class="inflow-adj-top-bar">
-        <div class="inflow-adj-top-left">
-            <a href="{{ url_for('inventory.list_adjustments') }}" class="inflow-adj-close-btn" onclick="return onCloseAdjustmentPage(event)" title="Back to Adjustments (បិទ / ត្រឡប់ក្រោយ)">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-            </a>
-            {% if is_detail %}
-            <span class="badge badge-success" style="font-size: 11.5px; padding: 4px 10px; font-weight: 700; letter-spacing: 0.04em;">
-                ✓ COMPLETED
-            </span>
-            {% endif %}
+<div class="inflow-adj-layout no-print">
+    <!-- Left Sidebar: History of Adjustments -->
+    <aside class="inflow-adj-sidebar" id="adjHistorySidebar">
+        <div class="inflow-sidebar-header">
+            <div class="inflow-sidebar-title-row">
+                <div class="inflow-sidebar-title">History</div>
+                <a href="{{ url_for('inventory.new_adjustment') }}" class="inflow-sidebar-new-btn" onclick="return onSidebarNewClick(event)" title="Start new adjustment">+ New</a>
+            </div>
+            <div class="inflow-sidebar-search-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="sidebarAdjSearch" class="inflow-sidebar-search-input" placeholder="Search adjustments..." oninput="filterSidebarAdjustments(this.value)">
+            </div>
+            <div class="inflow-sidebar-tabs">
+                <button type="button" class="inflow-sidebar-tab active" data-filter="ALL" onclick="filterSidebarStatus('ALL', this)">All</button>
+                <button type="button" class="inflow-sidebar-tab" data-filter="DRAFT" onclick="filterSidebarStatus('DRAFT', this)">Draft</button>
+                <button type="button" class="inflow-sidebar-tab" data-filter="COMPLETED" onclick="filterSidebarStatus('COMPLETED', this)">Completed</button>
+            </div>
         </div>
-        <div class="inflow-adj-top-right">
-            <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="copyAdjustmentData()" title="Copy adjustment data to clipboard">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                <span>Copy</span>
-            </button>
-            <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="printAdjustmentSheet()" title="Print adjustment voucher / count sheet">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                <span>Print</span>
-            </button>
-            <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="shareAdjustmentEmail()" title="Email or share summary">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                <span>Email</span>
-            </button>
-            {% if not is_detail %}
-            <button type="button" id="topBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
-                <span>Adjust stock</span>
-            </button>
+        <div class="inflow-sidebar-list" id="sidebarAdjList">
+            {% for hist in history_adjustments %}
+            {% set is_active_item = (adjustment and adjustment.id == hist.id) or (is_draft and draft_id == hist.id) %}
+            <a href="{{ url_for('inventory.detail_adjustment', id=hist.id) }}"
+               class="inflow-sidebar-card {% if is_active_item %}active{% endif %}"
+               data-id="{{ hist.id }}"
+               data-number="{{ hist.adjustment_number | lower }}"
+               data-status="{{ hist.status }}"
+               data-location="{{ (hist.location_name or '') | lower }}"
+               data-reason="{{ (hist.reason or '') | lower }}"
+               data-date="{{ (hist.adjustment_date | format_date if hist.adjustment_date else '') | lower }}"
+               onclick="return onSidebarItemClick(event, '{{ url_for('inventory.detail_adjustment', id=hist.id) }}')">
+                <div class="inflow-sidebar-card-top">
+                    <span class="inflow-sidebar-card-num">{{ hist.adjustment_number }}</span>
+                    {% if hist.status == 'DRAFT' %}
+                    <span class="badge" style="font-size: 10px; padding: 2px 6px; font-weight: 700; background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D;">DRAFT</span>
+                    {% else %}
+                    <span class="badge badge-success" style="font-size: 10px; padding: 2px 6px; font-weight: 700;">DONE</span>
+                    {% endif %}
+                </div>
+                <div class="inflow-sidebar-card-meta">
+                    <span>{{ hist.adjustment_date | format_date if hist.adjustment_date else '' }}</span>
+                    <span>•</span>
+                    <span>{{ hist.location_name or 'Warehouse' }}</span>
+                </div>
+                <div class="inflow-sidebar-card-bottom">
+                    <span class="inflow-sidebar-card-reason">{{ hist.reason or 'Correction' }}</span>
+                    <span class="inflow-sidebar-card-count">{{ hist.item_count or 0 }} items</span>
+                </div>
+            </a>
             {% else %}
-            <a href="{{ url_for('inventory.new_adjustment') }}" class="btn btn-primary btn-adjust-stock" style="text-decoration: none;">
-                <span>+ New Adjustment</span>
-            </a>
-            {% endif %}
+            <div class="inflow-sidebar-empty">No adjustments found</div>
+            {% endfor %}
         </div>
-    </div>
+    </aside>
+
+    <!-- Right: Main Content Panel -->
+    <div class="inflow-adj-main-content">
+        <!-- 1. Top Action Toolbar -->
+        <div class="inflow-adj-top-bar">
+            <div class="inflow-adj-top-left">
+                <a href="{{ url_for('inventory.list_adjustments') }}" class="inflow-adj-close-btn" onclick="return onCloseAdjustmentPage(event)" title="Back to Adjustments (បិទ / ត្រឡប់ក្រោយ)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </a>
+                <button type="button" class="btn btn-sm btn-secondary inflow-adj-sidebar-toggle-btn" onclick="toggleAdjSidebar()" title="Toggle History Sidebar (បង្ហាញ/លាក់ ប្រវត្តិ)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                    <span id="sidebarToggleText">History</span>
+                </button>
+                {% if is_detail %}
+                <span class="badge badge-success" style="font-size: 11.5px; padding: 4px 10px; font-weight: 700; letter-spacing: 0.04em;">
+                    ✓ COMPLETED
+                </span>
+                {% elif is_draft %}
+                <span class="badge" style="font-size: 11.5px; padding: 4px 10px; font-weight: 700; letter-spacing: 0.04em; background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D;">
+                    ✏️ DRAFT (In Progress)
+                </span>
+                {% endif %}
+            </div>
+            <div class="inflow-adj-top-right">
+                <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="copyAdjustmentData()" title="Copy adjustment data to clipboard">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="printAdjustmentSheet()" title="Print adjustment voucher / count sheet">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    <span>Print</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="shareAdjustmentEmail()" title="Email or share summary">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                    <span>Email</span>
+                </button>
+                {% if not is_detail %}
+                <button type="button" class="btn btn-sm btn-ghost btn-cancel-adj" onclick="onCloseAdjustmentPage(event)" style="font-weight: 600; color: #64748B;">
+                    Cancel
+                </button>
+                <button type="button" id="topBtnSaveDraft" class="btn btn-sm btn-secondary btn-save-draft" onclick="saveStockAdjustmentDraft()" title="Save as Draft to resume and adjust later without modifying live inventory">
+                    <span>💾 Save</span>
+                </button>
+                <button type="button" id="topBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
+                    <span>Adjust stock</span>
+                </button>
+                {% else %}
+                <a href="{{ url_for('inventory.new_adjustment') }}" class="btn btn-primary btn-adjust-stock" style="text-decoration: none;">
+                    <span>+ New Adjustment</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
 
     <!-- 2. Main Adjustment Document Container (White Card) -->
     <div class="inflow-adj-card">
@@ -226,17 +295,18 @@
             <table class="inflow-adj-table" id="adjProductTable">
                 <thead>
                     <tr>
-                        <th style="width: 26%;">Product</th>
-                        <th style="width: 13%;">Sublocation</th>
-                        <th style="width: 12%; text-align: center;" title="Physical quantity currently in warehouse on hand (Directly editable / កែសម្រួលចំនួនជាក់ស្ដែង)">
+                        <th style="width: 24%;">Product</th>
+                        <th style="width: 10%;">Sublocation</th>
+                        <th style="width: 12%; text-align: center;" title="Unit of Measure - Adjust in Base unit, Sales packaging, or Purchasing packaging">UOM</th>
+                        <th style="width: 11%; text-align: center;" title="Physical quantity currently in warehouse on hand (Directly editable / កែសម្រួលចំនួនជាក់ស្ដែង)">
                             Qty on Hand {% if not is_detail %}<span style="font-size: 11px; opacity: 0.75;" title="Directly editable count">✏️</span>{% endif %}
                         </th>
-                        <th style="width: 11%; text-align: right;" title="Quantity reserved on active customer bills / sales orders">Qty Reserved</th>
-                        <th style="width: 10%; text-align: center;" title="Baseline count before adjustment">Initial</th>
-                        <th style="width: 12%; text-align: center;" title="Adjustment delta (+ or -)">Change</th>
-                        <th style="width: 12%; text-align: center;" title="Calculated resulting quantity after adjustment">Final</th>
+                        <th style="width: 10%; text-align: right;" title="Quantity reserved on active customer bills / sales orders">Qty Reserved</th>
+                        <th style="width: 9%; text-align: center;" title="Baseline count before adjustment">Initial</th>
+                        <th style="width: 11%; text-align: center;" title="Adjustment delta (+ or -)">Change</th>
+                        <th style="width: 11%; text-align: center;" title="Calculated resulting quantity after adjustment">Final</th>
                         {% if not is_detail %}
-                        <th style="width: 4%; text-align: center;"></th>
+                        <th style="width: 2%; text-align: center;"></th>
                         {% endif %}
                     </tr>
                 </thead>
@@ -264,29 +334,40 @@
                             <td>
                                 <span class="inflow-adj-subloc-static">{{ line.sublocation or '-' }}</span>
                             </td>
+                            <!-- UOM -->
+                            <td style="text-align: center;">
+                                <span class="badge" style="font-size: 11px; font-weight: 700; color: #1E293B; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 3px 8px; border-radius: 5px;">
+                                    {{ line.uom or line.product_uom or 'Pcs' }}
+                                    {% if line.uom_factor and line.uom_factor > 1 %}
+                                    <span style="font-size: 9.5px; opacity: 0.8; margin-left: 2px;">({{ "{:g}".format(line.uom_factor) }}x)</span>
+                                    {% endif %}
+                                </span>
+                            </td>
                             <!-- Qty on Hand -->
+                            {% set factor = line.uom_factor if (line.uom_factor and line.uom_factor > 0) else 1.0 %}
                             <td style="text-align: center; font-weight: 700; color: #0F172A;">
-                                {{ "{:,.0f}".format(line.new_qty - line.reserved_qty) }}
+                                {{ "{:,.0f}".format((line.new_qty - line.reserved_qty) / factor) }}
                             </td>
                             <!-- Qty Reserved (from bills) -->
                             <td style="text-align: right;">
                                 <span class="badge badge-neutral" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">
-                                    {{ "{:,.0f}".format(line.reserved_qty) }}
+                                    {{ "{:,.0f}".format(line.reserved_qty / factor) }}
                                 </span>
                             </td>
                             <!-- Initial -->
                             <td style="text-align: center;">
-                                <div class="inflow-adj-pill pill-initial">{{ "{:,.0f}".format(line.old_qty) }}</div>
+                                <div class="inflow-adj-pill pill-initial">{{ "{:,.0f}".format(line.old_qty / factor) }}</div>
                             </td>
                             <!-- Change -->
                             <td style="text-align: center;">
-                                <div class="inflow-adj-pill {% if line.diff_qty < 0 %}pill-change-neg{% elif line.diff_qty > 0 %}pill-change-pos{% else %}pill-change-zero{% endif %}">
-                                    {{ "{:+,.0f}".format(line.diff_qty) }}
+                                {% set diff_disp = line.diff_qty / factor %}
+                                <div class="inflow-adj-pill {% if diff_disp < 0 %}pill-change-neg{% elif diff_disp > 0 %}pill-change-pos{% else %}pill-change-zero{% endif %}">
+                                    {{ "{:+,.0f}".format(diff_disp) }}
                                 </div>
                             </td>
                             <!-- Final -->
                             <td style="text-align: center;">
-                                <div class="inflow-adj-pill pill-final">{{ "{:,.0f}".format(line.new_qty) }}</div>
+                                <div class="inflow-adj-pill pill-final">{{ "{:,.0f}".format(line.new_qty / factor) }}</div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -318,9 +399,15 @@
                 </button>
             </div>
 
-            <!-- Right: Adjust Stock Primary Action -->
-            <div class="inflow-adj-bottom-right">
+            <!-- Right: Cancel, Save Draft, & Adjust Stock Primary Action -->
+            <div class="inflow-adj-bottom-right" style="display: flex; align-items: center; gap: 10px;">
                 {% if not is_detail %}
+                <button type="button" class="btn btn-ghost btn-cancel-adj" onclick="onCloseAdjustmentPage(event)" style="font-weight: 600; color: #64748B;">
+                    Cancel
+                </button>
+                <button type="button" id="bottomBtnSaveDraft" class="btn btn-secondary btn-save-draft" onclick="saveStockAdjustmentDraft()" title="Save as Draft to resume and adjust later without modifying live inventory">
+                    <span>💾 Save Draft</span>
+                </button>
                 <button type="button" id="bottomBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
                     <span>Adjust stock</span>
                 </button>
@@ -332,9 +419,10 @@
             </div>
         </div>
     </div>
+    </div>
 </div>
 
-<!-- Discard / Close Confirmation Alert Modal -->
+<!-- Discard / Save Confirmation Alert Modal -->
 <div id="inflowAdjDiscardModal" class="inflow-adj-modal-backdrop" style="display: none;">
     <div class="inflow-adj-modal-card" role="dialog" aria-modal="true" aria-labelledby="discardModalTitle">
         <div class="inflow-adj-modal-header">
@@ -347,17 +435,20 @@
             </div>
         </div>
         <div class="inflow-adj-modal-body">
-            <p>If you close now, any physical counts and quantity changes made on this sheet will be discarded.</p>
-            <p class="font-khmer" style="font-size: 12.5px; color: #64748B; margin-top: 6px;">
-                តើអ្នកចង់បន្តការកែសម្រួលស្តុក ឬបោះបង់ការផ្លាស់ប្តូរទាំងនេះ?
+            <p>You can save this adjustment as a <strong>Draft</strong> and adjust later without modifying live inventory, or discard all changes.</p>
+            <p class="font-khmer" style="font-size: 13px; color: #475569; margin-top: 6px;">
+                តើអ្នកចង់រក្សាទុកជាព្រាងដើម្បីបន្តកែសម្រួលនៅពេលក្រោយ ឬបោះបង់ការផ្លាស់ប្តូរទាំងនេះ?
             </p>
         </div>
-        <div class="inflow-adj-modal-actions">
-            <button type="button" class="btn btn-secondary inflow-adj-btn-discard" onclick="confirmDiscardChanges()">
+        <div class="inflow-adj-modal-actions" style="display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap;">
+            <button type="button" class="btn btn-secondary inflow-adj-btn-discard" onclick="confirmDiscardChanges()" style="border-radius: 8px; font-weight: 600;">
                 <span>Discard Changes (បោះបង់)</span>
             </button>
-            <button type="button" class="btn btn-primary inflow-adj-btn-continue" onclick="dismissDiscardModal()" autofocus>
-                <span>Continue Adjustment (បន្តការកែសម្រួល)</span>
+            <button type="button" class="btn btn-warning inflow-adj-btn-savedraft" onclick="confirmSaveDraftAndExit()" style="background: #D97706; border-color: #D97706; color: #FFFFFF; font-weight: 700; border-radius: 8px; padding: 9px 18px;">
+                <span>💾 Save Draft & Exit (រក្សាទុកជាព្រាង)</span>
+            </button>
+            <button type="button" class="btn btn-primary inflow-adj-btn-continue" onclick="dismissDiscardModal()" autofocus style="border-radius: 8px; font-weight: 700;">
+                <span>Continue Editing (បន្តការកែសម្រួល)</span>
             </button>
         </div>
     </div>
@@ -390,6 +481,7 @@
                 <th style="padding: 8px; text-align: left;">Product / Description</th>
                 <th style="padding: 8px; text-align: left;">SKU</th>
                 <th style="padding: 8px; text-align: left;">Subloc</th>
+                <th style="padding: 8px; text-align: center;">UOM</th>
                 <th style="padding: 8px; text-align: right;">On Hand</th>
                 <th style="padding: 8px; text-align: right;">Reserved</th>
                 <th style="padding: 8px; text-align: right;">Initial</th>
@@ -400,15 +492,17 @@
         <tbody id="printTableBody">
             {% if is_detail %}
             {% for line in lines %}
+            {% set factor = line.uom_factor if (line.uom_factor and line.uom_factor > 0) else 1.0 %}
             <tr style="border-bottom: 1px solid #E2E8F0;">
                 <td style="padding: 6px 8px; font-weight: 600;">{{ line.product_name }}</td>
                 <td style="padding: 6px 8px; font-family: monospace;">{{ line.product_sku }}</td>
                 <td style="padding: 6px 8px;">{{ line.sublocation or '-' }}</td>
-                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.old_qty) }}</td>
-                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.reserved_qty) }}</td>
-                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.old_qty) }}</td>
-                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:+,.0f}".format(line.diff_qty) }}</td>
-                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:,.0f}".format(line.new_qty) }}</td>
+                <td style="padding: 6px 8px; text-align: center; font-weight: 600;">{{ line.uom or line.product_uom or 'Pcs' }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format((line.new_qty - line.reserved_qty) / factor) }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.reserved_qty / factor) }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.old_qty / factor) }}</td>
+                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:+,.0f}".format(line.diff_qty / factor) }}</td>
+                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:,.0f}".format(line.new_qty / factor) }}</td>
             </tr>
             {% endfor %}
             {% endif %}
@@ -433,11 +527,286 @@
    Modern inFlow Cloud Stock Adjustment Styling
    Matches exact layout from user screenshot
    ========================================================================== */
+/* Layout with left sidebar */
+.inflow-adj-layout {
+    display: flex;
+    min-height: calc(100vh - 65px);
+    background: #F8FAFC;
+    position: relative;
+    width: 100%;
+}
+
+/* History Sidebar */
+.inflow-adj-sidebar {
+    width: 290px;
+    min-width: 290px;
+    max-width: 290px;
+    background: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.03);
+    z-index: 10;
+}
+
+.inflow-adj-sidebar.collapsed {
+    margin-left: -290px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.inflow-sidebar-header {
+    padding: 14px 16px 12px 16px;
+    border-bottom: 1px solid #E2E8F0;
+    background: #FFFFFF;
+}
+
+.inflow-sidebar-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.inflow-sidebar-title {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: -0.01em;
+}
+
+.inflow-sidebar-new-btn {
+    background: #0F766E;
+    color: #FFFFFF !important;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.15s ease;
+}
+.inflow-sidebar-new-btn:hover {
+    background: #0D655E;
+    transform: translateY(-1px);
+}
+
+.inflow-sidebar-search-box {
+    position: relative;
+    margin-bottom: 10px;
+}
+.inflow-sidebar-search-box svg {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+}
+.inflow-sidebar-search-input {
+    width: 100%;
+    padding: 6px 10px 6px 30px;
+    font-size: 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    background: #F8FAFC;
+    outline: none;
+    box-sizing: border-box;
+}
+.inflow-sidebar-search-input:focus {
+    border-color: #0F766E;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+}
+
+.inflow-sidebar-tabs {
+    display: flex;
+    gap: 4px;
+    background: #F1F5F9;
+    padding: 3px;
+    border-radius: 6px;
+}
+.inflow-sidebar-tab {
+    flex: 1;
+    border: none;
+    background: none;
+    padding: 4px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-align: center;
+}
+.inflow-sidebar-tab.active {
+    background: #FFFFFF;
+    color: #0F172A;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+
+.inflow-sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 10px;
+}
+
+.inflow-sidebar-card {
+    display: block;
+    padding: 10px 12px;
+    border-radius: 8px;
+    margin-bottom: 6px;
+    text-decoration: none !important;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    transition: all 0.15s ease;
+}
+.inflow-sidebar-card:hover {
+    border-color: #CBD5E1;
+    background: #F8FAFC;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0,0,0,0.03);
+}
+.inflow-sidebar-card.active {
+    background: #F0FDF4;
+    border-color: #86EFAC;
+    border-left: 3.5px solid #0F766E;
+    box-shadow: 0 2px 5px rgba(15, 118, 110, 0.08);
+}
+
+.inflow-sidebar-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+.inflow-sidebar-card-num {
+    font-weight: 800;
+    font-size: 12.5px;
+    color: #0F172A;
+    font-family: monospace;
+}
+.inflow-sidebar-card-meta {
+    font-size: 11px;
+    color: #64748B;
+    display: flex;
+    gap: 5px;
+    margin-bottom: 4px;
+}
+.inflow-sidebar-card-bottom {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+}
+.inflow-sidebar-card-reason {
+    color: #475569;
+    font-weight: 500;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.inflow-sidebar-card-count {
+    color: #0F766E;
+    font-weight: 700;
+}
+
+.inflow-sidebar-empty {
+    padding: 30px 16px;
+    text-align: center;
+    font-size: 12px;
+    color: #94A3B8;
+}
+
+/* Main Content Panel */
+.inflow-adj-main-content {
+    flex: 1;
+    min-width: 0;
+    padding: 18px 24px 60px 24px;
+}
+
 .inflow-adj-wrapper {
     max-width: 1220px;
     margin: 0 auto;
-    padding: 18px 24px 60px 24px;
+    padding: 0;
     font-family: inherit;
+}
+
+.inflow-adj-sidebar-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.inflow-adj-sidebar-toggle-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+
+.btn-save-draft {
+    background: #FFFFFF !important;
+    border: 1.5px solid #D97706 !important;
+    color: #B45309 !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding: 7px 16px !important;
+    font-size: 13px !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.btn-save-draft:hover {
+    background: #FEF3C7 !important;
+    border-color: #B45309 !important;
+    transform: translateY(-1px);
+}
+
+.btn-cancel-adj {
+    color: #64748B !important;
+    font-weight: 600 !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 7px 14px !important;
+    font-size: 13px !important;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s ease;
+}
+.btn-cancel-adj:hover {
+    color: #EF4444 !important;
+    background: #FEE2E2 !important;
+}
+
+/* UOM select dropdown in row */
+.inflow-adj-uom-select {
+    padding: 4px 6px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #0F172A;
+    background: #F8FAFC;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 6px;
+    outline: none;
+    cursor: pointer;
+    max-width: 115px;
+    transition: all 0.15s ease;
+}
+.inflow-adj-uom-select:focus {
+    border-color: #0F766E;
+    box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.15);
+    background: #FFFFFF;
 }
 
 .inflow-adj-top-bar {
@@ -1324,13 +1693,84 @@
 <script>
 // State Management for Stock Adjustment
 const IS_DETAIL_VIEW = {{ 'true' if is_detail else 'false' }};
+const IS_DRAFT = {{ 'true' if is_draft else 'false' }};
+let DRAFT_ID = {{ draft_id if draft_id else 'null' }};
 let loadedProductsMap = new Map(); // id -> product object
 let stockMode = 'default'; // 'add' | 'remove' | 'default'
 let isSubmittingOrConfirmedDiscard = false;
 let pendingCloseTarget = null;
 
 // ==========================================================================
-// Unsaved Changes & Discard Modal Lifecycle Handlers
+// Sidebar Handlers (History of Adjustments)
+// ==========================================================================
+function toggleAdjSidebar() {
+    const sb = document.getElementById('adjHistorySidebar');
+    if (!sb) return;
+    sb.classList.toggle('collapsed');
+    const isCollapsed = sb.classList.contains('collapsed');
+    localStorage.setItem('inflow_adj_sidebar_collapsed', isCollapsed ? 'true' : 'false');
+    const textEl = document.getElementById('sidebarToggleText');
+    if (textEl) textEl.innerText = isCollapsed ? 'Show History' : 'History';
+}
+
+let activeStatusFilter = 'ALL';
+function filterSidebarStatus(status, tabBtn) {
+    activeStatusFilter = status;
+    document.querySelectorAll('.inflow-sidebar-tab').forEach(b => b.classList.remove('active'));
+    if (tabBtn) tabBtn.classList.add('active');
+    applySidebarFilters();
+}
+
+function filterSidebarAdjustments(val) {
+    applySidebarFilters();
+}
+
+function applySidebarFilters() {
+    const searchVal = (document.getElementById('sidebarAdjSearch')?.value || '').toLowerCase().trim();
+    const cards = document.querySelectorAll('#sidebarAdjList .inflow-sidebar-card');
+    cards.forEach(card => {
+        const num = card.dataset.number || '';
+        const status = card.dataset.status || '';
+        const loc = card.dataset.location || '';
+        const reason = card.dataset.reason || '';
+        const date = card.dataset.date || '';
+
+        const matchesStatus = (activeStatusFilter === 'ALL' || status === activeStatusFilter);
+        const matchesSearch = !searchVal || num.includes(searchVal) || loc.includes(searchVal) || reason.includes(searchVal) || date.includes(searchVal);
+
+        card.style.display = (matchesStatus && matchesSearch) ? 'block' : 'none';
+    });
+}
+
+function onSidebarItemClick(e, targetUrl) {
+    if (isAdjustmentDirty()) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        pendingCloseTarget = targetUrl;
+        openDiscardModal();
+        return false;
+    }
+    return true;
+}
+
+function onSidebarNewClick(e) {
+    const targetUrl = "{{ url_for('inventory.new_adjustment') }}";
+    if (isAdjustmentDirty()) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        pendingCloseTarget = targetUrl;
+        openDiscardModal();
+        return false;
+    }
+    return true;
+}
+
+// ==========================================================================
+// Unsaved Changes & Discard / Save Draft Modal Handlers
 // ==========================================================================
 function isAdjustmentDirty() {
     if (IS_DETAIL_VIEW) return false;
@@ -1338,13 +1778,13 @@ function isAdjustmentDirty() {
 
     // Check if any product has a non-zero change
     for (const [pid, item] of loadedProductsMap.entries()) {
-        if (Math.abs(item.change_qty) > 0.0001) {
+        if (Math.abs(item.change_qty_base) > 0.0001) {
             return true;
         }
     }
 
-    // Check if products have been added to the sheet
-    if (loadedProductsMap.size > 0) {
+    // Check if products have been added to the sheet and not saved as draft
+    if (loadedProductsMap.size > 0 && !IS_DRAFT) {
         return true;
     }
 
@@ -1402,6 +1842,12 @@ function confirmDiscardChanges() {
     }
 }
 
+async function confirmSaveDraftAndExit() {
+    const modal = document.getElementById('inflowAdjDiscardModal');
+    if (modal) modal.style.display = 'none';
+    await saveStockAdjustmentDraft(true);
+}
+
 function onCloseAdjustmentPage(e) {
     if (isAdjustmentDirty()) {
         if (e) {
@@ -1453,26 +1899,40 @@ document.addEventListener('keydown', function(e) {
 });
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Restore sidebar state
+    if (localStorage.getItem('inflow_adj_sidebar_collapsed') === 'true') {
+        const sb = document.getElementById('adjHistorySidebar');
+        if (sb) sb.classList.add('collapsed');
+        const textEl = document.getElementById('sidebarToggleText');
+        if (textEl) textEl.innerText = 'Show History';
+    }
+
+    // Preload draft lines if resuming a draft adjustment
+    try {
+        const draftLines = {{ draft_lines_json | safe }};
+        if (Array.isArray(draftLines) && draftLines.length > 0) {
+            draftLines.forEach(item => addProductRowToTable(item));
+        }
+    } catch (e) {
+        console.warn("Could not preload draft lines:", e);
+    }
+
     // If detail view, table is already rendered server-side
     if (IS_DETAIL_VIEW) return;
 
-    // Load initial products if location preselected
-    const locSelect = document.getElementById('adjLocationSelect');
-    if (locSelect) {
-        // Close reason menu on outside click
-        document.addEventListener('click', (e) => {
-            const menu = document.getElementById('adjReasonDropdownMenu');
-            const inputWrap = document.querySelector('.inflow-adj-reason-input-wrap');
-            if (menu && inputWrap && !inputWrap.contains(e.target)) {
-                menu.style.display = 'none';
-            }
-            const searchDropdown = document.getElementById('adjLiveSearchResults');
-            const searchWrap = document.querySelector('.inflow-adj-mode-search');
-            if (searchDropdown && searchWrap && !searchWrap.contains(e.target)) {
-                searchDropdown.style.display = 'none';
-            }
-        });
-    }
+    // Close reason menu on outside click
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('adjReasonDropdownMenu');
+        const inputWrap = document.querySelector('.inflow-adj-reason-input-wrap');
+        if (menu && inputWrap && !inputWrap.contains(e.target)) {
+            menu.style.display = 'none';
+        }
+        const searchDropdown = document.getElementById('adjLiveSearchResults');
+        const searchWrap = document.querySelector('.inflow-adj-mode-search');
+        if (searchDropdown && searchWrap && !searchWrap.contains(e.target)) {
+            searchDropdown.style.display = 'none';
+        }
+    });
 });
 
 // Reason Menu Handlers
@@ -1536,9 +1996,9 @@ async function onAdjustmentLocationChanged() {
             loadedProductsMap.forEach((item, pid) => {
                 const fresh = freshMap.get(pid);
                 if (fresh) {
-                    item.on_hand_qty = fresh.on_hand_qty;
-                    item.reserved_qty = fresh.reserved_qty;
-                    item.available_qty = fresh.available_qty;
+                    item.on_hand_qty_base = fresh.on_hand_qty;
+                    item.reserved_qty_base = fresh.reserved_qty;
+                    item.available_qty_base = fresh.available_qty;
                     updateRowVisuals(pid);
                 }
             });
@@ -1561,15 +2021,15 @@ function applyBatchStockMode(mode) {
             stockMode = 'remove';
             btnRemove.classList.add('active-mode');
             btnAdd.classList.remove('active-mode');
-            // If rows exist, ensure positive values become negative
             loadedProductsMap.forEach((item, pid) => {
-                if (item.change_qty > 0) {
-                    item.change_qty = -Math.abs(item.change_qty);
-                    item.final_qty = item.on_hand_qty + item.change_qty;
+                const factor = item.uom_factor || 1.0;
+                if (item.change_qty_base > 0) {
+                    item.change_qty_base = -Math.abs(item.change_qty_base);
+                    item.final_qty_base = item.on_hand_qty_base + item.change_qty_base;
                     updateRowVisuals(pid);
-                } else if (item.change_qty === 0) {
-                    item.change_qty = -1;
-                    item.final_qty = item.on_hand_qty - 1;
+                } else if (Math.abs(item.change_qty_base) < 0.0001) {
+                    item.change_qty_base = -1 * factor;
+                    item.final_qty_base = item.on_hand_qty_base - factor;
                     updateRowVisuals(pid);
                 }
             });
@@ -1582,15 +2042,15 @@ function applyBatchStockMode(mode) {
             stockMode = 'add';
             btnAdd.classList.add('active-mode');
             btnRemove.classList.remove('active-mode');
-            // If rows exist, ensure negative values become positive
             loadedProductsMap.forEach((item, pid) => {
-                if (item.change_qty < 0) {
-                    item.change_qty = Math.abs(item.change_qty);
-                    item.final_qty = item.on_hand_qty + item.change_qty;
+                const factor = item.uom_factor || 1.0;
+                if (item.change_qty_base < 0) {
+                    item.change_qty_base = Math.abs(item.change_qty_base);
+                    item.final_qty_base = item.on_hand_qty_base + item.change_qty_base;
                     updateRowVisuals(pid);
-                } else if (item.change_qty === 0) {
-                    item.change_qty = 1;
-                    item.final_qty = item.on_hand_qty + 1;
+                } else if (Math.abs(item.change_qty_base) < 0.0001) {
+                    item.change_qty_base = 1 * factor;
+                    item.final_qty_base = item.on_hand_qty_base + factor;
                     updateRowVisuals(pid);
                 }
             });
@@ -1643,11 +2103,11 @@ function renderLiveSearchResults(products) {
                     ${imgHtml}
                     <div>
                         <div style="font-weight: 700; color: #0F172A; font-size: 13px;">${p.name}</div>
-                        <div style="font-size: 11px; color: #64748B; font-family: monospace;">${p.sku} • ${p.category_name}</div>
+                        <div style="font-size: 11px; color: #64748B; font-family: monospace;">${p.sku} • ${p.category_name} • Base: ${p.uom || 'Pcs'}</div>
                     </div>
                 </div>
                 <div style="text-align: right; font-size: 11.5px;">
-                    <div>On Hand: <strong style="color: #0F172A;">${formatNum(p.on_hand_qty)}</strong></div>
+                    <div>On Hand: <strong style="color: #0F172A;">${formatNum(p.on_hand_qty)}</strong> ${p.uom || ''}</div>
                     <div style="color: #0284C7;">Reserved: <strong>${formatNum(p.reserved_qty)}</strong></div>
                     ${isLoaded ? '<span style="color: #10B981; font-size: 10.5px; font-weight: 700;">✓ Added</span>' : ''}
                 </div>
@@ -1662,7 +2122,6 @@ function onPickProductFromSearch(product) {
     document.getElementById('adjLiveSearchResults').style.display = 'none';
     document.getElementById('adjProductLiveSearch').value = '';
 
-    // Focus change input of that row
     setTimeout(() => {
         const input = document.getElementById(`change_input_${product.id}`);
         if (input) {
@@ -1713,11 +2172,45 @@ async function addAllCatalogProducts() {
     }
 }
 
+// ==========================================================================
+// UOM Options & Live Selection
+// ==========================================================================
+function getUomOptionsHtml(item) {
+    let opts = [];
+    opts.push({ name: item.base_uom, factor: 1.0, label: `${item.base_uom} (1x)` });
+    if (item.sales_uom && item.sales_uom.trim().toLowerCase() !== item.base_uom.trim().toLowerCase()) {
+        opts.push({ name: item.sales_uom, factor: item.sales_uom_ratio, label: `${item.sales_uom} (${numVal(item.sales_uom_ratio)}x)` });
+    }
+    if (item.purchasing_uom && item.purchasing_uom.trim().toLowerCase() !== item.base_uom.trim().toLowerCase() &&
+        (!item.sales_uom || item.purchasing_uom.trim().toLowerCase() !== item.sales_uom.trim().toLowerCase())) {
+        opts.push({ name: item.purchasing_uom, factor: item.purchasing_uom_ratio, label: `${item.purchasing_uom} (${numVal(item.purchasing_uom_ratio)}x)` });
+    }
+    const existing = opts.find(o => o.name.toLowerCase() === (item.uom || '').toLowerCase());
+    if (!existing && item.uom && item.uom !== item.base_uom) {
+        opts.push({ name: item.uom, factor: item.uom_factor || 1.0, label: `${item.uom} (${numVal(item.uom_factor || 1.0)}x)` });
+    }
+    return opts.map(o => {
+        const isSel = (item.uom && item.uom.trim().toLowerCase() === o.name.trim().toLowerCase());
+        return `<option value="${o.name}" data-factor="${o.factor}" ${isSel ? 'selected' : ''}>${o.label}</option>`;
+    }).join('');
+}
+
+function onRowUomChanged(productId, newUomName) {
+    const item = loadedProductsMap.get(productId);
+    if (!item) return;
+    const select = document.getElementById(`uom_select_${productId}`);
+    if (!select) return;
+    const opt = select.options[select.selectedIndex];
+    item.uom = newUomName;
+    item.uom_factor = parseFloat(opt.dataset.factor || 1.0) || 1.0;
+    updateRowVisuals(productId);
+}
+
 // Core: Add Row to Table
 function addProductRowToTable(product) {
-    if (loadedProductsMap.has(product.id)) {
-        // Already loaded: highlight existing row
-        const existingRow = document.getElementById(`adj_row_${product.id}`);
+    const pid = product.id || product.product_id;
+    if (loadedProductsMap.has(pid)) {
+        const existingRow = document.getElementById(`adj_row_${pid}`);
         if (existingRow) {
             existingRow.style.backgroundColor = '#FEF3C7';
             setTimeout(() => { existingRow.style.backgroundColor = ''; }, 600);
@@ -1725,37 +2218,60 @@ function addProductRowToTable(product) {
         return;
     }
 
+    const factor = parseFloat(product.uom_factor || 1.0) || 1.0;
+    const baseUom = product.base_uom || product.product_uom || product.uom || 'Pcs';
+    const chosenUom = product.uom || baseUom;
+
+    const onHandBase = parseFloat(product.on_hand_qty || 0);
+    const reservedBase = parseFloat(product.reserved_qty || 0);
+    const availableBase = parseFloat(product.available_qty || (onHandBase - reservedBase));
+
+    const changeBase = (product.change_qty !== undefined) ? parseFloat(product.change_qty)
+                     : (product.diff_qty !== undefined) ? parseFloat(product.diff_qty) : 0;
+    const finalBase = (product.final_qty !== undefined) ? parseFloat(product.final_qty)
+                    : (product.new_qty !== undefined) ? parseFloat(product.new_qty) : onHandBase;
+
     const item = {
-        product_id: product.id,
-        name: product.name,
-        sku: product.sku,
-        uom: product.uom || 'Pcs',
-        image_url: product.image_url || '',
+        product_id: pid,
+        name: product.name || product.product_name,
+        sku: product.sku || product.product_sku,
+        base_uom: baseUom,
+        uom: chosenUom,
+        uom_factor: factor,
+        sales_uom: product.sales_uom || '',
+        sales_uom_ratio: parseFloat(product.sales_uom_ratio || product.sales_uom_ratio_std || 1.0) || 1.0,
+        purchasing_uom: product.purchasing_uom || '',
+        purchasing_uom_ratio: parseFloat(product.purchasing_uom_ratio || product.purchasing_uom_ratio_std || 1.0) || 1.0,
+        image_url: product.image_url || product.product_image_url || '',
         category_name: product.category_name || '',
         sublocation: product.sublocation || '',
-        on_hand_qty: parseFloat(product.on_hand_qty || 0),
-        reserved_qty: parseFloat(product.reserved_qty || 0),
-        available_qty: parseFloat(product.available_qty || 0),
         unit_cost: parseFloat(product.unit_cost || 0),
-        change_qty: 0,
-        final_qty: parseFloat(product.on_hand_qty || 0)
+        on_hand_qty_base: onHandBase,
+        reserved_qty_base: reservedBase,
+        available_qty_base: availableBase,
+        change_qty_base: changeBase,
+        final_qty_base: finalBase
     };
 
-    loadedProductsMap.set(product.id, item);
+    loadedProductsMap.set(pid, item);
 
-    // Hide empty state
     document.getElementById('adjEmptyState').style.display = 'none';
 
-    // Append table row
     const tbody = document.getElementById('adjProductTableBody');
     const tr = document.createElement('tr');
-    tr.id = `adj_row_${product.id}`;
+    tr.id = `adj_row_${item.product_id}`;
     tr.className = 'inflow-adj-row';
-    tr.dataset.productId = product.id;
+    tr.dataset.productId = item.product_id;
 
     const imgHtml = item.image_url 
         ? `<img src="${item.image_url}" alt="${item.sku}">`
         : `<div class="inflow-thumb-placeholder">📦</div>`;
+
+    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const resDisp = item.reserved_qty_base / factor;
+    const initialDisp = item.on_hand_qty_base / factor;
+    const changeDisp = item.change_qty_base / factor;
+    const finalDisp = item.final_qty_base / factor;
 
     tr.innerHTML = `
         <!-- Product Thumbnail, Name and SKU -->
@@ -1771,43 +2287,50 @@ function addProductRowToTable(product) {
             </div>
         </td>
 
-        <!-- Sublocation (e.g. A-5 from screenshot) -->
+        <!-- Sublocation -->
         <td>
             <input type="text" id="subloc_${item.product_id}" class="inflow-adj-subloc-input" value="${item.sublocation || 'A-1'}" placeholder="Bin/Aisle" onchange="onSublocChanged(${item.product_id}, this.value)">
         </td>
 
-        <!-- Qty on Hand (Directly Editable Count in Hand, accounting for Reserved) -->
+        <!-- UOM Selector -->
+        <td style="text-align: center;">
+            <select id="uom_select_${item.product_id}" class="inflow-adj-uom-select" onchange="onRowUomChanged(${item.product_id}, this.value)" title="Select Unit of Measure">
+                ${getUomOptionsHtml(item)}
+            </select>
+        </td>
+
+        <!-- Qty on Hand (Directly Editable Count in Hand in chosen UOM) -->
         <td style="text-align: center;">
             <input type="text" inputmode="decimal" id="on_hand_input_${item.product_id}"
-                   class="inflow-adj-onhand-input"
-                   value="${numVal(item.final_qty - item.reserved_qty)}"
-                   title="Physical count currently in hand (Accounting for Qty Reserved)"
+                   class="inflow-adj-onhand-input ${Math.abs(item.change_qty_base) > 0.0001 ? 'is-adjusted' : ''}"
+                   value="${numVal(onHandDisp)}"
+                   title="Physical count currently in hand in chosen UOM"
                    oninput="onOnHandQtyInput(${item.product_id}, this.value)"
                    onblur="onInputBlur(${item.product_id}, 'on_hand')"
                    onfocus="this.select()"
                    onkeydown="onInputKeyDown(event, ${item.product_id}, 'on_hand')">
         </td>
 
-        <!-- Qty Reserved (from customer bills) -->
+        <!-- Qty Reserved (in chosen UOM) -->
         <td style="text-align: right;" id="reserved_${item.product_id}">
             <span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;" title="Reserved on active customer orders">
-                ${formatNum(item.reserved_qty)}
+                ${formatNum(resDisp)}
             </span>
         </td>
 
-        <!-- Initial (Baseline Qty on Hand) -->
+        <!-- Initial (Baseline Qty on Hand in chosen UOM) -->
         <td style="text-align: center;">
             <div class="inflow-adj-pill pill-initial" id="initial_pill_${item.product_id}">
-                ${formatNum(item.on_hand_qty)}
+                ${formatNum(initialDisp)}
             </div>
         </td>
 
-        <!-- Change (Delta Input - Editable) -->
+        <!-- Change (Delta Input in chosen UOM) -->
         <td style="text-align: center;">
             <div class="inflow-adj-change-wrap">
                 <input type="text" inputmode="decimal" id="change_input_${item.product_id}" 
-                       class="inflow-adj-change-input pill-change-zero" 
-                       value="0" 
+                       class="inflow-adj-change-input ${changeDisp < 0 ? 'pill-change-neg' : (changeDisp > 0 ? 'pill-change-pos' : 'pill-change-zero')}" 
+                       value="${changeDisp > 0 ? '+' : ''}${numVal(changeDisp)}" 
                        title="Adjustment delta (+ or -)"
                        oninput="onChangeQtyInput(${item.product_id}, this.value)"
                        onblur="onInputBlur(${item.product_id}, 'change')"
@@ -1816,11 +2339,11 @@ function addProductRowToTable(product) {
             </div>
         </td>
 
-        <!-- Final (Resulting Qty Input - Editable) -->
+        <!-- Final (Resulting Qty Input in chosen UOM) -->
         <td style="text-align: center;">
             <input type="text" inputmode="decimal" id="final_input_${item.product_id}" 
                    class="inflow-adj-final-input" 
-                   value="${numVal(item.final_qty)}" 
+                   value="${numVal(finalDisp)}" 
                    title="Resulting count after adjustment"
                    oninput="onFinalQtyInput(${item.product_id}, this.value)"
                    onblur="onInputBlur(${item.product_id}, 'final')"
@@ -1855,125 +2378,130 @@ function numVal(n) {
 }
 
 // 1. When user edits Qty on Hand directly:
-//    Final = newOnHand + reserved_qty (accounting for open SOs so remaining physical stock equals newOnHand after paid)
+//    Final = (newOnHand * factor) + reserved_qty_base
 //    Change = Final - Initial
 function onOnHandQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
-    const newOnHand = parseQty(val);
-    const res = item.reserved_qty || 0;
-    item.final_qty = newOnHand + res;
-    item.change_qty = item.final_qty - item.on_hand_qty;
+    const factor = item.uom_factor || 1.0;
+    const inputOnHand = parseQty(val);
+    const newOnHandBase = inputOnHand * factor;
+    item.final_qty_base = newOnHandBase + item.reserved_qty_base;
+    item.change_qty_base = item.final_qty_base - item.on_hand_qty_base;
 
-    // Update Change input
+    const changeDisp = item.change_qty_base / factor;
+    const finalDisp = item.final_qty_base / factor;
+
     const changeInput = document.getElementById(`change_input_${productId}`);
     if (changeInput) {
-        changeInput.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+        changeInput.value = changeDisp > 0 ? `+${numVal(changeDisp)}` : `${numVal(changeDisp)}`;
     }
 
-    // Update Final input
     const finalInput = document.getElementById(`final_input_${productId}`);
     if (finalInput) {
-        finalInput.value = numVal(item.final_qty);
+        finalInput.value = numVal(finalDisp);
     }
 
-    updateOnHandInputStyle(productId, item.change_qty);
-    updateChangePillColor(productId, item.change_qty);
+    updateOnHandInputStyle(productId, item.change_qty_base);
+    updateChangePillColor(productId, item.change_qty_base);
 }
 
 // 2. When user edits Change input:
-//    Final = Initial + Change
-//    Qty on Hand = Final - reserved_qty (count in hand after open SO is paid)
+//    Change_base = diff * factor
+//    Final = Initial + Change_base
 function onChangeQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
-    const diff = parseQty(val);
-    const res = item.reserved_qty || 0;
-    item.change_qty = diff;
-    item.final_qty = item.on_hand_qty + diff;
+    const factor = item.uom_factor || 1.0;
+    const diffInput = parseQty(val);
+    item.change_qty_base = diffInput * factor;
+    item.final_qty_base = item.on_hand_qty_base + item.change_qty_base;
 
-    // Update Qty on Hand input
+    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const finalDisp = item.final_qty_base / factor;
+
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (onHandInput) {
-        onHandInput.value = numVal(item.final_qty - res);
+        onHandInput.value = numVal(onHandDisp);
     }
 
-    // Update Final input
     const finalInput = document.getElementById(`final_input_${productId}`);
     if (finalInput) {
-        finalInput.value = numVal(item.final_qty);
+        finalInput.value = numVal(finalDisp);
     }
 
-    updateOnHandInputStyle(productId, item.change_qty);
-    updateChangePillColor(productId, diff);
+    updateOnHandInputStyle(productId, item.change_qty_base);
+    updateChangePillColor(productId, item.change_qty_base);
 }
 
 // 3. When user edits Final input:
-//    Change = Final - Initial
-//    Qty on Hand = Final - reserved_qty (count in hand after open SO is paid)
+//    Final_base = finalVal * factor
+//    Change = Final_base - Initial
 function onFinalQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
-    const finalVal = parseQty(val);
-    const res = item.reserved_qty || 0;
-    item.final_qty = finalVal;
-    item.change_qty = finalVal - item.on_hand_qty;
+    const factor = item.uom_factor || 1.0;
+    const finalValInput = parseQty(val);
+    item.final_qty_base = finalValInput * factor;
+    item.change_qty_base = item.final_qty_base - item.on_hand_qty_base;
 
-    // Update Qty on Hand input
+    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const changeDisp = item.change_qty_base / factor;
+
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (onHandInput) {
-        onHandInput.value = numVal(finalVal - res);
+        onHandInput.value = numVal(onHandDisp);
     }
 
-    // Update Change input
     const changeInput = document.getElementById(`change_input_${productId}`);
     if (changeInput) {
-        changeInput.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+        changeInput.value = changeDisp > 0 ? `+${numVal(changeDisp)}` : `${numVal(changeDisp)}`;
     }
 
-    updateOnHandInputStyle(productId, item.change_qty);
-    updateChangePillColor(productId, item.change_qty);
+    updateOnHandInputStyle(productId, item.change_qty_base);
+    updateChangePillColor(productId, item.change_qty_base);
 }
 
 // Clean formatting on blur
 function onInputBlur(productId, fieldType) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
-    const res = item.reserved_qty || 0;
+    const factor = item.uom_factor || 1.0;
 
     if (fieldType === 'on_hand') {
         const input = document.getElementById(`on_hand_input_${productId}`);
-        if (input) input.value = numVal(item.final_qty - res);
+        if (input) input.value = numVal((item.final_qty_base - item.reserved_qty_base) / factor);
     } else if (fieldType === 'change') {
         const input = document.getElementById(`change_input_${productId}`);
-        if (input) input.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+        const changeDisp = item.change_qty_base / factor;
+        if (input) input.value = changeDisp > 0 ? `+${numVal(changeDisp)}` : `${numVal(changeDisp)}`;
     } else if (fieldType === 'final') {
         const input = document.getElementById(`final_input_${productId}`);
-        if (input) input.value = numVal(item.final_qty);
+        if (input) input.value = numVal(item.final_qty_base / factor);
     }
 }
 
-function updateOnHandInputStyle(productId, changeQty) {
+function updateOnHandInputStyle(productId, changeQtyBase) {
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (!onHandInput) return;
-    if (Math.abs(changeQty) > 0.0001) {
+    if (Math.abs(changeQtyBase) > 0.0001) {
         onHandInput.classList.add('is-adjusted');
     } else {
         onHandInput.classList.remove('is-adjusted');
     }
 }
 
-function updateChangePillColor(productId, diff) {
+function updateChangePillColor(productId, diffBase) {
     const changeInput = document.getElementById(`change_input_${productId}`);
     if (!changeInput) return;
 
     changeInput.classList.remove('pill-change-neg', 'pill-change-pos', 'pill-change-zero');
-    if (diff < 0) {
+    if (diffBase < 0) {
         changeInput.classList.add('pill-change-neg');
-    } else if (diff > 0) {
+    } else if (diffBase > 0) {
         changeInput.classList.add('pill-change-pos');
     } else {
         changeInput.classList.add('pill-change-zero');
@@ -1988,29 +2516,35 @@ function onSublocChanged(productId, val) {
 function updateRowVisuals(productId) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
-    const res = item.reserved_qty || 0;
+    const factor = item.uom_factor || 1.0;
+
+    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const resDisp = item.reserved_qty_base / factor;
+    const initialDisp = item.on_hand_qty_base / factor;
+    const changeDisp = item.change_qty_base / factor;
+    const finalDisp = item.final_qty_base / factor;
 
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (onHandInput) {
-        onHandInput.value = numVal(item.final_qty - res);
-        updateOnHandInputStyle(productId, item.change_qty);
+        onHandInput.value = numVal(onHandDisp);
+        updateOnHandInputStyle(productId, item.change_qty_base);
     }
 
     const resEl = document.getElementById(`reserved_${productId}`);
-    if (resEl) resEl.innerHTML = `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">${formatNum(item.reserved_qty)}</span>`;
+    if (resEl) resEl.innerHTML = `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">${formatNum(resDisp)}</span>`;
 
     const initPill = document.getElementById(`initial_pill_${productId}`);
-    if (initPill) initPill.innerText = formatNum(item.on_hand_qty);
+    if (initPill) initPill.innerText = formatNum(initialDisp);
 
     const changeInput = document.getElementById(`change_input_${productId}`);
     if (changeInput) {
-        changeInput.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+        changeInput.value = changeDisp > 0 ? `+${numVal(changeDisp)}` : `${numVal(changeDisp)}`;
     }
 
     const finalInput = document.getElementById(`final_input_${productId}`);
-    if (finalInput) finalInput.value = numVal(item.final_qty);
+    if (finalInput) finalInput.value = numVal(finalDisp);
 
-    updateChangePillColor(productId, item.change_qty);
+    updateChangePillColor(productId, item.change_qty_base);
 }
 
 function removeProductRow(productId) {
@@ -2026,7 +2560,7 @@ function removeProductRow(productId) {
 function clearUnadjustedItems() {
     const toRemove = [];
     loadedProductsMap.forEach((item, pid) => {
-        if (Math.abs(item.change_qty) < 0.0001) {
+        if (Math.abs(item.change_qty_base) < 0.0001) {
             toRemove.push(pid);
         }
     });
@@ -2072,33 +2606,38 @@ function onInputKeyDown(event, productId, fieldType) {
     }
 }
 
-// SUBMIT ADJUSTMENT FORM
-async function submitStockAdjustmentForm() {
+// SUBMIT / SAVE ADJUSTMENT FORM
+async function executeAdjustmentPost(status, isClosingAfter = false) {
     if (loadedProductsMap.size === 0) {
         alert("Please add at least one product to adjust stock.");
         return;
     }
 
-    // Filter items with non-zero change (or all loaded items)
     const lines = [];
     loadedProductsMap.forEach(item => {
         lines.push({
             product_id: item.product_id,
             sublocation: item.sublocation || '',
-            initial_qty: item.on_hand_qty,
-            change_qty: item.change_qty,
-            final_qty: item.final_qty
+            uom: item.uom || item.base_uom || 'Pcs',
+            uom_factor: item.uom_factor || 1.0,
+            initial_qty: item.on_hand_qty_base,
+            change_qty: item.change_qty_base,
+            final_qty: item.final_qty_base
         });
     });
 
-    const activeChanges = lines.filter(l => Math.abs(l.change_qty) > 0.0001);
-    if (activeChanges.length === 0) {
-        if (!confirm("All product changes are currently 0. Do you still wish to record this cycle count verification?")) {
-            return;
+    if (status === 'COMPLETED') {
+        const activeChanges = lines.filter(l => Math.abs(l.change_qty) > 0.0001);
+        if (activeChanges.length === 0) {
+            if (!confirm("All product changes are currently 0. Do you still wish to record this cycle count verification?")) {
+                return;
+            }
         }
     }
 
     const payload = {
+        adjustment_id: DRAFT_ID || null,
+        status: status,
         location_id: parseInt(document.getElementById('adjLocationSelect').value),
         adjustment_number: (document.getElementById('adjNumberInput').value || '').trim(),
         adjustment_date: document.getElementById('adjDateInput').value,
@@ -2112,10 +2651,19 @@ async function submitStockAdjustmentForm() {
         lines: lines
     };
 
-    const topBtn = document.getElementById('topBtnAdjustStock');
-    const bottomBtn = document.getElementById('bottomBtnAdjustStock');
-    if (topBtn) topBtn.disabled = true;
-    if (bottomBtn) bottomBtn.disabled = true;
+    const topAdjustBtn = document.getElementById('topBtnAdjustStock');
+    const bottomAdjustBtn = document.getElementById('bottomBtnAdjustStock');
+    const topSaveBtn = document.getElementById('topBtnSaveDraft');
+    const bottomSaveBtn = document.getElementById('bottomBtnSaveDraft');
+
+    const setButtonsDisabled = (dis) => {
+        if (topAdjustBtn) topAdjustBtn.disabled = dis;
+        if (bottomAdjustBtn) bottomAdjustBtn.disabled = dis;
+        if (topSaveBtn) topSaveBtn.disabled = dis;
+        if (bottomSaveBtn) bottomSaveBtn.disabled = dis;
+    };
+
+    setButtonsDisabled(true);
 
     try {
         isSubmittingOrConfirmedDiscard = true;
@@ -2130,24 +2678,58 @@ async function submitStockAdjustmentForm() {
         });
         const data = await res.json();
         if (data.success) {
-            window.location.href = data.redirect_url || "{{ url_for('inventory.list_adjustments') }}";
+            if (status === 'DRAFT') {
+                DRAFT_ID = data.adjustment_id;
+                if (data.adjustment_number) {
+                    const numInput = document.getElementById('adjNumberInput');
+                    if (numInput) numInput.value = data.adjustment_number;
+                }
+                showToast(data.message || "Draft saved! You can adjust later.");
+                if (isClosingAfter) {
+                    const target = pendingCloseTarget || '__CLOSE__';
+                    pendingCloseTarget = null;
+                    if (target === '__CLOSE__') {
+                        if (window.parent && window.parent.inflowTabs && typeof window.parent.inflowTabs.closeTab === 'function') {
+                            window.parent.inflowTabs.closeTab(window.parent.inflowTabs.activeTabId);
+                            return;
+                        }
+                        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.closeActiveTab === 'function') {
+                            window.top.inflowMdi.closeActiveTab();
+                            return;
+                        }
+                        window.location.href = "{{ url_for('inventory.list_adjustments') }}";
+                    } else {
+                        window.location.href = target;
+                    }
+                } else {
+                    setButtonsDisabled(false);
+                    isSubmittingOrConfirmedDiscard = false;
+                }
+            } else {
+                window.location.href = data.redirect_url || "{{ url_for('inventory.list_adjustments') }}";
+            }
         } else {
             isSubmittingOrConfirmedDiscard = false;
-            alert(data.error || "Error applying stock adjustment.");
-            if (topBtn) topBtn.disabled = false;
-            if (bottomBtn) bottomBtn.disabled = false;
+            alert(data.error || "Error executing stock adjustment.");
+            setButtonsDisabled(false);
         }
     } catch (e) {
         isSubmittingOrConfirmedDiscard = false;
         alert("Network error executing stock adjustment: " + e);
-        if (topBtn) topBtn.disabled = false;
-        if (bottomBtn) bottomBtn.disabled = false;
+        setButtonsDisabled(false);
     }
+}
+
+async function saveStockAdjustmentDraft(isClosingAfter = false) {
+    await executeAdjustmentPost('DRAFT', isClosingAfter);
+}
+
+async function submitStockAdjustmentForm() {
+    await executeAdjustmentPost('COMPLETED', false);
 }
 
 // Print Handler
 function printAdjustmentSheet() {
-    // Populate printable voucher elements
     const printNum = document.getElementById('printAdjNumber');
     const printDate = document.getElementById('printAdjDate');
     const printLoc = document.getElementById('printWarehouseName');
@@ -2170,15 +2752,17 @@ function printAdjustmentSheet() {
             loadedProductsMap.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid #E2E8F0';
+                const factor = item.uom_factor || 1.0;
                 tr.innerHTML = `
                     <td style="padding: 6px 8px; font-weight: 600;">${item.name}</td>
                     <td style="padding: 6px 8px; font-family: monospace;">${item.sku}</td>
                     <td style="padding: 6px 8px;">${item.sublocation || '-'}</td>
-                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.final_qty - item.reserved_qty)}</td>
-                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.reserved_qty)}</td>
-                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty)}</td>
-                    <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${item.change_qty > 0 ? '+' : ''}${formatNum(item.change_qty)}</td>
-                    <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${formatNum(item.final_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: center; font-weight: 600;">${item.uom || item.base_uom || 'Pcs'}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum((item.final_qty_base - item.reserved_qty_base) / factor)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.reserved_qty_base / factor)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty_base / factor)}</td>
+                    <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${item.change_qty_base > 0 ? '+' : ''}${formatNum(item.change_qty_base / factor)}</td>
+                    <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${formatNum(item.final_qty_base / factor)}</td>
                 `;
                 printTbody.appendChild(tr);
             });
@@ -2191,7 +2775,7 @@ function printAdjustmentSheet() {
 // Copy to Clipboard
 function copyAdjustmentData() {
     let rows = [];
-    rows.push(['SKU', 'Product Name', 'Sublocation', 'Qty on Hand', 'Qty Reserved', 'Initial', 'Change', 'Final'].join('\t'));
+    rows.push(['SKU', 'Product Name', 'Sublocation', 'UOM', 'Qty on Hand', 'Qty Reserved', 'Initial', 'Change', 'Final'].join('\t'));
 
     if (IS_DETAIL_VIEW) {
         document.querySelectorAll('#adjProductTableBody tr').forEach(tr => {
@@ -2200,15 +2784,17 @@ function copyAdjustmentData() {
         });
     } else {
         loadedProductsMap.forEach(item => {
+            const factor = item.uom_factor || 1.0;
             rows.push([
                 item.sku,
                 item.name,
                 item.sublocation || '-',
-                formatNum(item.final_qty - item.reserved_qty),
-                formatNum(item.reserved_qty),
-                formatNum(item.on_hand_qty),
-                item.change_qty > 0 ? `+${formatNum(item.change_qty)}` : formatNum(item.change_qty),
-                formatNum(item.final_qty)
+                item.uom || item.base_uom || 'Pcs',
+                formatNum((item.final_qty_base - item.reserved_qty_base) / factor),
+                formatNum(item.reserved_qty_base / factor),
+                formatNum(item.on_hand_qty_base / factor),
+                item.change_qty_base > 0 ? `+${formatNum(item.change_qty_base / factor)}` : formatNum(item.change_qty_base / factor),
+                formatNum(item.final_qty_base / factor)
             ].join('\t'));
         });
     }
