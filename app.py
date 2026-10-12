@@ -384,9 +384,17 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
+    import socket
+    try:
+        lan_ip = socket.gethostbyname(socket.gethostname())
+    except Exception:
+        lan_ip = '127.0.0.1'
+
     logger.info("==================================================================")
-    logger.info(f" inFlow Premium Web Application starting on http://localhost:{Config.PORT}")
-    logger.info(" High performance enterprise PostgreSQL backend active.")
+    logger.info("   inFlow Premium Web Application (Local Server Active)")
+    logger.info(f"   [This PC]       : http://localhost:{Config.PORT}")
+    logger.info(f"   [Other Devices] : http://{lan_ip}:{Config.PORT}")
+    logger.info("   High performance enterprise PostgreSQL backend active.")
     logger.info("==================================================================")
     try:
         from waitress import serve

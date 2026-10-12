@@ -32,12 +32,25 @@ if exist "%PG_BIN%\pg_ctl.exe" (
 echo [2/3] Checking database connection and schema...
 %PYTHON_EXE% database.py
 
+:: Detect LAN IP address for other devices
+for /f "tokens=*" %%i in ('%PYTHON_EXE% -c "import socket; print(socket.gethostbyname(socket.gethostname()))"') do set LAN_IP=%%i
+
 echo [3/3] Launching inFlow Premium Web Application on http://localhost:5050 ...
 start "" "http://localhost:5050"
 
+echo.
 echo ===================================================================
-echo   inFlow Premium Server is RUNNING at http://localhost:5050
-echo   Press Ctrl+C to terminate the web server.
+echo   inFlow Premium Server is ACTIVE and READY!
 echo ===================================================================
+echo   [THIS COMPUTER] : http://localhost:5050
+echo   [OTHER DEVICES] : http://%LAN_IP%:5050
+echo.
+echo   * Keep this window OPEN while you or other devices are working.
+echo   * Connect other devices (Phone, Tablet, PC) to the same Wi-Fi.
+echo   * Open browser on other device and go to: http://%LAN_IP%:5050
+echo   * If connecting from outside Wi-Fi (Cellular/Internet),
+echo     double-click 'share_online.bat' for a secure public link.
+echo ===================================================================
+echo.
 %PYTHON_EXE% app.py
 pause
