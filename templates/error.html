@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ error_title or "System Notice" }} | inFlow Premium Enterprise</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --brand-primary: #0284C7;
+            --brand-accent: #F59E0B;
+            --brand-dark: #0F172A;
+            --slate-50: #F8FAFC;
+            --slate-100: #F1F5F9;
+            --slate-200: #E2E8F0;
+            --slate-400: #94A3B8;
+            --slate-600: #475569;
+            --slate-700: #334155;
+            --slate-900: #0F172A;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', 'Kantumruy Pro', -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            color: var(--slate-900);
+        }
+        .error-card {
+            background: #FFFFFF;
+            border-radius: 16px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.45);
+            max-width: 620px;
+            width: 100%;
+            overflow: hidden;
+            animation: fadeIn 0.25s ease-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .card-header {
+            background: #F8FAFC;
+            padding: 24px;
+            border-bottom: 1px solid var(--slate-200);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: {% if is_db_error %}#FEF3C7{% else %}#FEE2E2{% endif %};
+            color: {% if is_db_error %}#D97706{% else %}#DC2626{% endif %};
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+        .header-text h1 {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: var(--slate-900);
+        }
+        .header-text p {
+            font-size: 0.85rem;
+            color: var(--slate-600);
+            margin-top: 2px;
+        }
+        .card-body {
+            padding: 28px 24px;
+        }
+        .instruction-box {
+            background: #F0F9FF;
+            border: 1px solid #BAE6FD;
+            border-radius: 10px;
+            padding: 16px;
+            margin-bottom: 20px;
+            font-size: 0.88rem;
+            color: #0369A1;
+            line-height: 1.5;
+        }
+        .instruction-box ol {
+            margin: 8px 0 0 20px;
+        }
+        .instruction-box li {
+            margin-bottom: 4px;
+        }
+        .detail-box {
+            background: #0F172A;
+            color: #E2E8F0;
+            padding: 14px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.78rem;
+            overflow-x: auto;
+            max-height: 140px;
+            margin-bottom: 24px;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            border: none;
+        }
+        .btn-primary {
+            background: var(--brand-primary);
+            color: #FFFFFF;
+        }
+        .btn-primary:hover {
+            background: #0275B1;
+        }
+        .btn-secondary {
+            background: var(--slate-100);
+            color: var(--slate-700);
+        }
+        .btn-secondary:hover {
+            background: var(--slate-200);
+        }
+    </style>
+</head>
+<body>
+    <div class="error-card">
+        <div class="card-header">
+            <div class="header-icon">
+                {% if is_db_error %}⚡{% else %}⚠️{% endif %}
+            </div>
+            <div class="header-text">
+                <h1>{{ error_title or "System Notice" }}</h1>
+                <p>inFlow Premium Enterprise Edition</p>
+            </div>
+        </div>
+        <div class="card-body">
+            {% if is_db_error %}
+            <div class="instruction-box">
+                <strong>PostgreSQL Database Configuration Required:</strong><br>
+                The cloud application is active on Vercel, but cannot reach a local database on <code>127.0.0.1</code>. To link your database:
+                <ol>
+                    <li>Create a free cloud PostgreSQL database on <a href="https://neon.tech" target="_blank" style="color: #0284C7; font-weight: 700;">Neon.tech</a> or <a href="https://supabase.com" target="_blank" style="color: #0284C7; font-weight: 700;">Supabase</a>.</li>
+                    <li>In your <strong>Vercel Project Dashboard</strong> &rarr; <strong>Settings</strong> &rarr; <strong>Environment Variables</strong>.</li>
+                    <li>Add <code>DATABASE_URL</code> with your PostgreSQL connection URL.</li>
+                    <li>Redeploy or reload this page.</li>
+                </ol>
+            </div>
+            {% endif %}
+
+            {% if error_message %}
+            <div class="detail-box">{{ error_message }}</div>
+            {% endif %}
+
+            <div class="actions">
+                <a href="/login" class="btn btn-primary">Return to Sign In</a>
+                <a href="javascript:location.reload()" class="btn btn-secondary">Retry Request</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

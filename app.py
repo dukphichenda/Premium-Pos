@@ -341,8 +341,20 @@ def create_app():
 
     @app.errorhandler(500)
     def internal_server_error(e):
-        logger.error(f"Internal server error: {e}")
-        return jsonify({'error': 'Internal server error occurred', 'details': str(e)}), 500
+        logger.error(f"Internal server error: {e}", exc_info=True)
+        orig = getattr(e, 'original_exception', e)
+        from flask import request
+        if request.path.startswith('/api/') or request.is_json or request.headers.get('Accept') == 'application/json':
+            return jsonify({'error': 'Internal server error occurred', 'details': str(orig)}), 500
+        
+        err_str = str(orig)
+        is_db = any(k in err_str.lower() for k in ['psycopg2', 'connection to server', 'connection refused', 'postgresql', 'pool'])
+        return render_template(
+            'error.html',
+            error_title="Database Connection Notice" if is_db else "Internal Server Error",
+            error_message=err_str,
+            is_db_error=is_db
+        ), 500
 
     @app.route('/health')
     def health_check():
