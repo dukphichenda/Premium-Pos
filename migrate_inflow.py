@@ -432,74 +432,200 @@ def migrate_all(limit_orders=None, progress_callback=None):
         stats['product_vendors'] = len(vi_rows)
 
         # 10. Purchase Orders & Lines
+        # 10. Purchase Orders & Lines
         if progress_callback: progress_callback("Migrating Purchase Orders...", 75)
         logger.info("Migrating Purchase Orders...")
         mssql_cur.execute("""
             SELECT 
-                PurchaseOrderId, OrderNumber, VendorId, LocationId, OrderDate, DueDate, OrderStatus,
-                OrderSubTotal, OrderTax1 + OrderTax2 as TaxAmount, OrderTotal, AmountPaid, PaymentBalance, OrderRemarks
-            FROM PO_PurchaseOrder
-            ORDER BY PurchaseOrderId
+                po.PurchaseOrderId, po.OrderNumber, po.VendorId, po.LocationId, 
+                po.OrderDate, po.DueDate, po.RequestShipDate, po.OrderStatus,
+                po.OrderSubTotal, po.OrderTax1 + po.OrderTax2 as TaxAmount, po.OrderExtra as Freight,
+                po.OrderTotal, po.AmountPaid, po.PaymentBalance, 
+                po.ContactName, po.Phone, po.VendorAddress1, po.Carrier, 
+                po.VendorOrderNumber, po.AncillaryExpenses, po.OrderRemarks
+            FROM PO_PurchaseOrder po
+            ORDER BY po.PurchaseOrderId
         """)
         po_rows = mssql_cur.fetchall()
-        po_status_map = {1: 'DRAFT', 2: 'ISSUED', 5: 'RECEIVED', 6: 'PAID', 10: 'CANCELLED'}
+        po_status_map = {1: 'ISSUED', 2: 'ISSUED', 5: 'RECEIVED', 6: 'PAID', 10: 'CANCELLED'}
         po_insert_data = []
         for po in po_rows:
-            st = po_status_map.get(po[6], 'ISSUED')
-            paid_amt = float(po[10]) if po[10] else 0.0
-            tot_amt = float(po[9]) if po[9] else 0.0
-            bal_due = float(po[11]) if po[11] else 0.0
-            pay_st = 'PAID' if (tot_amt > 0 and bal_due <= 0) else ('PARTIAL' if paid_amt > 0 else 'UNPAID')
-            po_date = po[4].date() if po[4] else datetime.now().date()
-            due_dt = po[5].date() if po[5] else None
+            p_id = po[0]
+            ord_num = po[1] or f"PO-{p_id:06d}"
+            vend_id = po[2]
+            loc_id = po[3] or 100
+            ord_date = po[4].date() if po[4] else datetime.now().date()
+            due_date = po[5].date() if po[5] else (po[6].date() if po[6] else None)
+            st = po_status_map.get(po[7], 'ISSUED')
+
+            subtotal = float(po[8] or 0)
+            tax_amt = float(po[9] or 0)
+            freight = float(po[10] or 0)
+            total_amt = float(po[11] or 0)
+            paid_amt = float(po[12] or 0)
+            balance_due = float(po[13] or 0)
+
+            if total_amt > 0 and balance_due <= 0:
+                pay_st = 'PAID'
+            elif paid_amt > 0:
+                pay_st = 'PARTIAL'
+            else:
+                pay_st = 'UNPAID'
+
+            contact = (po[14] or '').strip()
+            phone = (po[15] or '').strip()
+            addr = (po[16] or '').strip()
+            carrier = (po[17] or '').strip()
+            vendor_inv = (po[18] or '').strip()
+            non_vendor = float(po[19] or 0)
+            notes = (po[20] or '').strip()
 
             po_insert_data.append((
-                po[0], po[1] or f"PO-{po[0]}", po[2], po[3] or 100, po_date, due_dt,
-                st, pay_st, float(po[7] or 0), float(po[8] or 0), tot_amt, paid_amt, bal_due, po[12]
+                p_id, ord_num, vend_id, loc_id, ord_date, due_date,
+                st, pay_st, subtotal, tax_amt, freight, total_amt, paid_amt, balance_due,
+                contact, phone, addr, carrier, vendor_inv, non_vendor, 'USD', notes
             ))
         execute_values(pg_cur, """
             INSERT INTO purchase_orders (
                 id, order_number, vendor_id, location_id, order_date, expected_date,
-                status, payment_status, subtotal, tax_amount, total_amount, paid_amount, balance_due, notes
+                status, payment_status, subtotal, tax_amount, shipping_fee, total_amount, paid_amount, balance_due,
+                contact, phone, vendor_address, carrier, vendor_invoice_no, non_vendor_costs, currency_code, notes
             ) VALUES %s
             ON CONFLICT (id) DO UPDATE SET
                 order_number = EXCLUDED.order_number,
                 vendor_id = EXCLUDED.vendor_id,
                 location_id = EXCLUDED.location_id,
+                order_date = EXCLUDED.order_date,
+                expected_date = EXCLUDED.expected_date,
                 status = EXCLUDED.status,
                 payment_status = EXCLUDED.payment_status,
+                subtotal = EXCLUDED.subtotal,
+                tax_amount = EXCLUDED.tax_amount,
+                shipping_fee = EXCLUDED.shipping_fee,
                 total_amount = EXCLUDED.total_amount,
                 paid_amount = EXCLUDED.paid_amount,
-                balance_due = EXCLUDED.balance_due;
+                balance_due = EXCLUDED.balance_due,
+                contact = EXCLUDED.contact,
+                phone = EXCLUDED.phone,
+                vendor_address = EXCLUDED.vendor_address,
+                carrier = EXCLUDED.carrier,
+                vendor_invoice_no = EXCLUDED.vendor_invoice_no,
+                non_vendor_costs = EXCLUDED.non_vendor_costs,
+                currency_code = EXCLUDED.currency_code,
+                notes = EXCLUDED.notes;
         """, po_insert_data)
         stats['purchase_orders'] = len(po_rows)
 
-        # PO Lines
+        # PO Lines mapping
         logger.info("Migrating Purchase Order Lines...")
+        # Pre-fetch products mapping
+        pg_cur.execute("SELECT id, name, custom_attributes FROM products")
+        pg_prods_for_lines = pg_cur.fetchall()
+        pg_p_by_inflow_id = {}
+        pg_p_by_name = {}
+        for p in pg_prods_for_lines:
+            if p[1]: pg_p_by_name[p[1].strip().lower()] = p[0]
+            ca = p[2] or {}
+            if isinstance(ca, dict) and ca.get('inflow_prod_id'):
+                pg_p_by_inflow_id[int(ca['inflow_prod_id'])] = p[0]
+
         mssql_cur.execute("""
             SELECT 
-                PurchaseOrderLineId, PurchaseOrderId, LineNum, ProdId, Description, Quantity, UnitPrice, SubTotal
-            FROM PO_PurchaseOrder_Line
-            WHERE ProdId IN (SELECT ProdId FROM BASE_Product)
-            ORDER BY PurchaseOrderId, LineNum
+                pol.PurchaseOrderLineId, pol.PurchaseOrderId, pol.LineNum, pol.ProdId,
+                pol.Description, pol.VendorItemCode, pol.Quantity, pol.UnitPrice, pol.Discount, pol.SubTotal,
+                p.Name as ProductName
+            FROM PO_PurchaseOrder_Line pol
+            LEFT JOIN BASE_Product p ON pol.ProdId = p.ProdId
+            ORDER BY pol.PurchaseOrderId, pol.LineNum
         """)
         po_line_rows = mssql_cur.fetchall()
+
+        # Pre-fetch receipts from PO_PurchaseOrderReceive_Line
+        mssql_cur.execute("""
+            SELECT PurchaseOrderId, LineNum, SUM(Quantity) as RecvQty
+            FROM PO_PurchaseOrderReceive_Line
+            WHERE IsReceived = 1
+            GROUP BY PurchaseOrderId, LineNum;
+        """)
+        recv_dict = {}
+        for r in mssql_cur.fetchall():
+            recv_dict[(r[0], r[1])] = float(r[2] or 0)
+
         po_lines_insert = []
         for pol in po_line_rows:
-            qty = float(pol[5] or 0)
+            lid = pol[0]
+            po_id = pol[1]
+            line_num = pol[2]
+            prod_id = pol[3]
+            inflow_desc = (pol[4] or '').strip()
+            vendor_code = (pol[5] or '').strip()
+            qty = float(pol[6] or 0)
+            cost = float(pol[7] or 0)
+            disc = float(pol[8] or 0)
+            subtot = float(pol[9] or 0)
+            prod_name = (pol[10] or '').strip()
+
+            pg_pid = pg_p_by_inflow_id.get(prod_id)
+            if not pg_pid and prod_name:
+                pg_pid = pg_p_by_name.get(prod_name.lower())
+
+            final_desc = inflow_desc if inflow_desc else prod_name
+            actual_recv = recv_dict.get((po_id, line_num), qty)
+
             po_lines_insert.append((
-                pol[0], pol[1], pol[2], pol[3], pol[4] or '', qty, float(pol[6] or 0), float(pol[7] or 0), qty
+                lid, po_id, line_num, pg_pid, final_desc, vendor_code,
+                qty, cost, disc, subtot, actual_recv
             ))
         execute_values(pg_cur, """
             INSERT INTO purchase_order_lines (
-                id, purchase_order_id, line_num, product_id, description, quantity, unit_cost, subtotal, received_qty
+                id, purchase_order_id, line_num, product_id, description, vendor_product_code,
+                quantity, unit_cost, discount_percent, subtotal, received_qty
             ) VALUES %s
             ON CONFLICT (id) DO UPDATE SET
+                product_id = EXCLUDED.product_id,
+                description = EXCLUDED.description,
+                vendor_product_code = EXCLUDED.vendor_product_code,
                 quantity = EXCLUDED.quantity,
                 unit_cost = EXCLUDED.unit_cost,
-                subtotal = EXCLUDED.subtotal;
+                discount_percent = EXCLUDED.discount_percent,
+                subtotal = EXCLUDED.subtotal,
+                received_qty = EXCLUDED.received_qty;
         """, po_lines_insert)
         stats['purchase_order_lines'] = len(po_line_rows)
+
+        # Supplier Payments
+        logger.info("Migrating Supplier Payments...")
+        mssql_cur.execute("""
+            SELECT 
+                PurchaseOrderMoneyPaymentLineId, PurchaseOrderId, DatePaid,
+                PaymentMethod, ReferenceNumber, Remarks, Amount
+            FROM PO_PurchaseOrderMoneyPayment_Line
+            ORDER BY PurchaseOrderId, DatePaid;
+        """)
+        payment_rows = mssql_cur.fetchall()
+        pay_insert_data = []
+        for pr in payment_rows:
+            pay_id = pr[0]
+            p_order_id = pr[1]
+            p_date = pr[2] or datetime.now()
+            p_method = (pr[3] or 'Bank Transfer').strip() or 'Bank Transfer'
+            p_ref = (pr[4] or '').strip()
+            p_rem = (pr[5] or '').strip()
+            p_amt = float(pr[6] or 0)
+            pay_insert_data.append((
+                pay_id, p_order_id, 'PO', p_amt, p_date, p_method, p_ref, p_rem
+            ))
+        execute_values(pg_cur, """
+            INSERT INTO order_payments (
+                id, order_id, order_type, amount, payment_date, payment_method, reference, notes
+            ) VALUES %s
+            ON CONFLICT (id) DO UPDATE SET
+                amount = EXCLUDED.amount,
+                payment_date = EXCLUDED.payment_date,
+                payment_method = EXCLUDED.payment_method,
+                reference = EXCLUDED.reference,
+                notes = EXCLUDED.notes;
+        """, pay_insert_data)
 
         # 11. Sales Orders & Lines
         if progress_callback: progress_callback("Migrating Sales Orders & History...", 85)
