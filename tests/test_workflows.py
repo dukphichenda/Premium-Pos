@@ -59,6 +59,13 @@ class TestWorkflows(unittest.TestCase):
             DO UPDATE SET quantity = 100;
         """, (cls.prod_id, cls.loc_main))
 
+    def setUp(self):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['display_name'] = 'System Administrator'
+            sess['role'] = 'main_admin'
+
     @classmethod
     def tearDownClass(cls):
         execute("DELETE FROM stock_transfer_lines WHERE product_id = %s", (cls.prod_id,))

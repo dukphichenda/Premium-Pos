@@ -3,161 +3,416 @@
 {% block title %}Create Purchase Order - inFlow Premium{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-    <div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <a href="{{ url_for('purchase_orders.list_purchases') }}" style="color: #64748B; text-decoration: none; font-size: 0.88rem;">← Purchase Orders</a>
-            <span style="color: #CBD5E1;">/</span>
-            <span style="font-size: 0.88rem; font-weight: 600; color: #0F172A;">New PO</span>
-        </div>
-        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Create Purchase Order</h1>
-    </div>
-</div>
+<div class="inflow-po-create-page" style="padding: 2px 0 30px 0;">
+    <!-- Top Accent Bar (Teal for Purchasing) -->
+    <div style="height: 3px; width: 100%; background: #0D9488; border-radius: 2px; margin-bottom: 14px;"></div>
 
-<form action="{{ url_for('purchase_orders.create_purchase') }}" method="POST" id="poForm">
-    <!-- Header Details Card -->
-    <div class="card" style="margin-bottom: 20px;">
-        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px;">
-            <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Vendor / Supplier *</label>
-                <select name="vendor_id" required class="form-select">
-                    <option value="">Select Vendor...</option>
-                    {% for v in vendors %}
-                    <option value="{{ v.id }}">{{ v.name }} {% if v.phone %}({{ v.phone }}){% endif %}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Receive Into Warehouse *</label>
-                <select name="location_id" required class="form-select">
-                    {% for l in locations %}
-                    <option value="{{ l.id }}" {% if l.is_default %}selected{% endif %}>{{ l.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Order Date *</label>
-                <div class="gs-datepicker-wrapper" style="width: 100%;">
-                    <input type="text" name="order_date" value="{{ current_time.strftime('%d-%b-%y') }}" data-datepicker="google-sheet" required class="form-input gs-datepicker-input" style="cursor: pointer; padding-right: 26px;">
-                    <span class="gs-datepicker-icon" title="Select date">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </span>
-                </div>
-            </div>
-            <div class="form-group" style="margin-bottom: 0;">
-                <label class="form-label">Expected Arrival Date</label>
-                <div class="gs-datepicker-wrapper" style="width: 100%;">
-                    <input type="text" name="expected_date" placeholder="DD-MMM-YY" data-datepicker="google-sheet" class="form-input gs-datepicker-input" style="cursor: pointer; padding-right: 26px;">
-                    <span class="gs-datepicker-icon" title="Select date">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                    </span>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Line Items Card -->
-    <div class="card" style="margin-bottom: 20px; padding: 0; overflow: visible;">
-        <div style="padding: 18px 22px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="card-title" style="margin-bottom: 0;">Purchased Line Items</h2>
-            <button type="button" class="btn btn-secondary btn-sm" onclick="addPOLineItem()">
-                + Add Item Row
+    <!-- Desktop Ribbon Toolbar -->
+    <div class="inflow-desktop-toolbar" style="display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 6px 14px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="location.reload()" title="Reset new order">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <span>New</span>
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick="submitPoForm()" style="background: #0F766E; border-color: #0F766E;" title="Issue Purchase Order (Ctrl+S)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span>Save / Issue (Ctrl+S)</span>
+            </button>
+            <a href="{{ url_for('purchase_orders.list_purchases') }}" 
+               onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.list_purchases') }}', 'Purchase Orders', 'purchase'); }"
+               class="btn btn-secondary btn-sm" title="View all purchase orders">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <span>Orders List</span>
+            </a>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="openReorderModal()" style="color: #0F766E; border-color: #99F6E4; background: #F0FDFA;" title="Auto-suggest low stock items needing reorder">
+                <span>⚡ Reorder Suggestions</span>
             </button>
         </div>
 
-        <div class="table-container" style="border: none; overflow: visible;">
-            <table class="data-table" id="poLineItemsTable">
-                <thead>
-                    <tr>
-                        <th style="width: 40px;">#</th>
-                        <th style="min-width: 320px;">Product / Item</th>
-                        <th style="width: 130px; text-align: right;">Quantity</th>
-                        <th style="width: 140px; text-align: right;">Unit Cost ($)</th>
-                        <th style="width: 140px; text-align: right;">Subtotal</th>
-                        <th style="width: 50px;"></th>
-                    </tr>
-                </thead>
-                <tbody id="poLineItemsBody">
-                    <!-- Dynamic Rows -->
-                </tbody>
-            </table>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.closeActiveTab(); } else { window.location.href='{{ url_for('purchase_orders.list_purchases') }}'; }" style="color: #DC2626; font-weight: 600;" title="Close Tab">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span>Close</span>
+            </button>
         </div>
     </div>
 
-    <!-- Summary & Totals Grid -->
-    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
-        <div class="card">
-            <h2 class="card-title">PO Remarks & Delivery Terms</h2>
-            <div class="form-group">
-                <textarea name="notes" rows="4" placeholder="Payment terms, delivery instructions, supplier quote number..." class="form-textarea"></textarea>
+    <!-- Page Breadcrumb & Title -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <a href="{{ url_for('purchase_orders.list_purchases') }}" style="color: #64748B; text-decoration: none; font-size: 0.88rem;">← Purchase Orders</a>
+                <span style="color: #CBD5E1;">/</span>
+                <span style="font-size: 0.88rem; font-weight: 700; color: #0F766E;">New Purchase Order</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em; margin: 0;">
+                    New Purchase Order
+                </h1>
+                <span style="font-family: var(--font-mono); font-size: 0.85rem; font-weight: 800; background: #E6FFFA; color: #0F766E; padding: 3px 10px; border-radius: 6px; border: 1px solid #B2F5EA;">
+                    {{ preview_po_number }}
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <form action="{{ url_for('purchase_orders.create_purchase') }}" method="POST" id="poForm">
+        <!-- Two Column Header Cards Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px;">
+            <!-- Left Card: Vendor & Supplier Info -->
+            <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; border-bottom: 1px solid #F1F5F9; padding-bottom: 8px;">
+                    <h2 class="card-title" style="margin: 0; font-size: 1rem; color: #0F172A; display: flex; align-items: center; gap: 6px;">
+                        <span>🏢</span> <span>Vendor / Supplier Information (អ្នកផ្គត់ផ្គង់)</span>
+                    </h2>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openQuickVendorModal()" style="font-size: 0.78rem; padding: 2px 8px; color: #0F766E; border-color: #99F6E4; background: #F0FDFA;">
+                        + New Vendor
+                    </button>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-weight: 700; color: #334155; font-size: 0.84rem;">Select Supplier *</label>
+                    <select name="vendor_id" id="poVendorSelect" required class="form-select" onchange="onVendorChange()" style="height: 38px; font-weight: 600;">
+                        <option value="">-- Choose Vendor / Supplier --</option>
+                        {% for v in vendors %}
+                        <option value="{{ v.id }}" 
+                                data-phone="{{ v.phone or '' }}" 
+                                data-email="{{ v.email or '' }}" 
+                                data-address="{{ v.address1 or '' }}" 
+                                data-balance="{{ v.balance or 0 }}"
+                                data-terms="{{ v.payment_terms or 'Net 30' }}"
+                                {% if prefill_vendor_id and prefill_vendor_id == v.id|string %}selected{% endif %}>
+                            {{ v.name }} {% if v.phone %}({{ v.phone }}){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Dynamic Vendor Details Box -->
+                <div id="vendorDetailsBox" style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; font-size: 0.82rem; display: none;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span style="color: #64748B;">Contact Phone:</span>
+                        <span style="font-weight: 600; color: #0F172A;" id="vdPhone">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span style="color: #64748B;">Email Address:</span>
+                        <span style="font-weight: 600; color: #0F172A;" id="vdEmail">-</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                        <span style="color: #64748B;">Payment Terms:</span>
+                        <span style="font-weight: 600; color: #0F172A;" id="vdTerms">Net 30</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; border-top: 1px solid #E2E8F0; padding-top: 4px; margin-top: 4px;">
+                        <span style="color: #64748B;">Current Open Payables:</span>
+                        <span style="font-weight: 800; color: #DC2626;" id="vdBalance">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Card: Order Logistics & Destination -->
+            <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+                <div style="margin-bottom: 14px; border-bottom: 1px solid #F1F5F9; padding-bottom: 8px;">
+                    <h2 class="card-title" style="margin: 0; font-size: 1rem; color: #0F172A; display: flex; align-items: center; gap: 6px;">
+                        <span>📦</span> <span>Warehouse Logistics & Dates (ទីតាំងឃ្លាំង & កាលបរិច្ឆេទ)</span>
+                    </h2>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #334155; font-size: 0.84rem;">Destination Warehouse *</label>
+                        <select name="location_id" id="poLocationSelect" required class="form-select" style="height: 38px; font-weight: 600;">
+                            {% for l in locations %}
+                            <option value="{{ l.id }}" {% if l.is_default %}selected{% endif %}>{{ l.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #334155; font-size: 0.84rem;">Supplier Invoice / Quote Ref</label>
+                        <input type="text" name="vendor_invoice_no" placeholder="e.g. INV-9988 or Quote #..." class="form-input" style="height: 38px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #334155; font-size: 0.84rem;">Order Date *</label>
+                        <div class="gs-datepicker-wrapper" style="width: 100%;">
+                            <input type="text" name="order_date" value="{{ current_time.strftime('%d-%b-%y') }}" data-datepicker="google-sheet" required class="form-input gs-datepicker-input" style="cursor: pointer; padding-right: 26px; height: 38px;">
+                            <span class="gs-datepicker-icon" title="Select date">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #334155; font-size: 0.84rem;">Expected Arrival Date</label>
+                        <div class="gs-datepicker-wrapper" style="width: 100%;">
+                            <input type="text" name="expected_date" placeholder="DD-MMM-YY" data-datepicker="google-sheet" class="form-input gs-datepicker-input" style="cursor: pointer; padding-right: 26px; height: 38px;">
+                            <span class="gs-datepicker-icon" title="Select date">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" style="font-weight: 700; color: #334155; font-size: 0.84rem;">Shipping / Carrier</label>
+                        <input type="text" name="carrier" placeholder="e.g. Cargo, DHL, Truck..." class="form-input" style="height: 38px;">
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="card">
-            <h2 class="card-title">PO Cost Summary</h2>
-            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
-                <div style="display: flex; justify-content: space-between;">
-                    <span style="color: #64748B;">Items Subtotal:</span>
-                    <span style="font-weight: 600;" id="poSubtotal">$0.00</span>
+        <!-- Line Items Card (High Performance Desktop Data Grid) -->
+        <div class="card" style="margin-bottom: 20px; padding: 0; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; overflow: visible;">
+            <div style="padding: 14px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <h2 class="card-title" style="margin-bottom: 0; font-size: 1.05rem; color: #0F172A;">
+                        Purchased Items Grid (បញ្ជីទំនិញបញ្ជាទិញ)
+                    </h2>
+                    <span id="poLineCountBadge" style="background: #E2E8F0; color: #475569; font-weight: 700; font-size: 0.75rem; padding: 2px 8px; border-radius: 10px;">0 items</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span style="color: #64748B;">Shipping Freight ($):</span>
-                    <input type="number" step="0.01" name="shipping_fee" id="poShippingInput" value="0.00" style="width: 100px; text-align: right; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px;" oninput="calcPOTotals()">
-                </div>
-                <div style="border-top: 2px solid #E2E8F0; padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
-                    <span style="font-weight: 700; font-size: 1.1rem; color: #0F172A;">Total PO Amount:</span>
-                    <span style="font-weight: 800; font-size: 1.3rem; color: #0F766E;" id="poGrandTotal">$0.00</span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="openReorderModal()" style="color: #0F766E; border-color: #99F6E4; background: #F0FDFA; font-weight: 700;">
+                        ⚡ Add Low Stock Items
+                    </button>
+                    <button type="button" class="btn btn-primary btn-sm" onclick="addPOLineItem()" style="background: #0F766E; border-color: #0F766E; font-weight: 700;">
+                        + Add Item Row
+                    </button>
                 </div>
             </div>
-            <div style="margin-top: 20px;">
-                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
-                    Issue Purchase Order
+
+            <div class="table-container" style="border: none; overflow: visible; margin: 0;">
+                <table class="data-table" id="poLineItemsTable" style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1;">
+                            <th style="width: 40px; text-align: center;">#</th>
+                            <th style="min-width: 320px;">Product Item (ស្វែងរកឈ្មោះ ឬ SKU)</th>
+                            <th style="width: 110px; text-align: center;">Current Stock</th>
+                            <th style="width: 120px; text-align: right;">Order Qty</th>
+                            <th style="width: 130px; text-align: right;">Unit Cost ($)</th>
+                            <th style="width: 100px; text-align: right;">Disc %</th>
+                            <th style="width: 130px; text-align: right;">Subtotal ($)</th>
+                            <th style="width: 50px; text-align: center;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="poLineItemsBody">
+                        <!-- Dynamic spreadsheet rows inserted here -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Table Footer Quick Add Row Action -->
+            <div style="padding: 10px 20px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" class="btn btn-secondary btn-sm" onclick="addPOLineItem()" style="font-weight: 600;">
+                    + Click or press Enter to add next line
+                </button>
+                <button type="button" onclick="clearAllLines()" style="background: none; border: none; color: #94A3B8; font-size: 0.78rem; cursor: pointer;">
+                    Clear all lines
+                </button>
+            </div>
+        </div>
+
+        <!-- Summary & Totals Grid -->
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
+            <!-- Left: Remarks & Terms -->
+            <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+                <h2 class="card-title" style="font-size: 0.95rem; margin-bottom: 8px; color: #0F172A;">
+                    📝 PO Remarks & Supplier Terms (លក្ខខណ្ឌបញ្ជាទិញ)
+                </h2>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <textarea name="notes" rows="4" placeholder="Enter delivery terms, vendor quotes, payment details, or special receiving instructions..." class="form-textarea" style="resize: vertical;"></textarea>
+                </div>
+            </div>
+
+            <!-- Right: PO Financial Totals Card -->
+            <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+                <h2 class="card-title" style="font-size: 0.95rem; margin-bottom: 12px; color: #0F172A;">
+                    💰 PO Cost Summary (សរុបការចំណាយ)
+                </h2>
+                <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #64748B;">Items Subtotal:</span>
+                        <span style="font-weight: 700; color: #0F172A;" id="poSubtotal">$0.00</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #64748B;">Shipping Freight ($):</span>
+                        <input type="number" step="0.01" min="0" name="shipping_fee" id="poShippingInput" value="0.00" 
+                               style="width: 110px; text-align: right; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font-weight: 600;" 
+                               oninput="calcPOTotals()">
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #64748B;">Discount ($):</span>
+                        <input type="number" step="0.01" min="0" name="discount_amount" id="poDiscountInput" value="0.00" 
+                               style="width: 110px; text-align: right; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px; font-weight: 600;" 
+                               oninput="calcPOTotals()">
+                    </div>
+
+                    <div style="border-top: 2px solid #E2E8F0; padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-weight: 800; font-size: 1.05rem; color: #0F172A;">Total PO Amount:</span>
+                        <span style="font-weight: 900; font-size: 1.35rem; color: #0F766E;" id="poGrandTotal">$0.00</span>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #64748B;">
+                        <span>Payable Balance Due:</span>
+                        <span style="font-weight: 800; color: #DC2626;" id="poBalanceDue">$0.00</span>
+                    </div>
+                </div>
+
+                <div style="margin-top: 18px;">
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%; background: #0F766E; border-color: #0F766E; font-weight: 800; padding: 12px; box-shadow: 0 2px 6px rgba(15, 118, 110, 0.3);">
+                        ✓ Issue Purchase Order (ចេញប័ណ្ណបញ្ជាទិញ)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Modal 1: Quick Add Vendor Modal -->
+<div id="quickVendorModal" class="inflow-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; border-radius: 12px; max-width: 500px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden; animation: inflowDropdownFade 0.15s ease-out;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <h3 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #0F172A;">+ Quick Add Vendor (បន្ថែមអ្នកផ្គត់ផ្គង់)</h3>
+            <button type="button" onclick="closeQuickVendorModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #94A3B8;">&times;</button>
+        </div>
+        <form id="quickVendorForm" onsubmit="submitQuickVendor(event)" style="padding: 20px;">
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label">Vendor / Company Name *</label>
+                <input type="text" id="qvName" required class="form-input" placeholder="e.g. Apex Wholesale Supplies">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Phone Number</label>
+                    <input type="text" id="qvPhone" class="form-input" placeholder="+855 12 345 678">
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" id="qvEmail" class="form-input" placeholder="vendor@example.com">
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 12px;">
+                <label class="form-label">Address</label>
+                <input type="text" id="qvAddress" class="form-input" placeholder="City / Street address">
+            </div>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label">Payment Terms</label>
+                <select id="qvTerms" class="form-select">
+                    <option value="Net 30">Net 30 Days</option>
+                    <option value="Net 15">Net 15 Days</option>
+                    <option value="Due on Receipt">Due on Receipt (Cash / Instant)</option>
+                    <option value="Net 60">Net 60 Days</option>
+                </select>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeQuickVendorModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #0F766E; border-color: #0F766E; font-weight: 700;" id="qvSubmitBtn">
+                    Save Vendor
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal 2: Reorder Low Stock Suggestions Modal -->
+<div id="reorderSuggestionsModal" class="inflow-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; border-radius: 12px; max-width: 780px; width: 95%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0F172A;">⚡ Low Stock Reorder Suggestions</h3>
+                <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">Items currently at or below reorder threshold needing replenishment.</div>
+            </div>
+            <button type="button" onclick="closeReorderModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #94A3B8;">&times;</button>
+        </div>
+        <div style="padding: 16px 20px; overflow-y: auto; flex: 1;" id="reorderModalBody">
+            <div style="text-align: center; padding: 24px; color: #94A3B8;">Loading low stock items...</div>
+        </div>
+        <div style="padding: 14px 20px; border-top: 1px solid #E2E8F0; background: #F8FAFC; display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-size: 0.85rem; color: #64748B;" id="reorderSelectedCount">0 items selected</span>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeReorderModal()">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="addSelectedReorderItems()" style="background: #0F766E; border-color: #0F766E; font-weight: 700;">
+                    + Add Selected to PO
                 </button>
             </div>
         </div>
     </div>
-</form>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
 let poLineCount = 0;
 
+function submitPoForm() {
+    const form = document.getElementById('poForm');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    const rowCount = document.querySelectorAll('#poLineItemsBody tr').length;
+    if (rowCount === 0) {
+        alert('Please add at least one line item to the purchase order.');
+        return;
+    }
+    form.submit();
+}
+
+function onVendorChange() {
+    const sel = document.getElementById('poVendorSelect');
+    const box = document.getElementById('vendorDetailsBox');
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.value) {
+        document.getElementById('vdPhone').textContent = opt.dataset.phone || '-';
+        document.getElementById('vdEmail').textContent = opt.dataset.email || '-';
+        document.getElementById('vdTerms').textContent = opt.dataset.terms || 'Net 30';
+        const bal = parseFloat(opt.dataset.balance || 0);
+        document.getElementById('vdBalance').textContent = '$' + bal.toFixed(2);
+        box.style.display = 'block';
+    } else {
+        box.style.display = 'none';
+    }
+}
+
 function addPOLineItem(prefill = null) {
     poLineCount++;
     const tbody = document.getElementById('poLineItemsBody');
     const tr = document.createElement('tr');
     tr.id = `po-row-${poLineCount}`;
+    tr.style.borderBottom = '1px solid #F1F5F9';
 
     tr.innerHTML = `
-        <td style="color: #94A3B8; font-weight: 600;">${poLineCount}</td>
-        <td style="position: relative;">
-            <input type="text" class="form-input prod-search-input" placeholder="Type product name, SKU or barcode..." autocomplete="off">
+        <td style="color: #94A3B8; font-weight: 700; text-align: center; padding: 10px 8px;">
+            <span class="row-num">${document.querySelectorAll('#poLineItemsBody tr').length + 1}</span>
+        </td>
+        <td style="position: relative; padding: 10px 8px;">
+            <input type="text" class="form-input prod-search-input" placeholder="Type product name, SKU or barcode..." autocomplete="off" style="font-weight: 600; height: 36px;">
             <input type="hidden" name="product_id[]" class="prod-id-input" required>
             <input type="hidden" name="description[]" class="prod-desc-input">
-            <div class="prod-search-results" style="display: none; position: absolute; left: 0; right: 0; background: white; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; z-index: 50; margin-top: 4px;"></div>
+            <div class="prod-search-results" style="display: none; position: absolute; left: 8px; right: 8px; background: white; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 10px 20px -3px rgba(0,0,0,0.15); max-height: 240px; overflow-y: auto; z-index: 100; margin-top: 4px;"></div>
         </td>
-        <td style="text-align: right;">
-            <input type="number" step="1" name="quantity[]" value="${prefill ? prefill.qty : 1}" min="1" class="form-input qty-input" style="text-align: right; width: 110px;" oninput="calcPOTotals()">
+        <td style="text-align: center; padding: 10px 8px;">
+            <span class="stock-badge" style="display: inline-block; padding: 3px 8px; background: #F1F5F9; color: #475569; border-radius: 12px; font-size: 0.76rem; font-weight: 700;">
+                ${prefill ? prefill.on_hand || 0 : '-'}
+            </span>
         </td>
-        <td style="text-align: right;">
-            <input type="number" step="0.01" name="unit_cost[]" value="${prefill ? prefill.cost : '0.00'}" class="form-input cost-input" style="text-align: right; width: 120px;" oninput="calcPOTotals()">
+        <td style="text-align: right; padding: 10px 8px;">
+            <input type="number" step="any" name="quantity[]" value="${prefill ? prefill.qty : 1}" min="0.01" class="form-input qty-input" style="text-align: right; width: 100%; height: 36px; font-weight: 700;" oninput="calcPOTotals()" onkeydown="handleKeyNavigation(event, this)">
         </td>
-        <td style="text-align: right; font-weight: 700; color: #0F172A;" class="line-subtotal">
+        <td style="text-align: right; padding: 10px 8px;">
+            <input type="number" step="0.01" min="0" name="unit_cost[]" value="${prefill ? parseFloat(prefill.cost).toFixed(2) : '0.00'}" class="form-input cost-input" style="text-align: right; width: 100%; height: 36px; font-weight: 700;" oninput="calcPOTotals()" onkeydown="handleKeyNavigation(event, this)">
+        </td>
+        <td style="text-align: right; padding: 10px 8px;">
+            <input type="number" step="0.1" min="0" max="100" name="discount_percent[]" value="${prefill ? prefill.discount || 0 : 0}" class="form-input disc-input" style="text-align: right; width: 100%; height: 36px; font-size: 0.85rem;" oninput="calcPOTotals()" onkeydown="handleKeyNavigation(event, this)">
+        </td>
+        <td style="text-align: right; font-weight: 800; color: #0F172A; padding: 10px 14px; font-size: 0.95rem;" class="line-subtotal">
             $0.00
         </td>
-        <td style="text-align: center;">
-            <button type="button" onclick="removeLineRow('po-row-${poLineCount}')" style="background: none; border: none; color: #EF4444; font-size: 1.2rem; cursor: pointer;">×</button>
+        <td style="text-align: center; padding: 10px 4px;">
+            <button type="button" onclick="removeLineRow('${tr.id}')" style="background: none; border: none; color: #EF4444; font-size: 1.3rem; line-height: 1; cursor: pointer; padding: 4px;" title="Remove row">
+                &times;
+            </button>
         </td>
     `;
 
@@ -168,19 +423,23 @@ function addPOLineItem(prefill = null) {
     const idInput = tr.querySelector('.prod-id-input');
     const descInput = tr.querySelector('.prod-desc-input');
     const costInput = tr.querySelector('.cost-input');
+    const stockBadge = tr.querySelector('.stock-badge');
 
     if (prefill) {
         idInput.value = prefill.id;
         sInput.value = prefill.name;
         descInput.value = prefill.name;
         costInput.value = parseFloat(prefill.cost).toFixed(2);
+        if (prefill.on_hand !== undefined) {
+            stockBadge.textContent = prefill.on_hand;
+        }
     }
 
     let debounce;
     sInput.addEventListener('input', () => {
         clearTimeout(debounce);
         const q = sInput.value.trim();
-        if (q.length < 2) {
+        if (q.length < 1) {
             resDiv.style.display = 'none';
             return;
         }
@@ -190,16 +449,23 @@ function addPOLineItem(prefill = null) {
                 .then(r => r.json())
                 .then(items => {
                     if (items.length === 0) {
-                        resDiv.innerHTML = '<div style="padding: 10px; color: #94A3B8; font-size: 0.8rem;">No products found</div>';
+                        resDiv.innerHTML = '<div style="padding: 10px; color: #94A3B8; font-size: 0.82rem; text-align: center;">No matching products found</div>';
                         resDiv.style.display = 'block';
                         return;
                     }
                     let h = '';
                     items.forEach(it => {
+                        const cost = parseFloat(it.purchase_cost || it.average_cost || it.standard_cost || 0).toFixed(2);
                         h += `
-                            <div class="search-item-row" data-id="${it.id}" data-name="${it.name.replace(/"/g, '&quot;')}" data-cost="${it.average_cost || 0}" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #F1F5F9;">
-                                <div style="font-weight: 600; font-size: 0.85rem;">${it.name}</div>
-                                <div style="font-size: 0.72rem; color: #64748B;">SKU: ${it.sku} | Avg Cost: $${parseFloat(it.average_cost || 0).toFixed(2)}</div>
+                            <div class="search-item-row" data-id="${it.id}" data-name="${it.name.replace(/"/g, '&quot;')}" data-cost="${cost}" data-stock="${it.on_hand || 0}" data-sku="${it.sku || ''}" data-uom="${it.uom || ''}" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #F1F5F9; display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: 700; font-size: 0.88rem; color: #0F172A;">${it.name}</div>
+                                    <div style="font-size: 0.72rem; color: #64748B;">SKU: ${it.sku || '-'} | UOM: ${it.uom || 'Unit'}</div>
+                                </div>
+                                <div style="text-align: right;">
+                                    <div style="font-weight: 700; font-size: 0.86rem; color: #0F766E;">Cost: $${cost}</div>
+                                    <div style="font-size: 0.72rem; color: #475569;">In Stock: ${it.on_hand || 0}</div>
+                                </div>
                             </div>
                         `;
                     });
@@ -211,16 +477,76 @@ function addPOLineItem(prefill = null) {
                             idInput.value = row.dataset.id;
                             sInput.value = row.dataset.name;
                             descInput.value = row.dataset.name;
-                            costInput.value = parseFloat(row.dataset.cost || 0).toFixed(2);
+                            costInput.value = row.dataset.cost;
+                            stockBadge.textContent = row.dataset.stock;
                             resDiv.style.display = 'none';
                             calcPOTotals();
+                            tr.querySelector('.qty-input')?.focus();
                         });
                     });
                 });
-        }, 200);
+        }, 180);
     });
 
+    sInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const firstItem = resDiv.querySelector('.search-item-row');
+            if (firstItem && resDiv.style.display !== 'none') {
+                firstItem.click();
+            }
+        }
+    });
+
+    // Close dropdown on click outside
+    document.addEventListener('click', (e) => {
+        if (!tr.contains(e.target)) {
+            resDiv.style.display = 'none';
+        }
+    });
+
+    updateLineRowNumbers();
     calcPOTotals();
+    return tr;
+}
+
+function handleKeyNavigation(e, input) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const tr = input.closest('tr');
+        const nextTr = tr.nextElementSibling;
+        if (nextTr) {
+            nextTr.querySelector('.prod-search-input')?.focus();
+        } else {
+            const newTr = addPOLineItem();
+            newTr.querySelector('.prod-search-input')?.focus();
+        }
+    }
+}
+
+function removeLineRow(rowId) {
+    const el = document.getElementById(rowId);
+    if (el) el.remove();
+    updateLineRowNumbers();
+    calcPOTotals();
+}
+
+function clearAllLines() {
+    if (confirm('Clear all line items?')) {
+        document.getElementById('poLineItemsBody').innerHTML = '';
+        updateLineRowNumbers();
+        calcPOTotals();
+    }
+}
+
+function updateLineRowNumbers() {
+    const rows = document.querySelectorAll('#poLineItemsBody tr');
+    rows.forEach((tr, idx) => {
+        const numEl = tr.querySelector('.row-num');
+        if (numEl) numEl.textContent = idx + 1;
+    });
+    const countBadge = document.getElementById('poLineCountBadge');
+    if (countBadge) countBadge.textContent = `${rows.length} ${rows.length === 1 ? 'item' : 'items'}`;
 }
 
 function calcPOTotals() {
@@ -230,26 +556,215 @@ function calcPOTotals() {
     rows.forEach(tr => {
         const qty = parseFloat(tr.querySelector('.qty-input')?.value || 0);
         const cost = parseFloat(tr.querySelector('.cost-input')?.value || 0);
-        const lineTotal = qty * cost;
+        const disc = parseFloat(tr.querySelector('.disc-input')?.value || 0);
+        const lineTotal = Math.max(0, qty * cost * (1.0 - (disc / 100.0)));
         const cell = tr.querySelector('.line-subtotal');
         if (cell) cell.innerText = '$' + lineTotal.toFixed(2);
         subtotal += lineTotal;
     });
 
     const shipping = parseFloat(document.getElementById('poShippingInput')?.value || 0);
-    const grandTotal = subtotal + shipping;
+    const discount = parseFloat(document.getElementById('poDiscountInput')?.value || 0);
+    const grandTotal = Math.max(0, subtotal + shipping - discount);
 
     document.getElementById('poSubtotal').innerText = '$' + subtotal.toFixed(2);
     document.getElementById('poGrandTotal').innerText = '$' + grandTotal.toFixed(2);
+    document.getElementById('poBalanceDue').innerText = '$' + grandTotal.toFixed(2);
 }
 
+// Quick Add Vendor Modal Functions
+function openQuickVendorModal() {
+    document.getElementById('quickVendorModal').style.display = 'flex';
+    document.getElementById('qvName').focus();
+}
+
+function closeQuickVendorModal() {
+    document.getElementById('quickVendorModal').style.display = 'none';
+    document.getElementById('quickVendorForm').reset();
+}
+
+function submitQuickVendor(e) {
+    e.preventDefault();
+    const btn = document.getElementById('qvSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    const payload = {
+        name: document.getElementById('qvName').value.trim(),
+        phone: document.getElementById('qvPhone').value.trim(),
+        email: document.getElementById('qvEmail').value.trim(),
+        address1: document.getElementById('qvAddress').value.trim(),
+        payment_terms: document.getElementById('qvTerms').value
+    };
+
+    fetch('/api/vendors/quick-create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.textContent = 'Save Vendor';
+        if (data.success && data.vendor) {
+            const sel = document.getElementById('poVendorSelect');
+            const opt = document.createElement('option');
+            opt.value = data.vendor.id;
+            opt.textContent = `${data.vendor.name} ${data.vendor.phone ? '(' + data.vendor.phone + ')' : ''}`;
+            opt.dataset.phone = data.vendor.phone || '';
+            opt.dataset.email = data.vendor.email || '';
+            opt.dataset.address = data.vendor.address1 || '';
+            opt.dataset.terms = data.vendor.payment_terms || 'Net 30';
+            opt.dataset.balance = data.vendor.balance || 0;
+            opt.selected = true;
+            sel.appendChild(opt);
+            onVendorChange();
+            closeQuickVendorModal();
+        } else {
+            alert(data.message || 'Error saving vendor.');
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.textContent = 'Save Vendor';
+        alert('Server error saving vendor: ' + err);
+    });
+}
+
+// Low Stock Reorder Assistant Modal
+let lowStockSuggestionsData = [];
+
+function openReorderModal() {
+    const modal = document.getElementById('reorderSuggestionsModal');
+    const body = document.getElementById('reorderModalBody');
+    modal.style.display = 'flex';
+    body.innerHTML = '<div style="text-align: center; padding: 24px; color: #94A3B8;">Fetching low stock items...</div>';
+
+    const locId = document.getElementById('poLocationSelect')?.value || '';
+    fetch(`/api/purchases/reorder-suggestions?location_id=${locId}`)
+        .then(r => r.json())
+        .then(items => {
+            lowStockSuggestionsData = items;
+            if (items.length === 0) {
+                body.innerHTML = `
+                    <div style="text-align: center; padding: 32px; color: #059669;">
+                        <div style="font-size: 2rem;">✓</div>
+                        <div style="font-weight: 700; font-size: 1.05rem; margin-top: 6px;">All products are adequately stocked!</div>
+                        <div style="font-size: 0.82rem; color: #64748B; margin-top: 2px;">No items are currently below their defined reorder point.</div>
+                    </div>
+                `;
+                return;
+            }
+            let h = `
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                    <thead>
+                        <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1; text-align: left;">
+                            <th style="padding: 8px 10px; width: 40px; text-align: center;">
+                                <input type="checkbox" id="selectAllReorder" onchange="toggleSelectAllReorder(this)">
+                            </th>
+                            <th style="padding: 8px 10px;">Product Name & SKU</th>
+                            <th style="padding: 8px 10px; text-align: right;">On Hand</th>
+                            <th style="padding: 8px 10px; text-align: right;">Reorder Point</th>
+                            <th style="padding: 8px 10px; text-align: right;">Suggested Qty</th>
+                            <th style="padding: 8px 10px; text-align: right;">Est. Cost</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            items.forEach((it, idx) => {
+                h += `
+                    <tr style="border-bottom: 1px solid #E2E8F0;">
+                        <td style="padding: 10px; text-align: center;">
+                            <input type="checkbox" class="reorder-item-cb" data-idx="${idx}" checked onchange="updateReorderSelectedCount()">
+                        </td>
+                        <td style="padding: 10px;">
+                            <div style="font-weight: 700; color: #0F172A;">${it.name}</div>
+                            <div style="font-size: 0.74rem; color: #64748B;">SKU: ${it.sku || '-'} | ${it.uom || 'Unit'}</div>
+                        </td>
+                        <td style="padding: 10px; text-align: right; font-weight: 800; color: #DC2626;">
+                            ${it.on_hand}
+                        </td>
+                        <td style="padding: 10px; text-align: right; color: #64748B;">
+                            ${it.reorder_point}
+                        </td>
+                        <td style="padding: 10px; text-align: right;">
+                            <input type="number" step="1" min="1" value="${it.suggested_qty}" class="form-input" id="reorder-qty-${idx}" style="width: 80px; text-align: right; height: 30px; font-weight: 700;">
+                        </td>
+                        <td style="padding: 10px; text-align: right; font-weight: 600; color: #0F766E;">
+                            $${parseFloat(it.unit_cost || 0).toFixed(2)}
+                        </td>
+                    </tr>
+                `;
+            });
+            h += `</tbody></table>`;
+            body.innerHTML = h;
+            updateReorderSelectedCount();
+        })
+        .catch(err => {
+            body.innerHTML = `<div style="text-align: center; padding: 24px; color: #EF4444;">Failed to load suggestions: ${err}</div>`;
+        });
+}
+
+function closeReorderModal() {
+    document.getElementById('reorderSuggestionsModal').style.display = 'none';
+}
+
+function toggleSelectAllReorder(master) {
+    document.querySelectorAll('.reorder-item-cb').forEach(cb => {
+        cb.checked = master.checked;
+    });
+    updateReorderSelectedCount();
+}
+
+function updateReorderSelectedCount() {
+    const selected = document.querySelectorAll('.reorder-item-cb:checked').length;
+    document.getElementById('reorderSelectedCount').textContent = `${selected} items selected`;
+}
+
+function addSelectedReorderItems() {
+    const checkboxes = document.querySelectorAll('.reorder-item-cb:checked');
+    if (checkboxes.length === 0) {
+        alert('Please select at least one item to add.');
+        return;
+    }
+
+    checkboxes.forEach(cb => {
+        const idx = parseInt(cb.dataset.idx);
+        const item = lowStockSuggestionsData[idx];
+        const qtyInput = document.getElementById(`reorder-qty-${idx}`);
+        const qty = qtyInput ? parseFloat(qtyInput.value || item.suggested_qty) : item.suggested_qty;
+
+        addPOLineItem({
+            id: item.id,
+            name: item.name,
+            cost: item.unit_cost,
+            qty: qty,
+            on_hand: item.on_hand
+        });
+    });
+
+    closeReorderModal();
+}
+
+// Global Keyboard Shortcut: Ctrl + S to save
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        submitPoForm();
+    }
+});
+
+// Initial Page Load Initialization
 document.addEventListener('DOMContentLoaded', () => {
+    onVendorChange();
+
     {% if prefill_prod %}
     addPOLineItem({
         id: {{ prefill_prod.id }},
         name: '{{ prefill_prod.name.replace("'", "\\'") }}',
-        cost: {{ prefill_prod.average_cost or prefill_prod.standard_cost or 0 }},
-        qty: {{ prefill_prod.reorder_quantity or 10 }}
+        cost: {{ prefill_prod.purchase_cost or prefill_prod.average_cost or prefill_prod.standard_cost or 0 }},
+        qty: {{ prefill_prod.reorder_quantity or 10 }},
+        on_hand: {{ prefill_prod.on_hand or 0 }}
     });
     {% else %}
     addPOLineItem();

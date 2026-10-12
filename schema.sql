@@ -368,6 +368,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     status VARCHAR(50) NOT NULL DEFAULT 'DRAFT', -- DRAFT, ISSUED, PARTIAL_RECEIVED, RECEIVED, PAID, CANCELLED
     payment_status VARCHAR(50) NOT NULL DEFAULT 'UNPAID', -- UNPAID, PARTIAL, PAID
     subtotal NUMERIC(16, 4) DEFAULT 0,
+    discount_amount NUMERIC(16, 4) DEFAULT 0,
     tax_rate NUMERIC(6, 2) DEFAULT 0,
     tax_amount NUMERIC(16, 4) DEFAULT 0,
     shipping_fee NUMERIC(16, 4) DEFAULT 0,
@@ -375,6 +376,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
     paid_amount NUMERIC(16, 4) DEFAULT 0,
     balance_due NUMERIC(16, 4) DEFAULT 0,
     carrier VARCHAR(100),
+    vendor_invoice_no VARCHAR(100),
     received_date TIMESTAMP WITH TIME ZONE,
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -390,6 +392,7 @@ CREATE TABLE IF NOT EXISTS purchase_order_lines (
     description TEXT,
     quantity NUMERIC(14, 4) NOT NULL DEFAULT 1,
     unit_cost NUMERIC(16, 4) NOT NULL DEFAULT 0,
+    discount_percent NUMERIC(6, 2) DEFAULT 0,
     subtotal NUMERIC(16, 4) NOT NULL DEFAULT 0,
     received_qty NUMERIC(14, 4) DEFAULT 0
 );

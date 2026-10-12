@@ -13,8 +13,18 @@ class TestAuditBugs(unittest.TestCase):
         cls.app = create_app()
         cls.app.config['TESTING'] = True
         cls.client = cls.app.test_client()
+        with cls.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['display_name'] = 'System Administrator'
+            sess['role'] = 'main_admin'
 
     def setUp(self):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['display_name'] = 'System Administrator'
+            sess['role'] = 'main_admin'
         execute("""
             DELETE FROM sales_order_lines WHERE product_id IN (SELECT id FROM products WHERE sku LIKE 'AUDIT-%%');
             DELETE FROM sales_orders WHERE customer_id IN (SELECT id FROM customers WHERE name LIKE 'Audit%%');

@@ -1095,6 +1095,12 @@
                 if (title.startsWith('Sales Order:')) {
                     return 'ការបញ្ជាទិញ៖ ' + title.replace('Sales Order:', '').trim();
                 }
+                if (title.startsWith('Purchase Order:')) {
+                    return 'ការទិញចូល៖ ' + title.replace('Purchase Order:', '').trim();
+                }
+                if (title.startsWith('PO:')) {
+                    return 'ប័ណ្ណទិញចូល៖ ' + title.replace('PO:', '').trim();
+                }
                 if (title.startsWith('Product:')) {
                     return 'ទំនិញ៖ ' + title.replace('Product:', '').trim();
                 }

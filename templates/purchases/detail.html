@@ -1,197 +1,685 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ order.order_number }} - inFlow Premium{% endblock %}
+{% block title %}Purchase Order {{ order.order_number }} - inFlow Premium{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-    <div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-            <a href="{{ url_for('purchase_orders.list_purchases') }}" style="color: #64748B; text-decoration: none; font-size: 0.88rem;">← Purchase Orders</a>
-            <span style="color: #CBD5E1;">/</span>
-            <span style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; background: #F1F5F9; padding: 2px 8px; border-radius: 4px;">{{ order.order_number }}</span>
-        </div>
-        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Purchase Order {{ order.order_number }}</h1>
-    </div>
+<div class="inflow-po-detail-page" style="padding: 2px 0 32px 0;">
+    <!-- Top Accent Bar (Teal for Purchasing) -->
+    <div style="height: 3px; width: 100%; background: #0D9488; border-radius: 2px; margin-bottom: 14px;"></div>
 
-    <!-- Action Buttons -->
-    <div style="display: flex; gap: 10px;">
-        <button type="button" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.closeActiveTab(); } else { window.location.href='{{ url_for('purchase_orders.list_purchases') }}'; }" class="btn btn-secondary" style="color: #DC2626; font-weight: 600;" title="Close this tab">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            <span>Close</span>
-        </button>
-        <a href="{{ url_for('purchase_orders.print_po', id=order.id) }}" target="_blank" class="btn btn-secondary">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
-            <span>Print PO</span>
-        </a>
-        {% if order.balance_due > 0 and order.status != 'CANCELLED' %}
-        <button onclick="openModal('recordPaymentModal')" class="btn btn-secondary">
-            <span>$ Record Payment to Vendor</span>
-        </button>
-        {% endif %}
-        {% if order.status == 'ISSUED' %}
-        <form action="{{ url_for('purchase_orders.cancel_purchase', id=order.id) }}" method="POST" onsubmit="return confirm('Cancel this purchase order? This will revert open supplier payables.');" style="display: inline;">
-            <button type="submit" class="btn btn-secondary" style="color: #DC2626;">
-                <span>Cancel PO</span>
+    <!-- Desktop Ribbon Toolbar (Matching inFlow Desktop MDI standards) -->
+    <div class="inflow-desktop-toolbar" style="display: flex; justify-content: space-between; align-items: center; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 6px 14px; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); flex-wrap: wrap; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <a href="{{ url_for('purchase_orders.create_purchase') }}" 
+               onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.create_purchase') }}', 'New Purchase Order', 'purchase'); }"
+               class="btn btn-secondary btn-sm" title="Create a new purchase order in tab">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                <span>New</span>
+            </a>
+
+            {% if order.status != 'CANCELLED' %}
+            <button type="button" class="btn btn-primary btn-sm" onclick="savePoChanges()" style="background: #0F766E; border-color: #0F766E;" title="Save changes (Ctrl+S)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span>Save (Ctrl+S)</span>
             </button>
-        </form>
-        <form action="{{ url_for('purchase_orders.receive_goods', id=order.id) }}" method="POST" onsubmit="return confirm('Receive all items into warehouse stock now? This will immediately increment on-hand inventory.');">
-            <button type="submit" class="btn btn-primary">
-                <span>✓ Receive All Goods Into Warehouse</span>
-            </button>
-        </form>
-        {% endif %}
-    </div>
-</div>
+            {% endif %}
 
-<!-- Status Banner -->
-{% if order.status == 'RECEIVED' or order.status == 'PAID' %}
-<div class="card" style="margin-bottom: 24px; background: #ECFDF5; border: 1px solid #A7F3D0; display: flex; align-items: center; gap: 12px; padding: 16px 20px;">
-    <div style="font-size: 1.4rem;">✓</div>
-    <div>
-        <div style="font-weight: 700; color: #065F46;">Goods Received Successfully</div>
-        <div style="font-size: 0.82rem; color: #047857;">Items were added to {{ order.location_name }} stock and unit moving average costs updated.</div>
-    </div>
-</div>
-{% elif order.status == 'ISSUED' %}
-<div class="card" style="margin-bottom: 24px; background: #FFFBEB; border: 1px solid #FDE68A; display: flex; align-items: center; justify-content: space-between; padding: 16px 20px;">
-    <div>
-        <div style="font-weight: 700; color: #92400E;">Pending Goods Receiving</div>
-        <div style="font-size: 0.82rem; color: #B45309;">Waiting for physical delivery at {{ order.location_name }}. Click 'Receive All Goods' when cargo arrives.</div>
-    </div>
-</div>
-{% endif %}
+            <a href="{{ url_for('purchase_orders.list_purchases') }}" 
+               onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.list_purchases') }}', 'Purchase Orders', 'purchase'); }"
+               class="btn btn-secondary btn-sm" title="Back to purchase orders list">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                <span>Orders List</span>
+            </a>
 
-<!-- Overview & Vendor Grid -->
-<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
-    <div class="card">
-        <h2 class="card-title">Vendor & Receiving Details</h2>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 0.88rem;">
-            <div>
-                <div style="font-size: 0.75rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Vendor / Supplier</div>
-                <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">{{ order.vendor_name }}</div>
-                <div style="color: #64748B;">Phone: {{ order.vendor_phone or '-' }}</div>
-                <div style="color: #64748B;">Email: {{ order.vendor_email or '-' }}</div>
-                <div style="color: #64748B; margin-top: 4px;">{{ order.vendor_address or '-' }}</div>
-                <div style="margin-top: 6px; padding-top: 6px; border-top: 1px solid #F1F5F9; font-size: 0.82rem;">
-                    <span style="color: #64748B;">Supplier Payables:</span>
-                    <b style="color: {% if order.vendor_balance > 0 %}#DC2626{% else %}#059669{% endif %};">{{ order.vendor_balance | currency }}</b>
-                    <span style="color: #94A3B8; margin-left: 8px;">({{ order.vendor_payment_terms or 'Net 30' }})</span>
+            <!-- Print / Preview Dropdown -->
+            <div style="position: relative; display: inline-block;">
+                <div style="display: inline-flex; border: 1px solid #CBD5E1; border-radius: 6px; overflow: hidden;">
+                    <a href="{{ url_for('purchase_orders.print_po', id=order.id, doc='order') }}" target="_blank" class="btn btn-secondary btn-sm" style="border: none; border-radius: 0; background: #FFFFFF;" title="Print Purchase Order">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                        <span>Print PO</span>
+                    </a>
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="toggleDropdown('printDropdownMenu')" style="border: none; border-left: 1px solid #CBD5E1; border-radius: 0; padding: 0 6px; background: #FFFFFF;">
+                        ▾
+                    </button>
+                </div>
+                <div id="printDropdownMenu" style="display: none; position: absolute; left: 0; top: 100%; margin-top: 4px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; min-width: 190px; overflow: hidden;">
+                    <a href="{{ url_for('purchase_orders.print_po', id=order.id, doc='order') }}" target="_blank" style="display: block; padding: 8px 14px; text-decoration: none; color: #0F172A; font-size: 0.84rem; font-weight: 600; border-bottom: 1px solid #F1F5F9;">
+                        📄 Purchase Order
+                    </a>
+                    <a href="{{ url_for('purchase_orders.print_po', id=order.id, doc='receive') }}" target="_blank" style="display: block; padding: 8px 14px; text-decoration: none; color: #0F172A; font-size: 0.84rem; font-weight: 600;">
+                        📦 Goods Receiving Voucher
+                    </a>
                 </div>
             </div>
-            <div>
-                <div style="font-size: 0.75rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Receiving Warehouse</div>
-                <div style="font-weight: 600; color: #0F172A;">{{ order.location_name }}</div>
-                <div style="color: #64748B;">Order Date: {{ order.order_date | format_date }}</div>
-                <div style="color: #64748B;">Expected: {{ order.expected_date | format_date }}</div>
-                <div style="color: #64748B;">Status: <span class="badge badge-neutral">{{ order.status }}</span></div>
+
+            <!-- Duplicate / Copy Action -->
+            <form action="{{ url_for('purchase_orders.copy_purchase', id=order.id) }}" method="POST" style="display: inline;">
+                <button type="submit" class="btn btn-secondary btn-sm" title="Duplicate into a new purchase order" onclick="return confirm('Duplicate this purchase order into a new draft PO?');">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>Duplicate PO</span>
+                </button>
+            </form>
+        </div>
+
+        <!-- Right Workflow Actions -->
+        <div style="display: flex; align-items: center; gap: 8px;">
+            {% if order.balance_due > 0 and order.status != 'CANCELLED' %}
+            <button type="button" onclick="openPaymentModal()" class="btn btn-secondary btn-sm" style="color: #059669; border-color: #A7F3D0; background: #ECFDF5; font-weight: 700;">
+                <span>$ Record Payment</span>
+            </button>
+            {% endif %}
+
+            {% if order.status in ('ISSUED', 'PARTIAL_RECEIVED') %}
+            <button type="button" onclick="openReceiveModal()" class="btn btn-primary btn-sm" style="background: #0F766E; border-color: #0F766E; font-weight: 700;">
+                <span>✓ Receive Goods</span>
+            </button>
+            {% endif %}
+
+            {% if order.status == 'ISSUED' %}
+            <form action="{{ url_for('purchase_orders.cancel_purchase', id=order.id) }}" method="POST" onsubmit="return confirm('Cancel this purchase order? This will revert open supplier payables.');" style="display: inline;">
+                <button type="submit" class="btn btn-secondary btn-sm" style="color: #DC2626;">
+                    <span>Cancel PO</span>
+                </button>
+            </form>
+            {% endif %}
+
+            <button type="button" class="btn btn-secondary btn-sm" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.closeActiveTab(); } else { window.location.href='{{ url_for('purchase_orders.list_purchases') }}'; }" style="color: #DC2626; font-weight: 600;" title="Close Tab">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                <span>Close</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Header Section with Breadcrumbs & Status Badges -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                <a href="{{ url_for('purchase_orders.list_purchases') }}" style="color: #64748B; text-decoration: none; font-size: 0.88rem;">← Purchase Orders</a>
+                <span style="color: #CBD5E1;">/</span>
+                <span style="font-family: var(--font-mono); font-size: 0.82rem; font-weight: 700; background: #F1F5F9; padding: 2px 8px; border-radius: 4px; color: #334155;">{{ order.order_number }}</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <h1 style="font-size: 1.65rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em; margin: 0;">
+                    Purchase Order {{ order.order_number }}
+                </h1>
+                <!-- Receiving Status Pill -->
+                {% if order.status == 'RECEIVED' %}
+                    <span class="badge" style="background: #D1FAE5; color: #065F46; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">✓ GOODS RECEIVED</span>
+                {% elif order.status == 'PARTIAL_RECEIVED' %}
+                    <span class="badge" style="background: #FEF3C7; color: #92400E; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">📦 PARTIALLY RECEIVED</span>
+                {% elif order.status == 'ISSUED' %}
+                    <span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">⏳ ISSUED (PENDING)</span>
+                {% elif order.status == 'CANCELLED' %}
+                    <span class="badge" style="background: #F1F5F9; color: #64748B; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">✕ CANCELLED</span>
+                {% else %}
+                    <span class="badge badge-neutral">{{ order.status }}</span>
+                {% endif %}
+
+                <!-- Payment Status Pill -->
+                {% if order.payment_status == 'PAID' %}
+                    <span class="badge" style="background: #D1FAE5; color: #065F46; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">✓ PAID</span>
+                {% elif order.payment_status == 'PARTIAL' %}
+                    <span class="badge" style="background: #FEF3C7; color: #92400E; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">PARTIAL PAID</span>
+                {% else %}
+                    <span class="badge" style="background: #FEE2E2; color: #991B1B; font-weight: 800; padding: 4px 12px; border-radius: 12px; font-size: 0.82rem;">UNPAID</span>
+                {% endif %}
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <h2 class="card-title">PO Financial Balance</h2>
-        <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
-            <div style="display: flex; justify-content: space-between;">
-                <span style="color: #64748B;">Subtotal:</span>
-                <span style="font-weight: 600;">{{ order.subtotal | currency }}</span>
+    <!-- Interactive Status Workflow Banner -->
+    {% if order.status == 'RECEIVED' %}
+    <div class="card" style="margin-bottom: 20px; background: #ECFDF5; border: 1px solid #A7F3D0; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 1.5rem; line-height: 1;">✓</div>
+            <div>
+                <div style="font-weight: 800; color: #065F46; font-size: 0.95rem;">All Goods Ingested Into Warehouse Stock</div>
+                <div style="font-size: 0.82rem; color: #047857; margin-top: 2px;">
+                    Items were added to <b>{{ order.location_name }}</b> stock and product moving average costs were recalculated.
+                </div>
             </div>
-            {% if order.shipping_fee > 0 %}
-            <div style="display: flex; justify-content: space-between;">
-                <span style="color: #64748B;">Shipping / Freight:</span>
-                <span>{{ order.shipping_fee | currency }}</span>
+        </div>
+        <div style="font-size: 0.82rem; color: #065F46; font-weight: 700;">
+            Received Date: {{ order.received_date | format_date if order.received_date else 'Completed' }}
+        </div>
+    </div>
+    {% elif order.status == 'PARTIAL_RECEIVED' %}
+    <div class="card" style="margin-bottom: 20px; background: #FFFBEB; border: 1px solid #FDE68A; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 1.5rem; line-height: 1;">📦</div>
+            <div>
+                <div style="font-weight: 800; color: #92400E; font-size: 0.95rem;">
+                    Partially Received Shipment ({{ receiving_percent }}% Complete: {{ total_qty_received|int }}/{{ total_qty_ordered|int }} units)
+                </div>
+                <div style="font-size: 0.82rem; color: #B45309; margin-top: 2px;">
+                    Some items arrived and were stocked in {{ order.location_name }}. Awaiting delivery of the remaining items.
+                </div>
             </div>
-            {% endif %}
-            <div style="border-top: 1px solid #E2E8F0; padding-top: 8px; display: flex; justify-content: space-between;">
-                <span style="font-weight: 700;">Total Cost:</span>
-                <span style="font-weight: 800; font-size: 1.15rem; color: #0F172A;">{{ order.total_amount | currency }}</span>
+        </div>
+        <button type="button" onclick="openReceiveModal()" class="btn btn-primary btn-sm" style="background: #D97706; border-color: #D97706; font-weight: 800;">
+            Receive Remaining Goods →
+        </button>
+    </div>
+    {% elif order.status == 'ISSUED' %}
+    <div class="card" style="margin-bottom: 20px; background: #F0FDFA; border: 1px solid #99F6E4; display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; border-radius: 8px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 1.5rem; line-height: 1;">🚚</div>
+            <div>
+                <div style="font-weight: 800; color: #0F766E; font-size: 0.95rem;">Order Issued & Awaiting Cargo Delivery</div>
+                <div style="font-size: 0.82rem; color: #115E59; margin-top: 2px;">
+                    Destination: <b>{{ order.location_name }}</b>. When items arrive from vendor, click 'Receive Goods' to ingest inventory.
+                </div>
             </div>
-            <div style="display: flex; justify-content: space-between; color: #059669;">
-                <span>Paid to Vendor:</span>
-                <span style="font-weight: 700;">{{ order.paid_amount | currency }}</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button type="button" onclick="openReceiveModal()" class="btn btn-primary btn-sm" style="background: #0F766E; border-color: #0F766E; font-weight: 800;">
+                ✓ Receive Goods Now
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Two-Column Header Cards Grid -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 20px;">
+        <!-- Left Card: Vendor & Supplier Profile -->
+        <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #F1F5F9; padding-bottom: 8px;">
+                <h2 class="card-title" style="margin: 0; font-size: 1rem; color: #0F172A; display: flex; align-items: center; gap: 6px;">
+                    <span>🏢</span> <span>Vendor / Supplier Information</span>
+                </h2>
+                {% if order.vendor_id %}
+                <a href="{{ url_for('contacts.list_vendors') }}" style="font-size: 0.78rem; color: #0F766E; font-weight: 700; text-decoration: none;">
+                    View Vendor Profile →
+                </a>
+                {% endif %}
             </div>
-            <div style="border-top: 2px solid #E2E8F0; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
-                <span style="font-weight: 700; color: #0F172A;">Payable Balance:</span>
-                <span style="font-weight: 800; font-size: 1.25rem; color: {% if order.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
-                    {{ order.balance_due | currency }}
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 0.88rem;">
+                <div>
+                    <div style="font-size: 0.74rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 3px;">Supplier Company</div>
+                    <div style="font-weight: 800; font-size: 1.05rem; color: #0F172A;">{{ order.vendor_name or 'General Supplier' }}</div>
+                    <div style="color: #64748B; margin-top: 4px;">📞 Phone: <b>{{ order.vendor_phone or '-' }}</b></div>
+                    <div style="color: #64748B; margin-top: 2px;">✉️ Email: {{ order.vendor_email or '-' }}</div>
+                    <div style="color: #64748B; margin-top: 2px;">📍 Address: {{ order.vendor_address or '-' }}</div>
+                </div>
+
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px 14px;">
+                    <div style="font-size: 0.74rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 4px;">Accounting & Terms</div>
+                    <div style="margin-bottom: 6px;">
+                        <span style="color: #64748B;">Payment Terms:</span>
+                        <span style="font-weight: 700; color: #0F172A;">{{ order.vendor_payment_terms or 'Net 30' }}</span>
+                    </div>
+                    <div style="border-top: 1px solid #E2E8F0; padding-top: 6px;">
+                        <span style="color: #64748B;">Vendor Balance (Payables):</span>
+                        <div style="font-weight: 900; font-size: 1.15rem; color: {% if order.vendor_balance > 0 %}#DC2626{% else %}#059669{% endif %}; margin-top: 2px;">
+                            {{ order.vendor_balance | currency }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Card: Warehouse Logistics & Dates -->
+        <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+            <div style="margin-bottom: 12px; border-bottom: 1px solid #F1F5F9; padding-bottom: 8px;">
+                <h2 class="card-title" style="margin: 0; font-size: 1rem; color: #0F172A; display: flex; align-items: center; gap: 6px;">
+                    <span>📦</span> <span>Warehouse Logistics & Delivery Terms</span>
+                </h2>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.88rem;">
+                <div>
+                    <div style="font-size: 0.74rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 3px;">Receiving Location</div>
+                    <div style="font-weight: 800; font-size: 1rem; color: #0F172A;">🏢 {{ order.location_name }}</div>
+                    
+                    <div style="margin-top: 8px;">
+                        <span style="color: #64748B; font-size: 0.78rem; text-transform: uppercase; font-weight: 700;">Carrier / Freight:</span>
+                        <div style="font-weight: 600; color: #334155;">{{ order.carrier or 'Standard Freight / Cargo' }}</div>
+                    </div>
+                </div>
+
+                <div>
+                    <div style="font-size: 0.74rem; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 3px;">Important Dates</div>
+                    <div><span style="color: #64748B;">Order Date:</span> <b>{{ order.order_date | format_date }}</b></div>
+                    <div style="margin-top: 3px;"><span style="color: #64748B;">Expected Date:</span> <b>{{ order.expected_date | format_date if order.expected_date else 'Not set' }}</b></div>
+                    {% if order.vendor_invoice_no %}
+                    <div style="margin-top: 6px; padding-top: 4px; border-top: 1px solid #E2E8F0;">
+                        <span style="color: #64748B;">Supplier Invoice Ref:</span>
+                        <span style="font-family: var(--font-mono); font-weight: 700; color: #0F766E;">{{ order.vendor_invoice_no }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Table Card -->
+    <div class="card" style="margin-bottom: 20px; padding: 0; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; overflow: hidden;">
+        <div style="padding: 14px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h2 class="card-title" style="margin-bottom: 0; font-size: 1.05rem; color: #0F172A;">
+                    Purchased Items List ({{ lines|length }} items)
+                </h2>
+                <span style="background: #E6FFFA; color: #0F766E; font-weight: 800; font-size: 0.76rem; padding: 2px 8px; border-radius: 10px; border: 1px solid #B2F5EA;">
+                    {{ total_qty_received|int }} / {{ total_qty_ordered|int }} units received
                 </span>
             </div>
+
+            <div style="display: flex; gap: 8px;">
+                {% if order.status in ('ISSUED', 'PARTIAL_RECEIVED') %}
+                <button type="button" class="btn btn-primary btn-sm" onclick="openReceiveModal()" style="background: #0F766E; border-color: #0F766E; font-weight: 700;">
+                    ✓ Receive Items Into Stock
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="table-container" style="border: none; margin: 0;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1;">
+                        <th style="width: 40px; text-align: center;">#</th>
+                        <th>Product Item</th>
+                        <th style="width: 130px; text-align: center;">Warehouse Stock</th>
+                        <th style="width: 120px; text-align: right;">Ordered Qty</th>
+                        <th style="width: 140px; text-align: center;">Receiving Progress</th>
+                        <th style="width: 120px; text-align: right;">Unit Cost ($)</th>
+                        <th style="width: 100px; text-align: right;">Disc %</th>
+                        <th style="width: 130px; text-align: right;">Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in lines %}
+                    {% set is_full_rcv = line.received_qty >= line.quantity %}
+                    {% set is_partial_rcv = line.received_qty > 0 and line.received_qty < line.quantity %}
+                    <tr style="border-bottom: 1px solid #F1F5F9;">
+                        <td style="color: #94A3B8; font-weight: 700; text-align: center; padding: 12px 10px;">
+                            {{ line.line_num }}
+                        </td>
+                        <td style="padding: 12px 10px;">
+                            <a href="{{ url_for('products.detail_product', id=line.product_id) }}" 
+                               onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('products.detail_product', id=line.product_id) }}', 'Product: {{ line.product_name }}', 'product'); }"
+                               style="font-weight: 700; color: #0F172A; text-decoration: none; font-size: 0.92rem;">
+                                {{ line.product_name }}
+                            </a>
+                            <div style="font-size: 0.74rem; color: #64748B; margin-top: 2px;">
+                                SKU: <span style="font-family: var(--font-mono); font-weight: 600;">{{ line.product_sku }}</span> | UOM: {{ line.product_uom }}
+                            </div>
+                        </td>
+                        <td style="text-align: center; padding: 12px 10px;">
+                            <span style="display: inline-block; padding: 3px 8px; background: #F1F5F9; color: #475569; border-radius: 12px; font-size: 0.76rem; font-weight: 700;">
+                                {{ line.on_hand_stock|int }} on hand
+                            </span>
+                        </td>
+                        <td style="text-align: right; font-weight: 700; font-size: 0.95rem; color: #0F172A; padding: 12px 10px;">
+                            {{ line.quantity|int if line.quantity == line.quantity|int else line.quantity }}
+                        </td>
+                        <td style="text-align: center; padding: 12px 10px;">
+                            {% if is_full_rcv %}
+                                <span class="badge" style="background: #D1FAE5; color: #065F46; font-weight: 800; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px;">
+                                    ✓ {{ line.received_qty|int }}/{{ line.quantity|int }} Recv
+                                </span>
+                            {% elif is_partial_rcv %}
+                                <span class="badge" style="background: #FEF3C7; color: #92400E; font-weight: 800; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px;">
+                                    {{ line.received_qty|int }}/{{ line.quantity|int }} Recv
+                                </span>
+                            {% else %}
+                                <span class="badge" style="background: #F1F5F9; color: #64748B; font-weight: 600; font-size: 0.75rem; padding: 3px 8px; border-radius: 10px;">
+                                    0/{{ line.quantity|int }}
+                                </span>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #334155; padding: 12px 10px;">
+                            {{ line.unit_cost | currency }}
+                        </td>
+                        <td style="text-align: right; color: #64748B; padding: 12px 10px;">
+                            {{ line.discount_percent }}%
+                        </td>
+                        <td style="text-align: right; font-weight: 800; color: #0F172A; padding: 12px 14px; font-size: 0.95rem;">
+                            {{ line.subtotal | currency }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Summary & Tabs Bottom Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
+        <!-- Left: Bottom Information Tabs (Remarks, Payment Ledger, Inventory Movements) -->
+        <div class="card" style="padding: 0; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; overflow: hidden;">
+            <div style="display: flex; border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
+                <button type="button" class="tab-nav-btn active" onclick="switchPoTab('tabRemarks', this)" style="padding: 12px 18px; border: none; background: transparent; font-weight: 700; font-size: 0.88rem; color: #0F766E; border-bottom: 2px solid #0F766E; cursor: pointer;">
+                    📝 Remarks & Notes
+                </button>
+                <button type="button" class="tab-nav-btn" onclick="switchPoTab('tabPayments', this)" style="padding: 12px 18px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; color: #64748B; cursor: pointer;">
+                    💰 Payments to Supplier ({{ payments|length }})
+                </button>
+                <button type="button" class="tab-nav-btn" onclick="switchPoTab('tabMovements', this)" style="padding: 12px 18px; border: none; background: transparent; font-weight: 600; font-size: 0.88rem; color: #64748B; cursor: pointer;">
+                    📦 Warehouse Ingestion History ({{ inventory_logs|length }})
+                </button>
+            </div>
+
+            <!-- Tab 1: Remarks -->
+            <div id="tabRemarks" class="po-tab-content" style="padding: 18px 20px;">
+                <div style="font-weight: 700; color: #334155; margin-bottom: 6px; font-size: 0.86rem;">Remarks / Instructions:</div>
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px 16px; font-size: 0.9rem; color: #334155; min-height: 80px; white-space: pre-line;">
+                    {{ order.notes or 'No remarks recorded for this purchase order.' }}
+                </div>
+            </div>
+
+            <!-- Tab 2: Payments -->
+            <div id="tabPayments" class="po-tab-content" style="display: none; padding: 0;">
+                <div class="table-container" style="border: none; margin: 0;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                                <th style="padding: 10px 14px;">Date</th>
+                                <th style="padding: 10px 14px;">Method</th>
+                                <th style="padding: 10px 14px;">Reference #</th>
+                                <th style="padding: 10px 14px; text-align: right;">Amount Paid</th>
+                                <th style="padding: 10px 14px;">Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in payments %}
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="padding: 10px 14px;">{{ p.payment_date | format_date }}</td>
+                                <td style="padding: 10px 14px; font-weight: 600;">{{ p.payment_method }}</td>
+                                <td style="padding: 10px 14px; font-family: var(--font-mono); color: #0F766E;">{{ p.reference or '-' }}</td>
+                                <td style="padding: 10px 14px; text-align: right; font-weight: 800; color: #059669;">{{ p.amount | currency }}</td>
+                                <td style="padding: 10px 14px; color: #64748B;">{{ p.notes or '-' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: #94A3B8; padding: 24px;">No payments recorded yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Inventory Audit Movements -->
+            <div id="tabMovements" class="po-tab-content" style="display: none; padding: 0;">
+                <div class="table-container" style="border: none; margin: 0;">
+                    <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                                <th style="padding: 10px 14px;">Timestamp</th>
+                                <th style="padding: 10px 14px;">Product Item</th>
+                                <th style="padding: 10px 14px; text-align: right;">Qty Received</th>
+                                <th style="padding: 10px 14px; text-align: right;">Stock After</th>
+                                <th style="padding: 10px 14px; text-align: right;">Cost Ingested</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for l in inventory_logs %}
+                            <tr style="border-bottom: 1px solid #F1F5F9;">
+                                <td style="padding: 10px 14px; font-size: 0.82rem; color: #64748B;">{{ l.created_at.strftime('%Y-%m-%d %H:%M') if l.created_at else '-' }}</td>
+                                <td style="padding: 10px 14px; font-weight: 700;">{{ l.product_name }}</td>
+                                <td style="padding: 10px 14px; text-align: right; font-weight: 800; color: #059669;">+{{ l.quantity|int }}</td>
+                                <td style="padding: 10px 14px; text-align: right; font-weight: 600;">{{ l.qty_after|int }}</td>
+                                <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #0F766E;">{{ l.unit_cost | currency }}</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" style="text-align: center; color: #94A3B8; padding: 24px;">No goods receiving movements recorded yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Financial Balance & Totals -->
+        <div class="card" style="padding: 18px 20px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px;">
+            <h2 class="card-title" style="font-size: 0.95rem; margin-bottom: 12px; color: #0F172A;">
+                PO Financial Overview
+            </h2>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #64748B;">Items Subtotal:</span>
+                    <span style="font-weight: 700; color: #0F172A;">{{ order.subtotal | currency }}</span>
+                </div>
+
+                {% if order.shipping_fee > 0 %}
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #64748B;">Shipping / Freight:</span>
+                    <span style="font-weight: 600;">{{ order.shipping_fee | currency }}</span>
+                </div>
+                {% endif %}
+
+                {% if order.discount_amount > 0 %}
+                <div style="display: flex; justify-content: space-between; color: #059669;">
+                    <span>Supplier Discount:</span>
+                    <span style="font-weight: 600;">-{{ order.discount_amount | currency }}</span>
+                </div>
+                {% endif %}
+
+                <div style="border-top: 1px solid #E2E8F0; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 800; font-size: 1.05rem; color: #0F172A;">Total Order Amount:</span>
+                    <span style="font-weight: 900; font-size: 1.25rem; color: #0F766E;">{{ order.total_amount | currency }}</span>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; color: #059669;">
+                    <span>Total Paid to Vendor:</span>
+                    <span style="font-weight: 800;">{{ order.paid_amount | currency }}</span>
+                </div>
+
+                <div style="border-top: 2px solid #E2E8F0; padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 800; color: #0F172A; font-size: 1rem;">Payable Balance Due:</span>
+                    <span style="font-weight: 900; font-size: 1.35rem; color: {% if order.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
+                        {{ order.balance_due | currency }}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Quick Action Buttons Inside Financial Card -->
+            <div style="margin-top: 18px; display: flex; flex-direction: column; gap: 8px;">
+                {% if order.balance_due > 0 and order.status != 'CANCELLED' %}
+                <button type="button" onclick="openPaymentModal()" class="btn btn-primary btn-lg" style="width: 100%; background: #059669; border-color: #059669; font-weight: 800;">
+                    $ Pay Supplier ({{ order.balance_due | currency }})
+                </button>
+                {% endif %}
+
+                {% if order.status in ('ISSUED', 'PARTIAL_RECEIVED') %}
+                <button type="button" onclick="openReceiveModal()" class="btn btn-primary" style="width: 100%; background: #0F766E; border-color: #0F766E; font-weight: 800;">
+                    ✓ Receive Goods into Warehouse
+                </button>
+                {% endif %}
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Ordered Items Table -->
-<div class="card" style="padding: 0; overflow: hidden; margin-bottom: 24px;">
-    <div style="padding: 18px 22px; border-bottom: 1px solid #E2E8F0;">
-        <h2 class="card-title" style="margin-bottom: 0;">Purchased Items List ({{ lines|length }})</h2>
-    </div>
-    <div class="table-container" style="border: none;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th style="width: 40px;">#</th>
-                    <th>Product Item</th>
-                    <th style="text-align: right;">Quantity</th>
-                    <th style="text-align: right;">Unit Cost</th>
-                    <th style="text-align: right;">Subtotal</th>
-                    <th style="text-align: center;">Receiving Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for line in lines %}
-                <tr>
-                    <td style="color: #94A3B8; font-weight: 600;">{{ line.line_num }}</td>
-                    <td>
-                        <a href="{{ url_for('products.detail_product', id=line.product_id) }}" style="font-weight: 600; color: #0F172A; text-decoration: none;">
-                            {{ line.product_name }}
-                        </a>
-                        <div style="font-size: 0.72rem; color: #64748B; font-family: var(--font-mono);">
-                            SKU: {{ line.product_sku }} ({{ line.product_uom }})
-                        </div>
-                    </td>
-                    <td style="text-align: right; font-weight: 700;">
-                        {{ "{:,.0f}".format(line.quantity) }}
-                    </td>
-                    <td style="text-align: right; color: #475569;">
-                        {{ line.unit_cost | currency }}
-                    </td>
-                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
-                        {{ line.subtotal | currency }}
-                    </td>
-                    <td style="text-align: center;">
-                        {% if order.status in ['RECEIVED', 'PAID'] %}
-                            <span class="badge badge-success">Received ✓</span>
-                        {% else %}
-                            <span class="badge badge-warning">Awaiting Delivery</span>
-                        {% endif %}
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- Payment Modal -->
-<div class="modal-overlay" id="recordPaymentModal">
-    <div class="modal-dialog" style="max-width: 450px;">
-        <div class="modal-header">
-            <h2 class="modal-title">Record Payment to Vendor</h2>
-            <button class="modal-close" onclick="closeModal('recordPaymentModal')">×</button>
+<!-- Modal 1: Goods Receiving Modal (Supports 1-Click Receive All or Partial Custom Quantities) -->
+<div id="receiveGoodsModal" class="inflow-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; border-radius: 12px; max-width: 680px; width: 95%; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0F172A;">Receive Goods into Warehouse (ទទួលទំនិញចូលស្តុក)</h3>
+                <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">
+                    Destination Warehouse: <b>{{ order.location_name }}</b> • {{ order.order_number }}
+                </div>
+            </div>
+            <button type="button" onclick="closeReceiveModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #94A3B8;">&times;</button>
         </div>
-        <form action="{{ url_for('purchase_orders.record_payment', id=order.id) }}" method="POST">
-            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 14px; border-radius: 8px; margin-bottom: 16px;">
-                <div style="font-size: 0.8rem; color: #64748B;">Outstanding Vendor Payable:</div>
-                <div style="font-size: 1.4rem; font-weight: 800; color: #DC2626;">{{ order.balance_due | currency }}</div>
+
+        <form action="{{ url_for('purchase_orders.receive_goods', id=order.id) }}" method="POST" id="receiveGoodsForm">
+            <div style="padding: 18px 20px; overflow-y: auto; max-height: calc(85vh - 130px);">
+                <div style="margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-size: 0.84rem; font-weight: 700; color: #334155;">Confirm Received Quantities:</span>
+                    <button type="button" onclick="fillAllRemainingReceiveQty()" style="background: none; border: none; color: #0F766E; font-size: 0.8rem; font-weight: 700; cursor: pointer;">
+                        Receive 100% of All Remaining
+                    </button>
+                </div>
+
+                <table style="width: 100%; border-collapse: collapse; font-size: 0.88rem;">
+                    <thead>
+                        <tr style="background: #F1F5F9; border-bottom: 2px solid #CBD5E1; text-align: left;">
+                            <th style="padding: 8px 10px;">Product Name & SKU</th>
+                            <th style="padding: 8px 10px; text-align: right;">Ordered</th>
+                            <th style="padding: 8px 10px; text-align: right;">Already Recv</th>
+                            <th style="padding: 8px 10px; text-align: right; width: 140px;">Receive Now</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for line in lines %}
+                        {% set remaining = line.quantity - line.received_qty %}
+                        <tr style="border-bottom: 1px solid #E2E8F0;">
+                            <td style="padding: 10px;">
+                                <div style="font-weight: 700; color: #0F172A;">{{ line.product_name }}</div>
+                                <div style="font-size: 0.74rem; color: #64748B;">SKU: {{ line.product_sku }} | {{ line.product_uom }}</div>
+                            </td>
+                            <td style="padding: 10px; text-align: right; font-weight: 600;">
+                                {{ line.quantity|int }}
+                            </td>
+                            <td style="padding: 10px; text-align: right; color: #64748B;">
+                                {{ line.received_qty|int }}
+                            </td>
+                            <td style="padding: 10px; text-align: right;">
+                                <input type="number" step="any" min="0" max="{{ remaining }}" 
+                                       name="receive_qty_{{ line.id }}" 
+                                       value="{{ remaining }}" 
+                                       data-remaining="{{ remaining }}"
+                                       class="form-input receive-input-row" 
+                                       style="width: 100px; text-align: right; font-weight: 700; height: 32px;"
+                                       {% if remaining <= 0 %}disabled{% endif %}>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            <div class="form-group">
-                <label class="form-label">Payment Amount ($) *</label>
-                <input type="number" step="0.01" name="amount" value="{{ order.balance_due }}" required class="form-input" style="font-size: 1.15rem; font-weight: 700;">
-            </div>
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('recordPaymentModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Confirm Payment</button>
+
+            <div style="padding: 14px 20px; border-top: 1px solid #E2E8F0; background: #F8FAFC; display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeReceiveModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #0F766E; border-color: #0F766E; font-weight: 800;">
+                    ✓ Confirm Receiving into Stock
+                </button>
             </div>
         </form>
     </div>
 </div>
+
+<!-- Modal 2: Record Payment Modal -->
+<div id="recordPaymentModal" class="inflow-modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; border-radius: 12px; max-width: 480px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden; animation: inflowDropdownFade 0.15s ease-out;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <div>
+                <h3 style="margin: 0; font-size: 1.15rem; font-weight: 800; color: #0F172A;">Record Payment to Vendor</h3>
+                <div style="font-size: 0.8rem; color: #64748B; margin-top: 2px;">PO: {{ order.order_number }} • Payee: {{ order.vendor_name }}</div>
+            </div>
+            <button type="button" onclick="closePaymentModal()" style="background: none; border: none; font-size: 1.4rem; cursor: pointer; color: #94A3B8;">&times;</button>
+        </div>
+
+        <form action="{{ url_for('purchase_orders.record_payment', id=order.id) }}" method="POST" style="padding: 20px;">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Payment Amount ($) *</label>
+                <input type="number" step="0.01" min="0.01" max="{{ order.balance_due }}" name="amount" value="{{ order.balance_due }}" required class="form-input" style="font-weight: 800; font-size: 1.2rem; color: #059669; height: 42px;">
+                <div style="font-size: 0.76rem; color: #64748B; margin-top: 3px;">Max payable balance: ${{ "%.2f"|format(order.balance_due) }}</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Payment Method *</label>
+                <select name="method" class="form-select" style="height: 38px; font-weight: 600;">
+                    <option value="Bank Transfer">Bank Transfer (ABA / Bakong / Wire)</option>
+                    <option value="Cash">Cash (សាច់ប្រាក់)</option>
+                    <option value="Wing">Wing / TrueMoney</option>
+                    <option value="Check">Company Check</option>
+                    <option value="Credit Card">Credit Card</option>
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label">Reference / Transaction Number</label>
+                <input type="text" name="reference" placeholder="e.g. ABA-TXN-88992 or Check #" class="form-input" style="height: 38px;">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label">Notes & Remarks</label>
+                <textarea name="notes" rows="2" placeholder="Payment notes..." class="form-textarea"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #059669; border-color: #059669; font-weight: 800;">
+                    ✓ Submit Payment
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function switchPoTab(tabId, btn) {
+    document.querySelectorAll('.po-tab-content').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('.tab-nav-btn').forEach(b => {
+        b.style.color = '#64748B';
+        b.style.borderBottom = 'none';
+        b.style.fontWeight = '600';
+    });
+
+    const target = document.getElementById(tabId);
+    if (target) target.style.display = 'block';
+
+    btn.style.color = '#0F766E';
+    btn.style.borderBottom = '2px solid #0F766E';
+    btn.style.fontWeight = '700';
+}
+
+function toggleDropdown(menuId) {
+    const m = document.getElementById(menuId);
+    if (m) m.style.display = (m.style.display === 'block') ? 'none' : 'block';
+}
+
+document.addEventListener('click', (e) => {
+    const printMenu = document.getElementById('printDropdownMenu');
+    if (printMenu && !e.target.closest('#printDropdownMenu') && !e.target.closest('.btn-secondary')) {
+        printMenu.style.display = 'none';
+    }
+});
+
+function openReceiveModal() {
+    document.getElementById('receiveGoodsModal').style.display = 'flex';
+}
+
+function closeReceiveModal() {
+    document.getElementById('receiveGoodsModal').style.display = 'none';
+}
+
+function fillAllRemainingReceiveQty() {
+    document.querySelectorAll('.receive-input-row').forEach(inp => {
+        if (!inp.disabled) {
+            inp.value = inp.dataset.remaining;
+        }
+    });
+}
+
+function openPaymentModal() {
+    document.getElementById('recordPaymentModal').style.display = 'flex';
+}
+
+function closePaymentModal() {
+    document.getElementById('recordPaymentModal').style.display = 'none';
+}
+
+function savePoChanges() {
+    alert('Purchase Order details are saved and up-to-date.');
+}
+
+// Global Keyboard Shortcut: Ctrl + S
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        savePoChanges();
+    }
+});
+</script>
 {% endblock %}

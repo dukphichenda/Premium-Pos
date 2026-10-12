@@ -65,7 +65,10 @@ def get_db_cursor(commit=False):
 def query_all(query, params=None):
     try:
         with get_db_cursor(commit=False) as cur:
-            cur.execute(query, params or ())
+            if params is None:
+                cur.execute(query)
+            else:
+                cur.execute(query, params)
             return cur.fetchall()
     except Exception as e:
         if 'does not exist' in str(e).lower() and not getattr(query_all, '_in_init', False):
@@ -74,7 +77,10 @@ def query_all(query, params=None):
             try:
                 init_db()
                 with get_db_cursor(commit=False) as cur:
-                    cur.execute(query, params or ())
+                    if params is None:
+                        cur.execute(query)
+                    else:
+                        cur.execute(query, params)
                     return cur.fetchall()
             except Exception as retry_err:
                 logger.error(f"Failed to auto-provision schema on query_all: {retry_err}")
@@ -85,7 +91,10 @@ def query_all(query, params=None):
 def query_one(query, params=None):
     try:
         with get_db_cursor(commit=False) as cur:
-            cur.execute(query, params or ())
+            if params is None:
+                cur.execute(query)
+            else:
+                cur.execute(query, params)
             return cur.fetchone()
     except Exception as e:
         if 'does not exist' in str(e).lower() and not getattr(query_one, '_in_init', False):
@@ -94,7 +103,10 @@ def query_one(query, params=None):
             try:
                 init_db()
                 with get_db_cursor(commit=False) as cur:
-                    cur.execute(query, params or ())
+                    if params is None:
+                        cur.execute(query)
+                    else:
+                        cur.execute(query, params)
                     return cur.fetchone()
             except Exception as retry_err:
                 logger.error(f"Failed to auto-provision schema on query_one: {retry_err}")
@@ -104,12 +116,18 @@ def query_one(query, params=None):
 
 def execute(query, params=None):
     with get_db_cursor(commit=True) as cur:
-        cur.execute(query, params or ())
+        if params is None:
+            cur.execute(query)
+        else:
+            cur.execute(query, params)
         return cur.rowcount
 
 def execute_returning_id(query, params=None):
     with get_db_cursor(commit=True) as cur:
-        cur.execute(query, params or ())
+        if params is None:
+            cur.execute(query)
+        else:
+            cur.execute(query, params)
         row = cur.fetchone()
         return row['id'] if row else None
 

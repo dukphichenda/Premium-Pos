@@ -2363,6 +2363,8 @@ def search_products_json():
     results = query_all("""
         SELECT 
             p.id, p.sku, p.name, p.barcode, p.uom, p.default_price, p.average_cost,
+            p.last_purchase_cost, p.standard_cost,
+            COALESCE(p.last_purchase_cost, p.average_cost, p.standard_cost, 0) as purchase_cost,
             COALESCE(inv.total_qty, 0) as on_hand
         FROM products p
         LEFT JOIN (
@@ -2370,7 +2372,7 @@ def search_products_json():
         ) inv ON p.id = inv.product_id
         WHERE p.is_active = TRUE AND (p.name ILIKE %s OR p.sku ILIKE %s OR p.barcode ILIKE %s)
         ORDER BY p.name ASC
-        LIMIT 20
+        LIMIT 25
     """, (param, param, param))
 
     return jsonify([dict(r) for r in results])

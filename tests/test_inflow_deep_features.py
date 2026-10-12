@@ -13,8 +13,18 @@ class TestInflowDeepFeatures(unittest.TestCase):
         cls.app = create_app()
         cls.app.config['TESTING'] = True
         cls.client = cls.app.test_client()
+        with cls.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['display_name'] = 'System Administrator'
+            sess['role'] = 'main_admin'
 
     def setUp(self):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['display_name'] = 'System Administrator'
+            sess['role'] = 'main_admin'
         # Clean up any leftover test data
         execute("""
             DELETE FROM sales_order_lines WHERE product_id IN (SELECT id FROM products WHERE sku LIKE 'TEST-DEEP-%%');
@@ -109,7 +119,7 @@ class TestInflowDeepFeatures(unittest.TestCase):
 
     def test_product_detail_page_renders_inflow_architecture(self):
         """Verify product detail view has all inFlow toolbar buttons, section panels, and tabs"""
-        res = self.client.get(f'/products/{self.prod_id}')
+        res = self.client.get(f'/products/{self.prod_id}?legacy=1')
         self.assertEqual(res.status_code, 200)
         html = res.data.decode('utf-8')
 
