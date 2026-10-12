@@ -1,0 +1,399 @@
+{% extends 'base.html' %}
+
+{% block title %}Export Data - inFlow Premium{% endblock %}
+
+{% block content %}
+<div class="inflow-dialog-page-container">
+    <!-- Authentic inFlow Desktop Window Dialog (Matching media_1791620586458_5a242966.png) -->
+    <div class="inflow-win-window">
+        <!-- Window Titlebar -->
+        <div class="inflow-win-titlebar">
+            <div class="inflow-win-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="margin-right: 6px;">
+                    <rect x="11.5" y="2.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 2.5)" fill="#F59E0B"/>
+                    <rect x="4.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 4.5 9.5)" fill="#FBBF24"/>
+                    <rect x="18.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 18.5 9.5)" fill="#D97706"/>
+                    <rect x="11.5" y="16.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 16.5)" fill="#F59E0B"/>
+                </svg>
+                <span>inFlow - Export Data</span>
+            </div>
+            <div class="inflow-win-controls">
+                <span class="win-btn" title="Minimize">─</span>
+                <span class="win-btn" title="Maximize">□</span>
+                <span class="win-btn close" title="Close" onclick="onCancel()">✕</span>
+            </div>
+        </div>
+
+        <!-- Dialog Body -->
+        <div class="inflow-win-body">
+            <!-- Header with CD Icon and Title -->
+            <div class="inflow-win-header">
+                <!-- Disc with Outward Blue Arrow Icon -->
+                <div class="inflow-cd-icon-box">
+                    <svg width="46" height="46" viewBox="0 0 64 64" fill="none">
+                        <!-- CD Outer Disc (Metallic gradient) -->
+                        <circle cx="28" cy="32" r="26" fill="url(#cdGradientExp)" stroke="#94A3B8" stroke-width="1.5"/>
+                        <circle cx="28" cy="32" r="16" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="2 3"/>
+                        <!-- Center Ring & Hole -->
+                        <circle cx="28" cy="32" r="8" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1"/>
+                        <circle cx="28" cy="32" r="4.5" fill="#FFFFFF" stroke="#64748B" stroke-width="1"/>
+                        <!-- 3D Glossy Blue Arrow pointing Right/Outward out of CD -->
+                        <path d="M22 26H36V19L49 32L36 45V38H22V26Z" fill="url(#arrowBlueExp)" stroke="#1D4ED8" stroke-width="1.2"/>
+                        <defs>
+                            <linearGradient id="cdGradientExp" x1="4" y1="8" x2="52" y2="56" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#F8FAFC"/>
+                                <stop offset="35%" stop-color="#E2E8F0"/>
+                                <stop offset="70%" stop-color="#F1F5F9"/>
+                                <stop offset="100%" stop-color="#CBD5E1"/>
+                            </linearGradient>
+                            <linearGradient id="arrowBlueExp" x1="22" y1="19" x2="49" y2="45" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#60A5FA"/>
+                                <stop offset="50%" stop-color="#2563EB"/>
+                                <stop offset="100%" stop-color="#1D4ED8"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1 class="inflow-win-heading">Export Data</h1>
+            </div>
+
+            <div class="inflow-instruction-text" style="margin-top: 6px; margin-bottom: 24px;">
+                Please choose the type of data that you want to export and the file location.
+            </div>
+
+            <div class="inflow-form-grid">
+                <!-- Data Type Row -->
+                <div class="inflow-form-row">
+                    <label class="inflow-form-label" for="exportDataTypeSelect">Data Type</label>
+                    <div class="inflow-form-control-group">
+                        <select id="exportDataTypeSelect" class="inflow-win-dropdown" onchange="onExportTypeChange()">
+                            <option value="sales_order" {% if initial_type == 'sales_order' %}selected{% endif %}>Sales Order</option>
+                            <option value="product" {% if initial_type == 'product' %}selected{% endif %}>Product</option>
+                            <option value="customer" {% if initial_type == 'customer' %}selected{% endif %}>Customer</option>
+                            <option value="vendor" {% if initial_type == 'vendor' %}selected{% endif %}>Vendor</option>
+                            <option value="inventory" {% if initial_type == 'inventory' %}selected{% endif %}>Stock (Inventory)</option>
+                            <option value="purchase_order" {% if initial_type == 'purchase_order' %}selected{% endif %}>Purchase Order</option>
+                        </select>
+                        <div class="inflow-desc-text" id="exportDescription">
+                            Export your sales orders, including customer information and what was ordered.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Location Row -->
+                <div class="inflow-form-row" style="margin-top: 22px;">
+                    <label class="inflow-form-label" for="exportFilenameInput">File Location</label>
+                    <div class="inflow-form-control-group">
+                        <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                            <input type="text" id="exportFilenameInput" class="inflow-win-textbox" value="inFlow_SalesOrder.csv">
+                            <button type="button" class="inflow-win-btn-classic" onclick="promptCustomFilename()">Browse</button>
+                        </div>
+                        <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
+                            The exported CSV file includes UTF-8 BOM encoding and opens natively in Microsoft Excel.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Status Box -->
+            <div id="exportStatusBox" style="display: none; margin-top: 20px; padding: 12px; border-radius: 4px; font-size: 12.5px; background: #F0FDF4; border: 1px solid #86EFAC; color: #15803D;"></div>
+        </div>
+
+        <!-- Dialog Footer (Matching screenshot 2) -->
+        <div class="inflow-win-footer">
+            <button type="button" class="inflow-win-btn-action primary" id="btnExport" onclick="onExecuteExport()">Export</button>
+            <button type="button" class="inflow-win-btn-action" onclick="onCancel()">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Authentic inFlow Desktop Windows Dialog Styling */
+.inflow-dialog-page-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 30px 16px;
+    background: #F1F5F9;
+    min-height: calc(100vh - 40px);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.inflow-win-window {
+    width: 610px;
+    max-width: 100%;
+    background: #FFFFFF;
+    border: 1px solid #7F9DB9;
+    border-radius: 4px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.inflow-win-titlebar {
+    background: linear-gradient(180deg, #FFFFFF 0%, #E9EEF4 100%);
+    border-bottom: 1px solid #D1D5DB;
+    height: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px 0 10px;
+    user-select: none;
+}
+
+.inflow-win-title {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.inflow-win-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.win-btn {
+    width: 20px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #4B5563;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.win-btn:hover {
+    background: #E5E7EB;
+}
+.win-btn.close:hover {
+    background: #EF4444;
+    color: #FFFFFF;
+}
+
+.inflow-win-body {
+    padding: 24px 28px 28px 28px;
+    flex: 1;
+}
+
+.inflow-win-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+}
+
+.inflow-cd-icon-box {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.inflow-win-heading {
+    font-size: 24px;
+    font-weight: 400;
+    color: #4A90E2;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+.inflow-instruction-text {
+    font-size: 12.5px;
+    color: #262626;
+    line-height: 1.4;
+}
+
+.inflow-form-grid {
+    display: flex;
+    flex-direction: column;
+}
+
+.inflow-form-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.inflow-form-label {
+    font-size: 12.5px;
+    color: #262626;
+    padding-top: 4px;
+    text-align: left;
+}
+
+.inflow-form-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.inflow-win-dropdown {
+    width: 175px;
+    height: 25px;
+    font-size: 12px;
+    border: 1px solid #7F9DB9;
+    border-radius: 2px;
+    padding: 1px 6px;
+    background: #FFFFFF;
+    color: #1E293B;
+}
+
+.inflow-desc-text {
+    font-size: 11.5px;
+    color: #404040;
+    max-width: 320px;
+    line-height: 1.35;
+    margin-top: 2px;
+}
+
+.inflow-win-textbox {
+    flex: 1;
+    height: 25px;
+    border: 1px solid #7F9DB9;
+    border-radius: 2px;
+    padding: 1px 8px;
+    font-size: 12px;
+    color: #1E293B;
+    background: #FFFFFF;
+}
+
+.inflow-win-btn-classic {
+    height: 25px;
+    min-width: 76px;
+    padding: 0 12px;
+    font-size: 12px;
+    color: #1F2937;
+    background: linear-gradient(180deg, #F9FAFB 0%, #E5E7EB 100%);
+    border: 1px solid #9CA3AF;
+    border-radius: 2px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.inflow-win-btn-classic:hover {
+    background: linear-gradient(180deg, #FFFFFF 0%, #D1D5DB 100%);
+    border-color: #6B7280;
+}
+
+.inflow-win-footer {
+    background: #F0F0F0;
+    border-top: 1px solid #D9D9D9;
+    padding: 10px 18px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.inflow-win-btn-action {
+    min-width: 78px;
+    height: 25px;
+    padding: 0 12px;
+    font-size: 12px;
+    color: #1F2937;
+    background: linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%);
+    border: 1px solid #9CA3AF;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.inflow-win-btn-action:hover {
+    background: linear-gradient(180deg, #FFFFFF 0%, #D1D5DB 100%);
+}
+.inflow-win-btn-action.primary {
+    border-color: #2563EB;
+    font-weight: 600;
+    color: #1E3A8A;
+}
+</style>
+
+<script>
+const EXPORT_META = {
+    'sales_order': {
+        'filename': 'inFlow_SalesOrder.csv',
+        'desc': 'Export your sales orders, including customer information and what was ordered.'
+    },
+    'product': {
+        'filename': 'inFlow_Product.csv',
+        'desc': 'Export your product information, including item name/code, description, price, cost, barcode, etc.'
+    },
+    'customer': {
+        'filename': 'inFlow_Customer.csv',
+        'desc': 'Export your customers, including contact information, addresses, phone numbers, and balances.'
+    },
+    'vendor': {
+        'filename': 'inFlow_Vendor.csv',
+        'desc': 'Export your vendors and suppliers, including contact information and payment terms.'
+    },
+    'inventory': {
+        'filename': 'inFlow_Inventory_Stock.csv',
+        'desc': 'Export your current stock levels on hand by product, warehouse location, and sublocation.'
+    },
+    'purchase_order': {
+        'filename': 'inFlow_PurchaseOrder.csv',
+        'desc': 'Export your purchase orders, including vendor information, items, quantities, and costs.'
+    }
+};
+
+function onExportTypeChange() {
+    const sel = document.getElementById('exportDataTypeSelect');
+    const val = sel.value;
+    const meta = EXPORT_META[val] || EXPORT_META['sales_order'];
+
+    document.getElementById('exportDescription').textContent = meta.desc;
+    document.getElementById('exportFilenameInput').value = meta.filename;
+    document.getElementById('exportStatusBox').style.display = 'none';
+}
+
+function promptCustomFilename() {
+    const current = document.getElementById('exportFilenameInput').value;
+    const custom = prompt('Enter export filename:', current);
+    if (custom && custom.trim()) {
+        let clean = custom.trim();
+        if (!clean.toLowerCase().endsWith('.csv')) clean += '.csv';
+        document.getElementById('exportFilenameInput').value = clean;
+    }
+}
+
+function onExecuteExport() {
+    const dataType = document.getElementById('exportDataTypeSelect').value;
+    const filename = document.getElementById('exportFilenameInput').value || 'export.csv';
+
+    const downloadUrl = `/data/export/download?type=${encodeURIComponent(dataType)}`;
+
+    // Create hidden download trigger
+    const a = document.createElement('a');
+    a.href = downloadUrl;
+    a.download = filename;
+    a.setAttribute('data-no-tab', 'true');
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    const statusBox = document.getElementById('exportStatusBox');
+    statusBox.style.display = 'block';
+    statusBox.innerHTML = `<strong>✅ Export Initiated!</strong><br>Your file <code>${escapeHtml(filename)}</code> has been generated and downloaded.`;
+}
+
+function onCancel() {
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.closeActiveTab();
+    } else {
+        window.history.back();
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    onExportTypeChange();
+});
+</script>
+{% endblock %}

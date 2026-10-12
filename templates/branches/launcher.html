@@ -1,0 +1,149 @@
+{% extends 'base.html' %}
+
+{% block title %}Launch Branch System - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="max-width: 1200px; margin: 0 auto; padding: 10px 0;">
+    <!-- Top Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 14px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 44px; height: 44px; border-radius: 10px; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); display: flex; align-items: center; justify-content: center; font-size: 22px; color: #FFFFFF; box-shadow: 0 4px 10px rgba(2, 132, 199, 0.25);">
+                    🚀
+                </div>
+                <div>
+                    <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;">
+                        Branch System Launcher (បើកដំណើរការប្រព័ន្ធសាខា)
+                    </h1>
+                    <p style="color: #64748B; font-size: 0.88rem; margin: 3px 0 0 0;">
+                        Choose a store branch below to launch its dedicated retail workspace, POS billing counter, and inventory system.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <a href="{{ url_for('branches.switch_branch', id=0) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext(0, event); }" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-weight: 600; text-decoration: none;">
+                🏢 Main Store HQ (Headquarters)
+            </a>
+            <a href="{{ url_for('branches.list_branches') }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-weight: 600; text-decoration: none;">
+                ⚙️ Manage Branches
+            </a>
+        </div>
+    </div>
+
+    <!-- Central Fulfillment Info Banner -->
+    <div style="background: linear-gradient(90deg, #F0F9FF 0%, #E0F2FE 100%); border: 1px solid #BAE6FD; border-radius: 10px; padding: 14px 20px; margin-bottom: 26px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 26px;">🏢</span>
+            <div>
+                <div style="font-size: 14px; font-weight: 800; color: #0369A1;">Shared Central Fulfillment Live Sync</div>
+                <div style="font-size: 12.5px; color: #0284C7; margin-top: 1px;">
+                    All branch system sales atomically deduct stock from <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong> in real time.
+                </div>
+            </div>
+        </div>
+        <span class="badge" style="background: #22C55E; color: #FFFFFF; font-weight: 700; padding: 4px 10px;">HQ SYNC ACTIVE</span>
+    </div>
+
+    <!-- Branch Cards Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 20px; margin-bottom: 30px;">
+        {% for b in branches %}
+        <div class="card" style="padding: 22px; border-radius: 12px; border: 1.5px solid #E2E8F0; background: #FFFFFF; box-shadow: 0 4px 14px rgba(0,0,0,0.05); display: flex; flex-direction: column; justify-content: space-between; transition: transform 0.2s ease, box-shadow 0.2s ease;">
+            <div>
+                <!-- Branch Card Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                    <div>
+                        <span class="badge" style="background: #E0F2FE; color: #0284C7; font-size: 11px; font-weight: 800; padding: 3px 8px; border-radius: 4px; font-family: monospace;">
+                            {{ b.code }}
+                        </span>
+                        <h2 style="font-size: 1.25rem; font-weight: 800; color: #0F172A; margin: 8px 0 2px 0;" class="font-khmer">
+                            {{ b.name }}
+                        </h2>
+                    </div>
+                    <div style="width: 40px; height: 40px; border-radius: 8px; background: #F8FAFC; display: flex; align-items: center; justify-content: center; font-size: 20px; border: 1px solid #E2E8F0;">
+                        🏪
+                    </div>
+                </div>
+
+                <!-- Info Badges -->
+                <div style="display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: #475569; margin-bottom: 16px; background: #F8FAFC; padding: 10px 14px; border-radius: 8px; border: 1px solid #F1F5F9;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748B;">Manager / Cashier:</span>
+                        <strong style="color: #1E293B;" class="font-khmer">{{ b.manager_name or 'Store Staff' }}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748B;">Warehouse Stock:</span>
+                        <strong style="color: #1E293B;">{{ b.location_name or 'Central Warehouse' }}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #64748B;">SO Invoice Prefix:</span>
+                        <strong style="color: #0284C7; font-family: monospace;">{{ b.so_prefix }}</strong>
+                    </div>
+                </div>
+
+                <!-- Allowed Functions Badges -->
+                <div style="margin-bottom: 18px;">
+                    <div style="font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 6px;">Allowed Functions (សិទ្ធិប្រើប្រាស់):</div>
+                    <div style="display: flex; flex-wrap: wrap; gap: 5px;">
+                        {% if b.permissions.pos %}
+                        <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 10.5px; padding: 3px 7px;">⚡ POS</span>
+                        {% endif %}
+                        {% if b.permissions.sales_orders %}
+                        <span class="badge" style="background: #DCFCE7; color: #15803D; font-size: 10.5px; padding: 3px 7px;">📋 Sales Orders</span>
+                        {% endif %}
+                        {% if b.permissions.inventory %}
+                        <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 10.5px; padding: 3px 7px;">📦 Stock View</span>
+                        {% endif %}
+                        {% if b.permissions.transfers %}
+                        <span class="badge" style="background: #EEF2F6; color: #334155; font-size: 10.5px; padding: 3px 7px;">🔄 Transfers</span>
+                        {% endif %}
+                        {% if b.permissions.expenses %}
+                        <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 10.5px; padding: 3px 7px;">💸 Expenses</span>
+                        {% endif %}
+                        {% if b.permissions.customers %}
+                        <span class="badge" style="background: #F3E8FF; color: #7E22CE; font-size: 10.5px; padding: 3px 7px;">👥 Customers</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Big Launch Buttons -->
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+                <a href="{{ url_for('branches.switch_branch', id=b.id) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext({{ b.id }}, event); }" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); text-decoration: none; font-weight: 800; font-size: 13.5px; border-radius: 8px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);">
+                    <span>🚀 Launch Branch System (បើកដំណើរការប្រព័ន្ធ)</span>
+                </a>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    {% if b.permissions.sales_orders %}
+                    <a href="{{ url_for('branches.branch_new_order', id=b.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 10px; font-size: 12px; font-weight: 700; text-decoration: none; background: #F0F9FF; color: #0284C7; border: 1px solid #BAE6FD;">
+                        📋 + New Order (SO)
+                    </a>
+                    {% else %}
+                    <a href="{{ url_for('branches.view_branch', id=b.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 10px; font-size: 12px; font-weight: 600; text-decoration: none; background: #F8FAFC;">
+                        ⚙️ Branch Settings
+                    </a>
+                    {% endif %}
+
+                    {% if b.permissions.pos %}
+                    <a href="{{ url_for('branches.branch_pos', id=b.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 4px; padding: 7px 10px; font-size: 12px; font-weight: 600; text-decoration: none; background: #F8FAFC;">
+                        ⚡ POS Counter
+                    </a>
+                    {% else %}
+                    <button class="btn btn-secondary" disabled style="padding: 7px 10px; font-size: 12px; opacity: 0.5;">
+                        ⚡ POS Locked
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="card" style="padding: 40px; text-align: center; color: #64748B; grid-column: 1 / -1;">
+            <div style="font-size: 32px; margin-bottom: 10px;">🏪</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0F172A;">No active branches available to launch.</div>
+            <p style="margin: 6px 0 16px 0;">Create a new branch in the Branch Manager to get started.</p>
+            <a href="{{ url_for('branches.list_branches') }}" class="btn btn-primary" style="padding: 8px 18px; text-decoration: none;">+ Add Store Branch</a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ branch.name }} - Sales Orders Hub{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <a href="{{ url_for('branches.view_branch', id=branch.id) }}" class="btn btn-sm btn-secondary" style="padding: 5px 12px; font-weight: 600; text-decoration: none;">
+                ← Back to {{ branch.code }}
+            </a>
+            <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">
+                {{ branch.name }} - Sales Orders
+            </h1>
+            <span class="badge" style="background: #0284C7; color: #FFFFFF; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">{{ branch.code }}</span>
+        </div>
+        <p style="color: #64748B; font-size: 0.88rem; margin: 4px 0 0 0;">
+            Isolated branch sales order ledger &bull; Shared central fulfillment: <strong>Main Warehouse</strong>
+        </p>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}" 
+           class="btn btn-primary" 
+           onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('branches.branch_new_order', id=branch.id) }}', 'New Order ({{ branch.code }})', 'sales'); } else { window.location.href='{{ url_for('branches.branch_new_order', id=branch.id) }}'; }"
+           style="display: flex; align-items: center; gap: 7px; padding: 8px 18px; background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; font-weight: 700; text-decoration: none; border-radius: 6px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ New Sales Order (បង្កើត Order ថ្មី)</span>
+        </a>
+        <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            ⚡ Quick POS Counter
+        </a>
+        <a href="{{ url_for('branches.branch_reports', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            📊 Branch Statement
+        </a>
+    </div>
+</div>
+
+<!-- Central Stock Sync & Independent Order Banner -->
+<div style="background: linear-gradient(90deg, #F0F9FF 0%, #E0F2FE 100%); border: 1px solid #BAE6FD; border-radius: 8px; padding: 10px 16px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12.5px;">
+    <div style="display: flex; align-items: center; gap: 8px; color: #0369A1;">
+        <span style="font-size: 16px;">🏢</span>
+        <span><strong>Shared Central Warehouse:</strong> Products fulfilled atomically from <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong> with live real-time stock levels.</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <span class="badge" style="background: #0284C7; color: #FFFFFF; font-weight: 700; font-size: 11px;">PREFIX: {{ branch.so_prefix }}</span>
+        <span class="badge" style="background: #10B981; color: #FFFFFF; font-weight: 700; font-size: 11px;">INDEPENDENT LEDGER</span>
+    </div>
+</div>
+
+<!-- KPI Mini Banner -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px;">
+    <div class="card" style="padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Total Branch Orders</div>
+        <div style="font-size: 22px; font-weight: 800; color: #0F172A; margin-top: 2px;">{{ total_count }}</div>
+    </div>
+    <div class="card" style="padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Total Sales (លុយលក់)</div>
+        <div style="font-size: 22px; font-weight: 800; color: #10B981; margin-top: 2px;">{{ totals.total_sales|currency }}</div>
+    </div>
+    <div class="card" style="padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Collected Cash</div>
+        <div style="font-size: 22px; font-weight: 800; color: #0284C7; margin-top: 2px;">{{ totals.total_collected|currency }}</div>
+    </div>
+    <div class="card" style="padding: 14px 18px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Balance Due</div>
+        <div style="font-size: 22px; font-weight: 800; color: {{ '#EF4444' if totals.total_unpaid > 0 else '#10B981' }}; margin-top: 2px;">{{ totals.total_unpaid|currency }}</div>
+    </div>
+</div>
+
+<!-- Status Tabs Bar -->
+<div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
+    <a href="{{ url_for('branches.branch_orders', id=branch.id, search=search) }}" 
+       class="btn {% if not status %}btn-primary{% else %}btn-secondary{% endif %} btn-sm"
+       style="{% if not status %}background: #0284C7; border-color: #0284C7;{% endif %} border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        All Orders ({{ total_count }})
+    </a>
+    <a href="{{ url_for('branches.branch_orders', id=branch.id, status='OPEN', search=search) }}" 
+       class="btn {% if status == 'OPEN' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm"
+       style="{% if status == 'OPEN' %}background: #0284C7; border-color: #0284C7;{% endif %} border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Open ({{ stats_dict.get('OPEN', 0) }})
+    </a>
+    <a href="{{ url_for('branches.branch_orders', id=branch.id, status='PAID', search=search) }}" 
+       class="btn {% if status in ('PAID', 'INVOICED') %}btn-primary{% else %}btn-secondary{% endif %} btn-sm"
+       style="{% if status in ('PAID', 'INVOICED') %}background: #0284C7; border-color: #0284C7;{% endif %} border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Paid ({{ stats_dict.get('INVOICED', 0) + stats_dict.get('PAID', 0) }})
+    </a>
+    <a href="{{ url_for('branches.branch_orders', id=branch.id, status='CANCELLED', search=search) }}" 
+       class="btn {% if status == 'CANCELLED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm"
+       style="{% if status == 'CANCELLED' %}background: #0284C7; border-color: #0284C7;{% endif %} border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Cancelled ({{ stats_dict.get('CANCELLED', 0) }})
+    </a>
+</div>
+
+<!-- Search & Filters -->
+<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+    <form method="GET" action="{{ url_for('branches.branch_orders', id=branch.id) }}" style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+        <input type="hidden" name="status" value="{{ status }}">
+        <div style="flex: 1; min-width: 240px;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Search by Order #, Customer name, or phone..." class="form-input" style="padding: 8px 12px; font-size: 13px;">
+        </div>
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or status %}
+        <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Orders Table -->
+<div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; color: #475569;">
+                    <th style="padding: 12px 14px; text-align: left;">Order #</th>
+                    <th style="padding: 12px 14px; text-align: left;">Date</th>
+                    <th style="padding: 12px 14px; text-align: left;">Customer</th>
+                    <th style="padding: 12px 14px; text-align: right;">Lines</th>
+                    <th style="padding: 12px 14px; text-align: right;">Total Amount</th>
+                    <th style="padding: 12px 14px; text-align: right;">Balance Due</th>
+                    <th style="padding: 12px 14px; text-align: center;">Fulfillment</th>
+                    <th style="padding: 12px 14px; text-align: center;">Payment</th>
+                    <th style="padding: 12px 16px; text-align: right;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr style="border-bottom: 1px solid #F1F5F9; font-size: 13px; cursor: pointer;"
+                    ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=o.id, branch=branch.id) }}', 'Sales Order: {{ o.order_number }}', 'sales'); } else { window.location.href='{{ url_for('sales_orders.detail_order', id=o.id, branch=branch.id) }}'; }">
+                    <td style="padding: 12px 14px;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=o.id, branch=branch.id) }}" onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=o.id, branch=branch.id) }}', 'Sales Order: {{ o.order_number }}', 'sales'); }" style="font-weight: 700; font-family: monospace; color: #0284C7; text-decoration: none;">
+                            {{ o.order_number }}
+                        </a>
+                    </td>
+                    <td style="padding: 12px 14px; color: #64748B;">{{ o.order_date }}</td>
+                    <td style="padding: 12px 14px;">
+                        <div style="font-weight: 600; color: #0F172A;">{{ o.customer_name or 'Walk-in Customer' }}</div>
+                        {% if o.customer_phone %}
+                        <div style="font-size: 11px; color: #64748B;">{{ o.customer_phone }}</div>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; color: #64748B;">{{ o.line_count }}</td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ o.total_amount | currency }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: {% if o.balance_due > 0 %}#EF4444{% else %}#10B981{% endif %};">
+                        {{ o.balance_due | currency }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center;">
+                        <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 11px; font-weight: 600;">{{ o.status }}</span>
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center;">
+                        <span class="badge" style="background: {{ '#DCFCE7' if o.payment_status == 'PAID' else '#FEF3C7' }}; color: {{ '#15803D' if o.payment_status == 'PAID' else '#B45309' }}; font-size: 11px; font-weight: 700;">{{ o.payment_status }}</span>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=o.id, branch=branch.id) }}" class="btn btn-secondary btn-sm" style="padding: 4px 10px; font-size: 12px; text-decoration: none;">
+                            Manage →
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: #94A3B8; padding: 32px;">No sales orders found for this branch.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div style="padding: 14px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} branch orders)</span>
+        <div style="display: flex; gap: 8px;">
+            {% if page > 1 %}
+            <a href="{{ url_for('branches.branch_orders', id=branch.id, page=page-1, status=status, search=search) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('branches.branch_orders', id=branch.id, page=page+1, status=status, search=search) }}" class="btn btn-secondary btn-sm">Next →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

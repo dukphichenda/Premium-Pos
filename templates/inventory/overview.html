@@ -1,0 +1,92 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Levels - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Multi-Warehouse Stock Matrix</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Live quantities and inventory valuation across warehouses</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="{{ url_for('inventory.list_adjustments') }}" class="btn btn-secondary">
+            <span>Stock Adjustment</span>
+        </a>
+        <a href="{{ url_for('inventory.list_transfers') }}" class="btn btn-primary">
+            <span>Inter-Warehouse Transfer</span>
+        </a>
+    </div>
+</div>
+
+<!-- Filters Bar -->
+<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+    <form method="GET" action="{{ url_for('inventory.overview') }}" style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 240px;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Filter by product name or SKU..." class="form-input">
+        </div>
+        <div style="width: 200px;">
+            <select name="category_id" class="form-select" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}" {% if category_id|string == cat.id|string %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Search</button>
+        {% if search or category_id %}
+        <a href="{{ url_for('inventory.overview') }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Multi-Warehouse Matrix Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product / SKU</th>
+                    <th>Category</th>
+                    <th style="text-align: right; background-color: #F1F5F9;">Total On Hand</th>
+                    {% for loc in locations %}
+                    <th style="text-align: right;">{{ loc.name }}</th>
+                    {% endfor %}
+                    <th style="text-align: right;">Total Valuation</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in items %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('products.detail_product', id=item.id) }}" style="font-weight: 600; color: #0F172A; text-decoration: none;">
+                            {{ item.name }}
+                        </a>
+                        <div style="font-size: 0.72rem; color: #64748B; font-family: var(--font-mono);">
+                            {{ item.sku }} ({{ item.uom }})
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge badge-neutral">{{ item.category_name or '-' }}</span>
+                    </td>
+                    <td style="text-align: right; font-weight: 800; background-color: #F8FAFC; color: {% if item.total_qty <= 0 %}#DC2626{% else %}#0F766E{% endif %};">
+                        {{ "{:,.0f}".format(item.total_qty) }}
+                    </td>
+                    {% for loc in locations %}
+                    <td style="text-align: right; font-weight: 600; color: {% if location_matrix.get((item.id, loc.id), 0) > 0 %}#0F172A{% else %}#CBD5E1{% endif %};">
+                        {{ "{:,.0f}".format(location_matrix.get((item.id, loc.id), 0)) }}
+                    </td>
+                    {% endfor %}
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ item.total_value | currency }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="{{ 4 + locations|length }}" style="text-align: center; color: #94A3B8; padding: 32px;">No inventory records found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block title %}Expenses & Cash Flow - Summary Dashboard - inFlow Premium{% endblock %}
+
+{% block content %}
+<div class="inflow-expense-container">
+    <div class="expense-top-header">
+        <div class="expense-title-group">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="expense-badge-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2">
+                        <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="expense-main-heading">Summary Dashboard (តារាងសង្ខេបប្រចាំខែ)</h1>
+                    <div class="expense-sub-heading">
+                        <span>Multi-month financial comparison & cash-in-hand trends</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="expense-header-actions">
+            <a href="{{ url_for('expenses.monthly_expenses') }}" class="btn btn-primary">
+                <span>Go to Current Month Sheet ➔</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Monthly Sheet Tabs -->
+    <div class="sheet-tabs-container">
+        <div class="sheet-tabs-scroll">
+            <a href="{{ url_for('expenses.summary_dashboard') }}" class="sheet-tab-item tab-summary active">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span>Summary Dashboard</span>
+                <span class="sheet-tab-active-dot"></span>
+            </a>
+            {% for row in month_data %}
+            <a href="{{ url_for('expenses.monthly_expenses', month=row.month_key) }}" class="sheet-tab-item">
+                <span class="sheet-tab-icon">📊</span>
+                <span>{{ row.month_display }}</span>
+            </a>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Summary Dashboard Table -->
+    <div class="card" style="padding: 0; overflow: hidden; border-radius: 8px; border: 1px solid #CBD5E1; box-shadow: 0 2px 8px rgba(15, 118, 110, 0.05); margin-top: 16px;">
+        <div class="table-container" style="border: none;">
+            <table class="data-table" style="font-size: 11.5px;">
+                <thead>
+                    <tr style="background: linear-gradient(180deg, #F0FDFA 0%, #E6FFFA 100%);">
+                        <th style="color: #0F766E; font-weight: 700;">Month</th>
+                        <th style="text-align: right; color: #166534;">លុយចាស់ (Opening)</th>
+                        <th style="text-align: right; color: #0284C7;">Clear STM</th>
+                        <th style="text-align: right; color: #16A34A;">Media</th>
+                        <th style="text-align: right; color: #0F766E;">លុយលក់ (Received)</th>
+                        <th style="text-align: right; color: #1D4ED8; font-weight: 700;">លុយសរុប (Total In)</th>
+                        <th style="text-align: right; color: #B91C1C; font-weight: 700;">ចំណាយសរុប (Expense)</th>
+                        <th style="text-align: right; color: #B45309; font-weight: 800; background: #FEF3C7;">លុយសល់ (In Hand)</th>
+                        <th style="text-align: right; font-weight: 700;">ចំណូល-ចំណាយ (Net)</th>
+                        <th style="text-align: center; width: 100px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in month_data %}
+                    <tr>
+                        <td style="font-weight: 700; color: #0F172A;">
+                            <a href="{{ url_for('expenses.monthly_expenses', month=row.month_key) }}" style="color: #0F766E; text-decoration: none; font-weight: 700;">
+                                {{ row.month_display }}
+                            </a>
+                            <span style="font-size: 10px; color: #94A3B8; margin-left: 4px;">({{ row.expense_count }} exps)</span>
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace;">
+                            ${{ "{:,.2f}".format(row.opening_balance) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; color: #0284C7;">
+                            ${{ "{:,.2f}".format(row.clear_stm) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; color: #16A34A; font-weight: 600;">
+                            ${{ "{:,.2f}".format(row.media_total) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 600; color: #0F766E;">
+                            ${{ "{:,.2f}".format(row.sales_received) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #1D4ED8;">
+                            ${{ "{:,.2f}".format(row.total_money_in) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: #B91C1C;">
+                            ${{ "{:,.2f}".format(row.total_expenses) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 800; color: #B45309; background: #FFFBEB;">
+                            ${{ "{:,.2f}".format(row.money_in_hand) }}
+                        </td>
+                        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: {% if row.net_profit >= 0 %}#15803D{% else %}#B91C1C{% endif %};">
+                            ${{ "{:,.2f}".format(row.net_profit) }}
+                        </td>
+                        <td style="text-align: center; white-space: nowrap;">
+                            <a href="{{ url_for('expenses.monthly_expenses', month=row.month_key) }}" class="btn btn-sm btn-outline" style="padding: 2px 8px; font-size: 11px;" title="Open Monthly Sheet">
+                                Open ➔
+                            </a>
+                            <a href="{{ url_for('expenses.export_monthly_excel', month=row.month_key) }}" download="inFlow_Monthly_Report_{{ row.month_key }}.xlsx" data-no-tab="true" class="action-icon-btn" style="padding: 2px 4px; font-size: 13px; text-decoration: none;" title="Export to Excel (.xlsx)">
+                                📊
+                            </a>
+                            <a href="{{ url_for('expenses.export_monthly_pdf', month=row.month_key) }}" download="inFlow_Monthly_Report_{{ row.month_key }}.pdf" data-no-tab="true" class="action-icon-btn" style="padding: 2px 4px; font-size: 13px; text-decoration: none;" title="Export to PDF (.pdf)">
+                                📄
+                            </a>
+                            <form method="POST" action="{{ url_for('expenses.delete_month') }}" style="display: inline;" onsubmit="return confirm('Permanently delete all records for {{ row.month_display }}? This cannot be undone.');">
+                                <input type="hidden" name="month_key" value="{{ row.month_key }}">
+                                <button type="submit" class="action-icon-btn delete" style="padding: 2px 4px; font-size: 11px;" title="Delete Monthly Sheet">✕</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

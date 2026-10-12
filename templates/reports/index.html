@@ -1,0 +1,258 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports List - inFlow Premium{% endblock %}
+
+{% block content %}
+<!-- Top Accent Color Bar (Purple for Reports) -->
+<div class="inflow-top-accent-bar reports"></div>
+
+<!-- inFlow Desktop Ribbon Toolbar -->
+<div class="inflow-desktop-toolbar">
+    <div class="inflow-toolbar-left">
+        <button type="button" class="inflow-tb-btn primary" onclick="openReportTab('{{ selected_report }}', '{{ active_meta.title }}')" title="Open and generate this report">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+            <span style="color: #FFFFFF; font-weight: bold;">Open Report</span>
+        </button>
+        <button type="button" class="inflow-tb-btn" onclick="window.location.reload()" title="Refresh reports list">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span>Refresh</span>
+        </button>
+    </div>
+    <div>
+        <a href="{{ url_for('dashboard.index') }}" class="inflow-tb-btn danger" onclick="window.closeInflowTab('tab-reports-main', event)" title="Close document">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span>Close</span>
+        </a>
+    </div>
+</div>
+
+<!-- Two-Column Report Center Layout (Matching screenshot0028.JPEG - screenshot0032.JPEG) -->
+<div class="inflow-reports-center">
+    <!-- Left Navigation Categories -->
+    <aside class="inflow-reports-sidebar">
+        <!-- Sales Reports -->
+        <div class="inflow-report-category-group">
+            <div class="inflow-rep-cat-title {% if selected_cat == 'sales' %}active{% endif %}" onclick="switchCategory('sales')">
+                Sales Reports
+            </div>
+            <div class="inflow-rep-cat-links {% if selected_cat == 'sales' %}expanded{% endif %}" id="cat-sales">
+                {% for item in catalog['sales']['items'] %}
+                <a href="{{ url_for('reports.reports_center', cat='sales', report=item.key) }}" 
+                   ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
+                   class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
+                   title="Double-click to open in new tab">
+                    {{ item.title }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Purchasing Reports -->
+        <div class="inflow-report-category-group">
+            <div class="inflow-rep-cat-title {% if selected_cat == 'purchasing' %}active{% endif %}" onclick="switchCategory('purchasing')">
+                Purchasing Reports
+            </div>
+            <div class="inflow-rep-cat-links {% if selected_cat == 'purchasing' %}expanded{% endif %}" id="cat-purchasing">
+                {% for item in catalog['purchasing']['items'] %}
+                <a href="{{ url_for('reports.reports_center', cat='purchasing', report=item.key) }}" 
+                   ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
+                   class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
+                   title="Double-click to open in new tab">
+                    {{ item.title }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Inventory Reports -->
+        <div class="inflow-report-category-group">
+            <div class="inflow-rep-cat-title {% if selected_cat == 'inventory' %}active{% endif %}" onclick="switchCategory('inventory')">
+                Inventory Reports
+            </div>
+            <div class="inflow-rep-cat-links {% if selected_cat == 'inventory' %}expanded{% endif %}" id="cat-inventory">
+                {% for item in catalog['inventory']['items'] %}
+                <a href="{{ url_for('reports.reports_center', cat='inventory', report=item.key) }}" 
+                   ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
+                   class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
+                   title="Double-click to open in new tab">
+                    {{ item.title }}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- My Reports -->
+        <div class="inflow-report-category-group">
+            <div class="inflow-rep-cat-title {% if selected_cat == 'my_reports' %}active{% endif %}" onclick="switchCategory('my_reports')">
+                My Reports
+            </div>
+            <div class="inflow-rep-cat-links {% if selected_cat == 'my_reports' %}expanded{% endif %}" id="cat-my_reports">
+                {% for mr in my_reports %}
+                <div class="inflow-my-rep-row">
+                    <a href="javascript:void(0)" onclick="openReportTab('{{ mr.key }}', '{{ mr.title }}')" class="inflow-my-rep-link">
+                        <div class="inflow-my-rep-date">{{ mr.date_saved }}</div>
+                        <div class="inflow-my-rep-title">{{ mr.title }}</div>
+                    </a>
+                    <button type="button" class="inflow-my-rep-del" onclick="this.closest('.inflow-my-rep-row').remove()" title="Delete saved report">✕</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </aside>
+
+    <!-- Right Report Preview Canvas -->
+    <main class="inflow-reports-canvas">
+        <div class="inflow-rep-header-banner">
+            <div>
+                <h1 class="inflow-rep-main-title">{{ active_meta.title }}</h1>
+                <p class="inflow-rep-main-desc">{{ active_meta.description }}</p>
+            </div>
+            <div>
+                <button type="button" class="inflow-generate-cta-btn" onclick="openReportTab('{{ selected_report }}', '{{ active_meta.title }}')">
+                    Open & Generate Report ▶
+                </button>
+            </div>
+        </div>
+
+        <!-- Watermarked Sample Report Sheet Preview (Matching screenshot0028.JPEG & screenshot0031.JPEG) -->
+        <div class="inflow-sample-sheet-wrapper">
+            <div class="inflow-sample-sheet">
+                <!-- Large SAMPLE Watermark -->
+                <div class="inflow-watermark-text">SAMPLE</div>
+
+                <!-- Sample Header -->
+                <div class="inflow-sheet-header">
+                    <div>
+                        <div class="inflow-sheet-title">{{ active_meta.title }}</div>
+                        <div class="inflow-sheet-meta">Report Printed: <span style="color:#0F172A; font-weight: 500;">{{ today_str }}</span></div>
+                    </div>
+                    <div class="inflow-sheet-page-tag">page 1 / 1</div>
+                </div>
+
+                <!-- Sample Table Content based on type -->
+                <table class="inflow-sample-table">
+                    {% if selected_report == 'vendor-list' %}
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">NAME</th>
+                            <th style="width: 20%;">CONTACT</th>
+                            <th style="width: 15%;">PHONE</th>
+                            <th style="width: 15%;">EMAIL</th>
+                            <th style="width: 25%;">ADDRESS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>Tri-Mega Toys</td><td>Jim</td><td>408-555-0451</td><td>jim@mega.com</td><td>50 Lancaster Ave, Boston MA</td></tr>
+                        <tr class="alt"><td>Propack Strip Inc.</td><td>Samantha</td><td>408-555-0452</td><td>sam@propack.com</td><td>1 Propack Ave, Greensboro NC</td></tr>
+                        <tr><td>Richardsen Quick Liquidation</td><td>George Richardson</td><td>408-555-0481</td><td>george@richards.com</td><td>147 La Campaneta Road, Santa Clara CA</td></tr>
+                        <tr class="alt"><td>Global Express Packaging</td><td>David Lee</td><td>408-555-0499</td><td>dave@gep.com</td><td>88 Industry Blvd, Austin TX</td></tr>
+                    </tbody>
+                    {% elif selected_report == 'inventory-valuation' or selected_report == 'inventory-summary' %}
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">ITEM SKU / NAME</th>
+                            <th style="width: 20%;">CATEGORY</th>
+                            <th style="width: 15%; text-align: right;">ON HAND</th>
+                            <th style="width: 20%; text-align: right;">UNIT COST</th>
+                            <th style="width: 20%; text-align: right;">ASSET VALUE</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>SKU-0388 N1750-QP Box</td><td>Boxes</td><td style="text-align: right;">500</td><td style="text-align: right;">$8.00</td><td style="text-align: right;">$4,000.00</td></tr>
+                        <tr class="alt"><td>SKU-0104 Bubble Wrap 200m</td><td>Packing</td><td style="text-align: right;">120</td><td style="text-align: right;">$14.50</td><td style="text-align: right;">$1,740.00</td></tr>
+                        <tr><td>SKU-0012 Heavy Tape Clear</td><td>Tape</td><td style="text-align: right;">450</td><td style="text-align: right;">$2.20</td><td style="text-align: right;">$990.00</td></tr>
+                    </tbody>
+                    {% elif selected_cat == 'purchasing' %}
+                    <thead>
+                        <tr>
+                            <th style="width: 18%;">PO NUMBER</th>
+                            <th style="width: 32%;">VENDOR</th>
+                            <th style="width: 16%;">ORDER DATE</th>
+                            <th style="width: 14%;">STATUS</th>
+                            <th style="width: 20%; text-align: right;">TOTAL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>PO-00084</td><td>Global Containers Co.</td><td>02-Oct-26</td><td>Invoiced</td><td style="text-align: right;">$1,450.00</td></tr>
+                        <tr class="alt"><td>PO-00083</td><td>Paper Craft Cambodia</td><td>01-Oct-26</td><td>Received</td><td style="text-align: right;">$820.00</td></tr>
+                    </tbody>
+                    {% elif selected_report == 'sales-by-product-summary' or selected_report == 'sales-by-product-details' %}
+                    <thead>
+                        <tr>
+                            <th style="width: 25%;">ITEM</th>
+                            <th style="width: 20%;">CATEGORY</th>
+                            <th style="width: 15%; text-align: right;">QUANTITY SOLD</th>
+                            <th style="width: 20%; text-align: right;">TOTAL SALES</th>
+                            <th style="width: 20%; text-align: right;">GROSS PROFIT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>SET1-QP Premium Box</td><td>Boxes</td><td style="text-align: right;">1,200</td><td style="text-align: right;">$2,400.00</td><td style="text-align: right;">$680.00</td></tr>
+                        <tr class="alt"><td>BPP01-200 Bubble Film</td><td>Packing</td><td style="text-align: right;">850</td><td style="text-align: right;">$1,850.00</td><td style="text-align: right;">$420.00</td></tr>
+                        <tr><td>CL-001 Clear Tape 2"</td><td>Tape</td><td style="text-align: right;">3,400</td><td style="text-align: right;">$4,120.00</td><td style="text-align: right;">$1,150.00</td></tr>
+                        <tr class="alt"><td>WB-08 Heavy Kraft</td><td>Paper</td><td style="text-align: right;">600</td><td style="text-align: right;">$980.00</td><td style="text-align: right;">$310.00</td></tr>
+                    </tbody>
+                    {% else %}
+                    <!-- Sales Order Profit Report Sample Layout -->
+                    <thead>
+                        <tr>
+                            <th style="width: 14%;">ORDER NUMBER</th>
+                            <th style="width: 8%;">STATUS</th>
+                            <th style="width: 22%;">CUSTOMER</th>
+                            <th style="width: 24%;">BILLING ADDRESS</th>
+                            <th style="width: 12%;">ORDER DATE</th>
+                            <th style="width: 10%; text-align: right;">SALES AMOUNT</th>
+                            <th style="width: 10%; text-align: right;">GROSS PROFIT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr><td>SO-022407</td><td>Paid</td><td>Gather Ground Coffe & Eatery</td><td>ផ្លូវ 1007 ភ្នំពេញថ្មី</td><td>01-Oct-26</td><td style="text-align: right;">$78.00</td><td style="text-align: right;">$17.00</td></tr>
+                        <tr class="alt"><td>SO-022489</td><td>Paid</td><td>Gather Ground Coffe & Eatery</td><td>ផ្លូវ 1007 ភ្នំពេញថ្មី</td><td>01-Oct-26</td><td style="text-align: right;">$74.00</td><td style="text-align: right;">$20.00</td></tr>
+                        <tr><td>SO-022537</td><td>Paid</td><td>Gather Ground Coffe & Eatery</td><td>ផ្លូវ 1007 ភ្នំពេញថ្មី</td><td>01-Oct-26</td><td style="text-align: right;">$32.00</td><td style="text-align: right;">$9.00</td></tr>
+                        <tr class="alt"><td>SO-022568</td><td>Paid</td><td>Park Cafe Grand Phnom Penh</td><td>Street 307</td><td>01-Oct-26</td><td style="text-align: right;">$49.50</td><td style="text-align: right;">$10.10</td></tr>
+                        <tr><td>SO-022597</td><td>Paid</td><td>Cary Khoun</td><td>តែ៣ Tea Three</td><td>01-Oct-26</td><td style="text-align: right;">$38.00</td><td style="text-align: right;">$8.50</td></tr>
+                        <tr class="alt"><td>SO-022604</td><td>Paid</td><td>Sopor Dara</td><td>បុរី 100 ម៉ែត្រ</td><td>01-Oct-26</td><td style="text-align: right;">$38.50</td><td style="text-align: right;">$9.90</td></tr>
+                        <tr><td>SO-022606</td><td>Paid</td><td>Korean Supply</td><td>ផ្លូវម៉ុងឬទ្ធី សែនសុខ</td><td>01-Oct-26</td><td style="text-align: right;">$56.00</td><td style="text-align: right;">$8.00</td></tr>
+                    </tbody>
+                    {% endif %}
+                </table>
+
+                <div class="inflow-sample-footer-hint">
+                    Click <strong>Open & Generate Report</strong> or double-click any report to filter dates, select entities, and view live database results.
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.initInflowTabs) {
+        window.initInflowTabs({
+            id: 'tab-reports-main',
+            type: 'reports',
+            title: 'Reports List',
+            label: 'Reports List',
+            url: window.location.pathname
+        });
+    }
+});
+
+function switchCategory(catKey) {
+    const el = document.getElementById('cat-' + catKey);
+    if (el) {
+        el.classList.toggle('expanded');
+    }
+}
+
+function openReportTab(reportKey, reportTitle) {
+    const url = '/reports/view/' + reportKey;
+    const title = reportTitle || 'Report';
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.navigateOrOpenTab(url, title, 'reports', true);
+    } else {
+        window.location.href = url;
+    }
+}
+</script>
+{% endblock %}

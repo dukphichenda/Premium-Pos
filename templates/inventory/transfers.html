@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Warehouse Transfers - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Inter-Warehouse Stock Transfers</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Move inventory seamlessly between Main Warehouse, STM Warehouse, and retail outlets</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button onclick="openModal('newTransferModal')" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ New Stock Transfer</span>
+        </button>
+    </div>
+</div>
+
+<!-- Transfers History Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Transfer #</th>
+                    <th>Date</th>
+                    <th>Source Warehouse</th>
+                    <th>Destination Warehouse</th>
+                    <th style="text-align: right;">Total Units</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trf in transfers %}
+                <tr>
+                    <td style="font-weight: 700; font-family: var(--font-mono); color: #0F766E;">
+                        {{ trf.transfer_number }}
+                    </td>
+                    <td>{{ trf.transfer_date | format_date }}</td>
+                    <td style="font-weight: 600; color: #DC2626;">{{ trf.from_location_name }}</td>
+                    <td style="font-weight: 600; color: #059669;">{{ trf.to_location_name }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ "{:,.0f}".format(trf.total_units or 0) }}
+                    </td>
+                    <td><span class="badge badge-success">{{ trf.status }}</span></td>
+                    <td style="color: #64748B;">{{ trf.notes or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #94A3B8; padding: 32px;">No warehouse transfers recorded yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Transfer Modal -->
+<div class="modal-overlay" id="newTransferModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h2 class="modal-title">+ Inter-Warehouse Transfer</h2>
+            <button class="modal-close" onclick="closeModal('newTransferModal')">×</button>
+        </div>
+        <form action="{{ url_for('inventory.create_transfer') }}" method="POST">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">From Warehouse (Source) *</label>
+                    <select name="from_location_id" required class="form-select">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if loc.is_default %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">To Warehouse (Destination) *</label>
+                    <select name="to_location_id" required class="form-select">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if not loc.is_default %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Product Search -->
+            <div class="form-group">
+                <label class="form-label">Select Product to Move *</label>
+                <input type="text" id="trfProductSearch" placeholder="Type name or SKU..." class="form-input">
+                <input type="hidden" name="product_id" id="trfProductId" required>
+                <div id="trfProductSearchResults" style="max-height: 160px; overflow-y: auto; margin-top: 4px;"></div>
+            </div>
+
+            <div id="trfProductSelectedInfo" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="font-weight: 600; color: #0F172A;" id="trfSelectedName"></div>
+                <div style="font-size: 0.8rem; color: #64748B;" id="trfSelectedDetails"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Quantity to Transfer *</label>
+                <input type="number" step="1" name="quantity" value="1" required class="form-input" style="font-size: 1.1rem; font-weight: 700;">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Transfer Dispatch Notes</label>
+                <textarea name="notes" rows="2" placeholder="Driver name, vehicle #, or dispatch reason..." class="form-textarea"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newTransferModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Execute Transfer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const sInput = document.getElementById('trfProductSearch');
+    const resDiv = document.getElementById('trfProductSearchResults');
+    const idInput = document.getElementById('trfProductId');
+    const infoDiv = document.getElementById('trfProductSelectedInfo');
+    const nameSpan = document.getElementById('trfSelectedName');
+    const detSpan = document.getElementById('trfSelectedDetails');
+
+    let debounce;
+    sInput.addEventListener('input', () => {
+        clearTimeout(debounce);
+        const q = sInput.value.trim();
+        if (q.length < 2) {
+            resDiv.innerHTML = '';
+            return;
+        }
+
+        debounce = setTimeout(() => {
+            fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(items => {
+                    let h = '';
+                    items.forEach(it => {
+                        h += `
+                            <div onclick="selectTrfProduct(${it.id}, '${it.name.replace(/'/g, "\\'")}', '${it.sku}', '${it.uom}')" style="padding: 8px 12px; background: white; border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 4px; cursor: pointer;">
+                                <div style="font-weight: 600; font-size: 0.85rem;">${it.name}</div>
+                                <div style="font-size: 0.72rem; color: #64748B;">SKU: ${it.sku}</div>
+                            </div>
+                        `;
+                    });
+                    resDiv.innerHTML = h;
+                });
+        }, 200);
+    });
+
+    window.selectTrfProduct = function(id, name, sku, uom) {
+        idInput.value = id;
+        sInput.value = '';
+        resDiv.innerHTML = '';
+        infoDiv.style.display = 'block';
+        nameSpan.innerText = name;
+        detSpan.innerText = `SKU: ${sku} (${uom})`;
+    };
+});
+</script>
+{% endblock %}

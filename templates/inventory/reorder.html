@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block title %}Reorder Stock Assistant - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Reorder Stock Assistant</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Automated replenishment recommendations based on minimum reorder points</p>
+    </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product / SKU</th>
+                    <th>Category</th>
+                    <th style="text-align: right;">Current Stock</th>
+                    <th style="text-align: right;">Reorder Point</th>
+                    <th style="text-align: right; background-color: #FEF3C7; color: #92400E;">Suggested Order Qty</th>
+                    <th style="text-align: right;">Avg Unit Cost</th>
+                    <th style="text-align: right;">Est. Order Cost</th>
+                    <th style="text-align: center;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in low_stock %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('products.detail_product', id=item.id) }}" style="font-weight: 600; color: #0F172A; text-decoration: none;">
+                            {{ item.name }}
+                        </a>
+                        <div style="font-size: 0.72rem; color: #64748B; font-family: var(--font-mono);">
+                            {{ item.sku }} ({{ item.uom }})
+                        </div>
+                    </td>
+                    <td><span class="badge badge-neutral">{{ item.category_name or '-' }}</span></td>
+                    <td style="text-align: right; font-weight: 700; color: #DC2626;">
+                        {{ "{:,.0f}".format(item.current_qty) }}
+                    </td>
+                    <td style="text-align: right; color: #64748B;">
+                        {{ "{:,.0f}".format(item.reorder_point) }}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; background-color: #FFFBEB; color: #B45309;">
+                        {{ "{:,.0f}".format(item.suggested_reorder_qty) }}
+                    </td>
+                    <td style="text-align: right; color: #475569;">
+                        {{ item.average_cost | currency }}
+                    </td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ (item.suggested_reorder_qty * item.average_cost) | currency }}
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('purchase_orders.create_purchase', product_id=item.id) }}" class="btn btn-primary btn-sm">
+                            + Create PO
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #059669; padding: 40px; font-weight: 600;">
+                        ✓ Excellent! All inventory stock levels are healthy and above reorder thresholds.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

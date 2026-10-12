@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block title %}Branch Inventory - {{ branch.name }} - inFlow Premium{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="{{ url_for('branches.branch_workspace', id=branch.id) }}" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-weight: 600; text-decoration: none;">
+            ← Branch Workspace
+        </a>
+        <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;">
+            Branch Inventory & Stock ({{ branch.name }})
+        </h1>
+        <span class="badge" style="background: #0284C7; color: #FFFFFF; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">{{ branch.code }}</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        {% if perms.transfers %}
+        <a href="{{ url_for('branches.branch_transfers', id=branch.id) }}" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: #0284C7; text-decoration: none; font-weight: 600;">
+            🔄 Stock Transfers & Replenishment
+        </a>
+        {% endif %}
+        {% if perms.pos %}
+        <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            ⚡ Branch POS
+        </a>
+        {% endif %}
+        <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            🏷️ View Price Showcases (តារាងតម្លៃ)
+        </a>
+    </div>
+</div>
+
+<!-- Stock Channel Info -->
+<div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #166534;">
+        <span style="font-size: 20px;">🏢</span>
+        <div>
+            <strong>Central Stock Fulfillment:</strong> Branch POS draws stock in real time from <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong>. 
+            Local shelf stock is managed at <strong>{{ branch.location_name or 'Branch Location' }}</strong>.
+        </div>
+    </div>
+    {% if not perms.view_costs %}
+    <span style="background: #FEF3C7; color: #92400E; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">
+        🔒 Cost Prices Hidden by Main Store
+    </span>
+    {% endif %}
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="card" style="padding: 14px 18px; margin-bottom: 20px; border: 1px solid #E2E8F0; border-radius: 8px;">
+    <form method="GET" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+        <div style="flex: 2; min-width: 200px;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Search by product name, SKU or barcode..." class="form-control" style="width: 100%; padding: 8px 12px; font-size: 13px;">
+        </div>
+        <div style="width: 200px;">
+            <select name="category_id" class="form-control" style="width: 100%; padding: 8px 12px; font-size: 13px;" onchange="this.form.submit()">
+                <option value="">All Categories</option>
+                {% for c in categories %}
+                <option value="{{ c.id }}" {% if category_id|string == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary" style="padding: 8px 16px; font-weight: 600;">Filter</button>
+        {% if search or category_id %}
+        <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}" class="btn btn-outline" style="padding: 8px 14px; text-decoration: none;">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Products Inventory Table -->
+<div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <table class="data-table" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; color: #475569;">
+                <th style="padding: 12px 16px; text-align: left;">Product Details</th>
+                <th style="padding: 12px 14px; text-align: left;">Category</th>
+                <th style="padding: 12px 14px; text-align: left;">UOM</th>
+                <th style="padding: 12px 14px; text-align: right;">Selling Price ($)</th>
+                {% if perms.view_costs %}
+                <th style="padding: 12px 14px; text-align: right;">Cost Price ($)</th>
+                {% endif %}
+                <th style="padding: 12px 14px; text-align: right; color: #0284C7;">Central Stock</th>
+                <th style="padding: 12px 14px; text-align: right; color: #059669;">Branch Stock</th>
+                <th style="padding: 12px 16px; text-align: center;">Availability</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in products %}
+            <tr style="border-bottom: 1px solid #F1F5F9; font-size: 13px;">
+                <td style="padding: 12px 16px;">
+                    <a href="{{ url_for('products.detail_product', id=p.id) }}" style="font-weight: 700; color: #0284C7; text-decoration: none;" title="View Product Price Showcase & Details">{{ p.name }}</a>
+                    <div style="font-size: 11px; color: #64748B; font-family: monospace;">SKU: {{ p.sku or 'N/A' }} {% if p.barcode %}• Barcode: {{ p.barcode }}{% endif %}</div>
+                </td>
+                <td style="padding: 12px 14px; color: #475569;">
+                    {{ p.category_name or '-' }}
+                </td>
+                <td style="padding: 12px 14px; color: #475569; font-weight: 600;">
+                    {{ p.sales_uom or p.uom }}
+                </td>
+                <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #0F172A;">
+                    {{ p.default_price|currency }}
+                </td>
+                {% if perms.view_costs %}
+                <td style="padding: 12px 14px; text-align: right; color: #64748B;">
+                    {{ (p.average_cost or p.standard_cost or 0)|currency }}
+                </td>
+                {% endif %}
+                <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #0284C7; font-family: monospace;">
+                    {{ p.central_stock|format_inflow_qty }}
+                </td>
+                <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #059669; font-family: monospace;">
+                    {{ p.branch_stock|format_inflow_qty }}
+                </td>
+                <td style="padding: 12px 16px; text-align: center;">
+                    {% if p.central_stock|float > 0 or p.branch_stock|float > 0 %}
+                    <span class="badge" style="background: #DCFCE7; color: #15803D; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">In Stock</span>
+                    {% else %}
+                    <span class="badge" style="background: #FEE2E2; color: #991B1B; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">Out of Stock</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="{% if perms.view_costs %}8{% else %}7{% endif %}" style="text-align: center; padding: 40px; color: #94A3B8;">No products found matching your search.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

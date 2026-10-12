@@ -1,0 +1,422 @@
+{% extends 'base.html' %}
+
+{% block title %}Store Branches - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2"><path d="M3 9l1.5-5h15L21 9M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9c0 1.4 1.1 2.5 2.5 2.5S8 10.4 8 9c0 1.4 1.1 2.5 2.5 2.5S13 10.4 13 9c0 1.4 1.1 2.5 2.5 2.5S18 10.4 18 9c0 1.4 1.1 2.5 2.5 2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 21v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6"/></svg>
+            <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;">Store Branches (សាខាហាង)</h1>
+        </div>
+        <p style="color: #64748B; font-size: 0.88rem; margin: 4px 0 0 0;">Multi-branch retail & sales operations with centralized warehouse inventory fulfillment</p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+        <a href="{{ url_for('branches.branch_launcher') }}" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-weight: 700; border-radius: 6px; box-shadow: 0 1px 3px rgba(2,132,199,0.3); background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); text-decoration: none;">
+            <span>🚀 Launch Branch System (បើកប្រព័ន្ធសាខា)</span>
+        </a>
+        <button onclick="openModal('newBranchModal')" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-weight: 600; border-radius: 6px;">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Add New Branch</span>
+        </button>
+    </div>
+</div>
+
+<!-- Central Warehouse Fulfillment Banner -->
+<div style="background: linear-gradient(90deg, #F0F9FF 0%, #E0F2FE 100%); border: 1px solid #BAE6FD; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <span style="font-size: 24px;">📦</span>
+        <div>
+            <div style="font-size: 13.5px; font-weight: 700; color: #0369A1;">Shared Central Inventory Fulfillment</div>
+            <div style="font-size: 12px; color: #0284C7;">All branch sales automatically deduct packaging stock in real-time from <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong> (Central Warehouse).</div>
+        </div>
+    </div>
+    <div>
+        <a href="{{ url_for('locations.list_locations') }}" style="font-size: 12px; font-weight: 600; color: #0284C7; text-decoration: underline;">Manage Warehouses →</a>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px;">
+    <a href="{{ url_for('branches.list_branches', status='all') }}" 
+       class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" 
+       style="text-decoration: none; border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        All Branches ({{ branches|length }})
+    </a>
+    <a href="{{ url_for('branches.list_branches', status='active') }}" 
+       class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %}" 
+       style="text-decoration: none; border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Active
+    </a>
+    <a href="{{ url_for('branches.list_branches', status='inactive') }}" 
+       class="btn btn-sm {% if status_filter == 'inactive' %}btn-primary{% else %}btn-secondary{% endif %}" 
+       style="text-decoration: none; border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Inactive
+    </a>
+</div>
+
+<!-- Branches Table -->
+<div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div class="table-container" style="border: none;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 12px;">Branch Name & Code</th>
+                    <th style="padding: 12px 14px; text-align: left; font-weight: 700; color: #475569; font-size: 12px;">Manager / Cashier</th>
+                    <th style="padding: 12px 14px; text-align: left; font-weight: 700; color: #475569; font-size: 12px;">Phone / Address</th>
+                    <th style="padding: 12px 14px; text-align: center; font-weight: 700; color: #475569; font-size: 12px;">SO Prefix</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Total Orders</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Revenue (លុយលក់)</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Expenses (ចំណាយ)</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Net Balance</th>
+                    <th style="padding: 12px 14px; text-align: center; font-weight: 700; color: #475569; font-size: 12px;">Status</th>
+                    <th style="padding: 12px 16px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Quick Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for b in branches %}
+                <tr style="border-bottom: 1px solid #F1F5F9; {% if not b.is_active %}opacity: 0.75; background: #FAFAFA;{% endif %}">
+                    <td style="padding: 14px 16px;">
+                        <a href="{{ url_for('branches.view_branch', id=b.id) }}" style="font-weight: 700; color: #0F172A; text-decoration: none; font-size: 13.5px;" class="font-khmer">
+                            {{ b.name }}
+                        </a>
+                        <div style="display: flex; align-items: center; gap: 6px; margin-top: 4px; flex-wrap: wrap;">
+                            <span class="badge" style="background: #E2E8F0; color: #334155; font-size: 10.5px; font-weight: 700;">{{ b.code }}</span>
+                            {% if b.location_name %}
+                            <span class="badge" style="background: #EEF2F6; color: #475569; font-size: 10px;" title="Assigned stock location">📍 {{ b.location_name }}</span>
+                            {% endif %}
+                            {% if b.permissions.pos %}
+                            <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 9.5px; padding: 2px 5px;" title="POS Allowed">⚡ POS</span>
+                            {% endif %}
+                            {% if b.permissions.sales_orders %}
+                            <span class="badge" style="background: #DCFCE7; color: #15803D; font-size: 9.5px; padding: 2px 5px;" title="Orders Allowed">📋 SO</span>
+                            {% endif %}
+                            {% if b.permissions.inventory %}
+                            <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 9.5px; padding: 2px 5px;" title="Inventory Allowed">📦 Stock</span>
+                            {% endif %}
+                            {% if b.permissions.expenses %}
+                            <span class="badge" style="background: #FEE2E2; color: #DC2626; font-size: 9.5px; padding: 2px 5px;" title="Expenses Allowed">💸 Exp</span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td style="padding: 12px 14px; font-size: 12.5px; color: #334155;">
+                        <span class="font-khmer">{{ b.manager_name or 'N/A' }}</span>
+                    </td>
+                    <td style="padding: 12px 14px; font-size: 12px; color: #64748B; max-width: 200px;">
+                        <div style="font-weight: 600; color: #334155;">{{ b.phone or 'No phone' }}</div>
+                        <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ b.address }}">{{ b.address or 'No address' }}</div>
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center; font-size: 12px; font-family: monospace; font-weight: 700; color: #475569;">
+                        {{ b.so_prefix }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 600; font-size: 13px;">
+                        {{ b.total_orders }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #10B981; font-size: 13.5px;">
+                        {{ b.total_revenue|currency }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #EF4444; font-size: 13px;">
+                        {{ b.total_expenses|currency }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; font-size: 13.5px; color: {{ '#10B981' if b.net_balance >= 0 else '#EF4444' }};">
+                        {{ b.net_balance|currency }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center;">
+                        <form action="{{ url_for('branches.toggle_branch_status', id=b.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Toggle status for {{ b.name }}?');">
+                            {% if b.is_active %}
+                            <button type="submit" class="badge" style="background: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0; cursor: pointer; padding: 3px 8px; border-radius: 12px; font-weight: 700; font-size: 11px;" title="Click to Deactivate">
+                                Active ✓
+                            </button>
+                            {% else %}
+                            <button type="submit" class="badge" style="background: #F1F5F9; color: #64748B; border: 1px solid #CBD5E1; cursor: pointer; padding: 3px 8px; border-radius: 12px; font-weight: 700; font-size: 11px;" title="Click to Activate">
+                                Inactive
+                            </button>
+                            {% endif %}
+                        </form>
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right; white-space: nowrap;">
+                        <a href="{{ url_for('branches.switch_branch', id=b.id) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext({{ b.id }}, event); }" class="btn btn-sm btn-primary" style="padding: 5px 12px; font-size: 11.5px; background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); text-decoration: none; font-weight: 700; box-shadow: 0 1px 3px rgba(2,132,199,0.3);" title="Launch this branch store system">
+                            🚀 Launch System
+                        </a>
+                        <a href="{{ url_for('branches.switch_branch', id=b.id) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext({{ b.id }}, event); }" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11.5px; text-decoration: none; margin-left: 3px;" title="Switch store context to this branch">
+                            🏪 Switch
+                        </a>
+                        <a href="{{ url_for('branches.branch_pos', id=b.id) }}" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11.5px; text-decoration: none; margin-left: 3px;" title="POS Counter">
+                            ⚡ POS
+                        </a>
+                        <a href="{{ url_for('branches.view_branch', id=b.id) }}#branchPermForm" class="btn btn-sm btn-secondary" style="padding: 4px 8px; font-size: 11.5px; text-decoration: none; margin-left: 3px;" title="Configure Allowed Functions & Permissions">
+                            🛡️ Perms
+                        </a>
+                        <button type="button" 
+                                class="btn btn-sm btn-secondary btn-edit-branch" 
+                                data-id="{{ b.id }}"
+                                data-code="{{ b.code|escape }}"
+                                data-name="{{ b.name|escape }}"
+                                data-manager="{{ (b.manager_name or '')|escape }}"
+                                data-phone="{{ (b.phone or '')|escape }}"
+                                data-prefix="{{ b.so_prefix|escape }}"
+                                data-address="{{ (b.address or '')|escape }}"
+                                data-location="{{ b.location_id or '' }}"
+                                onclick="openEditBranchModalFromBtn(this)"
+                                style="padding: 4px 7px; font-size: 11.5px; margin-left: 3px;" 
+                                title="Edit Branch Profile">
+                            ✏️
+                        </button>
+                        <button type="button" 
+                                class="btn btn-sm" 
+                                data-id="{{ b.id }}"
+                                data-code="{{ b.code|escape }}"
+                                data-name="{{ b.name|escape }}"
+                                onclick="confirmDeleteBranchFromBtn(this)"
+                                style="padding: 4px 7px; font-size: 11.5px; margin-left: 3px; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA; border-radius: 4px; cursor: pointer;" 
+                                title="Delete this branch">
+                            🗑️
+                        </button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="padding: 30px; text-align: center; color: #64748B;">
+                        No store branches found.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Add New Branch -->
+<div id="newBranchModal" class="modal-overlay modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; width: 520px; max-width: 92vw; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden; margin: auto;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F172A;">+ Add New Store Branch</h3>
+            <button type="button" onclick="closeModal('newBranchModal')" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer;">&times;</button>
+        </div>
+        <form action="{{ url_for('branches.create_branch') }}" method="POST" style="padding: 20px;">
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Code *</label>
+                <input type="text" id="newBranchCode" name="code" placeholder="e.g. BKK-02, SENSOK-03" required oninput="autoSuggestPrefix(this.value)" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; text-transform: uppercase;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Name (Khmer & English) *</label>
+                <input type="text" name="name" placeholder="e.g. សាខាបឹងកេងកង (BKK1 Branch)" required style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Manager / Cashier</label>
+                <input type="text" name="manager_name" placeholder="e.g. Sokha Heng" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Phone Number</label>
+                    <input type="text" name="phone" placeholder="e.g. +855 12 345 678" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Invoice Prefix</label>
+                    <input type="text" id="newBranchPrefix" name="so_prefix" placeholder="e.g. SO-BKK-" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; text-transform: uppercase;">
+                </div>
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Assigned Stock Location (ឃ្លាំងស្តុក)</label>
+                <select name="location_id" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; background: #FFFFFF;">
+                    <option value="">-- Central Fulfillment Default --</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}">{{ loc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="margin-bottom: 18px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Address</label>
+                <textarea name="address" rows="2" placeholder="Street, Khan, City" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" onclick="closeModal('newBranchModal')" class="btn btn-secondary" style="padding: 8px 16px;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 18px; background: #0284C7;">Create Branch</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Edit Branch -->
+<div id="editBranchModal" class="modal-overlay modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; width: 520px; max-width: 92vw; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden; margin: auto;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F172A;">✏️ Edit Store Branch</h3>
+            <button type="button" onclick="closeModal('editBranchModal')" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer;">&times;</button>
+        </div>
+        <form id="editBranchForm" method="POST" style="padding: 20px;">
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Code *</label>
+                <input type="text" id="editCode" name="code" required style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; text-transform: uppercase;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Name *</label>
+                <input type="text" id="editName" name="name" required style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Manager / Cashier</label>
+                <input type="text" id="editManager" name="manager_name" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Phone Number</label>
+                    <input type="text" id="editPhone" name="phone" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Invoice Prefix</label>
+                    <input type="text" id="editPrefix" name="so_prefix" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; text-transform: uppercase;">
+                </div>
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Assigned Stock Location (ឃ្លាំងស្តុក)</label>
+                <select id="editLocation" name="location_id" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; background: #FFFFFF;">
+                    <option value="">-- Central Fulfillment Default --</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}">{{ loc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div style="margin-bottom: 18px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Address</label>
+                <textarea id="editAddress" name="address" rows="2" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" id="btnDeleteBranch" onclick="handleDeleteBranch()" class="btn btn-danger btn-sm" style="padding: 6px 12px; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA;">
+                    🗑️ Delete / Deactivate
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick="closeModal('editBranchModal')" class="btn btn-secondary" style="padding: 8px 16px;">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 18px; background: #0284C7;">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="deleteBranchForm" method="POST" style="display: none;"></form>
+
+<script>
+let currentEditingBranchId = null;
+
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'flex';
+        el.classList.add('active');
+        const firstInput = el.querySelector('input:not([type="hidden"]), select, textarea');
+        if (firstInput) firstInput.focus();
+    }
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    }
+}
+
+function autoSuggestPrefix(code) {
+    const prefixInput = document.getElementById('newBranchPrefix');
+    if (!prefixInput) return;
+    const clean = code.trim().replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (clean) {
+        prefixInput.value = 'SO-' + clean + '-';
+    }
+}
+
+function openEditBranchModalFromBtn(btn) {
+    if (!btn) return;
+    const button = btn.closest('button') || btn;
+    const id = button.getAttribute('data-id');
+    currentEditingBranchId = id;
+    
+    const form = document.getElementById('editBranchForm');
+    if (form) form.action = '/branches/' + id + '/edit';
+    
+    const codeEl = document.getElementById('editCode');
+    if (codeEl) codeEl.value = button.getAttribute('data-code') || '';
+    
+    const nameEl = document.getElementById('editName');
+    if (nameEl) nameEl.value = button.getAttribute('data-name') || '';
+    
+    const mgrEl = document.getElementById('editManager');
+    if (mgrEl) mgrEl.value = button.getAttribute('data-manager') || '';
+    
+    const phoneEl = document.getElementById('editPhone');
+    if (phoneEl) phoneEl.value = button.getAttribute('data-phone') || '';
+    
+    const prefixEl = document.getElementById('editPrefix');
+    if (prefixEl) prefixEl.value = button.getAttribute('data-prefix') || '';
+    
+    const addrEl = document.getElementById('editAddress');
+    if (addrEl) addrEl.value = button.getAttribute('data-address') || '';
+    
+    const locEl = document.getElementById('editLocation');
+    if (locEl) locEl.value = button.getAttribute('data-location') || '';
+    
+    openModal('editBranchModal');
+}
+
+function openEditBranchModal(id, code, name, manager, phone, prefix, address) {
+    currentEditingBranchId = id;
+    const form = document.getElementById('editBranchForm');
+    if (form) form.action = '/branches/' + id + '/edit';
+    
+    const codeEl = document.getElementById('editCode');
+    if (codeEl) codeEl.value = code || '';
+    
+    const nameEl = document.getElementById('editName');
+    if (nameEl) nameEl.value = name || '';
+    
+    const mgrEl = document.getElementById('editManager');
+    if (mgrEl) mgrEl.value = manager || '';
+    
+    const phoneEl = document.getElementById('editPhone');
+    if (phoneEl) phoneEl.value = phone || '';
+    
+    const prefixEl = document.getElementById('editPrefix');
+    if (prefixEl) prefixEl.value = prefix || '';
+    
+    const addrEl = document.getElementById('editAddress');
+    if (addrEl) addrEl.value = address || '';
+    
+    openModal('editBranchModal');
+}
+
+function confirmDeleteBranchFromBtn(btn) {
+    if (!btn) return;
+    const button = btn.closest('button') || btn;
+    const id = button.getAttribute('data-id');
+    const name = button.getAttribute('data-name');
+    const code = button.getAttribute('data-code');
+    if (confirm(`Are you sure you want to delete branch "${name} (${code})"?`)) {
+        const form = document.getElementById('deleteBranchForm');
+        form.action = '/branches/' + id + '/delete';
+        form.submit();
+    }
+}
+
+function handleDeleteBranch() {
+    if (!currentEditingBranchId) return;
+    const name = document.getElementById('editName').value || 'this branch';
+    if (confirm(`Are you sure you want to delete branch "${name}"?`)) {
+        const form = document.getElementById('deleteBranchForm');
+        form.action = '/branches/' + currentEditingBranchId + '/delete';
+        form.submit();
+    }
+}
+
+// Ensure backdrop click closes modal
+document.addEventListener('DOMContentLoaded', function() {
+    ['newBranchModal', 'editBranchModal'].forEach(function(mId) {
+        const modal = document.getElementById(mId);
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) closeModal(mId);
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

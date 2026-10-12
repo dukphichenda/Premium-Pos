@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+
+{% block title %}Vendors & Suppliers - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Vendors & Suppliers Directory</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Supplier accounts, purchasing relationships, and payables balances</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button onclick="openModal('newVendorModal')" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Add Vendor</span>
+        </button>
+    </div>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Vendor Name</th>
+                    <th>Contact Person</th>
+                    <th>Phone</th>
+                    <th>City / Country</th>
+                    <th style="text-align: right;">Total POs</th>
+                    <th style="text-align: right;">Total Purchased</th>
+                    <th style="text-align: right;">Open Payable</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in vendors %}
+                <tr style="cursor: pointer;" ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('purchase_orders.list_purchases') }}?vendor_id={{ v.id }}', 'Vendor: {{ v.name }}', 'purchase'); }" title="Double-click to view vendor purchase orders in tab">
+                    <td>
+                        <div style="font-weight: 700; color: #0F172A;">{{ v.name }}</div>
+                        {% if v.email %}<div style="font-size: 0.72rem; color: #64748B;">{{ v.email }}</div>{% endif %}
+                    </td>
+                    <td>{{ v.contact_name or '-' }}</td>
+                    <td style="font-family: monospace;">{{ v.phone or '-' }}</td>
+                    <td>{{ v.city or '' }} {% if v.country %}({{ v.country }}){% endif %}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ v.po_count }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ v.total_purchased | currency }}
+                    </td>
+                    <td style="text-align: right; font-weight: 700; color: {% if v.open_payable > 0 %}#DC2626{% else %}#059669{% endif %};">
+                        {{ v.open_payable | currency }}
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('purchase_orders.create_purchase') }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">
+                            + PO
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #94A3B8; padding: 32px;">No vendors found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Vendor Modal -->
+<div class="modal-overlay" id="newVendorModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h2 class="modal-title">+ Add New Vendor</h2>
+            <button class="modal-close" onclick="closeModal('newVendorModal')">×</button>
+        </div>
+        <form action="{{ url_for('contacts.create_vendor') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Vendor / Supplier Company Name *</label>
+                <input type="text" name="name" required placeholder="Official company name" class="form-input">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Contact Person</label>
+                    <input type="text" name="contact_name" placeholder="Sales agent / Manager" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number *</label>
+                    <input type="text" name="phone" placeholder="e.g. +855 ..." class="form-input">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" placeholder="orders@supplier.com" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Country</label>
+                    <input type="text" name="country" value="Cambodia" class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Address</label>
+                <input type="text" name="address1" placeholder="Factory / Office address" class="form-input">
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newVendorModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Vendor</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,437 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ branch.name }} - inFlow Premium{% endblock %}
+
+{% block content %}
+<!-- Back breadcrumb & actions -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="{{ url_for('branches.list_branches') }}" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-weight: 600; text-decoration: none;">
+            ← All Branches
+        </a>
+        <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">
+            {{ branch.name }}
+        </h1>
+        <span class="badge" style="background: #0284C7; color: #FFFFFF; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">{{ branch.code }}</span>
+    </div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+        <a href="{{ url_for('branches.switch_branch', id=branch.id) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext({{ branch.id }}, event); }" class="btn btn-primary" style="display: flex; align-items: center; gap: 8px; padding: 9px 18px; background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); text-decoration: none; font-weight: 800; border-radius: 6px; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);">
+            🚀 Launch Branch System (បើកប្រព័ន្ធសាខា)
+        </a>
+        <a href="{{ url_for('branches.switch_branch', id=branch.id) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext({{ branch.id }}, event); }" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600; background: #EEF2F6; color: #1E293B;">
+            🏪 Switch to this Branch
+        </a>
+        <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            ⚡ POS
+        </a>
+        <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            📋 Orders
+        </a>
+        <a href="{{ url_for('branches.branch_reports', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            📊 Financials
+        </a>
+        <button onclick="openModal('editBranchModal')" class="btn btn-secondary" style="padding: 8px 12px; font-weight: 600;">
+            ✏️ Edit
+        </button>
+    </div>
+</div>
+
+<!-- Central Warehouse Link Alert -->
+<div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 20px;">🏢</span>
+        <div style="font-size: 13px; color: #166534;">
+            <strong>Inventory Fulfillment Channel:</strong> Sales made at this branch draw physical stock in real time from <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong>.
+        </div>
+    </div>
+    <span class="badge" style="background: #22C55E; color: #FFFFFF; font-weight: 700;">LIVE SYNC ACTIVE</span>
+</div>
+
+<!-- KPI Cards -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px;">
+    <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Today's Orders</div>
+        <div style="font-size: 24px; font-weight: 800; color: #0F172A; margin-top: 4px;">{{ today_stats.today_orders }}</div>
+        <div style="font-size: 12px; color: #10B981; margin-top: 2px;">{{ today_stats.today_sales|currency }} gross</div>
+    </div>
+    <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">{{ current_month }} Revenue</div>
+        <div style="font-size: 24px; font-weight: 800; color: #10B981; margin-top: 4px;">{{ month_stats.month_sales|currency }}</div>
+        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Collected: {{ month_stats.month_collected|currency }}</div>
+    </div>
+    <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">{{ current_month }} Expenses</div>
+        <div style="font-size: 24px; font-weight: 800; color: #EF4444; margin-top: 4px;">{{ month_exp.month_expenses|currency }}</div>
+        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">Branch operational costs</div>
+    </div>
+    <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF;">
+        <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase;">Net Operating Profit</div>
+        {% set net_p = (month_stats.month_sales|float) - (month_exp.month_expenses|float) %}
+        <div style="font-size: 24px; font-weight: 800; color: {{ '#10B981' if net_p >= 0 else '#EF4444' }}; margin-top: 4px;">{{ net_p|currency }}</div>
+        <div style="font-size: 12px; color: #64748B; margin-top: 2px;">(Sales minus branch expenses)</div>
+    </div>
+</div>
+
+<!-- Branch Profile Info -->
+<div class="card" style="padding: 18px 22px; border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 24px; background: #F8FAFC;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; font-size: 13px;">
+        <div>
+            <div style="font-weight: 700; color: #475569;">Manager / Supervisor:</div>
+            <div style="color: #0F172A; font-weight: 600; margin-top: 2px;">{{ branch.manager_name or 'Not assigned' }}</div>
+        </div>
+        <div>
+            <div style="font-weight: 700; color: #475569;">Contact Phone:</div>
+            <div style="color: #0F172A; font-weight: 600; margin-top: 2px;">{{ branch.phone or 'Not provided' }}</div>
+        </div>
+        <div>
+            <div style="font-weight: 700; color: #475569;">Invoice / SO Prefix:</div>
+            <div style="color: #0F172A; font-weight: 700; font-family: monospace; margin-top: 2px;">{{ branch.so_prefix }}</div>
+        </div>
+        <div>
+            <div style="font-weight: 700; color: #475569;">Store Address:</div>
+            <div style="color: #0F172A; margin-top: 2px;">{{ branch.address or 'No address specified' }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Store Permission Control Card -->
+<div class="card" style="padding: 20px 24px; border: 1px solid #BAE6FD; border-radius: 10px; margin-bottom: 24px; background: #FFFFFF; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.06);">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; flex-wrap: wrap; gap: 14px; border-bottom: 1px solid #E2E8F0; padding-bottom: 14px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 20px;">🛡️</span>
+                <h2 style="font-size: 16px; font-weight: 800; color: #0F172A; margin: 0;">
+                    Branch Permissions & Allowed Functions (សិទ្ធិប្រើប្រាស់មុខងារសាខា)
+                </h2>
+            </div>
+            <p style="color: #64748B; font-size: 12.5px; margin: 4px 0 0 0;">
+                Main Store HQ controls which cloned functions this branch shop is allowed to use and see. Disabled functions are hidden from the branch interface.
+            </p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+            <span style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase; margin-right: 4px;">Quick Presets:</span>
+            <button type="button" onclick="applyPermPreset('all')" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600;">
+                🌟 Allow All
+            </button>
+            <button type="button" onclick="applyPermPreset('retail')" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600;">
+                🛍️ Retail Standard
+            </button>
+            <button type="button" onclick="applyPermPreset('pos_only')" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600;">
+                ⚡ POS Only
+            </button>
+            <button type="button" onclick="applyPermPreset('restricted')" class="btn btn-sm btn-secondary" style="padding: 4px 10px; font-size: 11.5px; font-weight: 600;">
+                🔒 Restricted
+            </button>
+        </div>
+    </div>
+
+    <form id="branchPermForm" action="{{ url_for('branches.update_branch_permissions', id=branch.id) }}" method="POST">
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(310px, 1fr)); gap: 14px; margin-bottom: 20px;">
+            <!-- 1. POS Counter -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_pos" id="perm_pos" class="perm-toggle-input" {% if perms.pos %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">⚡ POS Quick Checkout (បញ្ជរគិតប្រាក់)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Direct cashier touch counter for quick walk-in retail billing.</div>
+                </div>
+            </label>
+
+            <!-- 2. Sales Orders -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_sales_orders" id="perm_sales_orders" class="perm-toggle-input" {% if perms.sales_orders %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">📋 Sales Orders (ការបញ្ជាទិញ)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Create, invoice, and track orders with custom branch SO prefix.</div>
+                </div>
+            </label>
+
+            <!-- 3. Invoices -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_invoices" id="perm_invoices" class="perm-toggle-input" {% if perms.invoices %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">🧾 Invoice Generation (វិក្កយបត្រ)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Print official customer receipts and tax invoices.</div>
+                </div>
+            </label>
+
+            <!-- 4. Inventory -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_inventory" id="perm_inventory" class="perm-toggle-input" {% if perms.inventory %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">📦 Product & Stock Levels (ស្តុកទំនិញ)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">View catalog, product barcodes, and available central warehouse stock.</div>
+                </div>
+            </label>
+
+            <!-- 5. Stock Transfers / Replenishment -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_transfers" id="perm_transfers" class="perm-toggle-input" {% if perms.transfers %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">🔄 Stock Transfers / Request (ស្នើសុំស្តុក)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Request stock replenishment transfers from Central HQ.</div>
+                </div>
+            </label>
+
+            <!-- 6. Stock Adjustments -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_adjustments" id="perm_adjustments" class="perm-toggle-input" {% if perms.adjustments %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">⚖️ Stock Adjustments (កែប្រែចំនួនស្តុក)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Record physical count differences, damaged, or expired stock.</div>
+                </div>
+            </label>
+
+            <!-- 7. Supplier Purchasing -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_purchasing" id="perm_purchasing" class="perm-toggle-input" {% if perms.purchasing %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">🛒 Supplier Purchasing (បញ្ជាទិញចូល)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Issue purchase orders directly to suppliers from this branch.</div>
+                </div>
+            </label>
+
+            <!-- 8. Daily Expenses -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_expenses" id="perm_expenses" class="perm-toggle-input" {% if perms.expenses %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">💸 Daily Expenses & Cash (ចំណាយប្រចាំថ្ងៃ)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Record branch operational costs, utilities, and daily petty cash.</div>
+                </div>
+            </label>
+
+            <!-- 9. Customers -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_customers" id="perm_customers" class="perm-toggle-input" {% if perms.customers %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">👥 Customer Directory (បញ្ជីអតិថិជន)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Manage local retail and wholesale customer database.</div>
+                </div>
+            </label>
+
+            <!-- 10. Dashboard -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_dashboard" id="perm_dashboard" class="perm-toggle-input" {% if perms.dashboard %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">📊 Branch KPI Dashboard (ផ្ទាំងសង្ខេប)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Daily sales analytics, cash summary, and top products.</div>
+                </div>
+            </label>
+
+            <!-- 11. Financial Reports -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_reports" id="perm_reports" class="perm-toggle-input" {% if perms.reports %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">📈 Financial Statements (របាយការណ៍ហិរញ្ញវត្ថុ)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Branch monthly P&L profit statement and sales breakdown.</div>
+                </div>
+            </label>
+
+            <!-- 12. Edit Prices & Discounts -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_edit_prices" id="perm_edit_prices" class="perm-toggle-input" {% if perms.edit_prices %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">🏷️ Edit Prices & Discounts (កែសម្រួលតម្លៃ)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Allow branch cashier to discount or alter unit sales prices.</div>
+                </div>
+            </label>
+
+            <!-- 13. Cost Price Visibility -->
+            <label class="perm-card" style="display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #F8FAFC; cursor: pointer; transition: all 0.15s ease;">
+                <input type="checkbox" name="perm_view_costs" id="perm_view_costs" class="perm-toggle-input" {% if perms.view_costs %}checked{% endif %} style="margin-top: 3px; width: 17px; height: 17px; accent-color: #0284C7; cursor: pointer;">
+                <div>
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">🔒 View Cost Price & Margin (មើលថ្លៃដើម)</div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">Show wholesale buy cost and gross profit margin to branch staff.</div>
+                </div>
+            </label>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 14px; border-top: 1px solid #F1F5F9; flex-wrap: wrap; gap: 10px;">
+            <div style="font-size: 12px; color: #64748B;">
+                💡 Changes take effect immediately across all active branch sessions.
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding: 9px 22px; font-weight: 700; background: #0284C7; box-shadow: 0 1px 3px rgba(2, 132, 199, 0.3);">
+                💾 Save Branch Permissions (រក្សាទុកសិទ្ធិ)
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Recent Sales Orders -->
+<div style="margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <h2 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Recent Branch Orders ({{ orders|length }})</h2>
+        <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" style="font-size: 12px; color: #0284C7; font-weight: 700; text-decoration: none;">View All {{ branch.code }} Orders →</a>
+    </div>
+    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; color: #475569;">
+                    <th style="padding: 10px 14px; text-align: left;">Order #</th>
+                    <th style="padding: 10px 14px; text-align: left;">Date</th>
+                    <th style="padding: 10px 14px; text-align: left;">Customer</th>
+                    <th style="padding: 10px 14px; text-align: right;">Total Amount</th>
+                    <th style="padding: 10px 14px; text-align: center;">Status</th>
+                    <th style="padding: 10px 14px; text-align: center;">Payment</th>
+                    <th style="padding: 10px 14px; text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr style="border-bottom: 1px solid #F1F5F9; font-size: 13px;">
+                    <td style="padding: 10px 14px; font-weight: 700;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" style="color: #0284C7; text-decoration: none;">{{ o.order_number }}</a>
+                    </td>
+                    <td style="padding: 10px 14px; color: #64748B;">{{ o.order_date }}</td>
+                    <td style="padding: 10px 14px; color: #1E293B;">{{ o.customer_name or 'Walk-in Customer' }}</td>
+                    <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #0F172A;">{{ o.total_amount|currency }}</td>
+                    <td style="padding: 10px 14px; text-align: center;">
+                        <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 11px; font-weight: 600;">{{ o.status }}</span>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center;">
+                        <span class="badge" style="background: {{ '#DCFCE7' if o.payment_status == 'PAID' else '#FEF3C7' }}; color: {{ '#15803D' if o.payment_status == 'PAID' else '#B45309' }}; font-size: 11px; font-weight: 700;">{{ o.payment_status }}</span>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: right;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" class="btn btn-sm btn-secondary" style="padding: 3px 8px; font-size: 11.5px; text-decoration: none;">View</a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="padding: 24px; text-align: center; color: #94A3B8;">No sales orders recorded for this branch yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal: Edit Branch -->
+<div id="editBranchModal" class="modal-overlay modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; width: 500px; max-width: 92vw; border-radius: 8px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden; margin: auto;">
+        <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #0F172A;">✏️ Edit Branch Profile</h3>
+            <button type="button" onclick="closeModal('editBranchModal')" style="background: none; border: none; font-size: 20px; color: #64748B; cursor: pointer;">&times;</button>
+        </div>
+        <form action="{{ url_for('branches.edit_branch', id=branch.id) }}" method="POST" style="padding: 20px;">
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Code *</label>
+                <input type="text" name="code" value="{{ branch.code }}" required style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; text-transform: uppercase;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Branch Name *</label>
+                <input type="text" name="name" value="{{ branch.name }}" required style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Manager Name</label>
+                <input type="text" name="manager_name" value="{{ branch.manager_name or '' }}" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Phone</label>
+                    <input type="text" name="phone" value="{{ branch.phone or '' }}" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Invoice Prefix</label>
+                    <input type="text" name="so_prefix" value="{{ branch.so_prefix }}" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">
+                </div>
+            </div>
+            <div style="margin-bottom: 14px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Warehouse / Stock Location (ឃ្លាំងស្តុក)</label>
+                <select name="location_id" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; background: #FFFFFF;">
+                    <option value="">-- Central Fulfillment Default --</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if branch.location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                    {% endfor %}
+                </select>
+                <div style="font-size: 11px; color: #64748B; margin-top: 3px;">Stock at this location represents this branch's local physical on-hand inventory.</div>
+            </div>
+            <div style="margin-bottom: 18px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #334155; margin-bottom: 4px;">Address</label>
+                <textarea name="address" rows="2" style="width: 100%; padding: 8px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px;">{{ branch.address or '' }}</textarea>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button type="button" onclick="confirmDeleteThisBranch()" class="btn btn-danger btn-sm" style="padding: 6px 12px; background: #FEE2E2; color: #DC2626; border: 1px solid #FECACA;">
+                    🗑️ Delete Branch
+                </button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" onclick="closeModal('editBranchModal')" class="btn btn-secondary" style="padding: 8px 16px;">Cancel</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 8px 18px; background: #0284C7;">Save Changes</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<form id="deleteBranchDetailForm" action="{{ url_for('branches.delete_branch', id=branch.id) }}" method="POST" style="display: none;"></form>
+
+<script>
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'flex';
+        el.classList.add('active');
+        const firstInput = el.querySelector('input:not([type="hidden"]), select, textarea');
+        if (firstInput) firstInput.focus();
+    }
+}
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    }
+}
+function confirmDeleteThisBranch() {
+    if (confirm('Are you sure you want to delete branch "{{ branch.name }}"?')) {
+        document.getElementById('deleteBranchDetailForm').submit();
+    }
+}
+
+function applyPermPreset(preset) {
+    const keys = [
+        'pos', 'sales_orders', 'invoices', 'inventory', 'transfers', 
+        'adjustments', 'purchasing', 'expenses', 'customers', 
+        'dashboard', 'reports', 'edit_prices', 'view_costs'
+    ];
+
+    let rules = {};
+    if (preset === 'all') {
+        keys.forEach(k => rules[k] = true);
+    } else if (preset === 'retail') {
+        rules = {
+            pos: true, sales_orders: true, invoices: true, inventory: true,
+            transfers: true, adjustments: false, purchasing: false, expenses: true,
+            customers: true, dashboard: true, reports: true, edit_prices: true, view_costs: false
+        };
+    } else if (preset === 'pos_only') {
+        rules = {
+            pos: true, sales_orders: false, invoices: true, inventory: false,
+            transfers: false, adjustments: false, purchasing: false, expenses: false,
+            customers: true, dashboard: false, reports: false, edit_prices: false, view_costs: false
+        };
+    } else if (preset === 'restricted') {
+        rules = {
+            pos: true, sales_orders: true, invoices: true, inventory: true,
+            transfers: true, adjustments: false, purchasing: false, expenses: false,
+            customers: true, dashboard: true, reports: false, edit_prices: false, view_costs: false
+        };
+    }
+
+    keys.forEach(k => {
+        const input = document.getElementById('perm_' + k);
+        if (input) {
+            input.checked = !!rules[k];
+        }
+    });
+}
+
+// Close on backdrop click
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('editBranchModal');
+    if (modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) closeModal('editBranchModal');
+        });
+    }
+});
+</script>
+{% endblock %}

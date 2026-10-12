@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+
+{% block title %}Create Sales Order - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+            <a href="{{ url_for('sales_orders.list_orders') }}" style="color: #64748B; text-decoration: none; font-size: 0.88rem;">← Sales Orders</a>
+            <span style="color: #CBD5E1;">/</span>
+            <span style="font-size: 0.88rem; font-weight: 600; color: #0F172A;">New Order</span>
+        </div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Create Sales Order</h1>
+    </div>
+</div>
+
+<form action="{{ url_for('sales_orders.create_order') }}" method="POST" id="orderForm">
+    <!-- Header Details Card -->
+    <div class="card" style="margin-bottom: 20px;">
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 16px;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Customer *</label>
+                <select name="customer_id" id="customerSelect" required class="form-select">
+                    <option value="">Select Customer...</option>
+                    {% for c in customers %}
+                    <option value="{{ c.id }}" data-discount="{{ c.discount_percent or 0 }}">{{ c.name }} {% if c.phone %}({{ c.phone }}){% endif %}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Fulfill From Warehouse *</label>
+                <select name="location_id" required class="form-select">
+                    {% for l in locations %}
+                    <option value="{{ l.id }}" {% if l.is_default %}selected{% endif %}>{{ l.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Order Date *</label>
+                <div class="gs-datepicker-wrapper" style="width: 100%;">
+                    <input type="text" name="order_date" id="orderDateInput" value="{{ current_time.strftime('%d-%b-%y') }}" data-datepicker="google-sheet" required class="form-input gs-datepicker-input" style="cursor: pointer; padding-right: 26px;">
+                    <span class="gs-datepicker-icon" title="Select date">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label class="form-label">Sales Representative</label>
+                <input type="text" name="sales_rep" placeholder="e.g. Counter Sales" class="form-input">
+            </div>
+        </div>
+    </div>
+
+    <!-- Line Items Card -->
+    <div class="card" style="margin-bottom: 20px; padding: 0; overflow: visible;">
+        <div style="padding: 18px 22px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="card-title" style="margin-bottom: 0;">Order Line Items</h2>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="addLineItem()">
+                + Add Item Row
+            </button>
+        </div>
+
+        <div class="table-container" style="border: none; overflow: visible;">
+            <table class="data-table" id="lineItemsTable">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">#</th>
+                        <th style="min-width: 320px;">Product / Item</th>
+                        <th style="width: 100px; text-align: right;">Available</th>
+                        <th style="width: 120px; text-align: right;">Quantity</th>
+                        <th style="width: 130px; text-align: right;">Unit Price ($)</th>
+                        <th style="width: 110px; text-align: right;">Disc %</th>
+                        <th style="width: 130px; text-align: right;">Line Total</th>
+                        <th style="width: 50px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="lineItemsBody">
+                    <!-- Dynamic Line Item Row -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Summary & Totals Grid -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
+        <div class="card">
+            <h2 class="card-title">Order Remarks & Shipping Notes</h2>
+            <div class="form-group">
+                <textarea name="notes" rows="4" placeholder="Delivery instructions, customer purchase order number, packaging notes..." class="form-textarea"></textarea>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2 class="card-title">Order Summary</h2>
+            <div style="display: flex; flex-direction: column; gap: 10px; font-size: 0.9rem;">
+                <div style="display: flex; justify-content: space-between;">
+                    <span style="color: #64748B;">Lines Subtotal:</span>
+                    <span style="font-weight: 600;" id="summarySubtotal">$0.00</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #64748B;">Order Discount ($):</span>
+                    <input type="number" step="0.01" name="discount_amount" id="orderDiscountInput" value="0.00" style="width: 100px; text-align: right; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px;" oninput="calculateTotals()">
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #64748B;">Tax Rate (%):</span>
+                    <input type="number" step="0.1" name="tax_rate" id="orderTaxRateInput" value="0" style="width: 100px; text-align: right; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px;" oninput="calculateTotals()">
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span style="color: #64748B;">Shipping / Freight ($):</span>
+                    <input type="number" step="0.01" name="shipping_fee" id="orderShippingInput" value="0.00" style="width: 100px; text-align: right; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 6px;" oninput="calculateTotals()">
+                </div>
+                <div style="border-top: 2px solid #E2E8F0; padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <span style="font-weight: 700; font-size: 1.1rem; color: #0F172A;">Grand Total:</span>
+                    <span style="font-weight: 800; font-size: 1.3rem; color: #0F766E;" id="summaryGrandTotal">$0.00</span>
+                </div>
+            </div>
+            <div style="margin-top: 20px;">
+                <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                    Confirm & Place Sales Order
+                </button>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let lineCounter = 0;
+
+function addLineItem(initialData = null) {
+    lineCounter++;
+    const tbody = document.getElementById('lineItemsBody');
+    const tr = document.createElement('tr');
+    tr.id = `row-${lineCounter}`;
+
+    tr.innerHTML = `
+        <td style="color: #94A3B8; font-weight: 600;">${lineCounter}</td>
+        <td style="position: relative;">
+            <input type="text" class="form-input prod-search-input" placeholder="Type product name, SKU or barcode..." autocomplete="off">
+            <input type="hidden" name="product_id[]" class="prod-id-input" required>
+            <input type="hidden" name="description[]" class="prod-desc-input">
+            <div class="prod-search-results" style="display: none; position: absolute; left: 0; right: 0; background: white; border: 1px solid #CBD5E1; border-radius: 8px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-height: 200px; overflow-y: auto; z-index: 50; margin-top: 4px;"></div>
+        </td>
+        <td style="text-align: right;">
+            <span class="stock-avail-badge" style="font-weight: 600; color: #64748B;">-</span>
+        </td>
+        <td style="text-align: right;">
+            <input type="number" step="1" name="quantity[]" value="1" min="1" class="form-input qty-input" style="text-align: right; width: 100px;" oninput="calculateTotals()">
+        </td>
+        <td style="text-align: right;">
+            <input type="number" step="0.01" name="unit_price[]" value="0.00" class="form-input price-input" style="text-align: right; width: 110px;" oninput="calculateTotals()">
+        </td>
+        <td style="text-align: right;">
+            <input type="number" step="0.1" name="discount_percent[]" value="${getCustomerDiscount()}" class="form-input disc-input" style="text-align: right; width: 80px;" oninput="calculateTotals()">
+        </td>
+        <td style="text-align: right; font-weight: 700; color: #0F172A;" class="line-subtotal">
+            $0.00
+        </td>
+        <td style="text-align: center;">
+            <button type="button" onclick="removeLineRow('row-${lineCounter}')" style="background: none; border: none; color: #EF4444; font-size: 1.2rem; cursor: pointer;">×</button>
+        </td>
+    `;
+
+    tbody.appendChild(tr);
+
+    // Setup autocomplete for this row
+    const searchInput = tr.querySelector('.prod-search-input');
+    const resultsDiv = tr.querySelector('.prod-search-results');
+    const idInput = tr.querySelector('.prod-id-input');
+    const descInput = tr.querySelector('.prod-desc-input');
+    const priceInput = tr.querySelector('.price-input');
+    const stockBadge = tr.querySelector('.stock-avail-badge');
+
+    let debounce;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(debounce);
+        const q = searchInput.value.trim();
+        if (q.length < 2) {
+            resultsDiv.style.display = 'none';
+            return;
+        }
+
+        debounce = setTimeout(() => {
+            fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(items => {
+                    if (items.length === 0) {
+                        resultsDiv.innerHTML = '<div style="padding: 10px; color: #94A3B8; font-size: 0.8rem;">No products found</div>';
+                        resultsDiv.style.display = 'block';
+                        return;
+                    }
+                    let h = '';
+                    items.forEach(it => {
+                        h += `
+                            <div class="search-item-row" data-id="${it.id}" data-name="${it.name.replace(/"/g, '&quot;')}" data-price="${it.default_price}" data-stock="${it.on_hand}" data-uom="${it.uom}" style="padding: 8px 12px; cursor: pointer; border-bottom: 1px solid #F1F5F9;">
+                                <div style="font-weight: 600; font-size: 0.85rem;">${it.name}</div>
+                                <div style="font-size: 0.72rem; color: #64748B;">SKU: ${it.sku} | Price: $${parseFloat(it.default_price).toFixed(2)} | Avail: ${it.on_hand} ${it.uom}</div>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = h;
+                    resultsDiv.style.display = 'block';
+
+                    resultsDiv.querySelectorAll('.search-item-row').forEach(row => {
+                        row.addEventListener('click', () => {
+                            idInput.value = row.dataset.id;
+                            searchInput.value = row.dataset.name;
+                            descInput.value = row.dataset.name;
+                            priceInput.value = parseFloat(row.dataset.price || 0).toFixed(2);
+                            stockBadge.innerText = `${row.dataset.stock} ${row.dataset.uom}`;
+                            resultsDiv.style.display = 'none';
+                            calculateTotals();
+                        });
+                    });
+                });
+        }, 200);
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!tr.contains(e.target)) {
+            resultsDiv.style.display = 'none';
+        }
+    });
+
+    calculateTotals();
+}
+
+function removeLineRow(rowId) {
+    const row = document.getElementById(rowId);
+    if (row) {
+        row.remove();
+        calculateTotals();
+    }
+}
+
+function calculateTotals() {
+    let subtotal = 0;
+    const rows = document.querySelectorAll('#lineItemsBody tr');
+
+    rows.forEach(tr => {
+        const qty = parseFloat(tr.querySelector('.qty-input')?.value || 0);
+        const price = parseFloat(tr.querySelector('.price-input')?.value || 0);
+        const disc = parseFloat(tr.querySelector('.disc-input')?.value || 0);
+
+        const lineTotal = (qty * price) * (1 - (disc / 100));
+        const subtotalCell = tr.querySelector('.line-subtotal');
+        if (subtotalCell) {
+            subtotalCell.innerText = '$' + lineTotal.toFixed(2);
+        }
+        subtotal += lineTotal;
+    });
+
+    const discountAmount = parseFloat(document.getElementById('orderDiscountInput')?.value || 0);
+    const taxRate = parseFloat(document.getElementById('orderTaxRateInput')?.value || 0);
+    const shipping = parseFloat(document.getElementById('orderShippingInput')?.value || 0);
+
+    const taxAmount = (subtotal - discountAmount) * (taxRate / 100);
+    const grandTotal = Math.max(0, (subtotal - discountAmount) + taxAmount + shipping);
+
+    document.getElementById('summarySubtotal').innerText = '$' + subtotal.toFixed(2);
+    document.getElementById('summaryGrandTotal').innerText = '$' + grandTotal.toFixed(2);
+}
+
+function getCustomerDiscount() {
+    const custSelect = document.getElementById('customerSelect');
+    if (!custSelect || custSelect.selectedIndex < 0) return 0;
+    const opt = custSelect.options[custSelect.selectedIndex];
+    return parseFloat(opt ? opt.getAttribute('data-discount') : 0) || 0;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Add first line item automatically
+    addLineItem();
+
+    const custSelect = document.getElementById('customerSelect');
+    if (custSelect) {
+        custSelect.addEventListener('change', function() {
+            const disc = getCustomerDiscount();
+            if (disc > 0) {
+                document.querySelectorAll('#lineItemsBody .disc-input').forEach(input => {
+                    input.value = disc;
+                });
+                calculateTotals();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

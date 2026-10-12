@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly Expense & Cash Report - {{ month_display }} - inFlow Premium</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <style>
+        body {
+            background: #FFFFFF !important;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+            color: #0F172A;
+            margin: 0;
+            padding: 20px;
+        }
+        .print-toolbar {
+            position: sticky;
+            top: 0;
+            background: #0F766E;
+            color: #FFFFFF;
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            z-index: 999;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+        .print-btn {
+            background: #FFFFFF;
+            color: #0F766E;
+            border: none;
+            padding: 6px 16px;
+            border-radius: 4px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .print-btn:hover {
+            background: #CCFBF1;
+        }
+        .print-header-banner {
+            border-bottom: 2px solid #0F766E;
+            padding-bottom: 12px;
+            margin-bottom: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+        }
+        .print-kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .print-kpi-box {
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            padding: 8px;
+            text-align: center;
+        }
+        .print-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 11px;
+            margin-bottom: 20px;
+        }
+        .print-table th {
+            background: #0F766E;
+            color: #FFFFFF;
+            font-weight: 700;
+            padding: 6px 8px;
+            border: 1px solid #0F766E;
+            text-align: left;
+        }
+        .print-table td {
+            padding: 5px 8px;
+            border: 1px solid #E2E8F0;
+        }
+        .print-table tbody tr:nth-child(even) {
+            background-color: #F8FAFC;
+        }
+        .print-split-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        @media print {
+            @page {
+                size: landscape;
+                margin: 10mm;
+            }
+            .no-print {
+                display: none !important;
+            }
+            body {
+                padding: 0 !important;
+            }
+            .print-table {
+                page-break-inside: auto;
+            }
+            tr {
+                page-break-inside: avoid;
+                page-break-after: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-toolbar no-print">
+        <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-weight: 700; font-size: 14px;">🖨️ Print Preview • {{ month_display }}</span>
+            <span style="opacity: 0.8; font-size: 12px;">(Use landscape orientation for best results)</span>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <a href="{{ url_for('expenses.export_monthly_excel', month=current_month) }}" download="inFlow_Monthly_Report_{{ current_month }}.xlsx" data-no-tab="true" class="print-btn" style="text-decoration: none;">
+                📊 Excel (.xlsx)
+            </a>
+            <a href="{{ url_for('expenses.export_monthly_pdf', month=current_month) }}" download="inFlow_Monthly_Report_{{ current_month }}.pdf" data-no-tab="true" class="print-btn" style="text-decoration: none;">
+                📄 Direct PDF
+            </a>
+            <button type="button" class="print-btn" onclick="window.print()">
+                🖨️ Print / Save PDF
+            </button>
+            <button type="button" class="print-btn" onclick="window.close()" style="background: rgba(255,255,255,0.2); color: #fff;">
+                ✕ Close
+            </button>
+        </div>
+    </div>
+
+    <div class="print-header-banner">
+        <div>
+            <h1 style="font-size: 18px; font-weight: 800; color: #0F766E; margin: 0 0 4px 0;">
+                inFlow Premium • Monthly Expense & Cash Flow Report
+            </h1>
+            <div style="font-size: 12px; color: #64748B;">
+                របាយការណ៍ចំណាយ និងផ្ទៀងផ្ទាត់សាច់ប្រាក់ក្នុងដៃប្រចាំខែ
+            </div>
+        </div>
+        <div style="text-align: right; font-size: 11px; color: #475569;">
+            <div>Period: <strong style="color: #0F172A; font-size: 13px;">{{ month_display }}</strong></div>
+            <div>Generated: {{ today_date }} | Currency: <strong>USD ($)</strong></div>
+        </div>
+    </div>
+
+    <!-- KPI Summary Grid -->
+    <div class="print-kpi-grid">
+        <div class="print-kpi-box" style="background: #FEE2E2;">
+            <div style="font-size: 9px; font-weight: 700; color: #DC2626;">ចំណាយសរុប (Expenses)</div>
+            <div style="font-size: 13px; font-weight: 800; color: #DC2626;">${{ "{:,.2f}".format(total_expenses) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #DCFCE7;">
+            <div style="font-size: 9px; font-weight: 700; color: #166534;">លុយចាស់ (Opening)</div>
+            <div style="font-size: 13px; font-weight: 800; color: #166534;">${{ "{:,.2f}".format(opening_balance) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #E0F2FE;">
+            <div style="font-size: 9px; font-weight: 700; color: #0369A1;">Clear STM</div>
+            <div style="font-size: 13px; font-weight: 800; color: #0369A1;">${{ "{:,.2f}".format(clear_stm) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #DCFCE7;">
+            <div style="font-size: 9px; font-weight: 700; color: #15803D;">Media (ប្រាក់ពី Media)</div>
+            <div style="font-size: 13px; font-weight: 800; color: #15803D;">${{ "{:,.2f}".format(media_total) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #CCFBF1;">
+            <div style="font-size: 9px; font-weight: 700; color: #0F766E;">លុយលក់ (Sales)</div>
+            <div style="font-size: 13px; font-weight: 800; color: #0F766E;">${{ "{:,.2f}".format(sales_received) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #DBEAFE;">
+            <div style="font-size: 9px; font-weight: 700; color: #1D4ED8;">លុយសរុប (Total In)</div>
+            <div style="font-size: 13px; font-weight: 800; color: #1D4ED8;">${{ "{:,.2f}".format(total_money_in) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #FEF9C3;">
+            <div style="font-size: 9px; font-weight: 800; color: #B45309;">លុយសល់ (In Hand)</div>
+            <div style="font-size: 13px; font-weight: 800; color: #B45309;">${{ "{:,.2f}".format(money_in_hand) }}</div>
+        </div>
+        <div class="print-kpi-box" style="background: #DCFCE7;">
+            <div style="font-size: 9px; font-weight: 700; color: #15803D;">Net Margin</div>
+            <div style="font-size: 13px; font-weight: 800; color: #15803D;">${{ "{:,.2f}".format(net_operating_income) }}</div>
+        </div>
+    </div>
+
+    <!-- Daily Expenses Table -->
+    <div style="margin-bottom: 16px;">
+        <h3 style="font-size: 12px; font-weight: 700; color: #0F766E; margin: 0 0 6px 0;">
+            1. Daily Expense Breakdown (តារាងចំណាយប្រចាំថ្ងៃ) - Total {{ expenses|length }} Items
+        </h3>
+        <table class="print-table">
+            <thead>
+                <tr>
+                    <th style="width: 30px; text-align: center;">No</th>
+                    <th>Item Description</th>
+                    <th style="text-align: right; width: 80px;">Unit Price</th>
+                    <th style="text-align: center; width: 45px;">Qty</th>
+                    <th style="text-align: right; width: 90px;">Total Price</th>
+                    <th style="width: 75px; text-align: center;">Date</th>
+                    <th style="width: 80px;">Paid By</th>
+                    <th style="width: 90px;">Category</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for exp in expenses %}
+                <tr>
+                    <td style="text-align: center;">{{ loop.index }}</td>
+                    <td style="font-weight: 600;">{{ exp.item }}</td>
+                    <td style="text-align: right;">${{ "{:,.2f}".format(exp.unit_price|float) }}</td>
+                    <td style="text-align: center;">{{ "{:g}".format(exp.quantity|float) }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #B91C1C;">${{ "{:,.2f}".format(exp.total_price|float) }}</td>
+                    <td style="text-align: center;">{{ exp.expense_date.strftime('%d-%b') if exp.expense_date else '-' }}</td>
+                    <td>{{ exp.paid_by or '-' }}</td>
+                    <td>{{ exp.category or '-' }}</td>
+                    <td style="font-size: 10px; color: #64748B;">{{ exp.notes or '-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="background: #F1F5F9; font-weight: 700;">
+                    <td colspan="4" style="text-align: right;">សរុបការចំណាយ (Total Expenses):</td>
+                    <td style="text-align: right; color: #B91C1C; font-weight: 800; font-size: 12px;">${{ "{:,.2f}".format(total_expenses) }}</td>
+                    <td colspan="4"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <!-- Split Grid: Cash Reconciliation & Media Receipts -->
+    <div class="print-split-grid">
+        <!-- Cash Accounts -->
+        <div>
+            <h3 style="font-size: 12px; font-weight: 700; color: #0F766E; margin: 0 0 6px 0;">
+                2. Cash & Bank Accounts Count (ផ្ទៀងផ្ទាត់សាច់ប្រាក់ក្នុងដៃ)
+            </h3>
+            <table class="print-table">
+                <thead>
+                    <tr>
+                        <th>Account / Bank Name</th>
+                        <th style="text-align: right; width: 100px;">Amount ($)</th>
+                        <th>Notes / Formula</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acc in accounts %}
+                    <tr>
+                        <td style="font-weight: 600;">{{ acc.name }}</td>
+                        <td style="text-align: right; font-weight: 700; color: #0F766E;">${{ "{:,.2f}".format(acc.amount|float) }}</td>
+                        <td style="font-size: 9.5px; color: #64748B;">{{ acc.expr if acc.expr != "{:.2f}".format(acc.amount|float) else '' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #F0FDFA; font-weight: 700;">
+                        <td>ទឹកប្រាក់សរុប (Total Counted):</td>
+                        <td style="text-align: right; color: #0F766E; font-size: 11.5px;">${{ "{:,.2f}".format(total_counted_cash) }}</td>
+                        <td></td>
+                    </tr>
+                    <tr style="background: #FFFBEB;">
+                        <td style="color: #64748B;">លុយសល់តាមបញ្ជី (Expected In Hand):</td>
+                        <td style="text-align: right; font-weight: 700; color: #B45309;">${{ "{:,.2f}".format(money_in_hand) }}</td>
+                        <td></td>
+                    </tr>
+                    <tr style="font-weight: 800; background: {% if cash_variance < -0.005 %}#FEE2E2{% else %}#DCFCE7{% endif %};">
+                        <td style="color: {% if cash_variance < -0.005 %}#DC2626{% else %}#16A34A{% endif %};">
+                            ផ្សេងៗគ្នា លុយ (Difference):
+                            {% if cash_variance < -0.005 %}⚠️ Shortage (ខ្វះ){% elif cash_variance > 0.005 %}🟢 Surplus (លើស){% else %}✓ Matched{% endif %}
+                        </td>
+                        <td style="text-align: right; font-size: 12px; color: {% if cash_variance < -0.005 %}#DC2626{% else %}#16A34A{% endif %};">
+                            {% if cash_variance < -0.005 %}-${{ "{:,.2f}".format(cash_variance|abs) }}{% elif cash_variance > 0.005 %}+${{ "{:,.2f}".format(cash_variance) }}{% else %}$0.00{% endif %}
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Media Receipts -->
+        <div>
+            <h3 style="font-size: 12px; font-weight: 700; color: #166534; margin: 0 0 6px 0;">
+                3. Media Receipts (ប្រាក់ទទួលបានពី Media) - Total {{ media_receipts|length }} Receipts
+            </h3>
+            <table class="print-table">
+                <thead>
+                    <tr style="background: #166534;">
+                        <th style="width: 25px; text-align: center; background: #166534;">No</th>
+                        <th style="width: 65px; background: #166534;">Date</th>
+                        <th style="background: #166534;">Customer Name</th>
+                        <th style="text-align: right; width: 85px; background: #166534;">Received ($)</th>
+                        <th style="background: #166534;">Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in media_receipts %}
+                    <tr>
+                        <td style="text-align: center;">{{ loop.index }}</td>
+                        <td>{{ m.receipt_date.strftime('%d-%b') if m.receipt_date else '-' }}</td>
+                        <td style="font-weight: 600;">{{ m.customer_name }}</td>
+                        <td style="text-align: right; font-weight: 700; color: #16A34A;">${{ "{:,.2f}".format(m.amount|float) }}</td>
+                        <td style="font-size: 9.5px; color: #64748B;">{{ m.notes or '-' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #94A3B8; padding: 12px;">No media receipts recorded</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr style="background: #DCFCE7; font-weight: 700;">
+                        <td colspan="3" style="text-align: right; color: #166534;">សរុប (Total Media):</td>
+                        <td style="text-align: right; color: #166534; font-weight: 800; font-size: 12px;">${{ "{:,.2f}".format(media_total) }}</td>
+                        <td></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</body>
+</html>

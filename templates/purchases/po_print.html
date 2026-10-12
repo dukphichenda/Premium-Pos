@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ order.order_number }} - PURCHASE ORDER</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&family=Kantumruy+Pro:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', 'Kantumruy Pro', sans-serif;
+            margin: 0;
+            padding: 30px;
+            color: #1E293B;
+            background-color: #F8FAFC;
+        }
+        .invoice-sheet {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #E2E8F0;
+            padding-bottom: 24px;
+            margin-bottom: 24px;
+        }
+        .company-name { font-size: 1.4rem; font-weight: 800; color: #0F766E; }
+        .doc-title { font-size: 1.8rem; font-weight: 800; text-align: right; color: #0F172A; }
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 30px;
+            font-size: 0.88rem;
+        }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        th {
+            background-color: #F1F5F9;
+            padding: 10px 14px;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            text-align: left;
+            border-bottom: 2px solid #CBD5E1;
+        }
+        td { padding: 12px 14px; border-bottom: 1px solid #E2E8F0; font-size: 0.88rem; }
+        .totals-table { width: 320px; margin-left: auto; margin-bottom: 30px; }
+        .totals-table td { padding: 6px 12px; border-bottom: none; }
+        .print-banner { max-width: 800px; margin: 0 auto 20px auto; display: flex; justify-content: space-between; align-items: center; }
+        .print-btn { background-color: #0F766E; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+        @media print {
+            body { background: white; padding: 0; }
+            .invoice-sheet { box-shadow: none; padding: 0; }
+            .print-banner { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="print-banner">
+        <a href="javascript:window.close()" style="color: #64748B; text-decoration: none; font-size: 0.9rem;">← Close Window</a>
+        <button onclick="window.print()" class="print-btn">Print Purchase Order 🖨️</button>
+    </div>
+
+    <div class="invoice-sheet">
+        <div class="header">
+            <div>
+                <div class="company-name">{{ company.name }}</div>
+                <div style="font-size: 0.82rem; color: #64748B; margin-top: 4px;">{{ company.address1 or 'Phnom Penh, Cambodia' }}</div>
+                <div style="font-size: 0.82rem; color: #64748B;">Phone: {{ company.phone or '+855 23 888 999' }}</div>
+            </div>
+            <div>
+                <div class="doc-title">PURCHASE ORDER</div>
+                <div style="text-align: right; font-weight: 700; color: #0F766E; font-size: 1.1rem; margin-top: 4px;">
+                    {{ order.order_number }}
+                </div>
+                <div style="text-align: right; font-size: 0.82rem; color: #64748B; margin-top: 2px;">
+                    Date: {{ order.order_date | format_date }}
+                </div>
+            </div>
+        </div>
+
+        <div class="details-grid">
+            <div>
+                <div style="font-weight: 700; font-size: 0.78rem; text-transform: uppercase; color: #64748B; margin-bottom: 4px;">Supplier / Vendor:</div>
+                <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">{{ order.vendor_name }}</div>
+                <div style="color: #64748B;">Phone: {{ order.vendor_phone or '-' }}</div>
+                <div style="color: #64748B;">{{ order.vendor_address or '-' }}</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-weight: 700; font-size: 0.78rem; text-transform: uppercase; color: #64748B; margin-bottom: 4px;">Ship To Warehouse:</div>
+                <div>Location: <strong>{{ order.location_name }}</strong></div>
+                <div>Expected Arrival: <strong>{{ order.expected_date | format_date }}</strong></div>
+            </div>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 30px;">#</th>
+                    <th>Product Item</th>
+                    <th style="width: 120px;">SKU</th>
+                    <th style="width: 80px; text-align: right;">Qty</th>
+                    <th style="width: 110px; text-align: right;">Unit Cost</th>
+                    <th style="width: 120px; text-align: right;">Subtotal</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in lines %}
+                <tr>
+                    <td style="color: #94A3B8;">{{ line.line_num }}</td>
+                    <td style="font-weight: 600;">{{ line.product_name }}</td>
+                    <td style="color: #64748B; font-family: monospace;">{{ line.product_sku }}</td>
+                    <td style="text-align: right; font-weight: 700;">{{ "{:,.0f}".format(line.quantity) }}</td>
+                    <td style="text-align: right;">{{ line.unit_cost | currency }}</td>
+                    <td style="text-align: right; font-weight: 700;">{{ line.subtotal | currency }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="totals-table">
+            <table style="margin-bottom: 0;">
+                <tr>
+                    <td style="color: #64748B;">Items Subtotal:</td>
+                    <td style="text-align: right; font-weight: 600;">{{ order.subtotal | currency }}</td>
+                </tr>
+                {% if order.shipping_fee > 0 %}
+                <tr>
+                    <td style="color: #64748B;">Shipping Freight:</td>
+                    <td style="text-align: right;">{{ order.shipping_fee | currency }}</td>
+                </tr>
+                {% endif %}
+                <tr style="border-top: 2px solid #0F172A;">
+                    <td style="font-weight: 800; font-size: 1.1rem;">Total PO Cost:</td>
+                    <td style="text-align: right; font-weight: 800; font-size: 1.15rem; color: #0F766E;">{{ order.total_amount | currency }}</td>
+                </tr>
+            </table>
+        </div>
+
+        {% if order.notes %}
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px 16px; border-radius: 6px; font-size: 0.85rem; margin-top: 20px;">
+            <strong>PO Instructions:</strong> {{ order.notes }}
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>

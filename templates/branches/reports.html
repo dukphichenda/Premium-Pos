@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block title %}Branch Financial Statement - {{ branch.name }}{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;" class="no-print">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="{{ url_for('branches.view_branch', id=branch.id) }}" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-weight: 600; text-decoration: none;">
+            ← {{ branch.name }}
+        </a>
+        <h1 style="font-size: 1.5rem; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">
+            📊 របាយការណ៍ហិរញ្ញវត្ថុសាខា (Branch Financial Statement)
+        </h1>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center;">
+        <form method="GET" action="{{ url_for('branches.branch_reports', id=branch.id) }}" style="display: flex; gap: 6px; align-items: center;">
+            <label style="font-size: 12px; font-weight: 700; color: #475569;">Month:</label>
+            <input type="month" name="month" value="{{ month_key }}" onchange="this.form.submit()" style="padding: 5px 10px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; font-weight: 600;">
+        </form>
+        <button onclick="window.print()" class="btn btn-secondary" style="padding: 6px 14px; font-weight: 600;">
+            🖨️ Print Report
+        </button>
+    </div>
+</div>
+
+<!-- Printable Branch Header -->
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 18px 24px; margin-bottom: 20px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0F172A; padding-bottom: 14px; margin-bottom: 16px;">
+        <div>
+            <h2 style="margin: 0; font-size: 20px; font-weight: 800; color: #0F172A;" class="font-khmer">{{ branch.name }}</h2>
+            <div style="font-size: 12px; color: #64748B; margin-top: 2px;">
+                Branch Code: <strong>{{ branch.code }}</strong> | Manager: <strong>{{ branch.manager_name or 'N/A' }}</strong> | Phone: <strong>{{ branch.phone or 'N/A' }}</strong>
+            </div>
+            <div style="font-size: 12px; color: #64748B;">Address: {{ branch.address or 'N/A' }}</div>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase;">Reporting Period</div>
+            <div style="font-size: 18px; font-weight: 800; color: #0284C7;">{{ month_key }}</div>
+            <div style="font-size: 11px; color: #166534; font-weight: 600; margin-top: 4px;">Isolated Branch Accounting Ledger</div>
+        </div>
+    </div>
+
+    <!-- Financial KPI Summary -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; padding: 14px; border-radius: 6px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #64748B;">TOTAL BRANCH SALES</div>
+            <div style="font-size: 22px; font-weight: 800; color: #0F172A; margin-top: 4px;">{{ totals.total_sales|currency }}</div>
+            <div style="font-size: 11px; color: #64748B;">{{ sales_data|length }} invoiced orders</div>
+        </div>
+        <div style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 14px; border-radius: 6px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #166534;">CASH COLLECTED</div>
+            <div style="font-size: 22px; font-weight: 800; color: #16A34A; margin-top: 4px;">{{ totals.total_collected|currency }}</div>
+            <div style="font-size: 11px; color: #15803D;">Unpaid: {{ totals.total_unpaid|currency }}</div>
+        </div>
+        <div style="background: #FEF2F2; border: 1px solid #FECACA; padding: 14px; border-radius: 6px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #991B1B;">BRANCH EXPENSES</div>
+            <div style="font-size: 22px; font-weight: 800; color: #DC2626; margin-top: 4px;">{{ exp_total.total_expenses|currency }}</div>
+            <div style="font-size: 11px; color: #B91C1C;">{{ expense_data|length }} expense entries</div>
+        </div>
+        <div style="background: #F0F9FF; border: 1px solid #BAE6FD; padding: 14px; border-radius: 6px;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #0369A1;">NET OPERATING INCOME</div>
+            <div style="font-size: 22px; font-weight: 800; color: {{ '#0284C7' if net_income >= 0 else '#DC2626' }}; margin-top: 4px;">{{ net_income|currency }}</div>
+            <div style="font-size: 11px; color: #0369A1;">Sales minus expenses</div>
+        </div>
+    </div>
+</div>
+
+<!-- Section 1: Invoiced Sales -->
+<div style="margin-bottom: 24px;">
+    <h3 style="font-size: 14.5px; font-weight: 700; color: #0F172A; margin-bottom: 10px;">1. Branch Invoiced Sales (ការលក់ប្រចាំខែ)</h3>
+    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; color: #475569;">
+                    <th style="padding: 10px 14px; text-align: left;">Invoice #</th>
+                    <th style="padding: 10px 14px; text-align: left;">Date</th>
+                    <th style="padding: 10px 14px; text-align: left;">Customer</th>
+                    <th style="padding: 10px 14px; text-align: right;">Total Amount</th>
+                    <th style="padding: 10px 14px; text-align: right;">Paid Amount</th>
+                    <th style="padding: 10px 14px; text-align: right;">Balance Due</th>
+                    <th style="padding: 10px 14px; text-align: center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for s in sales_data %}
+                <tr style="border-bottom: 1px solid #F1F5F9; font-size: 12.5px;">
+                    <td style="padding: 9px 14px; font-weight: 700; font-family: monospace;">{{ s.order_number }}</td>
+                    <td style="padding: 9px 14px; color: #64748B;">{{ s.order_date }}</td>
+                    <td style="padding: 9px 14px;">{{ s.customer_name or 'Walk-in Customer' }}</td>
+                    <td style="padding: 9px 14px; text-align: right; font-weight: 700;">{{ s.total_amount|currency }}</td>
+                    <td style="padding: 9px 14px; text-align: right; color: #16A34A; font-weight: 600;">{{ s.paid_amount|currency }}</td>
+                    <td style="padding: 9px 14px; text-align: right; color: {{ '#DC2626' if s.balance_due > 0 else '#64748B' }}; font-weight: 600;">{{ s.balance_due|currency }}</td>
+                    <td style="padding: 9px 14px; text-align: center;">
+                        <span class="badge" style="background: {{ '#DCFCE7' if s.payment_status == 'PAID' else '#FEF3C7' }}; color: {{ '#15803D' if s.payment_status == 'PAID' else '#B45309' }}; font-size: 10.5px; font-weight: 700;">{{ s.payment_status }}</span>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="padding: 24px; text-align: center; color: #94A3B8;">No sales recorded for this branch in {{ month_key }}.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Section 2: Branch Daily Expenses -->
+<div>
+    <h3 style="font-size: 14.5px; font-weight: 700; color: #0F172A; margin-bottom: 10px;">2. Branch Daily Expenses (ការចំណាយប្រចាំខែ)</h3>
+    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; color: #475569;">
+                    <th style="padding: 10px 14px; text-align: left;">Date</th>
+                    <th style="padding: 10px 14px; text-align: left;">Expense Item</th>
+                    <th style="padding: 10px 14px; text-align: left;">Category</th>
+                    <th style="padding: 10px 14px; text-align: right;">Amount</th>
+                    <th style="padding: 10px 14px; text-align: left;">Paid By</th>
+                    <th style="padding: 10px 14px; text-align: left;">Account</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for e in expense_data %}
+                <tr style="border-bottom: 1px solid #F1F5F9; font-size: 12.5px;">
+                    <td style="padding: 9px 14px; color: #64748B;">{{ e.expense_date }}</td>
+                    <td style="padding: 9px 14px; font-weight: 600; color: #0F172A;">{{ e.item }}</td>
+                    <td style="padding: 9px 14px;"><span class="badge" style="background: #E2E8F0; color: #334155; font-size: 11px;">{{ e.category }}</span></td>
+                    <td style="padding: 9px 14px; text-align: right; font-weight: 700; color: #DC2626;">{{ e.total_price|currency }}</td>
+                    <td style="padding: 9px 14px; color: #334155;">{{ e.paid_by or '-' }}</td>
+                    <td style="padding: 9px 14px; color: #334155;">{{ e.payment_account or 'Cash' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" style="padding: 24px; text-align: center; color: #94A3B8;">No expenses recorded for this branch in {{ month_key }}.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

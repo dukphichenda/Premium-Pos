@@ -1,0 +1,248 @@
+{% extends 'base.html' %}
+
+{% block title %}Warehouses & Locations - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em; margin: 0 0 4px 0;">Warehouses & Locations</h1>
+        <p style="color: #64748B; font-size: 0.88rem; margin: 0;">Multi-warehouse storage network, physical locations, and asset allocation</p>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center;">
+        <button onclick="openModal('newLocationModal')" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; font-weight: 600; border-radius: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Add Warehouse</span>
+        </button>
+    </div>
+</div>
+
+<!-- Filter Tabs -->
+<div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #E2E8F0; padding-bottom: 8px;">
+    <a href="{{ url_for('locations.list_locations', status='all') }}" 
+       class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" 
+       style="text-decoration: none; border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        All Warehouses
+    </a>
+    <a href="{{ url_for('locations.list_locations', status='active') }}" 
+       class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %}" 
+       style="text-decoration: none; border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Active
+    </a>
+    <a href="{{ url_for('locations.list_locations', status='inactive') }}" 
+       class="btn btn-sm {% if status_filter == 'inactive' %}btn-primary{% else %}btn-secondary{% endif %}" 
+       style="text-decoration: none; border-radius: 20px; padding: 4px 14px; font-size: 12px;">
+        Inactive
+    </a>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div class="table-container" style="border: none;">
+        <table class="data-table" style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                    <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 12px;">Warehouse Name</th>
+                    <th style="padding: 12px 14px; text-align: left; font-weight: 700; color: #475569; font-size: 12px;">Code</th>
+                    <th style="padding: 12px 14px; text-align: left; font-weight: 700; color: #475569; font-size: 12px;">Address / Notes</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Unique SKUs</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Units On Hand</th>
+                    <th style="padding: 12px 14px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Asset Valuation</th>
+                    <th style="padding: 12px 14px; text-align: center; font-weight: 700; color: #475569; font-size: 12px;">Status</th>
+                    <th style="padding: 12px 16px; text-align: right; font-weight: 700; color: #475569; font-size: 12px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for loc in locations %}
+                <tr style="border-bottom: 1px solid #F1F5F9; {% if not loc.is_active %}opacity: 0.75; background: #FAFAFA;{% endif %}">
+                    <td style="padding: 12px 16px; font-weight: 700; color: #0F172A;">
+                        {{ loc.name }}
+                        {% if loc.is_default %}
+                        <span class="badge badge-primary" style="margin-left: 6px; font-size: 0.65rem; background: #0284C7; color: #FFFFFF; padding: 2px 6px; border-radius: 4px;">DEFAULT</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px 14px; font-family: monospace; color: #334155; font-size: 12px;">{{ loc.code or '-' }}</td>
+                    <td style="padding: 12px 14px; color: #64748B; font-size: 13px; max-width: 250px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">{{ loc.address or '-' }}</td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #334155;">{{ loc.stocked_products }}</td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #0F766E;">
+                        {{ "{:,.0f}".format(loc.total_units) }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 800; color: #0F172A;">
+                        {{ loc.total_valuation | currency }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: center;">
+                        {% if loc.is_active %}
+                        <span class="badge badge-success" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600;">ACTIVE</span>
+                        {% else %}
+                        <span class="badge badge-secondary" style="background: #F1F5F9; color: #64748B; border: 1px solid #CBD5E1; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: 600;">INACTIVE</span>
+                        {% endif %}
+                    </td>
+                    <td style="padding: 12px 16px; text-align: right; white-space: nowrap;">
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                            <!-- Edit Button -->
+                            <button type="button" 
+                                    class="btn btn-sm btn-secondary btn-edit-location" 
+                                    style="padding: 4px 8px; font-size: 11.5px; border-radius: 4px;"
+                                    data-id="{{ loc.id }}"
+                                    data-name="{{ loc.name|escape }}"
+                                    data-code="{{ (loc.code or '')|escape }}"
+                                    data-address="{{ (loc.address or '')|escape }}"
+                                    onclick="openEditLocationModalFromBtn(this)"
+                                    title="Edit warehouse info">
+                                ✏️ Edit
+                            </button>
+
+                            <!-- Inactivate / Activate Button -->
+                            {% if not loc.is_default %}
+                            <form action="{{ url_for('locations.toggle_active_location', id=loc.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to {% if loc.is_active %}deactivate{% else %}activate{% endif %} warehouse \'{{ loc.name|escape }}\'?');">
+                                <button type="submit" 
+                                        class="btn btn-sm {% if loc.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" 
+                                        style="padding: 4px 8px; font-size: 11.5px; border-radius: 4px; {% if loc.is_active %}color: #D97706; border-color: #FCD34D;{% else %}color: #059669; border-color: #A7F3D0;{% endif %}"
+                                        title="{% if loc.is_active %}Deactivate this warehouse{% else %}Activate this warehouse{% endif %}">
+                                    {% if loc.is_active %}
+                                    ⏸ Inactive
+                                    {% else %}
+                                    ▶ Active
+                                    {% endif %}
+                                </button>
+                            </form>
+                            {% endif %}
+
+                            <!-- Delete Button -->
+                            {% if not loc.is_default %}
+                            <form action="{{ url_for('locations.delete_location', id=loc.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete warehouse \'{{ loc.name|escape }}\'? This action cannot be undone.');">
+                                <button type="submit" 
+                                        class="btn btn-sm btn-outline-danger" 
+                                        style="padding: 4px 8px; font-size: 11.5px; border-radius: 4px; color: #DC2626; border-color: #FECACA;"
+                                        title="Delete warehouse">
+                                    🗑️ Delete
+                                </button>
+                            </form>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; padding: 36px; color: #64748B;">
+                        No warehouses found matching the current filter.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Location Modal -->
+<div class="modal-overlay modal-backdrop" id="newLocationModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; border-radius: 8px; width: 100%; max-width: 440px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden; margin: auto;">
+        <div class="modal-header" style="padding: 14px 18px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <h2 class="modal-title" style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">+ Add Warehouse Location</h2>
+            <button class="modal-close" onclick="closeModal('newLocationModal')" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748B;">×</button>
+        </div>
+        <form action="{{ url_for('locations.create_location') }}" method="POST" style="padding: 18px;">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Warehouse Name *</label>
+                <input type="text" name="name" required placeholder="e.g. Phnom Penh Central Hub" class="form-input" style="width: 100%; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 5px; font-size: 13px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Location Code</label>
+                <input type="text" name="code" placeholder="e.g. WH-PP-01" class="form-input" style="width: 100%; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 5px; font-size: 13px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Physical Address / Notes</label>
+                <textarea name="address" rows="3" placeholder="Street, Sangkat, Khan, City..." class="form-textarea" style="width: 100%; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 5px; font-size: 13px; resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newLocationModal')" style="padding: 7px 14px; font-size: 12.5px;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="padding: 7px 16px; font-size: 12.5px; font-weight: 600;">Create Location</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Edit Location Modal -->
+<div class="modal-overlay modal-backdrop" id="editLocationModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; border-radius: 8px; width: 100%; max-width: 440px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); overflow: hidden; margin: auto;">
+        <div class="modal-header" style="padding: 14px 18px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <h2 class="modal-title" style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">✏️ Edit Warehouse Location</h2>
+            <button class="modal-close" onclick="closeModal('editLocationModal')" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748B;">×</button>
+        </div>
+        <form id="editLocationForm" method="POST" style="padding: 18px;">
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Warehouse Name *</label>
+                <input type="text" name="name" id="editLocationName" required class="form-input" style="width: 100%; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 5px; font-size: 13px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 14px;">
+                <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Location Code</label>
+                <input type="text" name="code" id="editLocationCode" class="form-input" style="width: 100%; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 5px; font-size: 13px;">
+            </div>
+            <div class="form-group" style="margin-bottom: 18px;">
+                <label class="form-label" style="display: block; font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px;">Physical Address / Notes</label>
+                <textarea name="address" id="editLocationAddress" rows="3" class="form-textarea" style="width: 100%; padding: 7px 10px; border: 1px solid #CBD5E1; border-radius: 5px; font-size: 13px; resize: vertical;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editLocationModal')" style="padding: 7px 14px; font-size: 12.5px;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="padding: 7px 16px; font-size: 12.5px; font-weight: 600;">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'flex';
+        el.classList.add('active');
+        const firstInput = el.querySelector('input:not([type="hidden"]), select, textarea');
+        if (firstInput) firstInput.focus();
+    }
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    }
+}
+
+function openEditLocationModalFromBtn(btn) {
+    if (!btn) return;
+    const button = btn.closest('button') || btn;
+    const id = button.getAttribute('data-id');
+    const name = button.getAttribute('data-name');
+    const code = button.getAttribute('data-code');
+    const address = button.getAttribute('data-address');
+    openEditLocationModal(id, name, code, address);
+}
+
+function openEditLocationModal(id, name, code, address) {
+    const form = document.getElementById('editLocationForm');
+    if (form) form.action = '/locations/' + id + '/edit';
+    
+    const nameInp = document.getElementById('editLocationName');
+    if (nameInp) nameInp.value = name || '';
+    
+    const codeInp = document.getElementById('editLocationCode');
+    if (codeInp) codeInp.value = code || '';
+    
+    const addrInp = document.getElementById('editLocationAddress');
+    if (addrInp) addrInp.value = address || '';
+    
+    openModal('editLocationModal');
+}
+
+// Ensure backdrop click closes modal
+document.addEventListener('DOMContentLoaded', function() {
+    ['newLocationModal', 'editLocationModal'].forEach(function(mId) {
+        const modal = document.getElementById(mId);
+        if (modal) {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) closeModal(mId);
+            });
+        }
+    });
+});
+</script>
+{% endblock %}

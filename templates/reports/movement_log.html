@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Movement Audit Ledger - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Stock Movement Audit Trail</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Complete chronological audit ledger of every inventory change and warehouse transaction</p>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+    <form method="GET" action="{{ url_for('reports.movement_log') }}" style="display: flex; gap: 14px; align-items: center;">
+        <select name="type" class="form-select" style="width: 220px;" onchange="this.form.submit()">
+            <option value="">All Movement Types</option>
+            <option value="INITIAL" {% if movement_type == 'INITIAL' %}selected{% endif %}>Initial Stock-In</option>
+            <option value="PO_RECEIVE" {% if movement_type == 'PO_RECEIVE' %}selected{% endif %}>Purchase Order Receiving</option>
+            <option value="SALE_SHIP" {% if movement_type == 'SALE_SHIP' %}selected{% endif %}>Sales Order Shipment</option>
+            <option value="TRANSFER" {% if movement_type == 'TRANSFER' %}selected{% endif %}>Warehouse Transfer</option>
+            <option value="ADJUSTMENT" {% if movement_type == 'ADJUSTMENT' %}selected{% endif %}>Stock Adjustment / Recount</option>
+        </select>
+        {% if movement_type %}
+        <a href="{{ url_for('reports.movement_log') }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Timestamp</th>
+                    <th>Product</th>
+                    <th>SKU</th>
+                    <th>Type</th>
+                    <th>Reference</th>
+                    <th>Warehouse Location</th>
+                    <th style="text-align: right;">Quantity</th>
+                    <th style="text-align: right;">Before</th>
+                    <th style="text-align: right;">After</th>
+                    <th>Reason / Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for l in logs %}
+                <tr>
+                    <td style="font-size: 0.82rem; color: #64748B;">{{ l.created_at | format_datetime }}</td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('products.detail_product', id=l.product_id) }}" style="text-decoration: none; color: inherit;">
+                            {{ l.product_name }}
+                        </a>
+                    </td>
+                    <td style="font-family: monospace; font-size: 0.8rem; color: #64748B;">{{ l.product_sku }}</td>
+                    <td>
+                        <span class="badge {% if 'PO' in l.movement_type or 'INITIAL' in l.movement_type %}badge-success{% elif 'SALE' in l.movement_type %}badge-info{% elif 'TRANSFER' in l.movement_type %}badge-primary{% else %}badge-neutral{% endif %}">
+                            {{ l.movement_type }}
+                        </span>
+                    </td>
+                    <td style="font-family: monospace; font-weight: 600;">{{ l.reference_id or '-' }}</td>
+                    <td>{{ l.to_location_name or l.from_location_name or 'Main Warehouse' }}</td>
+                    <td style="text-align: right; font-weight: 700; color: {% if l.quantity > 0 %}#059669{% else %}#DC2626{% endif %};">
+                        {{ "{:+,.0f}".format(l.quantity) }}
+                    </td>
+                    <td style="text-align: right; color: #64748B;">{{ "{:,.0f}".format(l.qty_before) }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(l.qty_after) }}</td>
+                    <td style="color: #64748B;">{{ l.reason or l.notes or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; color: #94A3B8; padding: 32px;">No logged movements found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div style="padding: 16px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} audit records)</span>
+        <div style="display: flex; gap: 8px;">
+            {% if page > 1 %}
+            <a href="{{ url_for('reports.movement_log', page=page-1, type=movement_type) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('reports.movement_log', page=page+1, type=movement_type) }}" class="btn btn-secondary btn-sm">Next →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

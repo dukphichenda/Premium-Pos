@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>inFlow Premium Enterprise - Modern Web ERP & Inventory Management</title>
+    <meta name="description" content="Next-generation Web ERP and Inventory Management System powered by PostgreSQL 16. Fast, responsive, multi-branch, bilingual English and Khmer.">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='11.5' y='2.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 11.5 2.5)' fill='%23F59E0B'/><rect x='4.5' y='9.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 4.5 9.5)' fill='%23FBBF24'/><rect x='18.5' y='9.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 18.5 9.5)' fill='%23D97706'/><rect x='11.5' y='16.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 11.5 16.5)' fill='%23F59E0B'/></svg>">
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --brand-primary: #2563EB;
+            --brand-primary-hover: #1D4ED8;
+            --brand-accent: #F59E0B;
+            --brand-success: #10B981;
+            --brand-teal: #0D9488;
+            --slate-950: #020617;
+            --slate-900: #0F172A;
+            --slate-800: #1E293B;
+            --slate-700: #334155;
+            --slate-600: #475569;
+            --slate-400: #94A3B8;
+            --slate-300: #CBD5E1;
+            --slate-200: #E2E8F0;
+            --slate-100: #F1F5F9;
+            --slate-50: #F8FAFC;
+            --white: #FFFFFF;
+            --glow: rgba(37, 99, 235, 0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', 'Kantumruy Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--slate-950);
+            color: var(--slate-100);
+            line-height: 1.6;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Ambient Glow & Grid Background */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-image: 
+                radial-gradient(circle at 50% 15%, rgba(37, 99, 235, 0.12) 0%, transparent 60%),
+                radial-gradient(circle at 85% 65%, rgba(245, 158, 11, 0.08) 0%, transparent 50%),
+                linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 48px 48px, 48px 48px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Layout Container */
+        .container {
+            width: 100%;
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0 24px;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Top Navigation Header */
+        header.site-header {
+            position: sticky;
+            top: 0;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            background: rgba(15, 23, 42, 0.82);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            z-index: 100;
+            transition: all 0.25s ease;
+        }
+
+        .nav-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 72px;
+        }
+
+        .brand-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+            color: var(--white);
+        }
+
+        .brand-logo-icon {
+            width: 38px;
+            height: 38px;
+            background: linear-gradient(135deg, #1E293B, #0F172A);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+        }
+
+        .brand-title-group h1 {
+            font-size: 1.15rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .brand-title-group .badge-enterprise {
+            font-size: 0.65rem;
+            font-weight: 700;
+            background: rgba(245, 158, 11, 0.15);
+            color: #FBBF24;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+            padding: 1px 6px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .brand-subtitle {
+            font-size: 0.72rem;
+            color: var(--slate-400);
+            font-weight: 500;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--slate-300);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: color 0.15s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--white);
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Language Toggle Button */
+        .btn-lang {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--slate-200);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .btn-lang:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: var(--white);
+        }
+
+        /* Launch Portal Button */
+        .btn-launch {
+            background: linear-gradient(135deg, #2563EB, #1D4ED8);
+            border: 1px solid #3B82F6;
+            color: var(--white);
+            padding: 9px 20px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .btn-launch:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+            background: linear-gradient(135deg, #3B82F6, #2563EB);
+        }
+
+        /* Hero Section */
+        section.hero {
+            padding: 80px 0 60px;
+            text-align: center;
+        }
+
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.25);
+            padding: 4px 14px;
+            border-radius: 30px;
+            font-size: 0.8rem;
+            color: #34D399;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .status-indicator-dot {
+            width: 8px;
+            height: 8px;
+            background: #10B981;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #10B981;
+            animation: pulseDot 2s infinite;
+        }
+
+        @keyframes pulseDot {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .hero-title {
+            font-size: clamp(2.4rem, 5vw, 3.8rem);
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            line-height: 1.15;
+            color: var(--white);
+            max-width: 960px;
+            margin: 0 auto 20px;
+        }
+
+        .hero-title .gradient-text {
+            background: linear-gradient(135deg, #60A5FA 0%, #3B82F6 40%, #F59E0B 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero-subtitle {
+            font-size: clamp(1rem, 2vw, 1.25rem);
+            color: var(--slate-300);
+            max-width: 760px;
+            margin: 0 auto 36px;
+            font-weight: 400;
+        }
+
+        .hero-cta-group {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            margin-bottom: 48px;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: var(--slate-100);
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.3);
+            color: var(--white);
+        }
+
+        /* Quick Server Endpoint Bar */
+        .endpoint-bar {
+            background: rgba(15, 23, 42, 0.65);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            max-width: 640px;
+            margin: 0 auto;
+            padding: 8px 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+
+        .endpoint-icon {
+            color: #60A5FA;
+            padding-left: 8px;
+        }
+
+        .endpoint-input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--white);
+            font-size: 0.9rem;
+            font-family: monospace;
+        }
+
+        .endpoint-input::placeholder {
+            color: var(--slate-400);
+        }
+
+        .btn-connect {
+            background: #0284C7;
+            color: var(--white);
+            border: none;
+            padding: 7px 16px;
+            border-radius: 6px;
+            font-size: 0.82rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .btn-connect:hover {
+            background: #0369A1;
+        }
+
+        /* Metrics Grid */
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin: 60px 0;
+        }
+
+        .metric-card {
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.6) 0%, rgba(15, 23, 42, 0.6) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 24px 20px;
+            text-align: left;
+            transition: transform 0.2s ease, border-color 0.2s ease;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(59, 130, 246, 0.4);
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--white);
+            margin-bottom: 4px;
+            letter-spacing: -0.02em;
+        }
+
+        .metric-value.highlight {
+            color: #38BDF8;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            color: var(--slate-400);
+            font-weight: 600;
+        }
+
+        /* Modules Section */
+        .section-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+
+        .section-tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            color: #F59E0B;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 8px;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--white);
+            letter-spacing: -0.02em;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 24px;
+            margin-bottom: 80px;
+        }
+
+        .feature-card {
+            background: rgba(30, 41, 59, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 28px;
+            transition: all 0.25s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .feature-card:hover {
+            background: rgba(30, 41, 59, 0.7);
+            border-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-4px);
+            box-shadow: 0 16px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .feature-icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: rgba(37, 99, 235, 0.15);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 18px;
+        }
+
+        .feature-card h3 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--white);
+            margin-bottom: 8px;
+        }
+
+        .feature-card p {
+            font-size: 0.9rem;
+            color: var(--slate-400);
+            line-height: 1.55;
+            margin-bottom: 16px;
+        }
+
+        .feature-badge-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .feature-badge {
+            font-size: 0.72rem;
+            font-weight: 600;
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--slate-300);
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* Tech Specs Banner */
+        .tech-banner {
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.8), rgba(15, 23, 42, 0.9));
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 16px;
+            padding: 40px;
+            margin-bottom: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .tech-info h3 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--white);
+            margin-bottom: 8px;
+        }
+
+        .tech-info p {
+            color: var(--slate-400);
+            max-width: 580px;
+            font-size: 0.92rem;
+        }
+
+        .tech-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .tech-tag {
+            background: #0284C7;
+            color: #FFFFFF;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+        }
+
+        .tech-tag.gold {
+            background: #D97706;
+            box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+        }
+
+        /* Footer */
+        footer.site-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 48px 0 36px;
+            background: rgba(2, 6, 23, 0.7);
+        }
+
+        .footer-wrap {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .footer-left {
+            color: var(--slate-400);
+            font-size: 0.85rem;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 20px;
+            list-style: none;
+        }
+
+        .footer-links a {
+            color: var(--slate-400);
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: color 0.15s ease;
+        }
+
+        .footer-links a:hover {
+            color: var(--white);
+        }
+
+        /* Deployment Modal */
+        .modal-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(4px);
+            z-index: 999;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-box {
+            background: #0F172A;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            width: 100%;
+            max-width: 680px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6);
+            overflow: hidden;
+            animation: modalIn 0.2s ease-out;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: scale(0.96); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        .modal-header {
+            padding: 18px 24px;
+            background: #1E293B;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.1rem;
+            font-weight: 800;
+            color: var(--white);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--slate-400);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .modal-body {
+            padding: 24px;
+            max-height: 70vh;
+            overflow-y: auto;
+            color: var(--slate-300);
+            font-size: 0.9rem;
+        }
+
+        .code-block {
+            background: #020617;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: #38BDF8;
+            margin: 10px 0 16px;
+            overflow-x: auto;
+        }
+
+        /* Language Switching Helper */
+        [data-lang="km"] .lang-en { display: none !important; }
+        [data-lang="en"] .lang-km { display: none !important; }
+
+        @media (max-width: 768px) {
+            .nav-links { display: none; }
+            .hero-title { font-size: 2.2rem; }
+            .tech-banner { flex-direction: column; align-items: flex-start; }
+            .footer-wrap { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-grid"></div>
+
+    <!-- Top Navigation Header -->
+    <header class="site-header">
+        <div class="container nav-wrap">
+            <a href="#" class="brand-logo">
+                <div class="brand-logo-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <rect x="11.5" y="2.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 2.5)" fill="#F59E0B"/>
+                        <rect x="4.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 4.5 9.5)" fill="#FBBF24"/>
+                        <rect x="18.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 18.5 9.5)" fill="#D97706"/>
+                        <rect x="11.5" y="16.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 16.5)" fill="#F59E0B"/>
+                    </svg>
+                </div>
+                <div class="brand-title-group">
+                    <h1>inFlow Premium <span class="badge-enterprise">Enterprise</span></h1>
+                    <span class="brand-subtitle">Web ERP & Wholesale Inventory System</span>
+                </div>
+            </a>
+
+            <ul class="nav-links">
+                <li><a href="#features"><span class="lang-en">Modules</span><span class="lang-km">មុខងារចម្បង</span></a></li>
+                <li><a href="#architecture"><span class="lang-en">Architecture</span><span class="lang-km">រចនាសម្ព័ន្ធ</span></a></li>
+                <li><a href="javascript:void(0)" onclick="openDeployModal()"><span class="lang-en">Deployment</span><span class="lang-km">ការដំឡើង</span></a></li>
+            </ul>
+
+            <div class="nav-actions">
+                <button type="button" class="btn-lang" onclick="toggleLanguage()" title="Switch English / ខ្មែរ">
+                    <span id="langFlag">🇰🇭</span>
+                    <span id="langLabel">KH</span>
+                </button>
+                <a id="navLaunchBtn" href="/login" class="btn-launch">
+                    <span class="lang-en">Launch App →</span>
+                    <span class="lang-km">ចូលប្រើប្រព័ន្ធ →</span>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="container">
+        
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="status-pill">
+                <div class="status-indicator-dot"></div>
+                <span id="serverStatusText">System Online &bull; PostgreSQL 16 &bull; Port 5050</span>
+            </div>
+
+            <h2 class="hero-title">
+                <span class="lang-en">Next-Generation <span class="gradient-text">Wholesale & ERP</span> Inventory Platform</span>
+                <span class="lang-km">ប្រព័ន្ធគ្រប់គ្រង <span class="gradient-text">ឃ្លាំងទំនិញ និងការលក់</span> កម្រិតសហគ្រាស</span>
+            </h2>
+
+            <p class="hero-subtitle">
+                <span class="lang-en">
+                    Re-engineered from inFlow Inventory concept. Ultra-fast, PostgreSQL ACID database, sub-millisecond query latency, multi-branch store ledgers, and seamless bilingual Khmer Unicode & English experience.
+                </span>
+                <span class="lang-km">
+                    អភិវឌ្ឍន៍ឡើងវិញប្រកបដោយប្រសិទ្ធភាពខ្ពស់ ផ្អែកលើគំរូ inFlow Inventory ដំណើរការដោយ PostgreSQL 16 ល្បឿនលឿនបំផុត គាំទ្រការគ្រប់គ្រងច្រើនសាខា ភាសាខ្មែរ និងអង់គ្លេស។
+                </span>
+            </p>
+
+            <div class="hero-cta-group">
+                <a id="heroLaunchBtn" href="/login" class="btn-launch" style="padding: 13px 32px; font-size: 1rem;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span class="lang-en">Open inFlow Premium</span>
+                    <span class="lang-km">បើកប្រព័ន្ធ inFlow Premium</span>
+                </a>
+
+                <button type="button" class="btn-secondary" onclick="openDeployModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 17l6-6-6-6M12 19h8"></path>
+                    </svg>
+                    <span class="lang-en">Hosting & Setup Guide</span>
+                    <span class="lang-km">ការណែនាំអំពីការដំឡើង</span>
+                </button>
+            </div>
+
+            <!-- Server Endpoint Configurator -->
+            <div class="endpoint-bar" title="Configure your inFlow Premium Application Server URL">
+                <div class="endpoint-icon">⚡</div>
+                <input type="text" id="serverUrlInput" class="endpoint-input" placeholder="http://localhost:5050 or http://your-domain:5050" value="">
+                <button type="button" class="btn-connect" onclick="connectToServer()">Connect / ភ្ជាប់</button>
+            </div>
+        </section>
+
+        <!-- Metrics Overview Grid -->
+        <section class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-value highlight">&lt; 2ms</div>
+                <div class="metric-label">
+                    <span class="lang-en">Query Latency</span>
+                    <span class="lang-km">ល្បឿនដំណើរការទិន្នន័យ</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">50,000+</div>
+                <div class="metric-label">
+                    <span class="lang-en">Transactions Handled</span>
+                    <span class="lang-km">ទិន្នន័យប្រតិបត្តិការ</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">100%</div>
+                <div class="metric-label">
+                    <span class="lang-en">PostgreSQL ACID Compliant</span>
+                    <span class="lang-km">សុវត្ថិភាពទិន្នន័យកម្រិតខ្ពស់</span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value">Multi-Store</div>
+                <div class="metric-label">
+                    <span class="lang-en">Isolated Branch Ledgers</span>
+                    <span class="lang-km">បែងចែកសាខា និងឃ្លាំង</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Core Modules Grid -->
+        <section id="features" style="padding: 30px 0;">
+            <div class="section-header">
+                <div class="section-tag">Enterprise Modules / ម៉ូឌុលមុខងារ</div>
+                <h3 class="section-title">Everything Built For Real-World Speed</h3>
+            </div>
+
+            <div class="features-grid">
+                <!-- Module 1: Products & BOM -->
+                <div class="feature-card">
+                    <div>
+                        <div class="feature-icon-wrapper">📦</div>
+                        <h3>
+                            <span class="lang-en">Master Products & BOM Kit</span>
+                            <span class="lang-km">បញ្ជីមុខទំនិញ និងផ្សំគ្រឿង (BOM)</span>
+                        </h3>
+                        <p>
+                            <span class="lang-en">Multi-UOM pack ratios, tier pricing schemes, automatic moving average costing, and real-time kit component cost rollup.</span>
+                            <span class="lang-km">កំណត់ខ្នាតលក់ដុំ-រាយ កម្រិតតម្លៃច្រើនជម្រើស គណនាថ្លៃដើមមធ្យម និងគណនាថ្លៃដើមផ្សំគ្រឿងភ្លាមៗ។</span>
+                        </p>
+                    </div>
+                    <div class="feature-badge-list">
+                        <span class="feature-badge">BOM Rollup</span>
+                        <span class="feature-badge">Multi-Tier Pricing</span>
+                        <span class="feature-badge">Barcode Scanning</span>
+                    </div>
+                </div>
+
+                <!-- Module 2: Sales Orders & Delivery -->
+                <div class="feature-card">
+                    <div>
+                        <div class="feature-icon-wrapper">🛒</div>
+                        <h3>
+                            <span class="lang-en">Sales Orders & Delivery Dispatch</span>
+                            <span class="lang-km">ការលក់ និងចាត់ចែងអ្នកដឹកជញ្ជូន</span>
+                        </h3>
+                        <p>
+                            <span class="lang-en">Rapid order builder, + Next Customer button, multi-delivery person fee splits, and instant print for invoices & 80x100mm stickers.</span>
+                            <span class="lang-km">បង្កើតវិក្កយបត្ររហ័ស ប៊ូតុងអតិថិជនបន្ទាប់ ចែកថ្លៃដឹកជញ្ជូនស្មើគ្នា និងបោះពុម្ពវិក្កយបត្រព្រមទាំងស្លាកដឹកជញ្ជូន។</span>
+                        </p>
+                    </div>
+                    <div class="feature-badge-list">
+                        <span class="feature-badge">Next Customer</span>
+                        <span class="feature-badge">Delivery Split</span>
+                        <span class="feature-badge">Thermal Label Print</span>
+                    </div>
+                </div>
+
+                <!-- Module 3: Inventory Matrix -->
+                <div class="feature-card">
+                    <div>
+                        <div class="feature-icon-wrapper">🏢</div>
+                        <h3>
+                            <span class="lang-en">Multi-Warehouse Matrix</span>
+                            <span class="lang-km">ការគ្រប់គ្រងឃ្លាំងច្រើនទីតាំង</span>
+                        </h3>
+                        <p>
+                            <span class="lang-en">Real-time stock on hand, physical inventory audits, inter-warehouse transfers, and automated reorder assistant.</span>
+                            <span class="lang-km">ពិនិត្យទំនិញក្នុងស្តុកជាក់ស្តែង ការផ្ទេរទំនិញរវាងឃ្លាំង កែសម្រួលស្តុក និងជំនួយការបញ្ជាទិញទំនិញជិតអស់ពីស្តុក។</span>
+                        </p>
+                    </div>
+                    <div class="feature-badge-list">
+                        <span class="feature-badge">Stock Transfer</span>
+                        <span class="feature-badge">Audit Ledger</span>
+                        <span class="feature-badge">Reorder Alerts</span>
+                    </div>
+                </div>
+
+                <!-- Module 4: Purchase Orders & AP -->
+                <div class="feature-card">
+                    <div>
+                        <div class="feature-icon-wrapper">📥</div>
+                        <h3>
+                            <span class="lang-en">Purchasing & Vendor Receiving</span>
+                            <span class="lang-km">ការបញ្ជាទិញ និងទទួលទំនិញពីអ្នកផ្គត់ផ្គង់</span>
+                        </h3>
+                        <p>
+                            <span class="lang-en">Purchase orders workflow, 1-click warehouse receiving with auto stock increments and Accounts Payable tracking.</span>
+                            <span class="lang-km">បង្កើតការបញ្ជាទិញ ទទួលទំនិញចូលស្តុកដោយចុចតែ១ដង និងគ្រប់គ្រងប្រាក់ជំពាក់អ្នកផ្គត់ផ្គង់។</span>
+                        </p>
+                    </div>
+                    <div class="feature-badge-list">
+                        <span class="feature-badge">1-Click Receive</span>
+                        <span class="feature-badge">Moving Average Cost</span>
+                        <span class="feature-badge">Vendor Balances</span>
+                    </div>
+                </div>
+
+                <!-- Module 5: Branch Management -->
+                <div class="feature-card">
+                    <div>
+                        <div class="feature-icon-wrapper">🏬</div>
+                        <h3>
+                            <span class="lang-en">Multi-Branch Store Scope</span>
+                            <span class="lang-km">ការគ្រប់គ្រងបណ្តាញសាខា</span>
+                        </h3>
+                        <p>
+                            <span class="lang-en">Dedicated branch numbering sequences, isolated store ledgers, role-based store access, and consolidated Headquarters reporting.</span>
+                            <span class="lang-km">បែងចែកកូដវិក្កយបត្រតាមសាខា សៀវភៅតាមដានដាច់ដោយឡែក សិទ្ធិចូលប្រើប្រាស់ និងរបាយការណ៍រួមសរុប។</span>
+                        </p>
+                    </div>
+                    <div class="feature-badge-list">
+                        <span class="feature-badge">Isolated Scope</span>
+                        <span class="feature-badge">Headquarters Sync</span>
+                        <span class="feature-badge">Branch Ledgers</span>
+                    </div>
+                </div>
+
+                <!-- Module 6: Executive Analytics -->
+                <div class="feature-card">
+                    <div>
+                        <div class="feature-icon-wrapper">📊</div>
+                        <h3>
+                            <span class="lang-en">Executive Reports & Valuation</span>
+                            <span class="lang-km">របាយការណ៍ និងការវិភាគប្រាក់ចំណេញ</span>
+                        </h3>
+                        <p>
+                            <span class="lang-en">Gross profit margins, FIFO/Average inventory valuation, chronologically indexed audit log, and 1-click CSV export.</span>
+                            <span class="lang-km">របាយការណ៍ប្រាក់ចំណេញសរុប ការវាយតម្លៃតម្លៃស្តុកសរុប កំណត់ត្រាចលនាស្តុក និងទាញយកជាឯកសារ Excel/CSV។</span>
+                        </p>
+                    </div>
+                    <div class="feature-badge-list">
+                        <span class="feature-badge">Gross Margin</span>
+                        <span class="feature-badge">Valuation</span>
+                        <span class="feature-badge">CSV Export</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Tech Architecture Banner -->
+        <section id="architecture" class="tech-banner">
+            <div class="tech-info">
+                <h3>PostgreSQL 16 & Enterprise Python WSGI</h3>
+                <p>
+                    Architected for high-concurrency environments. Powered by Waitress WSGI server and PostgreSQL connection pooling, ensuring rock-solid stability under heavy sales operations.
+                </p>
+            </div>
+            <div class="tech-tags">
+                <span class="tech-tag">PostgreSQL 16</span>
+                <span class="tech-tag">Python 3.12</span>
+                <span class="tech-tag">Flask 3.1</span>
+                <span class="tech-tag gold">Waitress WSGI</span>
+                <span class="tech-tag">Khmer Unicode</span>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+        <div class="container footer-wrap">
+            <div class="footer-left">
+                &copy; <span id="currentYear"></span> <strong>inFlow Premium Enterprise</strong>. All rights reserved. Built for high performance.
+            </div>
+            <ul class="footer-links">
+                <li><a href="javascript:void(0)" onclick="openDeployModal()">Hosting Guide</a></li>
+                <li><a href="/login">Sign In</a></li>
+            </ul>
+        </div>
+    </footer>
+
+    <!-- Hosting & Deployment Modal -->
+    <div id="deployModal" class="modal-backdrop">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h3>🚀 How to Publish / Host inFlow Premium</h3>
+                <button type="button" class="modal-close" onclick="closeDeployModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 14px;">
+                    inFlow Premium is a production-ready Web ERP. You can run it on a <strong>Local Server (LAN)</strong> or host it on a <strong>Cloud VPS (Ubuntu, Windows Server, cPanel)</strong>.
+                </p>
+
+                <h4 style="color: #FBBF24; font-size: 0.95rem; margin-top: 14px;">Option 1: Windows Server or Local LAN (Default)</h4>
+                <p>Run the background server using the built-in production WSGI:</p>
+                <div class="code-block">run.bat</div>
+                <p>The app will listen on port <strong>5050</strong>. Any PC on the same Wi-Fi/LAN can access via <code>http://[SERVER_IP]:5050</code>.</p>
+
+                <h4 style="color: #FBBF24; font-size: 0.95rem; margin-top: 16px;">Option 2: Cloud VPS with Nginx Reverse Proxy (Linux)</h4>
+                <p>Configure Nginx to proxy port 80/443 to the Waitress WSGI server:</p>
+                <div class="code-block">
+server {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;listen 80;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;server_name your-inflow-domain.com;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;location / {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;proxy_pass http://127.0.0.1:5050;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;proxy_set_header Host $host;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;proxy_set_header X-Real-IP $remote_addr;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+}
+                </div>
+
+                <h4 style="color: #FBBF24; font-size: 0.95rem; margin-top: 16px;">Option 3: Web Hosting (cPanel / Apache)</h4>
+                <p>Upload this <code>index.html</code> to your <code>public_html/</code> directory. Visitors can use the Connect bar to link to your backend server or point directly to the application host.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Client Script -->
+    <script>
+        document.getElementById('currentYear').innerText = new Date().getFullYear();
+
+        // 1. Language Toggle Logic (EN <-> KM)
+        function setLanguage(lang) {
+            document.documentElement.setAttribute('data-lang', lang);
+            localStorage.setItem('inflow_landing_lang', lang);
+            const flag = document.getElementById('langFlag');
+            const label = document.getElementById('langLabel');
+            if (lang === 'km') {
+                flag.innerText = '🇬🇧';
+                label.innerText = 'EN';
+            } else {
+                flag.innerText = '🇰🇭';
+                label.innerText = 'KH';
+            }
+        }
+
+        function toggleLanguage() {
+            const current = document.documentElement.getAttribute('data-lang') || 'en';
+            setLanguage(current === 'en' ? 'km' : 'en');
+        }
+
+        const savedLang = localStorage.getItem('inflow_landing_lang') || 'en';
+        setLanguage(savedLang);
+
+        // 2. Server URL Auto-Detection & Connector
+        function getResolvedServerUrl() {
+            const stored = localStorage.getItem('inflow_server_url');
+            if (stored) return stored;
+            
+            // If running on a web server directly (http/https), use origin
+            if (window.location.protocol.startsWith('http')) {
+                return window.location.origin;
+            }
+            // Fallback for file:// or local testing
+            return 'http://localhost:5050';
+        }
+
+        const serverUrlInput = document.getElementById('serverUrlInput');
+        const resolvedUrl = getResolvedServerUrl();
+        if (serverUrlInput) serverUrlInput.value = resolvedUrl;
+
+        function updateLaunchButtons(url) {
+            let base = (url || '').trim().replace(/\/+$/, '');
+            if (!base) base = 'http://localhost:5050';
+            const targetLogin = base + '/login';
+
+            const navBtn = document.getElementById('navLaunchBtn');
+            const heroBtn = document.getElementById('heroLaunchBtn');
+            if (navBtn) navBtn.href = targetLogin;
+            if (heroBtn) heroBtn.href = targetLogin;
+        }
+
+        updateLaunchButtons(resolvedUrl);
+
+        function connectToServer() {
+            const url = (serverUrlInput.value || '').trim();
+            if (!url) return;
+            localStorage.setItem('inflow_server_url', url);
+            updateLaunchButtons(url);
+            
+            // Quick ping test
+            fetch(url + '/login', { mode: 'no-cors' })
+                .then(() => {
+                    alert('Connecting to inFlow Premium: ' + url);
+                    window.location.href = url + '/login';
+                })
+                .catch(() => {
+                    // Navigate anyway
+                    window.location.href = url + '/login';
+                });
+        }
+
+        // 3. Deployment Modal Controls
+        function openDeployModal() {
+            document.getElementById('deployModal').style.display = 'flex';
+        }
+
+        function closeDeployModal() {
+            document.getElementById('deployModal').style.display = 'none';
+        }
+
+        window.onclick = function(e) {
+            const modal = document.getElementById('deployModal');
+            if (e.target === modal) {
+                closeDeployModal();
+            }
+        };
+    </script>
+</body>
+</html>

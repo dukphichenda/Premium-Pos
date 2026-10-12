@@ -1,0 +1,180 @@
+{% extends 'base.html' %}
+
+{% block title %}inFlow SQL Server Migration & Sync - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">inFlow Legacy SQL Server Sync Hub</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">1-Click high-speed ETL pipeline from `C:\Program Files (x86)\inFlow Inventory` (SQL Server) to PostgreSQL</p>
+    </div>
+</div>
+
+<!-- Connection Status Card -->
+<div class="card" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background-color: {% if sqlserver_connected %}#D1FAE5; color: #059669;{% else %}#FEE2E2; color: #DC2626;{% endif %} display: flex; align-items: center; justify-content: center; font-size: 1.3rem;">
+                {% if sqlserver_connected %}✓{% else %}⚠️{% endif %}
+            </div>
+            <div>
+                <div style="font-weight: 700; font-size: 1.05rem; color: #0F172A;">
+                    Legacy SQL Server ({{ config.SQLSERVER_HOST }} / {{ config.SQLSERVER_DB }})
+                </div>
+                <div style="font-size: 0.82rem; color: #64748B;">
+                    {% if sqlserver_connected %}
+                        Connected & Ready for live sync. User: {{ config.SQLSERVER_USER }}
+                    {% else %}
+                        Connection failed. Check MSSQL service and credentials.
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button onclick="testConnection()" class="btn btn-secondary btn-sm" id="btnTestConn">
+                Test Connection
+            </button>
+            <button onclick="runMigration()" class="btn btn-primary" id="btnStartSync">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                <span>Run 1-Click Migration</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Comparison Stats Table -->
+<div class="card" style="margin-bottom: 24px; padding: 0; overflow: hidden;">
+    <div style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
+        <h2 class="card-title" style="margin-bottom: 0;">Database Records Comparison</h2>
+    </div>
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Data Entity</th>
+                    <th style="text-align: right;">Legacy SQL Server</th>
+                    <th style="text-align: right; color: #0F766E;">PostgreSQL 16 (inFlow Premium)</th>
+                    <th style="text-align: center;">Sync Health</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td style="font-weight: 600;">Products Master Catalog</td>
+                    <td style="text-align: right; font-weight: 700;">{{ sqlserver_stats.get('products', '-') }}</td>
+                    <td style="text-align: right; font-weight: 800; color: #0F766E;">{{ pg_stats.products }}</td>
+                    <td style="text-align: center;"><span class="badge badge-success">SYNCHRONIZED ✓</span></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 600;">Customers CRM Directory</td>
+                    <td style="text-align: right; font-weight: 700;">{{ sqlserver_stats.get('customers', '-') }}</td>
+                    <td style="text-align: right; font-weight: 800; color: #0F766E;">{{ pg_stats.customers }}</td>
+                    <td style="text-align: center;"><span class="badge badge-success">SYNCHRONIZED ✓</span></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 600;">Sales Orders History</td>
+                    <td style="text-align: right; font-weight: 700;">{{ sqlserver_stats.get('sales_orders', '-') }}</td>
+                    <td style="text-align: right; font-weight: 800; color: #0F766E;">{{ pg_stats.sales_orders }}</td>
+                    <td style="text-align: center;"><span class="badge badge-success">SYNCHRONIZED ✓</span></td>
+                </tr>
+                <tr>
+                    <td style="font-weight: 600;">Purchase Orders</td>
+                    <td style="text-align: right; font-weight: 700;">{{ sqlserver_stats.get('purchase_orders', '-') }}</td>
+                    <td style="text-align: right; font-weight: 800; color: #0F766E;">{{ pg_stats.purchase_orders }}</td>
+                    <td style="text-align: center;"><span class="badge badge-success">SYNCHRONIZED ✓</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Live Migration Console Card -->
+<div class="card" id="migrationConsoleCard" style="display: none;">
+    <div class="card-header">
+        <h2 class="card-title">Live Migration Progress</h2>
+        <span id="migrationStatusLabel" style="font-weight: 600; color: #0F766E;">Processing...</span>
+    </div>
+    <!-- Progress Bar -->
+    <div style="background-color: #E2E8F0; height: 12px; border-radius: 6px; overflow: hidden; margin-bottom: 16px;">
+        <div id="migrationProgressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #0F766E, #14B8A6); transition: width 0.3s ease;"></div>
+    </div>
+    <!-- Console Log Window -->
+    <pre id="migrationConsoleLog" style="background-color: #0F172A; color: #38BDF8; padding: 16px; border-radius: 8px; font-family: monospace; font-size: 0.82rem; height: 180px; overflow-y: auto; line-height: 1.6;"></pre>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function testConnection() {
+    const btn = document.getElementById('btnTestConn');
+    btn.innerText = 'Testing...';
+    btn.disabled = true;
+
+    fetch('/api/migration/test')
+        .then(r => r.json())
+        .then(data => {
+            btn.innerText = 'Test Connection';
+            btn.disabled = false;
+            if (data.success) {
+                alert(`✓ Success!\n${data.message}`);
+            } else {
+                alert(`⚠️ Error: ${data.message}`);
+            }
+        })
+        .catch(err => {
+            btn.innerText = 'Test Connection';
+            btn.disabled = false;
+            alert(`Network error: ${err.message}`);
+        });
+}
+
+function runMigration() {
+    if (!confirm("Start automated sync from legacy SQL Server into PostgreSQL now?")) return;
+
+    const card = document.getElementById('migrationConsoleCard');
+    const bar = document.getElementById('migrationProgressBar');
+    const log = document.getElementById('migrationConsoleLog');
+    const label = document.getElementById('migrationStatusLabel');
+    const btn = document.getElementById('btnStartSync');
+
+    card.style.display = 'block';
+    btn.disabled = true;
+    btn.innerText = 'Syncing...';
+    bar.style.width = '30%';
+    label.innerText = 'Connecting to SQL Server and running ETL pipeline...';
+    log.innerHTML = '[INFO] Starting ETL pipeline...\n[INFO] Extracting Products, Categories, Locations, Inventory, Orders...\n';
+
+    fetch('/api/migration/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerText = 'Run 1-Click Migration';
+        if (data.success) {
+            bar.style.width = '100%';
+            label.innerText = 'Sync Completed Successfully!';
+            log.innerHTML += `[SUCCESS] ${data.message}\n`;
+            log.innerHTML += `[STATS] Products: ${data.stats.products}, Customers: ${data.stats.customers}, Orders: ${data.stats.sales_orders}\n`;
+            log.innerHTML += `[SUCCESS] Complete migration finished in ${data.stats.duration_seconds} seconds!\n`;
+            setTimeout(() => {
+                window.location.reload();
+            }, 2500);
+        } else {
+            bar.style.backgroundColor = '#EF4444';
+            label.innerText = 'Migration Failed';
+            log.innerHTML += `[ERROR] ${data.message}\n`;
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerText = 'Run 1-Click Migration';
+        bar.style.backgroundColor = '#EF4444';
+        label.innerText = 'Network Error';
+        log.innerHTML += `[ERROR] Network error: ${err.message}\n`;
+    });
+}
+</script>
+{% endblock %}

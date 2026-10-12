@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delivery Label (80x100mm) - {{ order.order_number }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ==========================================================================
+           80mm x 100mm Thermal Sticker Label - High-Contrast Cambodia Logistics Style
+           Designed for Direct Thermal Sticker Printers (Xprinter, HPRT, Rongta)
+           No Color Needed - 100% Pure Crisp Monochrome Black & White
+           ========================================================================== */
+        
+        @page {
+            size: 80mm 100mm;
+            margin: 0;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: #E2E8F0;
+            font-family: 'Kantumruy Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            color: #000000;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Screen Toolbar */
+        .no-print-toolbar {
+            position: sticky;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #1E293B;
+            color: #FFFFFF;
+            padding: 10px 18px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 10000;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+            font-size: 13px;
+        }
+
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tb-select, .tb-input {
+            padding: 5px 8px;
+            border-radius: 4px;
+            border: 1px solid #475569;
+            background: #0F172A;
+            color: #FFFFFF;
+            font-size: 12px;
+            font-family: inherit;
+            outline: none;
+        }
+        .tb-select:focus, .tb-input:focus {
+            border-color: #38BDF8;
+        }
+
+        .tb-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 14px;
+            border-radius: 4px;
+            border: none;
+            font-size: 12.5px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-decoration: none;
+        }
+        .tb-btn-primary {
+            background: #2563EB;
+            color: #FFFFFF;
+        }
+        .tb-btn-primary:hover {
+            background: #1D4ED8;
+        }
+        .tb-btn-success {
+            background: #059669;
+            color: #FFFFFF;
+        }
+        .tb-btn-success:hover {
+            background: #047857;
+        }
+        .tb-btn-secondary {
+            background: #334155;
+            color: #E2E8F0;
+        }
+        .tb-btn-secondary:hover {
+            background: #475569;
+        }
+        .tb-btn-danger {
+            background: #DC2626;
+            color: #FFFFFF;
+            padding: 5px 8px;
+        }
+        .tb-btn-danger:hover {
+            background: #B91C1C;
+        }
+
+        /* Screen Preview Workspace */
+        .preview-workspace {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 24px 12px 60px;
+            gap: 20px;
+        }
+
+        /* Single Sticker Page (80mm x 100mm) */
+        .label-page {
+            width: 80mm;
+            height: 100mm;
+            min-height: 100mm;
+            max-height: 100mm;
+            background: #FFFFFF;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+            padding: 1.8mm;
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* Inner Printable Border Frame */
+        .label-frame {
+            width: 100%;
+            height: 100%;
+            border: 2.2px solid #000000;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 1.5mm 1.8mm;
+            background: #FFFFFF;
+        }
+
+        /* Section 1: Carrier Header */
+        .carrier-header {
+            background: #000000;
+            color: #FFFFFF;
+            text-align: center;
+            padding: 2.5px 2px;
+            font-weight: 900;
+            font-size: 13px;
+            letter-spacing: 0.5px;
+            line-height: 1.15;
+            text-transform: uppercase;
+        }
+
+        /* Section 2: Order Meta (NO BARCODE) */
+        .order-meta-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1.5px solid #000000;
+            padding: 2px 0 3px;
+            font-size: 11px;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 800;
+        }
+
+        /* Section 3: Customer Address (MOVED TO THE TOP) */
+        .address-top-section {
+            border: 2px solid #000000;
+            margin: 2px 0;
+            padding: 3px 4px;
+            background: #FFFFFF;
+        }
+        .address-top-badge {
+            background: #000000;
+            color: #FFFFFF;
+            font-size: 9px;
+            font-weight: 800;
+            padding: 1px 5px;
+            display: inline-block;
+            text-transform: uppercase;
+        }
+        .address-top-text {
+            font-size: 13.5px;
+            font-weight: 800;
+            line-height: 1.25;
+            color: #000000;
+            word-break: break-word;
+            margin-top: 2px;
+        }
+
+        /* Section 4: Receiver Name & Phone */
+        .receiver-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            border: 2px solid #000000;
+            padding: 3px 4px;
+            margin: 2px 0;
+            background: #FFFFFF;
+        }
+        .receiver-name-col {
+            flex: 1;
+            min-width: 0;
+        }
+        .receiver-badge {
+            font-size: 8.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            color: #000000;
+            display: block;
+        }
+        .receiver-name {
+            font-size: 14px;
+            font-weight: 900;
+            line-height: 1.15;
+            color: #000000;
+            word-break: break-word;
+        }
+        .receiver-phone-box {
+            border: 2px dashed #000000;
+            text-align: center;
+            padding: 3px 6px;
+            background: #FFFFFF;
+            flex-shrink: 0;
+        }
+        .receiver-phone {
+            font-size: 19px;
+            font-weight: 900;
+            letter-spacing: 0.6px;
+            color: #000000;
+            line-height: 1;
+            font-family: 'JetBrains Mono', Arial, sans-serif;
+            white-space: nowrap;
+        }
+
+        /* Section 5: Case Count & Product Cost (USD Only, No KHR) */
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2px;
+            margin: 2px 0;
+        }
+        .grid-cell {
+            border: 1.5px solid #000000;
+            padding: 2px 3px;
+            text-align: center;
+        }
+        .cell-label {
+            font-size: 8px;
+            font-weight: 800;
+            text-transform: uppercase;
+            border-bottom: 1px solid #000000;
+            padding-bottom: 1px;
+            margin-bottom: 1px;
+        }
+        .cell-value-case {
+            font-size: 16px;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', sans-serif;
+            line-height: 1.1;
+        }
+        .cell-value-cost {
+            font-size: 16px;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', sans-serif;
+            line-height: 1.1;
+        }
+
+        /* Section 6: Sender (NO NAME OF SENDER, BIG & CLEAR AS RECEIVER) */
+        .sender-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+            border: 2px solid #000000;
+            padding: 3px 4px;
+            margin: 2px 0;
+            background: #FFFFFF;
+        }
+        .sender-badge-col {
+            flex-shrink: 0;
+        }
+        .sender-badge {
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            color: #000000;
+            display: block;
+            line-height: 1.15;
+        }
+        .sender-phone-box {
+            border: 2px dashed #000000;
+            text-align: center;
+            padding: 3px 6px;
+            background: #FFFFFF;
+            flex: 1;
+        }
+        .sender-phone {
+            font-size: 19px;
+            font-weight: 900;
+            letter-spacing: 0.6px;
+            color: #000000;
+            line-height: 1;
+            font-family: 'JetBrains Mono', Arial, sans-serif;
+            white-space: nowrap;
+        }
+
+        /* Section 7: Caution / Fragile / Notes */
+        .caution-box {
+            border: 1.5px solid #000000;
+            background: #000000;
+            color: #FFFFFF;
+            text-align: center;
+            font-size: 9px;
+            font-weight: 900;
+            padding: 2px;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+        }
+        .notes-text {
+            font-size: 8.5px;
+            font-weight: 700;
+            line-height: 1.15;
+            padding-top: 1px;
+            border-top: 1px dashed #000000;
+            margin-top: 1px;
+        }
+
+        /* Print Media Styles */
+        @media print {
+            body {
+                background: #FFFFFF !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .no-print-toolbar, .no-print {
+                display: none !important;
+            }
+            .preview-workspace {
+                padding: 0 !important;
+                gap: 0 !important;
+            }
+            .label-page {
+                box-shadow: none !important;
+                margin: 0 !important;
+                page-break-after: always !important;
+                width: 80mm !important;
+                height: 100mm !important;
+                min-height: 100mm !important;
+                max-height: 100mm !important;
+            }
+            .label-page:last-child {
+                page-break-after: avoid !important;
+            }
+        }
+
+        /* Modal: Add Delivery Service */
+        .inflow-modal-backdrop {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 20000;
+            align-items: center;
+            justify-content: center;
+        }
+        .inflow-modal-dialog {
+            background: #FFFFFF;
+            color: #0F172A;
+            border-radius: 8px;
+            width: 380px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            overflow: hidden;
+            font-family: inherit;
+        }
+        .inflow-modal-header {
+            background: #0F172A;
+            color: #FFFFFF;
+            padding: 10px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 700;
+            font-size: 13px;
+        }
+        .inflow-modal-body {
+            padding: 16px;
+        }
+        .inflow-modal-footer {
+            background: #F8FAFC;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            border-top: 1px solid #E2E8F0;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Top Floating Toolbar -->
+    <header class="no-print-toolbar">
+        <div class="toolbar-group">
+            <span style="font-weight: 800; color: #38BDF8; font-size: 13.5px;">🏷️ LABEL (80x100mm)</span>
+            
+            <!-- Delivery Service Selector -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 6px;">Carrier:</label>
+            <select id="carrierSelect" class="tb-select" onchange="onCarrierChange()" style="font-weight: 700;">
+                {% for s in delivery_services %}
+                <option value="{{ s.name }}" {% if s.name == selected_carrier %}selected{% endif %}>{{ s.name }}</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="openAddServiceModal()" title="Add new delivery service" style="padding: 4px 8px; font-size: 11px;">+ Add</button>
+            <button type="button" class="tb-btn tb-btn-danger" onclick="deleteCurrentService()" title="Delete selected delivery service" style="font-size: 11px;">🗑️</button>
+
+            <!-- Case / Box Count -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Total Cases:</label>
+            <input type="number" id="caseCountInput" class="tb-input" value="{{ package_count }}" min="1" max="50" style="width: 55px; font-weight: 800; text-align: center;" onchange="onCaseCountChange()">
+
+            <!-- Product Cost (USD Only, No KHR) -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Product Cost ($):</label>
+            <input type="number" id="productCostInput" class="tb-input" value="{{ '%.2f'|format(product_cost) }}" step="0.5" style="width: 75px; text-align: right;" onchange="onProductCostChange()">
+
+            <!-- Sender Phone (First 9 numbers before / or \) -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Sender Phone:</label>
+            <input type="text" id="senderPhoneInput" class="tb-input" value="{{ sender_phone or (inv_settings.phone or company.phone or '010 264 731').split('/')[0].split('\\')[0].strip() }}" style="width: 140px; font-weight: 700; text-align: center;" oninput="onSenderPhoneChange()">
+        </div>
+
+        <div class="toolbar-group">
+            <button type="button" class="tb-btn tb-btn-success" onclick="saveShippingAndPrint()" title="Print sticker label on 80mm x 100mm">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                <span>Print Sticker</span>
+            </button>
+            <button type="button" class="tb-btn tb-btn-secondary" onclick="window.close()" title="Close window">Close</button>
+        </div>
+    </header>
+
+    <!-- Canvas Preview Workspace -->
+    <main class="preview-workspace" id="labelsWorkspace">
+        {% for c_num in range(1, package_count + 1) %}
+        <div class="label-page" data-case-index="{{ c_num }}">
+            <div class="label-frame">
+                
+                <!-- 1. CARRIER HEADER -->
+                <div class="carrier-header" id="labelCarrierDisplay-{{ c_num }}">
+                    ★ {{ selected_carrier }} ★
+                </div>
+
+                <!-- 2. ORDER NUMBER (NO BARCODE) -->
+                <div class="order-meta-row">
+                    <span>SO #: <strong>{{ order.order_number }}</strong></span>
+                    <span>DATE: <strong>{{ order.order_date | format_inflow_date }}</strong></span>
+                </div>
+
+                <!-- 3. CUSTOMER ADDRESS (MOVED TO THE TOP) -->
+                <div class="address-top-section">
+                    <span class="address-top-badge">📍 អាសយដ្ឋានដឹកជញ្ជូន / DELIVERY ADDRESS</span>
+                    <div class="address-top-text">
+                        {{ order.customer_address or 'រាជធានីភ្នំពេញ / Phnom Penh' }}
+                    </div>
+                </div>
+
+                <!-- 4. RECEIVER (អ្នកទទួល) - HUGE NAME & PHONE -->
+                <div class="receiver-row">
+                    <div class="receiver-name-col">
+                        <span class="receiver-badge">អ្នកទទួល / RECEIVER:</span>
+                        <div class="receiver-name">
+                            {{ order.customer_name or order.customer_contact or 'អតិថិជន (Customer)' }}
+                        </div>
+                    </div>
+                    <div class="receiver-phone-box">
+                        <div class="receiver-phone">
+                            📞 {{ order.customer_phone or 'គ្មានលេខទូរស័ព្ទ' }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. CASE COUNT & PRODUCT COST (Product Cost in USD Only, NO KHR) -->
+                <div class="info-grid">
+                    <div class="grid-cell">
+                        <div class="cell-label">កេសទី / CASE</div>
+                        <div class="cell-value-case labelCaseDisplay-{{ c_num }}">
+                            {{ c_num }} / {{ package_count }}
+                        </div>
+                    </div>
+                    <div class="grid-cell" id="productCostCell-{{ c_num }}">
+                        <div class="cell-label" style="background: #000; color: #fff; padding: 1px 0;">តម្លៃទំនិញ / PRODUCT COST</div>
+                        <div class="cell-value-cost productCostDisplay-{{ c_num }}">
+                            ${{ '%.2f'|format(product_cost) }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 6. SENDER (NO NAME OF SENDER, BIG & CLEAR AS RECEIVER) -->
+                <div class="sender-row">
+                    <div class="sender-badge-col">
+                        <span class="sender-badge">អ្នកផ្ញើ / SENDER:</span>
+                    </div>
+                    <div class="sender-phone-box">
+                        <div class="sender-phone labelSenderPhoneDisplay-{{ c_num }}">
+                            ☎ {{ sender_phone or (inv_settings.phone or company.phone or '010 264 731').split('/')[0].split('\\')[0].strip() }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 7. CAUTION / FRAGILE / NOTES (NO BOTTOM FOOTER) -->
+                <div>
+                    <div class="caution-box">
+                        ⚠ ទំនិញប្រយ័ត្នបែក / FRAGILE - HANDLE WITH CARE ⚠
+                    </div>
+                    {% if delivery_notes %}
+                    <div class="notes-text" id="labelNotesDisplay-{{ c_num }}">
+                        ចំណាំ: {{ delivery_notes }}
+                    </div>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+        {% endfor %}
+    </main>
+
+    <!-- Modal: Add Delivery Service -->
+    <div class="inflow-modal-backdrop" id="addServiceModal">
+        <div class="inflow-modal-dialog">
+            <div class="inflow-modal-header">
+                <span>➕ Add Delivery Service</span>
+                <button type="button" onclick="closeAddServiceModal()" style="background:none; border:none; color:#fff; font-size:16px; cursor:pointer;">✕</button>
+            </div>
+            <div class="inflow-modal-body">
+                <div style="margin-bottom: 12px;">
+                    <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Service Name (e.g. Virak Buntham, Capitol, Taxi):</label>
+                    <input type="text" id="newServiceName" class="tb-input" style="width:100%; color:#000; background:#F8FAFC; border:1px solid #CBD5E1;" placeholder="Enter name...">
+                </div>
+                <div style="margin-bottom: 12px;">
+                    <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Short Code (optional):</label>
+                    <input type="text" id="newServiceCode" class="tb-input" style="width:100%; color:#000; background:#F8FAFC; border:1px solid #CBD5E1;" placeholder="e.g. VET, JT">
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <label style="display:block; font-size:12px; font-weight:700; margin-bottom:4px;">Contact Phone (optional):</label>
+                    <input type="text" id="newServicePhone" class="tb-input" style="width:100%; color:#000; background:#F8FAFC; border:1px solid #CBD5E1;" placeholder="e.g. 023 999 999">
+                </div>
+            </div>
+            <div class="inflow-modal-footer">
+                <button type="button" class="tb-btn tb-btn-secondary" onclick="closeAddServiceModal()">Cancel</button>
+                <button type="button" class="tb-btn tb-btn-primary" onclick="submitAddService()">Save Service</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const orderId = {{ order.id }};
+        let currentTotalCases = {{ package_count }};
+        let currentProductCost = {{ product_cost }};
+
+        function onCarrierChange() {
+            const carrier = document.getElementById('carrierSelect').value;
+            document.querySelectorAll('[id^="labelCarrierDisplay-"]').forEach(el => {
+                el.innerText = '★ ' + carrier + ' ★';
+            });
+        }
+
+        function onCaseCountChange() {
+            const count = Math.max(1, parseInt(document.getElementById('caseCountInput').value) || 1);
+            currentTotalCases = count;
+            regenerateStickers(count);
+        }
+
+        function onProductCostChange() {
+            const cost = Math.max(0, parseFloat(document.getElementById('productCostInput').value) || 0);
+            currentProductCost = cost;
+
+            for (let i = 1; i <= currentTotalCases; i++) {
+                const cell = document.getElementById('productCostCell-' + i);
+                if (cell) {
+                    cell.innerHTML = `
+                        <div class="cell-label" style="background: #000; color: #fff; padding: 1px 0;">តម្លៃទំនិញ / PRODUCT COST</div>
+                        <div class="cell-value-cost">$${cost.toFixed(2)}</div>
+                    `;
+                }
+            }
+        }
+
+        function onSenderPhoneChange() {
+            let raw = (document.getElementById('senderPhoneInput') ? document.getElementById('senderPhoneInput').value.trim() : '');
+            if (raw) {
+                raw = raw.split(/[/\\;,|]/)[0].trim();
+            }
+            const phone = raw || '010 264 731';
+            document.querySelectorAll('[class*="labelSenderPhoneDisplay-"]').forEach(el => {
+                el.innerText = '☎ ' + phone;
+            });
+        }
+
+        function regenerateStickers(totalCount) {
+            const carrier = document.getElementById('carrierSelect').value;
+            const cost = Math.max(0, parseFloat(document.getElementById('productCostInput').value) || 0);
+            const customerName = `{{ order.customer_name or order.customer_contact or 'អតិថិជន (Customer)' }}`;
+            const customerPhone = `{{ order.customer_phone or 'គ្មានលេខទូរស័ព្ទ' }}`;
+            const customerAddress = `{{ order.customer_address or 'រាជធានីភ្នំពេញ / Phnom Penh' }}`;
+            let rawSender = (document.getElementById('senderPhoneInput') ? document.getElementById('senderPhoneInput').value.trim() : '');
+            if (rawSender) {
+                rawSender = rawSender.split(/[/\\;,|]/)[0].trim();
+            }
+            const senderPhone = rawSender || `{{ sender_phone or (inv_settings.phone or company.phone or '010 264 731').split('/')[0].split('\\')[0].strip() }}`;
+            const orderNum = `{{ order.order_number }}`;
+            const orderDate = `{{ order.order_date | format_inflow_date }}`;
+            const notes = `{{ delivery_notes }}`;
+
+            const workspace = document.getElementById('labelsWorkspace');
+            let html = '';
+
+            for (let c = 1; c <= totalCount; c++) {
+                html += `
+                <div class="label-page" data-case-index="${c}">
+                    <div class="label-frame">
+                        <div class="carrier-header" id="labelCarrierDisplay-${c}">
+                            ★ ${carrier} ★
+                        </div>
+                        <div class="order-meta-row">
+                            <span>SO #: <strong>${orderNum}</strong></span>
+                            <span>DATE: <strong>${orderDate}</strong></span>
+                        </div>
+                        <div class="address-top-section">
+                            <span class="address-top-badge">📍 អាសយដ្ឋានដឹកជញ្ជូន / DELIVERY ADDRESS</span>
+                            <div class="address-top-text">${customerAddress}</div>
+                        </div>
+                        <div class="receiver-row">
+                            <div class="receiver-name-col">
+                                <span class="receiver-badge">អ្នកទទួល / RECEIVER:</span>
+                                <div class="receiver-name">${customerName}</div>
+                            </div>
+                            <div class="receiver-phone-box">
+                                <div class="receiver-phone">📞 ${customerPhone}</div>
+                            </div>
+                        </div>
+                        <div class="info-grid">
+                            <div class="grid-cell">
+                                <div class="cell-label">កេសទី / CASE</div>
+                                <div class="cell-value-case">${c} / ${totalCount}</div>
+                            </div>
+                            <div class="grid-cell" id="productCostCell-${c}">
+                                <div class="cell-label" style="background: #000; color: #fff; padding: 1px 0;">តម្លៃទំនិញ / PRODUCT COST</div>
+                                <div class="cell-value-cost">$${cost.toFixed(2)}</div>
+                            </div>
+                        </div>
+                        <div class="sender-row">
+                            <div class="sender-badge-col">
+                                <span class="sender-badge">អ្នកផ្ញើ / SENDER:</span>
+                            </div>
+                            <div class="sender-phone-box">
+                                <div class="sender-phone labelSenderPhoneDisplay-${c}">☎ ${senderPhone}</div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="caution-box">⚠ ទំនិញប្រយ័ត្នបែក / FRAGILE - HANDLE WITH CARE ⚠</div>
+                            ${notes ? `<div class="notes-text">ចំណាំ: ${notes}</div>` : ''}
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            workspace.innerHTML = html;
+        }
+
+        function saveShippingAndPrint() {
+            const carrier = document.getElementById('carrierSelect').value;
+            const packages = currentTotalCases;
+            const cost = currentProductCost;
+
+            fetch('/sales/' + orderId + '/update-shipping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    carrier: carrier,
+                    package_count: packages,
+                    cod_amount: cost
+                })
+            }).catch(e => console.error(e));
+
+            window.print();
+        }
+
+        // Add Service Modal Logic
+        function openAddServiceModal() {
+            document.getElementById('addServiceModal').style.display = 'flex';
+            document.getElementById('newServiceName').focus();
+        }
+        function closeAddServiceModal() {
+            document.getElementById('addServiceModal').style.display = 'none';
+            document.getElementById('newServiceName').value = '';
+            document.getElementById('newServiceCode').value = '';
+            document.getElementById('newServicePhone').value = '';
+        }
+        function submitAddService() {
+            const name = document.getElementById('newServiceName').value.trim();
+            const code = document.getElementById('newServiceCode').value.trim();
+            const phone = document.getElementById('newServicePhone').value.trim();
+            if (!name) {
+                alert('Please enter delivery service name');
+                return;
+            }
+
+            fetch('/api/delivery-services', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, code: code, phone: phone })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const sel = document.getElementById('carrierSelect');
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.innerText = name;
+                    opt.selected = true;
+                    sel.appendChild(opt);
+                    closeAddServiceModal();
+                    onCarrierChange();
+                } else {
+                    alert(data.error || 'Failed to add service');
+                }
+            })
+            .catch(err => alert('Error adding delivery service'));
+        }
+
+        function deleteCurrentService() {
+            const sel = document.getElementById('carrierSelect');
+            const name = sel.value;
+            if (!confirm(`Are you sure you want to delete delivery service "${name}"?`)) return;
+
+            fetch('/api/delivery-services?name=' + encodeURIComponent(name))
+            .then(res => res.json())
+            .then(data => {
+                const s = (data.services || []).find(x => x.name === name);
+                if (s) {
+                    fetch('/api/delivery-services/' + s.id, { method: 'DELETE' })
+                    .then(res => res.json())
+                    .then(delData => {
+                        if (delData.success) {
+                            sel.remove(sel.selectedIndex);
+                            if (sel.options.length > 0) {
+                                sel.selectedIndex = 0;
+                            }
+                            onCarrierChange();
+                        } else {
+                            alert(delData.error || 'Failed to delete service');
+                        }
+                    });
+                } else {
+                    sel.remove(sel.selectedIndex);
+                    onCarrierChange();
+                }
+            })
+            .catch(e => alert('Error deleting service'));
+        }
+
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('autoprint') === '1') {
+                setTimeout(function() {
+                    window.print();
+                }, 500);
+            }
+        });
+    </script>
+</body>
+</html>

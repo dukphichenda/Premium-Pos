@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+
+{% block title %}Customers CRM - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Customers CRM Directory</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Customer relationships, outstanding credit balances, and order histories ({{ total_count }} clients)</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button onclick="openModal('newCustomerModal')" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Add Customer</span>
+        </button>
+    </div>
+</div>
+
+<!-- Search Bar -->
+<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+    <form method="GET" action="{{ url_for('contacts.list_customers') }}" style="display: flex; gap: 14px;">
+        <input type="text" name="search" value="{{ search }}" placeholder="Search customer name, phone number, or contact person..." class="form-input" style="flex: 1;">
+        <button type="submit" class="btn btn-secondary">Search</button>
+        {% if search %}
+        <a href="{{ url_for('contacts.list_customers') }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Customers Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Customer Name</th>
+                    <th>Phone</th>
+                    <th>Contact Person</th>
+                    <th>City / Location</th>
+                    <th style="text-align: right;">Total Orders</th>
+                    <th style="text-align: right;">Total Spent</th>
+                    <th style="text-align: right;">Open Balance</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in customers %}
+                <tr style="cursor: pointer;" ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name }}', 'sales'); } else { window.location.href='{{ url_for('contacts.detail_customer', id=c.id) }}'; }" title="Double-click to open customer in new tab">
+                    <td>
+                        <a href="{{ url_for('contacts.detail_customer', id=c.id) }}" onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name }}', 'sales'); }" style="font-weight: 700; color: #0F172A; text-decoration: none;">
+                            {{ c.name }}
+                        </a>
+                        {% if c.email %}
+                        <div style="font-size: 0.72rem; color: #64748B;">{{ c.email }}</div>
+                        {% endif %}
+                    </td>
+                    <td style="font-family: monospace; font-size: 0.85rem;">{{ c.phone or '-' }}</td>
+                    <td style="color: #475569;">{{ c.contact_name or '-' }}</td>
+                    <td style="color: #64748B;">{{ c.city or '-' }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ c.order_count }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ c.total_spent | currency }}
+                    </td>
+                    <td style="text-align: right; font-weight: 700; color: {% if c.open_balance > 0 %}#DC2626{% else %}#059669{% endif %};">
+                        {{ c.open_balance | currency }}
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('contacts.detail_customer', id=c.id) }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">
+                            Detail
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="8" style="text-align: center; color: #94A3B8; padding: 32px;">No customers found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div style="padding: 16px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} customers)</span>
+        <div style="display: flex; gap: 8px;">
+            {% if page > 1 %}
+            <a href="{{ url_for('contacts.list_customers', page=page-1, search=search) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('contacts.list_customers', page=page+1, search=search) }}" class="btn btn-secondary btn-sm">Next →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<!-- New Customer Modal -->
+<div class="modal-overlay" id="newCustomerModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h2 class="modal-title">+ Add New Customer</h2>
+            <button class="modal-close" onclick="closeModal('newCustomerModal')">×</button>
+        </div>
+        <form action="{{ url_for('contacts.create_customer') }}" method="POST">
+            <div class="form-group">
+                <label class="form-label">Customer / Business Name *</label>
+                <input type="text" name="name" required placeholder="Full business or personal name" class="form-input">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Contact Person</label>
+                    <input type="text" name="contact_name" placeholder="Manager / Contact" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Phone Number *</label>
+                    <input type="text" name="phone" placeholder="e.g. 012 345 678" class="form-input">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Email Address</label>
+                    <input type="email" name="email" placeholder="client@example.com" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">City</label>
+                    <input type="text" name="city" value="Phnom Penh" class="form-input">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Billing / Street Address</label>
+                <input type="text" name="address1" placeholder="Street, Building, Khan/Sangkat" class="form-input">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Default Discount %</label>
+                    <input type="number" step="0.1" name="discount_percent" value="0" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Pricing Scheme</label>
+                    <select name="default_pricing_scheme_id" class="form-select">
+                        <option value="">Default Wholesale</option>
+                        {% for ps in pricing_schemes %}
+                        <option value="{{ ps.id }}">{{ ps.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newCustomerModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Customer</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

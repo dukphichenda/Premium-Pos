@@ -1,0 +1,769 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ branch.name }} (Branch Dashboard) - inFlow Premium{% endblock %}
+
+{% block content %}
+<!-- Top Accent Bar (inFlow Branch Theme) -->
+<div class="inflow-top-accent-bar branch"></div>
+
+<!-- Branch Mode Header Banner -->
+<div style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; border-radius: 8px; padding: 18px 22px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: 0 4px 14px rgba(2, 132, 199, 0.16);">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;">
+            🏪
+        </div>
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <h1 style="font-size: 1.45rem; font-weight: 800; color: #FFFFFF; margin: 0; line-height: 1.2;" class="font-khmer">{{ branch.name }}</h1>
+                <span style="background: rgba(255,255,255,0.22); color: #FFFFFF; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: 0.05em;">{{ branch.code }}</span>
+                <span style="background: #22C55E; color: #FFFFFF; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
+                    <span style="width: 6px; height: 6px; background: #FFFFFF; border-radius: 50%; display: inline-block;"></span>
+                    BRANCH ACTIVE
+                </span>
+            </div>
+            <div style="font-size: 12.5px; color: rgba(255,255,255,0.9); margin-top: 5px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                <span>📍 Fulfillment: <strong>{{ branch.location_name or central_wh.name or 'Main Warehouse' }}</strong></span>
+                <span>•</span>
+                <span>📄 SO Prefix: <strong>{{ branch.so_prefix }}</strong></span>
+                <span>•</span>
+                <span>👤 Manager: <strong>{{ branch.manager_name or 'Store Staff' }}</strong></span>
+                {% if branch.phone %}
+                <span>•</span>
+                <span>📞 <strong>{{ branch.phone }}</strong></span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        {% if perms.pos %}
+        <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" class="btn btn-sm" style="background: #FFFFFF; color: #0284C7; font-weight: 700; text-decoration: none; padding: 7px 14px; border-radius: 6px; box-shadow: 0 2px 5px rgba(0,0,0,0.12); display: flex; align-items: center; gap: 6px;">
+            <span>⚡</span>
+            <span>POS Billing</span>
+        </a>
+        {% endif %}
+        {% if perms.sales_orders %}
+        <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}" class="btn btn-sm" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.35); font-weight: 700; text-decoration: none; padding: 7px 14px; border-radius: 6px; display: flex; align-items: center; gap: 6px;">
+            <span>+</span>
+            <span>New Order</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('branches.branch_settings', id=branch.id) }}" class="btn btn-sm" style="background: rgba(255,255,255,0.18); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.35); font-weight: 700; text-decoration: none; padding: 7px 14px; border-radius: 6px; display: flex; align-items: center; gap: 6px;" title="Branch Color, Invoice Style, Import/Export Data">
+            <span>⚙️</span>
+            <span>Settings</span>
+        </a>
+        <a href="{{ url_for('branches.switch_branch', id=0) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext(0, event); }" class="btn btn-sm" style="background: rgba(0,0,0,0.22); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.2); font-weight: 600; text-decoration: none; padding: 7px 14px; border-radius: 6px;" title="Switch back to Main Store (HQ)">
+            🏢 Exit to Main Store
+        </a>
+    </div>
+</div>
+
+<!-- Real-time Central Stock Sync Alert -->
+<div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; color: #166534; flex-wrap: wrap; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-size: 16px;">🔄</span>
+        <span><strong>Live Central Fulfillment:</strong> All branch sales atomically deduct physical stock in real time from Central Warehouse (<strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong>). Multi-terminal consistency guaranteed.</span>
+    </div>
+    <span style="font-size: 11px; font-weight: 700; color: #15803D; background: #DCFCE7; padding: 2px 8px; border-radius: 4px;">MANAGED BY MAIN STORE</span>
+</div>
+
+<!-- inFlow Inventory Classic Workflow Map (Tailored for Branch Operations) -->
+<div class="inflow-workflow-card" style="margin-bottom: 22px;">
+    <div class="inflow-workflow-container">
+        <!-- Connecting Arc SVG Overlay -->
+        <svg class="inflow-wf-svg-overlay" viewBox="0 0 1000 240" preserveAspectRatio="none">
+            <!-- Top Loop 1: CENTRAL HQ to INVENTORY -->
+            <path d="M 100 70 C 150 15, 230 15, 260 70" fill="none" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4,4" />
+            <!-- Top Loop 2: INVENTORY to POS COUNTER -->
+            <path d="M 280 70 C 330 20, 390 20, 420 70" fill="none" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4,4" />
+            <!-- Top Loop 3: POS COUNTER to SALES ORDER -->
+            <path d="M 440 70 C 490 20, 550 20, 580 70" fill="none" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4,4" />
+            <!-- Top Loop 4: SALES ORDER to CUSTOMER -->
+            <path d="M 600 70 C 660 15, 720 15, 750 70" fill="none" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4,4" />
+            <!-- Top Loop 5: CUSTOMER to REPORTS -->
+            <path d="M 770 70 C 820 15, 880 15, 910 70" fill="none" stroke="#BAE6FD" stroke-width="2" stroke-dasharray="4,4" />
+
+            <!-- Bottom Return Cash Flow Loop: CUSTOMER -> $ -> EXPENSES -> $ -> CENTRAL HQ -->
+            <path d="M 890 110 C 760 225, 240 225, 110 110" fill="none" stroke="#E2E8F0" stroke-width="2" />
+            <!-- Arrowheads -->
+            <polygon points="105,110 110,95 118,110" fill="#94A3B8" />
+            <polygon points="415,75 420,60 428,75" fill="#0284C7" />
+            <polygon points="575,75 580,60 588,75" fill="#0284C7" />
+            <polygon points="745,75 750,60 758,75" fill="#0284C7" />
+            <polygon points="905,75 910,60 918,75" fill="#0284C7" />
+
+            <!-- Floating $ Cashflow Symbols -->
+            <circle cx="290" cy="178" r="13" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5" />
+            <text x="290" y="182" font-size="12" font-weight="700" fill="#059669" text-anchor="middle" dominant-baseline="middle">$</text>
+            <circle cx="680" cy="178" r="13" fill="#ECFDF5" stroke="#10B981" stroke-width="1.5" />
+            <text x="680" y="182" font-size="12" font-weight="700" fill="#059669" text-anchor="middle" dominant-baseline="middle">$</text>
+        </svg>
+
+        <!-- Nodes Track (7 Branch Operational Nodes) -->
+        <div class="inflow-workflow-track" style="justify-content: space-between;">
+            <!-- 1. CENTRAL HQ -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_transfers', id=branch.id) if perms.transfers else '#' }}" class="inflow-wf-icon-btn" title="Central Warehouse Fulfillment">
+                    <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+                        <rect x="8" y="20" width="48" height="36" rx="4" fill="#E0F2FE" stroke="#0284C7" stroke-width="2"/>
+                        <path d="M4 22L32 6L60 22" stroke="#0369A1" stroke-width="2.5" stroke-linejoin="round"/>
+                        <rect x="24" y="34" width="16" height="22" fill="#0284C7"/>
+                        <circle cx="32" cy="45" r="1.8" fill="#FFFFFF"/>
+                        <path d="M14 28h8v8h-8zM42 28h8v8h-8z" fill="#BAE6FD"/>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">CENTRAL HQ</div>
+                <div class="inflow-wf-links">
+                    {% if perms.transfers %}
+                    <a href="{{ url_for('branches.branch_transfers', id=branch.id) }}">Stock Transfers</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">Transfer Locked</span>
+                    {% endif %}
+                    <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}">HQ Inventory</a>
+                </div>
+            </div>
+
+            <!-- 2. INVENTORY & STOCK -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_inventory', id=branch.id) if perms.inventory else '#' }}" class="inflow-wf-icon-btn" title="Products & Stock">
+                    <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+                        <!-- Bottom Left Box -->
+                        <path d="M12 36l16-8 16 8-16 8z" fill="#93C5FD" stroke="#2563EB" stroke-width="1.5"/>
+                        <path d="M12 36v16l16 8V44z" fill="#3B82F6" stroke="#2563EB" stroke-width="1.5"/>
+                        <path d="M28 44l16-8v-16l-16 8z" fill="#60A5FA" stroke="#2563EB" stroke-width="1.5"/>
+                        <!-- Top Center Box -->
+                        <path d="M28 16l14-7 14 7-14 7z" fill="#BFDBFE" stroke="#2563EB" stroke-width="1.5"/>
+                        <path d="M28 16v14l14 7V23z" fill="#93C5FD" stroke="#2563EB" stroke-width="1.5"/>
+                        <path d="M42 23l14-7v-14l-14 7z" fill="#60A5FA" stroke="#2563EB" stroke-width="1.5"/>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">INVENTORY</div>
+                <div class="inflow-wf-links">
+                    {% if perms.inventory %}
+                    <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}">Current Stock</a>
+                    <a href="{{ url_for('products.list_products') }}" title="Product Catalog with Cost Protected">🏷️ Price Cards</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">Stock Locked</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 3. POS COUNTER -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_pos', id=branch.id) if perms.pos else '#' }}" class="inflow-wf-icon-btn" title="POS Retail Checkout">
+                    <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+                        <rect x="10" y="14" width="44" height="30" rx="3" fill="#0284C7" stroke="#0369A1" stroke-width="2"/>
+                        <rect x="15" y="19" width="34" height="14" rx="2" fill="#E0F2FE"/>
+                        <text x="32" y="30" font-size="10" font-weight="800" fill="#0369A1" text-anchor="middle">⚡ POS SALE</text>
+                        <path d="M6 44h52v8H6z" fill="#334155" rx="2"/>
+                        <circle cx="20" cy="48" r="1.5" fill="#38BDF8"/>
+                        <circle cx="26" cy="48" r="1.5" fill="#38BDF8"/>
+                        <circle cx="32" cy="48" r="1.5" fill="#38BDF8"/>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">POS COUNTER</div>
+                <div class="inflow-wf-links">
+                    {% if perms.pos %}
+                    <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" style="font-weight: 700; color: #0284C7;">⚡ POS Billing</a>
+                    <a href="{{ url_for('branches.branch_pos', id=branch.id) }}">Barcode Sale</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">POS Disabled</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 4. SALES ORDER -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_orders', id=branch.id) if perms.sales_orders else '#' }}" class="inflow-wf-icon-btn" title="Branch Sales Orders">
+                    <svg width="50" height="56" viewBox="0 0 56 64" fill="none">
+                        <path d="M8 4h30l12 12v44H8V4z" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2"/>
+                        <polygon points="38,4 38,16 50,16" fill="#E2E8F0"/>
+                        <line x1="16" y1="24" x2="40" y2="24" stroke="#CBD5E1" stroke-width="2"/>
+                        <line x1="16" y1="32" x2="40" y2="32" stroke="#CBD5E1" stroke-width="2"/>
+                        <text x="28" y="48" font-size="16" font-weight="800" fill="#0284C7" text-anchor="middle">$</text>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">SALES ORDER</div>
+                <div class="inflow-wf-links">
+                    {% if perms.sales_orders %}
+                    <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}">+ New Branch SO</a>
+                    <a href="{{ url_for('branches.branch_orders', id=branch.id) }}">Branch Orders</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">Orders Locked</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 5. CUSTOMER -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_customers', id=branch.id) if perms.customers else '#' }}" class="inflow-wf-icon-btn" title="Branch Customers">
+                    <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+                        <circle cx="24" cy="24" r="14" fill="#86EFAC"/>
+                        <path d="M10 52c0-8 6-14 14-14s14 6 14 14" fill="#4ADE80"/>
+                        <circle cx="44" cy="28" r="12" fill="#BBF7D0"/>
+                        <path d="M32 52c0-6 5-11 12-11s12 5 12 11" fill="#86EFAC"/>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">CUSTOMER</div>
+                <div class="inflow-wf-links">
+                    {% if perms.customers %}
+                    <a href="{{ url_for('branches.branch_customers', id=branch.id) }}?action=add">+ Add Customer</a>
+                    <a href="{{ url_for('branches.branch_customers', id=branch.id) }}">Customer List</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">Customer Locked</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 6. EXPENSES -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_expenses', id=branch.id) if perms.expenses else '#' }}" class="inflow-wf-icon-btn" title="Branch Operating Expenses">
+                    <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+                        <rect x="8" y="16" width="48" height="34" rx="4" fill="#FEE2E2" stroke="#EF4444" stroke-width="2"/>
+                        <line x1="8" y1="26" x2="56" y2="26" stroke="#EF4444" stroke-width="2"/>
+                        <circle cx="32" cy="38" r="6" fill="#DC2626"/>
+                        <text x="32" y="42" font-size="11" font-weight="800" fill="#FFFFFF" text-anchor="middle">$</text>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">EXPENSES</div>
+                <div class="inflow-wf-links">
+                    {% if perms.expenses %}
+                    <a href="{{ url_for('branches.branch_expenses', id=branch.id) }}">+ Record Expense</a>
+                    <a href="{{ url_for('branches.branch_expenses', id=branch.id) }}">Expense Ledger</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">Expenses Locked</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 7. REPORTS & P&L -->
+            <div class="inflow-wf-node">
+                <a href="{{ url_for('branches.branch_reports', id=branch.id) if perms.reports else '#' }}" class="inflow-wf-icon-btn" title="Branch Financials">
+                    <svg width="56" height="56" viewBox="0 0 64 64" fill="none">
+                        <rect x="8" y="8" width="48" height="48" rx="4" fill="#F0FDF4" stroke="#16A34A" stroke-width="2"/>
+                        <line x1="20" y1="44" x2="20" y2="34" stroke="#16A34A" stroke-width="4" stroke-linecap="round"/>
+                        <line x1="32" y1="44" x2="32" y2="22" stroke="#16A34A" stroke-width="4" stroke-linecap="round"/>
+                        <line x1="44" y1="44" x2="44" y2="16" stroke="#16A34A" stroke-width="4" stroke-linecap="round"/>
+                    </svg>
+                </a>
+                <div class="inflow-wf-title">REPORTS</div>
+                <div class="inflow-wf-links">
+                    {% if perms.reports %}
+                    <a href="{{ url_for('branches.branch_reports', id=branch.id) }}">Daily Sales Summary</a>
+                    <a href="{{ url_for('branches.branch_reports', id=branch.id) }}">Branch P&L</a>
+                    {% else %}
+                    <span style="color: #94A3B8; font-size: 10.5px;">Reports Locked</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="inflow-wf-tip">
+            <span style="font-weight: 700; color: #0369A1;">💡 Branch Tip:</span>
+            <span>You are operating under <strong>{{ branch.name }} ({{ branch.code }})</strong>. All inventory deductions directly update Central Warehouse. Internal purchase costs and margins are protected.</span>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards Grid (4 Top Metric Cards + Receivables) -->
+<div class="kpi-grid" style="margin-bottom: 24px;">
+    <!-- 1. Today's Branch Sales -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Today's Branch Sales</span>
+            <div class="kpi-icon" style="background-color: #E0F2FE; color: #0284C7;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value">{{ today_stats.today_sales | currency }}</div>
+        <div class="kpi-subtext" style="color: #0284C7; font-weight: 600;">{{ today_stats.today_orders }} orders billed today</div>
+    </div>
+
+    <!-- 2. Month's Sales -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">{{ current_month }} Invoiced Revenue</span>
+            <div class="kpi-icon" style="background-color: #D1FAE5; color: #059669;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="color: #059669;">{{ month_stats.month_sales | currency }}</div>
+        <div class="kpi-subtext">Cash Collected: <strong>{{ month_stats.month_collected | currency }}</strong></div>
+    </div>
+
+    <!-- 3. Month's Expenses -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Branch Operating Expenses</span>
+            <div class="kpi-icon" style="background-color: #FEE2E2; color: #DC2626;">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2" stroke-width="2"/><line x1="2" y1="10" x2="22" y2="10" stroke-width="2"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="color: #DC2626;">{{ month_exp.month_expenses | currency }}</div>
+        <div class="kpi-subtext">Recorded costs for {{ current_month }}</div>
+    </div>
+
+    <!-- 4. Net Operating Profit -->
+    <div class="kpi-card">
+        <div class="kpi-header">
+            <span class="kpi-label">Branch Net Profit</span>
+            {% set net_p = (month_stats.month_sales|float) - (month_exp.month_expenses|float) %}
+            <div class="kpi-icon" style="background-color: {{ '#D1FAE5' if net_p >= 0 else '#FEE2E2' }}; color: {{ '#059669' if net_p >= 0 else '#DC2626' }};">
+                <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 6l3 1m0 0l-3 9a5.002 5.002 0 006.001 0M6 7l3 9M6 7l6-2m6 2l3-1m-3 1l-3 9a5.002 5.002 0 006.001 0M18 7l3 9m-3-9l-6-2m0-2v2m0 16V5m0 16H9m3 0h3"/></svg>
+            </div>
+        </div>
+        <div class="kpi-value" style="color: {{ '#059669' if net_p >= 0 else '#DC2626' }};">{{ net_p | currency }}</div>
+        <div class="kpi-subtext">Sales minus branch expenses</div>
+    </div>
+</div>
+
+<!-- Interactive Analytics Charts (Matching Main Store inFlow Layout) -->
+<div style="display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px;">
+    <!-- 1. Daily Revenue Velocity (Last 14 Days) -->
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 class="card-title" style="margin: 0;">Branch Revenue Velocity</h2>
+                <div style="font-size: 0.78rem; color: #64748B;">Daily sales trend for {{ branch.name }} (Last 14 Days)</div>
+            </div>
+            <span class="badge" style="background: #E0F2FE; color: #0284C7; font-weight: 700; font-size: 11px;">LIVE BRANCH METRICS</span>
+        </div>
+        <div style="height: 270px; position: relative;">
+            <canvas id="branchRevenueTrendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 2. Sales Share by Category -->
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+                <h2 class="card-title" style="margin: 0;">Sales by Category</h2>
+                <div style="font-size: 0.78rem; color: #64748B;">Product revenue mix</div>
+            </div>
+            <span class="badge" style="background: #F1F5F9; color: #475569; font-weight: 600; font-size: 11px;">BRANCH MIX</span>
+        </div>
+        <div style="height: 270px; position: relative;">
+            <canvas id="branchCategoryChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Cloned Functions Grid (Governed by Main Store Permissions) -->
+<div style="margin-bottom: 28px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div>
+            <h2 style="font-size: 16px; font-weight: 800; color: #0F172A; margin: 0;">Branch Operations & Permitted Functions (មុខងារសាខា)</h2>
+            <p style="font-size: 12px; color: #64748B; margin: 3px 0 0 0;">Permissions strictly configured and managed by Main Store HQ</p>
+        </div>
+        <span style="font-size: 12px; font-weight: 700; color: #0284C7; background: #E0F2FE; padding: 4px 10px; border-radius: 4px;">Main Store Governed</span>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px;">
+        <!-- 1. POS Counter -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.pos %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center; font-size: 18px;">⚡</div>
+                    {% if perms.pos %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Branch POS Counter (លក់រហ័ស)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Instant retail checkout with barcode scanning and live inventory deduction.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.pos %}
+                <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" class="btn btn-sm btn-primary" style="width: 100%; text-align: center; text-decoration: none; padding: 7px 0; background: #0284C7; border-color: #0284C7; font-weight: 700;">Launch POS Counter →</a>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 2. Sales Orders & Invoices -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.sales_orders %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 18px;">📋</div>
+                    {% if perms.sales_orders %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Sales Orders (វិក្កយបត្រ)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Manage sales invoices, track customer order status and official PDF printing.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.sales_orders %}
+                <div style="display: flex; gap: 8px;">
+                    <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}" class="btn btn-sm btn-primary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; background: #0284C7; border-color: #0284C7; font-weight: 700;">+ New Order</a>
+                    <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">View Orders →</a>
+                </div>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 3. Branch Inventory & Stock -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.inventory %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #E0E7FF; color: #4F46E5; display: flex; align-items: center; justify-content: center; font-size: 18px;">📦</div>
+                    {% if perms.inventory %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Products & Stock (ស្តុកទំនិញ)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Real-time stock on hand and central warehouse fulfillment stock availability.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.inventory %}
+                <div style="display: flex; gap: 8px;">
+                    <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">Check Stock →</a>
+                    <a href="{{ url_for('products.list_products') }}" class="btn btn-sm btn-primary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; background: #0284C7; border-color: #0284C7; font-weight: 600;" title="View Catalog & Product Price Showcases">🏷️ Price Cards</a>
+                </div>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 4. Stock Transfers from HQ -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.transfers %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #F1F5F9; color: #0284C7; display: flex; align-items: center; justify-content: center; font-size: 18px;">🔄</div>
+                    {% if perms.transfers %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Stock Transfers (ផ្ទេរទំនិញ)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Request replenishment transfers from Main Store Central Warehouse.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.transfers %}
+                <a href="{{ url_for('branches.branch_transfers', id=branch.id) }}" class="btn btn-sm btn-secondary" style="width: 100%; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">Stock Transfers →</a>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 5. Branch Expenses & Cash -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.expenses %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; font-size: 18px;">💵</div>
+                    {% if perms.expenses %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Branch Expenses (ចំណាយ)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Record daily store operational expenses and manage local cash drawer.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.expenses %}
+                <a href="{{ url_for('branches.branch_expenses', id=branch.id) }}" class="btn btn-sm btn-secondary" style="width: 100%; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">Branch Expenses →</a>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 6. Customers Directory -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.customers %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 18px;">👥</div>
+                    {% if perms.customers %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Branch Customers (អតិថិជន)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Lookup branch customer contact details and outstanding debt balances.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.customers %}
+                <div style="display: flex; gap: 8px;">
+                    <a href="{{ url_for('branches.branch_customers', id=branch.id) }}?action=add" class="btn btn-sm btn-primary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; background: #0284C7; border-color: #0284C7; font-weight: 700;">+ Add Customer</a>
+                    <a href="{{ url_for('branches.branch_customers', id=branch.id) }}" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">Customers List →</a>
+                </div>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 7. Financial & Sales Reports -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.reports %}opacity: 0.6;{% endif %}">
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #F0FDF4; color: #16A34A; display: flex; align-items: center; justify-content: center; font-size: 18px;">📊</div>
+                    {% if perms.reports %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
+                    {% else %}
+                    <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
+                    {% endif %}
+                </div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Financials & P&L (របាយការណ៍)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Monthly profit statement, daily revenue, and expense reconciliations.</div>
+            </div>
+            <div style="margin-top: 14px;">
+                {% if perms.reports %}
+                <a href="{{ url_for('branches.branch_reports', id=branch.id) }}" class="btn btn-sm btn-secondary" style="width: 100%; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">View Financials →</a>
+                {% else %}
+                <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Orders & Top Selling Split Grid -->
+<div style="display: grid; grid-template-columns: 3fr 2fr; gap: 20px; align-items: start; margin-bottom: 24px;">
+    <!-- Recent Orders -->
+    <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Recent Orders at {{ branch.code }}</h3>
+            {% if perms.sales_orders %}
+            <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" style="font-size: 12px; color: #0284C7; font-weight: 700; text-decoration: none;">View All Orders →</a>
+            {% endif %}
+        </div>
+        <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 11.5px; color: #475569;">
+                        <th style="padding: 10px 14px; text-align: left;">Order #</th>
+                        <th style="padding: 10px 12px; text-align: left;">Customer</th>
+                        <th style="padding: 10px 12px; text-align: right;">Total</th>
+                        <th style="padding: 10px 12px; text-align: center;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in recent_orders %}
+                    <tr style="border-bottom: 1px solid #F1F5F9; font-size: 12.5px;">
+                        <td style="padding: 10px 14px; font-family: monospace; font-weight: 700; color: #0284C7;">
+                            <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" style="color: inherit; text-decoration: none;">{{ o.order_number }}</a>
+                        </td>
+                        <td style="padding: 10px 12px; color: #1E293B; font-weight: 600;">
+                            {{ o.customer_name or 'Walk-in Customer' }}
+                        </td>
+                        <td style="padding: 10px 12px; text-align: right; font-weight: 700; color: #0F172A;">
+                            {{ o.total_amount | currency }}
+                        </td>
+                        <td style="padding: 10px 12px; text-align: center;">
+                            {% if o.status == 'OPEN' %}
+                                <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">OPEN</span>
+                            {% elif o.status in ('PAID', 'INVOICED') or o.payment_status == 'PAID' %}
+                                <span class="badge" style="background: #DCFCE7; color: #15803D; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">{{ o.payment_status or o.status }}</span>
+                            {% else %}
+                                <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">{{ o.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 28px; color: #94A3B8;">No sales orders recorded yet for this branch.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Top Selling Products -->
+    <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Top Selling Products</h3>
+            {% if perms.inventory %}
+            <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}" style="font-size: 12px; color: #0284C7; font-weight: 700; text-decoration: none;">Stock →</a>
+            {% endif %}
+        </div>
+        <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 11.5px; color: #475569;">
+                        <th style="padding: 10px 14px; text-align: left;">Product</th>
+                        <th style="padding: 10px 12px; text-align: right;">Qty Sold</th>
+                        <th style="padding: 10px 14px; text-align: right;">Revenue</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in top_products %}
+                    <tr style="border-bottom: 1px solid #F1F5F9; font-size: 12.5px;">
+                        <td style="padding: 10px 14px; font-weight: 600; color: #0F172A;">
+                            <div>{{ p.name }}</div>
+                            <div style="font-size: 11px; color: #64748B; font-family: monospace;">{{ p.sku }}</div>
+                        </td>
+                        <td style="padding: 10px 12px; text-align: right; font-weight: 700; color: #0284C7;">
+                            {{ p.total_qty_sold | format_inflow_qty }} {{ p.uom }}
+                        </td>
+                        <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: #10B981;">
+                            {{ p.total_revenue | currency }}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; padding: 28px; color: #94A3B8;">No sales history for this branch.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Central Fulfillment Stock Status / Low Stock Warnings -->
+<div class="card" style="margin-bottom: 24px;">
+    <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <h2 class="card-title" style="display: flex; align-items: center; gap: 8px; margin: 0;">
+            <span>Central Warehouse Low Stock Alerts</span>
+            <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 11px; font-weight: 700;">{{ low_stock_items|length }} items</span>
+        </h2>
+        {% if perms.transfers %}
+        <a href="{{ url_for('branches.branch_transfers', id=branch.id) }}" style="font-size: 0.8rem; color: #0284C7; font-weight: 700; text-decoration: none;">Request HQ Transfers →</a>
+        {% endif %}
+    </div>
+    <div class="table-container" style="border: none;">
+        <table class="data-table" style="width: 100%;">
+            <thead>
+                <tr style="background: #F8FAFC;">
+                    <th>Product</th>
+                    <th>Category</th>
+                    <th style="text-align: right;">Central Stock Available</th>
+                    <th style="text-align: right;">Reorder Threshold</th>
+                    <th style="text-align: center;">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in low_stock_items %}
+                <tr>
+                    <td>
+                        <span style="font-weight: 600; color: #0F172A; display: block;">{{ item.name }}</span>
+                        <span style="font-size: 0.72rem; color: #64748B; font-family: monospace;">SKU: {{ item.sku }}</span>
+                    </td>
+                    <td>
+                        <span style="font-size: 12px; color: #64748B;">{{ item.category_name or 'General' }}</span>
+                    </td>
+                    <td style="text-align: right;">
+                        <span style="font-weight: 700; color: #DC2626;">{{ "{:,.0f}".format(item.current_qty) }}</span> {{ item.uom }}
+                    </td>
+                    <td style="text-align: right; color: #64748B;">
+                        {{ "{:,.0f}".format(item.reorder_point) }} {{ item.uom }}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if item.current_qty <= 0 %}
+                        <span class="badge" style="background: #FEE2E2; color: #991B1B; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">OUT OF STOCK</span>
+                        {% else %}
+                        <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">LOW IN CENTRAL</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" style="text-align: center; color: #94A3B8; padding: 20px;">All fulfillment inventory is healthy and above reorder threshold.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Fetch Dynamic Charts Data for Branch
+    fetch('/api/branches/{{ branch.id }}/charts')
+        .then(res => res.json())
+        .then(data => {
+            // Revenue Velocity Line Chart
+            const ctxRev = document.getElementById('branchRevenueTrendChart');
+            if (ctxRev && data.daily_labels) {
+                new Chart(ctxRev.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: data.daily_labels,
+                        datasets: [{
+                            label: 'Branch Sales ($)',
+                            data: data.daily_revenue,
+                            borderColor: '#0284C7',
+                            backgroundColor: 'rgba(2, 132, 199, 0.08)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2.5,
+                            pointBackgroundColor: '#0284C7',
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { display: false } },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: val => '$' + val.toLocaleString()
+                                },
+                                grid: { color: '#F1F5F9' }
+                            },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            }
+
+            // Category Share Doughnut
+            const ctxCat = document.getElementById('branchCategoryChart');
+            if (ctxCat && data.category_labels) {
+                new Chart(ctxCat.getContext('2d'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: data.category_labels,
+                        datasets: [{
+                            data: data.category_values,
+                            backgroundColor: [
+                                '#0284C7', '#0EA5E9', '#38BDF8', '#7DD3FC',
+                                '#10B981', '#F59E0B', '#94A3B8'
+                            ],
+                            borderWidth: 2,
+                            borderColor: '#FFFFFF'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                        },
+                        cutout: '68%'
+                    }
+                });
+            }
+        })
+        .catch(err => console.error("Error loading branch charts:", err));
+
+    // 2. Initialize inFlow Desktop Tab for Branch
+    if (window.initInflowTabs) {
+        window.initInflowTabs({
+            type: 'home',
+            title: '{{ branch.name }} Dashboard',
+            label: '{{ branch.code }} Dashboard',
+            url: '{{ url_for("branches.branch_workspace", id=branch.id) }}'
+        });
+    }
+});
+</script>
+{% endblock %}

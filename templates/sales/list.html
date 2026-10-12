@@ -1,0 +1,260 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales Orders - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">
+            {% if branch_filter == 'main' %}
+            🏢 Main Store Sales Orders (ការបញ្ជាទិញហាងធំ)
+            {% elif branch_filter == 'all' %}
+            🌐 All Outlets Sales Orders (ការបញ្ជាទិញទាំងអស់)
+            {% else %}
+            🏬 Branch Sales Orders (ការបញ្ជាទិញសាខា)
+            {% endif %}
+        </h1>
+        <p style="color: #64748B; font-size: 0.88rem;">
+            {% if branch_filter == 'main' %}
+            Main store order ledger strictly isolated from branch orders ({{ total_count }} orders)
+            {% elif branch_filter == 'all' %}
+            Consolidated overview across headquarters and all branches ({{ total_count }} orders)
+            {% else %}
+            Dedicated branch orders ledger ({{ total_count }} orders)
+            {% endif %}
+        </p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="{{ url_for('data_exchange.import_data', type='sales_order') }}" class="btn btn-secondary" title="Import Sales Orders from CSV file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Import CSV</span>
+        </a>
+        <a href="{{ url_for('data_exchange.export_data', type='sales_order') }}" class="btn btn-secondary" title="Export Sales Orders to CSV file">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Export CSV</span>
+        </a>
+        {% if is_branch_mode and current_branch %}
+        <a href="{{ url_for('sales_orders.new_order', branch=current_branch.id) }}" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Create Sales Order ({{ current_branch.code }})</span>
+        </a>
+        {% elif branch_filter and branch_filter not in ('main', 'all') %}
+        <a href="{{ url_for('sales_orders.new_order', branch=branch_filter) }}" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Create Sales Order</span>
+        </a>
+        {% else %}
+        <a href="{{ url_for('sales_orders.new_order') }}" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Create Sales Order</span>
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Store Scope Tabs Bar (Keeps Main Store & Branches Isolated) -->
+<div style="display: flex; align-items: center; justify-content: space-between; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.03em; margin-right: 4px;">Store Scope:</span>
+        <a href="{{ url_for('sales_orders.list_orders', view='table', branch='main', status=status, search=search) }}" 
+           class="btn btn-sm {% if branch_filter == 'main' %}btn-primary{% else %}btn-secondary{% endif %}" 
+           style="border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 700; text-decoration: none;">
+            🏢 Main Store (ហាងធំ)
+        </a>
+        {% for br in branches %}
+        <a href="{{ url_for('sales_orders.list_orders', view='table', branch=br.id, status=status, search=search) }}" 
+           class="btn btn-sm {% if branch_filter == (br.id|string) %}btn-primary{% else %}btn-secondary{% endif %}" 
+           style="border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 700; text-decoration: none;">
+            🏬 {{ br.name }} ({{ br.code }})
+        </a>
+        {% endfor %}
+        <a href="{{ url_for('sales_orders.list_orders', view='table', branch='all', status=status, search=search) }}" 
+           class="btn btn-sm {% if branch_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" 
+           style="border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 700; text-decoration: none;">
+            🌐 All Outlets (ទាំងអស់)
+        </a>
+    </div>
+    <div>
+        <a href="{{ url_for('branches.list_branches') }}" style="font-size: 12px; font-weight: 700; color: #0284C7; text-decoration: none; display: flex; align-items: center; gap: 4px;">
+            <span>⚙️ Manage Store Branches</span>
+            <span>→</span>
+        </a>
+    </div>
+</div>
+
+<!-- Status Tabs Bar -->
+<div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, search=search) }}" class="btn {% if not status %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        All Orders ({{ total_count }})
+    </a>
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, status='OPEN', search=search) }}" class="btn {% if status == 'OPEN' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Open ({{ stats_dict.get('OPEN', 0) }})
+    </a>
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, status='PICKED', search=search) }}" class="btn {% if status == 'PICKED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Picked ({{ stats_dict.get('PICKED', 0) }})
+    </a>
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, status='PACKED', search=search) }}" class="btn {% if status == 'PACKED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Packed ({{ stats_dict.get('PACKED', 0) }})
+    </a>
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, status='SHIPPED', search=search) }}" class="btn {% if status == 'SHIPPED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Shipped ({{ stats_dict.get('SHIPPED', 0) }})
+    </a>
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, status='PAID', search=search) }}" class="btn {% if status in ('PAID', 'INVOICED') %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Paid / Invoiced ({{ stats_dict.get('INVOICED', 0) + stats_dict.get('PAID', 0) }})
+    </a>
+    <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter, status='CANCELLED', search=search) }}" class="btn {% if status == 'CANCELLED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Cancelled ({{ stats_dict.get('CANCELLED', 0) }})
+    </a>
+</div>
+
+<!-- Search & Filters -->
+<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+    <form method="GET" action="{{ url_for('sales_orders.list_orders') }}" style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+        <input type="hidden" name="view" value="table">
+        <input type="hidden" name="status" value="{{ status }}">
+        <input type="hidden" name="branch" value="{{ branch_filter }}">
+        <div style="flex: 1; min-width: 240px;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Search by Order #, Customer name, or phone..." class="form-input">
+        </div>
+        <div style="width: 180px;">
+            <select name="payment_status" class="form-select" onchange="this.form.submit()">
+                <option value="">All Payment States</option>
+                <option value="PAID" {% if payment_status == 'PAID' %}selected{% endif %}>Paid</option>
+                <option value="PARTIAL" {% if payment_status == 'PARTIAL' %}selected{% endif %}>Partial</option>
+                <option value="UNPAID" {% if payment_status == 'UNPAID' %}selected{% endif %}>Unpaid</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or payment_status or status %}
+        <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_filter) }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- Orders Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Order #</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <th>Warehouse / Branch</th>
+                    <th style="text-align: right;">Lines</th>
+                    <th style="text-align: right;">Total Amount</th>
+                    <th style="text-align: right;">Balance Due</th>
+                    <th style="text-align: center;">Fulfillment</th>
+                    <th style="text-align: center;">Payment</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr style="cursor: pointer;" ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=o.id) }}', 'Sales Order: {{ o.order_number }}', 'sales'); } else { window.location.href='{{ url_for('sales_orders.detail_order', id=o.id) }}'; }" title="Double-click to open order in new tab">
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=o.id) }}', 'Sales Order: {{ o.order_number }}', 'sales'); }" style="font-weight: 700; font-family: var(--font-mono); color: #0F766E; text-decoration: none;">
+                                {{ o.order_number }}
+                            </a>
+                            {% if o.branch_code %}
+                            <span class="badge" style="background: #E0F2FE; color: #0284C7; font-size: 10px; font-weight: 700; padding: 2px 5px; border-radius: 4px;" title="Branch: {{ o.branch_name }}">
+                                {{ o.branch_code }}
+                            </span>
+                            {% else %}
+                            <span class="badge" style="background: #F1F5F9; color: #64748B; font-size: 10px; font-weight: 600; padding: 2px 5px; border-radius: 4px;">
+                                MAIN
+                            </span>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>{{ o.order_date | format_date }}</td>
+                    <td>
+                        <div style="font-weight: 600; color: #0F172A;">{{ o.customer_name or 'Walk-in Customer' }}</div>
+                        {% if o.customer_phone %}
+                        <div style="font-size: 0.72rem; color: #64748B;">{{ o.customer_phone }}</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div>{{ o.location_name or 'Main Warehouse' }}</div>
+                        {% if o.branch_name %}
+                        <div style="font-size: 0.72rem; color: #0284C7; font-weight: 600;">{{ o.branch_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; color: #64748B;">{{ o.line_count }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ o.total_amount | currency }}
+                    </td>
+                    <td style="text-align: right; font-weight: 600; color: {% if o.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
+                        {{ o.balance_due | currency }}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if o.status == 'OPEN' %}
+                            <span class="badge badge-warning">OPEN</span>
+                        {% elif o.status == 'PICKED' %}
+                            <span class="badge badge-info">PICKED</span>
+                        {% elif o.status == 'PACKED' %}
+                            <span class="badge badge-info">PACKED</span>
+                        {% elif o.status == 'SHIPPED' %}
+                            <span class="badge badge-primary" style="background:#CCFBF1; color:#0F766E;">SHIPPED</span>
+                        {% elif o.status == 'INVOICED' %}
+                            <span class="badge badge-success">INVOICED</span>
+                        {% elif o.status == 'CANCELLED' %}
+                            <span class="badge badge-danger">CANCELLED</span>
+                        {% else %}
+                            <span class="badge badge-neutral">{{ o.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if o.payment_status == 'PAID' %}
+                            <span class="badge badge-success">PAID</span>
+                            {% if o.payment_method %}
+                            <div style="font-size: 0.72rem; color: #047857; font-weight: 700; margin-top: 3px;">
+                                {% if o.payment_method|upper in ('KB PRASAC', 'KB PRASAC BANK', 'PRASAC', 'KB') %}🏦 KB PRASAC
+                                {% elif o.payment_method|upper in ('ABA', 'ABA BANK') %}🏦 ABA Bank
+                                {% elif o.payment_method|upper in ('ACLEDA', 'ACLEDA BANK', 'ACELEDA') %}🏦 ACLEDA Bank
+                                {% elif o.payment_method|upper == 'CASH' %}💵 Cash
+                                {% else %}💳 {{ o.payment_method }}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if o.completed_by %}
+                            <div style="font-size: 0.68rem; color: #64748B; margin-top: 2px;" title="Completed by">by {{ o.completed_by }}</div>
+                            {% endif %}
+                        {% elif o.payment_status == 'PARTIAL' %}
+                            <span class="badge badge-warning">PARTIAL</span>
+                        {% else %}
+                            <span class="badge badge-danger">UNPAID</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">
+                            Manage →
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="10" style="text-align: center; color: #94A3B8; padding: 32px;">No sales orders found matching your criteria.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if total_pages > 1 %}
+    <div style="padding: 16px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} orders)</span>
+        <div style="display: flex; gap: 8px;">
+            {% if page > 1 %}
+            <a href="{{ url_for('sales_orders.list_orders', view='table', page=page-1, status=status, payment_status=payment_status, search=search, branch=branch_filter) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('sales_orders.list_orders', view='table', page=page+1, status=status, payment_status=payment_status, search=search, branch=branch_filter) }}" class="btn btn-secondary btn-sm">Next →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Transfers - {{ branch.name }} - inFlow Premium{% endblock %}
+
+{% block content %}
+<!-- Breadcrumb Header -->
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <a href="{{ url_for('branches.branch_workspace', id=branch.id) }}" class="btn btn-sm btn-secondary" style="padding: 6px 12px; font-weight: 600; text-decoration: none;">
+            ← Branch Workspace
+        </a>
+        <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;">
+            Stock Transfers & Replenishment ({{ branch.name }})
+        </h1>
+        <span class="badge" style="background: #0284C7; color: #FFFFFF; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">{{ branch.code }}</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+        <button onclick="openModal('requestTransferModal')" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 8px 16px; background: #0284C7; border-color: #0284C7; font-weight: 600;">
+            + Request Stock from Central Warehouse
+        </button>
+        {% if perms.inventory %}
+        <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; text-decoration: none; font-weight: 600;">
+            📦 Branch Stock
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Stock Channel Banner -->
+<div style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+    <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #0369A1;">
+        <span style="font-size: 20px;">🔄</span>
+        <div>
+            <strong>Replenishment Channel:</strong> Transfers pull inventory from <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong> to <strong>{{ branch.location_name or 'Branch Location' }}</strong>.
+        </div>
+    </div>
+    <span style="font-size: 11px; font-weight: 700; color: #0284C7; background: #E0F2FE; padding: 3px 8px; border-radius: 4px;">HQ DISPATCH CONNECTED</span>
+</div>
+
+<!-- Transfers Table -->
+<div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
+    <table class="data-table" style="width: 100%; border-collapse: collapse;">
+        <thead>
+            <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; font-size: 12px; color: #475569;">
+                <th style="padding: 12px 16px; text-align: left; width: 140px;">Transfer #</th>
+                <th style="padding: 12px 14px; text-align: left; width: 110px;">Date</th>
+                <th style="padding: 12px 14px; text-align: left;">From Location</th>
+                <th style="padding: 12px 14px; text-align: left;">To Destination</th>
+                <th style="padding: 12px 14px; text-align: center;">Status</th>
+                <th style="padding: 12px 16px; text-align: left;">Notes / Reason</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for t in transfers %}
+            <tr style="border-bottom: 1px solid #F1F5F9; font-size: 13px;">
+                <td style="padding: 12px 16px; font-family: monospace; font-weight: 700; color: #0284C7;">
+                    {{ t.transfer_number }}
+                </td>
+                <td style="padding: 12px 14px; font-family: monospace; color: #64748B;">
+                    {{ t.transfer_date|format_inflow_date }}
+                </td>
+                <td style="padding: 12px 14px; font-weight: 600; color: #0F172A;">
+                    {{ t.from_location_name or 'Main Warehouse' }}
+                </td>
+                <td style="padding: 12px 14px; font-weight: 600; color: #0284C7;">
+                    {{ t.to_location_name or branch.name }}
+                </td>
+                <td style="padding: 12px 14px; text-align: center;">
+                    {% if t.status == 'COMPLETED' %}
+                    <span class="badge" style="background: #DCFCE7; color: #15803D; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">COMPLETED</span>
+                    {% elif t.status == 'IN_TRANSIT' %}
+                    <span class="badge" style="background: #FEF3C7; color: #92400E; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">IN TRANSIT</span>
+                    {% else %}
+                    <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">PENDING HQ</span>
+                    {% endif %}
+                </td>
+                <td style="padding: 12px 16px; color: #64748B; font-size: 12.5px;">
+                    {{ t.notes or '-' }}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 40px; color: #94A3B8;">No stock transfers recorded for {{ branch.name }}.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Modal: Request Transfer from Central Warehouse -->
+<div class="modal-overlay" id="requestTransferModal">
+    <div class="modal-dialog" style="max-width: 480px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">🔄 Request Stock from Central Warehouse</h3>
+            <button type="button" class="modal-close-btn" onclick="closeModal('requestTransferModal')">✕</button>
+        </div>
+        <form action="{{ url_for('branches.request_branch_transfer', id=branch.id) }}" method="POST">
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px;">
+                <div>From: <strong>{{ central_wh.name if central_wh else 'Main Warehouse' }}</strong> (Central Fulfillment)</div>
+                <div style="margin-top: 4px;">To Destination: <strong>{{ branch.name }}</strong> ({{ branch.location_name or 'Branch Location' }})</div>
+            </div>
+            <div class="form-group mb-3">
+                <label style="font-size: 12px; font-weight: 600; color: #334155; display: block; margin-bottom: 4px;">Replenishment Request Notes *</label>
+                <textarea name="notes" required rows="3" class="form-control" placeholder="Specify items or quantities needed (e.g. Need 50 cases of Box 01, 20 cases of Box 02)..." style="width: 100%; padding: 8px 10px; font-size: 13px;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('requestTransferModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="background: #0284C7; border-color: #0284C7;">Submit Request to HQ</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

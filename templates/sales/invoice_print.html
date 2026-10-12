@@ -1,0 +1,1335 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ order.order_number }} - {{ inv_settings.invoice_title_kh or 'វិក្កយបត្រ' }} ({{ inv_settings.invoice_title_en or 'INVOICE' }})</title>
+    
+    <!-- Google Fonts: Popular Cambodian Typography Suite -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Moul&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Siemreap&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary-color: {{ inv_settings.primary_color or '#0284C7' }};
+            --secondary-color: {{ inv_settings.secondary_color or '#0F172A' }};
+            --font-main: '{{ inv_settings.font_family or "Kantumruy Pro" }}', 'Kantumruy Pro', sans-serif;
+            --khmer-title-font: {% if inv_settings.font_family == 'Moul' %}'Moul'{% elif inv_settings.font_family == 'Battambang' %}'Battambang'{% elif inv_settings.font_family == 'Siemreap' %}'Siemreap'{% else %}'Kantumruy Pro'{% endif %}, sans-serif;
+        }
+
+        @page {
+            size: A5 portrait;
+            margin: 4mm 5mm 4mm 5mm;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        body {
+            font-family: var(--font-main);
+            margin: 0;
+            padding: 16px 0 40px 0;
+            background-color: #F1F5F9;
+            color: #1E293B;
+            font-size: 11px;
+            line-height: 1.35;
+        }
+
+        /* Non-printable Control Toolbar */
+        .no-print-toolbar {
+            max-width: 580px;
+            margin: 0 auto 12px auto;
+            padding: 8px 14px;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+        }
+
+        .no-print-toolbar .tb-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .no-print-toolbar .tb-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tb-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid #CBD5E1;
+            background: #FFFFFF;
+            color: #334155;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .tb-btn:hover {
+            background: #F8FAFC;
+            border-color: #94A3B8;
+        }
+
+        .tb-btn.primary {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: #FFFFFF;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+        }
+
+        .tb-btn.primary:hover {
+            opacity: 0.92;
+        }
+
+        .rate-control-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 11.5px;
+            background: #F8FAFC;
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid #E2E8F0;
+        }
+
+        .rate-input {
+            width: 65px;
+            padding: 2px 5px;
+            border: 1px solid #CBD5E1;
+            border-radius: 4px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #0F172A;
+            text-align: right;
+        }
+
+        /* Printable Paper Canvas (A5 Standard: 148mm x 210mm) */
+        .invoice-paper {
+            width: 100%;
+            max-width: 580px;
+            margin: 0 auto;
+            background: #FFFFFF;
+            padding: 16px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            position: relative;
+        }
+
+        /* Template Style Variants */
+        .invoice-paper.style-classic {
+            border: 2px solid var(--primary-color);
+            border-radius: 4px;
+            box-shadow: 0 0 0 4px #F8FAFC, 0 4px 16px rgba(0,0,0,0.06);
+        }
+        .invoice-paper.style-classic .top-accent-bar {
+            display: none;
+        }
+        .invoice-paper.style-classic .inv-header {
+            border-bottom: 2px solid var(--primary-color);
+        }
+        .invoice-paper.style-classic .inv-table th {
+            background: #F8FAFC;
+            border-top: 1px solid var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+            color: #0F172A;
+        }
+
+        .invoice-paper.style-thermal_80mm {
+            max-width: 320px !important;
+            padding: 10px 12px;
+            border-radius: 0;
+            border: 1px dashed #CBD5E1;
+            font-size: 10px;
+        }
+        .invoice-paper.style-thermal_80mm .top-accent-bar {
+            display: none;
+        }
+        .invoice-paper.style-thermal_80mm .inv-header {
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            border-bottom: 1px dashed #94A3B8;
+        }
+        .invoice-paper.style-thermal_80mm .inv-shop-brand {
+            max-width: 100%;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .invoice-paper.style-minimal {
+            border: 1px solid #E2E8F0;
+            border-radius: 2px;
+            box-shadow: none;
+        }
+        .invoice-paper.style-minimal .top-accent-bar {
+            display: none;
+        }
+        .invoice-paper.style-minimal .inv-header {
+            border-bottom: 1px solid #E2E8F0;
+        }
+
+        /* Brand Top Accent Strip */
+        .top-accent-bar {
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+
+        /* Header Layout */
+        .inv-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 1.5px solid #E2E8F0;
+            padding-bottom: 10px;
+            margin-bottom: 10px;
+        }
+
+        .inv-shop-brand {
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            max-width: 60%;
+        }
+
+        .shop-logo-img {
+            max-width: 62px;
+            max-height: 56px;
+            object-fit: contain;
+            border-radius: 4px;
+        }
+
+        .shop-logo-placeholder {
+            width: 54px;
+            height: 54px;
+            border-radius: 6px;
+            background: #F1F5F9;
+            border: 1.5px dashed #CBD5E1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary-color);
+            font-weight: 800;
+            font-size: 16px;
+        }
+
+        .shop-info-text {
+            flex: 1;
+        }
+
+        .shop-name-kh {
+            font-family: var(--khmer-title-font);
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin: 0 0 1px 0;
+            line-height: 1.25;
+        }
+
+        .shop-name-en {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--secondary-color);
+            margin: 0 0 3px 0;
+            letter-spacing: 0.01em;
+        }
+
+        .shop-meta-line {
+            font-size: 9.5px;
+            color: #475569;
+            margin: 1px 0;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            line-height: 1.3;
+        }
+
+        .inv-title-box {
+            text-align: right;
+            min-width: 38%;
+        }
+
+        .inv-badge-title {
+            display: inline-block;
+            background: var(--primary-color);
+            color: #FFFFFF;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .inv-number-big {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin: 4px 0 2px 0;
+            letter-spacing: 0.02em;
+        }
+
+        .inv-meta-table {
+            margin-left: auto;
+            border-collapse: collapse;
+            font-size: 9.5px;
+            margin-top: 3px;
+        }
+
+        .inv-meta-table td {
+            padding: 1px 3px;
+        }
+
+        .inv-meta-table .lbl {
+            color: #64748B;
+            text-align: right;
+            font-weight: 500;
+        }
+
+        .inv-meta-table .val {
+            color: #0F172A;
+            text-align: right;
+            font-weight: 700;
+        }
+
+        /* Customer Details Split Card */
+        .inv-parties-card {
+            display: grid;
+            grid-template-columns: 1.3fr 1fr;
+            gap: 10px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 8px 12px;
+            margin-bottom: 10px;
+        }
+
+        .party-col-title {
+            font-size: 9.5px;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border-bottom: 1px solid #E2E8F0;
+            padding-bottom: 2px;
+        }
+
+        .cust-name {
+            font-size: 11.5px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 2px;
+            line-height: 1.25;
+        }
+
+        .party-row {
+            font-size: 9.5px;
+            color: #475569;
+            margin: 1.5px 0;
+            display: flex;
+            gap: 4px;
+        }
+
+        .party-row strong {
+            color: #1E293B;
+            min-width: 55px;
+        }
+
+        .status-pill {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-pill.paid { background: #D1FAE5; color: #065F46; }
+        .status-pill.partial { background: #FEF3C7; color: #92400E; }
+        .status-pill.unpaid { background: #FEE2E2; color: #991B1B; }
+
+        /* Items Table */
+        .inv-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        .inv-table thead th {
+            background-color: transparent !important;
+            background: none !important;
+            color: var(--primary-color) !important;
+            font-size: 9.5px;
+            font-weight: 700;
+            padding: 5px 6px;
+            text-align: left;
+            border-top: 1.5px solid var(--primary-color) !important;
+            border-bottom: 1.5px solid var(--primary-color) !important;
+            border-left: none !important;
+            border-right: none !important;
+            line-height: 1.25;
+        }
+
+        .inv-table thead th .kh-th {
+            display: block;
+            font-size: 9.5px;
+            font-weight: 700;
+            color: var(--primary-color) !important;
+        }
+
+        .inv-table thead th .en-th {
+            display: block;
+            font-size: 8px;
+            font-weight: 600;
+            color: var(--primary-color) !important;
+            opacity: 0.95;
+            text-transform: uppercase;
+        }
+
+        .inv-table thead th.text-right { text-align: right; }
+        .inv-table thead th.text-center { text-align: center; }
+
+        .inv-table tbody td {
+            padding: 5px 6px;
+            font-size: 9.5px;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+            border-bottom: 1px solid #E2E8F0;
+            vertical-align: middle;
+        }
+
+        .inv-table tbody tr:nth-child(even) {
+            background-color: #F8FAFC;
+        }
+
+        .inv-table .item-name {
+            font-weight: 600;
+            color: #0F172A;
+            font-size: 10px;
+            line-height: 1.25;
+        }
+
+        /* Bottom Section: KHQR Payment & Totals */
+        .inv-bottom-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            align-items: start;
+            margin-top: 6px;
+            page-break-inside: avoid;
+        }
+
+        /* KHQR Bakong Card (Cambodia Style) */
+        .khqr-card {
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 8px;
+            background: #FFFFFF;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .khqr-img-box {
+            width: 80px;
+            height: 80px;
+            flex-shrink: 0;
+            background: #FFFFFF;
+            border: 1px solid #CBD5E1;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            padding: 2px;
+        }
+
+        .khqr-img-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .khqr-details {
+            flex: 1;
+        }
+
+        .khqr-header-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            background: #E1251B; /* KHQR Official Red */
+            color: #FFFFFF;
+            font-size: 8px;
+            font-weight: 800;
+            padding: 1px 5px;
+            border-radius: 3px;
+            letter-spacing: 0.05em;
+            margin-bottom: 2px;
+        }
+
+        .khqr-bank-name {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 1px;
+        }
+
+        .khqr-acc-name {
+            font-size: 9px;
+            font-weight: 600;
+            color: #334155;
+            text-transform: uppercase;
+        }
+
+        .khqr-acc-num {
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--primary-color);
+            letter-spacing: 0.02em;
+            margin-top: 1px;
+        }
+
+        .khqr-note {
+            font-size: 8px;
+            color: #64748B;
+            margin-top: 2px;
+            line-height: 1.25;
+        }
+
+        /* Order Notes / Remarks */
+        .order-notes-box {
+            margin-top: 6px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 9px;
+            color: #475569;
+        }
+
+        /* Cambodian Standard Terms Notice */
+        .cambodia-terms-box {
+            margin-top: 6px;
+            font-size: 8.5px;
+            color: #64748B;
+            line-height: 1.35;
+        }
+
+        /* Totals Card */
+        .totals-card {
+            border: 1px solid #CBD5E1;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #FFFFFF;
+        }
+
+        .totals-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .totals-table td {
+            padding: 4px 8px;
+            font-size: 9.5px;
+            border-bottom: 1px solid #F1F5F9;
+        }
+
+        .totals-table .lbl {
+            color: #475569;
+        }
+
+        .totals-table .val {
+            text-align: right;
+            font-weight: 600;
+            color: #0F172A;
+        }
+
+        /* Grand Total USD Row */
+        .total-usd-row {
+            background-color: #F8FAFC;
+            border-top: 1.5px solid #CBD5E1 !important;
+            border-bottom: 1px solid #CBD5E1 !important;
+        }
+
+        .total-usd-row td {
+            padding: 6px 8px;
+            font-size: 11px;
+            font-weight: 800;
+            color: #0F172A;
+        }
+
+        .total-usd-row .usd-val {
+            color: var(--primary-color);
+            font-size: 12.5px;
+        }
+
+        /* Grand Total KHR Row (Cambodian Highlight) */
+        .total-khr-row {
+            background: linear-gradient(90deg, #FEF3C7, #FFFBEB);
+            border-bottom: 1.5px solid #F59E0B !important;
+        }
+
+        .total-khr-row td {
+            padding: 6px 8px;
+            color: #92400E;
+        }
+
+        .khr-badge-title {
+            font-size: 10px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .khr-big-val {
+            font-size: 13.5px;
+            font-weight: 900;
+            color: #B45309;
+            text-align: right;
+            letter-spacing: 0.02em;
+        }
+
+        .exchange-rate-pill {
+            font-size: 8px;
+            font-weight: 600;
+            color: #64748B;
+            background: #F1F5F9;
+            padding: 1px 6px;
+            border-radius: 3px;
+            display: inline-block;
+            margin-top: 1px;
+        }
+
+        /* Payment Summary Rows */
+        .paid-row td { color: #059669; }
+        .balance-row { background: #FEF2F2; }
+        .balance-row td { color: #DC2626; font-weight: 700; font-size: 10.5px; }
+
+        /* Signature Blocks */
+        .signature-section {
+            margin-top: 14px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            page-break-inside: avoid;
+        }
+
+        .sig-box {
+            text-align: center;
+        }
+
+        .sig-title-kh {
+            font-size: 10px;
+            font-weight: 700;
+            color: #0F172A;
+            margin-bottom: 1px;
+        }
+
+        .sig-title-en {
+            font-size: 8.5px;
+            font-weight: 500;
+            color: #64748B;
+            text-transform: uppercase;
+        }
+
+        .sig-space {
+            height: 32px;
+            border-bottom: 1px dashed #94A3B8;
+            margin-bottom: 4px;
+        }
+
+        .sig-meta {
+            font-size: 8.5px;
+            color: #64748B;
+            display: flex;
+            justify-content: space-between;
+            padding: 0 4px;
+        }
+
+        /* Footer */
+        .inv-footer {
+            text-align: center;
+            margin-top: 10px;
+            padding-top: 6px;
+            border-top: 1px solid #E2E8F0;
+            font-size: 8.5px;
+            color: #94A3B8;
+        }
+
+        /* Print Media Styles for A5 Paper (148mm x 210mm) */
+        @media print {
+            html, body {
+                width: 148mm;
+                height: 210mm;
+                background: #FFFFFF !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                font-size: 9.5px !important;
+            }
+            .no-print-toolbar {
+                display: none !important;
+            }
+            .invoice-paper {
+                box-shadow: none !important;
+                border-radius: 0 !important;
+                padding: 2mm 3mm !important;
+                max-width: 100% !important;
+                width: 100% !important;
+                margin: 0 !important;
+            }
+            .top-accent-bar {
+                border-radius: 0 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Non-printable Top Action Bar -->
+    <div class="no-print-toolbar">
+        <div class="tb-left">
+            <a href="javascript:window.history.back()" class="tb-btn">← Back</a>
+            
+            <!-- Live Exchange Rate Modifier -->
+            <div class="rate-control-box" title="Adjust USD to KHR exchange rate live on this invoice">
+                <span>Rate 1$ =</span>
+                <input type="number" id="liveRateInput" class="rate-input" value="{{ khr_rate }}" step="10" oninput="updateLiveKhrCalculations(this.value)">
+                <span>៛ KHR</span>
+            </div>
+
+            <!-- Toggle KHR Display -->
+            <label style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; cursor: pointer; color: #475569;">
+                <input type="checkbox" id="chkShowKhr" {% if inv_settings.enable_khr_total %}checked{% endif %} onchange="toggleKhrDisplay(this.checked)">
+                <span>Show Khmer Riel Total</span>
+            </label>
+        </div>
+
+        <div class="tb-right">
+            <a href="{{ url_for('settings.general_settings', tab='tabInvoice') }}" class="tb-btn" title="Customize invoice fonts, color, logo, and address in Settings">
+                ⚙️ Invoice Settings
+            </a>
+            <button type="button" class="tb-btn primary" onclick="window.print()">
+                🖨️ Print Invoice (A5)
+            </button>
+        </div>
+    </div>
+
+    <!-- Printable Invoice Sheet (A5) -->
+    <div class="invoice-paper style-{{ inv_settings.template_style or 'modern' }}" id="invoiceSheet">
+        <!-- Top Colored Accent Bar -->
+        <div class="top-accent-bar"></div>
+
+        <!-- 1. Header: Shop Profile & Invoice Title -->
+        <div class="inv-header">
+            <!-- Left: Shop Details -->
+            <div class="inv-shop-brand">
+                {% if inv_settings.logo_url %}
+                <img src="{{ inv_settings.logo_url }}" alt="Shop Logo" class="shop-logo-img">
+                {% else %}
+                <div class="shop-logo-placeholder">
+                    <span>{{ (inv_settings.shop_name_en or company.name or 'IP')[:2] | upper }}</span>
+                </div>
+                {% endif %}
+
+                <div class="shop-info-text">
+                    <h1 class="shop-name-kh">{{ inv_settings.shop_name_kh or 'ក្រុមហ៊ុន អ៊ិនហ្វ្លូ ត្រេឌីង (ខេមបូឌា)' }}</h1>
+                    <h2 class="shop-name-en">{{ inv_settings.shop_name_en or company.name or 'inFlow Premium Trading Co., Ltd.' }}</h2>
+                    
+                    <div class="shop-meta-line">
+                        <span>📍</span>
+                        <span>{{ inv_settings.shop_address_kh or inv_settings.shop_address_en or company.address1 or 'Phnom Penh, Cambodia' }}</span>
+                    </div>
+
+                    {% if inv_settings.phone or company.phone %}
+                    <div class="shop-meta-line">
+                        <span>📞</span>
+                        <span>{{ inv_settings.phone or company.phone }}</span>
+                        {% if inv_settings.email or company.email %}
+                        <span style="color: #CBD5E1; margin: 0 4px;">|</span>
+                        <span>✉️ {{ inv_settings.email or company.email }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right: Document Meta Details -->
+            <div class="inv-title-box">
+                <div class="inv-badge-title">
+                    {% if doc_type == 'pick' %}
+                        បញ្ជីរើសទំនិញ / PICK LIST
+                    {% elif doc_type == 'pack' %}
+                        បញ្ជីវេចខ្ចប់ / PACKING SLIP
+                    {% elif doc_type == 'receipt' %}
+                        បង្កាន់ដៃទទួលប្រាក់ / OFFICIAL RECEIPT
+                    {% elif doc_type in ('order', 'sales_order') %}
+                        ការបញ្ជាទិញ / SALES ORDER
+                    {% else %}
+                        {{ inv_settings.invoice_title_kh or 'វិក្កយបត្រ' }} / {{ inv_settings.invoice_title_en or 'INVOICE' }}
+                    {% endif %}
+                </div>
+
+                <div class="inv-number-big">#{{ order.order_number }}</div>
+
+                <table class="inv-meta-table">
+                    <tr>
+                        <td class="lbl">កាលបរិច្ឆេទ / Date:</td>
+                        <td class="val">{{ order.order_date | format_date }}</td>
+                    </tr>
+                    {% if order.due_date %}
+                    <tr>
+                        <td class="lbl">ថ្ងៃផុតកំណត់ / Due Date:</td>
+                        <td class="val">{{ order.due_date | format_date }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="lbl">លក្ខខណ្ឌ / Terms:</td>
+                        <td class="val">{{ order.payment_terms or inv_settings.payment_terms or 'Due on Receipt' }}</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- 2. Customer & Order Info Card (Cambodia Style) -->
+        <div class="inv-parties-card">
+            <!-- Customer Details Column -->
+            <div>
+                <div class="party-col-title">
+                    <span>👤</span>
+                    <span>ព័ត៌មានអតិថិជន / Customer Details</span>
+                </div>
+                <div class="cust-name">{{ order.customer_name }}</div>
+                {% if order.customer_contact and order.customer_contact != order.customer_name %}
+                <div class="party-row">
+                    <strong>អ្នកទាក់ទង:</strong>
+                    <span>{{ order.customer_contact }}</span>
+                </div>
+                {% endif %}
+                <div class="party-row">
+                    <strong>ទូរស័ព្ទ:</strong>
+                    <span>{{ order.customer_phone or '-' }}</span>
+                </div>
+                <div class="party-row">
+                    <strong>អាសយដ្ឋាន:</strong>
+                    <span>{{ order.customer_address or '-' }} {{ order.customer_city or '' }}</span>
+                </div>
+            </div>
+
+            <!-- Fulfillment & Logistics Column -->
+            <div>
+                <div class="party-col-title">
+                    <span>📦</span>
+                    <span>ព័ត៌មានដឹកជញ្ជូន / Fulfillment</span>
+                </div>
+                <div class="party-row">
+                    <strong>អ្នកលក់:</strong>
+                    <span>{{ order.salesperson or 'Admin / Sales' }}</span>
+                </div>
+                <div class="party-row">
+                    <strong>ឃ្លាំងទំនិញ:</strong>
+                    <span>{{ order.location_name or 'Main Warehouse' }}</span>
+                </div>
+                {% if order.carrier %}
+                <div class="party-row">
+                    <strong>សេវាដឹក:</strong>
+                    <span>{{ order.carrier }}</span>
+                </div>
+                {% endif %}
+                {% if order.delivery_man %}
+                <div class="party-row">
+                    <strong>អ្នកដឹក (Delivery):</strong>
+                    <span>{{ order.delivery_man }}{% if order.delivery_helper %} & {{ order.delivery_helper }}{% endif %}</span>
+                </div>
+                {% endif %}
+                {% if order.delivery_fee_khr and (order.delivery_fee_khr|float > 0) %}
+                <div class="party-row">
+                    <strong>ថ្លៃដឹក (Delivery Fee):</strong>
+                    <span>{{ "{:,.0f}".format(order.delivery_fee_khr|float) }} ៛</span>
+                </div>
+                {% endif %}
+                {% if order.payment_method %}
+                <div class="party-row">
+                    <strong>វិធីទូទាត់ (Paid by):</strong>
+                    <span style="font-weight: 700; color: #059669;">{{ order.payment_method }}</span>
+                </div>
+                {% endif %}
+                {% if order.completed_by %}
+                <div class="party-row">
+                    <strong>អ្នកបញ្ចប់ (Completed by):</strong>
+                    <span style="font-weight: 600; color: #1E293B;">{{ order.completed_by }}</span>
+                </div>
+                {% endif %}
+                <div class="party-row" style="margin-top: 6px;">
+                    <strong>ស្ថានភាព:</strong>
+                    <span class="status-pill {% if order.balance_due <= 0 and order.paid_amount > 0 %}paid{% elif order.paid_amount > 0 %}partial{% else %}unpaid{% endif %}">
+                        {% if order.balance_due <= 0 and order.paid_amount > 0 %}
+                            PAID / បានទូទាត់
+                        {% elif order.paid_amount > 0 %}
+                            PARTIAL / ទូទាត់ខ្លះ
+                        {% else %}
+                            UNPAID / មិនទាន់ទូទាត់
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detect if any item has discount -->
+        {% set ns = namespace(has_discount=false) %}
+        {% for line in lines %}
+            {% if line.discount_percent and (line.discount_percent|float > 0) %}
+                {% set ns.has_discount = true %}
+            {% endif %}
+        {% endfor %}
+        {% if order.discount_amount and (order.discount_amount|float > 0) %}
+            {% set ns.has_discount = true %}
+        {% endif %}
+
+        <!-- 3. Line Items Table (No SKU, conditional Discount column) -->
+        <table class="inv-table">
+            <thead>
+                <tr>
+                    <th style="width: 28px; text-align: center;">
+                        <span class="kh-th">ល.រ</span>
+                        <span class="en-th">No.</span>
+                    </th>
+                    <th>
+                        <span class="kh-th">បរិយាយមុខទំនិញ</span>
+                        <span class="en-th">Item Description</span>
+                    </th>
+                    <th style="width: 55px; text-align: right;">
+                        <span class="kh-th">ចំនួន</span>
+                        <span class="en-th">Qty</span>
+                    </th>
+                    <th style="width: 48px; text-align: center;">
+                        <span class="kh-th">ឯកតា</span>
+                        <span class="en-th">UOM</span>
+                    </th>
+                    {% if doc_type in ('invoice', 'order', 'sales_order', 'receipt') %}
+                    <th style="width: 80px; text-align: right;">
+                        <span class="kh-th">តម្លៃរាយ</span>
+                        <span class="en-th">Unit Price</span>
+                    </th>
+                    {% if ns.has_discount %}
+                    <th style="width: 58px; text-align: right;">
+                        <span class="kh-th">បញ្ចុះតម្លៃ</span>
+                        <span class="en-th">Disc</span>
+                    </th>
+                    {% endif %}
+                    <th style="width: 90px; text-align: right;">
+                        <span class="kh-th">សរុបទូទាត់</span>
+                        <span class="en-th">Amount ($)</span>
+                    </th>
+                    {% else %}
+                    <th style="width: 70px; text-align: center;">
+                        <span class="kh-th">ផ្ទៀងផ្ទាត់</span>
+                        <span class="en-th">Verified</span>
+                    </th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in lines %}
+                <tr>
+                    <td style="text-align: center; color: #94A3B8; font-weight: 600;">{{ loop.index }}</td>
+                    <td>
+                        <div class="item-name">
+                            <span>{{ line.product_name or line.name or 'Item' }}</span>{% set d = (line.line_description or line.description or '').strip() %}{% if d and d != (line.product_name or line.name or '').strip() %} <span class="item-desc-inline" style="font-weight: 500; color: #475569;">({% if d.startswith('(') and d.endswith(')') %}{{ d[1:-1].strip() }}{% else %}{{ d }}{% endif %})</span>{% endif %}
+                        </div>
+                    </td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ "{:g}".format((line.quantity_display if (line.quantity_display is defined and line.quantity_display is not none) else line.quantity)|float) }}
+                    </td>
+                    <td style="text-align: center; color: #64748B;">
+                        {{ line.uom or line.product_uom or 'ea' }}
+                    </td>
+                    {% if doc_type in ('invoice', 'order', 'sales_order', 'receipt') %}
+                    <td style="text-align: right; color: #334155;">
+                        ${{ "{:,.2f}".format(line.unit_price|float) }}
+                    </td>
+                    {% if ns.has_discount %}
+                    <td style="text-align: right; color: #64748B;">
+                        {{ "{:g}%".format(line.discount_percent|float) if line.discount_percent and line.discount_percent > 0 else '-' }}
+                    </td>
+                    {% endif %}
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        ${{ "{:,.2f}".format(line.subtotal|float) }}
+                    </td>
+                    {% else %}
+                    <td style="text-align: center; color: #94A3B8; border-left: 1px dashed #CBD5E1;">[ &nbsp; ]</td>
+                    {% endif %}
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 20px; color: #94A3B8;">No items in this invoice.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- 4. Bottom Payment & Totals Section (Dynamic Layout from Customizer) -->
+        {% set qr_pos = inv_settings.qr_position or 'left' %}
+        {% set bank_pos = inv_settings.bank_info_position or 'below_qr' %}
+        {% set qr_sz = (inv_settings.qr_size or 180)|int %}
+        {% set bank_sz = inv_settings.bank_info_size or '8.5' %}
+        {% set col_w = (qr_sz + 18) %}
+
+        {% macro render_khqr_card() %}
+            {% if inv_settings.qr_code_url %}
+            <div style="background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; width: {{ qr_sz }}px; display: inline-block;">
+                <div style="background: #DC2626; color: #FFFFFF; font-weight: 800; font-size: 10px; padding: 4px 0; letter-spacing: 1px;">
+                    KHQR / BAKONG
+                </div>
+                <div style="padding: 6px; display: flex; justify-content: center; background: #FFFFFF;">
+                    <img src="{{ inv_settings.qr_code_url }}" alt="KHQR Payment Code" id="invoiceQrCodeImg" style="width: {{ qr_sz }}px; height: {{ qr_sz }}px; max-width: 100%; object-fit: contain;">
+                </div>
+                <div style="background: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 4px; font-size: 8.5px; font-weight: 600; color: #64748B;">
+                    ស្កេនទូទាត់ប្រាក់ / Scan to Pay
+                </div>
+            </div>
+            {% endif %}
+        {% endmacro %}
+
+        {% macro render_bank_info_card() %}
+            <div style="font-size: {{ bank_sz }}px; line-height: 1.4; padding: 0 2px;">
+                <div style="font-size: 1.1em; font-weight: 700; color: #0F172A; margin-bottom: 2px;">
+                    ព័ត៌មានទូទាត់ប្រាក់ / Payment Instructions:
+                </div>
+                <div style="color: #475569; margin-bottom: 1px;">
+                    <span>ធនាគារ / Bank: </span><strong style="color: #0F172A;">{{ inv_settings.bank_name or 'ABA Bank (KHQR / Bakong)' }}</strong>
+                </div>
+                <div style="color: #475569; margin-bottom: 1px;">
+                    <span>ឈ្មោះគណនី / A/C Name: </span><strong style="color: #0F172A;">{{ inv_settings.account_name or 'INFLOW TRADING CO LTD' }}</strong>
+                </div>
+                <div style="color: #475569; margin-bottom: 4px;">
+                    <span>លេខគណនី / A/C No: </span><strong style="color: #0F172A; font-family: monospace; font-size: 1em;">{{ inv_settings.account_number or '098 299 605' }}</strong>
+                </div>
+
+
+                <div style="background: #F8FAFC; border-left: 2.5px solid var(--primary-color); padding: 3px 6px; border-radius: 0 4px 4px 0; margin-top: 4px;">
+                    <div style="font-weight: 600; color: #334155; font-size: 0.95em;">
+                        {{ inv_settings.footer_notes_kh or 'ទំនិញដែលបានទិញរួចមិនអាចប្តូរវិញបានទេ!' }}
+                    </div>
+                    <div style="font-size: 0.9em; color: #64748B;">
+                        {{ inv_settings.footer_notes_en or 'Goods sold cannot be returned.' }}
+                    </div>
+                </div>
+            </div>
+        {% endmacro %}
+
+        {% macro render_totals_table() %}
+            {% if doc_type in ('invoice', 'order', 'sales_order', 'receipt') %}
+            <div class="totals-card" style="width: 100%; max-width: 270px;">
+                <table class="totals-table">
+                    <tr>
+                        <td class="lbl">សរុបផ្នែក / Subtotal:</td>
+                        <td class="val">${{ "{:,.2f}".format((order.subtotal or 0)|float) }}</td>
+                    </tr>
+                    {% if order.discount_amount and order.discount_amount > 0 %}
+                    <tr>
+                        <td class="lbl" style="color: #059669;">បញ្ចុះតម្លៃ / Discount:</td>
+                        <td class="val" style="color: #059669;">- ${{ "{:,.2f}".format(order.discount_amount|float) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if inv_settings.show_tax and order.tax_amount and order.tax_amount > 0 %}
+                    <tr>
+                        <td class="lbl">អាករលើតម្លៃបន្ថែម / VAT:</td>
+                        <td class="val">${{ "{:,.2f}".format(order.tax_amount|float) }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if order.shipping_fee and order.shipping_fee > 0 %}
+                    <tr>
+                        <td class="lbl">ថ្លៃដឹកជញ្ជូន / Shipping:</td>
+                        <td class="val">${{ "{:,.2f}".format(order.shipping_fee|float) }}</td>
+                    </tr>
+                    {% endif %}
+
+                    <!-- Grand Total USD -->
+                    <tr class="total-usd-row">
+                        <td>សរុបរួម / Grand Total (USD):</td>
+                        <td class="val usd-val" id="totalUsdDisplay">
+                            ${{ "{:,.2f}".format((order.total_amount or 0)|float) }}
+                        </td>
+                    </tr>
+
+                    <!-- Grand Total in Khmer Riel (KHR) -->
+                    <tr class="total-khr-row" id="khrTotalRow" style="{% if not inv_settings.enable_khr_total %}display: none;{% endif %}">
+                        <td>
+                            <div class="khr-badge-title">
+                                <span>🇰🇭</span>
+                                <span>សរុបជាប្រាក់រៀល (KHR):</span>
+                            </div>
+                            <span class="exchange-rate-pill" id="exchangeRateBadge">1 USD = {{ "{:,.0f}".format(khr_rate) }} ៛</span>
+                        </td>
+                        <td class="val khr-big-val" id="totalKhrDisplay">
+                            {{ "{:,.0f}".format(total_khr) }} ៛
+                        </td>
+                    </tr>
+
+                    <!-- Amount Paid & Balance Due -->
+                    {% if doc_type == 'receipt' %}
+                    <tr class="paid-row">
+                        <td class="lbl" style="font-weight: 600;">ប្រាក់បានបង់ / Paid:</td>
+                        <td class="val">
+                            ${{ "{:,.2f}".format((order.paid_amount if order.paid_amount and order.paid_amount > 0 else order.total_amount)|float) }}
+                        </td>
+                    </tr>
+                    <tr style="border-top: 1px solid #E2E8F0;">
+                        <td class="lbl">ប្រាក់នៅខ្វះ / Balance Due:</td>
+                        <td class="val" style="color: #059669; font-weight: 800;">$0.00</td>
+                    </tr>
+                    {% else %}
+                    <tr class="paid-row">
+                        <td class="lbl" style="font-weight: 600;">ប្រាក់បានបង់ / Paid:</td>
+                        <td class="val" id="paidUsdDisplay">
+                            ${{ "{:,.2f}".format((order.paid_amount or 0)|float) }}
+                            <span style="font-size: 11px; color: #059669; display: block;" id="paidKhrDisplay">({{ "{:,.0f}".format(paid_khr) }} ៛)</span>
+                        </td>
+                    </tr>
+                    <tr class="balance-row">
+                        <td class="lbl" style="font-weight: 700;">ប្រាក់នៅខ្វះ / Balance Due:</td>
+                        <td class="val" id="balanceUsdDisplay">
+                            ${{ "{:,.2f}".format((order.balance_due or 0)|float) }}
+                            <span style="font-size: 11px; color: #DC2626; display: block;" id="balanceKhrDisplay">({{ "{:,.0f}".format(balance_khr) }} ៛)</span>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </table>
+
+                {% set order_remark = (order.notes or order.delivery_notes or '').strip() %}
+                {% if order_remark %}
+                <div class="totals-remarks-box" style="margin-top: 0; padding: 6px 8px; background: #F8FAFC; border-top: 1.5px solid #CBD5E1; font-size: 9.5px; color: #1E293B; line-height: 1.35; word-break: break-word; text-align: left;">
+                    <div style="font-weight: 800; color: #0F172A; font-size: 9px; margin-bottom: 2px;">📝 សម្គាល់ / Remarks:</div>
+                    <div style="font-weight: 500; color: #334155; white-space: pre-line;">{{ order_remark }}</div>
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            {% set order_remark = (order.notes or order.delivery_notes or '').strip() %}
+            {% if order_remark %}
+            <div class="totals-card" style="width: 100%; max-width: 270px; border: 1px solid #CBD5E1; border-radius: 6px; overflow: hidden; background: #FFFFFF;">
+                <div class="totals-remarks-box" style="padding: 6px 8px; background: #F8FAFC; font-size: 9.5px; color: #1E293B; line-height: 1.35; word-break: break-word; text-align: left;">
+                    <div style="font-weight: 800; color: #0F172A; font-size: 9px; margin-bottom: 2px;">📝 សម្គាល់ / Remarks:</div>
+                    <div style="font-weight: 500; color: #334155; white-space: pre-line;">{{ order_remark }}</div>
+                </div>
+            </div>
+            {% endif %}
+            {% endif %}
+        {% endmacro %}
+
+        {% if qr_pos == 'left' %}
+            {% if bank_pos == 'below_qr' %}
+            <div style="display: grid; grid-template-columns: {{ col_w }}px 1fr; gap: 16px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div>
+                    {{ render_khqr_card() }}
+                    <div style="margin-top: 8px;">
+                        {{ render_bank_info_card() }}
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    {{ render_totals_table() }}
+                </div>
+            </div>
+            {% elif bank_pos == 'beside_qr' %}
+            <div style="display: grid; grid-template-columns: 1fr 270px; gap: 14px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="display: flex; gap: 12px; align-items: start;">
+                    {{ render_khqr_card() }}
+                    <div style="flex: 1;">
+                        {{ render_bank_info_card() }}
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end;">
+                    {{ render_totals_table() }}
+                </div>
+            </div>
+            {% else %}
+            <!-- bottom_full -->
+            <div style="margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="display: grid; grid-template-columns: {{ col_w }}px 1fr; gap: 16px; align-items: start; margin-bottom: 8px;">
+                    <div>
+                        {{ render_khqr_card() }}
+                    </div>
+                    <div style="display: flex; justify-content: flex-end;">
+                        {{ render_totals_table() }}
+                    </div>
+                </div>
+                <div style="width: 100%;">
+                    {{ render_bank_info_card() }}
+                </div>
+            </div>
+            {% endif %}
+        {% elif qr_pos == 'right' %}
+            {% if bank_pos == 'below_qr' %}
+            <div style="display: grid; grid-template-columns: 1fr {{ col_w }}px; gap: 16px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="display: flex; justify-content: flex-start;">
+                    {{ render_totals_table() }}
+                </div>
+                <div>
+                    {{ render_khqr_card() }}
+                    <div style="margin-top: 8px;">
+                        {{ render_bank_info_card() }}
+                    </div>
+                </div>
+            </div>
+            {% elif bank_pos == 'beside_qr' %}
+            <div style="display: grid; grid-template-columns: 270px 1fr; gap: 14px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="display: flex; justify-content: flex-start;">
+                    {{ render_totals_table() }}
+                </div>
+                <div style="display: flex; gap: 12px; align-items: start;">
+                    <div style="flex: 1;">
+                        {{ render_bank_info_card() }}
+                    </div>
+                    {{ render_khqr_card() }}
+                </div>
+            </div>
+            {% else %}
+            <!-- bottom_full -->
+            <div style="margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="display: grid; grid-template-columns: 1fr {{ col_w }}px; gap: 16px; align-items: start; margin-bottom: 8px;">
+                    <div style="display: flex; justify-content: flex-start;">
+                        {{ render_totals_table() }}
+                    </div>
+                    <div>
+                        {{ render_khqr_card() }}
+                    </div>
+                </div>
+                <div style="width: 100%;">
+                    {{ render_bank_info_card() }}
+                </div>
+            </div>
+            {% endif %}
+        {% else %}
+            <!-- bottom -->
+            <div style="margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="display: flex; justify-content: flex-end; margin-bottom: 10px;">
+                    {{ render_totals_table() }}
+                </div>
+                {% if bank_pos == 'beside_qr' %}
+                <div style="display: flex; gap: 14px; align-items: start;">
+                    {{ render_khqr_card() }}
+                    <div style="flex: 1;">
+                        {{ render_bank_info_card() }}
+                    </div>
+                </div>
+                {% else %}
+                <div>
+                    {{ render_khqr_card() }}
+                    <div style="margin-top: 8px;">
+                        {{ render_bank_info_card() }}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        {% endif %}
+
+        <!-- 6. Signature Section (Cambodia Standard) -->
+        {% if inv_settings.show_signature %}
+        <div class="signature-section" style="margin-top: 8px; padding-top: 6px;">
+            <div class="sig-box">
+                <div class="sig-title-kh">ហត្ថលេខា និងឈ្មោះអ្នកទិញ</div>
+                <div class="sig-title-en">Customer's Signature & Name</div>
+                <div class="sig-space"></div>
+                <div class="sig-meta">
+                    <span>ឈ្មោះ / Name: ...........................</span>
+                    <span>កាលបរិច្ឆេទ: ......./......./202...</span>
+                </div>
+            </div>
+
+            <div class="sig-box">
+                <div class="sig-title-kh">ហត្ថលេខា និងឈ្មោះអ្នកលក់</div>
+                <div class="sig-title-en">Seller's Authorized Signature</div>
+                <div class="sig-space"></div>
+                <div class="sig-meta">
+                    <span>ឈ្មោះ / Name: <b>{{ order.completed_by if order.completed_by else '...........................' }}</b></span>
+                    <span>កាលបរិច្ឆេទ: ......./......./202...</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 7. Footer Thank You -->
+        <div class="inv-footer">
+            <div>សូមអរគុណចំពោះការគាំទ្ររបស់លោកអ្នក! Thank you for choosing {{ inv_settings.shop_name_en or company.name or 'inFlow Premium' }}.</div>
+        </div>
+    </div>
+
+    <!-- Live Dynamic Calculation Scripts -->
+    <script>
+        const RAW_TOTAL_USD = {{ order.total_amount or 0 }};
+        const RAW_PAID_USD = {{ order.paid_amount or 0 }};
+        const RAW_BALANCE_USD = {{ order.balance_due or 0 }};
+        let currentRate = {{ khr_rate }};
+
+        function formatRiel(amount) {
+            // Round to nearest 100 Riels (Cambodia standard)
+            const rounded = Math.round(amount / 100) * 100;
+            return rounded.toLocaleString('en-US') + ' ៛';
+        }
+
+        function updateLiveKhrCalculations(newRate) {
+            currentRate = parseFloat(newRate) || 4100;
+            
+            const totalKhr = RAW_TOTAL_USD * currentRate;
+            const paidKhr = RAW_PAID_USD * currentRate;
+            const balanceKhr = RAW_BALANCE_USD * currentRate;
+
+            const totalEl = document.getElementById('totalKhrDisplay');
+            if (totalEl) totalEl.innerText = formatRiel(totalKhr);
+
+            const badgeEl = document.getElementById('exchangeRateBadge');
+            if (badgeEl) badgeEl.innerText = '1 USD = ' + currentRate.toLocaleString('en-US') + ' ៛';
+
+            const paidKhrEl = document.getElementById('paidKhrDisplay');
+            if (paidKhrEl) paidKhrEl.innerText = '(' + formatRiel(paidKhr) + ')';
+
+            const balKhrEl = document.getElementById('balanceKhrDisplay');
+            if (balKhrEl) balKhrEl.innerText = '(' + formatRiel(balanceKhr) + ')';
+        }
+
+        function toggleKhrDisplay(show) {
+            const row = document.getElementById('khrTotalRow');
+            if (row) row.style.display = show ? 'table-row' : 'none';
+        }
+
+        // Auto-print support if requested via ?autoprint=1
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('autoprint') === '1') {
+            window.addEventListener('load', () => {
+                setTimeout(() => window.print(), 400);
+            });
+        }
+    </script>
+</body>
+</html>

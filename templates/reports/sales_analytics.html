@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+
+{% block title %}Sales & Margin Analysis - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Sales & Margin Analysis</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Gross revenue, cost of goods sold (COGS), and profit margin percentages</p>
+    </div>
+</div>
+
+<!-- Summary Financial KPI Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-label">Gross Sales Revenue</span></div>
+        <div class="kpi-value" style="color: #0F172A;">{{ summary.total_revenue | currency }}</div>
+        <div class="kpi-subtext">{{ summary.total_orders }} orders fulfilled</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-label">Cost of Goods Sold (COGS)</span></div>
+        <div class="kpi-value" style="color: #64748B;">{{ summary.total_cogs | currency }}</div>
+        <div class="kpi-subtext">Product inventory cost</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-header"><span class="kpi-label">Gross Profit</span></div>
+        <div class="kpi-value" style="color: #059669;">{{ summary.gross_profit | currency }}</div>
+        <div class="kpi-subtext">
+            {% if summary.total_revenue > 0 %}
+                Margin: {{ "{:,.1f}%".format((summary.gross_profit / summary.total_revenue) * 100) }}
+            {% else %}
+                Margin: 0%
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Product Sales Breakdown -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div style="padding: 18px 22px; border-bottom: 1px solid #E2E8F0;">
+        <h2 class="card-title" style="margin-bottom: 0;">Top Products Performance Breakdown</h2>
+    </div>
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Product Name</th>
+                    <th>SKU</th>
+                    <th style="text-align: right;">Units Sold</th>
+                    <th style="text-align: right;">Revenue</th>
+                    <th style="text-align: right;">COGS</th>
+                    <th style="text-align: right;">Gross Profit</th>
+                    <th style="text-align: right;">Margin %</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pb in product_breakdown %}
+                <tr>
+                    <td style="font-weight: 600; color: #0F172A;">
+                        <a href="{{ url_for('products.detail_product', id=pb.id) }}" style="text-decoration: none; color: inherit;">
+                            {{ pb.name }}
+                        </a>
+                    </td>
+                    <td style="font-family: monospace; color: #64748B;">{{ pb.sku }}</td>
+                    <td style="text-align: right; font-weight: 700;">{{ "{:,.0f}".format(pb.units_sold) }}</td>
+                    <td style="text-align: right; font-weight: 700;">{{ pb.revenue | currency }}</td>
+                    <td style="text-align: right; color: #64748B;">{{ pb.cogs | currency }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #059669;">{{ pb.gross_profit | currency }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F766E;">
+                        {{ "{:,.1f}%".format(pb.margin_percent) }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #94A3B8; padding: 32px;">No sales performance data found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

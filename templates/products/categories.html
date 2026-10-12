@@ -1,0 +1,651 @@
+{% extends 'base.html' %}
+
+{% block title %}Product Categories (ប្រភេទទំនិញ) - inFlow Premium{% endblock %}
+
+{% block content %}
+<div class="inflow-categories-page" style="padding: 24px 32px; max-width: 1400px; margin: 0 auto;">
+
+    <!-- Breadcrumb & Top Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.15);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/>
+                    <line x1="7" y1="7" x2="7.01" y2="7"/>
+                </svg>
+            </div>
+            <div>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <h1 style="font-size: 1.5rem; font-weight: 800; color: #0F172A; margin: 0; letter-spacing: -0.02em;">
+                        Product Categories
+                    </h1>
+                    <span class="font-khmer" style="font-size: 1.15rem; font-weight: 700; color: #64748B;">(ប្រភេទទំនិញ)</span>
+                </div>
+                <p style="color: #64748B; font-size: 0.85rem; margin: 4px 0 0 0;">
+                    Manage catalog classification, color tags, and organize products across POS and inventory.
+                </p>
+            </div>
+        </div>
+
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; text-decoration: none;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="19" y1="12" x2="5" y2="12"></line>
+                    <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                <span>Products Catalog</span>
+            </a>
+            <button type="button" onclick="openNewCategoryModal()" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; padding: 8px 18px; font-size: 13px; font-weight: 700; background: #0284C7; border-color: #0284C7; box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>+ Add Category</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- 4 Stats Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <!-- Card 1: Total Categories -->
+        <div class="card" style="padding: 16px 20px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em;">Total Categories</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #0F172A; margin-top: 4px;">{{ total_categories }}</div>
+            </div>
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: #F1F5F9; color: #475569; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Card 2: Active Categories -->
+        <div class="card" style="padding: 16px 20px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em;">Active Categories</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #059669; margin-top: 4px;">{{ active_categories }}</div>
+            </div>
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: #ECFDF5; color: #059669; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Card 3: Categorized Products -->
+        <div class="card" style="padding: 16px 20px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em;">Assigned Products</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: #0284C7; margin-top: 4px;">{{ categorized_products }}</div>
+            </div>
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Card 4: Uncategorized Products -->
+        <div class="card" style="padding: 16px 20px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: space-between;">
+            <div>
+                <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em;">Uncategorized Products</div>
+                <div style="font-size: 1.6rem; font-weight: 800; color: {% if uncategorized_products > 0 %}#D97706{% else %}#64748B{% endif %}; margin-top: 4px;">{{ uncategorized_products }}</div>
+            </div>
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: {% if uncategorized_products > 0 %}#FEF3C7{% else %}#F1F5F9{% endif %}; color: {% if uncategorized_products > 0 %}#D97706{% else %}#64748B{% endif %}; display: flex; align-items: center; justify-content: center;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card" style="padding: 14px 20px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <!-- Status Tabs -->
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <a href="{{ url_for('products.list_categories', status='all', q=search_query) }}"
+                   class="btn btn-sm {% if status_filter == 'all' %}btn-primary{% else %}btn-secondary{% endif %}"
+                   style="border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 600; text-decoration: none; {% if status_filter == 'all' %}background: #0284C7; border-color: #0284C7;{% endif %}">
+                    All Categories ({{ total_categories }})
+                </a>
+                <a href="{{ url_for('products.list_categories', status='active', q=search_query) }}"
+                   class="btn btn-sm {% if status_filter == 'active' %}btn-primary{% else %}btn-secondary{% endif %}"
+                   style="border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 600; text-decoration: none; {% if status_filter == 'active' %}background: #0284C7; border-color: #0284C7;{% endif %}">
+                    Active ({{ active_categories }})
+                </a>
+                <a href="{{ url_for('products.list_categories', status='inactive', q=search_query) }}"
+                   class="btn btn-sm {% if status_filter == 'inactive' %}btn-primary{% else %}btn-secondary{% endif %}"
+                   style="border-radius: 20px; padding: 5px 14px; font-size: 12px; font-weight: 600; text-decoration: none; {% if status_filter == 'inactive' %}background: #0284C7; border-color: #0284C7;{% endif %}">
+                    Inactive ({{ total_categories - active_categories }})
+                </a>
+            </div>
+
+            <!-- Instant Search Input -->
+            <div style="position: relative; min-width: 280px; max-width: 400px; flex: 1;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); pointer-events: none;">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="categoryLiveSearch" value="{{ search_query }}" placeholder="Filter categories by name or description..."
+                       class="form-input" style="width: 100%; padding: 7px 32px 7px 36px; font-size: 13px; border-radius: 6px; border: 1px solid #CBD5E1;">
+                <button type="button" id="clearSearchBtn" onclick="clearCategorySearch()"
+                        style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; font-size: 16px; color: #94A3B8; cursor: pointer; display: {% if search_query %}block{% else %}none{% endif %};">
+                    &times;
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories Data Table -->
+    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div class="table-container" style="border: none;">
+            <table class="data-table" id="categoriesTable" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                        <th style="padding: 12px 18px; text-align: left; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 320px;">Category Name</th>
+                        <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">Description</th>
+                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 150px;">Products</th>
+                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 120px;">Status</th>
+                        <th style="padding: 12px 20px; text-align: right; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 200px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="categoriesTableBody">
+                    {% for c in categories %}
+                    <tr class="category-row"
+                        data-id="{{ c.id }}"
+                        data-name="{{ c.name|escape }}"
+                        data-color="{{ c.color }}"
+                        data-description="{{ (c.description or '')|escape }}"
+                        data-active="{{ '1' if c.is_active else '0' }}"
+                        data-count="{{ c.product_count }}"
+                        style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s ease; {% if not c.is_active %}opacity: 0.7; background: #FAFAFA;{% endif %}"
+                        ondblclick="openEditCategoryModalFromRow(this)"
+                        title="Double-click to edit category">
+                        
+                        <!-- Column 1: Color Swatch + Name -->
+                        <td style="padding: 12px 18px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 22px; height: 22px; border-radius: 6px; background-color: {{ c.color }}; flex-shrink: 0; box-shadow: 0 1px 3px rgba(0,0,0,0.2); border: 2px solid #FFFFFF;"></div>
+                                <div>
+                                    <div style="font-weight: 700; color: #0F172A; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                                        <span class="category-name-text">{{ c.name }}</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: #94A3B8; font-family: monospace;">ID: #{{ c.id }} &bull; <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ c.color }}; vertical-align: middle; margin-right: 2px;"></span>{{ c.color }}</div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Column 2: Description -->
+                        <td style="padding: 12px 16px; color: #475569; font-size: 13px;">
+                            <span class="category-desc-text">
+                                {{ c.description or '—' }}
+                            </span>
+                        </td>
+
+                        <!-- Column 3: Associated Products -->
+                        <td style="padding: 12px 16px; text-align: center;">
+                            <a href="{{ url_for('products.list_products', category_id=c.id) }}"
+                               title="Filter catalog products in this category"
+                               style="display: inline-flex; align-items: center; gap: 5px; background: #F1F5F9; color: #0369A1; font-weight: 700; font-size: 12px; padding: 3px 10px; border-radius: 12px; text-decoration: none; border: 1px solid #E2E8F0; transition: all 0.15s ease;"
+                               onmouseover="this.style.background='#E0F2FE'; this.style.borderColor='#BAE6FD';"
+                               onmouseout="this.style.background='#F1F5F9'; this.style.borderColor='#E2E8F0';">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                                </svg>
+                                <span>{{ c.product_count }} items</span>
+                            </a>
+                        </td>
+
+                        <!-- Column 4: Status -->
+                        <td style="padding: 12px 16px; text-align: center;">
+                            {% if c.is_active %}
+                            <span class="badge badge-success" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; padding: 3px 9px; border-radius: 12px; font-weight: 700;">
+                                ACTIVE
+                            </span>
+                            {% else %}
+                            <span class="badge badge-secondary" style="background: #F1F5F9; color: #64748B; border: 1px solid #CBD5E1; font-size: 11px; padding: 3px 9px; border-radius: 12px; font-weight: 700;">
+                                INACTIVE
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Column 5: Actions -->
+                        <td style="padding: 12px 20px; text-align: right; white-space: nowrap;">
+                            <div style="display: inline-flex; align-items: center; gap: 6px;">
+                                <!-- Edit Button -->
+                                <button type="button"
+                                        class="btn btn-sm btn-secondary"
+                                        style="padding: 4px 9px; font-size: 12px; font-weight: 600; border-radius: 5px; color: #334155; border: 1px solid #CBD5E1;"
+                                        onclick="openEditCategoryModalFromRow(this.closest('tr'))"
+                                        title="Edit category details">
+                                    ✏️ Edit
+                                </button>
+
+                                <!-- Toggle Active Form Button -->
+                                <form action="{{ url_for('products.toggle_active_category', id=c.id) }}" method="POST" style="display: inline;"
+                                      onsubmit="return confirm('Are you sure you want to {{ 'deactivate' if c.is_active else 'activate' }} category \'{{ c.name|escape }}\'?');">
+                                    <button type="submit"
+                                            class="btn btn-sm"
+                                            style="padding: 4px 8px; font-size: 11.5px; font-weight: 600; border-radius: 5px; {% if c.is_active %}color: #D97706; background: #FFFBEB; border: 1px solid #FCD34D;{% else %}color: #059669; background: #ECFDF5; border: 1px solid #A7F3D0;{% endif %}"
+                                            title="{% if c.is_active %}Deactivate category{% else %}Activate category{% endif %}">
+                                        {% if c.is_active %}Deactivate{% else %}Activate{% endif %}
+                                    </button>
+                                </form>
+
+                                <!-- Delete Button -->
+                                <button type="button"
+                                        class="btn btn-sm"
+                                        style="padding: 4px 8px; font-size: 11.5px; font-weight: 600; border-radius: 5px; color: #DC2626; background: #FEF2F2; border: 1px solid #FECACA;"
+                                        onclick="openDeleteCategoryModal('{{ c.id }}', '{{ c.name|escape }}', '{{ c.product_count }}')"
+                                        title="Delete category (safe reassignment)">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="noCategoriesRow">
+                        <td colspan="5" style="text-align: center; padding: 48px 20px; color: #64748B;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">📂</div>
+                            <div style="font-size: 14px; font-weight: 600; color: #334155;">No categories found</div>
+                            <div style="font-size: 12.5px; color: #94A3B8; margin-top: 4px;">Click "+ Add Category" to create your first product category.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: ADD NEW CATEGORY -->
+<!-- ========================================================================= -->
+<div class="modal-overlay modal-backdrop" id="newCategoryModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; border-radius: 10px; width: 100%; max-width: 480px; box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25); overflow: hidden; margin: auto;">
+        <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">🏷️</span>
+                <h2 class="modal-title" style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Add Product Category (បង្កើតប្រភេទទំនិញ)</h2>
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('newCategoryModal')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748B; line-height: 1;">&times;</button>
+        </div>
+        <form action="{{ url_for('products.create_category') }}" method="POST" style="padding: 20px;" onsubmit="return validateCategoryForm(this)">
+            <!-- Name -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 5px;">
+                    Category Name (ឈ្មោះប្រភេទ) <span style="color: #EF4444;">*</span>
+                </label>
+                <input type="text" name="name" id="newCategoryName" required placeholder="e.g. Hot Paper Cups, Cold Cups, Lids..."
+                       class="form-input" style="width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13.5px;">
+            </div>
+
+            <!-- Color Swatch & Palette -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                    Color Tag (ពណ៌ចំណាំ)
+                </label>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <div id="newColorPreview" style="width: 32px; height: 32px; border-radius: 6px; background-color: #00A3E0; border: 2px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.15); flex-shrink: 0;"></div>
+                    <input type="color" id="newColorPicker" value="#00A3E0" onchange="syncColorInput('newColorPicker', 'newColorHex', 'newColorPreview')" style="width: 36px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0;">
+                    <input type="text" name="color" id="newColorHex" value="#00A3E0" oninput="syncColorInput('newColorHex', 'newColorPicker', 'newColorPreview')" placeholder="#00A3E0"
+                           class="form-input" style="width: 120px; font-family: monospace; font-size: 13px; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 6px; text-transform: uppercase;">
+                    <span style="font-size: 11.5px; color: #64748B;">Used on price tags & POS badges</span>
+                </div>
+
+                <!-- Palette presets -->
+                <div style="display: flex; gap: 7px; flex-wrap: wrap;">
+                    {% for hex in ['#0284C7', '#00A3E0', '#0D9488', '#10B981', '#84CC16', '#F59E0B', '#F97316', '#EF4444', '#EC4899', '#8B5CF6', '#6366F1', '#475569'] %}
+                    <button type="button" onclick="selectColorPreset('{{ hex }}', 'newColorPicker', 'newColorHex', 'newColorPreview')"
+                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ hex }}; border: 2px solid #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.1s;"
+                            onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="{{ hex }}">
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 5px;">
+                    Description (ពិពណ៌នា)
+                </label>
+                <textarea name="description" rows="2" placeholder="Optional category description or notes..."
+                          class="form-textarea" style="width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Active Checkbox -->
+            <div class="form-group" style="margin-bottom: 20px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: #334155;">
+                    <input type="checkbox" name="is_active" value="1" checked style="width: 16px; height: 16px; accent-color: #0284C7; cursor: pointer;">
+                    <span>Active category (available for product selection)</span>
+                </label>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #F1F5F9; padding-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newCategoryModal')" style="padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 20px; font-size: 13px; font-weight: 700; background: #0284C7; border-color: #0284C7;">Create Category</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: EDIT CATEGORY -->
+<!-- ========================================================================= -->
+<div class="modal-overlay modal-backdrop" id="editCategoryModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; border-radius: 10px; width: 100%; max-width: 480px; box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25); overflow: hidden; margin: auto;">
+        <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">✏️</span>
+                <h2 class="modal-title" style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Edit Category (កែសម្រួលប្រភេទទំនិញ)</h2>
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('editCategoryModal')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #64748B; line-height: 1;">&times;</button>
+        </div>
+        <form id="editCategoryForm" method="POST" style="padding: 20px;" onsubmit="return validateCategoryForm(this)">
+            <!-- Name -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 5px;">
+                    Category Name (ឈ្មោះប្រភេទ) <span style="color: #EF4444;">*</span>
+                </label>
+                <input type="text" name="name" id="editCategoryName" required
+                       class="form-input" style="width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13.5px;">
+            </div>
+
+            <!-- Color Swatch & Palette -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                    Color Tag (ពណ៌ចំណាំ)
+                </label>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <div id="editColorPreview" style="width: 32px; height: 32px; border-radius: 6px; background-color: #00A3E0; border: 2px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.15); flex-shrink: 0;"></div>
+                    <input type="color" id="editColorPicker" value="#00A3E0" onchange="syncColorInput('editColorPicker', 'editColorHex', 'editColorPreview')" style="width: 36px; height: 34px; border: none; background: transparent; cursor: pointer; padding: 0;">
+                    <input type="text" name="color" id="editColorHex" value="#00A3E0" oninput="syncColorInput('editColorHex', 'editColorPicker', 'editColorPreview')"
+                           class="form-input" style="width: 120px; font-family: monospace; font-size: 13px; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 6px; text-transform: uppercase;">
+                    <span style="font-size: 11.5px; color: #64748B;">Badge & card accent color</span>
+                </div>
+
+                <!-- Palette presets -->
+                <div style="display: flex; gap: 7px; flex-wrap: wrap;">
+                    {% for hex in ['#0284C7', '#00A3E0', '#0D9488', '#10B981', '#84CC16', '#F59E0B', '#F97316', '#EF4444', '#EC4899', '#8B5CF6', '#6366F1', '#475569'] %}
+                    <button type="button" onclick="selectColorPreset('{{ hex }}', 'editColorPicker', 'editColorHex', 'editColorPreview')"
+                            style="width: 24px; height: 24px; border-radius: 50%; background: {{ hex }}; border: 2px solid #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.25); cursor: pointer; transition: transform 0.1s;"
+                            onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'" title="{{ hex }}">
+                    </button>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 5px;">
+                    Description (ពិពណ៌នា)
+                </label>
+                <textarea name="description" id="editCategoryDescription" rows="2" placeholder="Optional category description or notes..."
+                          class="form-textarea" style="width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Active Checkbox -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 600; color: #334155;">
+                    <input type="checkbox" name="is_active" id="editCategoryActive" value="1" style="width: 16px; height: 16px; accent-color: #0284C7; cursor: pointer;">
+                    <span>Active category (available for product selection)</span>
+                </label>
+            </div>
+
+            <!-- Product count notification -->
+            <div id="editCategoryProductInfo" style="padding: 10px 14px; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; font-size: 12px; color: #0369A1; margin-bottom: 18px; display: flex; align-items: center; gap: 8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="16" x2="12" y2="12"/>
+                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                <span id="editCategoryProductCountText">Currently linked to 0 products.</span>
+            </div>
+
+            <!-- Modal Footer -->
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #F1F5F9; padding-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editCategoryModal')" style="padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="padding: 8px 20px; font-size: 13px; font-weight: 700; background: #0284C7; border-color: #0284C7;">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================================================= -->
+<!-- MODAL: DELETE CATEGORY (SAFE DELETION) -->
+<!-- ========================================================================= -->
+<div class="modal-overlay modal-backdrop" id="deleteCategoryModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; width: 100vw; height: 100vh; background: rgba(15, 23, 42, 0.5); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="background: #FFFFFF; border-radius: 10px; width: 100%; max-width: 460px; box-shadow: 0 25px 35px -5px rgba(0, 0, 0, 0.25); overflow: hidden; margin: auto;">
+        <div class="modal-header" style="padding: 16px 20px; border-bottom: 1px solid #FEE2E2; display: flex; justify-content: space-between; align-items: center; background: #FEF2F2;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">⚠️</span>
+                <h2 class="modal-title" style="font-size: 15px; font-weight: 700; color: #991B1B; margin: 0;">Delete Category (លុបប្រភេទទំនិញ)</h2>
+            </div>
+            <button type="button" class="modal-close" onclick="closeModal('deleteCategoryModal')" style="background: none; border: none; font-size: 20px; cursor: pointer; color: #991B1B; line-height: 1;">&times;</button>
+        </div>
+        <form id="deleteCategoryForm" method="POST" style="padding: 20px;">
+            <div style="font-size: 13.5px; color: #334155; line-height: 1.5; margin-bottom: 14px;">
+                Are you sure you want to permanently delete category <strong id="deleteCategoryNameDisplay" style="color: #0F172A;"></strong>?
+            </div>
+
+            <!-- Safe Reassignment Warning Notice -->
+            <div style="padding: 12px 14px; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 6px; font-size: 12px; color: #92400E; margin-bottom: 18px; line-height: 1.5;">
+                <div style="font-weight: 700; margin-bottom: 2px; display: flex; align-items: center; gap: 6px;">
+                    <span>🛡️ Safe Product Protection</span>
+                </div>
+                Existing products assigned to this category will <strong>NOT</strong> be deleted. They will safely become <strong>(Uncategorized)</strong> in the inventory.
+                <div id="deleteCategoryProductImpactText" style="margin-top: 4px; font-weight: 600;"></div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #F1F5F9; padding-top: 14px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deleteCategoryModal')" style="padding: 8px 16px; font-size: 13px; font-weight: 600;">Cancel</button>
+                <button type="submit" class="btn" style="padding: 8px 20px; font-size: 13px; font-weight: 700; background: #DC2626; color: #FFFFFF; border: 1px solid #DC2626; border-radius: 6px;">
+                    Yes, Delete Category
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+/* Modal Utilities */
+function openModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'flex';
+        el.classList.add('active');
+        const firstInput = el.querySelector('input:not([type="hidden"]), select, textarea');
+        if (firstInput) {
+            setTimeout(() => firstInput.focus(), 50);
+        }
+    }
+}
+
+function closeModal(id) {
+    const el = document.getElementById(id);
+    if (el) {
+        el.style.display = 'none';
+        el.classList.remove('active');
+    }
+}
+
+// Close modals when clicking backdrop or pressing ESC
+window.addEventListener('click', function(e) {
+    if (e.target.classList.contains('modal-backdrop')) {
+        e.target.style.display = 'none';
+        e.target.classList.remove('active');
+    }
+});
+
+window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-backdrop').forEach(el => {
+            el.style.display = 'none';
+            el.classList.remove('active');
+        });
+    }
+});
+
+/* Open Add Modal */
+function openNewCategoryModal() {
+    document.getElementById('newCategoryName').value = '';
+    document.getElementById('newColorHex').value = '#00A3E0';
+    document.getElementById('newColorPicker').value = '#00A3E0';
+    document.getElementById('newColorPreview').style.backgroundColor = '#00A3E0';
+    openModal('newCategoryModal');
+}
+
+/* Open Edit Modal */
+function openEditCategoryModalFromRow(row) {
+    if (!row) return;
+    const catId = row.getAttribute('data-id');
+    const catName = row.getAttribute('data-name') || '';
+    const catColor = row.getAttribute('data-color') || '#00A3E0';
+    const catDesc = row.getAttribute('data-description') || '';
+    const catActive = row.getAttribute('data-active') === '1';
+    const catCount = row.getAttribute('data-count') || '0';
+
+    const form = document.getElementById('editCategoryForm');
+    form.action = `/categories/${catId}/edit`;
+
+    document.getElementById('editCategoryName').value = catName;
+    document.getElementById('editColorHex').value = catColor;
+    document.getElementById('editColorPicker').value = catColor;
+    document.getElementById('editColorPreview').style.backgroundColor = catColor;
+    document.getElementById('editCategoryDescription').value = catDesc;
+    document.getElementById('editCategoryActive').checked = catActive;
+
+    document.getElementById('editCategoryProductCountText').innerText = 
+        `Currently linked to ${catCount} product(s). Updates will reflect in catalog immediately.`;
+
+    openModal('editCategoryModal');
+}
+
+/* Open Delete Modal */
+function openDeleteCategoryModal(catId, catName, catCount) {
+    const form = document.getElementById('deleteCategoryForm');
+    form.action = `/categories/${catId}/delete`;
+
+    document.getElementById('deleteCategoryNameDisplay').innerText = `"${catName}"`;
+    const impactEl = document.getElementById('deleteCategoryProductImpactText');
+    if (parseInt(catCount, 10) > 0) {
+        impactEl.innerText = `ℹ️ ${catCount} product(s) will be automatically preserved and unlinked.`;
+    } else {
+        impactEl.innerText = `No products currently use this category.`;
+    }
+
+    openModal('deleteCategoryModal');
+}
+
+/* Color Synchronizers */
+function syncColorInput(sourceId, targetId, previewId) {
+    const src = document.getElementById(sourceId);
+    const tgt = document.getElementById(targetId);
+    const prev = document.getElementById(previewId);
+    if (!src || !tgt || !prev) return;
+
+    let val = src.value.trim();
+    if (!val.startsWith('#') && val.length > 0) {
+        val = '#' + val;
+    }
+
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        tgt.value = val.toUpperCase();
+        prev.style.backgroundColor = val;
+    }
+}
+
+function selectColorPreset(hex, pickerId, textId, previewId) {
+    const picker = document.getElementById(pickerId);
+    const text = document.getElementById(textId);
+    const prev = document.getElementById(previewId);
+    if (picker) picker.value = hex;
+    if (text) text.value = hex.toUpperCase();
+    if (prev) prev.style.backgroundColor = hex;
+}
+
+/* Form validation */
+function validateCategoryForm(form) {
+    const nameInput = form.querySelector('input[name="name"]');
+    if (!nameInput || !nameInput.value.trim()) {
+        alert('Please enter a valid category name.');
+        if (nameInput) nameInput.focus();
+        return false;
+    }
+    return true;
+}
+
+/* Live Client-Side Search Filter */
+const searchInput = document.getElementById('categoryLiveSearch');
+const clearBtn = document.getElementById('clearSearchBtn');
+
+if (searchInput) {
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        if (clearBtn) {
+            clearBtn.style.display = query ? 'block' : 'none';
+        }
+
+        const rows = document.querySelectorAll('.category-row');
+        let visibleCount = 0;
+
+        rows.forEach(row => {
+            const name = (row.getAttribute('data-name') || '').toLowerCase();
+            const desc = (row.getAttribute('data-description') || '').toLowerCase();
+            if (name.includes(query) || desc.includes(query)) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        // Show/hide empty row
+        let emptyRow = document.getElementById('noLiveSearchResultsRow');
+        if (visibleCount === 0 && rows.length > 0) {
+            if (!emptyRow) {
+                emptyRow = document.createElement('tr');
+                emptyRow.id = 'noLiveSearchResultsRow';
+                emptyRow.innerHTML = `<td colspan="5" style="text-align: center; padding: 36px 20px; color: #64748B;">No categories match "${query}"</td>`;
+                document.getElementById('categoriesTableBody').appendChild(emptyRow);
+            } else {
+                emptyRow.style.display = '';
+                emptyRow.querySelector('td').innerText = `No categories match "${query}"`;
+            }
+        } else if (emptyRow) {
+            emptyRow.style.display = 'none';
+        }
+    });
+
+    // Enter key submits server search if desired
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const url = new URL(window.location.href);
+            url.searchParams.set('q', this.value.trim());
+            window.location.href = url.toString();
+        }
+    });
+}
+
+function clearCategorySearch() {
+    if (searchInput) {
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input'));
+        searchInput.focus();
+        if (clearBtn) clearBtn.style.display = 'none';
+
+        // Also clean URL query param if server filtered
+        const url = new URL(window.location.href);
+        if (url.searchParams.has('q')) {
+            url.searchParams.delete('q');
+            window.location.href = url.toString();
+        }
+    }
+}
+</script>
+{% endblock %}

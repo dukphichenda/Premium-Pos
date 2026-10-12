@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+
+{% block title %}Purchase Orders - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Purchase Orders Hub</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Vendor purchasing, incoming warehouse stock reception, and accounts payable ({{ total_count }} orders)</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <a href="{{ url_for('purchase_orders.create_purchase') }}" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ Create Purchase Order</span>
+        </a>
+    </div>
+</div>
+
+<!-- Status Tabs -->
+<div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
+    <a href="{{ url_for('purchase_orders.list_purchases') }}" class="btn {% if not status %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        All POs ({{ total_count }})
+    </a>
+    <a href="{{ url_for('purchase_orders.list_purchases', status='ISSUED') }}" class="btn {% if status == 'ISSUED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Issued / Pending ({{ stats_dict.get('ISSUED', 0) }})
+    </a>
+    <a href="{{ url_for('purchase_orders.list_purchases', status='RECEIVED') }}" class="btn {% if status == 'RECEIVED' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Received ({{ stats_dict.get('RECEIVED', 0) }})
+    </a>
+    <a href="{{ url_for('purchase_orders.list_purchases', status='PAID') }}" class="btn {% if status == 'PAID' %}btn-primary{% else %}btn-secondary{% endif %} btn-sm">
+        Paid ({{ stats_dict.get('PAID', 0) }})
+    </a>
+</div>
+
+<!-- Search & Filter Bar -->
+<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
+    <form method="GET" action="{{ url_for('purchase_orders.list_purchases') }}" style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap;">
+        <input type="hidden" name="status" value="{{ status }}">
+        <div style="flex: 1; min-width: 240px;">
+            <input type="text" name="search" value="{{ search }}" placeholder="Search by PO # or Vendor name..." class="form-input">
+        </div>
+        <div style="width: 180px;">
+            <select name="payment_status" class="form-select" onchange="this.form.submit()">
+                <option value="">All Payment States</option>
+                <option value="PAID" {% if payment_status == 'PAID' %}selected{% endif %}>Paid</option>
+                <option value="PARTIAL" {% if payment_status == 'PARTIAL' %}selected{% endif %}>Partial</option>
+                <option value="UNPAID" {% if payment_status == 'UNPAID' %}selected{% endif %}>Unpaid</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-secondary">Filter</button>
+        {% if search or payment_status or status %}
+        <a href="{{ url_for('purchase_orders.list_purchases') }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        {% endif %}
+    </form>
+</div>
+
+<!-- PO Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>PO #</th>
+                    <th>Date</th>
+                    <th>Vendor / Supplier</th>
+                    <th>Destination Warehouse</th>
+                    <th style="text-align: right;">Total Amount</th>
+                    <th style="text-align: right;">Balance Due</th>
+                    <th style="text-align: center;">Receiving Status</th>
+                    <th style="text-align: center;">Payment</th>
+                    <th style="text-align: center;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for o in orders %}
+                <tr style="cursor: pointer;" ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('purchase_orders.detail_purchase', id=o.id) }}', 'Purchase Order: {{ o.order_number }}', 'purchase'); } else { window.location.href='{{ url_for('purchase_orders.detail_purchase', id=o.id) }}'; }" title="Double-click to open order in new tab">
+                    <td>
+                        <a href="{{ url_for('purchase_orders.detail_purchase', id=o.id) }}" onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.detail_purchase', id=o.id) }}', 'Purchase Order: {{ o.order_number }}', 'purchase'); }" style="font-weight: 700; font-family: var(--font-mono); color: #0F766E; text-decoration: none;">
+                            {{ o.order_number }}
+                        </a>
+                    </td>
+                    <td>{{ o.order_date | format_date }}</td>
+                    <td>
+                        <div style="font-weight: 600; color: #0F172A;">{{ o.vendor_name or 'General Supplier' }}</div>
+                        {% if o.vendor_phone %}
+                        <div style="font-size: 0.72rem; color: #64748B;">{{ o.vendor_phone }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ o.location_name or 'Main Warehouse' }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ o.total_amount | currency }}
+                    </td>
+                    <td style="text-align: right; font-weight: 600; color: {% if o.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
+                        {{ o.balance_due | currency }}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if o.status == 'RECEIVED' or o.status == 'PAID' %}
+                            <span class="badge badge-success">RECEIVED</span>
+                        {% elif o.status == 'ISSUED' %}
+                            <span class="badge badge-warning">ISSUED</span>
+                        {% else %}
+                            <span class="badge badge-neutral">{{ o.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        {% if o.payment_status == 'PAID' %}
+                            <span class="badge badge-success">PAID</span>
+                        {% elif o.payment_status == 'PARTIAL' %}
+                            <span class="badge badge-warning">PARTIAL</span>
+                        {% else %}
+                            <span class="badge badge-danger">UNPAID</span>
+                        {% endif %}
+                    </td>
+                    <td style="text-align: center;">
+                        <a href="{{ url_for('purchase_orders.detail_purchase', id=o.id) }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">
+                            Manage →
+                        </a>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" style="text-align: center; color: #94A3B8; padding: 32px;">No purchase orders found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if total_pages > 1 %}
+    <div style="padding: 16px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} orders)</span>
+        <div style="display: flex; gap: 8px;">
+            {% if page > 1 %}
+            <a href="{{ url_for('purchase_orders.list_purchases', page=page-1, status=status, payment_status=payment_status, search=search) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            {% endif %}
+            {% if page < total_pages %}
+            <a href="{{ url_for('purchase_orders.list_purchases', page=page+1, status=status, payment_status=payment_status, search=search) }}" class="btn btn-secondary btn-sm">Next →</a>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

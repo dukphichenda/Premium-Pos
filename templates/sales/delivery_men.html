@@ -1,0 +1,511 @@
+{% extends 'base.html' %}
+
+{% block title %}Delivery Person Directory - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="max-width: 1400px; margin: 0 auto; padding-bottom: 40px;">
+    <!-- Page Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 14px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #64748B; margin-bottom: 4px; font-weight: 500;">
+                <a href="{{ url_for('sales_orders.list_orders', view='table') }}" style="color: #64748B; text-decoration: none;">Sales</a>
+                <span>/</span>
+                <span style="color: #0F172A; font-weight: 600;">Delivery Person Directory</span>
+            </div>
+            <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em; margin: 0; display: flex; align-items: center; gap: 10px;">
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 8px; background: #E0F2FE; color: #0284C7;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                </span>
+                <span>Delivery Person List</span>
+            </h1>
+            <p style="color: #64748B; font-size: 0.86rem; margin-top: 4px; margin-bottom: 0;">
+                Manage couriers, track delivery fee distribution (with equal split for shared & all-team deliveries), and filter earnings by time period.
+            </p>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ url_for('sales_orders.list_orders', view='table') }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; font-size: 0.84rem;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                <span>Sales Orders</span>
+            </a>
+            <button type="button" onclick="openModal('newDeliveryPersonModal')" class="btn btn-primary" style="display: flex; align-items: center; gap: 6px; font-weight: 700; box-shadow: 0 2px 4px rgba(2,132,199,0.25);">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 4v16m8-8H4"/>
+                </svg>
+                <span>+ Add Delivery Person</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Time Period Filter Toolbar (Today, This Month, Any Date) -->
+    <div class="card" style="margin-bottom: 18px; padding: 12px 18px; border: 1px solid #BAE6FD; background: #F8FAFC; border-radius: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <!-- Left: Preset Time Chips -->
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                <span style="font-size: 0.80rem; font-weight: 700; color: #475569; display: flex; align-items: center; gap: 4px; margin-right: 4px;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                    Time Period:
+                </span>
+                
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='all', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'all' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    All Time
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='today', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'today' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    Today
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='yesterday', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'yesterday' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    Yesterday
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='this_week', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'this_week' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    This Week
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='this_month', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'this_month' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    This Month
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='last_month', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'last_month' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    Last Month
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='this_year', status=status_filter, search=search) }}" 
+                   style="padding: 4px 11px; border-radius: 20px; font-size: 0.78rem; font-weight: 700; text-decoration: none; border: 1px solid {% if stats.period == 'this_year' %}#0284C7; background: #0284C7; color: #FFFFFF;{% else %}#CBD5E1; background: #FFFFFF; color: #475569;{% endif %}">
+                    This Year
+                </a>
+            </div>
+
+            <!-- Right: Any Date / Custom Date Range Picker Form -->
+            <form method="GET" action="{{ url_for('sales_orders.list_delivery_men') }}" style="display: flex; align-items: center; gap: 6px; margin: 0; flex-wrap: wrap;">
+                <input type="hidden" name="period" value="custom">
+                <input type="hidden" name="status" value="{{ status_filter }}">
+                <input type="hidden" name="search" value="{{ search }}">
+                
+                <span style="font-size: 0.78rem; font-weight: 600; color: #64748B;">Any Date:</span>
+                <input type="date" name="start_date" value="{{ stats.start_date }}" class="form-input" style="padding: 3px 8px; font-size: 0.78rem; height: 28px; width: 130px;" title="Specific date or start date">
+                <span style="font-size: 0.78rem; color: #94A3B8;">to</span>
+                <input type="date" name="end_date" value="{{ stats.end_date }}" class="form-input" style="padding: 3px 8px; font-size: 0.78rem; height: 28px; width: 130px;" title="Optional end date (leave blank for single day)">
+                
+                <button type="submit" class="btn btn-secondary btn-sm" style="height: 28px; padding: 0 10px; font-size: 0.78rem; font-weight: 700;">
+                    Apply
+                </button>
+                {% if stats.period != 'all' %}
+                <a href="{{ url_for('sales_orders.list_delivery_men', period='all', status=status_filter, search=search) }}" class="btn btn-secondary btn-sm" style="height: 28px; padding: 0 8px; font-size: 0.78rem; color: #64748B; text-decoration: none;" title="Reset time filter">
+                    Clear
+                </a>
+                {% endif %}
+            </form>
+        </div>
+
+        <!-- Active Filter Indicator Banner -->
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px dashed #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="font-size: 0.82rem; color: #0369A1; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #0284C7;"></span>
+                <span>Active Filter: <strong>{{ stats.period_label }}</strong></span>
+                <span style="color: #64748B; font-weight: 400; font-size: 0.76rem;">&bull; Orders where "ALL" or multiple drivers were assigned have delivery fees divided equally.</span>
+            </div>
+            <div style="font-size: 0.80rem; font-weight: 700; color: #B45309;">
+                Period Total Fees: {{ '{:,}'.format(stats.total_fees_khr) }} ៛ KHR
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 22px;">
+        <!-- Card 1: Total Staff -->
+        <div class="card" style="padding: 16px 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.04em;">Total Personnel</span>
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #F1F5F9; color: #475569;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+                </span>
+            </div>
+            <div style="font-size: 1.65rem; font-weight: 800; color: #0F172A; margin-top: 6px;">{{ stats.total }}</div>
+            <div style="font-size: 0.75rem; color: #64748B; margin-top: 2px;">Registered couriers & drivers</div>
+        </div>
+
+        <!-- Card 2: Active Staff -->
+        <div class="card" style="padding: 16px 18px; border: 1px solid #BBF7D0; background: #F0FDF4; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.04em;">Active Staff</span>
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #DCFCE7; color: #16A34A;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                </span>
+            </div>
+            <div style="font-size: 1.65rem; font-weight: 800; color: #15803D; margin-top: 6px;">{{ stats.active }}</div>
+            <div style="font-size: 0.75rem; color: #166534; margin-top: 2px;">Available for order assignments</div>
+        </div>
+
+        <!-- Card 3: Deliveries in Period -->
+        <div class="card" style="padding: 16px 18px; border: 1px solid #BAE6FD; background: #F0F9FF; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #075985; text-transform: uppercase; letter-spacing: 0.04em;">Orders Handled</span>
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #E0F2FE; color: #0284C7;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                </span>
+            </div>
+            <div style="font-size: 1.65rem; font-weight: 800; color: #0369A1; margin-top: 6px;">{{ stats.total_deliveries }}</div>
+            <div style="font-size: 0.75rem; color: #075985; margin-top: 2px;">Delivered in {{ stats.period_label }}</div>
+        </div>
+
+        <!-- Card 4: Delivery Fees in Period -->
+        <div class="card" style="padding: 16px 18px; border: 1px solid #FEF08A; background: #FEFCE8; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.78rem; font-weight: 700; color: #854D0E; text-transform: uppercase; letter-spacing: 0.04em;">Total Delivery Fees</span>
+                <span style="display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 6px; background: #FEF9C3; color: #CA8A04;">
+                    <span style="font-weight: 800; font-size: 0.85rem;">៛</span>
+                </span>
+            </div>
+            <div style="font-size: 1.65rem; font-weight: 800; color: #A16207; margin-top: 6px;">{{ '{:,}'.format(stats.total_fees_khr) }} <span style="font-size: 1rem; font-weight: 600;">KHR</span></div>
+            <div style="font-size: 0.75rem; color: #854D0E; margin-top: 2px;">Collected during {{ stats.period_label }}</div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Bar -->
+    <div class="card" style="margin-bottom: 18px; padding: 12px 18px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
+        <form method="GET" action="{{ url_for('sales_orders.list_delivery_men') }}" style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            <input type="hidden" name="period" value="{{ stats.period }}">
+            <input type="hidden" name="start_date" value="{{ stats.start_date }}">
+            <input type="hidden" name="end_date" value="{{ stats.end_date }}">
+
+            <!-- Status Tabs -->
+            <div style="display: inline-flex; background: #F1F5F9; padding: 3px; border-radius: 6px; gap: 2px;">
+                <a href="{{ url_for('sales_orders.list_delivery_men', status='all', period=stats.period, start_date=stats.start_date, end_date=stats.end_date, search=search) }}" 
+                   style="padding: 5px 12px; border-radius: 5px; font-size: 0.82rem; font-weight: 600; text-decoration: none; color: {% if status_filter == 'all' %}#0F172A{% else %}#64748B{% endif %}; background: {% if status_filter == 'all' %}#FFFFFF{% else %}transparent{% endif %}; box-shadow: {% if status_filter == 'all' %}0 1px 2px rgba(0,0,0,0.06){% else %}none{% endif %};">
+                    All ({{ stats.total }})
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', status='active', period=stats.period, start_date=stats.start_date, end_date=stats.end_date, search=search) }}" 
+                   style="padding: 5px 12px; border-radius: 5px; font-size: 0.82rem; font-weight: 600; text-decoration: none; color: {% if status_filter == 'active' %}#166534{% else %}#64748B{% endif %}; background: {% if status_filter == 'active' %}#FFFFFF{% else %}transparent{% endif %}; box-shadow: {% if status_filter == 'active' %}0 1px 2px rgba(0,0,0,0.06){% else %}none{% endif %};">
+                    Active ({{ stats.active }})
+                </a>
+                <a href="{{ url_for('sales_orders.list_delivery_men', status='inactive', period=stats.period, start_date=stats.start_date, end_date=stats.end_date, search=search) }}" 
+                   style="padding: 5px 12px; border-radius: 5px; font-size: 0.82rem; font-weight: 600; text-decoration: none; color: {% if status_filter == 'inactive' %}#991B1B{% else %}#64748B{% endif %}; background: {% if status_filter == 'inactive' %}#FFFFFF{% else %}transparent{% endif %}; box-shadow: {% if status_filter == 'inactive' %}0 1px 2px rgba(0,0,0,0.06){% else %}none{% endif %};">
+                    Inactive ({{ stats.inactive }})
+                </a>
+            </div>
+
+            <!-- Search Field -->
+            <div style="flex: 1; min-width: 240px; position: relative;">
+                <input type="text" name="search" value="{{ search }}" placeholder="Search driver name or phone number..." class="form-input" style="padding-left: 36px; font-size: 0.85rem;">
+                <svg width="16" height="16" fill="none" stroke="#94A3B8" viewBox="0 0 24 24" style="position: absolute; left: 11px; top: 50%; transform: translateY(-50%);">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+            <input type="hidden" name="status" value="{{ status_filter }}">
+
+            <button type="submit" class="btn btn-secondary" style="font-size: 0.85rem; padding: 7px 16px;">
+                Search
+            </button>
+            {% if search or status_filter != 'all' or stats.period != 'all' %}
+            <a href="{{ url_for('sales_orders.list_delivery_men') }}" class="btn btn-secondary" style="font-size: 0.85rem; padding: 7px 14px; color: #64748B; text-decoration: none;">
+                Reset All
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Data Table Card -->
+    <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;">
+        <div class="table-container" style="border: none; margin: 0;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; text-align: left;">
+                        <th style="padding: 12px 18px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">Delivery Person</th>
+                        <th style="padding: 12px 16px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">Phone Number</th>
+                        <th style="padding: 12px 16px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; text-align: center;">Status</th>
+                        <th style="padding: 12px 16px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; text-align: right;">Period Orders</th>
+                        <th style="padding: 12px 16px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; text-align: right;">Completed</th>
+                        <th style="padding: 12px 16px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; text-align: right;">Earned Fees (៛)</th>
+                        <th style="padding: 12px 16px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">Last Delivery</th>
+                        <th style="padding: 12px 18px; font-size: 0.78rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; text-align: center;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for dm in delivery_men %}
+                    <tr style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+                        <!-- Name & Avatar -->
+                        <td style="padding: 12px 18px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 36px; height: 36px; border-radius: 50%; background: {% if dm.is_active %}#E0F2FE{% else %}#F1F5F9{% endif %}; color: {% if dm.is_active %}#0284C7{% else %}#94A3B8{% endif %}; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.95rem; flex-shrink: 0; border: 1px solid {% if dm.is_active %}#BAE6FD{% else %}#E2E8F0{% endif %};">
+                                    {{ dm.name[:2]|upper }}
+                                </div>
+                                <div>
+                                    <div style="font-weight: 700; color: #0F172A; font-size: 0.92rem;">
+                                        {{ dm.name }}
+                                    </div>
+                                    <div style="font-size: 0.72rem; color: #94A3B8;">
+                                        ID: #{{ dm.id }} &bull; Added {{ dm.created_at|format_date if dm.created_at else '-' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Phone -->
+                        <td style="padding: 12px 16px;">
+                            {% if dm.phone %}
+                            <a href="tel:{{ dm.phone }}" style="display: inline-flex; align-items: center; gap: 6px; color: #2563EB; text-decoration: none; font-family: monospace; font-size: 0.88rem; font-weight: 600;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                                {{ dm.phone }}
+                            </a>
+                            {% else %}
+                            <span style="color: #94A3B8; font-size: 0.82rem; font-style: italic;">No phone</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Status Badge -->
+                        <td style="padding: 12px 16px; text-align: center;">
+                            {% if dm.is_active %}
+                            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 0.74rem; font-weight: 700; background: #DCFCE7; color: #15803D; border: 1px solid #BBF7D0;">
+                                <span style="width: 6px; height: 6px; border-radius: 50%; background: #16A34A;"></span>
+                                Active
+                            </span>
+                            {% else %}
+                            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 9999px; font-size: 0.74rem; font-weight: 700; background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0;">
+                                <span style="width: 6px; height: 6px; border-radius: 50%; background: #94A3B8;"></span>
+                                Inactive
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Total Orders in Selected Time Period -->
+                        <td style="padding: 12px 16px; text-align: right;">
+                            {% if dm.total_orders > 0 %}
+                            <a href="{{ url_for('sales_orders.list_orders', view='table', search=dm.name) }}" title="View orders assigned to {{ dm.name }}" style="font-weight: 700; color: #0284C7; text-decoration: none; padding: 2px 8px; background: #F0F9FF; border-radius: 4px; font-size: 0.88rem;">
+                                {{ dm.total_orders }} orders &rarr;
+                            </a>
+                            {% else %}
+                            <span style="color: #94A3B8; font-size: 0.86rem;">0</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Completed Orders in Period -->
+                        <td style="padding: 12px 16px; text-align: right; font-weight: 600; color: #16A34A; font-size: 0.88rem;">
+                            {{ dm.completed_orders }}
+                        </td>
+
+                        <!-- Total Earned Fees in Period (with equal split applied) -->
+                        <td style="padding: 12px 16px; text-align: right;">
+                            <div style="font-weight: 800; color: {% if dm.total_fee_khr > 0 %}#B45309{% else %}#64748B{% endif %}; font-size: 0.92rem; font-family: monospace;">
+                                {{ '{:,}'.format(dm.total_fee_khr) }} ៛
+                            </div>
+                            {% if dm.shared_orders > 0 %}
+                            <div style="font-size: 0.70rem; color: #0284C7; font-weight: 600;" title="Includes {{ dm.shared_orders }} order(s) divided equally among couriers">
+                                👥 {{ dm.shared_orders }} shared split
+                            </div>
+                            {% endif %}
+                        </td>
+
+                        <!-- Last Delivery Date -->
+                        <td style="padding: 12px 16px; font-size: 0.82rem; color: #64748B;">
+                            {{ dm.last_delivery_date|format_date if dm.last_delivery_date else 'No deliveries yet' }}
+                        </td>
+
+                        <!-- Actions -->
+                        <td style="padding: 12px 18px; text-align: center;">
+                            <div style="display: inline-flex; gap: 6px; align-items: center;">
+                                <!-- Edit Button -->
+                                <button type="button" 
+                                        onclick="openEditDeliveryManModal({{ dm.id }}, '{{ dm.name|replace("'", "\\'") }}', '{{ (dm.phone or '')|replace("'", "\\'") }}', {{ 'true' if dm.is_active else 'false' }})"
+                                        class="btn btn-secondary btn-sm" 
+                                        style="padding: 4px 10px; font-size: 0.76rem; font-weight: 600; display: inline-flex; align-items: center; gap: 4px;"
+                                        title="Edit delivery person">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                    Edit
+                                </button>
+
+                                <!-- Toggle Active Status Form -->
+                                <form method="POST" action="{{ url_for('sales_orders.toggle_delivery_man', id=dm.id) }}" style="display: inline; margin: 0;">
+                                    <button type="submit" 
+                                            class="btn btn-secondary btn-sm" 
+                                            style="padding: 4px 9px; font-size: 0.76rem; color: {% if dm.is_active %}#D97706{% else %}#16A34A{% endif %}; font-weight: 600;"
+                                            title="{% if dm.is_active %}Deactivate this courier{% else %}Activate this courier{% endif %}">
+                                        {% if dm.is_active %}Deactivate{% else %}Activate{% endif %}
+                                    </button>
+                                </form>
+
+                                <!-- Delete Confirmation Button -->
+                                <button type="button" 
+                                        onclick="openDeleteDeliveryManModal({{ dm.id }}, '{{ dm.name|replace("'", "\\'") }}', {{ dm.total_orders }})"
+                                        class="btn btn-secondary btn-sm" 
+                                        style="padding: 4px 8px; font-size: 0.76rem; color: #EF4444;"
+                                        title="Delete delivery person">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="8" style="text-align: center; color: #94A3B8; padding: 48px 20px;">
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;">
+                                <div style="width: 48px; height: 48px; border-radius: 50%; background: #F1F5F9; display: flex; align-items: center; justify-content: center; color: #94A3B8;">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                                </div>
+                                <div style="font-weight: 700; color: #475569; font-size: 0.96rem;">No delivery personnel found</div>
+                                <div style="font-size: 0.82rem; color: #94A3B8; max-width: 340px;">
+                                    {% if search or stats.period != 'all' %}
+                                    No records matching filter "{{ search or stats.period_label }}". Try resetting your filter or search keywords.
+                                    {% else %}
+                                    Click "+ Add Delivery Person" to register your first delivery driver or courier.
+                                    {% endif %}
+                                </div>
+                                <button type="button" onclick="openModal('newDeliveryPersonModal')" class="btn btn-primary btn-sm" style="margin-top: 10px;">
+                                    + Add Delivery Person
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- 1. Add New Delivery Person Modal -->
+<div class="modal-overlay" id="newDeliveryPersonModal">
+    <div class="modal-dialog" style="max-width: 480px;">
+        <div class="modal-header">
+            <h2 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2.5"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                <span>+ Add New Delivery Person</span>
+            </h2>
+            <button type="button" class="modal-close" onclick="closeModal('newDeliveryPersonModal')">&times;</button>
+        </div>
+        <form action="{{ url_for('sales_orders.add_delivery_man') }}" method="POST">
+            <div style="padding: 20px 24px;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.86rem; margin-bottom: 6px; display: block;">Full Name *</label>
+                    <input type="text" name="name" required placeholder="e.g. Dara Delivery, Chan Thary..." class="form-input" style="width: 100%;">
+                    <div style="font-size: 0.74rem; color: #64748B; margin-top: 4px;">This name appears in the Delivery dropdown when creating Sales Orders.</div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.86rem; margin-bottom: 6px; display: block;">Phone Number</label>
+                    <input type="text" name="phone" placeholder="e.g. 012 345 678 / 098 765 432" class="form-input" style="width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #0F172A;">
+                        <input type="checkbox" name="is_active" value="1" checked style="width: 16px; height: 16px; accent-color: #0284C7;">
+                        <span>Active for assignments</span>
+                    </label>
+                    <div style="font-size: 0.74rem; color: #64748B; margin-left: 24px;">Uncheck to hide this driver from new order delivery selections.</div>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid #E2E8F0; background: #F8FAFC; border-radius: 0 0 8px 8px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newDeliveryPersonModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">Save Delivery Person</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. Edit Delivery Person Modal -->
+<div class="modal-overlay" id="editDeliveryPersonModal">
+    <div class="modal-dialog" style="max-width: 480px;">
+        <div class="modal-header">
+            <h2 class="modal-title" style="display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>Edit Delivery Person</span>
+            </h2>
+            <button type="button" class="modal-close" onclick="closeModal('editDeliveryPersonModal')">&times;</button>
+        </div>
+        <form id="editDeliveryPersonForm" method="POST" action="">
+            <div style="padding: 20px 24px;">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.86rem; margin-bottom: 6px; display: block;">Full Name *</label>
+                    <input type="text" id="edit_dm_name" name="name" required placeholder="Full Name" class="form-input" style="width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label class="form-label" style="font-weight: 600; font-size: 0.86rem; margin-bottom: 6px; display: block;">Phone Number</label>
+                    <input type="text" id="edit_dm_phone" name="phone" placeholder="Phone Number" class="form-input" style="width: 100%;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 8px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: #0F172A;">
+                        <input type="checkbox" id="edit_dm_is_active" name="is_active" value="1" style="width: 16px; height: 16px; accent-color: #0284C7;">
+                        <span>Active for assignments</span>
+                    </label>
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid #E2E8F0; background: #F8FAFC; border-radius: 0 0 8px 8px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('editDeliveryPersonModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary" style="font-weight: 700;">Update Details</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. Delete Confirmation Modal -->
+<div class="modal-overlay" id="deleteDeliveryPersonModal">
+    <div class="modal-dialog" style="max-width: 450px;">
+        <div class="modal-header">
+            <h2 class="modal-title" style="color: #DC2626; display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span>Delete Delivery Person</span>
+            </h2>
+            <button type="button" class="modal-close" onclick="closeModal('deleteDeliveryPersonModal')">&times;</button>
+        </div>
+        <form id="deleteDeliveryPersonForm" method="POST" action="">
+            <div style="padding: 20px 24px;">
+                <p style="font-size: 0.92rem; color: #1E293B; margin-bottom: 12px;">
+                    Are you sure you want to remove <strong id="delete_dm_name" style="color: #0F172A;"></strong> from the delivery team?
+                </p>
+                <div id="delete_dm_warning" style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 12px; font-size: 0.82rem; color: #991B1B; line-height: 1.45;">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; padding: 14px 24px; border-top: 1px solid #E2E8F0; background: #F8FAFC; border-radius: 0 0 8px 8px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('deleteDeliveryPersonModal')">Cancel</button>
+                <button type="submit" class="btn btn-danger" style="background: #DC2626; border-color: #DC2626; color: #FFFFFF; font-weight: 700;">Confirm Delete</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openEditDeliveryManModal(id, name, phone, isActive) {
+    const form = document.getElementById('editDeliveryPersonForm');
+    form.action = '/sales/delivery_men/' + id + '/edit';
+    document.getElementById('edit_dm_name').value = name;
+    document.getElementById('edit_dm_phone').value = phone || '';
+    document.getElementById('edit_dm_is_active').checked = !!isActive;
+    openModal('editDeliveryPersonModal');
+}
+
+function openDeleteDeliveryManModal(id, name, totalOrders) {
+    const form = document.getElementById('deleteDeliveryPersonForm');
+    form.action = '/sales/delivery_men/' + id + '/delete';
+    document.getElementById('delete_dm_name').innerText = name;
+    
+    const warnEl = document.getElementById('delete_dm_warning');
+    if (totalOrders > 0) {
+        warnEl.innerHTML = '<strong>Notice:</strong> This person has <strong>' + totalOrders + ' order(s)</strong> assigned to them. They will be safely <strong>deactivated</strong> instead of deleted to protect order audit history.';
+        warnEl.style.background = '#FEF3C7';
+        warnEl.style.borderColor = '#FDE68A';
+        warnEl.style.color = '#92400E';
+    } else {
+        warnEl.innerHTML = 'This person has no associated order history and will be permanently removed.';
+        warnEl.style.background = '#FEF2F2';
+        warnEl.style.borderColor = '#FECACA';
+        warnEl.style.color = '#991B1B';
+    }
+    openModal('deleteDeliveryPersonModal');
+}
+</script>
+{% endblock %}

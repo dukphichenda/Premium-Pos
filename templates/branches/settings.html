@@ -1,0 +1,2571 @@
+{% extends 'base.html' %}
+
+{% block title %}Branch Settings & Customization - {{ branch.name }} | inFlow{% endblock %}
+
+{% block content %}
+<!-- Google Fonts link for live font preview in settings -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Moul&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Siemreap&display=swap" rel="stylesheet">
+
+<style>
+/* Modern Branch Settings Styles */
+.settings-container {
+    max-width: 1280px;
+    margin: 0 auto 40px auto;
+}
+
+.settings-header-banner {
+    background: linear-gradient(135deg, {{ branch.color or '#FF5A5F' }} 0%, #1E293B 100%);
+    color: #FFFFFF;
+    border-radius: 12px;
+    padding: 22px 26px;
+    margin-bottom: 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    box-shadow: 0 4px 18px rgba(0,0,0,0.08);
+}
+
+.settings-tab-nav {
+    display: flex;
+    gap: 8px;
+    border-bottom: 2px solid #E2E8F0;
+    margin-bottom: 24px;
+    overflow-x: auto;
+}
+
+.settings-tab-btn {
+    padding: 10px 18px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #64748B;
+    background: transparent;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    white-space: nowrap;
+}
+
+.settings-tab-btn:hover {
+    color: #0F172A;
+}
+
+.settings-tab-btn.active {
+    color: {{ branch.color or '#FF5A5F' }};
+    border-bottom-color: {{ branch.color or '#FF5A5F' }};
+}
+
+.settings-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 22px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+
+.settings-card-title {
+    font-size: 15.5px;
+    font-weight: 800;
+    color: #0F172A;
+    margin-top: 0;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.settings-card-desc {
+    font-size: 12px;
+    color: #64748B;
+    margin-bottom: 18px;
+}
+
+/* Color Palette Swatches */
+.color-swatches-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+    margin-bottom: 16px;
+}
+
+.color-swatch-item {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    cursor: pointer;
+    border: 3px solid #FFFFFF;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+    transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.color-swatch-item:hover {
+    transform: scale(1.12);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+}
+
+.color-swatch-item.active {
+    border-color: #0F172A;
+    transform: scale(1.12);
+}
+
+/* Template Style Cards */
+.style-options-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.style-card {
+    border: 2px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.style-card:hover {
+    border-color: #CBD5E1;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+.style-card.active {
+    border-color: {{ branch.color or '#FF5A5F' }};
+    background: #FFF5F5;
+    box-shadow: 0 4px 14px rgba(255, 90, 95, 0.15);
+}
+
+.style-preview-mini {
+    height: 60px;
+    border-radius: 6px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    margin-bottom: 10px;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    gap: 4px;
+    overflow: hidden;
+}
+
+/* Form Controls */
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.form-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+}
+
+.form-group {
+    margin-bottom: 14px;
+}
+
+.form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 5px;
+}
+
+.form-input, .form-select, .form-textarea {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #0F172A;
+    outline: none;
+    transition: border-color 0.15s;
+    background: #FFFFFF;
+    box-sizing: border-box;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+    border-color: {{ branch.color or '#FF5A5F' }};
+}
+
+.toggle-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+/* Switch slider for toggles */
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+    margin: 0;
+}
+.switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #CBD5E1;
+    transition: .3s;
+}
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: .3s;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+input:checked + .slider {
+    background-color: #10B981;
+}
+input:checked + .slider:before {
+    transform: translateX(20px);
+}
+.slider.round {
+    border-radius: 24px;
+}
+
+/* Color & Rate preset buttons */
+.color-preset-pill:hover, .rate-preset-pill:hover, .layout-preset-pill:hover, .layout-pos-pill:hover, .layout-size-pill:hover, .layout-bankpos-pill:hover {
+    filter: brightness(0.96);
+    border-color: #94A3B8 !important;
+}
+
+/* Interactive Direct Preview Box Styles (Parity with Main Store) */
+.prev-draggable-box {
+    position: relative;
+    border-radius: 8px;
+    border: 1.5px dashed transparent;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.prev-draggable-box:hover, .prev-draggable-box.is-active {
+    border-color: #2563EB !important;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+.bank-interactive-box:hover, .bank-interactive-box.is-active {
+    border-color: #D97706 !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.12);
+}
+.prev-box-toolbar {
+    position: absolute;
+    top: -30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 3px 8px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    z-index: 60;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    white-space: nowrap;
+}
+.prev-draggable-box:hover .prev-box-toolbar,
+.prev-draggable-box.is-active .prev-box-toolbar {
+    opacity: 1;
+    pointer-events: auto;
+}
+.prev-drag-handle {
+    cursor: grab;
+    background: rgba(255,255,255,0.15);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    color: #93C5FD;
+}
+.prev-drag-handle:active {
+    cursor: grabbing;
+}
+.prev-btn-group {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+}
+.prev-tool-btn {
+    background: transparent;
+    border: none;
+    color: #FFFFFF;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 2px 6px;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+.prev-tool-btn:hover {
+    background: rgba(255,255,255,0.25);
+}
+.prev-size-indicator {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 0 4px;
+    color: #FCD34D;
+    font-family: monospace;
+}
+.prev-corner-handle {
+    position: absolute;
+    bottom: -5px;
+    right: -5px;
+    width: 20px;
+    height: 20px;
+    background: #2563EB;
+    color: #FFFFFF;
+    border: 2px solid #FFFFFF;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: bold;
+    cursor: se-resize;
+    z-index: 50;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+.bank-corner-handle {
+    background: #D97706;
+}
+.prev-draggable-box:hover .prev-corner-handle,
+.prev-draggable-box.is-active .prev-corner-handle {
+    opacity: 1;
+}
+
+/* Data Exchange Cards */
+.exchange-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 20px;
+}
+
+.exchange-box {
+    border: 1.5px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 20px;
+    background: #FFFFFF;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    transition: all 0.2s;
+}
+
+.exchange-box:hover {
+    border-color: #CBD5E1;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.04);
+}
+</style>
+
+<div class="settings-container">
+    
+    <!-- Header Banner -->
+    <div class="settings-header-banner">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 50px; height: 50px; border-radius: 12px; background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center; font-size: 26px;">
+                ⚙️
+            </div>
+            <div>
+                <h1 style="font-size: 1.4rem; font-weight: 800; margin: 0; line-height: 1.2;" class="font-khmer">
+                    {{ branch.name }} — Settings & Preferences
+                </h1>
+                <div style="font-size: 12px; opacity: 0.9; margin-top: 4px;">
+                    Branch Code: <strong style="font-family: monospace;">{{ branch.code }}</strong> | Fulfillment Warehouse: <strong>{{ central_wh.name if central_wh else 'STM Warehouse' }}</strong>
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" class="btn btn-sm" style="background: #FFFFFF; color: {{ branch.color or '#FF5A5F' }}; font-weight: 700; text-decoration: none; padding: 7px 14px; border-radius: 6px;">
+                ⚡ POS Counter
+            </a>
+            <a href="{{ url_for('branches.branch_workspace', id=branch.id) }}" class="btn btn-sm" style="background: rgba(255,255,255,0.2); color: #FFFFFF; border: 1px solid rgba(255,255,255,0.4); text-decoration: none; font-weight: 700; padding: 7px 14px; border-radius: 6px;">
+                🏪 Workspace
+            </a>
+            <a href="{{ url_for('branches.branch_preview_invoice', id=branch.id) }}" target="_blank" class="btn btn-sm" style="background: #10B981; color: #FFFFFF; font-weight: 700; text-decoration: none; padding: 7px 14px; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+                👁️ Preview Invoice
+            </a>
+        </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="settings-tab-nav">
+        <button type="button" class="settings-tab-btn {% if active_tab == 'theme' or not active_tab %}active{% endif %}" onclick="switchSettingsTab('theme', this)">
+            <span>🎨</span> Branch Brand Color & Profile
+        </button>
+        <button type="button" class="settings-tab-btn {% if active_tab == 'invoice' %}active{% endif %}" onclick="switchSettingsTab('invoice', this)">
+            <span>🧾</span> Invoice Style & Customization
+        </button>
+        <button type="button" class="settings-tab-btn {% if active_tab == 'import' %}active{% endif %}" onclick="switchSettingsTab('import', this)">
+            <span>📥</span> Import Data (inFlow CSV)
+        </button>
+        <button type="button" class="settings-tab-btn {% if active_tab == 'export' %}active{% endif %}" onclick="switchSettingsTab('export', this)">
+            <span>📤</span> Export Data (inFlow CSV)
+        </button>
+        <button type="button" class="settings-tab-btn {% if active_tab == 'users' %}active{% endif %}" onclick="switchSettingsTab('users', this)">
+            <span>👥</span> Branch Users & Access
+        </button>
+    </div>
+
+    <!-- Form for Settings Submission (Enclosing Tabs 1 & 2) -->
+    <form id="branchSettingsForm" action="{{ url_for('branches.branch_save_settings', id=branch.id) }}" method="POST" enctype="multipart/form-data">
+        <input type="hidden" name="active_tab" id="formActiveTab" value="{{ active_tab or 'theme' }}">
+        
+        <!-- ============================================================ -->
+        <!-- TAB 1: BRANCH BRAND COLOR & PROFILE                         -->
+        <!-- ============================================================ -->
+        <div id="tabSection-theme" class="tab-content-panel" {% if active_tab and active_tab != 'theme' %}style="display: none;"{% endif %}>
+            
+            <!-- 1. Color Customization Card -->
+            <div class="settings-card">
+                <h3 class="settings-card-title">
+                    <span>🎨</span> Signature Branch Brand Color
+                </h3>
+                <div class="settings-card-desc">
+                    Choose the signature accent color for this branch. This color will be applied across the branch workspace, POS counter buttons, and printed customer invoices.
+                </div>
+
+                <div class="color-swatches-grid">
+                    {% set presets = [
+                        ('#FF5A5F', 'Coral Rose'),
+                        ('#0284C7', 'inFlow Sky'),
+                        ('#10B981', 'Emerald Green'),
+                        ('#8B5CF6', 'Royal Violet'),
+                        ('#F59E0B', 'Amber Gold'),
+                        ('#EC4899', 'Hot Pink'),
+                        ('#0D9488', 'Teal Mint'),
+                        ('#2563EB', 'Royal Blue'),
+                        ('#DC2626', 'Crimson Red'),
+                        ('#475569', 'Slate Charcoal')
+                    ] %}
+                    {% for hex, label in presets %}
+                    <div class="color-swatch-item {% if (branch.color or '#FF5A5F') == hex %}active{% endif %}" 
+                         style="background-color: {{ hex }};" 
+                         title="{{ label }} ({{ hex }})"
+                         onclick="selectBranchColor('{{ hex }}')">
+                        {% if (branch.color or '#FF5A5F') == hex %}✓{% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 14px; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px 16px; border-radius: 8px; width: fit-content;">
+                    <label class="form-label" style="margin: 0;">Custom Hex Color:</label>
+                    <input type="color" id="branchColorPicker" value="{{ branch.color or '#FF5A5F' }}" onchange="selectBranchColor(this.value)" style="cursor: pointer; border: none; width: 36px; height: 36px; border-radius: 6px; background: transparent;">
+                    <input type="text" id="branchColorInput" name="color" value="{{ branch.color or '#FF5A5F' }}" class="form-input" style="width: 100px; font-weight: 700; font-family: monospace; text-transform: uppercase;" onchange="selectBranchColor(this.value)">
+                </div>
+            </div>
+
+            <!-- 2. Branch Profile Card -->
+            <div class="settings-card">
+                <h3 class="settings-card-title">
+                    <span>🏪</span> Branch Information & Numbering
+                </h3>
+                <div class="settings-card-desc">
+                    General profile and fulfillment location settings for {{ branch.name }}.
+                </div>
+
+                <div class="form-grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Branch Display Name *</label>
+                        <input type="text" name="name" class="form-input font-khmer" value="{{ branch.name }}" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sales Order Prefix *</label>
+                        <input type="text" name="so_prefix" class="form-input" value="{{ branch.so_prefix }}" style="font-family: monospace; font-weight: 700;" required>
+                    </div>
+                </div>
+
+                <div class="form-grid-3">
+                    <div class="form-group">
+                        <label class="form-label">Manager / Operator Name</label>
+                        <input type="text" name="manager_name" class="form-input" value="{{ branch.manager_name or '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Contact Phone</label>
+                        <input type="text" name="phone" class="form-input" value="{{ branch.phone or '' }}">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Assigned Warehouse (Fulfillment Location)</label>
+                        <select name="location_id" class="form-select">
+                            {% for w in warehouses %}
+                            <option value="{{ w.id }}" {% if branch.location_id == w.id %}selected{% endif %}>
+                                {{ w.name }} {% if 'STM' in w.name.upper() %}⭐ (Default){% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Physical Address</label>
+                    <textarea name="address" class="form-textarea" rows="2">{{ branch.address or '' }}</textarea>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 2: INVOICE STYLE & CUSTOMIZATION (IDENTICAL TO MAIN STORE)-->
+        <!-- ============================================================ -->
+        <div id="tabSection-invoice" class="tab-content-panel" {% if active_tab != 'invoice' %}style="display: none;"{% endif %}>
+            
+            <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 24px; align-items: start;">
+                
+                <!-- LEFT COLUMN: Customization Steps 1-5 -->
+                <div>
+                    
+                    <!-- 1. Typography & Branding Colors -->
+                    <div class="settings-card" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #F1F5F9; padding-bottom: 12px;">
+                            <div>
+                                <h2 class="settings-card-title" style="margin-bottom: 2px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{ branch.color or '#0284C7' }}" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                    <span>ពុម្ពអក្សរ និងពណ៌សម្គាល់ / Typography & Brand Color</span>
+                                </h2>
+                                <p style="font-size: 0.82rem; color: #64748B; margin: 0;">Customize invoice font family and branch corporate palette</p>
+                            </div>
+                            <span style="font-size: 11px; background: #EEF2FF; color: #4338CA; padding: 4px 10px; border-radius: 4px; font-weight: 600;">Step 1</span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                            <!-- Font Family -->
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ពុម្ពអក្សរ / Font Family *</label>
+                                <select name="font_family" id="invFontFamily" class="form-input" style="font-size: 0.9rem;" onchange="updateInvoicePreview()">
+                                    <option value="Kantumruy Pro" {% if inv_settings.font_family == 'Kantumruy Pro' or not inv_settings.font_family %}selected{% endif %} style="font-family: 'Kantumruy Pro', sans-serif;">Kantumruy Pro (Modern Cambodia Standard - ពេញនិយម)</option>
+                                    <option value="Battambang" {% if inv_settings.font_family == 'Battambang' %}selected{% endif %} style="font-family: 'Battambang', sans-serif;">Battambang (Classic Clean Khmer)</option>
+                                    <option value="Siemreap" {% if inv_settings.font_family == 'Siemreap' %}selected{% endif %} style="font-family: 'Siemreap', sans-serif;">Siemreap (Traditional Corporate Khmer)</option>
+                                    <option value="Moul" {% if inv_settings.font_family == 'Moul' %}selected{% endif %} style="font-family: 'Moul', cursive;">Moul (Ornate Traditional Headline)</option>
+                                    <option value="Plus Jakarta Sans" {% if inv_settings.font_family == 'Plus Jakarta Sans' %}selected{% endif %} style="font-family: 'Plus Jakarta Sans', sans-serif;">Plus Jakarta Sans (Modern Geometric)</option>
+                                    <option value="Inter" {% if inv_settings.font_family == 'Inter' %}selected{% endif %} style="font-family: 'Inter', sans-serif;">Inter (Clean International)</option>
+                                </select>
+                                <div style="font-size: 0.76rem; color: #64748B; margin-top: 4px;">Supports bilingual Khmer & Latin glyphs seamlessly</div>
+                            </div>
+
+                            <!-- Primary Brand Color Picker -->
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ពណ៌ចម្បង / Primary Brand Color *</label>
+                                <div style="display: flex; gap: 8px; align-items: center;">
+                                    <input type="color" id="invColorPicker" value="{{ inv_settings.primary_color or branch.color or '#FF5A5F' }}" style="width: 44px; height: 38px; border: 1px solid #CBD5E1; border-radius: 6px; padding: 2px; cursor: pointer;" oninput="syncColorInput(this.value)">
+                                    <input type="text" name="primary_color" id="invColorHex" value="{{ inv_settings.primary_color or branch.color or '#FF5A5F' }}" class="form-input" style="font-family: monospace; font-size: 0.9rem;" oninput="syncColorPicker(this.value)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Preset Color Swatches -->
+                        <div style="margin-bottom: 16px;">
+                            <div style="font-size: 0.78rem; font-weight: 600; color: #475569; margin-bottom: 6px;">ពណ៌ពេញនិយមនៅកម្ពុជា / Popular Cambodian Corporate Palettes:</div>
+                            <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                <button type="button" class="color-preset-pill" onclick="setPresetColor('{{ branch.color or '#FF5A5F' }}')" style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <span style="width: 12px; height: 12px; border-radius: 3px; background: {{ branch.color or '#FF5A5F' }}; display: inline-block;"></span>
+                                    <span>Branch Accent ({{ branch.color or '#FF5A5F' }})</span>
+                                </button>
+                                <button type="button" class="color-preset-pill" onclick="setPresetColor('#0284C7')" style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <span style="width: 12px; height: 12px; border-radius: 3px; background: #0284C7; display: inline-block;"></span>
+                                    <span>Ocean Blue (HQ)</span>
+                                </button>
+                                <button type="button" class="color-preset-pill" onclick="setPresetColor('#1E3A8A')" style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <span style="width: 12px; height: 12px; border-radius: 3px; background: #1E3A8A; display: inline-block;"></span>
+                                    <span>Navy Corporate</span>
+                                </button>
+                                <button type="button" class="color-preset-pill" onclick="setPresetColor('#0D9488')" style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <span style="width: 12px; height: 12px; border-radius: 3px; background: #0D9488; display: inline-block;"></span>
+                                    <span>ABA Teal Emerald</span>
+                                </button>
+                                <button type="button" class="color-preset-pill" onclick="setPresetColor('#DC2626')" style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <span style="width: 12px; height: 12px; border-radius: 3px; background: #DC2626; display: inline-block;"></span>
+                                    <span>Royal Crimson</span>
+                                </button>
+                                <button type="button" class="color-preset-pill" onclick="setPresetColor('#D97706')" style="border: 1px solid #CBD5E1; background: #F8FAFC; border-radius: 6px; padding: 5px 10px; font-size: 11.5px; display: flex; align-items: center; gap: 6px; cursor: pointer;">
+                                    <span style="width: 12px; height: 12px; border-radius: 3px; background: #D97706; display: inline-block;"></span>
+                                    <span>Khmer Gold / Amber</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Shop Logo Upload -->
+                        <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 8px; padding: 14px 16px;">
+                            <label class="form-label" style="margin-bottom: 6px;">ឡូហ្គោសាខា / Branch Logo (PNG, JPG, SVG, WebP)</label>
+                            <div style="display: flex; gap: 16px; align-items: center;">
+                                <div style="width: 80px; height: 60px; border: 1px solid #E2E8F0; border-radius: 6px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                                    <img id="invLogoPreviewThumb" src="{{ inv_settings.logo_url or company.logo_url or '/static/uploads/invoice/sample_khqr.png' }}" style="max-width: 100%; max-height: 100%; object-fit: contain; {% if not inv_settings.logo_url and not company.logo_url %}display: none;{% endif %}" alt="Shop Logo">
+                                    <span id="invLogoPlaceholder" style="font-size: 11px; color: #94A3B8; text-align: center; {% if inv_settings.logo_url or company.logo_url %}display: none;{% endif %}">No Logo</span>
+                                </div>
+                                <div style="flex: 1;">
+                                    <input type="file" name="logo_file" id="invLogoFileInput" accept="image/*" class="form-input" style="padding: 5px; font-size: 0.82rem;" onchange="previewLogoFile(this)">
+                                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 6px;">
+                                        <label style="font-size: 0.78rem; color: #64748B; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" name="remove_logo" value="1" onchange="toggleRemoveLogo(this)"> លុបឡូហ្គោចោល / Remove current logo
+                                        </label>
+                                        <span style="font-size: 0.75rem; color: #94A3B8;">Recommended: transparent PNG (max 400x150px)</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Shop Details & Address (Khmer & English) -->
+                    <div class="settings-card" style="margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #F1F5F9; padding-bottom: 12px;">
+                            <div>
+                                <h2 class="settings-card-title" style="margin-bottom: 2px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{ branch.color or '#0284C7' }}" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                    <span>ព័ត៌មាន និងអាសយដ្ឋានសាខា / Branch Profile & Address</span>
+                                </h2>
+                                <p style="font-size: 0.82rem; color: #64748B; margin: 0;">Bilingual business identity for Cambodian tax & trade compliance</p>
+                            </div>
+                            <span style="font-size: 11px; background: #EEF2FF; color: #4338CA; padding: 4px 10px; border-radius: 4px; font-weight: 600;">Step 2</span>
+                        </div>
+
+                        <!-- Shop Names -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ឈ្មោះហាងជាភាសាខ្មែរ / Shop Name (Khmer) *</label>
+                                <input type="text" name="shop_name_kh" id="invShopNameKh" class="form-input" value="{{ inv_settings.shop_name_kh or 'ក្រុមហ៊ុន អ៊ិនហ្វ្លូ ត្រេឌីង (' ~ branch.name ~ ')' }}" oninput="updateInvoicePreview()" placeholder="ឧ. ក្រុមហ៊ុន អ៊ិនហ្វ្លូ ត្រេឌីង">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ឈ្មោះហាងជាភាសាអង់គ្លេស / Shop Name (English) *</label>
+                                <input type="text" name="shop_name_en" id="invShopNameEn" class="form-input" value="{{ inv_settings.shop_name_en or branch.name or 'inFlow Premium Trading Co., Ltd.' }}" oninput="updateInvoicePreview()" placeholder="e.g. inFlow Premium - Branch">
+                            </div>
+                        </div>
+
+                        <!-- Shop Addresses -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">អាសយដ្ឋានជាភាសាខ្មែរ / Address (Khmer) *</label>
+                                <textarea name="shop_address_kh" id="invShopAddrKh" class="form-input" rows="2" style="resize: vertical; font-size: 0.85rem;" oninput="updateInvoicePreview()" placeholder="ផ្ទះលេខ... ផ្លូវ... សង្កាត់... ខណ្ឌ... រាជធានីភ្នំពេញ">{{ inv_settings.shop_address_kh or 'ផ្ទះលេខ ១២៣, មហាវិថីព្រះមុនីវង្ស, សង្កាត់បឹងកេងកង១, ខណ្ឌចំការមន, រាជធានីភ្នំពេញ' }}</textarea>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">អាសយដ្ឋានជាភាសាអង់គ្លេស / Address (English) *</label>
+                                <textarea name="shop_address_en" id="invShopAddrEn" class="form-input" rows="2" style="resize: vertical; font-size: 0.85rem;" oninput="updateInvoicePreview()" placeholder="#123, Street..., Phnom Penh, Cambodia">{{ inv_settings.shop_address_en or branch.address or company.address1 or '#123, Preah Monivong Blvd, Sangkat Boeung Keng Kang 1, Phnom Penh, Cambodia' }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Contact & VAT TIN -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">លេខទូរស័ព្ទ / Phone Numbers *</label>
+                                <input type="text" name="phone" id="invShopPhone" class="form-input" value="{{ inv_settings.phone or branch.phone or company.phone or '+855 23 888 999' }}" oninput="updateInvoicePreview()" placeholder="+855 ...">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">អ៊ីមែល / Email</label>
+                                <input type="email" name="email" id="invShopEmail" class="form-input" value="{{ inv_settings.email or company.email or 'billing@inflowpremium.com.kh' }}" oninput="updateInvoicePreview()" placeholder="billing@...">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">លេខអត្តសញ្ញាណកម្មសារពើពន្ធ / VAT TIN</label>
+                                <input type="text" name="vat_tin" id="invShopVat" class="form-input" value="{{ inv_settings.vat_tin or company.tax_number or 'K001-902103456' }}" oninput="updateInvoicePreview()" placeholder="e.g. K001-902103456">
+                            </div>
+                        </div>
+
+                        <!-- Invoice Header Titles -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ចំណងជើងខ្មែរ / Khmer Title</label>
+                                <input type="text" name="invoice_title_kh" id="invTitleKh" class="form-input" value="{{ inv_settings.invoice_title_kh or 'វិក្កយបត្រ' }}" oninput="updateInvoicePreview()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ចំណងជើងឡាតាំង / English Title</label>
+                                <input type="text" name="invoice_title_en" id="invTitleEn" class="form-input" value="{{ inv_settings.invoice_title_en or 'INVOICE' }}" oninput="updateInvoicePreview()">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">គេហទំព័រ / ថេឡេក្រាម / Website</label>
+                                <input type="text" name="website" id="invShopWeb" class="form-input" value="{{ inv_settings.website or company.website or 'www.inflowpremium.com.kh' }}" oninput="updateInvoicePreview()">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Khmer Riel (KHR) & Live Exchange Rate -->
+                    <div class="settings-card" style="margin-bottom: 20px; border-left: 4px solid #F59E0B;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #F1F5F9; padding-bottom: 12px;">
+                            <div>
+                                <h2 class="settings-card-title" style="margin-bottom: 2px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"/><path d="M12 18V6"/></svg>
+                                    <span>សរុបជាប្រាក់រៀល និងអត្រាប្តូរប្រាក់ / Khmer Riel (KHR) & Exchange Rate</span>
+                                </h2>
+                                <p style="font-size: 0.82rem; color: #64748B; margin: 0;">Calculate and show invoice total in Khmer Riel (៛) automatically with live editable rate</p>
+                            </div>
+                            <span style="font-size: 11px; background: #FEF3C7; color: #92400E; padding: 4px 10px; border-radius: 4px; font-weight: 700;">Cambodia Essential</span>
+                        </div>
+
+                        <!-- Toggle KHR Display -->
+                        <div style="display: flex; align-items: center; justify-content: space-between; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px;">
+                            <div>
+                                <div style="font-weight: 700; font-size: 0.9rem; color: #92400E;">បង្ហាញទឹកប្រាក់សរុបជាប្រាក់រៀល (៛) / Display Total in Khmer Riel</div>
+                                <div style="font-size: 0.78rem; color: #B45309;">Include Grand Total and Balance Due in Khmer Riel on printable invoice</div>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" name="enable_khr_total" id="invEnableKhr" value="1" {% if inv_settings.enable_khr_total %}checked{% endif %} onchange="updateInvoicePreview()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+
+                        <!-- Exchange Rate Input & Quick Rate Pills -->
+                        <div style="display: grid; grid-template-columns: 1fr 1.4fr; gap: 16px; align-items: center;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">អត្រាប្តូរប្រាក់ (USD ទៅ KHR) / Rate (1 USD = ? KHR) *</label>
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <span style="font-weight: 700; color: #475569; font-size: 0.95rem;">1 $ =</span>
+                                    <input type="number" step="1" min="1000" max="10000" name="khr_exchange_rate" id="invExchangeRate" class="form-input" style="font-size: 1.05rem; font-weight: 700; color: #B45309; text-align: center;" value="{{ inv_settings.khr_exchange_rate or 4100 }}" oninput="updateInvoicePreview()">
+                                    <span style="font-weight: 700; color: #475569; font-size: 0.95rem;">៛</span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="font-size: 0.78rem; font-weight: 600; color: #475569; margin-bottom: 6px;">អត្រាជ្រើសរើសរហ័ស / Quick Market Rates:</div>
+                                <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+                                    <button type="button" class="rate-preset-pill" onclick="setPresetRate(4000)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">4,000 ៛</button>
+                                    <button type="button" class="rate-preset-pill" onclick="setPresetRate(4080)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">4,080 ៛</button>
+                                    <button type="button" class="rate-preset-pill" onclick="setPresetRate(4100)" style="border: 1px solid #B45309; background: #FEF3C7; color: #92400E; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 700; cursor: pointer;">4,100 ៛ (NBC)</button>
+                                    <button type="button" class="rate-preset-pill" onclick="setPresetRate(4120)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; cursor: pointer;">4,120 ៛</button>
+                                </div>
+                                <div id="invRateExamplePill" style="font-size: 0.76rem; color: #64748B; margin-top: 6px;">Sample: $1,440.00 USD = 5,904,000 ៛ (rounded to nearest 100 ៛)</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. KHQR / Bakong Payment & Bank Details -->
+                    <div class="settings-card" style="margin-bottom: 20px; border-left: 4px solid #EF4444;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #F1F5F9; padding-bottom: 12px;">
+                            <div>
+                                <h2 class="settings-card-title" style="margin-bottom: 2px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                    <span>កូដទូទាត់ KHQR Bakong និងគណនីធនាគារ / KHQR Code & Bank Info</span>
+                                </h2>
+                                <p style="font-size: 0.82rem; color: #64748B; margin: 0;">Uploadable Cambodia KHQR payment code for instant scanning by ABA, Bakong, ACLEDA, Wing</p>
+                            </div>
+                            <span style="font-size: 11px; background: #FEE2E2; color: #991B1B; padding: 4px 10px; border-radius: 4px; font-weight: 700;">National QR Standard</span>
+                        </div>
+
+                        <!-- QR Code Upload -->
+                        <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px;">
+                            <label class="form-label" style="margin-bottom: 6px;">រូបភាពកូដ QR / KHQR Image File (PNG, JPG, WebP)</label>
+                            <div style="display: flex; gap: 16px; align-items: center;">
+                                <div style="width: 80px; height: 80px; border: 1px solid #E2E8F0; border-radius: 6px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 4px;">
+                                    <img id="invQrPreviewThumb" src="{{ inv_settings.qr_code_url or '/static/uploads/invoice/sample_khqr.png' }}" style="max-width: 100%; max-height: 100%; object-fit: contain; {% if not inv_settings.qr_code_url %}display: none;{% endif %}" alt="KHQR Code">
+                                    <span id="invQrPlaceholder" style="font-size: 11px; color: #94A3B8; text-align: center; {% if inv_settings.qr_code_url %}display: none;{% endif %}">No QR</span>
+                                </div>
+                                <div style="flex: 1;">
+                                    <input type="file" name="qr_code_file" id="invQrFileInput" accept="image/*" class="form-input" style="padding: 5px; font-size: 0.82rem;" onchange="previewQrFile(this)">
+                                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 6px;">
+                                        <label style="font-size: 0.78rem; color: #64748B; cursor: pointer; display: flex; align-items: center; gap: 5px;">
+                                            <input type="checkbox" name="remove_qr" value="1" onchange="toggleRemoveQr(this)"> Remove custom QR
+                                        </label>
+                                        <span style="font-size: 0.75rem; color: #94A3B8;">Compatible with all KHQR / Bakong apps in Cambodia</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bank Details -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ឈ្មោះធនាគារ / Bank Name *</label>
+                                <input type="text" name="bank_name" id="invBankName" class="form-input" value="{{ inv_settings.bank_name or 'ABA Bank (KHQR / Bakong)' }}" oninput="updateInvoicePreview()" placeholder="e.g. ABA Bank / Bakong">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">ឈ្មោះគណនី / Account Name *</label>
+                                <input type="text" name="account_name" id="invAccountName" class="form-input" value="{{ inv_settings.account_name or branch.name or 'INFLOW BRANCH' }}" oninput="updateInvoicePreview()" placeholder="e.g. YOUR BRANCH NAME">
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">លេខគណនី / Account Number *</label>
+                                <input type="text" name="account_number" id="invAccountNumber" class="form-input" value="{{ inv_settings.account_number or '001 234 567 (USD) | 001 234 568 (KHR)' }}" oninput="updateInvoicePreview()" placeholder="e.g. 001 234 567">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">លក្ខខណ្ឌទូទាត់ / Payment Terms</label>
+                                <input type="text" name="payment_terms" id="invPaymentTerms" class="form-input" value="{{ inv_settings.payment_terms or 'ទូទាត់ភ្លាមៗពេលទទួលទំនិញ / Due on Receipt' }}" oninput="updateInvoicePreview()" placeholder="Due on receipt">
+                            </div>
+                        </div>
+
+                        <!-- Hidden Inputs for Visual Layout & Sizing -->
+                        <input type="hidden" name="qr_size" id="invQrSize" value="{{ inv_settings.qr_size or 180 }}">
+                        <input type="hidden" name="qr_position" id="invQrPosition" value="{{ inv_settings.qr_position or 'left' }}">
+                        <input type="hidden" name="bank_info_size" id="invBankInfoSize" value="{{ inv_settings.bank_info_size or '8.5' }}">
+                        <input type="hidden" name="bank_info_position" id="invBankInfoPosition" value="{{ inv_settings.bank_info_position or 'below_qr' }}">
+                        <input type="hidden" name="qr_offset_x" id="invQrOffsetX" value="{{ inv_settings.qr_offset_x or 0 }}">
+                        <input type="hidden" name="qr_offset_y" id="invQrOffsetY" value="{{ inv_settings.qr_offset_y or 0 }}">
+                        <input type="hidden" name="bank_offset_x" id="invBankOffsetX" value="{{ inv_settings.bank_offset_x or 0 }}">
+                        <input type="hidden" name="bank_offset_y" id="invBankOffsetY" value="{{ inv_settings.bank_offset_y or 0 }}">
+
+                        <!-- Visual Layout Customization Controls in Step 4 -->
+                        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px; margin-top: 4px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <div style="font-weight: 700; font-size: 0.85rem; color: #1E293B; display: flex; align-items: center; gap: 6px;">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18"/><path d="M14 9h7"/><path d="M14 15h7"/></svg>
+                                    <span>កែសម្រួលទំហំ និងទីតាំង KHQR & ធនាគារ / Move & Resize Layout</span>
+                                </div>
+                                <span style="font-size: 11px; background: #DBEAFE; color: #1E40AF; padding: 2px 8px; border-radius: 4px; font-weight: 600;">Interactive</span>
+                            </div>
+
+                            <!-- KHQR Sizing & Position Row -->
+                            <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                                <div>
+                                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                                        <label class="form-label" style="font-size: 0.8rem; margin: 0;">ទំហំកូដ KHQR / KHQR Size:</label>
+                                        <span id="formQrSizeDisplay" style="font-weight: 700; color: #2563EB; font-family: monospace; font-size: 0.85rem;">{{ inv_settings.qr_size or 180 }}px</span>
+                                    </div>
+                                    <input type="range" min="100" max="250" step="5" id="formQrSizeSlider" value="{{ inv_settings.qr_size or 180 }}" style="width: 100%; cursor: pointer; accent-color: #2563EB;" oninput="onFormQrSizeChange(this.value)">
+                                    <div style="display: flex; gap: 4px; margin-top: 4px;">
+                                        <button type="button" class="layout-preset-pill" onclick="onFormQrSizeChange(150)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer;">150px</button>
+                                        <button type="button" class="layout-preset-pill" onclick="onFormQrSizeChange(180)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer;">180px (Std)</button>
+                                        <button type="button" class="layout-preset-pill" onclick="onFormQrSizeChange(200)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer;">200px</button>
+                                        <button type="button" class="layout-preset-pill" onclick="onFormQrSizeChange(230)" style="border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; padding: 2px 8px; font-size: 10.5px; cursor: pointer;">230px (Max)</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px;">ទីតាំងកូដ KHQR / KHQR Position:</label>
+                                    <div style="display: flex; gap: 6px;" id="qrPosBtnGroup">
+                                        <button type="button" class="layout-pos-pill {% if (inv_settings.qr_position or 'left') == 'left' %}active{% endif %}" onclick="setQrPosition('left')" id="btnQrPosLeft" style="flex: 1; padding: 6px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">⇦ ឆ្វេង (Left)</button>
+                                        <button type="button" class="layout-pos-pill {% if inv_settings.qr_position == 'right' %}active{% endif %}" onclick="setQrPosition('right')" id="btnQrPosRight" style="flex: 1; padding: 6px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">ស្តាំ (Right) ⇨</button>
+                                        <button type="button" class="layout-pos-pill {% if inv_settings.qr_position == 'bottom' %}active{% endif %}" onclick="setQrPosition('bottom')" id="btnQrPosBottom" style="flex: 1; padding: 6px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">⬇ ក្រោម (Bottom)</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Bank Info Sizing & Position Row -->
+                            <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 14px; margin-top: 12px;">
+                                <div>
+                                    <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px;">ទំហំអក្សរធនាគារ / Bank Text Scale:</label>
+                                    <div style="display: flex; gap: 6px;" id="bankSizeBtnGroup">
+                                        <button type="button" class="layout-size-pill {% if (inv_settings.bank_info_size or '8.5') == '7.5' %}active{% endif %}" onclick="setBankSize('7.5')" id="btnBankSizeCompact" style="flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">តូច (7.5px)</button>
+                                        <button type="button" class="layout-size-pill {% if (inv_settings.bank_info_size or '8.5') == '8.5' %}active{% endif %}" onclick="setBankSize('8.5')" id="btnBankSizeStd" style="flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">ស្តង់ដារ (8.5px)</button>
+                                        <button type="button" class="layout-size-pill {% if (inv_settings.bank_info_size or '8.5') == '10' %}active{% endif %}" onclick="setBankSize('10')" id="btnBankSizeLarge" style="flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">ធំ (10px)</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="form-label" style="font-size: 0.8rem; margin-bottom: 4px;">ទីតាំងព័ត៌មានធនាគារ / Bank Info Position:</label>
+                                    <div style="display: flex; gap: 6px;" id="bankPosBtnGroup">
+                                        <button type="button" class="layout-bankpos-pill {% if (inv_settings.bank_info_position or 'below_qr') == 'below_qr' %}active{% endif %}" onclick="setBankPosition('below_qr')" id="btnBankPosBelow" style="flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">⬇ ក្រោម QR</button>
+                                        <button type="button" class="layout-bankpos-pill {% if inv_settings.bank_info_position == 'beside_qr' %}active{% endif %}" onclick="setBankPosition('beside_qr')" id="btnBankPosBeside" style="flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">➡ ក្បែរ QR</button>
+                                        <button type="button" class="layout-bankpos-pill {% if inv_settings.bank_info_position == 'bottom_full' %}active{% endif %}" onclick="setBankPosition('bottom_full')" id="btnBankPosBottom" style="flex: 1; padding: 5px 4px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 5px; cursor: pointer; font-weight: 600;">📄 ពេញទទឹង</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="font-size: 0.76rem; color: #64748B; margin-top: 10px; display: flex; align-items: center; gap: 6px; background: #EFF6FF; padding: 6px 10px; border-radius: 5px; border-left: 3px solid #3B82F6;">
+                                <span>💡</span>
+                                <span><strong>Direct Visual Editor:</strong> You can also grab, drag, and resize KH QR and Bank info directly inside the <strong>Live Invoice Preview</strong> on the right!</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Footer Terms & Document Options -->
+                    <div class="settings-card" style="margin-bottom: 24px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #F1F5F9; padding-bottom: 12px;">
+                            <div>
+                                <h2 class="settings-card-title" style="margin-bottom: 2px;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="{{ branch.color or '#0284C7' }}" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                                    <span>កំណត់សម្គាល់ និងជម្រើសវិក្កយបត្រ / Footer Terms & Style Options</span>
+                                </h2>
+                                <p style="font-size: 0.82rem; color: #64748B; margin: 0;">Template style, standard terms of trade, and signature blocks</p>
+                            </div>
+                            <span style="font-size: 11px; background: #EEF2FF; color: #4338CA; padding: 4px 10px; border-radius: 4px; font-weight: 600;">Step 5</span>
+                        </div>
+
+                        <!-- Template Style Picker -->
+                        <div style="margin-bottom: 16px;">
+                            <label class="form-label">ទម្រង់វិក្កយបត្រ / Invoice Template Style:</label>
+                            <input type="hidden" name="template_style" id="inputTemplateStyle" value="{{ inv_settings.template_style or 'modern' }}">
+                            <div class="style-options-grid">
+                                <div class="style-card {% if (inv_settings.template_style or 'modern') == 'modern' %}active{% endif %}" onclick="selectInvoiceStyle('modern', this)">
+                                    <div style="font-weight: 800; font-size: 12.5px; color: #0F172A;">🌟 Modern Professional</div>
+                                    <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Cambodia Standard with color accent bar</div>
+                                </div>
+                                <div class="style-card {% if inv_settings.template_style == 'classic' %}active{% endif %}" onclick="selectInvoiceStyle('classic', this)">
+                                    <div style="font-weight: 800; font-size: 12.5px; color: #0F172A;">🏛️ Classic Formal</div>
+                                    <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Formal double-border corporate frame</div>
+                                </div>
+                                <div class="style-card {% if inv_settings.template_style == 'thermal_80mm' %}active{% endif %}" onclick="selectInvoiceStyle('thermal_80mm', this)">
+                                    <div style="font-weight: 800; font-size: 12.5px; color: #0F172A;">🧾 Thermal POS (80mm)</div>
+                                    <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Compact receipt roll format</div>
+                                </div>
+                                <div class="style-card {% if inv_settings.template_style == 'minimal' %}active{% endif %}" onclick="selectInvoiceStyle('minimal', this)">
+                                    <div style="font-weight: 800; font-size: 12.5px; color: #0F172A;">⚪ Clean Minimalist</div>
+                                    <div style="font-size: 11px; color: #64748B; margin-top: 2px;">Clean lines with airy margins</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">កំណត់សម្គាល់ជាភាសាខ្មែរ / Footer Notes (Khmer)</label>
+                                <textarea name="footer_notes_kh" id="invFooterKh" class="form-input" rows="2" style="font-size: 0.85rem;" oninput="updateInvoicePreview()">{{ inv_settings.footer_notes_kh or 'ទំនិញដែលបានទិញរួចមិនអាចប្តូរវិញបានទេ! សូមអរគុណចំពោះការគាំទ្ររបស់លោកអ្នក!' }}</textarea>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label class="form-label">កំណត់សម្គាល់ជាភាសាអង់គ្លេស / Footer Notes (English)</label>
+                                <textarea name="footer_notes_en" id="invFooterEn" class="form-input" rows="2" style="font-size: 0.85rem;" oninput="updateInvoicePreview()">{{ inv_settings.footer_notes_en or 'Goods sold are not returnable. Thank you for your business!' }}</textarea>
+                            </div>
+                        </div>
+
+                        <!-- Toggles -->
+                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
+                                <input type="checkbox" name="show_signature" id="invShowSig" value="1" {% if inv_settings.show_signature %}checked{% endif %} onchange="updateInvoicePreview()">
+                                <span>បង្ហាញប្រអប់ហត្ថលេខា / Show Signatures</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
+                                <input type="checkbox" name="show_tax" id="invShowTax" value="1" {% if inv_settings.show_tax %}checked{% endif %} onchange="updateInvoicePreview()">
+                                <span>បង្ហាញពន្ធអាករ / Show VAT (10%)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
+                                <input type="checkbox" name="show_sku" id="invShowSku" value="1" {% if inv_settings.show_sku %}checked{% endif %} onchange="updateInvoicePreview()">
+                                <span>បង្ហាញកូដទំនិញ / Show SKU</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Submit Action Buttons -->
+                    <div style="display: flex; justify-content: flex-end; gap: 12px; margin-bottom: 40px;">
+                        <a href="{{ url_for('branches.branch_preview_invoice', id=branch.id) }}" target="_blank" class="btn btn-secondary" style="padding: 10px 20px; font-size: 0.95rem; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span>Print / Full Preview Test (A5)</span>
+                        </a>
+                        <button type="submit" class="btn btn-primary" style="background: {{ branch.color or '#FF5A5F' }}; border: none; padding: 10px 28px; font-size: 0.95rem; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            <span>Save Invoice Settings</span>
+                        </button>
+                    </div>
+
+                </div>
+
+                <!-- RIGHT COLUMN: Sticky Real-time Interactive Invoice Preview (Identical to Main Store) -->
+                <div style="position: sticky; top: 20px;">
+                    <div class="settings-card" style="padding: 0; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.12); border: 1px solid #CBD5E1;">
+                        
+                        <!-- Preview Toolbar Header -->
+                        <div style="background: #0F172A; color: #FFFFFF; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #10B981; box-shadow: 0 0 8px #10B981;"></span>
+                                <span style="font-size: 0.88rem; font-weight: 700; letter-spacing: -0.01em;">Live Invoice Preview</span>
+                                <span style="background: rgba(255,255,255,0.2); font-size: 11px; padding: 2px 7px; border-radius: 4px; font-weight: 600;">Cambodia Standard (A5)</span>
+                                <span id="prevLayoutSavedBadge" style="display: none; background: #065F46; color: #A7F3D0; font-size: 10px; padding: 2px 8px; border-radius: 12px; font-weight: 700; align-items: center; gap: 4px;">✓ Layout Saved</span>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <button type="button" onclick="resetInvoiceLayout()" title="Reset QR and Bank info to standard defaults" style="background: rgba(255,255,255,0.15); color: #FFFFFF; border: none; font-size: 11px; font-weight: 600; padding: 4px 8px; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                    <span>↺ Reset</span>
+                                </button>
+                                <a href="{{ url_for('branches.branch_preview_invoice', id=branch.id) }}" target="_blank" style="background: {{ branch.color or '#2563EB' }}; color: #FFFFFF; text-decoration: none; font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                    <span>Open A5</span>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Interactive Visual Editor Bar -->
+                        <div style="background: #EFF6FF; border-bottom: 1px solid #DBEAFE; padding: 5px 14px; display: flex; align-items: center; justify-content: space-between; font-size: 11px; color: #1E40AF;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span>🖐️ <strong>Visual Customizer:</strong> Grab & drag <strong>KHQR</strong> or <strong>Bank Info</strong> to move, or drag corner handle <strong style="color: #2563EB;">⤡</strong> to resize.</span>
+                            </div>
+                            <span style="font-size: 10px; color: #3B82F6; font-weight: 600;">Auto-syncs with invoice</span>
+                        </div>
+
+                        <!-- Scaled Miniature A5 Sheet Mockup -->
+                        <div id="invoiceMiniSheet" style="background: #FFFFFF; padding: 18px 20px; font-family: '{{ inv_settings.font_family or 'Kantumruy Pro' }}', sans-serif; font-size: 10.5px; line-height: 1.35; color: #1E293B; max-height: 820px; overflow-y: auto;">
+                            
+                            <!-- 1. Header with Logo & Bilingual Shop Info -->
+                            <div style="display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 10px; border-bottom: 1.5px solid var(--preview-primary, {{ branch.color or '#FF5A5F' }}); margin-bottom: 10px;">
+                                <div style="display: flex; gap: 10px; align-items: flex-start; max-width: 62%;">
+                                    <div id="prevMockLogoWrap" style="width: 52px; height: 52px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                                        <img id="prevMockLogo" src="{{ inv_settings.logo_url or company.logo_url or '/static/uploads/invoice/sample_khqr.png' }}" style="max-width: 100%; max-height: 100%; object-fit: contain;" alt="Logo">
+                                    </div>
+                                    <div>
+                                        <div id="prevMockShopNameKh" style="font-size: 12.5px; font-weight: 700; color: #0F172A; line-height: 1.25; margin-bottom: 1px;">
+                                            {{ inv_settings.shop_name_kh or 'ក្រុមហ៊ុន អ៊ិនហ្វ្លូ ត្រេឌីង (' ~ branch.name ~ ')' }}
+                                        </div>
+                                        <div id="prevMockShopNameEn" style="font-size: 10.5px; font-weight: 700; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); text-transform: uppercase; margin-bottom: 2px;">
+                                            {{ inv_settings.shop_name_en or branch.name or 'inFlow Premium Trading Co., Ltd.' }}
+                                        </div>
+                                        <div id="prevMockShopAddrKh" style="font-size: 9.5px; color: #64748B; margin-bottom: 1px;">
+                                            {{ inv_settings.shop_address_kh or 'ផ្ទះលេខ ១២៣, មហាវិថីព្រះមុនីវង្ស, សង្កាត់បឹងកេងកង១, ខណ្ឌចំការមន, រាជធានីភ្នំពេញ' }}
+                                        </div>
+                                        <div style="font-size: 9.5px; color: #64748B;">
+                                            <span>Tel: </span><span id="prevMockPhone">{{ inv_settings.phone or branch.phone or company.phone or '+855 23 888 999' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right: Invoice Title & Meta -->
+                                <div style="text-align: right;">
+                                    <div id="prevMockTitleKh" style="font-size: 15px; font-weight: 800; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); line-height: 1.1;">
+                                        {{ inv_settings.invoice_title_kh or 'វិក្កយបត្រ' }}
+                                    </div>
+                                    <div id="prevMockTitleEn" style="font-size: 10.5px; font-weight: 800; letter-spacing: 1.5px; color: #0F172A; margin-bottom: 4px;">
+                                        {{ inv_settings.invoice_title_en or 'INVOICE' }}
+                                    </div>
+                                    <div style="font-size: 9.5px; font-family: monospace; background: #F1F5F9; padding: 2px 5px; border-radius: 4px; display: inline-block; font-weight: 700; color: #0F172A;">
+                                        {{ branch.so_prefix or 'SO-TK-' }}0089
+                                    </div>
+                                    <div style="font-size: 9px; color: #64748B; margin-top: 3px;">
+                                        Date: <strong style="color: #0F172A;">{{ today_date or 'Today' }}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 2. Customer Information Card -->
+                            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px;">
+                                <div>
+                                    <div style="font-size: 9px; font-weight: 700; color: #64748B; text-transform: uppercase; margin-bottom: 2px;">អតិថិជន / Bill To:</div>
+                                    <div style="font-size: 11px; font-weight: 700; color: #0F172A;">ក្រុមហ៊ុន សុខា ត្រេឌីង ខូអិលធីឌី (Sokha Trading)</div>
+                                    <div style="font-size: 9.5px; color: #475569;">#88, ផ្លូវ 1986, សង្កាត់ភ្នំពេញថ្មី, ខណ្ឌសែនសុខ, ភ្នំពេញ</div>
+                                    <div style="font-size: 9.5px; color: #475569;">
+                                        <span>Phone: +855 12 888 777</span>
+                                    </div>
+                                </div>
+                                <div style="border-left: 1px solid #E2E8F0; padding-left: 10px; font-size: 9.5px;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                        <span style="color: #64748B;">Payment Terms:</span>
+                                        <span id="prevMockTerms" style="font-weight: 600;">Due on Receipt</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                                        <span style="color: #64748B;">Branch:</span>
+                                        <span><strong>{{ branch.name }}</strong></span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: #64748B;">Payment Status:</span>
+                                        <span style="background: #DEF7EC; color: #03543F; font-size: 8.5px; font-weight: 700; padding: 1px 5px; border-radius: 4px;">PAID</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 3. Line Items Table -->
+                            <table style="width: 100%; border-collapse: collapse; font-size: 9.5px; margin-bottom: 10px;">
+                                <thead>
+                                    <tr id="prevTheadTr" style="background: transparent; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); border-top: 1.5px solid var(--preview-primary, {{ branch.color or '#FF5A5F' }}); border-bottom: 1.5px solid var(--preview-primary, {{ branch.color or '#FF5A5F' }});">
+                                        <th style="padding: 5px 5px; text-align: center; width: 24px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">#</th>
+                                        <th style="padding: 5px 5px; text-align: left; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">បរិយាយមុខទំនិញ / Description</th>
+                                        <th style="padding: 5px 5px; text-align: center; width: 34px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Qty</th>
+                                        <th style="padding: 5px 5px; text-align: right; width: 50px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Price</th>
+                                        <th style="padding: 5px 5px; text-align: right; width: 60px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody style="border-bottom: 1px solid #CBD5E1;">
+                                    <tr style="border-bottom: 1px solid #F1F5F9;">
+                                        <td style="padding: 4px 5px; text-align: center;">1</td>
+                                        <td style="padding: 4px 5px;">
+                                            <div style="font-weight: 600; color: #0F172A;">ចានក្រដាស Kraft Bowl 500ML (50 Pcs)</div>
+                                        </td>
+                                        <td style="padding: 4px 5px; text-align: center; font-weight: 600;">20</td>
+                                        <td style="padding: 4px 5px; text-align: right;">$35.00</td>
+                                        <td style="padding: 4px 5px; text-align: right; font-weight: 600;">$700.00</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #F1F5F9; background: #F8FAFC;">
+                                        <td style="padding: 4px 5px; text-align: center;">2</td>
+                                        <td style="padding: 4px 5px;">
+                                            <div style="font-weight: 600; color: #0F172A;">ប្រអប់អាលុយមីញ៉ូម Bento Box 750ML</div>
+                                        </td>
+                                        <td style="padding: 4px 5px; text-align: center; font-weight: 600;">10</td>
+                                        <td style="padding: 4px 5px; text-align: right;">$45.00</td>
+                                        <td style="padding: 4px 5px; text-align: right; font-weight: 600;">$450.00</td>
+                                    </tr>
+                                    <tr style="border-bottom: 1px solid #F1F5F9;">
+                                        <td style="padding: 4px 5px; text-align: center;">3</td>
+                                        <td style="padding: 4px 5px;">
+                                            <div style="font-weight: 600; color: #0F172A;">ទុយោធម្មជាតិ PLA Eco Straw 8mm (100 Pcs)</div>
+                                        </td>
+                                        <td style="padding: 4px 5px; text-align: center; font-weight: 600;">5</td>
+                                        <td style="padding: 4px 5px; text-align: right;">$44.50</td>
+                                        <td style="padding: 4px 5px; text-align: right; font-weight: 600;">$222.50</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+
+                            <!-- 4. Bottom Payment & Totals Section with Direct Movable & Resizable Elements -->
+                            <div id="prevBottomSection" style="margin-top: 8px; margin-bottom: 14px; position: relative;">
+                                
+                                <!-- 4A. KHQR WRAPPER (Draggable & Corner-Resizable) -->
+                                <div id="prevMockQrWrapper" class="prev-draggable-box qr-interactive-box" style="position: relative; display: inline-block;">
+                                    <!-- Floating Actions for KHQR -->
+                                    <div class="prev-box-toolbar qr-toolbar">
+                                        <span class="prev-drag-handle qr-drag-handle" title="Hold & drag to move KHQR">⠿ Drag to Move</span>
+                                        <div class="prev-btn-group">
+                                            <button type="button" class="prev-tool-btn" onclick="setQrPosition('left', event)" title="Move Left">⇦ Left</button>
+                                            <button type="button" class="prev-tool-btn" onclick="setQrPosition('right', event)" title="Move Right">Right ⇨</button>
+                                            <button type="button" class="prev-tool-btn" onclick="setQrPosition('bottom', event)" title="Move Below Totals">⬇ Below</button>
+                                        </div>
+                                        <div class="prev-btn-group">
+                                            <button type="button" class="prev-tool-btn" onclick="adjustQrSize(-15, event)" title="Make Smaller">−</button>
+                                            <span id="prevQrSizeBadge" class="prev-size-indicator">{{ inv_settings.qr_size or 180 }}px</span>
+                                            <button type="button" class="prev-tool-btn" onclick="adjustQrSize(15, event)" title="Make Larger">+</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- KHQR Card -->
+                                    <div id="prevMockQrCard" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); text-align: center; width: 100%;">
+                                        <div style="background: #DC2626; color: #FFFFFF; font-weight: 800; font-size: 10px; padding: 4px 0; letter-spacing: 1px;">
+                                            KHQR / BAKONG
+                                        </div>
+                                        <div style="padding: 6px; display: flex; justify-content: center; background: #FFFFFF;">
+                                            <img id="prevMockQr" src="{{ inv_settings.qr_code_url or '/static/uploads/invoice/sample_khqr.png' }}" style="width: {{ inv_settings.qr_size or 180 }}px; height: {{ inv_settings.qr_size or 180 }}px; max-width: 100%; object-fit: contain; pointer-events: none;" alt="KHQR">
+                                        </div>
+                                        <div style="background: #F8FAFC; border-top: 1px solid #F1F5F9; padding: 4px; font-size: 8.5px; font-weight: 600; color: #64748B;">
+                                            ស្កេនទូទាត់ប្រាក់ / Scan to Pay
+                                        </div>
+                                    </div>
+
+                                    <!-- Bottom-Right Corner Resize Grip for QR -->
+                                    <div class="prev-corner-handle qr-corner-handle" id="prevQrCornerHandle" title="Drag corner to resize KHQR code">⤡</div>
+                                </div>
+
+                                <!-- 4B. BANK INFO WRAPPER (Draggable & Corner-Resizable) -->
+                                <div id="prevMockBankWrapper" class="prev-draggable-box bank-interactive-box" style="position: relative;">
+                                    <!-- Floating Actions for Bank Info -->
+                                    <div class="prev-box-toolbar bank-toolbar">
+                                        <span class="prev-drag-handle bank-drag-handle" title="Hold & drag to move Bank Info">⠿ Drag to Move</span>
+                                        <div class="prev-btn-group">
+                                            <button type="button" class="prev-tool-btn" onclick="setBankPosition('below_qr', event)" title="Place Below QR">⬇ Below QR</button>
+                                            <button type="button" class="prev-tool-btn" onclick="setBankPosition('beside_qr', event)" title="Place Beside QR">➡ Beside QR</button>
+                                            <button type="button" class="prev-tool-btn" onclick="setBankPosition('bottom_full', event)" title="Place Full Width">📄 Bottom</button>
+                                        </div>
+                                        <div class="prev-btn-group">
+                                            <button type="button" class="prev-tool-btn" onclick="adjustBankSize(-0.5, event)" title="Smaller Text">A−</button>
+                                            <span id="prevBankSizeBadge" class="prev-size-indicator">{{ inv_settings.bank_info_size or '8.5' }}px</span>
+                                            <button type="button" class="prev-tool-btn" onclick="adjustBankSize(0.5, event)" title="Larger Text">A+</button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bank Info Card Content -->
+                                    <div id="prevMockBankCard" style="font-size: {{ inv_settings.bank_info_size or '8.5' }}px; line-height: 1.4; padding: 4px 6px;">
+                                        <div style="font-size: 1.1em; font-weight: 700; color: #0F172A; margin-bottom: 2px;">
+                                            ព័ត៌មានទូទាត់ប្រាក់ / Payment Instructions:
+                                        </div>
+                                        <div style="color: #475569; margin-bottom: 1px;">
+                                            <span>ធនាគារ / Bank: </span><strong id="prevMockBankName" style="color: #0F172A;">{{ inv_settings.bank_name or 'ABA Bank (KHQR / Bakong)' }}</strong>
+                                        </div>
+                                        <div style="color: #475569; margin-bottom: 1px;">
+                                            <span>ឈ្មោះគណនី / A/C Name: </span><strong id="prevMockAccName" style="color: #0F172A;">{{ inv_settings.account_name or branch.name or 'INFLOW BRANCH' }}</strong>
+                                        </div>
+                                        <div style="color: #475569; margin-bottom: 4px;">
+                                            <span>លេខគណនី / A/C No: </span><strong id="prevMockAccNo" style="color: #0F172A; font-family: monospace; font-size: 1em;">{{ inv_settings.account_number or '001 234 567 (USD)' }}</strong>
+                                        </div>
+
+                                        <div style="background: #F8FAFC; border-left: 2.5px solid var(--preview-primary, {{ branch.color or '#FF5A5F' }}); padding: 3px 6px; border-radius: 0 4px 4px 0; margin-top: 4px;">
+                                            <div id="prevMockFooterKh" style="font-weight: 600; color: #334155; font-size: 0.95em;">
+                                                {{ inv_settings.footer_notes_kh or 'ទំនិញដែលបានទិញរួចមិនអាចប្តូរវិញបានទេ!' }}
+                                            </div>
+                                            <div id="prevMockFooterEn" style="font-size: 0.9em; color: #64748B;">
+                                                {{ inv_settings.footer_notes_en or 'Goods sold cannot be returned.' }}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Bottom-Right Corner Resize Grip for Bank Info -->
+                                    <div class="prev-corner-handle bank-corner-handle" id="prevBankCornerHandle" title="Drag corner to adjust text scale">⤡</div>
+                                </div>
+
+                                <!-- 4C. TOTALS WRAPPER -->
+                                <div id="prevMockTotalsWrapper" style="width: 100%; max-width: 250px; font-size: 11px;">
+                                    <div style="display: flex; justify-content: space-between; padding: 2px 0;">
+                                        <span style="color: #64748B;">Subtotal:</span>
+                                        <span style="font-weight: 600;">$1,372.50</span>
+                                    </div>
+                                    <div class="prev-row-tax" style="display: flex; justify-content: space-between; padding: 2px 0;">
+                                        <span style="color: #64748B;">VAT (10%):</span>
+                                        <span style="font-weight: 600;">$137.25</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; padding: 2px 0; border-top: 1px solid #CBD5E1; margin-top: 2px;">
+                                        <span style="font-weight: 700; color: #0F172A;">Total (USD):</span>
+                                        <span style="font-weight: 700; color: #0F172A;">$1,509.75</span>
+                                    </div>
+
+                                    <!-- TOTAL IN KHMER RIEL (KHR) HIGHLIGHT ROW -->
+                                    <div id="prevMockKhrRow" style="margin-top: 6px; background: #FEF3C7; border: 1px solid #FDE68A; border-radius: 5px; padding: 6px 8px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                                            <div>
+                                                <div style="font-weight: 800; color: #92400E; font-size: 11.5px;">សរុបជាប្រាក់រៀល:</div>
+                                                <div style="font-size: 9px; color: #B45309;">Total in Khmer Riel (KHR):</div>
+                                            </div>
+                                            <div id="prevMockKhrTotalVal" style="font-size: 14px; font-weight: 800; color: #B45309;">
+                                                6,190,000 ៛
+                                            </div>
+                                        </div>
+                                        <div id="prevMockRateNotice" style="font-size: 8.5px; color: #78350F; text-align: right; margin-top: 2px;">
+                                            (អត្រាប្តូរប្រាក់ / Rate: 1$ = 4,100 ៛)
+                                        </div>
+                                    </div>
+
+                                    <!-- Balance Due -->
+                                    <div style="display: flex; justify-content: space-between; padding: 5px 0 0 0; font-size: 11.5px;">
+                                        <span style="font-weight: 700; color: #DC2626;">Balance Due (USD):</span>
+                                        <span style="font-weight: 800; color: #DC2626;">$0.00</span>
+                                    </div>
+                                    <div id="prevMockKhrBalanceRow" style="text-align: right; font-size: 10px; font-weight: 700; color: #DC2626;">
+                                        ≈ <span id="prevMockKhrBalanceVal">0 ៛</span>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <!-- 6. Signature Blocks -->
+                            <div id="prevMockSigBox" style="display: flex; justify-content: space-between; border-top: 1px solid #E2E8F0; padding-top: 10px; margin-top: 10px;">
+                                <div style="text-align: center; width: 45%;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #0F172A;">ហត្ថលេខាអ្នកទិញ / Customer Signature</div>
+                                    <div style="font-size: 9px; color: #94A3B8;">(Received By)</div>
+                                    <div style="height: 36px; border-bottom: 1px dashed #CBD5E1; margin: 6px 12px 4px 12px;"></div>
+                                    <div style="font-size: 9px; color: #94A3B8;">កាលបរិច្ឆេទ / Date: ____ / ____ / 2026</div>
+                                </div>
+                                <div style="text-align: center; width: 45%;">
+                                    <div style="font-size: 10px; font-weight: 700; color: #0F172A;">ហត្ថលេខាអ្នកលក់ / Seller Signature</div>
+                                    <div style="font-size: 9px; color: #94A3B8;">(Authorized By)</div>
+                                    <div style="height: 36px; border-bottom: 1px dashed #CBD5E1; margin: 6px 12px 4px 12px;"></div>
+                                    <div style="font-size: 9px; color: #94A3B8;">កាលបរិច្ឆេទ / Date: ____ / ____ / 2026</div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- Sticky Save Action Bar for Tabs 1 & 2 -->
+        <div style="position: sticky; bottom: 16px; background: #FFFFFF; border: 1.5px solid #E2E8F0; padding: 14px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 25px rgba(0,0,0,0.1); z-index: 100; margin-top: 20px;">
+            <div style="font-size: 13px; color: #64748B;">
+                Click Save to apply changes across {{ branch.name }} POS, Workspace & Invoices.
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <a href="{{ url_for('branches.branch_preview_invoice', id=branch.id) }}" target="_blank" class="btn btn-secondary" style="font-weight: 700;">
+                    👁️ Preview Invoice
+                </a>
+                <button type="submit" class="btn btn-primary" style="background: {{ branch.color or '#FF5A5F' }}; border: none; font-weight: 800; padding: 10px 24px; font-size: 14px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+                    💾 Save Branch Settings
+                </button>
+            </div>
+        </div>
+
+    </form>
+
+    <!-- ============================================================ -->
+    <!-- TAB 3: IMPORT DATA (inFlow CSV)                              -->
+    <!-- ============================================================ -->
+    <div id="tabSection-import" class="tab-content-panel" {% if active_tab != 'import' %}style="display: none;"{% endif %}>
+        
+        <div class="settings-card">
+            <h3 class="settings-card-title">
+                <span>📥</span> Import Data into {{ branch.name }} (inFlow CSV Compatible)
+            </h3>
+            <div class="settings-card-desc">
+                Seamlessly import your packaging products, stock levels, or customer contact files created in standard inFlow Inventory format.
+            </div>
+
+            <div class="exchange-grid">
+                
+                <!-- Import Products & Inventory -->
+                <div class="exchange-box">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <span style="font-size: 26px;">📦</span>
+                            <div>
+                                <h4 style="font-size: 15px; font-weight: 800; color: #0F172A; margin: 0;">Import Products & Stock</h4>
+                                <span style="font-size: 11.5px; color: #64748B;">inFlow Product / Stock CSV</span>
+                            </div>
+                        </div>
+                        <p style="font-size: 12px; color: #64748B; line-height: 1.4; margin-bottom: 14px;">
+                            Uploads product items, prices, barcodes, and synchronizes physical inventory quantities directly for <strong>{{ central_wh.name if central_wh else 'STM Warehouse' }}</strong>.
+                        </p>
+                    </div>
+
+                    <form action="{{ url_for('branches.branch_import_csv', id=branch.id, import_type='products') }}" method="POST" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label class="form-label">Stock Quantity Update Mode:</label>
+                            <select name="import_mode" class="form-select">
+                                <option value="set">Set Exact Stock Count (Overwrite with CSV quantity)</option>
+                                <option value="add">Add to Existing Stock (Increment by CSV quantity)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Choose inFlow Products CSV File:</label>
+                            <input type="file" name="file" accept=".csv" class="form-input" required>
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 14px;">
+                            <button type="submit" class="btn btn-primary" style="flex: 1; background: {{ branch.color or '#FF5A5F' }}; border: none; font-weight: 700;">
+                                📥 Start Product Import
+                            </button>
+                            <a href="{{ url_for('branches.branch_csv_template', id=branch.id, template_type='products') }}" class="btn btn-secondary" title="Download sample template">
+                                📄 Template
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Import Customers -->
+                <div class="exchange-box">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                            <span style="font-size: 26px;">👥</span>
+                            <div>
+                                <h4 style="font-size: 15px; font-weight: 800; color: #0F172A; margin: 0;">Import Customers Directory</h4>
+                                <span style="font-size: 11.5px; color: #64748B;">inFlow Customer CSV</span>
+                            </div>
+                        </div>
+                        <p style="font-size: 12px; color: #64748B; line-height: 1.4; margin-bottom: 14px;">
+                            Import wholesale and retail customers including shop names, contact persons, phones, emails, and street addresses.
+                        </p>
+                    </div>
+
+                    <form action="{{ url_for('branches.branch_import_csv', id=branch.id, import_type='customers') }}" method="POST" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label class="form-label">Choose inFlow Customers CSV File:</label>
+                            <input type="file" name="file" accept=".csv" class="form-input" required style="margin-top: 38px;">
+                        </div>
+                        <div style="display: flex; gap: 8px; margin-top: 14px;">
+                            <button type="submit" class="btn btn-primary" style="flex: 1; background: #0284C7; border: none; font-weight: 700;">
+                                📥 Start Customer Import
+                            </button>
+                            <a href="{{ url_for('branches.branch_csv_template', id=branch.id, template_type='customers') }}" class="btn btn-secondary" title="Download sample template">
+                                📄 Template
+                            </a>
+                        </div>
+                    </form>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB 4: EXPORT DATA (inFlow CSV)                              -->
+    <!-- ============================================================ -->
+    <div id="tabSection-export" class="tab-content-panel" {% if active_tab != 'export' %}style="display: none;"{% endif %}>
+        
+        <div class="settings-card">
+            <h3 class="settings-card-title">
+                <span>📤</span> Export Branch Data (inFlow CSV Compatible)
+            </h3>
+            <div class="settings-card-desc">
+                Export branch products, live stock on hand, sales orders, or customers to CSV files fully formatted with UTF-8 BOM encoding for seamless Microsoft Excel and inFlow import.
+            </div>
+
+            <div class="exchange-grid">
+                
+                <!-- Export 1: Inventory & Stock -->
+                <div class="exchange-box">
+                    <div>
+                        <div style="font-size: 32px; margin-bottom: 10px;">📦</div>
+                        <h4 style="font-size: 15px; font-weight: 800; color: #0F172A; margin: 0 0 6px 0;">Export Branch Stock on Hand</h4>
+                        <p style="font-size: 12px; color: #64748B; line-height: 1.4;">
+                            Includes SKU codes, product names, categories, barcodes, retail prices, standard costs, and exact quantities on hand at <strong>{{ central_wh.name if central_wh else 'STM Warehouse' }}</strong>.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <a href="{{ url_for('branches.branch_export_csv', id=branch.id, export_type='inventory') }}" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: {{ branch.color or '#FF5A5F' }}; border: none; font-weight: 700; text-decoration: none;">
+                            <span>📥</span> Download Stock CSV
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Export 2: Sales Orders -->
+                <div class="exchange-box">
+                    <div>
+                        <div style="font-size: 32px; margin-bottom: 10px;">📋</div>
+                        <h4 style="font-size: 15px; font-weight: 800; color: #0F172A; margin: 0 0 6px 0;">Export Branch Sales Orders</h4>
+                        <p style="font-size: 12px; color: #64748B; line-height: 1.4;">
+                            Includes order numbers, order dates, customer names, payment statuses, subtotals, discounts, amounts paid, and fulfilled locations for {{ branch.name }}.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <a href="{{ url_for('branches.branch_export_csv', id=branch.id, export_type='sales_orders') }}" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #0284C7; border: none; font-weight: 700; text-decoration: none;">
+                            <span>📥</span> Download Sales Orders CSV
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Export 3: Customers -->
+                <div class="exchange-box">
+                    <div>
+                        <div style="font-size: 32px; margin-bottom: 10px;">👥</div>
+                        <h4 style="font-size: 15px; font-weight: 800; color: #0F172A; margin: 0 0 6px 0;">Export Customer Directory</h4>
+                        <p style="font-size: 12px; color: #64748B; line-height: 1.4;">
+                            Includes customer contact directory, phone numbers, shipping addresses, open balances, and payment terms.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px;">
+                        <a href="{{ url_for('branches.branch_export_csv', id=branch.id, export_type='customers') }}" class="btn btn-primary" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; background: #10B981; border: none; font-weight: 700; text-decoration: none;">
+                            <span>📥</span> Download Customers CSV
+                        </a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ============================================================ -->
+        <!-- TAB 5: BRANCH USERS & ACCESS (បុគ្គលិក និងសិទ្ធិសាខា)           -->
+        <!-- ============================================================ -->
+        <div id="tabSection-users" class="tab-content-panel" {% if active_tab != 'users' %}style="display: none;"{% endif %}>
+            <div class="settings-card">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 14px;">
+                    <div>
+                        <h3 class="settings-card-title" style="font-size: 1.15rem; margin-bottom: 4px;">
+                            <span>👥</span> {{ branch.name }} — Branch Users & Access (គណនីបុគ្គលិកសាខា)
+                        </h3>
+                        <div class="settings-card-desc" style="margin-bottom: 0;">
+                            Users listed below are restricted strictly to <strong>{{ branch.name }} ({{ branch.code }})</strong>. They cannot manage other branches or access Main Store HQ settings.
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="openBranchUserModal()" style="display: flex; align-items: center; gap: 6px; font-weight: 700; background: {{ branch.color or '#FF5A5F' }}; border: none; padding: 9px 18px; border-radius: 8px;">
+                        <span>➕</span> Add Branch User / Cashier
+                    </button>
+                </div>
+
+                <!-- Branch Users Table -->
+                <div style="overflow-x: auto; border: 1px solid #E2E8F0; border-radius: 10px;">
+                    <table class="table" style="width: 100%; border-collapse: collapse; margin-bottom: 0;">
+                        <thead>
+                            <tr style="background: #F8FAFC; border-bottom: 2px solid #E2E8F0; font-size: 12px; color: #475569; text-align: left;">
+                                <th style="padding: 12px 16px;">User / Username</th>
+                                <th style="padding: 12px 16px;">Role</th>
+                                <th style="padding: 12px 16px;">Allowed Branch</th>
+                                <th style="padding: 12px 16px;">Contact</th>
+                                <th style="padding: 12px 16px;">Permissions</th>
+                                <th style="padding: 12px 16px;">Status</th>
+                                <th style="padding: 12px 16px;">Last Login</th>
+                                <th style="padding: 12px 16px; text-align: right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody style="font-size: 13px;">
+                            {% if branch_users %}
+                            {% for u in branch_users %}
+                            <tr style="border-bottom: 1px solid #E2E8F0; transition: background 0.15s;">
+                                <td style="padding: 12px 16px;">
+                                    <div style="display: flex; align-items: center; gap: 10px;">
+                                        <div style="width: 34px; height: 34px; border-radius: 8px; background: rgba(255, 90, 95, 0.15); color: {{ branch.color or '#FF5A5F' }}; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px;">
+                                            🏪
+                                        </div>
+                                        <div>
+                                            <div style="font-weight: 700; color: #0F172A;">{{ u.display_name }}</div>
+                                            <div style="font-size: 11.5px; color: #64748B; font-family: monospace;">@{{ u.username }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td style="padding: 12px 16px;">
+                                    {% if u.role == 'branch_admin' %}
+                                    <span style="background: #E0F2FE; color: #0369A1; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid #BAE6FD;">
+                                        🏪 Branch Admin
+                                    </span>
+                                    {% else %}
+                                    <span style="background: #FEF3C7; color: #92400E; font-weight: 700; font-size: 11px; padding: 3px 9px; border-radius: 12px; border: 1px solid #FCD34D;">
+                                        ⚡ Branch Cashier
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 12px 16px;">
+                                    <span style="display: inline-flex; align-items: center; gap: 5px; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 6px; padding: 3px 8px; font-size: 11.5px; font-weight: 700; color: #1E293B;">
+                                        <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: {{ branch.color or '#FF5A5F' }};"></span>
+                                        {{ branch.name }} ({{ branch.code }})
+                                    </span>
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 12px; color: #64748B;">
+                                    <div>{{ u.phone or '-' }}</div>
+                                    <div style="font-size: 11px; color: #94A3B8;">{{ u.email or '-' }}</div>
+                                </td>
+                                <td style="padding: 12px 16px;">
+                                    <div style="display: flex; flex-wrap: wrap; gap: 4px; max-width: 240px;">
+                                        {% set p = u.permissions_json or {} %}
+                                        {% if p.pos %}<span style="font-size: 10px; background: #E0F2FE; color: #0284C7; padding: 1px 5px; border-radius: 4px; font-weight: 600;">POS</span>{% endif %}
+                                        {% if p.sales_orders %}<span style="font-size: 10px; background: #E0F2FE; color: #0284C7; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Orders</span>{% endif %}
+                                        {% if p.inventory %}<span style="font-size: 10px; background: #FEF3C7; color: #B45309; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Stock</span>{% endif %}
+                                        {% if p.expenses %}<span style="font-size: 10px; background: #DCFCE7; color: #166534; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Expenses</span>{% endif %}
+                                        {% if p.reports %}<span style="font-size: 10px; background: #EDE9FE; color: #6D28D9; padding: 1px 5px; border-radius: 4px; font-weight: 600;">Reports</span>{% endif %}
+                                    </div>
+                                </td>
+                                <td style="padding: 12px 16px;">
+                                    {% if u.is_active %}
+                                    <span style="color: #10B981; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                                        <span style="width: 7px; height: 7px; border-radius: 50%; background: #10B981;"></span> Active
+                                    </span>
+                                    {% else %}
+                                    <span style="color: #EF4444; font-weight: 700; font-size: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                                        <span style="width: 7px; height: 7px; border-radius: 50%; background: #EF4444;"></span> Inactive
+                                    </span>
+                                    {% endif %}
+                                </td>
+                                <td style="padding: 12px 16px; font-size: 11.5px; color: #64748B; white-space: nowrap;">
+                                    {{ u.last_login|format_datetime if u.last_login else 'Never' }}
+                                </td>
+                                <td style="padding: 12px 16px; text-align: right; white-space: nowrap;">
+                                    <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                                        <a href="{{ url_for('auth.quick_login', role_or_user=u.username) }}" title="Fast switch & login" class="btn btn-sm" style="padding: 4px 8px; font-size: 11.5px; background: #F1F5F9; color: #334155; text-decoration: none; border: 1px solid #CBD5E1; border-radius: 6px; font-weight: 600;">
+                                            ⚡ Switch
+                                        </a>
+                                        <button type="button" class="btn btn-sm btn-outline" onclick='editBranchUser({{ u|tojson }})' style="padding: 4px 8px; font-size: 11.5px; border-radius: 6px;">
+                                            ✏️ Edit
+                                        </button>
+                                        {% if current_user and current_user.id != u.id %}
+                                        <form action="{{ url_for('auth.delete_user', user_id=u.id) }}" method="POST" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete user \'{{ u.display_name }}\'?');">
+                                            <input type="hidden" name="source_page" value="branch_settings">
+                                            <input type="hidden" name="branch_id" value="{{ branch.id }}">
+                                            <button type="submit" class="btn btn-sm" style="padding: 4px 8px; font-size: 11.5px; background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer;">
+                                                🗑️
+                                            </button>
+                                        </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            {% else %}
+                            <tr>
+                                <td colspan="8" style="padding: 24px; text-align: center; color: #94A3B8;">
+                                    No dedicated users created for this branch yet. Click "Add Branch User / Cashier" above to add staff accounts.
+                                </td>
+                            </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- MODAL: ADD / EDIT BRANCH USER -->
+        <div id="branchUserModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.6); z-index: 100000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+            <div style="background: #FFFFFF; border-radius: 14px; max-width: 620px; width: 92%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0,0,0,0.25); border: 1px solid #E2E8F0;">
+                <div style="padding: 18px 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC; border-radius: 14px 14px 0 0;">
+                    <h3 id="branchUserModalTitle" style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0;">
+                        <span>👤</span> Add Branch User / Cashier
+                    </h3>
+                    <button type="button" onclick="closeBranchUserModal()" style="background: none; border: none; font-size: 18px; color: #64748B; cursor: pointer; padding: 4px 8px;">✕</button>
+                </div>
+
+                <form action="{{ url_for('auth.save_user') }}" method="POST" id="branchUserAccountForm" style="padding: 24px;">
+                    <input type="hidden" name="user_id" id="bmodalUserId" value="">
+                    <input type="hidden" name="source_page" value="branch_settings">
+                    <input type="hidden" name="branch_id" value="{{ branch.id }}">
+
+                    <div style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: #0369A1; font-weight: 600;">
+                        🏪 Account will be assigned to <strong>{{ branch.name }} ({{ branch.code }})</strong> only.
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Username (ឈ្មោះគណនី) *</label>
+                            <input type="text" name="username" id="bmodalUsername" required class="form-input" placeholder="e.g. tk_cashier1" style="font-family: monospace;">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Full Display Name (ឈ្មោះបុគ្គលិក) *</label>
+                            <input type="text" name="display_name" id="bmodalDisplayName" required class="form-input" placeholder="e.g. Sreymom (POS 1)">
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Password (លេខសំងាត់) <span id="bmodalPasswordHint" style="font-weight: normal; color: #94A3B8;"></span></label>
+                            <input type="password" name="password" id="bmodalPassword" class="form-input" placeholder="••••••••">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Phone Number (លេខទូរស័ព្ទ)</label>
+                            <input type="text" name="phone" id="bmodalPhone" class="form-input" placeholder="+855 12 345 678">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label class="form-label">Branch Role (តួនាទីសាខា) *</label>
+                        <select name="role" id="bmodalRole" class="form-input" style="font-weight: 700;">
+                            <option value="branch_admin">🏪 Branch Admin (គ្រប់គ្រងសាខានេះ)</option>
+                            <option value="branch_cashier">⚡ Branch Cashier (គិតលុយ POS ប្រចាំសាខា)</option>
+                        </select>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label class="form-label" style="margin-bottom: 6px;">Branch Permissions (សិទ្ធិអនុញ្ញាតប្រចាំសាខា)</label>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px;">
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_dashboard" id="bperm_dashboard" value="1" checked>
+                                <span>Branch Dashboard</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_pos" id="bperm_pos" value="1" checked>
+                                <span>POS Quick Checkout</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_sales_orders" id="bperm_sales_orders" value="1" checked>
+                                <span>Sales Orders</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_invoices" id="bperm_invoices" value="1" checked>
+                                <span>Print Invoices</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_inventory" id="bperm_inventory" value="1" checked>
+                                <span>View Stock</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_transfers" id="bperm_transfers" value="1" checked>
+                                <span>Stock Transfers</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_expenses" id="bperm_expenses" value="1" checked>
+                                <span>Daily Expenses</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_customers" id="bperm_customers" value="1" checked>
+                                <span>Customers</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_reports" id="bperm_reports" value="1" checked>
+                                <span>Branch Financials</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_manage_settings" id="bperm_manage_settings" value="1" checked>
+                                <span>Branch Settings</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_edit_prices" id="bperm_edit_prices" value="1">
+                                <span>💲 Edit Selling Prices</span>
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; cursor: pointer;">
+                                <input type="checkbox" name="perm_view_costs" id="bperm_view_costs" value="1">
+                                <span>👁️ View Product Costs</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; margin-bottom: 18px;">
+                        <div>
+                            <div style="font-size: 12px; font-weight: 700;">Account Active (គណនីដំណើរការ)</div>
+                        </div>
+                        <label class="switch">
+                            <input type="checkbox" name="is_active" id="bmodalIsActive" value="true" checked>
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+
+                    <div style="display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0; padding-top: 16px;">
+                        <button type="button" class="btn btn-outline" onclick="closeBranchUserModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" style="background: {{ branch.color or '#FF5A5F' }}; border: none; font-weight: 700;">Save Account</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+// Tab Switching
+function switchSettingsTab(tabName, btnEl) {
+    document.querySelectorAll('.settings-tab-btn').forEach(b => b.classList.remove('active'));
+    if (btnEl) btnEl.classList.add('active');
+
+    document.querySelectorAll('.tab-content-panel').forEach(p => p.style.display = 'none');
+    const target = document.getElementById(`tabSection-${tabName}`);
+    if (target) target.style.display = 'block';
+
+    const tabHidden = document.getElementById('formActiveTab');
+    if (tabHidden) tabHidden.value = tabName;
+
+    if (tabName === 'invoice') {
+        setTimeout(updateInvoicePreview, 50);
+    }
+
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabName);
+    window.history.replaceState({}, '', url);
+}
+
+// Branch User Modal Functions
+function openBranchUserModal() {
+    document.getElementById('branchUserModalTitle').innerHTML = '<span>👤</span> Add Branch User / Cashier';
+    document.getElementById('bmodalUserId').value = '';
+    document.getElementById('bmodalUsername').value = '';
+    document.getElementById('bmodalDisplayName').value = '';
+    document.getElementById('bmodalPassword').value = '';
+    document.getElementById('bmodalPassword').setAttribute('required', 'required');
+    document.getElementById('bmodalPasswordHint').textContent = '(Initial password)';
+    document.getElementById('bmodalPhone').value = '';
+    document.getElementById('bmodalRole').value = 'branch_cashier';
+    document.getElementById('bmodalIsActive').checked = true;
+    document.getElementById('branchUserModal').style.display = 'flex';
+}
+
+function closeBranchUserModal() {
+    document.getElementById('branchUserModal').style.display = 'none';
+}
+
+function editBranchUser(u) {
+    document.getElementById('branchUserModalTitle').innerHTML = `<span>✏️</span> Edit User: ${u.display_name}`;
+    document.getElementById('bmodalUserId').value = u.id;
+    document.getElementById('bmodalUsername').value = u.username;
+    document.getElementById('bmodalDisplayName').value = u.display_name;
+    document.getElementById('bmodalPassword').value = '';
+    document.getElementById('bmodalPassword').removeAttribute('required');
+    document.getElementById('bmodalPasswordHint').textContent = '(Leave blank to keep unchanged)';
+    document.getElementById('bmodalPhone').value = u.phone || '';
+    document.getElementById('bmodalRole').value = u.role || 'branch_cashier';
+    document.getElementById('bmodalIsActive').checked = (u.is_active !== false);
+
+    let p = u.permissions_json || {};
+    if (typeof p === 'string') {
+        try { p = JSON.parse(p); } catch(e) { p = {}; }
+    }
+
+    const permKeys = [
+        'dashboard', 'pos', 'sales_orders', 'invoices', 'inventory',
+        'transfers', 'expenses', 'customers', 'reports', 'manage_settings',
+        'edit_prices', 'view_costs'
+    ];
+    permKeys.forEach(k => {
+        const el = document.getElementById('bperm_' + k);
+        if (el) {
+            el.checked = !!p[k];
+        }
+    });
+
+    document.getElementById('branchUserModal').style.display = 'flex';
+}
+
+
+// Color Swatch Selection (Tab 1)
+function selectBranchColor(hex) {
+    document.getElementById('branchColorInput').value = hex;
+    document.getElementById('branchColorPicker').value = hex;
+
+    document.querySelectorAll('.color-swatch-item').forEach(sw => {
+        sw.classList.remove('active');
+        sw.textContent = '';
+    });
+
+    const activeEl = Array.from(document.querySelectorAll('.color-swatch-item')).find(el => {
+        const bg = el.getAttribute('style') || '';
+        return bg.toLowerCase().includes(hex.toLowerCase());
+    });
+    if (activeEl) {
+        activeEl.classList.add('active');
+        activeEl.textContent = '✓';
+    }
+
+    // Also sync invoice tab primary color
+    setPresetColor(hex);
+}
+
+// Invoice Template Style Selection
+function selectInvoiceStyle(styleKey, cardEl) {
+    const input = document.getElementById('inputTemplateStyle');
+    if (input) input.value = styleKey;
+    document.querySelectorAll('.style-card').forEach(c => c.classList.remove('active'));
+    if (cardEl) cardEl.classList.add('active');
+}
+
+// ==========================================
+// INVOICE CUSTOMIZATION SCRIPTS (Identical to Main Store)
+// ==========================================
+function updateInvoicePreview() {
+    const font = document.getElementById('invFontFamily')?.value || 'Kantumruy Pro';
+    const primaryColor = document.getElementById('invColorHex')?.value || '{{ branch.color or "#FF5A5F" }}';
+    
+    const miniSheet = document.getElementById('invoiceMiniSheet');
+    if (miniSheet) {
+        miniSheet.style.fontFamily = `'${font}', sans-serif`;
+        miniSheet.style.setProperty('--preview-primary', primaryColor);
+    }
+
+    // Dynamic Color updates
+    const titleKh = document.getElementById('prevMockTitleKh');
+    if (titleKh) titleKh.style.color = primaryColor;
+    const shopEn = document.getElementById('prevMockShopNameEn');
+    if (shopEn) shopEn.style.color = primaryColor;
+    const theadTr = document.getElementById('prevTheadTr') || (miniSheet ? miniSheet.querySelector('thead tr') : null);
+    if (theadTr) {
+        theadTr.style.background = 'transparent';
+        theadTr.style.color = primaryColor;
+        theadTr.style.borderTopColor = primaryColor;
+        theadTr.style.borderBottomColor = primaryColor;
+        theadTr.querySelectorAll('th').forEach(th => {
+            th.style.color = primaryColor;
+        });
+    }
+
+    // Text fields sync
+    const shopKhVal = document.getElementById('invShopNameKh')?.value;
+    const shopEnVal = document.getElementById('invShopNameEn')?.value;
+    const addrKhVal = document.getElementById('invShopAddrKh')?.value;
+    const phoneVal = document.getElementById('invShopPhone')?.value;
+    const titKhVal = document.getElementById('invTitleKh')?.value;
+    const titEnVal = document.getElementById('invTitleEn')?.value;
+    const termsVal = document.getElementById('invPaymentTerms')?.value;
+    const bankVal = document.getElementById('invBankName')?.value;
+    const accNameVal = document.getElementById('invAccountName')?.value;
+    const accNoVal = document.getElementById('invAccountNumber')?.value;
+    const footKhVal = document.getElementById('invFooterKh')?.value;
+    const footEnVal = document.getElementById('invFooterEn')?.value;
+
+    if (shopKhVal && document.getElementById('prevMockShopNameKh')) document.getElementById('prevMockShopNameKh').innerText = shopKhVal;
+    if (shopEnVal && document.getElementById('prevMockShopNameEn')) document.getElementById('prevMockShopNameEn').innerText = shopEnVal;
+    if (addrKhVal && document.getElementById('prevMockShopAddrKh')) document.getElementById('prevMockShopAddrKh').innerText = addrKhVal;
+    if (phoneVal && document.getElementById('prevMockPhone')) document.getElementById('prevMockPhone').innerText = phoneVal;
+    if (titKhVal && document.getElementById('prevMockTitleKh')) document.getElementById('prevMockTitleKh').innerText = titKhVal;
+    if (titEnVal && document.getElementById('prevMockTitleEn')) document.getElementById('prevMockTitleEn').innerText = titEnVal;
+    if (termsVal && document.getElementById('prevMockTerms')) document.getElementById('prevMockTerms').innerText = termsVal;
+    if (bankVal && document.getElementById('prevMockBankName')) document.getElementById('prevMockBankName').innerText = bankVal;
+    if (accNameVal && document.getElementById('prevMockAccName')) document.getElementById('prevMockAccName').innerText = accNameVal;
+    if (accNoVal && document.getElementById('prevMockAccNo')) document.getElementById('prevMockAccNo').innerText = accNoVal;
+    if (footKhVal && document.getElementById('prevMockFooterKh')) document.getElementById('prevMockFooterKh').innerText = footKhVal;
+    if (footEnVal && document.getElementById('prevMockFooterEn')) document.getElementById('prevMockFooterEn').innerText = footEnVal;
+
+    // Exchange Rate & KHR Live Calculation
+    const rateInput = document.getElementById('invExchangeRate');
+    const rate = parseFloat(rateInput?.value || 4100.0) || 4100.0;
+    const totalUsd = 1509.75;
+    const balanceUsd = 0.0;
+    const khrTotal = Math.round((totalUsd * rate) / 100) * 100;
+    const khrBalance = Math.round((balanceUsd * rate) / 100) * 100;
+
+    const khrTotalEl = document.getElementById('prevMockKhrTotalVal');
+    const rateNoticeEl = document.getElementById('prevMockRateNotice');
+    const khrBalanceEl = document.getElementById('prevMockKhrBalanceVal');
+    const ratePillEl = document.getElementById('invRateExamplePill');
+
+    if (khrTotalEl) khrTotalEl.innerText = khrTotal.toLocaleString('en-US') + ' ៛';
+    if (rateNoticeEl) rateNoticeEl.innerText = `(អត្រាប្តូរប្រាក់ / Rate: 1$ = ${rate.toLocaleString('en-US')} ៛)`;
+    if (khrBalanceEl) khrBalanceEl.innerText = khrBalance.toLocaleString('en-US') + ' ៛';
+    if (ratePillEl) ratePillEl.innerText = `Sample: $1,440.00 USD × ${rate.toLocaleString('en-US')} = ${(Math.round((1440 * rate) / 100) * 100).toLocaleString('en-US')} ៛ (rounded to nearest 100 ៛)`;
+
+    // Toggle KHR
+    const enableKhr = document.getElementById('invEnableKhr')?.checked;
+    const khrRow = document.getElementById('prevMockKhrRow');
+    const khrBalRow = document.getElementById('prevMockKhrBalanceRow');
+    if (khrRow) khrRow.style.display = enableKhr ? 'block' : 'none';
+    if (khrBalRow) khrBalRow.style.display = enableKhr ? 'block' : 'none';
+    
+    // Toggle Tax
+    const showTax = document.getElementById('invShowTax')?.checked;
+    document.querySelectorAll('.prev-row-tax').forEach(el => {
+        el.style.display = showTax ? 'flex' : 'none';
+    });
+
+    // Toggle Signatures
+    const showSig = document.getElementById('invShowSig')?.checked;
+    const sigBox = document.getElementById('prevMockSigBox');
+    if (sigBox) sigBox.style.display = showSig ? 'flex' : 'none';
+
+    // Render layout positions and sizes
+    renderInvoiceLayout();
+}
+
+function syncColorInput(val) {
+    const hexInput = document.getElementById('invColorHex');
+    if (hexInput) hexInput.value = val;
+    // Also sync branch color inputs in Tab 1
+    const bInput = document.getElementById('branchColorInput');
+    const bPicker = document.getElementById('branchColorPicker');
+    if (bInput) bInput.value = val;
+    if (bPicker) bPicker.value = val;
+    updateInvoicePreview();
+}
+
+function syncColorPicker(val) {
+    if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+        const picker = document.getElementById('invColorPicker');
+        if (picker) picker.value = val;
+        const bInput = document.getElementById('branchColorInput');
+        const bPicker = document.getElementById('branchColorPicker');
+        if (bInput) bInput.value = val;
+        if (bPicker) bPicker.value = val;
+    }
+    updateInvoicePreview();
+}
+
+function setPresetColor(hex) {
+    const hexInput = document.getElementById('invColorHex');
+    const picker = document.getElementById('invColorPicker');
+    if (hexInput) hexInput.value = hex;
+    if (picker) picker.value = hex;
+    const bInput = document.getElementById('branchColorInput');
+    const bPicker = document.getElementById('branchColorPicker');
+    if (bInput) bInput.value = hex;
+    if (bPicker) bPicker.value = hex;
+    updateInvoicePreview();
+}
+
+function setPresetRate(rate) {
+    const rateInput = document.getElementById('invExchangeRate');
+    if (rateInput) {
+        rateInput.value = rate;
+        updateInvoicePreview();
+    }
+}
+
+function previewLogoFile(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const thumb = document.getElementById('invLogoPreviewThumb');
+            const placeholder = document.getElementById('invLogoPlaceholder');
+            const mockLogo = document.getElementById('prevMockLogo');
+            if (thumb) {
+                thumb.src = e.target.result;
+                thumb.style.display = 'block';
+            }
+            if (placeholder) placeholder.style.display = 'none';
+            if (mockLogo) {
+                mockLogo.src = e.target.result;
+                mockLogo.style.display = 'block';
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function toggleRemoveLogo(cb) {
+    const mockLogo = document.getElementById('prevMockLogo');
+    const thumb = document.getElementById('invLogoPreviewThumb');
+    const placeholder = document.getElementById('invLogoPlaceholder');
+    if (cb.checked) {
+        if (mockLogo) mockLogo.style.display = 'none';
+        if (thumb) thumb.style.display = 'none';
+        if (placeholder) placeholder.style.display = 'block';
+    } else {
+        if (mockLogo) mockLogo.style.display = 'block';
+        if (thumb) thumb.style.display = 'block';
+        if (placeholder) placeholder.style.display = 'none';
+    }
+}
+
+function previewQrFile(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const thumb = document.getElementById('invQrPreviewThumb');
+            const placeholder = document.getElementById('invQrPlaceholder');
+            const mockQr = document.getElementById('prevMockQr');
+            if (thumb) {
+                thumb.src = e.target.result;
+                thumb.style.display = 'block';
+            }
+            if (placeholder) placeholder.style.display = 'none';
+            if (mockQr) {
+                mockQr.src = e.target.result;
+                mockQr.style.display = 'block';
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function toggleRemoveQr(cb) {
+    const mockQr = document.getElementById('prevMockQr');
+    const thumb = document.getElementById('invQrPreviewThumb');
+    if (cb.checked) {
+        if (mockQr) mockQr.src = '/static/uploads/invoice/sample_khqr.png';
+        if (thumb) thumb.src = '/static/uploads/invoice/sample_khqr.png';
+    }
+}
+
+// ==========================================
+// INVOICE LAYOUT STATE & DIRECT LIVE PREVIEW INTERACTIVITY
+// ==========================================
+let currentQrSize = parseInt('{{ inv_settings.qr_size or 180 }}') || 180;
+let currentQrPos = '{{ inv_settings.qr_position or "left" }}';
+let currentBankSize = parseFloat('{{ inv_settings.bank_info_size or "8.5" }}') || 8.5;
+let currentBankPos = '{{ inv_settings.bank_info_position or "below_qr" }}';
+let currentQrOffsetX = parseInt('{{ inv_settings.qr_offset_x or 0 }}') || 0;
+let currentQrOffsetY = parseInt('{{ inv_settings.qr_offset_y or 0 }}') || 0;
+let currentBankOffsetX = parseInt('{{ inv_settings.bank_offset_x or 0 }}') || 0;
+let currentBankOffsetY = parseInt('{{ inv_settings.bank_offset_y or 0 }}') || 0;
+
+let layoutSaveTimeout = null;
+
+function renderInvoiceLayout() {
+    const container = document.getElementById('prevBottomSection');
+    const qrWrapper = document.getElementById('prevMockQrWrapper');
+    const bankWrapper = document.getElementById('prevMockBankWrapper');
+    const totalsWrapper = document.getElementById('prevMockTotalsWrapper');
+    const qrImg = document.getElementById('prevMockQr');
+    const bankCard = document.getElementById('prevMockBankCard');
+
+    if (!container || !qrWrapper || !bankWrapper || !totalsWrapper) return;
+
+    // Apply QR sizes
+    if (qrImg) {
+        qrImg.style.width = currentQrSize + 'px';
+        qrImg.style.height = currentQrSize + 'px';
+    }
+    if (qrWrapper) {
+        qrWrapper.style.width = currentQrSize + 'px';
+    }
+
+    // Apply Bank sizes
+    if (bankCard) {
+        bankCard.style.fontSize = currentBankSize + 'px';
+    }
+
+    // Update size indicators
+    const qrBadge = document.getElementById('prevQrSizeBadge');
+    if (qrBadge) qrBadge.innerText = currentQrSize + 'px';
+    const formQrBadge = document.getElementById('formQrSizeDisplay');
+    if (formQrBadge) formQrBadge.innerText = currentQrSize + 'px';
+    const formSlider = document.getElementById('formQrSizeSlider');
+    if (formSlider) formSlider.value = currentQrSize;
+
+    const bankBadge = document.getElementById('prevBankSizeBadge');
+    if (bankBadge) bankBadge.innerText = currentBankSize + 'px';
+
+    // Sync Hidden Form Inputs
+    const inQrSz = document.getElementById('invQrSize');
+    if (inQrSz) inQrSz.value = currentQrSize;
+    const inQrPos = document.getElementById('invQrPosition');
+    if (inQrPos) inQrPos.value = currentQrPos;
+    const inBankSz = document.getElementById('invBankInfoSize');
+    if (inBankSz) inBankSz.value = currentBankSize;
+    const inBankPos = document.getElementById('invBankInfoPosition');
+    if (inBankPos) inBankPos.value = currentBankPos;
+    const inQrOffX = document.getElementById('invQrOffsetX');
+    if (inQrOffX) inQrOffX.value = currentQrOffsetX;
+    const inQrOffY = document.getElementById('invQrOffsetY');
+    if (inQrOffY) inQrOffY.value = currentQrOffsetY;
+    const inBankOffX = document.getElementById('invBankOffsetX');
+    if (inBankOffX) inBankOffX.value = currentBankOffsetX;
+    const inBankOffY = document.getElementById('invBankOffsetY');
+    if (inBankOffY) inBankOffY.value = currentBankOffsetY;
+
+    // Sync Form layout buttons in Step 4
+    updateFormLayoutButtons();
+
+    // Reset styles on wrappers
+    qrWrapper.style.display = 'inline-block';
+    bankWrapper.style.display = 'block';
+
+    // DOM Re-arrangement based on currentQrPos and currentBankPos
+    container.innerHTML = '';
+    container.style.marginTop = '8px';
+    container.style.marginBottom = '14px';
+    container.style.position = 'relative';
+
+    const colWidth = Math.max(currentQrSize + 16, 170) + 'px';
+
+    if (currentQrPos === 'left') {
+        if (currentBankPos === 'below_qr') {
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = `${colWidth} 1fr`;
+            container.style.gap = '16px';
+            container.style.alignItems = 'start';
+
+            const leftCol = document.createElement('div');
+            leftCol.id = 'prevLeftCol';
+            qrWrapper.style.marginBottom = '8px';
+            bankWrapper.style.width = '100%';
+            leftCol.appendChild(qrWrapper);
+            leftCol.appendChild(bankWrapper);
+
+            const rightCol = document.createElement('div');
+            rightCol.style.display = 'flex';
+            rightCol.style.justifyContent = 'flex-end';
+            rightCol.appendChild(totalsWrapper);
+
+            container.appendChild(leftCol);
+            container.appendChild(rightCol);
+        } else if (currentBankPos === 'beside_qr') {
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = '1fr 250px';
+            container.style.gap = '14px';
+            container.style.alignItems = 'start';
+
+            const leftCol = document.createElement('div');
+            leftCol.style.display = 'flex';
+            leftCol.style.gap = '10px';
+            leftCol.style.alignItems = 'flex-start';
+            qrWrapper.style.marginBottom = '0';
+            bankWrapper.style.flex = '1';
+            leftCol.appendChild(qrWrapper);
+            leftCol.appendChild(bankWrapper);
+
+            const rightCol = document.createElement('div');
+            rightCol.style.display = 'flex';
+            rightCol.style.justifyContent = 'flex-end';
+            rightCol.appendChild(totalsWrapper);
+
+            container.appendChild(leftCol);
+            container.appendChild(rightCol);
+        } else { // bottom_full
+            container.style.display = 'block';
+
+            const topRow = document.createElement('div');
+            topRow.style.display = 'grid';
+            topRow.style.gridTemplateColumns = `${colWidth} 1fr`;
+            topRow.style.gap = '16px';
+            topRow.style.alignItems = 'start';
+            topRow.style.marginBottom = '10px';
+
+            const leftCol = document.createElement('div');
+            qrWrapper.style.marginBottom = '0';
+            leftCol.appendChild(qrWrapper);
+
+            const rightCol = document.createElement('div');
+            rightCol.style.display = 'flex';
+            rightCol.style.justifyContent = 'flex-end';
+            rightCol.appendChild(totalsWrapper);
+
+            topRow.appendChild(leftCol);
+            topRow.appendChild(rightCol);
+            container.appendChild(topRow);
+
+            bankWrapper.style.width = '100%';
+            container.appendChild(bankWrapper);
+        }
+    } else if (currentQrPos === 'right') {
+        if (currentBankPos === 'below_qr') {
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = `1fr ${colWidth}`;
+            container.style.gap = '16px';
+            container.style.alignItems = 'start';
+
+            const leftCol = document.createElement('div');
+            leftCol.appendChild(totalsWrapper);
+
+            const rightCol = document.createElement('div');
+            rightCol.id = 'prevRightCol';
+            qrWrapper.style.marginBottom = '8px';
+            bankWrapper.style.width = '100%';
+            rightCol.appendChild(qrWrapper);
+            rightCol.appendChild(bankWrapper);
+
+            container.appendChild(leftCol);
+            container.appendChild(rightCol);
+        } else if (currentBankPos === 'beside_qr') {
+            container.style.display = 'grid';
+            container.style.gridTemplateColumns = '250px 1fr';
+            container.style.gap = '14px';
+            container.style.alignItems = 'start';
+
+            const leftCol = document.createElement('div');
+            leftCol.appendChild(totalsWrapper);
+
+            const rightCol = document.createElement('div');
+            rightCol.style.display = 'flex';
+            rightCol.style.gap = '10px';
+            rightCol.style.alignItems = 'flex-start';
+            bankWrapper.style.flex = '1';
+            qrWrapper.style.marginBottom = '0';
+            rightCol.appendChild(bankWrapper);
+            rightCol.appendChild(qrWrapper);
+
+            container.appendChild(leftCol);
+            container.appendChild(rightCol);
+        } else { // bottom_full
+            container.style.display = 'block';
+
+            const topRow = document.createElement('div');
+            topRow.style.display = 'grid';
+            topRow.style.gridTemplateColumns = `1fr ${colWidth}`;
+            topRow.style.gap = '16px';
+            topRow.style.alignItems = 'start';
+            topRow.style.marginBottom = '10px';
+
+            const leftCol = document.createElement('div');
+            leftCol.appendChild(totalsWrapper);
+
+            const rightCol = document.createElement('div');
+            rightCol.style.display = 'flex';
+            rightCol.style.justifyContent = 'flex-end';
+            qrWrapper.style.marginBottom = '0';
+            rightCol.appendChild(qrWrapper);
+
+            topRow.appendChild(leftCol);
+            topRow.appendChild(rightCol);
+            container.appendChild(topRow);
+
+            bankWrapper.style.width = '100%';
+            container.appendChild(bankWrapper);
+        }
+    } else { // bottom
+        container.style.display = 'block';
+
+        const topRow = document.createElement('div');
+        topRow.style.display = 'flex';
+        topRow.style.justifyContent = 'flex-end';
+        topRow.style.marginBottom = '12px';
+        topRow.appendChild(totalsWrapper);
+        container.appendChild(topRow);
+
+        const bottomRow = document.createElement('div');
+        if (currentBankPos === 'beside_qr') {
+            bottomRow.style.display = 'flex';
+            bottomRow.style.gap = '14px';
+            bottomRow.style.alignItems = 'start';
+            qrWrapper.style.marginBottom = '0';
+            bankWrapper.style.flex = '1';
+            bottomRow.appendChild(qrWrapper);
+            bottomRow.appendChild(bankWrapper);
+        } else {
+            bottomRow.style.display = 'block';
+            qrWrapper.style.marginBottom = '8px';
+            bankWrapper.style.width = '100%';
+            bottomRow.appendChild(qrWrapper);
+            bottomRow.appendChild(bankWrapper);
+        }
+        container.appendChild(bottomRow);
+    }
+}
+
+function updateFormLayoutButtons() {
+    ['left', 'right', 'bottom'].forEach(p => {
+        const btn = document.getElementById('btnQrPos' + p.charAt(0).toUpperCase() + p.slice(1));
+        if (btn) {
+            if (currentQrPos === p) {
+                btn.style.background = '#2563EB';
+                btn.style.borderColor = '#2563EB';
+                btn.style.color = '#FFFFFF';
+            } else {
+                btn.style.background = '#FFFFFF';
+                btn.style.borderColor = '#CBD5E1';
+                btn.style.color = '#334155';
+            }
+        }
+    });
+
+    const mapPos = { 'below_qr': 'Below', 'beside_qr': 'Beside', 'bottom_full': 'Bottom' };
+    Object.keys(mapPos).forEach(k => {
+        const btn = document.getElementById('btnBankPos' + mapPos[k]);
+        if (btn) {
+            if (currentBankPos === k) {
+                btn.style.background = '#2563EB';
+                btn.style.borderColor = '#2563EB';
+                btn.style.color = '#FFFFFF';
+            } else {
+                btn.style.background = '#FFFFFF';
+                btn.style.borderColor = '#CBD5E1';
+                btn.style.color = '#334155';
+            }
+        }
+    });
+
+    const mapSz = { '7.5': 'Compact', '8.5': 'Std', '10': 'Large' };
+    Object.keys(mapSz).forEach(k => {
+        const btn = document.getElementById('btnBankSize' + mapSz[k]);
+        if (btn) {
+            if (String(currentBankSize) === k) {
+                btn.style.background = '#2563EB';
+                btn.style.borderColor = '#2563EB';
+                btn.style.color = '#FFFFFF';
+            } else {
+                btn.style.background = '#FFFFFF';
+                btn.style.borderColor = '#CBD5E1';
+                btn.style.color = '#334155';
+            }
+        }
+    });
+}
+
+function setQrPosition(pos, e) {
+    if (e) e.stopPropagation();
+    currentQrPos = pos;
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+}
+
+function adjustQrSize(delta, e) {
+    if (e) e.stopPropagation();
+    currentQrSize = Math.max(90, Math.min(250, currentQrSize + delta));
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+}
+
+function onFormQrSizeChange(val) {
+    currentQrSize = parseInt(val) || 180;
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+}
+
+function setBankPosition(pos, e) {
+    if (e) e.stopPropagation();
+    currentBankPos = pos;
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+}
+
+function adjustBankSize(delta, e) {
+    if (e) e.stopPropagation();
+    currentBankSize = Math.max(7, Math.min(12, Math.round((currentBankSize + delta) * 2) / 2));
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+}
+
+function setBankSize(val) {
+    currentBankSize = parseFloat(val) || 8.5;
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+}
+
+function resetInvoiceLayout() {
+    currentQrSize = 180;
+    currentQrPos = 'left';
+    currentBankSize = 8.5;
+    currentBankPos = 'below_qr';
+    currentQrOffsetX = 0;
+    currentQrOffsetY = 0;
+    currentBankOffsetX = 0;
+    currentBankOffsetY = 0;
+    renderInvoiceLayout();
+    debouncedSaveLayout();
+    showLayoutSavedToast('Reset to default');
+}
+
+function debouncedSaveLayout() {
+    clearTimeout(layoutSaveTimeout);
+    layoutSaveTimeout = setTimeout(saveLayoutAjax, 400);
+}
+
+function saveLayoutAjax() {
+    fetch('/api/branches/{{ branch.id }}/settings/invoice/layout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            qr_size: currentQrSize,
+            qr_position: currentQrPos,
+            bank_info_size: String(currentBankSize),
+            bank_info_position: currentBankPos,
+            qr_offset_x: currentQrOffsetX,
+            qr_offset_y: currentQrOffsetY,
+            bank_offset_x: currentBankOffsetX,
+            bank_offset_y: currentBankOffsetY
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showLayoutSavedToast('Layout saved');
+        }
+    })
+    .catch(err => console.error('Auto-save error:', err));
+}
+
+function showLayoutSavedToast(msg) {
+    const badge = document.getElementById('prevLayoutSavedBadge');
+    if (!badge) return;
+    badge.innerText = '✓ ' + (msg || 'Layout Saved');
+    badge.style.display = 'inline-flex';
+    setTimeout(() => {
+        badge.style.display = 'none';
+    }, 2200);
+}
+
+// Mouse Drag & Corner Resize Interactions on Live Preview Elements
+function initDirectPreviewInteractions() {
+    // 1. QR Corner Resize Handle (Drag to adjust size)
+    const qrHandle = document.getElementById('prevQrCornerHandle');
+    if (qrHandle) {
+        qrHandle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startSize = currentQrSize;
+            const qrWrapper = document.getElementById('prevMockQrWrapper');
+            if (qrWrapper) qrWrapper.classList.add('is-active');
+
+            function onMouseMove(ev) {
+                const delta = (ev.clientX - startX) + (ev.clientY - startY);
+                currentQrSize = Math.max(90, Math.min(250, startSize + Math.round(delta * 0.75)));
+                renderInvoiceLayout();
+            }
+
+            function onMouseUp() {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                if (qrWrapper) qrWrapper.classList.remove('is-active');
+                debouncedSaveLayout();
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
+    // 2. Bank Corner Resize Handle (Drag to adjust text size)
+    const bankHandle = document.getElementById('prevBankCornerHandle');
+    if (bankHandle) {
+        bankHandle.addEventListener('mousedown', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const startX = e.clientX;
+            const startSize = currentBankSize;
+            const bankWrapper = document.getElementById('prevMockBankWrapper');
+            if (bankWrapper) bankWrapper.classList.add('is-active');
+
+            function onMouseMove(ev) {
+                const delta = (ev.clientX - startX) / 18;
+                currentBankSize = Math.max(7, Math.min(12, Math.round((startSize + delta) * 2) / 2));
+                renderInvoiceLayout();
+            }
+
+            function onMouseUp() {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                if (bankWrapper) bankWrapper.classList.remove('is-active');
+                debouncedSaveLayout();
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    }
+
+    // 3. QR Card Drag to Move
+    const qrDragHandles = document.querySelectorAll('.qr-drag-handle, #prevMockQrCard');
+    qrDragHandles.forEach(el => {
+        el.addEventListener('mousedown', function(e) {
+            if (e.target.closest('button') || e.target.closest('.prev-corner-handle')) return;
+            const startX = e.clientX;
+            const startY = e.clientY;
+            let hasMoved = false;
+            const qrWrapper = document.getElementById('prevMockQrWrapper');
+            const container = document.getElementById('prevBottomSection');
+            if (!container || !qrWrapper) return;
+
+            function onMouseMove(ev) {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                    hasMoved = true;
+                    qrWrapper.classList.add('is-active');
+                    qrWrapper.style.transform = `translate(${dx}px, ${dy}px) scale(1.02)`;
+                    qrWrapper.style.opacity = '0.75';
+                    qrWrapper.style.zIndex = '100';
+                }
+            }
+
+            function onMouseUp(ev) {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                qrWrapper.style.transform = '';
+                qrWrapper.style.opacity = '';
+                qrWrapper.style.zIndex = '';
+                qrWrapper.classList.remove('is-active');
+
+                if (hasMoved) {
+                    const rect = container.getBoundingClientRect();
+                    const relX = ev.clientX - rect.left;
+                    const relY = ev.clientY - rect.top;
+
+                    if (relY > rect.height * 0.75 && rect.height > 100) {
+                        currentQrPos = 'bottom';
+                    } else if (relX > rect.width * 0.5) {
+                        currentQrPos = 'right';
+                    } else {
+                        currentQrPos = 'left';
+                    }
+                    renderInvoiceLayout();
+                    debouncedSaveLayout();
+                }
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    });
+
+    // 4. Bank Info Drag to Move
+    const bankDragHandles = document.querySelectorAll('.bank-drag-handle, #prevMockBankCard');
+    bankDragHandles.forEach(el => {
+        el.addEventListener('mousedown', function(e) {
+            if (e.target.closest('button') || e.target.closest('.prev-corner-handle')) return;
+            const startX = e.clientX;
+            const startY = e.clientY;
+            let hasMoved = false;
+            const bankWrapper = document.getElementById('prevMockBankWrapper');
+            const container = document.getElementById('prevBottomSection');
+            if (!container || !bankWrapper) return;
+
+            function onMouseMove(ev) {
+                const dx = ev.clientX - startX;
+                const dy = ev.clientY - startY;
+                if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                    hasMoved = true;
+                    bankWrapper.classList.add('is-active');
+                    bankWrapper.style.transform = `translate(${dx}px, ${dy}px) scale(1.02)`;
+                    bankWrapper.style.opacity = '0.75';
+                    bankWrapper.style.zIndex = '100';
+                }
+            }
+
+            function onMouseUp(ev) {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                bankWrapper.style.transform = '';
+                bankWrapper.style.opacity = '';
+                bankWrapper.style.zIndex = '';
+                bankWrapper.classList.remove('is-active');
+
+                if (hasMoved) {
+                    const rect = container.getBoundingClientRect();
+                    const relX = ev.clientX - rect.left;
+                    const relY = ev.clientY - rect.top;
+
+                    if (relY > rect.height * 0.75) {
+                        currentBankPos = 'bottom_full';
+                    } else if (relX > currentQrSize + 20) {
+                        currentBankPos = 'beside_qr';
+                    } else {
+                        currentBankPos = 'below_qr';
+                    }
+                    renderInvoiceLayout();
+                    debouncedSaveLayout();
+                }
+            }
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    updateInvoicePreview();
+    initDirectPreviewInteractions();
+});
+</script>
+{% endblock %}

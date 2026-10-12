@@ -1,0 +1,1379 @@
+{% extends 'base.html' %}
+
+{% block title %}Monthly Expense & Cash Tracker - {{ month_display }} - inFlow Premium{% endblock %}
+
+{% block content %}
+<div class="inflow-expense-container">
+    <!-- Top Bar: Title & Primary Actions -->
+    <div class="expense-top-header">
+        <div class="expense-title-group">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <div class="expense-badge-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <rect x="2.5" y="5" width="19" height="14" rx="3" stroke="#0F766E" stroke-width="2"/>
+                        <path d="M16 12h4" stroke="#0F766E" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="17.5" cy="12" r="1.2" fill="#0F766E"/>
+                        <path d="M2.5 9h19" stroke="#0F766E" stroke-width="1.4" opacity="0.4"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="expense-main-heading">Monthly Expense & Cash Flow Record</h1>
+                    <div class="expense-sub-heading">
+                        <span>Period: <strong>{{ month_display }}</strong></span>
+                        <span class="dot-sep">•</span>
+                        <span>Daily expense tracking & cash-in-hand reconciliation</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="expense-header-actions">
+            <!-- Export Dropdown -->
+            <div class="dropdown-wrapper" style="position: relative; display: inline-block;">
+                <button type="button" class="btn btn-outline" id="exportDropdownBtn" onclick="toggleExportMenu(event)" title="Export Report as Excel or PDF">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Export ▾</span>
+                </button>
+                <div class="dropdown-menu-custom" id="exportDropdownMenu" style="display: none; position: absolute; right: 0; top: calc(100% + 5px); background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 1000; min-width: 195px; overflow: hidden;">
+                    <a href="javascript:void(0)" onclick="triggerMonthlyExport('excel')" data-no-tab="true" class="dropdown-item-custom" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 12px; color: #1E293B; text-decoration: none; border-bottom: 1px solid #F1F5F9; cursor: pointer;">
+                        <span style="font-size: 15px;">📊</span>
+                        <div>
+                            <div style="font-weight: 700; color: #0F766E;">Export to Excel</div>
+                            <div style="font-size: 10px; color: #64748B;">Formatted .xlsx workbook</div>
+                        </div>
+                    </a>
+                    <a href="javascript:void(0)" onclick="triggerMonthlyExport('pdf')" data-no-tab="true" class="dropdown-item-custom" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 12px; color: #1E293B; text-decoration: none; border-bottom: 1px solid #F1F5F9; cursor: pointer;">
+                        <span style="font-size: 15px;">📄</span>
+                        <div>
+                            <div style="font-weight: 700; color: #DC2626;">Export to PDF</div>
+                            <div style="font-size: 10px; color: #64748B;">Landscape document</div>
+                        </div>
+                    </a>
+                    <a href="{{ url_for('expenses.print_monthly_report', month=current_month) }}" target="_blank" data-no-tab="true" onclick="closeExportMenu()" class="dropdown-item-custom" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 12px; color: #1E293B; text-decoration: none; cursor: pointer;">
+                        <span style="font-size: 15px;">🖨️</span>
+                        <div>
+                            <div style="font-weight: 700; color: #2563EB;">Print / High-DPI View</div>
+                            <div style="font-size: 10px; color: #64748B;">Browser print dialog</div>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-outline" onclick="openBalanceModal()" title="Edit Opening Balance, STM & Sales">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                <span>Edit Balances (លុយចាស់ / STM)</span>
+            </button>
+            <button type="button" class="btn btn-outline" onclick="openNewMonthModal()" title="Add another month sheet">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
+                <span>+ Add Month</span>
+            </button>
+            <button type="button" class="btn btn-outline" onclick="openDeleteMonthModal()" style="color: #DC2626; border-color: #FCA5A5;" title="Delete this month sheet and all its entries">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Delete Month</span>
+            </button>
+            <button type="button" class="btn btn-primary" onclick="openRecordModal()">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                <span>+ Record Expense</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Google Sheets Style Monthly Tabs -->
+    <div class="sheet-tabs-container">
+        <div class="sheet-tabs-scroll">
+            <a href="{{ url_for('expenses.summary_dashboard') }}" class="sheet-tab-item tab-summary">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span>Summary Dashboard</span>
+            </a>
+            {% for tab in month_tabs %}
+            <a href="{{ url_for('expenses.monthly_expenses', month=tab.key) }}" 
+               class="sheet-tab-item {% if tab.key == current_month %}active{% endif %}">
+                <span class="sheet-tab-icon">📊</span>
+                <span>{{ tab.label }}</span>
+                {% if tab.key == current_month %}
+                <span class="sheet-tab-active-dot"></span>
+                {% endif %}
+            </a>
+            {% endfor %}
+            <button type="button" class="sheet-tab-add-btn" onclick="openNewMonthModal()" title="Create month sheet">
+                +
+            </button>
+        </div>
+    </div>
+
+    <!-- Executive Financial KPI Summary Cards (Matching Columns A-I of Google Sheet) -->
+    <div class="expense-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+        <!-- 1. Total Expenses (ចំណាយសរុប) -->
+        <div class="expense-kpi-card danger-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">ចំណាយសរុប (Expenses)</span>
+                <span class="kpi-tag red">{{ expenses|length }} items</span>
+            </div>
+            <div class="kpi-card-value red-text">${{ "{:,.2f}".format(total_expenses) }}</div>
+            <div class="kpi-card-sub">Sum of all daily recorded expenses</div>
+        </div>
+
+        <!-- 2. Opening Balance (លុយចាស់) - Auto or Manual -->
+        <div class="expense-kpi-card green-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">លុយចាស់ (Opening)</span>
+                {% if is_manual_opening %}
+                <span class="kpi-tag blue" title="Manually entered by user">Manual</span>
+                {% else %}
+                <span class="kpi-tag green" title="Auto carried from previous month's Money in Hand">Auto Prev</span>
+                {% endif %}
+            </div>
+            <div class="kpi-card-value green-text">${{ "{:,.2f}".format(opening_balance) }}</div>
+            <div class="kpi-card-sub">
+                {% if is_manual_opening %}
+                Manual Set <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">(Edit)</button>
+                {% else %}
+                From {{ prev_month_display or 'Prev Month' }} (${{ "{:,.2f}".format(prev_money_in_hand) }})
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 3. Clear STM -->
+        <div class="expense-kpi-card teal-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Clear STM</span>
+                <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">Edit ✎</button>
+            </div>
+            <div class="kpi-card-value teal-text">${{ "{:,.2f}".format(clear_stm) }}</div>
+            <div class="kpi-card-sub">Bank/STM cleared settlement</div>
+        </div>
+
+        <!-- 4. Media Total (ប្រាក់ទទួលបានពី Media: Auto from Sheet or Manual) -->
+        <div class="expense-kpi-card green-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Media (ប្រាក់ពី Media)</span>
+                {% if is_manual_media %}
+                <span class="kpi-tag blue" title="Manually entered in balances modal">Manual</span>
+                {% else %}
+                <a href="#mediaReceiptsSection" class="kpi-tag green" style="text-decoration: none;" title="Auto-calculated from Media sheet below">{{ media_receipts|length }} items ↓</a>
+                {% endif %}
+            </div>
+            <div class="kpi-card-value green-text">${{ "{:,.2f}".format(media_total) }}</div>
+            <div class="kpi-card-sub">
+                {% if is_manual_media %}
+                Manual Set <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">(Sheet: ${{ "{:,.2f}".format(media_sheet_total) }})</button>
+                {% else %}
+                Auto from Media Sheet ({{ media_receipts|length }} entries)
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 5. Customer Receipts (លុយលក់) -->
+        <div class="expense-kpi-card teal-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">លុយលក់ (Sales)</span>
+                <span class="kpi-tag teal">{% if is_custom_sales %}Custom{% else %}inFlow Live{% endif %}</span>
+            </div>
+            <div class="kpi-card-value teal-text">${{ "{:,.2f}".format(sales_received) }}</div>
+            <div class="kpi-card-sub">
+                Invoiced: ${{ "{:,.2f}".format(inflow_data.total_invoiced) }} ({{ inflow_data.paid_invoice_count }} paid)
+            </div>
+        </div>
+
+        <!-- 6. Total Cash Inflow (លុយសរុប: ចាស់ + STM + Media + លក់) -->
+        <div class="expense-kpi-card blue-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">លុយសរុប (Total Inflow)</span>
+                <span class="kpi-tag blue">ចាស់+STM+Media+លក់</span>
+            </div>
+            <div class="kpi-card-value blue-text">${{ "{:,.2f}".format(total_money_in) }}</div>
+            <div class="kpi-card-sub">Opening + Clear STM + Media + Sales</div>
+        </div>
+
+        <!-- 7. Money in Hand / Remaining (លុយសល់: លុយសរុប - ចំណាយ) -->
+        <div class="expense-kpi-card amber-spotlight">
+            <div class="kpi-card-header">
+                <span class="kpi-label" style="font-weight: 800; color: #92400E;">លុយសល់ (Money in Hand)</span>
+                <span class="kpi-tag amber" style="background: #FDE68A; color: #92400E;">សរុប - ចំណាយ</span>
+            </div>
+            <div class="kpi-card-value amber-text" style="font-size: 1.55rem; font-weight: 800; color: #B45309;">
+                ${{ "{:,.2f}".format(money_in_hand) }}
+            </div>
+            <div class="kpi-card-sub" style="color: #92400E;">
+                Expected theoretical cash balance
+            </div>
+        </div>
+
+        <!-- 8. Net Margin / Profit (ចំណូល - ចំណាយ) -->
+        <div class="expense-kpi-card {% if net_operating_income >= 0 %}success-accent{% else %}danger-accent{% endif %}">
+            <div class="kpi-card-header">
+                <span class="kpi-label">ចំណូល - ចំណាយ (Net)</span>
+                <span class="kpi-tag {% if net_operating_income >= 0 %}green{% else %}red{% endif %}">
+                    {% if net_operating_income >= 0 %}Profit{% else %}Deficit{% endif %}
+                </span>
+            </div>
+            <div class="kpi-card-value {% if net_operating_income >= 0 %}green-text{% else %}red-text{% endif %}">
+                ${{ "{:,.2f}".format(net_operating_income) }}
+            </div>
+            <div class="kpi-card-sub">Sales + STM + Media minus Expenses</div>
+        </div>
+    </div>
+
+    <!-- Two-Panel Workspace Split Layout -->
+    <div class="expense-workspace-split">
+        <!-- LEFT PANEL: Daily Expenses Spreadsheet Grid (70%) -->
+        <div class="expense-sheet-panel">
+            <div class="panel-header-bar">
+                <div class="panel-title-group">
+                    <span class="panel-title">Daily Expense Breakdown (តារាងចំណាយប្រចាំថ្ងៃ)</span>
+                    <span class="panel-counter">{{ expenses|length }} entries</span>
+                </div>
+                <div class="panel-filter-bar">
+                    <div class="search-input-wrap">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                        <input type="text" id="expenseSearchInput" placeholder="Search expense..." oninput="filterExpenseRows(this.value)">
+                    </div>
+                    <select id="expensePayerFilter" class="filter-select-sm" onchange="filterExpenseByPayer(this.value)">
+                        <option value="">All Payers (ទាំងអស់)</option>
+                        {% for p in payers %}
+                        <option value="{{ p }}">{{ p }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="expense-table-wrapper">
+                <table class="expense-grid-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 40px; text-align: center;">No</th>
+                            <th>Item Description (មុខទំនិញ)</th>
+                            <th style="text-align: right; width: 95px;">Unit Price ($)</th>
+                            <th style="text-align: center; width: 55px;">Qty</th>
+                            <th style="text-align: right; width: 110px;">Total Price ($)</th>
+                            <th style="width: 100px;">Date</th>
+                            <th style="width: 100px;">Paid By</th>
+                            <th style="width: 110px;">Category</th>
+                            <th style="width: 70px; text-align: center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="expenseTableBody">
+                        {% for exp in expenses %}
+                        <tr class="expense-row" data-id="{{ exp.id }}" data-item="{{ exp.item|lower }}" data-payer="{{ exp.paid_by|lower }}" data-cat="{{ exp.category|lower }}">
+                            <td style="text-align: center; color: #64748B; font-weight: 600;">{{ loop.index }}</td>
+                            <td style="font-weight: 600; color: #0F172A;">
+                                <span>{{ exp.item }}</span>
+                                {% if exp.notes %}
+                                <div style="font-size: 10px; color: #64748B; font-weight: 400; margin-top: 1px;">{{ exp.notes }}</div>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: right; font-family: 'JetBrains Mono', monospace;">
+                                ${{ "{:,.2f}".format(exp.unit_price|float) }}
+                            </td>
+                            <td style="text-align: center; font-weight: 600; color: #475569;">
+                                {{ "{:g}".format(exp.quantity|float) }}
+                            </td>
+                            <td style="text-align: right; font-weight: 700; font-family: 'JetBrains Mono', monospace; color: #B91C1C;">
+                                ${{ "{:,.2f}".format(exp.total_price|float) }}
+                            </td>
+                            <td style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #475569;">
+                                {{ exp.expense_date.strftime('%d-%b') if exp.expense_date else '-' }}
+                            </td>
+                            <td>
+                                {% if exp.paid_by %}
+                                <span class="payer-badge {{ exp.paid_by|lower }}">{{ exp.paid_by }}</span>
+                                {% else %}
+                                <span style="color: #94A3B8;">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if exp.category %}
+                                <span class="cat-pill">{{ exp.category }}</span>
+                                {% else %}
+                                <span style="color: #94A3B8;">-</span>
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">
+                                <button type="button" class="action-icon-btn edit" 
+                                        data-id="{{ exp.id }}"
+                                        data-item="{{ exp.item }}"
+                                        data-price="{{ exp.unit_price }}"
+                                        data-qty="{{ exp.quantity }}"
+                                        data-total="{{ exp.total_price }}"
+                                        data-date="{{ exp.expense_date }}"
+                                        data-payer="{{ exp.paid_by }}"
+                                        data-cat="{{ exp.category }}"
+                                        data-notes="{{ exp.notes or '' }}"
+                                        onclick="openEditExpenseModalFromBtn(this)" 
+                                        title="Edit Row">✎</button>
+                                <form method="POST" action="{{ url_for('expenses.delete_expense', id=exp.id) }}" style="display: inline;" onsubmit="return confirm('Delete expense \'{{ exp.item }}\'?');">
+                                    <button type="submit" class="action-icon-btn delete" title="Delete Row">✕</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" style="text-align: center; padding: 40px 16px; color: #94A3B8;">
+                                <div style="font-size: 28px; margin-bottom: 6px;">📋</div>
+                                <div style="font-size: 13px; font-weight: 600; color: #64748B;">No expenses recorded yet for {{ month_display }}</div>
+                                <div style="font-size: 11px; margin-top: 4px;">Click the <strong>+ Record Expense</strong> button above to add your first daily entry.</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="expense-table-footer">
+                            <td colspan="4" style="text-align: right; font-weight: 700; color: #1E293B; padding: 8px 12px;">
+                                សរុបការចំណាយ (Total {{ expenses|length }} Items):
+                            </td>
+                            <td style="text-align: right; font-weight: 800; font-size: 13px; color: #B91C1C; font-family: 'JetBrains Mono', monospace; padding: 8px 12px;">
+                                ${{ "{:,.2f}".format(total_expenses) }}
+                            </td>
+                            <td colspan="4"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <!-- Quick Add Bar at Bottom (Spreadsheet fast input) -->
+            <div class="expense-quick-entry-bar">
+                <form id="quickExpenseForm" onsubmit="handleQuickExpenseSubmit(event)">
+                    <div style="font-size: 11px; font-weight: 700; color: #0F766E; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                        <span>⚡ Quick Row Entry (Add directly without popup)</span>
+                    </div>
+                    <div class="quick-inputs-grid">
+                        <input type="text" id="quickItem" placeholder="Item name (e.g. Vegetables, Delivery...)" required style="flex: 2;">
+                        <input type="number" id="quickPrice" placeholder="Price ($)" step="0.01" min="0" required style="width: 100px;" oninput="calcQuickTotal()">
+                        <input type="number" id="quickQty" placeholder="Qty" value="1" step="0.1" min="0.1" style="width: 65px;" oninput="calcQuickTotal()">
+                        <input type="text" id="quickTotal" placeholder="Total" readonly style="width: 100px; background: #F1F5F9; font-weight: 700; color: #B91C1C;">
+                        <input type="date" id="quickDate" value="{{ today_date }}" style="width: 125px;">
+                        <input type="text" id="quickPayer" placeholder="Paid by" list="payersList" style="width: 100px;">
+                        <input type="text" id="quickCategory" placeholder="Category" list="categoriesList" style="width: 110px;">
+                        <button type="submit" class="btn btn-sm btn-primary" style="white-space: nowrap;">+ Add Row</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL: Cash & Bank Accounts Count (Editable, Add/Delete, Google Sheets Calculator) -->
+        <div class="expense-reconciliation-panel">
+            <div class="recon-card">
+                <div class="recon-card-header">
+                    <div>
+                        <div class="recon-title">ផ្ទៀងផ្ទាត់សាច់ប្រាក់ក្នុងដៃ</div>
+                        <div class="recon-subtitle">Cash & Bank Accounts Count (Google Sheet Style)</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-primary" onclick="saveAccountBalances()" id="saveBalancesBtn" style="padding: 3px 10px; font-size: 11px;">
+                        💾 Save
+                    </button>
+                </div>
+
+                <div class="recon-table-wrap">
+                    <table class="recon-accounts-table">
+                        <thead>
+                            <tr>
+                                <th>Account / Bank Name</th>
+                                <th style="text-align: right; width: 120px;">Amount ($)</th>
+                                <th style="width: 28px; text-align: center;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="reconAccountsBody">
+                            {% for acc in accounts %}
+                            <tr class="recon-acc-row">
+                                <td class="acc-name-cell">
+                                    <span class="acc-icon-indicator"></span>
+                                    <input type="text" class="acc-name-input" value="{{ acc.name }}" placeholder="Account name">
+                                </td>
+                                <td>
+                                    <input type="text" 
+                                           class="acc-val-input" 
+                                           data-expr="{{ acc.expr }}" 
+                                           value="{{ "{:.2f}".format(acc.amount) }}" 
+                                           placeholder="0.00 or e.g. 6+2359"
+                                           oninput="handleAccountInput(this)" 
+                                           onblur="formatAccountBlur(this)" 
+                                           onfocus="formatAccountFocus(this)"
+                                           onkeydown="handleAccountKeyDown(event, this)"
+                                           title="Type number or math like 6+2359">
+                                    <div class="acc-formula-hint">{% if acc.expr and ('+' in acc.expr or '-' in acc.expr or '*' in acc.expr or '/' in acc.expr or acc.expr.startswith('=')) %}fx: {{ acc.expr }}{% endif %}</div>
+                                </td>
+                                <td style="text-align: center;">
+                                    <button type="button" class="btn-del-acc" onclick="deleteAccountRow(this)" title="Delete Account">✕</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="3" style="padding: 4px 10px;">
+                                    <button type="button" class="btn-add-acc" onclick="addAccountRow()">
+                                        + Add Account (បន្ថែមគណនី)
+                                    </button>
+                                </td>
+                            </tr>
+
+                            <!-- Total in Accounts (ទឹកប្រាក់សរុប) -->
+                            <tr class="recon-total-row">
+                                <td style="font-weight: 700; color: #0F172A;">ទឹកប្រាក់សរុប (Total Counted):</td>
+                                <td colspan="2" style="text-align: right; font-weight: 800; font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #0F766E;" id="reconCountedTotal">
+                                    ${{ "{:,.2f}".format(total_counted_cash) }}
+                                </td>
+                            </tr>
+
+                            <!-- Expected Cash in Hand (លុយសល់តាមបញ្ជី) -->
+                            <tr class="recon-expected-row">
+                                <td style="color: #64748B; font-size: 11px;">លុយសល់តាមបញ្ជី (Expected):</td>
+                                <td colspan="2" style="text-align: right; font-weight: 700; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #B45309;" id="reconExpectedTotal">
+                                    ${{ "{:,.2f}".format(money_in_hand) }}
+                                </td>
+                            </tr>
+
+                            <!-- Difference (ផ្សេងៗគ្នា លុយ): Negative = RED, Positive = GREEN -->
+                            <tr class="recon-diff-row {% if cash_variance < -0.005 %}diff-negative{% elif cash_variance > 0.005 %}diff-positive{% else %}diff-balanced{% endif %}" id="reconDiffRow">
+                                <td>
+                                    <div style="font-weight: 800;">ផ្សេងៗគ្នា លុយ (Difference):</div>
+                                    <div id="diffBadgeStatusWrap">
+                                        {% if cash_variance < -0.005 %}
+                                        <span class="diff-badge-status red">⚠️ Shortage (ខ្វះ)</span>
+                                        {% elif cash_variance > 0.005 %}
+                                        <span class="diff-badge-status green">🟢 Surplus (លើស)</span>
+                                        {% else %}
+                                        <span class="diff-badge-status green">✓ Matched (ត្រូវគ្នា)</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td colspan="2" style="text-align: right; font-weight: 800; font-family: 'JetBrains Mono', monospace; font-size: 13.5px;" id="reconDiffVal">
+                                    {% if cash_variance < -0.005 %}
+                                    -${{ "{:,.2f}".format(cash_variance|abs) }}
+                                    {% elif cash_variance > 0.005 %}
+                                    +${{ "{:,.2f}".format(cash_variance) }}
+                                    {% else %}
+                                    $0.00
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="recon-footer-note">
+                    <div style="font-size: 10px; color: #64748B; line-height: 1.4;">
+                        ℹ️ <strong>Google Sheet Formulas:</strong> You can enter math directly in the amount box (e.g. <code>6+2359</code>).<br>
+                        <strong>Variance Alert:</strong> <span style="color: #DC2626; font-weight: 700;">Red</span> if negative (shortage), <span style="color: #16A34A; font-weight: 700;">Green</span> if positive or matched.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM SHEET: Money Received from Media (ប្រាក់ទទួលបានពី Media) -->
+    <div class="media-sheet-panel" id="mediaReceiptsSection">
+        <div class="media-sheet-header">
+            <div class="media-sheet-title">
+                <span style="font-size: 16px;">📺</span>
+                <span>ប្រាក់ទទួលបានពី Media (Money Received from Media)</span>
+                <span class="media-sheet-counter">{{ media_receipts|length }} entries</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 12px; font-weight: 700; color: #166534;">
+                    សរុប Media Total: <span style="font-size: 14.5px; font-family: 'JetBrains Mono', monospace; color: #15803D;">${{ "{:,.2f}".format(media_total) }}</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="media-sheet-table-wrap">
+            <table class="media-sheet-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45px; text-align: center;">No</th>
+                        <th style="width: 130px;">Date (កាលបរិច្ឆេទ)</th>
+                        <th>Customer / Client Name (ឈ្មោះអតិថិជន)</th>
+                        <th style="text-align: right; width: 150px;">Money Received ($)</th>
+                        <th>Notes / Remark (កំណត់សម្គាល់)</th>
+                        <th style="width: 65px; text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="mediaTableBody">
+                    {% for m in media_receipts %}
+                    <tr class="media-row">
+                        <td style="text-align: center; color: #64748B; font-weight: 600;">{{ loop.index }}</td>
+                        <td style="font-family: 'JetBrains Mono', monospace; color: #0F766E; font-weight: 600;">
+                            {{ m.receipt_date.strftime('%d-%b-%Y') if m.receipt_date else '-' }}
+                        </td>
+                        <td style="font-weight: 700; color: #0F172A;">{{ m.customer_name }}</td>
+                        <td style="text-align: right; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #16A34A; font-size: 12.5px;">
+                            ${{ "{:,.2f}".format(m.amount|float) }}
+                        </td>
+                        <td style="color: #64748B; font-size: 11px;">{{ m.notes or '-' }}</td>
+                        <td style="text-align: center;">
+                            <button type="button" class="action-icon-btn delete" onclick="deleteMediaReceipt({{ m.id }})" title="Delete Receipt">✕</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 26px 12px; color: #94A3B8;">
+                            <div style="font-size: 26px; margin-bottom: 4px;">📺</div>
+                            <div style="font-size: 12.5px; font-weight: 600; color: #64748B;">No media receipts recorded yet for {{ month_display }}</div>
+                            <div style="font-size: 11px; margin-top: 3px;">Use the quick entry row below to record payments received from media.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="media-table-footer">
+                        <td colspan="3" style="text-align: right; font-weight: 700; color: #166534; padding: 8px 12px;">
+                            សរុបប្រាក់ទទួលបានពី Media (Total Media Received):
+                        </td>
+                        <td style="text-align: right; font-weight: 800; font-size: 13.5px; color: #166534; font-family: 'JetBrains Mono', monospace; padding: 8px 12px;">
+                            ${{ "{:,.2f}".format(media_total) }}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Quick Add Row for Media -->
+        <div class="media-quick-entry-bar">
+            <form id="quickMediaForm" onsubmit="handleQuickMediaSubmit(event)">
+                <div style="font-size: 11px; font-weight: 700; color: #166534; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                    <span>⚡ Quick Add Media Receipt (បញ្ចូលប្រាក់ទទួលបានពី Media ភ្លាមៗ)</span>
+                </div>
+                <div class="quick-inputs-grid">
+                    <input type="date" id="quickMediaDate" value="{{ today_date }}" style="width: 130px;" required>
+                    <input type="text" id="quickMediaCustomer" placeholder="Customer Name (e.g. Mak Thea, Sekla, FB Media...)" required style="flex: 2;">
+                    <input type="number" id="quickMediaAmount" placeholder="Amount ($)" step="0.01" min="0" required style="width: 120px;">
+                    <input type="text" id="quickMediaNotes" placeholder="Notes / Remark (optional)" style="flex: 1.5;">
+                    <button type="submit" class="btn btn-sm btn-primary" style="background: #16A34A; border-color: #15803D; white-space: nowrap;">
+                        + Add Media Receipt
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Datalists for autocomplete -->
+<datalist id="payersList">
+    {% for p in payers %}
+    <option value="{{ p }}">
+    {% endfor %}
+</datalist>
+
+<datalist id="categoriesList">
+    {% for c in categories %}
+    <option value="{{ c }}">
+    {% endfor %}
+</datalist>
+
+<!-- 1. RECORD EXPENSE MODAL -->
+<div class="modal-overlay" id="recordExpenseModal">
+    <div class="modal-dialog" style="max-width: 500px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 6px;">
+                <span>💸 Record New Expense</span>
+            </h3>
+            <button type="button" class="modal-close-btn" onclick="closeModal('recordExpenseModal')">✕</button>
+        </div>
+        <form method="POST" action="{{ url_for('expenses.add_expense') }}">
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Item Name / Description (មុខទំនិញ/ការចំណាយ) *</label>
+                <input type="text" name="item" class="form-control" required placeholder="e.g. Vegetables, TTK Order, Staff Salary...">
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Unit Price ($) *</label>
+                    <input type="number" step="0.01" min="0" name="unit_price" id="modalUnitPrice" class="form-control" required placeholder="0.00" oninput="calcModalTotal()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Quantity</label>
+                    <input type="number" step="0.1" min="0.1" name="quantity" id="modalQuantity" class="form-control" value="1" oninput="calcModalTotal()">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Total Price ($)</label>
+                    <input type="number" step="0.01" name="total_price" id="modalTotalPrice" class="form-control" style="font-weight: 700; color: #B91C1C; background: #F8FAFC;" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Expense Date *</label>
+                    <input type="date" name="expense_date" class="form-control" value="{{ today_date }}" required>
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Paid By (អ្នកចំណាយ)</label>
+                    <input type="text" name="paid_by" class="form-control" placeholder="e.g. Chenda, Veasna..." list="payersList">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Category</label>
+                    <input type="text" name="category" class="form-control" placeholder="e.g. Supplier, Food, Salary..." list="categoriesList">
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Notes / Remark</label>
+                <textarea name="notes" class="form-control" rows="2" placeholder="Optional notes..."></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('recordExpenseModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Expense</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 2. EDIT EXPENSE MODAL -->
+<div class="modal-overlay" id="editExpenseModal">
+    <div class="modal-dialog" style="max-width: 500px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">✎ Edit Expense</h3>
+            <button type="button" class="modal-close-btn" onclick="closeModal('editExpenseModal')">✕</button>
+        </div>
+        <form id="editExpenseForm" method="POST">
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Item Name *</label>
+                <input type="text" name="item" id="editItem" class="form-control" required>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Unit Price ($) *</label>
+                    <input type="number" step="0.01" min="0" name="unit_price" id="editUnitPrice" class="form-control" required oninput="calcEditTotal()">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Quantity</label>
+                    <input type="number" step="0.1" min="0.1" name="quantity" id="editQuantity" class="form-control" oninput="calcEditTotal()">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Total Price ($)</label>
+                    <input type="number" step="0.01" name="total_price" id="editTotalPrice" class="form-control" style="font-weight: 700; color: #B91C1C; background: #F8FAFC;" readonly>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Expense Date</label>
+                    <input type="date" name="expense_date" id="editExpenseDate" class="form-control">
+                </div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Paid By</label>
+                    <input type="text" name="paid_by" id="editPaidBy" class="form-control" list="payersList">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Category</label>
+                    <input type="text" name="category" id="editCategory" class="form-control" list="categoriesList">
+                </div>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Notes</label>
+                <textarea name="notes" id="editNotes" class="form-control" rows="2"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editExpenseModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Expense</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3. BALANCES & CLEAR STM MODAL (With Dynamic Opening Balance Auto/Manual) -->
+<div class="modal-overlay" id="balanceModal">
+    <div class="modal-dialog" style="max-width: 500px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances & STM for {{ month_display }}</h3>
+            <button type="button" class="modal-close-btn" onclick="closeModal('balanceModal')">✕</button>
+        </div>
+        <form id="summaryBalanceForm" onsubmit="handleSummaryBalanceSubmit(event)">
+            <!-- Opening Balance with Auto/Manual Selector -->
+            <div class="form-group mb-3">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600; margin: 0;">
+                        លុយចាស់ (Opening Balance) ($)
+                    </label>
+                    <button type="button" class="btn btn-xs" onclick="resetOpeningToAuto()" style="background: #F1F5F9; border: 1px solid #CBD5E1; color: #0F766E; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; cursor: pointer;" title="Clear manual input to auto-carry from previous month">
+                        🔄 Auto from Prev Month (${{ "{:,.2f}".format(prev_money_in_hand) }})
+                    </button>
+                </div>
+                <input type="number" step="0.01" id="inputOpeningBalance" class="form-control" 
+                       value="{% if is_manual_opening %}{{ "{:.2f}".format(opening_balance) }}{% endif %}"
+                       placeholder="Leave empty for auto previous month (${{ "{:,.2f}".format(prev_money_in_hand) }})">
+                <small id="openingBalanceNote" style="color: #64748B; font-size: 10.5px; display: block; margin-top: 4px;">
+                    {% if is_manual_opening %}
+                    <span style="color: #2563EB; font-weight: 700;">● Manual override active (${{ "{:,.2f}".format(opening_balance) }}).</span> Leave empty or click button above to auto-use previous month's Money in Hand (${{ "{:,.2f}".format(prev_money_in_hand) }}).
+                    {% else %}
+                    <span style="color: #16A34A; font-weight: 700;">● Auto mode active:</span> automatically using ${{ "{:,.2f}".format(prev_money_in_hand) }} from {{ prev_month_display or 'previous month' }}.
+                    {% endif %}
+                </small>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Clear STM ($)</label>
+                <input type="number" step="0.01" id="inputClearStm" class="form-control" value="{{ "{:.2f}".format(clear_stm) }}">
+            </div>
+
+            <!-- Media Money with Auto/Manual Selector -->
+            <div class="form-group mb-3">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600; margin: 0;">
+                        Media ($) (ប្រាក់ទទួលបានពី Media)
+                    </label>
+                    <button type="button" class="btn btn-xs" onclick="resetMediaToAuto()" style="background: #F1F5F9; border: 1px solid #CBD5E1; color: #166534; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; cursor: pointer;" title="Clear manual input to auto-take total from Media sheet">
+                        🔄 Auto from Media Sheet (${{ "{:,.2f}".format(media_sheet_total) }})
+                    </button>
+                </div>
+                <input type="number" step="0.01" id="inputMedia" class="form-control" 
+                       value="{% if is_manual_media %}{{ "{:.2f}".format(media_total) }}{% endif %}" 
+                       placeholder="Leave empty for auto from Media sheet (${{ "{:,.2f}".format(media_sheet_total) }})">
+                <small id="mediaMoneyNote" style="color: #64748B; font-size: 10.5px; display: block; margin-top: 4px;">
+                    {% if is_manual_media %}
+                    <span style="color: #2563EB; font-weight: 700;">● Manual override active (${{ "{:,.2f}".format(media_total) }}).</span> Leave empty or click button above to auto-use Media sheet total (${{ "{:,.2f}".format(media_sheet_total) }}).
+                    {% else %}
+                    <span style="color: #166534; font-weight: 700;">● Auto mode active:</span> automatically using ${{ "{:,.2f}".format(media_sheet_total) }} from Media sheet below.
+                    {% endif %}
+                </small>
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">
+                    លុយលក់ (Customer Receipts Override) ($)
+                </label>
+                <input type="number" step="0.01" id="inputCustomSales" class="form-control" 
+                       value="{% if is_custom_sales %}{{ "{:.2f}".format(sales_received) }}{% endif %}" 
+                       placeholder="Leave empty to use automatic inFlow live calculation (${{ "{:,.2f}".format(inflow_data.total_paid) }})">
+                <small style="color: #64748B; font-size: 10.5px;">Leave blank to auto-sync with inFlow paid orders (${{ "{:,.2f}".format(inflow_data.total_paid) }}).</small>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('balanceModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Balances</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 4. NEW MONTH MODAL -->
+<div class="modal-overlay" id="newMonthModal">
+    <div class="modal-dialog" style="max-width: 420px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">📅 Open Monthly Sheet</h3>
+            <button type="button" class="modal-close-btn" onclick="closeModal('newMonthModal')">✕</button>
+        </div>
+        <div class="form-group mb-3">
+            <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Select Month (Year & Month)</label>
+            <input type="month" id="newMonthInput" class="form-control" value="{{ current_month }}">
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px;">
+            <button type="button" class="btn btn-outline" onclick="closeModal('newMonthModal')">Cancel</button>
+            <button type="button" class="btn btn-primary" onclick="goToSelectedMonth()">Go to Sheet</button>
+        </div>
+    </div>
+</div>
+
+<!-- 5. DELETE MONTH CONFIRMATION MODAL -->
+<div class="modal-overlay" id="deleteMonthModal">
+    <div class="modal-dialog" style="max-width: 450px; padding: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #FEE2E2; padding-bottom: 12px; margin-bottom: 16px;">
+            <h3 style="font-size: 15px; font-weight: 700; color: #DC2626; display: flex; align-items: center; gap: 6px;">
+                <span>🗑️ Delete Monthly Sheet (លុបខែ)</span>
+            </h3>
+            <button type="button" class="modal-close-btn" onclick="closeModal('deleteMonthModal')">✕</button>
+        </div>
+        <div style="margin-bottom: 18px;">
+            <p style="font-size: 13px; color: #1E293B; line-height: 1.5; margin-bottom: 12px;">
+                Are you sure you want to delete the entire monthly sheet for <strong>{{ month_display }}</strong>?
+            </p>
+            <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 10px 12px; font-size: 11.5px; color: #991B1B; line-height: 1.45;">
+                ⚠️ <strong>Permanent Action:</strong> This will delete all data for this period:
+                <ul style="margin: 6px 0 0 16px; padding: 0;">
+                    <li><strong>{{ expenses|length }}</strong> daily recorded expenses</li>
+                    <li><strong>{{ media_receipts|length }}</strong> recorded media customer receipts</li>
+                    <li>Cash & bank reconciliation counts and settings</li>
+                </ul>
+            </div>
+        </div>
+        <form method="POST" action="{{ url_for('expenses.delete_month') }}">
+            <input type="hidden" name="month_key" value="{{ current_month }}">
+            <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                <button type="button" class="btn btn-outline" onclick="closeModal('deleteMonthModal')">Cancel</button>
+                <button type="submit" class="btn btn-danger" style="background: #DC2626; border-color: #B91C1C; color: #FFFFFF; font-weight: 600;">
+                    Yes, Delete This Month
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+    const CURRENT_MONTH = "{{ current_month }}";
+    const EXPECTED_MONEY_IN_HAND = {{ money_in_hand }};
+    const PREV_MONEY_IN_HAND = {{ prev_money_in_hand }};
+    const MEDIA_SHEET_TOTAL = {{ media_sheet_total }};
+
+    function toggleExportMenu(e) {
+        e.stopPropagation();
+        const menu = document.getElementById('exportDropdownMenu');
+        if (menu) {
+            menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+        }
+    }
+
+    function closeExportMenu() {
+        const menu = document.getElementById('exportDropdownMenu');
+        if (menu) {
+            menu.style.display = 'none';
+        }
+    }
+
+    function triggerMonthlyExport(type) {
+        closeExportMenu();
+        const url = `/expenses/export/${type}?month=${encodeURIComponent(CURRENT_MONTH)}`;
+        window.location.href = url;
+    }
+
+    document.addEventListener('click', (e) => {
+        const menu = document.getElementById('exportDropdownMenu');
+        if (menu && !e.target.closest('.dropdown-wrapper')) {
+            menu.style.display = 'none';
+        }
+    });
+
+    function openDeleteMonthModal() {
+        openModal('deleteMonthModal');
+    }
+
+    // Safe Google Sheets-style arithmetic expression evaluator (e.g. "6+2359", "=100+50", "200-50")
+    function evaluateArithmetic(expr) {
+        if (expr === null || expr === undefined) return 0;
+        let cleaned = expr.toString().trim();
+        if (cleaned.startsWith('=')) cleaned = cleaned.substring(1).trim();
+        if (!cleaned) return 0;
+        
+        // Remove currency symbols and commas
+        cleaned = cleaned.replace(/[$,]/g, '');
+
+        // Only allow safe characters: digits, decimal, +, -, *, /, (, ), and whitespace
+        if (!/^[\d\.\+\-\*\/\(\)\s]+$/.test(cleaned)) {
+            const num = parseFloat(cleaned);
+            return isNaN(num) ? 0 : num;
+        }
+
+        try {
+            const result = Function('"use strict"; return (' + cleaned + ')')();
+            if (typeof result === 'number' && !isNaN(result) && isFinite(result)) {
+                return result;
+            }
+        } catch (e) {
+            // Ignore incomplete typing e.g. "6+"
+        }
+
+        const fallback = parseFloat(cleaned);
+        return isNaN(fallback) ? 0 : fallback;
+    }
+
+    function openRecordModal() {
+        openModal('recordExpenseModal');
+    }
+
+    function openBalanceModal() {
+        openModal('balanceModal');
+    }
+
+    function openNewMonthModal() {
+        openModal('newMonthModal');
+    }
+
+    function goToSelectedMonth() {
+        const val = document.getElementById('newMonthInput').value;
+        if (val) {
+            window.location.href = "{{ url_for('expenses.monthly_expenses') }}?month=" + encodeURIComponent(val);
+        }
+    }
+
+    function calcModalTotal() {
+        const p = parseFloat(document.getElementById('modalUnitPrice').value) || 0;
+        const q = parseFloat(document.getElementById('modalQuantity').value) || 0;
+        document.getElementById('modalTotalPrice').value = (p * q).toFixed(2);
+    }
+
+    function calcEditTotal() {
+        const p = parseFloat(document.getElementById('editUnitPrice').value) || 0;
+        const q = parseFloat(document.getElementById('editQuantity').value) || 0;
+        document.getElementById('editTotalPrice').value = (p * q).toFixed(2);
+    }
+
+    function calcQuickTotal() {
+        const p = parseFloat(document.getElementById('quickPrice').value) || 0;
+        const q = parseFloat(document.getElementById('quickQty').value) || 0;
+        document.getElementById('quickTotal').value = '$' + (p * q).toFixed(2);
+    }
+
+    function openEditExpenseModalFromBtn(btn) {
+        const id = btn.getAttribute('data-id');
+        const item = btn.getAttribute('data-item') || '';
+        const price = parseFloat(btn.getAttribute('data-price')) || 0;
+        const qty = parseFloat(btn.getAttribute('data-qty')) || 1;
+        const total = parseFloat(btn.getAttribute('data-total')) || 0;
+        const date = btn.getAttribute('data-date') || '';
+        const payer = btn.getAttribute('data-payer') || '';
+        const cat = btn.getAttribute('data-cat') || '';
+        const notes = btn.getAttribute('data-notes') || '';
+        openEditExpenseModal(id, item, price, qty, total, date, payer, cat, notes);
+    }
+
+    function openEditExpenseModal(id, item, price, qty, total, date, payer, cat, notes) {
+        document.getElementById('editExpenseForm').action = "/expenses/" + id + "/update";
+        document.getElementById('editItem').value = item;
+        document.getElementById('editUnitPrice').value = price;
+        document.getElementById('editQuantity').value = qty;
+        document.getElementById('editTotalPrice').value = total.toFixed(2);
+        document.getElementById('editExpenseDate').value = date;
+        document.getElementById('editPaidBy').value = payer;
+        document.getElementById('editCategory').value = cat;
+        document.getElementById('editNotes').value = notes;
+        openModal('editExpenseModal');
+    }
+
+    // Quick Expense Submit
+    async function handleQuickExpenseSubmit(e) {
+        e.preventDefault();
+        const item = document.getElementById('quickItem').value.trim();
+        const price = parseFloat(document.getElementById('quickPrice').value) || 0;
+        const qty = parseFloat(document.getElementById('quickQty').value) || 1;
+        const total = price * qty;
+        const dateVal = document.getElementById('quickDate').value;
+        const payer = document.getElementById('quickPayer').value.trim();
+        const category = document.getElementById('quickCategory').value.trim();
+
+        if (!item) return;
+
+        try {
+            const resp = await fetch("{{ url_for('expenses.add_expense') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    item: item,
+                    unit_price: price,
+                    quantity: qty,
+                    total_price: total,
+                    expense_date: dateVal,
+                    paid_by: payer,
+                    category: category
+                })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert("Error: " + (data.error || "Failed to add expense"));
+            }
+        } catch (err) {
+            console.error(err);
+            window.location.reload();
+        }
+    }
+
+    // Quick Media Receipt Submit
+    async function handleQuickMediaSubmit(e) {
+        e.preventDefault();
+        const customer = document.getElementById('quickMediaCustomer').value.trim();
+        const amount = parseFloat(document.getElementById('quickMediaAmount').value) || 0;
+        const dateVal = document.getElementById('quickMediaDate').value;
+        const notes = document.getElementById('quickMediaNotes').value.trim();
+
+        if (!customer || amount <= 0) {
+            alert('Please provide valid customer name and amount.');
+            return;
+        }
+
+        try {
+            const resp = await fetch("{{ url_for('expenses.add_media_receipt') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    customer_name: customer,
+                    amount: amount,
+                    receipt_date: dateVal,
+                    notes: notes,
+                    month_key: CURRENT_MONTH
+                })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert("Error: " + (data.error || "Failed to add media receipt"));
+            }
+        } catch (err) {
+            console.error(err);
+            window.location.reload();
+        }
+    }
+
+    // Delete Media Receipt
+    async function deleteMediaReceipt(id) {
+        if (!confirm('Are you sure you want to delete this media receipt?')) return;
+        try {
+            const resp = await fetch(`/expenses/media/${id}/delete`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                window.location.reload();
+            } else {
+                alert("Error: " + (data.error || "Failed to delete"));
+            }
+        } catch (err) {
+            console.error(err);
+            window.location.reload();
+        }
+    }
+
+    // Live search filter in expense rows
+    function filterExpenseRows(keyword) {
+        keyword = keyword.toLowerCase().trim();
+        const payerFilter = document.getElementById('expensePayerFilter').value.toLowerCase();
+        const rows = document.querySelectorAll('#expenseTableBody tr.expense-row');
+
+        rows.forEach(r => {
+            const item = r.getAttribute('data-item') || '';
+            const payer = r.getAttribute('data-payer') || '';
+            const cat = r.getAttribute('data-cat') || '';
+            const textMatch = !keyword || item.includes(keyword) || payer.includes(keyword) || cat.includes(keyword);
+            const payerMatch = !payerFilter || payer === payerFilter;
+
+            r.style.display = (textMatch && payerMatch) ? '' : 'none';
+        });
+    }
+
+    function filterExpenseByPayer(payer) {
+        filterExpenseRows(document.getElementById('expenseSearchInput').value);
+    }
+
+    // Cash & Bank Account Calculator & Manipulation
+    function handleAccountKeyDown(event, input) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            input.blur();
+        }
+    }
+
+    function handleAccountInput(input) {
+        const raw = input.value.trim();
+        const evalVal = evaluateArithmetic(raw);
+        input.dataset.expr = raw;
+
+        const cell = input.closest('td');
+        const hint = cell.querySelector('.acc-formula-hint');
+        if (hint) {
+            if (/[\+\-\*\/]/.test(raw) || raw.startsWith('=')) {
+                hint.textContent = `fx = $${evalVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            } else {
+                hint.textContent = '';
+            }
+        }
+
+        calcCountedCashTotal();
+    }
+
+    function formatAccountBlur(input) {
+        const raw = input.value.trim();
+        const cell = input.closest('td');
+        const hint = cell.querySelector('.acc-formula-hint');
+
+        if (/[\+\-\*\/]/.test(raw) || raw.startsWith('=')) {
+            input.dataset.expr = raw;
+            const evalVal = evaluateArithmetic(raw);
+            input.value = evalVal.toFixed(2);
+            if (hint) {
+                hint.textContent = `fx: ${raw}`;
+            }
+        } else {
+            const evalVal = evaluateArithmetic(raw);
+            input.value = evalVal.toFixed(2);
+            input.dataset.expr = input.value;
+            if (hint) {
+                hint.textContent = '';
+            }
+        }
+        calcCountedCashTotal();
+    }
+
+    function formatAccountFocus(input) {
+        const expr = (input.dataset.expr || input.value || '').trim();
+        if (/[\+\-\*\/]/.test(expr) || expr.startsWith('=')) {
+            input.value = expr;
+            const evalVal = evaluateArithmetic(expr);
+            const cell = input.closest('td');
+            const hint = cell.querySelector('.acc-formula-hint');
+            if (hint) {
+                hint.textContent = `fx = $${evalVal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            }
+        }
+        setTimeout(() => input.select(), 10);
+    }
+
+    function addAccountRow() {
+        const tbody = document.getElementById('reconAccountsBody');
+        const tr = document.createElement('tr');
+        tr.className = 'recon-acc-row';
+        tr.innerHTML = `
+            <td class="acc-name-cell">
+                <span class="acc-icon-indicator"></span>
+                <input type="text" class="acc-name-input" value="New Account" placeholder="Account name">
+            </td>
+            <td>
+                <input type="text" 
+                       class="acc-val-input" 
+                       data-expr="0.00" 
+                       value="0.00" 
+                       placeholder="0.00 or e.g. 6+2359"
+                       oninput="handleAccountInput(this)" 
+                       onblur="formatAccountBlur(this)" 
+                       onfocus="formatAccountFocus(this)"
+                       onkeydown="handleAccountKeyDown(event, this)">
+                <div class="acc-formula-hint"></div>
+            </td>
+            <td style="text-align: center;">
+                <button type="button" class="btn-del-acc" onclick="deleteAccountRow(this)" title="Delete Account">✕</button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        const nameInput = tr.querySelector('.acc-name-input');
+        nameInput.focus();
+        nameInput.select();
+        calcCountedCashTotal();
+    }
+
+    function deleteAccountRow(btn) {
+        const row = btn.closest('tr');
+        if (row) {
+            row.remove();
+            calcCountedCashTotal();
+        }
+    }
+
+    // Live calculate counted cash total & update Red/Green difference badge
+    function calcCountedCashTotal() {
+        let total = 0;
+        document.querySelectorAll('.acc-val-input').forEach(inp => {
+            const rawVal = (inp.value || '').trim();
+            const expr = (inp.dataset.expr || '').trim();
+            const source = (/[\+\-\*\/]/.test(rawVal) || rawVal.startsWith('=')) ? rawVal : (expr || rawVal);
+            total += evaluateArithmetic(source);
+        });
+
+        const countedEl = document.getElementById('reconCountedTotal');
+        if (countedEl) {
+            countedEl.textContent = '$' + total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Variance = Counted Cash - Expected Cash in Hand
+        // If Counted < Expected: negative variance (Shortage) -> RED
+        // If Counted >= Expected: positive or zero variance -> GREEN
+        const expected = EXPECTED_MONEY_IN_HAND;
+        const diff = total - expected;
+
+        const diffRow = document.getElementById('reconDiffRow');
+        const diffValEl = document.getElementById('reconDiffVal');
+        const badgeWrap = document.getElementById('diffBadgeStatusWrap');
+
+        if (diffValEl && diffRow && badgeWrap) {
+            if (diff < -0.005) {
+                // Negative: Cash Shortage (ALERT IN RED)
+                diffRow.className = 'recon-diff-row diff-negative';
+                diffValEl.textContent = '-$' + Math.abs(diff).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                badgeWrap.innerHTML = '<span class="diff-badge-status red">⚠️ Shortage (ខ្វះ)</span>';
+            } else if (diff > 0.005) {
+                // Positive: Cash Surplus (ALERT IN GREEN)
+                diffRow.className = 'recon-diff-row diff-positive';
+                diffValEl.textContent = '+$' + diff.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                badgeWrap.innerHTML = '<span class="diff-badge-status green">🟢 Surplus (លើស)</span>';
+            } else {
+                // Matched (0.00) (ALERT IN GREEN)
+                diffRow.className = 'recon-diff-row diff-balanced';
+                diffValEl.textContent = '$0.00';
+                badgeWrap.innerHTML = '<span class="diff-badge-status green">✓ Matched (ត្រូវគ្នា)</span>';
+            }
+        }
+    }
+
+    // Save Bank & Cash Account Balances
+    async function saveAccountBalances() {
+        const btn = document.getElementById('saveBalancesBtn');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Saving...';
+        btn.disabled = true;
+
+        const accountsList = [];
+        document.querySelectorAll('#reconAccountsBody tr.recon-acc-row').forEach(row => {
+            const nameInput = row.querySelector('.acc-name-input');
+            const valInput = row.querySelector('.acc-val-input');
+            if (nameInput && valInput) {
+                const name = nameInput.value.trim();
+                const rawVal = valInput.value.trim();
+                const expr = (valInput.dataset.expr || rawVal).trim();
+                const source = (/[\+\-\*\/]/.test(rawVal) || rawVal.startsWith('=')) ? rawVal : expr;
+                const amt = evaluateArithmetic(source);
+                if (name) {
+                    accountsList.push({
+                        name: name,
+                        amount: amt,
+                        expr: source || `${amt.toFixed(2)}`
+                    });
+                }
+            }
+        });
+
+        try {
+            const resp = await fetch("{{ url_for('expenses.update_monthly_summary') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    month_key: CURRENT_MONTH,
+                    manual_opening_balance: {% if is_manual_opening %}{{ opening_balance }}{% else %}null{% endif %},
+                    clear_stm: {{ clear_stm }},
+                    media_expense: {{ media_total }},
+                    manual_media_income: {% if is_manual_media %}{{ media_total }}{% else %}null{% endif %},
+                    custom_sales_income: {% if is_custom_sales %}{{ sales_received }}{% else %}null{% endif %},
+                    accounts_json: accountsList
+                })
+            });
+            const res = await resp.json();
+            if (res.success) {
+                document.querySelectorAll('#reconAccountsBody .acc-val-input').forEach(inp => {
+                    const raw = (inp.dataset.expr || inp.value || '').trim();
+                    if (/[\+\-\*\/]/.test(raw) || raw.startsWith('=')) {
+                        const evalVal = evaluateArithmetic(raw);
+                        inp.value = evalVal.toFixed(2);
+                        const hint = inp.closest('td').querySelector('.acc-formula-hint');
+                        if (hint) hint.textContent = `fx: ${raw}`;
+                    }
+                });
+                calcCountedCashTotal();
+                btn.innerHTML = '✓ Saved!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                }, 1500);
+            } else {
+                alert("Error saving: " + res.error);
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        } catch (e) {
+            alert("Error: " + e.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }
+
+    // Reset opening balance in modal to auto from previous month
+    function resetOpeningToAuto() {
+        document.getElementById('inputOpeningBalance').value = '';
+        const note = document.getElementById('openingBalanceNote');
+        if (note) {
+            note.innerHTML = `<span style="color: #16A34A; font-weight: 700;">● Reset to Auto:</span> will automatically use $${PREV_MONEY_IN_HAND.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} upon saving.`;
+        }
+    }
+
+    // Reset media money in modal to auto from media sheet
+    function resetMediaToAuto() {
+        document.getElementById('inputMedia').value = '';
+        const note = document.getElementById('mediaMoneyNote');
+        if (note) {
+            note.innerHTML = `<span style="color: #16A34A; font-weight: 700;">● Reset to Auto:</span> will automatically use $${MEDIA_SHEET_TOTAL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from Media sheet upon saving.`;
+        }
+    }
+
+    // Save Balances (Opening, STM, Media, Custom Sales)
+    async function handleSummaryBalanceSubmit(e) {
+        e.preventDefault();
+        const openVal = document.getElementById('inputOpeningBalance').value.trim();
+        const manualOpening = openVal !== '' ? parseFloat(openVal) : null;
+        const stm = parseFloat(document.getElementById('inputClearStm').value) || 0;
+        
+        const mediaVal = document.getElementById('inputMedia').value.trim();
+        const manualMedia = mediaVal !== '' ? parseFloat(mediaVal) : null;
+
+        const customSalesVal = document.getElementById('inputCustomSales').value.trim();
+        const customSales = customSalesVal !== '' ? parseFloat(customSalesVal) : null;
+
+        const accountsList = [];
+        document.querySelectorAll('#reconAccountsBody tr.recon-acc-row').forEach(row => {
+            const nameInput = row.querySelector('.acc-name-input');
+            const valInput = row.querySelector('.acc-val-input');
+            if (nameInput && valInput) {
+                const name = nameInput.value.trim();
+                const rawVal = valInput.value.trim();
+                const expr = (valInput.dataset.expr || rawVal).trim();
+                const source = (/[\+\-\*\/]/.test(rawVal) || rawVal.startsWith('=')) ? rawVal : expr;
+                const amt = evaluateArithmetic(source);
+                if (name) {
+                    accountsList.push({
+                        name: name,
+                        amount: amt,
+                        expr: source || `${amt.toFixed(2)}`
+                    });
+                }
+            }
+        });
+
+        try {
+            const resp = await fetch("{{ url_for('expenses.update_monthly_summary') }}", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    month_key: CURRENT_MONTH,
+                    manual_opening_balance: manualOpening,
+                    clear_stm: stm,
+                    manual_media_income: manualMedia,
+                    custom_sales_income: customSales,
+                    accounts_json: accountsList
+                })
+            });
+            const res = await resp.json();
+            if (res.success) {
+                window.location.reload();
+            } else {
+                alert("Error: " + res.error);
+            }
+        } catch (e) {
+            alert("Error saving balances: " + e.message);
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Automatically evaluate all expressions and ensure calculated results display in inputs
+        document.querySelectorAll('.acc-val-input').forEach(inp => {
+            const expr = (inp.dataset.expr || '').trim();
+            const rawVal = (inp.value || '').trim();
+            const source = expr || rawVal;
+            if (/[\+\-\*\/]/.test(source) || source.startsWith('=')) {
+                inp.dataset.expr = source;
+                const evalVal = evaluateArithmetic(source);
+                inp.value = evalVal.toFixed(2);
+                const hint = inp.closest('td').querySelector('.acc-formula-hint');
+                if (hint) hint.textContent = `fx: ${source}`;
+            } else {
+                const evalVal = evaluateArithmetic(rawVal);
+                inp.value = evalVal.toFixed(2);
+                inp.dataset.expr = inp.value;
+            }
+        });
+
+        // Initialize counted total and difference status
+        calcCountedCashTotal();
+
+        // If URL has #recordModal or #new, auto open record modal
+        if (window.location.hash === '#recordModal' || window.location.hash === '#new' || window.location.hash === '#newRecord') {
+            openRecordModal();
+        }
+    });
+</script>
+{% endblock %}

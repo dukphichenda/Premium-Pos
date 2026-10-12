@@ -1,0 +1,2777 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if is_new %}New Product{% else %}{{ product.name }} ({{ product.sku }}){% endif %} - inFlow Premium{% endblock %}
+
+{% block content %}
+{% set p_price_dec = product.price_decimals if (product and product.price_decimals is defined) else none %}
+{% set p_cost_dec = product.cost_decimals if (product and product.cost_decimals is defined) else none %}
+{% set p_qty_dec = product.qty_decimals if (product and product.qty_decimals is defined) else none %}
+{% set item_price_dec = p_price_dec if p_price_dec is not none else (company.decimal_places_price if (company and company.decimal_places_price is defined and company.decimal_places_price is not none) else 2) %}
+{% set item_cost_dec = p_cost_dec if p_cost_dec is not none else (company.decimal_places_cost if (company and company.decimal_places_cost is defined and company.decimal_places_cost is not none) else 3) %}
+{% set item_qty_dec = p_qty_dec if p_qty_dec is not none else (company.decimal_places_qty if (company and company.decimal_places_qty is defined and company.decimal_places_qty is not none) else 0) %}
+{% set cost_step = '0.' ~ ('0' * (item_cost_dec - 1)) ~ '1' if item_cost_dec > 0 else '1' %}
+{% set price_step = '0.' ~ ('0' * (item_price_dec - 1)) ~ '1' if item_price_dec > 0 else '1' %}
+{% set qty_step = '0.' ~ ('0' * (item_qty_dec - 1)) ~ '1' if item_qty_dec > 0 else '1' %}
+<div class="inflow-window-canvas">
+    <form id="productMainForm" method="POST" action="{% if is_new %}{{ url_for('products.create_product') }}{% else %}{{ url_for('products.edit_product', id=product.id) }}{% endif %}" enctype="multipart/form-data">
+        <input type="hidden" name="clear_picture" id="clearPictureFlag" value="0">
+        <input type="hidden" name="active_tab" id="activeTabInput" value="{{ active_tab or 'tabProductInfo' }}">
+        <input type="hidden" name="save_and_close" id="saveAndCloseInput" value="0">
+        <input type="hidden" name="combine_type" id="combineTypeInput" value="{{ product.combine_type or ('multi' if boms else 'single') }}">
+        <input type="hidden" name="bom_submitted" value="1">
+        <input type="file" name="picture" id="pictureFileInput" accept="image/*" style="display:none;" onchange="previewSelectedImage(this)">
+
+        <!-- Authentic inFlow Top Toolbar -->
+        <div class="inflow-win-toolbar inflow-toolbar">
+            <div class="inflow-toolbar-left">
+                <!-- New Button -->
+                <a href="{{ url_for('products.new_product') }}" class="inflow-tb-btn" title="Create New Product (Ctrl+N)">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 2C3 1.44772 3.44772 1 4 1H9.58579C9.851 1 10.1054 1.10536 10.2929 1.29289L13.7071 4.70711C13.8946 4.89464 14 5.149 14 5.41421V14C14 14.5523 13.5523 15 13 15H4C3.44772 15 3 14.5523 3 14V2Z" fill="#F8FAFC" stroke="#64748B" stroke-width="1.2"/>
+                        <path d="M9.5 1V5H13.5" stroke="#64748B" stroke-width="1.2"/>
+                        <path d="M8 8V12M6 10H10" stroke="#0284C7" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                    <span>New</span>
+                </a>
+
+                <!-- Save Button -->
+                <button type="submit" class="inflow-tb-btn" id="btnSaveProduct" title="Save Product (Ctrl+S)">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                        <path d="M2.5 2C2.5 1.72386 2.72386 1.5 3 1.5H11.5L13.5 3.5V13.5C13.5 13.7761 13.2761 14 13 14H3C2.72386 14 2.5 13.7761 2.5 13.5V2Z" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.2"/>
+                        <rect x="4.5" y="2" width="6" height="4" rx="0.5" fill="#E0E7FF"/>
+                        <rect x="4.5" y="8.5" width="7" height="4.5" rx="0.5" fill="#FFFFFF"/>
+                    </svg>
+                    <span>Save</span>
+                </button>
+
+                <span class="inflow-tb-sep">|</span>
+
+                {% if not is_new %}
+                <!-- Copy Button -->
+                <a href="{{ url_for('products.copy_product', id=product.id) }}" class="inflow-tb-btn" onclick="return confirm('Duplicate this product specifications and pricing schemes?');" title="Copy Product (Ctrl+D)">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                        <rect x="5.5" y="4.5" width="8" height="10" rx="1" fill="#FFFFFF" stroke="#475569" stroke-width="1.2"/>
+                        <path d="M3.5 11.5H2.5C2.22386 11.5 2 11.2761 2 11V2C2 1.72386 2.22386 1.5 2.5 1.5H9.5C9.77614 1.5 10 1.72386 10 2V3" stroke="#64748B" stroke-width="1.2"/>
+                    </svg>
+                    <span>Copy</span>
+                </a>
+
+                <!-- Version Button -->
+                <button type="button" class="inflow-tb-btn" onclick="openModal('versionHistoryModal')" title="Version History">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                        <path d="M2.5 3C2.5 2.44772 2.94772 2 3.5 2H7.5C8 2 8 4 8 4H2.5V3Z" fill="#60A5FA"/>
+                        <path d="M8.5 2H12.5C13.0523 2 13.5 2.44772 13.5 3V12C13.5 12.5523 13.0523 13 12.5 13H8.5V2Z" fill="#EFF6FF" stroke="#3B82F6" stroke-width="1.2"/>
+                        <path d="M7.5 2H3.5C2.94772 2 2.5 2.44772 2.5 3V12C2.5 12.5523 2.94772 13 3.5 13H7.5V2Z" fill="#FFFFFF" stroke="#3B82F6" stroke-width="1.2"/>
+                        <line x1="8" y1="2" x2="8" y2="13" stroke="#1D4ED8" stroke-width="1.2"/>
+                    </svg>
+                    <span>Version</span>
+                </button>
+
+                <span class="inflow-tb-sep">|</span>
+
+                <!-- Deactivate Button -->
+                <button type="button" class="inflow-tb-btn" onclick="submitToggleStatus()" title="Toggle product status">
+                    {% if product.is_active %}
+                    <span class="inflow-icon-circle-red"></span>
+                    <span>Deactivate</span>
+                    {% else %}
+                    <span class="inflow-icon-circle-green"></span>
+                    <span>Activate</span>
+                    {% endif %}
+                </button>
+
+                <span class="inflow-tb-sep">|</span>
+
+                <!-- Attachment Button -->
+                <button type="button" class="inflow-tb-btn" onclick="openModal('attachmentModal')" title="Manage Attachments">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                        <path d="M11.5 4.5L5.79289 10.2071C5.40237 10.5976 5.40237 11.2309 5.79289 11.6214C6.18342 12.0119 6.81658 12.0119 7.20711 11.6214L13.2071 5.62132C14.0042 4.82423 14.0042 3.53036 13.2071 2.73327C12.41 1.93617 11.1162 1.93617 10.3191 2.73327L4.02513 9.02728C2.85355 10.1989 2.85355 12.0984 4.02513 13.2699C5.1967 14.4415 7.0962 14.4415 8.26777 13.2699L13.5 8" stroke="#475569" stroke-width="1.2" stroke-linecap="round"/>
+                    </svg>
+                    <span>Attachment</span>
+                </button>
+                {% endif %}
+            </div>
+
+            <div class="inflow-toolbar-right">
+                {% if not is_new %}
+                <a href="{{ url_for('purchase_orders.create_purchase', product_id=product.id) }}" class="inflow-tb-btn" style="color: #0F766E;">
+                    <span>+ Create PO</span>
+                </a>
+                {% endif %}
+                <a href="{{ url_for('products.list_products') }}" class="inflow-tb-btn" style="color: #64748B;">
+                    <span>← Product List</span>
+                </a>
+                <button type="button" class="inflow-tb-btn" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.closeActiveTab(); } else { window.location.href='{{ url_for('products.list_products') }}'; }" style="color: #DC2626; font-weight: 600;" title="Close this tab">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <span>Close</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 1: Product Info (The Core 2-Column inFlow Desktop Screen) -->
+        <div id="tabProductInfo" class="inflow-tab-pane" {% if active_tab and active_tab != 'tabProductInfo' %}style="display: none;"{% endif %}>
+            <div style="display: grid; grid-template-columns: minmax(0, 520px) minmax(0, 380px); gap: 40px; align-items: start;">
+                
+                <!-- LEFT COLUMN: Basic, Sales Info, Inventory -->
+                <div>
+                    <!-- 1. Basic -->
+                    <div class="inflow-title-blue">Basic</div>
+                    
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Item Name/Code</label>
+                        <input type="text" name="name" id="productNameInput" value="{{ product.name }}" required class="inflow-txt-input font-khmer" style="width: 320px; font-weight: 500;">
+                        <input type="hidden" name="sku" id="productSkuInput" value="{{ product.sku }}">
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Category</label>
+                        <select name="category_id" id="categorySelect" class="inflow-combo" style="width: 320px;">
+                            <option value="">(None)</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}" {% if product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Type</label>
+                        <select name="item_type" class="inflow-combo" style="width: 320px;">
+                            <option value="Stockable" {% if product.item_type == 'Stockable' %}selected{% endif %}>Stockable</option>
+                            <option value="Non-Stocked" {% if product.item_type == 'Non-Stocked' %}selected{% endif %}>Non-Stocked</option>
+                            <option value="Service" {% if product.item_type == 'Service' %}selected{% endif %}>Service</option>
+                        </select>
+                    </div>
+
+
+                    <div class="inflow-form-row" style="align-items: flex-start; margin-bottom: 22px;">
+                        <label class="inflow-form-lbl" style="padding-top: 3px;">Description</label>
+                        <textarea name="description" class="inflow-txtarea font-khmer" style="width: 320px; height: 58px; resize: vertical;">{{ product.description or '' }}</textarea>
+                    </div>
+
+                    <!-- 2. Sales Info -->
+                    <div class="inflow-title-blue">Sales Info</div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Tax Code</label>
+                        <select name="tax_code" class="inflow-combo" style="width: 140px;">
+                            <option value="Taxable" {% if product.tax_code == 'Taxable' %}selected{% endif %}>Taxable</option>
+                            <option value="Non-Taxable" {% if product.tax_code == 'Non-Taxable' %}selected{% endif %}>Non-Taxable</option>
+                            <option value="Exempt" {% if product.tax_code == 'Exempt' %}selected{% endif %}>Exempt</option>
+                        </select>
+                    </div>
+
+                    <!-- Pricing Schemes Scrollbox -->
+                    <div class="inflow-pricing-container" id="pricingSchemeContainer">
+                        {% for pt in price_tiers %}
+                        <div class="inflow-pricing-row" id="pricingRow_{{ pt.pricing_scheme_id }}" data-scheme-id="{{ pt.pricing_scheme_id }}">
+                            <span class="inflow-tier-name" title="{{ pt.scheme_name }}">{{ pt.scheme_name }}</span>
+                            <span style="margin-right: 2px; color: #333;">$</span>
+                            <input type="number" step="{{ price_step }}" name="scheme_price_{{ pt.pricing_scheme_id }}" id="price_{{ pt.pricing_scheme_id }}" value="{{ ('{:.' ~ item_price_dec ~ 'f}').format(pt.unit_price) }}" class="inflow-price-num scheme-price-input" data-scheme-id="{{ pt.pricing_scheme_id }}" oninput="onSchemePriceChange({{ pt.pricing_scheme_id }})" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed; border-color: #CBD5E1;" title="Selling price editing is restricted by administrator"{% endif %}>
+                            {% if can_view_costs %}
+                            <span style="margin: 0 4px; color: #555;">=</span>
+                            <input type="number" step="0.01" name="scheme_markup_{{ pt.pricing_scheme_id }}" id="markup_{{ pt.pricing_scheme_id }}" value="{{ pt.markup }}" class="inflow-markup-num scheme-markup-input" data-scheme-id="{{ pt.pricing_scheme_id }}" oninput="onSchemeMarkupChange({{ pt.pricing_scheme_id }})" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed; border-color: #CBD5E1;" title="Markup editing is restricted by administrator"{% endif %}>
+                            <span style="margin-left: 4px; font-size: 11px; color: #333;">% Markup</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    {% if can_edit_prices %}
+                    <!-- Add new Pricing / Currency Link (Matching inFlow center_step5.png) -->
+                    <div style="margin-top: 4px; margin-bottom: 22px;">
+                        <a href="javascript:void(0)" onclick="openPricingSchemeModal()" class="inflow-blue-link" style="font-size: 11.5px; text-decoration: underline;">Add new Pricing / Currency</a>
+                    </div>
+                    {% else %}
+                    <div style="margin-top: 4px; margin-bottom: 16px; font-size: 11px; color: #64748B; font-style: italic;">
+                        🔒 Selling prices are locked by administrator (ការកែប្រែតម្លៃលក់ត្រូវបានបិទ)
+                    </div>
+                    {% endif %}
+
+                    <!-- 3. Inventory -->
+                    <div class="inflow-title-blue">Inventory</div>
+
+                    <div style="width: 360px;">
+                        <table class="inflow-win-grid" id="locationStockGrid">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22px;"></th>
+                                    <th style="width: 210px; text-align: left;">Location</th>
+                                    <th style="text-align: right;">Quantity</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ws in location_stocks %}
+                                <tr class="inflow-grid-row {% if loop.first %}inflow-row-selected{% endif %}" onclick="selectInflowRow(this)" data-loc-id="{{ ws.location_id }}">
+                                    <td class="inflow-row-sel">{% if loop.first %}▶{% endif %}</td>
+                                    <td>{{ ws.location_name }}</td>
+                                    <td style="text-align: right;">
+                                        <input type="number" step="1" name="stock_qty_{{ ws.location_id }}" value="{{ '{:,.0f}'.format(ws.quantity) }}" class="inflow-grid-input loc-stock-input" data-reserved="{{ ws.reserved_quantity }}" oninput="recalcInventorySummary()">
+                                        <span style="margin-left: 3px;">pcs</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                <tr class="inflow-grid-row">
+                                    <td class="inflow-row-sel">*</td>
+                                    <td></td>
+                                    <td></td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="display: flex; justify-content: space-between; margin-top: 8px; font-size: 11.5px; color: #333333;">
+                            <span>Quantity on Hand</span>
+                            <span id="summaryTotalOnHand" style="font-weight: 500;">{{ "{:,.0f}".format(product.total_qty) }} pcs.</span>
+                        </div>
+
+                        <div style="text-align: right; margin-top: 14px;">
+                            <a href="javascript:void(0)" onclick="switchProductTab('tabExtraInfo', document.getElementById('btnTabExtraInfo'))" class="inflow-blue-link">Add Custom Fields</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT COLUMN: Picture, Costing Info -->
+                <div>
+                    <!-- 1. Picture -->
+                    <div class="inflow-title-blue">Picture</div>
+
+                    <div class="inflow-picture-frame" id="pictureContainer">
+                        {% if product.image_url %}
+                            <img id="productImagePreview" src="{{ product.image_url }}" alt="Product Image">
+                            <div id="productImagePlaceholder" style="display: none; color: #888; font-size: 11px;">No Image Available</div>
+                        {% else %}
+                            <img id="productImagePreview" src="" alt="Product Image" style="display: none;">
+                            <div id="productImagePlaceholder" style="display: flex; color: #888; font-size: 11px;">No Image Available</div>
+                        {% endif %}
+                    </div>
+
+                    <div style="display: flex; gap: 8px; justify-content: center; width: 320px; margin-top: 8px; margin-bottom: 26px;">
+                        <button type="button" class="inflow-win-btn" onclick="document.getElementById('pictureFileInput').click()">Browse</button>
+                        <button type="button" class="inflow-win-btn" onclick="clearProductPhoto()">Clear</button>
+                    </div>
+
+                    {% if can_view_costs %}
+                    <!-- 2. Costing Info -->
+                    <div class="inflow-title-blue">Costing Info</div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Costing Method</label>
+                        <select name="costing_method" id="costingMethodSelect" class="inflow-combo" style="width: 170px;">
+                            <option value="Manual" {% if product.costing_method == 'Manual' %}selected{% endif %}>Manual</option>
+                            <option value="Average" {% if product.costing_method == 'Average' %}selected{% endif %}>Average</option>
+                            <option value="Standard" {% if product.costing_method == 'Standard' %}selected{% endif %}>Standard</option>
+                            <option value="FIFO" {% if product.costing_method == 'FIFO' %}selected{% endif %}>FIFO</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row" style="margin-top: 6px;">
+                        <div style="width: 110px;"></div>
+                        <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                            <div style="display: flex; align-items: center; border: 1px solid #ABADB3; background: #FFFFFF; width: 170px; height: 23px; padding: 0 4px; position: relative;">
+                                <span style="color: #444444; font-size: 11.5px; margin-right: 2px;">$</span>
+                                <input type="text" name="cost_price" id="costPriceInput" 
+                                       data-formula="{{ product.cost_formula or '' }}"
+                                       value="{{ ('{:.' ~ item_cost_dec ~ 'f}').format(product.standard_cost or product.average_cost or 0) }}" 
+                                       style="border: none; outline: none; width: 100%; text-align: right; font-size: 11.5px; font-family: 'Segoe UI', Tahoma, sans-serif;" 
+                                       placeholder="0.00" 
+                                       title="Enter cost or formula e.g. =5592+3764100/4000, 10+2.5" 
+                                       onfocus="onCostInputFocus(this)"
+                                       oninput="onCostFormulaInput(this)" 
+                                       onblur="onCostFormulaBlur(this)" 
+                                       onkeydown="onCostFormulaKeydown(event, this)">
+                                <span id="costFormulaBadge" class="formula-preview-badge" style="display: none; position: absolute; right: 0; top: -22px; z-index: 10; font-size: 11px; background: #1E3A5F; color: #fff; padding: 2px 6px; border-radius: 4px; font-family: monospace;"></span>
+                            </div>
+                            <!-- Formula preview row below input -->
+                            <div class="inflow-fx-display-row" id="costFormulaDisplayRowDetail" onclick="focusCostInputDetail()" 
+                                 style="display: {{ 'inline-flex' if product.cost_formula else 'none' }}; margin-top: 3px;"
+                                 title="Formula saved in sheet. Click to edit.">
+                                <span class="inflow-fx-prefix">fx:</span>
+                                <span class="inflow-fx-expr" id="costFormulaExprTextDetail">{{ product.cost_formula if product.cost_formula else '' }}</span>
+                            </div>
+                            <input type="hidden" name="cost_formula" id="hiddenCostFormulaInput" value="{{ product.cost_formula or '' }}">
+                        </div>
+                    </div>
+
+                    <!-- Helpful Cost Formula Note (Below Costing Box) -->
+                    <div class="inflow-cost-note-box" style="margin-top: 8px; margin-left: 10px; padding: 6px 10px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 4px; font-size: 11px; color: #64748B; display: flex; align-items: flex-start; gap: 6px; max-width: 440px;">
+                        <span style="color: #0284C7; font-weight: bold; flex-shrink: 0;">ℹ️ ចំណាំ (Note):</span>
+                        <span style="line-height: 1.4;">
+                            ប្រអប់ថ្លៃដើម (Cost) នេះអាចគណនារូបមន្តដោយផ្ទាល់បាន (ឧ. <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">=9.66+100</code>, <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">=(100/7.2)+3.5</code>, <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">15/12</code>) ហើយរក្សារូបមន្តទុកកែប្រែពេលក្រោយបានគ្រប់ពេល។<br>
+                            <span style="font-size: 10.5px; color: #94A3B8;">(Direct formula calculation supported. Formulations are retained automatically for editing later.)</span>
+                        </span>
+                    </div>
+                    {% else %}
+                    <!-- Costing Info (Branch Hidden) -->
+                    <div class="inflow-title-blue" style="color: #94A3B8;">Costing Info (Locked)</div>
+                    <div style="margin-top: 8px; padding: 12px 14px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 6px; font-size: 11.5px; color: #64748B; max-width: 380px;">
+                        <div style="font-weight: 700; color: #0284C7; margin-bottom: 4px;">🔒 ថ្លៃដើមផលិតផល (Product Costing)</div>
+                        <div>ទិន្នន័យថ្លៃដើម និងការវិភាគប្រាក់ចំណេញត្រូវបានរក្សាជាការសម្ងាត់ដោយ Main Store។ សាខាអាចមើល និងលក់តាមតម្លៃលក់ជូនអតិថិជនបានជាធម្មតា។</div>
+                    </div>
+                    {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Price Table & Showcase Card (Khmer Primary / English Secondary) -->
+            <div class="inflow-price-showcase-container" style="margin-top: 30px; max-width: 900px;" id="productPriceCardSection">
+                <div class="inflow-price-showcase-toolbar no-print">
+                    <div class="inflow-price-showcase-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        <span class="font-khmer">តារាងតម្លៃផលិតផល & ការវិភាគចំណេញ</span>
+                        <span style="font-size: 11px; color: #64748B; font-weight: 500;">(Product Price Showcase)</span>
+                    </div>
+                    <div class="inflow-price-showcase-actions" style="flex-wrap: wrap; gap: 8px;">
+                        {% if can_view_costs %}
+                        <button type="button" class="inflow-btn-showcase-action" id="btnToggleProfitDetail" onclick="toggleInternalProfitDrawerDetail()">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span id="toggleProfitBtnLabelDetail" class="font-khmer">👁️ ការវិភាគចំណេញ</span>
+                        </button>
+                        {% endif %}
+                        <button type="button" class="inflow-btn-showcase-action" onclick="window.print()">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            <span class="font-khmer">🖨️ បោះពុម្ព</span>
+                        </button>
+                        <button type="button" class="inflow-btn-showcase-action" onclick="exportCurrentCardAsJpgDetail()" title="Save this Price Table as High-Quality JPG image">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                            <span class="font-khmer">📷 រក្សាទុក JPG</span>
+                        </button>
+                        <div class="inflow-export-dropdown">
+                            <button type="button" class="inflow-btn-showcase-action" onclick="toggleExportMenuDetail(event)" title="Export options: Save Category or All Products as JPG ZIP file">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                <span class="font-khmer">📦 នាំចេញ ZIP ▾</span>
+                            </button>
+                            <div id="exportPriceCardMenuDetail" class="inflow-export-menu">
+                                <a href="javascript:void(0)" onclick="exportCategoryZipDetail()" class="inflow-export-item">
+                                    <span style="font-size: 16px;">📦</span>
+                                    <div>
+                                        <div style="font-weight: 600;">រក្សាទុកតាមក្រុម (Category ZIP)</div>
+                                        <div style="font-size: 11px; color: #64748B;">ទាញយកគ្រប់ផលិតផលក្នុងក្រុម {{ product.category_name or 'បច្ចុប្បន្ន' }} ជា JPG ZIP</div>
+                                    </div>
+                                </a>
+                                <div class="inflow-export-divider"></div>
+                                <a href="javascript:void(0)" onclick="exportAllProductsZipDetail()" class="inflow-export-item" style="color: #0284C7;">
+                                    <span style="font-size: 16px;">🌐</span>
+                                    <div>
+                                        <div style="font-weight: 700; color: #0284C7;">រក្សាទុកទាំងអស់ (All Products ZIP)</div>
+                                        <div style="font-size: 11px; color: #64748B;">ទាញយកគ្រប់ផលិតផលទាំងអស់ជា JPG ZIP</div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- The Printable Customer Price Card (Screenshot 1 Authentic Design) -->
+                <div class="inflow-spec-card" id="printablePriceCardDetail" style="--price-card-color: {{ price_card.card_color if price_card else (product.price_card_color or '#00A3E0') }}; --price-card-font: {{ price_card.card_font if price_card else (product.price_card_font or 'Kantumruy Pro') }}, 'Siemreap', sans-serif;">
+                    <div class="inflow-spec-header-grid">
+                        <div class="inflow-spec-header-cell">
+                            <div class="inflow-spec-hdr-km font-khmer">{{ price_card.khmer_name if price_card else product.name }}</div>
+                            <div class="inflow-spec-hdr-en">{{ price_card.english_name if price_card else (product.sku or '') }}</div>
+                        </div>
+                        <div class="inflow-spec-header-cell">
+                            <div class="inflow-spec-hdr-km font-khmer">ព័ត៌មានលម្អិត</div>
+                            <div class="inflow-spec-hdr-en">(Product Detail)</div>
+                        </div>
+                    </div>
+
+                    <div class="inflow-spec-upper-grid">
+                        <div class="inflow-spec-image-box">
+                            {% if product.image_url %}
+                            <img src="{{ product.image_url }}" class="inflow-spec-img" alt="{{ product.name }}">
+                            {% else %}
+                            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                <span style="font-size: 11px; margin-top: 6px;">No Image</span>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="inflow-spec-info-box">
+                            <div class="inflow-spec-info-line">
+                                ទំហំ: {{ price_card.dim_str if price_card else '21cm x 21cm x 4cm' }}
+                            </div>
+                            <div class="inflow-spec-info-line">
+                                1 កេស មាន {{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 4)) }} ដុំ
+                            </div>
+                            <div class="inflow-spec-info-line">
+                                1 ដុំ មាន {{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 100)) }} ប្រអប់
+                            </div>
+                            <div class="inflow-spec-info-line">
+                                {{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} ប្រអប់/1កេស
+                            </div>
+                            <div class="inflow-spec-info-sub">
+                                ({{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} PCS/ Carton)
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="inflow-spec-price-header-grid">
+                        <div class="inflow-spec-price-hdr-cell">
+                            <div class="inflow-spec-hdr-km font-khmer">តម្លៃ</div>
+                            <div class="inflow-spec-hdr-en">(Price)</div>
+                        </div>
+                        <div class="inflow-spec-price-hdr-cell">
+                            <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div>
+                            <div class="inflow-spec-hdr-en">(UNIT PRICE)</div>
+                        </div>
+                    </div>
+
+                    <div class="inflow-spec-price-row">
+                        <div class="inflow-spec-price-left-cell">
+                            <span class="inflow-spec-qty-label">
+                                <input type="number" name="tier_qty_1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input"> ប្រអប់ (PCS) =
+                            </span>
+                            <span class="inflow-spec-total-price">
+                                <input type="text" name="tier_price_1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing is restricted by administrator"{% endif %}> $
+                            </span>
+                        </div>
+                        <div class="inflow-spec-price-right-cell">
+                            <span class="inflow-spec-unit-price">
+                                ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/PCS)
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="inflow-spec-price-row">
+                        <div class="inflow-spec-price-left-cell">
+                            <span class="inflow-spec-qty-label">
+                                <input type="number" name="tier_qty_2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input"> ប្រអប់ (PCS) =
+                            </span>
+                            <span class="inflow-spec-total-price">
+                                <input type="text" name="tier_price_2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing is restricted by administrator"{% endif %}> $
+                            </span>
+                        </div>
+                        <div class="inflow-spec-price-right-cell">
+                            <span class="inflow-spec-unit-price">
+                                ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/PCS)
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="inflow-spec-price-row">
+                        <div class="inflow-spec-price-left-cell">
+                            <span class="inflow-spec-qty-label">
+                                <input type="number" name="tier_qty_3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input"> ប្រអប់ (PCS) =
+                            </span>
+                            <span class="inflow-spec-total-price">
+                                <input type="text" name="tier_price_3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing is restricted by administrator"{% endif %}> $
+                            </span>
+                        </div>
+                        <div class="inflow-spec-price-right-cell">
+                            <span class="inflow-spec-unit-price">
+                                ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/PCS)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if can_view_costs %}
+                <!-- Internal Profit Drawer (Screenshot 2) -->
+                <div class="inflow-internal-profit-section" id="internalProfitDrawerDetail" style="display: none;">
+                    <div class="inflow-internal-profit-banner">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span>🔐</span>
+                            <span class="font-khmer">ការវិភាគថ្លៃដើម និងប្រាក់ចំណេញ (ទិន្នន័យផ្ទៃក្នុង មិនបង្ហាញជូនអតិថិជន)</span>
+                        </div>
+                        <span style="background: #334155; padding: 2px 8px; border-radius: 3px; font-size: 11px;">ADMIN CONFIDENTIAL</span>
+                    </div>
+                    <table class="inflow-internal-profit-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 22%;">កម្រិតបរិមាណ<span class="en-sub">Tier Qty</span></th>
+                                <th style="width: 26%;">តម្លៃដើម<span class="en-sub">Costing</span></th>
+                                <th style="width: 26%;">ចំណេញ<span class="en-sub">Profit $</span></th>
+                                <th style="width: 26%;">ចំណេញ<span class="en-sub">Profit %</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="text-align: left; font-weight: 700; color: #0284C7;">
+                                    {{ price_card.tier_qty_1 if price_card else 100 }} ប្រអប់ (PCS)
+                                </td>
+                                <td style="text-align: right;">
+                                    {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #16A34A;">
+                                    {{ '{:.0f}'.format(price_card.profit_dlr_1 if price_card else 3) if price_card and price_card.profit_dlr_1 == price_card.profit_dlr_1|int else '{:.2f}'.format(price_card.profit_dlr_1 if price_card else 3.0) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #2563EB;">
+                                    {{ price_card.profit_pct_1 if price_card else 25 }}%
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: left; font-weight: 700; color: #0284C7;">
+                                    {{ price_card.tier_qty_2 if price_card else 400 }} ប្រអប់ (PCS)
+                                </td>
+                                <td style="text-align: right;">
+                                    {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #16A34A;">
+                                    {{ '{:.0f}'.format(price_card.profit_dlr_2 if price_card else 8) if price_card and price_card.profit_dlr_2 == price_card.profit_dlr_2|int else '{:.2f}'.format(price_card.profit_dlr_2 if price_card else 8.0) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #2563EB;">
+                                    {{ price_card.profit_pct_2 if price_card else 17 }}%
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: left; font-weight: 700; color: #0284C7;">
+                                    {{ price_card.tier_qty_3 if price_card else 800 }} ប្រអប់ (PCS)
+                                </td>
+                                <td style="text-align: right;">
+                                    {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #16A34A;">
+                                    {{ '{:.0f}'.format(price_card.profit_dlr_3 if price_card else 12) if price_card and price_card.profit_dlr_3 == price_card.profit_dlr_3|int else '{:.2f}'.format(price_card.profit_dlr_3 if price_card else 12.0) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #2563EB;">
+                                    {{ price_card.profit_pct_3 if price_card else 13 }}%
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- TAB 2: Extra Info (Replicating inFlow media_1791385732091_cbf4b599.png 100%) -->
+        <div id="tabExtraInfo" class="inflow-tab-pane" {% if active_tab != 'tabExtraInfo' %}style="display: none;"{% endif %}>
+            <div style="display: grid; grid-template-columns: 325px 325px; gap: 50px; align-items: start; padding-top: 6px;">
+                
+                <!-- LEFT COLUMN: Storage Info, Unit of Measure, Remarks -->
+                <div>
+                    <!-- 1. Storage Info -->
+                    <div class="inflow-title-blue">Storage Info</div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Barcode</label>
+                        <input type="text" name="barcode" value="{{ product.barcode or '' }}" class="inflow-txt-input font-mono" style="width: 190px; height: 21px; padding: 1px 4px;">
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Reorder Point</label>
+                        <div style="display: inline-flex; align-items: center; border: 1px solid #ABADB3; background: #FFFFFF; width: 190px; height: 21px; padding: 0 4px; box-sizing: border-box;">
+                            <input type="number" step="1" name="reorder_point" id="reorderPointInput" value="{{ '{:g}'.format(product.reorder_point or 0) }}" style="border: none; outline: none; width: 100%; text-align: right; font-size: 11.5px; font-family: 'Segoe UI', Tahoma, sans-serif; padding: 0;">
+                            <span id="lblReorderPointUom" style="margin-left: 3px; font-size: 11.5px; color: #000000; white-space: nowrap;">{{ product.uom or 'pcs.' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Reorder Quantity</label>
+                        <input type="number" step="1" name="reorder_quantity" value="{{ '{:g}'.format(product.reorder_quantity) if product.reorder_quantity else '' }}" class="inflow-txt-input" style="width: 190px; height: 21px; padding: 1px 4px;">
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Default Location</label>
+                        <select name="default_location_id" class="inflow-combo" style="width: 190px; height: 21px; padding: 1px 2px;">
+                            <option value="">&nbsp;</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}" {% if product.default_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Default Sublocation</label>
+                        <select name="default_sublocation" class="inflow-combo" style="width: 190px; height: 21px; padding: 1px 2px;">
+                            <option value="">&nbsp;</option>
+                            {% if product.default_sublocation %}
+                            <option value="{{ product.default_sublocation }}" selected>{{ product.default_sublocation }}</option>
+                            {% endif %}
+                            <option value="Main Bin" {% if product.default_sublocation == 'Main Bin' %}selected{% endif %}>Main Bin</option>
+                            <option value="Aisle 1" {% if product.default_sublocation == 'Aisle 1' %}selected{% endif %}>Aisle 1</option>
+                            <option value="Aisle 2" {% if product.default_sublocation == 'Aisle 2' %}selected{% endif %}>Aisle 2</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row" style="margin-bottom: 24px;">
+                        <label class="inflow-form-lbl">Last Vendor</label>
+                        <select name="last_vendor_id" class="inflow-combo" style="width: 190px; height: 21px; padding: 1px 2px;">
+                            <option value="">&nbsp;</option>
+                            {% for v in all_vendors %}
+                            <option value="{{ v.id }}" {% if product.last_vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- 2. Unit of Measure -->
+                    <div class="inflow-title-blue">Unit of Measure</div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Standard UoM</label>
+                        <select name="uom" id="standardUomSelect" class="inflow-combo" style="width: 60px; height: 21px; padding: 1px 2px;" onchange="updateStandardUom(this.value)">
+                            <option value="pcs." {% if product.uom == 'pcs.' or not product.uom %}selected{% endif %}>pcs.</option>
+                            <option value="cases" {% if product.uom == 'cases' %}selected{% endif %}>cases</option>
+                            <option value="box" {% if product.uom == 'box' %}selected{% endif %}>box</option>
+                            <option value="pack" {% if product.uom == 'pack' %}selected{% endif %}>pack</option>
+                            <option value="kg" {% if product.uom == 'kg' %}selected{% endif %}>kg</option>
+                            <option value="set" {% if product.uom == 'set' %}selected{% endif %}>set</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row" style="margin-bottom: 4px;">
+                        <label class="inflow-form-lbl">Sales UoM</label>
+                        <select name="sales_uom" id="salesUomSelect" class="inflow-combo" style="width: 60px; height: 21px; padding: 1px 2px;" onchange="updateSalesUom(this.value)">
+                            <option value="cases" {% if product.sales_uom == 'cases' or not product.sales_uom %}selected{% endif %}>cases</option>
+                            <option value="pcs." {% if product.sales_uom == 'pcs.' %}selected{% endif %}>pcs.</option>
+                            <option value="box" {% if product.sales_uom == 'box' %}selected{% endif %}>box</option>
+                            <option value="pack" {% if product.sales_uom == 'pack' %}selected{% endif %}>pack</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row" style="margin-bottom: 8px;">
+                        <label class="inflow-form-lbl" style="padding-left: 18px; width: 92px; color: #333333;">Conversion</label>
+                        <div style="display: inline-flex; align-items: center; font-size: 11.5px; gap: 4px;">
+                            <input type="number" step="1" name="sales_uom_ratio" id="salesUomRatioInput" value="{{ '{:g}'.format(product.sales_uom_ratio or 1) }}" class="inflow-txt-input" style="width: 36px; height: 21px; text-align: center; padding: 1px 2px;" oninput="recalcAllPricingMarkups()">
+                            <span id="lblSalesUom" style="margin: 0 4px; color: #000000;">{{ product.sales_uom or 'cases' }}</span>
+                            <span style="margin: 0 4px; color: #333333;">=</span>
+                            <input type="number" step="1" name="sales_uom_ratio_std" id="salesUomRatioStdInput" value="{{ '{:g}'.format(product.sales_uom_ratio_std or 200) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center; padding: 1px 2px;" oninput="recalcAllPricingMarkups()">
+                            <span id="lblStdUomForSales" style="margin-left: 4px; color: #000000;">{{ product.uom or 'pcs.' }}</span>
+                        </div>
+                    </div>
+
+                    <div class="inflow-form-row" style="margin-bottom: 4px;">
+                        <label class="inflow-form-lbl">Purchasing UoM</label>
+                        <select name="purchasing_uom" id="purchasingUomSelect" class="inflow-combo" style="width: 60px; height: 21px; padding: 1px 2px;" onchange="updatePurchasingUom(this.value)">
+                            <option value="cases" {% if product.purchasing_uom == 'cases' or not product.purchasing_uom %}selected{% endif %}>cases</option>
+                            <option value="pcs." {% if product.purchasing_uom == 'pcs.' %}selected{% endif %}>pcs.</option>
+                            <option value="box" {% if product.purchasing_uom == 'box' %}selected{% endif %}>box</option>
+                            <option value="pack" {% if product.purchasing_uom == 'pack' %}selected{% endif %}>pack</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row" style="margin-bottom: 24px;">
+                        <label class="inflow-form-lbl" style="padding-left: 18px; width: 92px; color: #333333;">Conversion</label>
+                        <div style="display: inline-flex; align-items: center; font-size: 11.5px; gap: 4px;">
+                            <input type="number" step="1" name="purchasing_uom_ratio" id="purchasingUomRatioInput" value="{{ '{:g}'.format(product.purchasing_uom_ratio or 1) }}" class="inflow-txt-input" style="width: 36px; height: 21px; text-align: center; padding: 1px 2px;">
+                            <span id="lblPurchasingUom" style="margin: 0 4px; color: #000000;">{{ product.purchasing_uom or 'cases' }}</span>
+                            <span style="margin: 0 4px; color: #333333;">=</span>
+                            <input type="number" step="1" name="purchasing_uom_ratio_std" id="purchasingUomRatioStdInput" value="{{ '{:g}'.format(product.purchasing_uom_ratio_std or 1) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center; padding: 1px 2px;">
+                            <span id="lblStdUomForPurchasing" style="margin-left: 4px; color: #000000;">{{ product.uom or 'pcs.' }}</span>
+                        </div>
+                    </div>
+
+                    <!-- Dimensions & Packaging (Near Unit of Measure) -->
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 12px; margin-bottom: 20px; width: 320px; box-sizing: border-box;">
+                        <div style="font-size: 11.5px; font-weight: 700; color: #0284C7; margin-bottom: 8px; display: flex; justify-content: space-between;">
+                            <span>DIMENSIONS & PACKAGING (cm)</span>
+                            <span id="detailDimSummaryTag" style="color: #334155; font-weight: 600;">{{ '{:g}'.format(product.length or 21) }}x{{ '{:g}'.format(product.width or 21) }}x{{ '{:g}'.format(product.height or 4) }}cm</span>
+                        </div>
+                        <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 8px;">
+                            <label style="font-size: 11px; font-weight: 600; color: #475569;">L:</label>
+                            <input type="number" step="0.01" name="length" id="detailDimLength" value="{{ '{:g}'.format(product.length or 21) }}" class="inflow-txt-input" style="width: 52px; height: 21px; text-align: center;" oninput="onDetailDimChange()">
+                            <span style="font-size: 10px; color: #64748B;">cm</span>
+
+                            <label style="font-size: 11px; font-weight: 600; color: #475569; margin-left: 4px;">W:</label>
+                            <input type="number" step="0.01" name="width" id="detailDimWidth" value="{{ '{:g}'.format(product.width or 21) }}" class="inflow-txt-input" style="width: 52px; height: 21px; text-align: center;" oninput="onDetailDimChange()">
+                            <span style="font-size: 10px; color: #64748B;">cm</span>
+
+                            <label style="font-size: 11px; font-weight: 600; color: #475569; margin-left: 4px;">H:</label>
+                            <input type="number" step="0.01" name="height" id="detailDimHeight" value="{{ '{:g}'.format(product.height or 4) }}" class="inflow-txt-input" style="width: 52px; height: 21px; text-align: center;" oninput="onDetailDimChange()">
+                            <span style="font-size: 10px; color: #64748B;">cm</span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px dashed #CBD5E1; padding-top: 6px;">
+                            <div>
+                                <label style="font-size: 10.5px; color: #334155; font-weight: 600; display: block;">1 កេស មាន (Packs/Case):</label>
+                                <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+                                    <input type="number" step="1" name="packs_per_case" id="detailPacksCase" value="{{ '{:g}'.format(product.packs_per_case or 3) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center;" oninput="onDetailPackagingChange()">
+                                    <span style="font-size: 10px; color: #64748B;">ដុំ</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="font-size: 10.5px; color: #334155; font-weight: 600; display: block;">1 ដុំ មាន (Pcs/Pack):</label>
+                                <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+                                    <input type="number" step="1" name="pcs_per_pack" id="detailPcsPack" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center;" oninput="onDetailPackagingChange()">
+                                    <span style="font-size: 10px; color: #64748B;">ប្រអប់</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Remarks -->
+                    <div class="inflow-title-blue">Remarks</div>
+                    <textarea name="remarks" class="inflow-txtarea font-khmer" style="width: 320px; height: 130px; box-sizing: border-box; resize: vertical;">{{ product.remarks or '' }}</textarea>
+                </div>
+
+                <!-- RIGHT COLUMN: Bill of Materials, Measurements -->
+                <div>
+                    <!-- 1. Bill of Materials -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 330px;">
+                        <div class="inflow-title-blue" style="margin: 0; display: flex; align-items: center; gap: 6px;">
+                            <span>Bill of Materials</span>
+                            <span id="bomCombineBadge" style="font-size: 9.5px; background: #E0F2FE; color: #0284C7; font-weight: 600; padding: 1px 5px; border-radius: 3px; display: {% if boms %}inline-block{% else %}none{% endif %};">🧩 Kit (ផ្សំ)</span>
+                        </div>
+                        <button type="button" onclick="addSelectedBomToTable()" class="inflow-win-btn" style="font-size: 10px; padding: 1px 6px; cursor: pointer; height: 20px;" title="Add selected component to list">
+                            + Add Item
+                        </button>
+                    </div>
+
+                    <div style="width: 330px;">
+                        <table class="inflow-win-grid" id="bomTable" style="width: 330px; border-collapse: collapse;">
+                            <thead>
+                                <tr>
+                                    <th style="width: 22px; min-width: 22px; text-align: center;"></th>
+                                    <th style="width: 110px; text-align: left;">Component Item</th>
+                                    <th style="width: 85px; text-align: left;">Description</th>
+                                    <th style="width: 50px; text-align: right;">Quantity</th>
+                                    {% if can_view_costs %}
+                                    <th style="width: 55px; text-align: right;">Cost</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for b in boms %}
+                                <tr class="inflow-grid-row bom-item-row" data-cost="{{ b.cost or 0 }}">
+                                    <td class="inflow-row-sel" style="text-align: center; padding: 0;">
+                                        <button type="button" onclick="removeBomRow(this)" title="Remove Component" style="background: none; border: none; cursor: pointer; color: #DC2626; font-size: 11px; line-height: 1; padding: 2px;">✕</button>
+                                    </td>
+                                    <td style="font-weight: 500; font-size: 11px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        <input type="hidden" name="bom_component_id[]" value="{{ b.component_product_id }}">
+                                        {{ b.component_name }}
+                                    </td>
+                                    <td style="color: #666; font-size: 10px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ b.description or '' }}</td>
+                                    <td style="text-align: right; padding: 0;">
+                                        <input type="number" step="any" min="0.001" name="bom_quantity[]" value="{{ '{:g}'.format(b.quantity) }}" class="inflow-grid-input bom-qty-input" style="width: 100%; text-align: right; border: none; height: 20px; background: transparent; padding-right: 4px; font-size: 11px;" oninput="recalcBomTotal()">
+                                    </td>
+                                    {% if can_view_costs %}
+                                    <td class="bom-subtotal-cost" style="text-align: right; font-size: 11px; padding-right: 4px; color: #0284C7; font-weight: 500;">${{ '{:.2f}'.format((b.cost or 0) * (b.quantity or 1)) }}</td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+
+                                <!-- Asterisk New Component Row -->
+                                <tr class="inflow-grid-row" id="bomPickerRow">
+                                    <td class="inflow-row-sel" style="text-align: center; font-size: 13px; font-weight: bold; color: #444;">*</td>
+                                    <td style="padding: 0; position: relative;">
+                                        <input type="hidden" name="new_bom_component_id" id="newBomSelectedId" value="">
+                                        <div style="position: relative; display: flex; align-items: center; width: 100%; height: 20px;">
+                                            <input type="text" id="newBomSearchInput" 
+                                                   class="inflow-grid-input" 
+                                                   autocomplete="off"
+                                                   placeholder="🔍 Search product..." 
+                                                   style="width: 100%; border: none; font-size: 10.5px; height: 20px; background: transparent; padding-left: 3px; padding-right: 16px;" 
+                                                   onfocus="openBomSearchDropdown()" 
+                                                   oninput="filterBomSearchDropdown(this.value)"
+                                                   onkeydown="handleBomSearchKey(event)">
+                                            <button type="button" id="newBomClearBtn" onclick="clearBomSearchSelection()" 
+                                                    style="display: none; position: absolute; right: 1px; top: 2px; background: none; border: none; font-size: 9px; color: #94A3B8; cursor: pointer; padding: 0 2px;" title="Clear">✕</button>
+                                        </div>
+
+                                        <!-- Floating Search Dropdown Table matching Windows inFlow style -->
+                                        <div id="bomSearchDropdownPopup" style="display: none; position: absolute; top: 21px; left: 0; width: 320px; max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 4px; box-shadow: 0 6px 18px rgba(0,0,0,0.18); z-index: 2000; font-size: 11px;">
+                                            <div style="padding: 4px 8px; background: #F1F5F9; border-bottom: 1px solid #E2E8F0; font-size: 9.5px; font-weight: 700; color: #64748B; display: flex; justify-content: space-between;">
+                                                <span>PRODUCT COMPONENT</span>
+                                                <span>COST</span>
+                                            </div>
+                                            <div id="bomSearchResultsList">
+                                                {% for cp in all_products %}
+                                                {% if not product.id or cp.id != product.id %}
+                                                <div class="bom-search-item" 
+                                                     data-id="{{ cp.id }}"
+                                                     data-sku="{{ cp.sku }}"
+                                                     data-name="{{ cp.name }}"
+                                                     data-desc="{{ cp.description or '' }}"
+                                                     data-cost="{{ '{:.4f}'.format(cp.standard_cost or 0) }}"
+                                                     data-search="{{ (cp.sku ~ ' ' ~ cp.name ~ ' ' ~ (cp.description or ''))|lower }}"
+                                                     onclick="selectBomComponentFromSearch(this)"
+                                                     style="padding: 5px 8px; cursor: pointer; border-bottom: 1px solid #F8FAFC; display: flex; align-items: center; justify-content: space-between; gap: 8px;"
+                                                     onmouseover="this.style.background='#F0F9FF'"
+                                                     onmouseout="this.style.background='transparent'">
+                                                    <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                        <span style="font-weight: 700; color: #0284C7;">{{ cp.sku }}</span>
+                                                        <span style="color: #1E293B; margin-left: 4px;">{{ cp.name }}</span>
+                                                    </div>
+                                                    <span style="font-weight: 600; color: #059669; font-size: 10.5px; white-space: nowrap;">
+                                                        ${{ '{:.2f}'.format(cp.standard_cost or 0) }}
+                                                    </span>
+                                                </div>
+                                                {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                            <div id="bomSearchNoMatch" style="display: none; padding: 10px; text-align: center; color: #94A3B8; font-size: 10.5px;">
+                                                No matching products found
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td id="newBomDescCell" style="color: #666; font-size: 10px; padding: 0 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></td>
+                                    <td style="text-align: right; padding: 0;">
+                                        <input type="number" step="any" min="0.001" name="new_bom_quantity" id="newBomQtyInput" value="1" class="inflow-grid-input" style="width: 100%; text-align: right; border: none; height: 20px; background: transparent; padding-right: 4px; font-size: 11px;" oninput="onNewBomQtyInputChange()" onkeydown="if(event.key==='Enter'){event.preventDefault();addSelectedBomToTable();}">
+                                    </td>
+                                    {% if can_view_costs %}
+                                    <td id="newBomCostCell" style="text-align: right; font-size: 11px; padding-right: 4px; color: #64748B;">$0.00</td>
+                                    {% endif %}
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; font-size: 11.5px; color: #000000; width: 330px;">
+                            <span id="bomItemCount" style="font-size: 10.5px; color: #64748B;">{{ boms|length }} item(s)</span>
+                            {% if can_view_costs %}
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="color: #475569; font-size: 11px;">Combined Cost:</span>
+                                <span id="lblBomTotalCost" style="font-weight: 700; color: #0284C7;">$0.00</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 2. Measurements -->
+                    <div class="inflow-title-blue" style="margin-top: 24px;">Measurements</div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Length</label>
+                        <input type="number" step="0.01" name="length" value="{{ '{:g}'.format(product.length) if product.length is not none else '' }}" class="inflow-txt-input" style="width: 190px; height: 21px; padding: 1px 4px;">
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Width</label>
+                        <input type="number" step="0.01" name="width" value="{{ '{:g}'.format(product.width) if product.width is not none else '' }}" class="inflow-txt-input" style="width: 190px; height: 21px; padding: 1px 4px;">
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Height</label>
+                        <input type="number" step="0.01" name="height" value="{{ '{:g}'.format(product.height) if product.height is not none else '' }}" class="inflow-txt-input" style="width: 190px; height: 21px; padding: 1px 4px;">
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Weight</label>
+                        <input type="number" step="0.01" name="weight" value="{{ '{:g}'.format(product.weight) if product.weight is not none else '' }}" class="inflow-txt-input" style="width: 190px; height: 21px; padding: 1px 4px;">
+                    </div>
+
+                    <!-- 3. Decimal Precision (This Item) -->
+                    <div class="inflow-title-blue" style="margin-top: 24px;">Decimal Precision</div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Price Decimals</label>
+                        <select name="price_decimals" class="inflow-combo" style="width: 190px; height: 21px; padding: 1px 2px;">
+                            <option value="" {% if product.price_decimals is none %}selected{% endif %}>System Default ({{ company.decimal_places_price or 2 }})</option>
+                            <option value="0" {% if product.price_decimals == 0 %}selected{% endif %}>0 ($39)</option>
+                            <option value="1" {% if product.price_decimals == 1 %}selected{% endif %}>1 ($39.0)</option>
+                            <option value="2" {% if product.price_decimals == 2 %}selected{% endif %}>2 ($39.00)</option>
+                            <option value="3" {% if product.price_decimals == 3 %}selected{% endif %}>3 ($39.000)</option>
+                            <option value="4" {% if product.price_decimals == 4 %}selected{% endif %}>4 ($39.0000)</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Cost Decimals</label>
+                        <select name="cost_decimals" class="inflow-combo" style="width: 190px; height: 21px; padding: 1px 2px;">
+                            <option value="" {% if product.cost_decimals is none %}selected{% endif %}>System Default ({{ company.decimal_places_cost or 3 }})</option>
+                            <option value="0" {% if product.cost_decimals == 0 %}selected{% endif %}>0 ($0)</option>
+                            <option value="1" {% if product.cost_decimals == 1 %}selected{% endif %}>1 ($0.1)</option>
+                            <option value="2" {% if product.cost_decimals == 2 %}selected{% endif %}>2 ($0.11)</option>
+                            <option value="3" {% if product.cost_decimals == 3 %}selected{% endif %}>3 ($0.107)</option>
+                            <option value="4" {% if product.cost_decimals == 4 %}selected{% endif %}>4 ($0.1070)</option>
+                            <option value="5" {% if product.cost_decimals == 5 %}selected{% endif %}>5 ($0.10700)</option>
+                            <option value="6" {% if product.cost_decimals == 6 %}selected{% endif %}>6 ($0.107000)</option>
+                        </select>
+                    </div>
+
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-lbl">Qty Decimals</label>
+                        <select name="qty_decimals" class="inflow-combo" style="width: 190px; height: 21px; padding: 1px 2px;">
+                            <option value="" {% if product.qty_decimals is none %}selected{% endif %}>System Default ({{ company.decimal_places_qty or 0 }})</option>
+                            <option value="0" {% if product.qty_decimals == 0 %}selected{% endif %}>0 (300)</option>
+                            <option value="1" {% if product.qty_decimals == 1 %}selected{% endif %}>1 (300.0)</option>
+                            <option value="2" {% if product.qty_decimals == 2 %}selected{% endif %}>2 (300.00)</option>
+                            <option value="3" {% if product.qty_decimals == 3 %}selected{% endif %}>3 (300.000)</option>
+                            <option value="4" {% if product.qty_decimals == 4 %}selected{% endif %}>4 (300.0000)</option>
+                        </select>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TAB 3: Product Vendors -->
+        <div id="tabProductVendors" class="inflow-tab-pane" style="display: none;">
+            <div class="inflow-tab-body">
+                <div class="inflow-title-blue" style="margin-bottom: 12px;">Product Vendors ({{ product_vendors|length }})</div>
+                <table class="inflow-win-grid">
+                    <thead>
+                        <tr>
+                            <th style="width: 24px;"></th>
+                            <th>Vendor Name</th>
+                            <th>Vendor Item Code</th>
+                            {% if can_view_costs %}
+                            <th style="text-align: right;">Last Cost</th>
+                            {% endif %}
+                            <th>Payment Terms</th>
+                            <th>Contact / Phone</th>
+                            <th style="text-align: center; width: 100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for pv in product_vendors %}
+                        <tr>
+                            <td class="inflow-row-sel"></td>
+                            <td style="font-weight: 500;">{{ pv.vendor_name }}</td>
+                            <td style="font-family: var(--font-mono);">{{ pv.vendor_item_code or '-' }}</td>
+                            {% if can_view_costs %}
+                            <td style="text-align: right; font-weight: 600; color: #0F766E;">{{ pv.last_cost | currency }}</td>
+                            {% endif %}
+                            <td>{{ pv.payment_terms or 'Net 30' }}</td>
+                            <td>{{ pv.vendor_phone or pv.contact_name or '-' }}</td>
+                            <td style="text-align: center;">
+                                <a href="{{ url_for('purchase_orders.create_purchase', product_id=product.id) }}" class="inflow-win-btn" style="text-decoration: none; padding: 1px 8px; height: 20px; font-size: 11px;">
+                                    + PO
+                                </a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="{% if can_view_costs %}7{% else %}6{% endif %}" style="text-align: center; color: #888; padding: 24px;">No supplier records linked to this product yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 4: Movement History -->
+        <div id="tabMovementHistory" class="inflow-tab-pane" style="display: none;">
+            <div class="inflow-tab-body">
+                <div class="inflow-title-blue" style="margin-bottom: 12px;">Stock Movement Audit Trail</div>
+                <table class="inflow-win-grid">
+                    <thead>
+                        <tr>
+                            <th style="width: 24px;"></th>
+                            <th>Date & Time</th>
+                            <th>Type</th>
+                            <th>Reference #</th>
+                            <th>Warehouse</th>
+                            <th style="text-align: right;">Quantity Moved</th>
+                            <th>Reason / Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for mv in recent_movements %}
+                        <tr>
+                            <td class="inflow-row-sel"></td>
+                            <td style="white-space: nowrap;">{{ mv.created_at | format_datetime }}</td>
+                            <td>{{ mv.movement_type }}</td>
+                            <td style="font-family: var(--font-mono); font-weight: 500;">{{ mv.reference_id or '-' }}</td>
+                            <td>{{ mv.to_location_name or mv.from_location_name or '-' }}</td>
+                            <td style="text-align: right; font-weight: 600; color: {% if mv.quantity > 0 %}#0F766E{% else %}#DC2626{% endif %};">
+                                {{ "{:+,.0f}".format(mv.quantity) }}
+                            </td>
+                            <td>{{ mv.reason or mv.notes or '-' }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" style="text-align: center; color: #888; padding: 24px;">No logged inventory movements for this product yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB 5: Order History -->
+        <div id="tabOrderHistory" class="inflow-tab-pane" style="display: none;">
+            <div class="inflow-tab-body">
+                <div class="inflow-title-blue" style="margin-bottom: 12px;">Sales & Purchase Order History ({{ recent_orders|length }})</div>
+                <table class="inflow-win-grid">
+                    <thead>
+                        <tr>
+                            <th style="width: 24px;"></th>
+                            <th>Type</th>
+                            <th>Order #</th>
+                            <th>Date</th>
+                            <th>Customer / Vendor</th>
+                            <th style="text-align: right;">Qty</th>
+                            <th style="text-align: right;">Unit Price</th>
+                            <th style="text-align: center;">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ord in recent_orders %}
+                        <tr class="inflow-history-row" 
+                            style="cursor: pointer;"
+                            ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{% if ord.order_type == 'SO' %}{{ url_for('sales_orders.detail_order', id=ord.order_id) }}{% else %}{{ url_for('purchase_orders.detail_purchase', id=ord.order_id) }}{% endif %}', '{% if ord.order_type == 'SO' %}Sales Order: {{ ord.order_number }}{% else %}Purchase Order: {{ ord.order_number }}{% endif %}', '{% if ord.order_type == 'SO' %}sales{% else %}purchase{% endif %}'); } else { window.location.href='{% if ord.order_type == 'SO' %}{{ url_for('sales_orders.detail_order', id=ord.order_id) }}{% else %}{{ url_for('purchase_orders.detail_purchase', id=ord.order_id) }}{% endif %}'; }"
+                            title="Double-click to open in new tab">
+                            <td class="inflow-row-sel"></td>
+                            <td style="font-weight: 600; color: {% if ord.order_type == 'SO' %}#0284C7{% else %}#D97706{% endif %};">{{ ord.order_type }}</td>
+                            <td>
+                                {% if ord.order_type == 'SO' %}
+                                <a href="{{ url_for('sales_orders.detail_order', id=ord.order_id) }}" onclick="if(window.top.inflowMdi){event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=ord.order_id) }}', 'Sales Order: {{ ord.order_number }}', 'sales');}" style="color: #0F766E; font-family: var(--font-mono); font-weight: 600; text-decoration: none;">{{ ord.order_number }}</a>
+                                {% else %}
+                                <a href="{{ url_for('purchase_orders.detail_purchase', id=ord.order_id) }}" onclick="if(window.top.inflowMdi){event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.detail_purchase', id=ord.order_id) }}', 'Purchase Order: {{ ord.order_number }}', 'purchase');}" style="color: #0F766E; font-family: var(--font-mono); font-weight: 600; text-decoration: none;">{{ ord.order_number }}</a>
+                                {% endif %}
+                            </td>
+                            <td>{{ ord.order_date | format_date }}</td>
+                            <td>{{ ord.party_name or '-' }}</td>
+                            <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(ord.quantity) }}</td>
+                            <td style="text-align: right;">
+                                {% if ord.order_type == 'PO' and not can_view_costs %}
+                                    <span style="color: #94A3B8; font-size: 11px;">🔒 Hidden</span>
+                                {% else %}
+                                    {{ ord.unit_price | currency }}
+                                {% endif %}
+                            </td>
+                            <td style="text-align: center;">{{ ord.status }}</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: #888; padding: 24px;">No transaction history recorded for this item yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+
+
+        <!-- Authentic inFlow Bottom Tab Strip (Pinned along bottom) -->
+        <div class="inflow-bottom-tabstrip">
+            <button type="button" id="btnTabProductInfo" class="inflow-bot-tab {% if active_tab == 'tabProductInfo' or not active_tab %}active{% endif %}" onclick="switchProductTab('tabProductInfo', this)">Product Info</button>
+            <button type="button" id="btnTabExtraInfo" class="inflow-bot-tab {% if active_tab == 'tabExtraInfo' %}active{% endif %}" onclick="switchProductTab('tabExtraInfo', this)">Extra Info</button>
+            <button type="button" id="btnTabProductVendors" class="inflow-bot-tab {% if active_tab == 'tabProductVendors' %}active{% endif %}" onclick="switchProductTab('tabProductVendors', this)">Product Vendors</button>
+            <button type="button" id="btnTabMovementHistory" class="inflow-bot-tab {% if active_tab == 'tabMovementHistory' %}active{% endif %}" onclick="switchProductTab('tabMovementHistory', this)">Movement History</button>
+            <button type="button" id="btnTabOrderHistory" class="inflow-bot-tab {% if active_tab == 'tabOrderHistory' %}active{% endif %}" onclick="switchProductTab('tabOrderHistory', this)">Order History</button>
+        </div>
+
+    </form>
+</div>
+
+<!-- Modal: Version History -->
+<div class="modal-overlay" id="versionHistoryModal">
+    <div class="modal-dialog" style="max-width: 760px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Revision History - {{ product.name }} ({{ product.sku }})</h2>
+            <button class="modal-close" onclick="closeModal('versionHistoryModal')">×</button>
+        </div>
+        <div style="padding: 14px; max-height: 420px; overflow-y: auto;">
+            <table class="inflow-win-grid">
+                <thead>
+                    <tr>
+                        <th style="width: 55px; text-align: center;">Rev</th>
+                        <th style="width: 140px;">Date & Time</th>
+                        <th>Product Name</th>
+                        {% if can_view_costs %}
+                        <th style="text-align: right;">Cost</th>
+                        {% endif %}
+                        <th style="text-align: right;">Price</th>
+                        <th>Change Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for ver in versions %}
+                    <tr>
+                        <td style="text-align: center; font-weight: 600; color: #1A73E8;">v{{ ver.version_number }}</td>
+                        <td style="white-space: nowrap; color: #555;">{{ ver.created_at | format_datetime }}</td>
+                        <td>{{ ver.name }}</td>
+                        {% if can_view_costs %}
+                        <td style="text-align: right;">{{ ver.standard_cost | currency }}</td>
+                        {% endif %}
+                        <td style="text-align: right; font-weight: 600;">{{ ver.default_price | currency }}</td>
+                        <td style="color: #666;">{{ ver.change_summary or 'Updated' }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="{% if can_view_costs %}6{% else %}5{% endif %}" style="text-align: center; color: #888; padding: 20px;">No version snapshots recorded yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding: 10px 14px; border-top: 1px solid #E2E8F0; text-align: right;">
+            <button type="button" class="inflow-win-btn" onclick="closeModal('versionHistoryModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Attachments -->
+<div class="modal-overlay" id="attachmentModal">
+    <div class="modal-dialog" style="max-width: 620px;">
+        <div class="modal-header">
+            <h2 class="modal-title">Attachments ({{ attachments|length }})</h2>
+            <button class="modal-close" onclick="closeModal('attachmentModal')">×</button>
+        </div>
+        <div style="padding: 14px;">
+            {% if not is_new %}
+            <form action="{{ url_for('products.upload_attachment', id=product.id) }}" method="POST" enctype="multipart/form-data" style="margin-bottom: 14px; padding: 10px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 4px;">
+                <div style="font-weight: 600; font-size: 11.5px; margin-bottom: 6px;">Upload Specification / Document</div>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="file" name="attachment_file" required class="inflow-txt-input" style="padding: 3px;">
+                    <button type="submit" class="inflow-win-btn">Upload</button>
+                </div>
+            </form>
+            {% endif %}
+
+            <table class="inflow-win-grid">
+                <thead>
+                    <tr>
+                        <th>Filename</th>
+                        <th style="width: 80px;">Size</th>
+                        <th style="width: 120px;">Date</th>
+                        <th style="width: 60px; text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for att in attachments %}
+                    <tr>
+                        <td style="font-weight: 500;">
+                            <a href="{{ att.file_path }}" target="_blank" style="color: #0F766E; text-decoration: none;">{{ att.file_name }}</a>
+                        </td>
+                        <td style="color: #666;">{{ "{:,.1f} KB".format(att.file_size / 1024) if att.file_size else '-' }}</td>
+                        <td style="color: #666;">{{ att.created_at | format_date }}</td>
+                        <td style="text-align: center;">
+                            <form action="{{ url_for('products.delete_attachment', id=product.id, att_id=att.id) }}" method="POST" onsubmit="return confirm('Remove attachment?');" style="display: inline;">
+                                <button type="submit" style="background: none; border: none; color: #DC2626; cursor: pointer; font-size: 11px;">Delete</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="4" style="text-align: center; color: #888; padding: 20px;">No files attached to this product.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div style="padding: 10px 14px; border-top: 1px solid #E2E8F0; text-align: right;">
+            <button type="button" class="inflow-win-btn" onclick="closeModal('attachmentModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Batch Export JPG ZIP Progress Overlay -->
+<div class="inflow-batch-export-modal" id="batchExportProgressModalDetail">
+    <div class="inflow-batch-export-box">
+        <div style="font-size: 38px; margin-bottom: 8px;">📦</div>
+        <h3 id="batchProgressTitleDetail" style="font-size: 16.5px; font-weight: 700; color: #0F172A; margin: 0 0 6px 0;">កំពុងរៀបចំបង្កើតរូបភាពតារាងតម្លៃ...</h3>
+        <p id="batchProgressSubtitleDetail" style="font-size: 12.5px; color: #64748B; margin: 0 0 14px 0;">Generating High-Resolution JPGs for ZIP archive...</p>
+        
+        <div class="inflow-progress-bar-track">
+            <div class="inflow-progress-bar-fill" id="batchProgressBarFillDetail"></div>
+        </div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 8px;">
+            <span id="batchProgressStatusTextDetail">កំពុងចាប់ផ្តើម...</span>
+            <span id="batchProgressCountTextDetail">0 / 0 (0%)</span>
+        </div>
+        <div id="batchCurrentItemPreviewDetail" style="font-size: 11.5px; color: #0284C7; font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 16px; min-height: 18px;"></div>
+        
+        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelBatchExportDetail()" style="padding: 6px 18px;">បោះបង់ (Cancel)</button>
+    </div>
+</div>
+
+<!-- Offscreen Rendering Container for Batch Price Card Generation -->
+<div id="batchPriceCardStageContainerDetail" style="position: fixed; left: -9999px; top: 0; width: 680px; z-index: -100; pointer-events: none; opacity: 0;">
+    <div class="inflow-spec-card is-exporting" id="batchPriceCardStageDetail" style="width: 680px; max-width: 680px; margin: 0; background: #FFFFFF;"></div>
+</div>
+
+{% if not is_new %}
+<!-- Hidden form for status toggle -->
+<form id="toggleStatusForm" action="{{ url_for('products.toggle_product_status', id=product.id) }}" method="POST" style="display:none;"></form>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Bottom Tab Switching (inFlow Native Behavior)
+function switchProductTab(tabId, btn) {
+    document.querySelectorAll('.inflow-bot-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.inflow-tab-pane').forEach(p => p.style.display = 'none');
+
+    btn.classList.add('active');
+    const target = document.getElementById(tabId);
+    if (target) {
+        target.style.display = 'block';
+    }
+    const tabInput = document.getElementById('activeTabInput');
+    if (tabInput) tabInput.value = tabId;
+}
+
+// Extra Info Tab Helpers (Authentic inFlow Parity)
+function updateStandardUom(val) {
+    const lblRpo = document.getElementById('lblReorderPointUom');
+    if (lblRpo) lblRpo.innerText = val;
+    const lblStdSales = document.getElementById('lblStdUomForSales');
+    if (lblStdSales) lblStdSales.innerText = val;
+    const lblStdPurch = document.getElementById('lblStdUomForPurchasing');
+    if (lblStdPurch) lblStdPurch.innerText = val;
+    if (typeof recalcAllPricingMarkups === 'function') recalcAllPricingMarkups();
+}
+
+function updateSalesUom(val) {
+    const lblSales = document.getElementById('lblSalesUom');
+    if (lblSales) lblSales.innerText = val;
+    if (typeof recalcAllPricingMarkups === 'function') recalcAllPricingMarkups();
+}
+
+function updatePurchasingUom(val) {
+    const lblPurch = document.getElementById('lblPurchasingUom');
+    if (lblPurch) lblPurch.innerText = val;
+}
+
+let bomSearchActiveIdx = -1;
+
+function openBomSearchDropdown() {
+    const pop = document.getElementById('bomSearchDropdownPopup');
+    if (!pop) return;
+    pop.style.display = 'block';
+    bomSearchActiveIdx = -1;
+    filterBomSearchDropdown(document.getElementById('newBomSearchInput')?.value || '');
+    setTimeout(() => {
+        document.addEventListener('click', onOutsideClickBomSearch);
+    }, 10);
+}
+
+function closeBomSearchDropdown() {
+    const pop = document.getElementById('bomSearchDropdownPopup');
+    if (pop) pop.style.display = 'none';
+    document.removeEventListener('click', onOutsideClickBomSearch);
+}
+
+function onOutsideClickBomSearch(e) {
+    const pop = document.getElementById('bomSearchDropdownPopup');
+    const inp = document.getElementById('newBomSearchInput');
+    if (!pop) return;
+    if (!pop.contains(e.target) && e.target !== inp) {
+        closeBomSearchDropdown();
+    }
+}
+
+function filterBomSearchDropdown(term) {
+    const q = (term || '').trim().toLowerCase();
+    const items = document.querySelectorAll('#bomSearchResultsList .bom-search-item');
+    let visibleCount = 0;
+    items.forEach(el => {
+        const text = el.getAttribute('data-search') || '';
+        if (!q || text.includes(q)) {
+            el.style.display = 'flex';
+            visibleCount++;
+        } else {
+            el.style.display = 'none';
+        }
+        el.style.background = 'transparent';
+    });
+    const noMatch = document.getElementById('bomSearchNoMatch');
+    if (noMatch) noMatch.style.display = visibleCount === 0 ? 'block' : 'none';
+    bomSearchActiveIdx = -1;
+}
+
+function handleBomSearchKey(e) {
+    const pop = document.getElementById('bomSearchDropdownPopup');
+    if (pop && pop.style.display === 'none' && (e.key === 'ArrowDown' || e.key === 'Enter')) {
+        openBomSearchDropdown();
+        return;
+    }
+    const visibleItems = Array.from(document.querySelectorAll('#bomSearchResultsList .bom-search-item')).filter(el => el.style.display !== 'none');
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (visibleItems.length === 0) return;
+        bomSearchActiveIdx = (bomSearchActiveIdx + 1) % visibleItems.length;
+        visibleItems.forEach((el, idx) => {
+            el.style.background = idx === bomSearchActiveIdx ? '#BAE6FD' : 'transparent';
+            if (idx === bomSearchActiveIdx) el.scrollIntoView({ block: 'nearest' });
+        });
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (visibleItems.length === 0) return;
+        bomSearchActiveIdx = (bomSearchActiveIdx - 1 + visibleItems.length) % visibleItems.length;
+        visibleItems.forEach((el, idx) => {
+            el.style.background = idx === bomSearchActiveIdx ? '#BAE6FD' : 'transparent';
+            if (idx === bomSearchActiveIdx) el.scrollIntoView({ block: 'nearest' });
+        });
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (bomSearchActiveIdx >= 0 && visibleItems[bomSearchActiveIdx]) {
+            selectBomComponentFromSearch(visibleItems[bomSearchActiveIdx]);
+        } else if (visibleItems.length === 1) {
+            selectBomComponentFromSearch(visibleItems[0]);
+        }
+    } else if (e.key === 'Escape') {
+        closeBomSearchDropdown();
+    }
+}
+
+function selectBomComponentFromSearch(el) {
+    const pid = el.getAttribute('data-id');
+    const sku = el.getAttribute('data-sku');
+    const name = el.getAttribute('data-name');
+    const desc = el.getAttribute('data-desc') || '';
+    const cost = parseFloat(el.getAttribute('data-cost')) || 0;
+
+    const idInput = document.getElementById('newBomSelectedId');
+    const searchInp = document.getElementById('newBomSearchInput');
+    const clearBtn = document.getElementById('newBomClearBtn');
+    const descCell = document.getElementById('newBomDescCell');
+    const qtyInput = document.getElementById('newBomQtyInput');
+    const costCell = document.getElementById('newBomCostCell');
+
+    if (idInput) idInput.value = pid;
+    if (searchInp) {
+        searchInp.value = `${sku} - ${name}`;
+        searchInp.setAttribute('data-cost', cost);
+        searchInp.setAttribute('data-sku', sku);
+        searchInp.setAttribute('data-name', name);
+    }
+    if (clearBtn) clearBtn.style.display = 'block';
+    if (descCell) descCell.innerText = desc;
+    if (qtyInput && (parseFloat(qtyInput.value) || 0) <= 0) {
+        qtyInput.value = '1';
+    }
+    const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+    if (costCell) costCell.innerText = cost > 0 ? '$' + (cost * qty).toFixed(2) : '$0.00';
+
+    closeBomSearchDropdown();
+    recalcBomTotal();
+
+    if (qtyInput) {
+        qtyInput.focus();
+        qtyInput.select();
+    }
+}
+
+function clearBomSearchSelection() {
+    const idInput = document.getElementById('newBomSelectedId');
+    const searchInp = document.getElementById('newBomSearchInput');
+    const clearBtn = document.getElementById('newBomClearBtn');
+    const descCell = document.getElementById('newBomDescCell');
+    const costCell = document.getElementById('newBomCostCell');
+    const qtyInput = document.getElementById('newBomQtyInput');
+
+    if (idInput) idInput.value = '';
+    if (searchInp) {
+        searchInp.value = '';
+        searchInp.removeAttribute('data-cost');
+        searchInp.removeAttribute('data-sku');
+        searchInp.removeAttribute('data-name');
+    }
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (descCell) descCell.innerText = '';
+    if (costCell) costCell.innerText = '$0.00';
+    if (qtyInput) qtyInput.value = '1';
+
+    recalcBomTotal();
+}
+
+function onNewBomQtyInputChange() {
+    const searchInp = document.getElementById('newBomSearchInput');
+    const cost = parseFloat(searchInp ? searchInp.getAttribute('data-cost') : 0) || 0;
+    const qty = parseFloat(document.getElementById('newBomQtyInput')?.value) || 0;
+    const costCell = document.getElementById('newBomCostCell');
+    if (costCell) costCell.innerText = cost > 0 ? '$' + (cost * qty).toFixed(2) : '$0.00';
+    recalcBomTotal();
+}
+
+function removeBomRow(btn) {
+    const row = btn.closest('tr');
+    if (row) {
+        row.remove();
+        recalcBomTotal();
+        markDirty();
+    }
+}
+
+function addSelectedBomToTable() {
+    const idInput = document.getElementById('newBomSelectedId');
+    const searchInp = document.getElementById('newBomSearchInput');
+    const qtyInput = document.getElementById('newBomQtyInput');
+    const pid = idInput ? idInput.value : '';
+
+    if (!pid) {
+        alert('Please search and select a component product first.');
+        searchInp?.focus();
+        return;
+    }
+    const name = searchInp.getAttribute('data-name') || searchInp.value;
+    const sku = searchInp.getAttribute('data-sku') || '';
+    const desc = document.getElementById('newBomDescCell')?.innerText || '';
+    const cost = parseFloat(searchInp.getAttribute('data-cost')) || 0;
+    const qty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+
+    // Check if already in table
+    const existingInput = document.querySelector(`#bomTable tbody tr.bom-item-row input[name="bom_component_id[]"][value="${pid}"]`);
+    if (existingInput) {
+        const row = existingInput.closest('tr');
+        const qInp = row.querySelector('input[name="bom_quantity[]"]');
+        if (qInp) {
+            const currentQ = parseFloat(qInp.value) || 0;
+            qInp.value = ((currentQ + qty)).toString();
+        }
+    } else {
+        const pickerRow = document.getElementById('bomPickerRow');
+        const tr = document.createElement('tr');
+        tr.className = 'inflow-grid-row bom-item-row';
+        tr.setAttribute('data-cost', cost);
+        tr.innerHTML = `
+            <td class="inflow-row-sel" style="text-align: center; padding: 0;">
+                <button type="button" onclick="removeBomRow(this)" title="Remove Component" style="background: none; border: none; cursor: pointer; color: #DC2626; font-size: 11px; line-height: 1; padding: 2px;">✕</button>
+            </td>
+            <td style="font-weight: 500; font-size: 11px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                <input type="hidden" name="bom_component_id[]" value="${pid}">
+                <span style="font-weight: 700; color: #0284C7;">${sku}</span> ${name}
+            </td>
+            <td style="color: #666; font-size: 10px; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${desc}</td>
+            <td style="text-align: right; padding: 0;">
+                <input type="number" step="any" min="0.001" name="bom_quantity[]" value="${qty}" class="inflow-grid-input bom-qty-input" style="width: 100%; text-align: right; border: none; height: 20px; background: transparent; padding-right: 4px; font-size: 11px;" oninput="recalcBomTotal()">
+            </td>
+            <td class="bom-subtotal-cost" style="text-align: right; font-size: 11px; padding-right: 4px; color: #0284C7; font-weight: 500;">$${(cost * qty).toFixed(2)}</td>
+        `;
+        pickerRow.parentNode.insertBefore(tr, pickerRow);
+    }
+
+    clearBomSearchSelection();
+    searchInp?.focus();
+    recalcBomTotal();
+    markDirty();
+}
+
+function recalcBomTotal() {
+    let total = 0;
+    let count = 0;
+
+    // Sum all explicit component rows
+    document.querySelectorAll('#bomTable tbody tr.bom-item-row').forEach(row => {
+        const qtyInput = row.querySelector('input[name="bom_quantity[]"]');
+        const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+        const unitCost = parseFloat(row.getAttribute('data-cost')) || 0;
+        const subtotal = qty * unitCost;
+        total += subtotal;
+        count++;
+        const subCell = row.querySelector('.bom-subtotal-cost');
+        if (subCell) subCell.innerText = '$' + subtotal.toFixed(2);
+    });
+
+    const lblTotal = document.getElementById('lblBomTotalCost');
+    if (lblTotal) lblTotal.innerText = '$' + total.toFixed(2);
+
+    const countLbl = document.getElementById('bomItemCount');
+    if (countLbl) countLbl.innerText = count + ' item(s)';
+
+    const badge = document.getElementById('bomCombineBadge');
+    if (badge) badge.style.display = count > 0 ? 'inline-block' : 'none';
+
+    // Auto-update standard cost input if this product has BOM components
+    const costInput = document.getElementById('costPriceInput');
+    const combineTypeInput = document.getElementById('combineTypeInput');
+    if (count > 0) {
+        if (costInput) {
+            costInput.value = total.toFixed(4);
+            costInput.style.backgroundColor = '#EFF6FF';
+            costInput.title = 'Cost auto-calculated from combined components';
+        }
+        if (combineTypeInput) combineTypeInput.value = 'multi';
+        if (typeof recalcAllPricingMarkups === 'function') {
+            recalcAllPricingMarkups();
+        }
+    } else {
+        if (costInput) {
+            costInput.style.backgroundColor = '';
+            costInput.title = '';
+        }
+        if (combineTypeInput) combineTypeInput.value = 'single';
+    }
+}
+
+function toggleInternalProfitDrawerDetail() {
+    const drawer = document.getElementById('internalProfitDrawerDetail');
+    const btn = document.getElementById('btnToggleProfitDetail');
+    const label = document.getElementById('toggleProfitBtnLabelDetail');
+    if (!drawer) return;
+    if (drawer.style.display === 'none' || !drawer.style.display) {
+        drawer.style.display = 'block';
+        if (btn) btn.classList.add('active-toggle');
+        if (label) label.innerText = '👁️ លាក់ការវិភាគចំណេញ (Hide Profit)';
+    } else {
+        drawer.style.display = 'none';
+        if (btn) btn.classList.remove('active-toggle');
+        if (label) label.innerText = '👁️ ការវិភាគចំណេញ (Internal Profit)';
+    }
+}
+
+function addExportMarginToCanvas(sourceCanvas, marginPx = 24) {
+    if (!sourceCanvas) return sourceCanvas;
+    const scale = 2;
+    const margin = Math.round(marginPx * scale);
+    const framedCanvas = document.createElement('canvas');
+    framedCanvas.width = sourceCanvas.width + (margin * 2);
+    framedCanvas.height = sourceCanvas.height + (margin * 2);
+    const ctx = framedCanvas.getContext('2d');
+    if (!ctx) return sourceCanvas;
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, framedCanvas.width, framedCanvas.height);
+    ctx.drawImage(sourceCanvas, margin, margin);
+    return framedCanvas;
+}
+
+function exportCurrentCardAsJpgDetail() {
+    const card = document.getElementById('printablePriceCardDetail');
+    if (!card) {
+        alert('Price Card element not found!');
+        return;
+    }
+    
+    card.classList.add('is-exporting');
+    const sku = "{{ product.sku or 'Product' }}".replace(/[^a-zA-Z0-9_-]/g, '_');
+    const name = "{{ product.name or 'PriceCard' }}".replace(/[\/\\:*?"<>|]/g, '_');
+    const filename = `${sku}_${name}_Price_Card.jpg`;
+    
+    setTimeout(() => {
+        html2canvas(card, {
+            scale: 2,
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: '#FFFFFF',
+            logging: false
+        }).then(canvas => {
+            card.classList.remove('is-exporting');
+            const framedCanvas = addExportMarginToCanvas(canvas, 24);
+            framedCanvas.toBlob(blob => {
+                if (blob) {
+                    saveAs(blob, filename);
+                } else {
+                    alert('Could not generate JPG blob.');
+                }
+            }, 'image/jpeg', 0.95);
+        }).catch(err => {
+            card.classList.remove('is-exporting');
+            console.error('JPG Export error:', err);
+            alert('Export failed: ' + err);
+        });
+    }, 100);
+}
+
+function toggleExportMenuDetail(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('exportPriceCardMenuDetail');
+    if (menu) menu.classList.toggle('show');
+}
+
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('exportPriceCardMenuDetail');
+    if (menu && menu.classList.contains('show') && !e.target.closest('.inflow-export-dropdown')) {
+        menu.classList.remove('show');
+    }
+});
+
+let batchExportCancelledDetail = false;
+
+function cancelBatchExportDetail() {
+    batchExportCancelledDetail = true;
+    const modal = document.getElementById('batchExportProgressModalDetail');
+    if (modal) modal.style.display = 'none';
+}
+
+function exportCategoryZipDetail() {
+    const menu = document.getElementById('exportPriceCardMenuDetail');
+    if (menu) menu.classList.remove('show');
+    const catId = "{{ product.category_id or '' }}";
+    const catName = "{{ product.category_name or 'Category' }}";
+    if (!catId) {
+        alert('Product has no assigned category.');
+        return;
+    }
+    fetchPriceCardsAndExportZipDetail(`/api/products/price-cards-data?category_id=${catId}`, `${catName.replace(/[\/\\:*?"<>|]/g, '_')}_Price_Cards.zip`);
+}
+
+function exportAllProductsZipDetail() {
+    const menu = document.getElementById('exportPriceCardMenuDetail');
+    if (menu) menu.classList.remove('show');
+    fetchPriceCardsAndExportZipDetail('/api/products/price-cards-data?all=1', 'All_Products_Price_Cards.zip');
+}
+
+async function fetchPriceCardsAndExportZipDetail(apiUrl, zipFileName) {
+    batchExportCancelledDetail = false;
+    const modal = document.getElementById('batchExportProgressModalDetail');
+    const progressFill = document.getElementById('batchProgressBarFillDetail');
+    const statusText = document.getElementById('batchProgressStatusTextDetail');
+    const countText = document.getElementById('batchProgressCountTextDetail');
+    const preview = document.getElementById('batchCurrentItemPreviewDetail');
+    
+    if (modal) modal.style.display = 'flex';
+    if (progressFill) progressFill.style.width = '0%';
+    if (statusText) statusText.innerText = 'កំពុងទាញយកទិន្នន័យពី Server...';
+    if (countText) countText.innerText = '0%';
+    if (preview) preview.innerText = '';
+    
+    try {
+        const res = await fetch(apiUrl);
+        const data = await res.json();
+        if (!data.success || !data.items || data.items.length === 0) {
+            if (modal) modal.style.display = 'none';
+            alert('No products found for export.');
+            return;
+        }
+        
+        const items = data.items;
+        const total = items.length;
+        const zip = new JSZip();
+        const stage = document.getElementById('batchPriceCardStageDetail');
+        
+        for (let i = 0; i < total; i++) {
+            if (batchExportCancelledDetail) {
+                if (modal) modal.style.display = 'none';
+                return;
+            }
+            const item = items[i];
+            const pct = Math.round(((i + 1) / total) * 100);
+            if (progressFill) progressFill.style.width = pct + '%';
+            if (statusText) statusText.innerText = `កំពុងបង្កើតរូបភាព ${i + 1} នៃ ${total}...`;
+            if (countText) countText.innerText = `${i + 1} / ${total} (${pct}%)`;
+            if (preview) preview.innerText = `[${item.sku || 'SKU'}] ${item.name || ''}`;
+            
+            const c = item.card;
+            const cardColor = c.card_color || '#00A3E0';
+            stage.style.setProperty('--price-card-color', cardColor);
+            
+            stage.innerHTML = `
+                <div class="inflow-spec-header-grid" style="background: ${cardColor};">
+                    <div class="inflow-spec-header-cell">
+                        <div class="inflow-spec-hdr-km font-khmer">${c.khmer_name || item.name}</div>
+                        <div class="inflow-spec-hdr-en">${c.english_name || item.sku}</div>
+                    </div>
+                    <div class="inflow-spec-header-cell">
+                        <div class="inflow-spec-hdr-km font-khmer">ព័ត៌មានលម្អិត</div>
+                        <div class="inflow-spec-hdr-en">(Product Detail)</div>
+                    </div>
+                </div>
+                <div class="inflow-spec-upper-grid">
+                    <div class="inflow-spec-image-box">
+                        ${item.image_url ? `<img src="${item.image_url}" class="inflow-spec-img" style="width: 100%; max-width: 100%; height: auto; max-height: 320px; object-fit: contain;">` : `<span style="color:#94A3B8;">No Image</span>`}
+                    </div>
+                    <div class="inflow-spec-info-box">
+                        <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
+                        <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
+                        <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ប្រអប់</div>
+                        <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ប្រអប់/1កេស</div>
+                        <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
+                    </div>
+                </div>
+                <div class="inflow-spec-price-header-grid" style="background: ${cardColor};">
+                    <div class="inflow-spec-price-hdr-cell"><div class="inflow-spec-hdr-km font-khmer">តម្លៃ</div></div>
+                    <div class="inflow-spec-price-hdr-cell"><div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div></div>
+                </div>
+                <div class="inflow-spec-price-row">
+                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_1} ប្រអប់ (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_1).toFixed(2)} $</span></div>
+                    <div class="inflow-spec-price-right-cell"><span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_1).toFixed(3)} $/PCS)</span></div>
+                </div>
+                <div class="inflow-spec-price-row">
+                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_2} ប្រអប់ (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_2).toFixed(2)} $</span></div>
+                    <div class="inflow-spec-price-right-cell"><span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_2).toFixed(3)} $/PCS)</span></div>
+                </div>
+                <div class="inflow-spec-price-row">
+                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_3} ប្រអប់ (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_3).toFixed(2)} $</span></div>
+                    <div class="inflow-spec-price-right-cell"><span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_3).toFixed(3)} $/PCS)</span></div>
+                </div>
+            `;
+            
+            await new Promise(r => setTimeout(r, 60));
+            const canvas = await html2canvas(stage, { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#FFFFFF', logging: false });
+            const framedCanvas = addExportMarginToCanvas(canvas, 24);
+            const blob = await new Promise(resolve => framedCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+            if (blob) {
+                const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+                const safeName = (item.card.khmer_name || item.name || '').replace(/[\/\\:*?"<>|]/g, '_').trim();
+                zip.file(`${safeSku}_${safeName || 'Product'}.jpg`, blob);
+            }
+        }
+        
+        if (statusText) statusText.innerText = 'កំពុងបង្ហាប់ឯកសារ ZIP...';
+        const zipContent = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+        saveAs(zipContent, zipFileName);
+        if (modal) modal.style.display = 'none';
+    } catch (err) {
+        if (modal) modal.style.display = 'none';
+        alert('Batch export error: ' + err);
+    }
+}
+
+window.addEventListener('DOMContentLoaded', function() {
+    recalcBomTotal();
+});
+
+// Arrow selector column in Location Stock table
+function selectInflowRow(row) {
+    document.querySelectorAll('#locationStockGrid tr.inflow-grid-row').forEach(r => {
+        r.classList.remove('inflow-row-selected');
+        const arrow = r.querySelector('.inflow-row-sel');
+        if (arrow && arrow.innerText === '▶') arrow.innerText = '';
+    });
+    row.classList.add('inflow-row-selected');
+    const arrow = row.querySelector('.inflow-row-sel');
+    if (arrow) arrow.innerText = '▶';
+}
+
+// Picture live preview & clear
+function previewSelectedImage(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const preview = document.getElementById('productImagePreview');
+            const placeholder = document.getElementById('productImagePlaceholder');
+            preview.src = e.target.result;
+            preview.style.display = 'block';
+            placeholder.style.display = 'none';
+            document.getElementById('clearPictureFlag').value = '0';
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function clearProductPhoto() {
+    document.getElementById('clearPictureFlag').value = '1';
+    document.getElementById('pictureFileInput').value = '';
+    const preview = document.getElementById('productImagePreview');
+    const placeholder = document.getElementById('productImagePlaceholder');
+    preview.src = '';
+    preview.style.display = 'none';
+    placeholder.style.display = 'flex';
+}
+
+// Bidirectional Pricing Schemes & Markup Calculation based on Sales UOM
+// Formula: Effective Cost = Cost per piece * (pcs in 1 Sales Unit)
+// Markup % = ((Selling Price - Effective Cost) / Effective Cost) * 100
+function getEffectiveCostPerSalesUnit() {
+    const costInput = document.getElementById('costPriceInput');
+    const baseCost = parseFloat(costInput ? costInput.value : 0) || 0;
+
+    const stdUomEl = document.getElementById('standardUomSelect');
+    const salesUomEl = document.getElementById('salesUomSelect');
+    const stdUom = stdUomEl ? stdUomEl.value.trim().toLowerCase() : 'pcs.';
+    const salesUom = salesUomEl ? salesUomEl.value.trim().toLowerCase() : 'cases';
+
+    if (stdUom && salesUom && stdUom === salesUom) {
+        return baseCost;
+    }
+
+    const ratioSalesInput = document.getElementById('salesUomRatioInput');
+    const ratioStdInput = document.getElementById('salesUomRatioStdInput');
+
+    const ratioSales = parseFloat(ratioSalesInput ? ratioSalesInput.value : 1) || 1;
+    const ratioStd = parseFloat(ratioStdInput ? ratioStdInput.value : 1) || 1;
+
+    const multiplier = ratioSales > 0 ? (ratioStd / ratioSales) : 1;
+    return baseCost * multiplier;
+}
+
+function formatMarkupValue(val) {
+    if (isNaN(val) || !isFinite(val)) return '0';
+    const mDec = {{ company.decimal_places_markup if company.decimal_places_markup is not none else 2 }};
+    const factor = Math.pow(10, mDec);
+    let formatted = (Math.round(val * factor) / factor).toFixed(mDec);
+    // Remove unnecessary trailing zeroes: 2.80 -> 2.8, 12.00 -> 12
+    return formatted.replace(/\.00$/, '').replace(/(\.[0-9])0$/, '$1');
+}
+
+function onSchemePriceChange(schemeId) {
+    const effectiveCost = getEffectiveCostPerSalesUnit();
+    const priceInput = document.getElementById('price_' + schemeId);
+    const markupInput = document.getElementById('markup_' + schemeId);
+    if (!priceInput || !markupInput) return;
+
+    const price = parseFloat(priceInput.value) || 0;
+    if (effectiveCost > 0) {
+        const markup = ((price - effectiveCost) / effectiveCost) * 100;
+        markupInput.value = formatMarkupValue(markup);
+    } else {
+        markupInput.value = '0';
+    }
+}
+
+function onSchemeMarkupChange(schemeId) {
+    const effectiveCost = getEffectiveCostPerSalesUnit();
+    const priceInput = document.getElementById('price_' + schemeId);
+    const markupInput = document.getElementById('markup_' + schemeId);
+    if (!priceInput || !markupInput) return;
+
+    const markup = parseFloat(markupInput.value) || 0;
+    if (effectiveCost > 0) {
+        const price = effectiveCost * (1 + (markup / 100));
+        priceInput.value = price.toFixed({{ item_price_dec }});
+    }
+}
+
+function recalcAllPricingMarkups() {
+    const effectiveCost = getEffectiveCostPerSalesUnit();
+    document.querySelectorAll('.scheme-price-input').forEach(priceInput => {
+        const schemeId = priceInput.getAttribute('data-scheme-id');
+        const markupInput = document.getElementById('markup_' + schemeId);
+        if (!markupInput) return;
+        const price = parseFloat(priceInput.value) || 0;
+        if (effectiveCost > 0 && price > 0) {
+            const markup = ((price - effectiveCost) / effectiveCost) * 100;
+            markupInput.value = formatMarkupValue(markup);
+        } else if (price === 0) {
+            markupInput.value = '0';
+        }
+    });
+}
+
+function evaluateMathExpression(raw) {
+    if (!raw) return null;
+    let s = String(raw).trim();
+    if (s.startsWith('=')) s = s.substring(1).trim();
+    s = s.replace(/[\$,]/g, '').trim();
+    if (!s) return null;
+    if (/^[0-9\.\+\-\*\/\%\(\)\s]+$/.test(s)) {
+        try {
+            const val = Function('"use strict"; return (' + s + ')')();
+            if (typeof val === 'number' && !isNaN(val) && isFinite(val)) {
+                return val;
+            }
+        } catch (e) {}
+    }
+    const directFloat = parseFloat(s);
+    return isNaN(directFloat) ? null : directFloat;
+}
+
+function focusCostInputDetail() {
+    const input = document.getElementById('costPriceInput');
+    if (input) {
+        input.focus();
+        onCostInputFocus(input);
+    }
+}
+
+function onCostInputFocus(input) {
+    const formula = input.dataset.formula;
+    if (formula && formula.trim()) {
+        input.value = formula;
+        setTimeout(() => { input.select(); }, 15);
+    }
+    const fxRow = document.getElementById('costFormulaDisplayRowDetail');
+    if (fxRow && formula && formula.trim()) {
+        fxRow.style.display = 'inline-flex';
+    }
+}
+
+function onCostFormulaInput(input) {
+    const raw = input.value.trim();
+    const badge = document.getElementById('costFormulaBadge');
+    const fxRow = document.getElementById('costFormulaDisplayRowDetail');
+    const fxText = document.getElementById('costFormulaExprTextDetail');
+
+    if (/[\+\-\*\/\=]/.test(raw)) {
+        const result = evaluateMathExpression(raw);
+        if (result !== null) {
+            if (badge) {
+                badge.innerText = '= ' + result.toFixed(4);
+                badge.style.display = 'inline-flex';
+            }
+            const formulaStr = raw.startsWith('=') ? raw : ('=' + raw);
+            if (fxText) fxText.innerText = formulaStr;
+            if (fxRow) fxRow.style.display = 'inline-flex';
+            recalcAllPricingMarkups();
+            return;
+        }
+    }
+    if (badge) badge.style.display = 'none';
+    recalcAllPricingMarkups();
+}
+
+function onCostFormulaBlur(input) {
+    const badge = document.getElementById('costFormulaBadge');
+    if (badge) badge.style.display = 'none';
+    const raw = (input.value || '').trim();
+    const fxRow = document.getElementById('costFormulaDisplayRowDetail');
+    const fxText = document.getElementById('costFormulaExprTextDetail');
+    const hiddenFormula = document.getElementById('hiddenCostFormulaInput');
+
+    let storedFormula = (input.dataset.formula || '').trim();
+    if (storedFormula === 'None' || storedFormula === 'null' || storedFormula === 'undefined') {
+        storedFormula = '';
+        input.dataset.formula = '';
+    }
+
+    if (!raw || raw === '0.00' || raw === '0') {
+        input.value = '0.00';
+        input.dataset.formula = '';
+        if (hiddenFormula) hiddenFormula.value = '';
+        if (fxRow) fxRow.style.display = 'none';
+        if (fxText) fxText.innerText = '';
+        recalcAllPricingMarkups();
+        return;
+    }
+
+    const isFormula = /[\+\-\*\/\=]/.test(raw) || raw.startsWith('=');
+    if (isFormula) {
+        const result = evaluateMathExpression(raw);
+        if (result !== null) {
+            const formulaStr = raw.startsWith('=') ? raw : ('=' + raw);
+            input.dataset.formula = formulaStr;
+            if (hiddenFormula) hiddenFormula.value = formulaStr;
+            input.value = (result < 1 && result > 0) ? parseFloat(result.toFixed(4)).toString() : result.toFixed(2);
+            if (fxText) fxText.innerText = formulaStr;
+            if (fxRow) fxRow.style.display = 'inline-flex';
+            recalcAllPricingMarkups();
+        } else {
+            if (storedFormula) {
+                const prev = evaluateMathExpression(storedFormula);
+                input.value = (prev !== null && prev < 1 && prev > 0) ? parseFloat(prev.toFixed(4)).toString() : (prev ? prev.toFixed(2) : '0.00');
+                if (fxText) fxText.innerText = storedFormula;
+                if (fxRow) fxRow.style.display = 'inline-flex';
+            }
+        }
+    } else {
+        const numVal = parseFloat(raw);
+        if (!isNaN(numVal)) {
+            // CRITICAL CHECK: Does this number match the evaluated result of the stored formula?
+            if (storedFormula) {
+                const storedResult = evaluateMathExpression(storedFormula);
+                if (storedResult !== null && Math.abs(storedResult - numVal) < 0.0001) {
+                    // User was just viewing or blurred the cell while it was showing the result!
+                    // DO NOT DELETE THE FORMULA! KEEP IT!
+                    input.value = (numVal < 1 && numVal > 0) ? parseFloat(numVal.toFixed(4)).toString() : numVal.toFixed(2);
+                    if (hiddenFormula) hiddenFormula.value = storedFormula;
+                    if (fxText) fxText.innerText = storedFormula;
+                    if (fxRow) fxRow.style.display = 'inline-flex';
+                    recalcAllPricingMarkups();
+                    return; // Retain formula intact!
+                }
+            }
+
+            // User deliberately entered a completely new plain number that replaces the formula
+            input.dataset.formula = '';
+            if (hiddenFormula) hiddenFormula.value = '';
+            input.value = (numVal < 1 && numVal > 0) ? parseFloat(numVal.toFixed(4)).toString() : numVal.toFixed(2);
+            if (fxRow) fxRow.style.display = 'none';
+            if (fxText) fxText.innerText = '';
+            recalcAllPricingMarkups();
+        }
+    }
+}
+
+function onCostFormulaKeydown(e, input) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        onCostFormulaBlur(input);
+        input.blur();
+    } else if (e.key === 'Escape') {
+        const formula = input.dataset.formula;
+        if (formula && formula.trim()) {
+            const prev = evaluateMathExpression(formula);
+            if (prev !== null) {
+                input.value = (prev < 1 && prev > 0) ? parseFloat(prev.toFixed(4)).toString() : prev.toFixed(2);
+            }
+            const fxRow = document.getElementById('costFormulaDisplayRowDetail');
+            if (fxRow) fxRow.style.display = 'inline-flex';
+        }
+        input.blur();
+    }
+}
+
+
+function onDetailDimChange() {
+    const l = parseFloat(document.getElementById('detailDimLength')?.value) || 21;
+    const w = parseFloat(document.getElementById('detailDimWidth')?.value) || 21;
+    const h = parseFloat(document.getElementById('detailDimHeight')?.value) || 4;
+    const tag = document.getElementById('detailDimSummaryTag');
+    if (tag) tag.innerText = `${l}x${w}x${h}cm`;
+}
+
+function onDetailPackagingChange() {
+    const packs = parseFloat(document.getElementById('detailPacksCase')?.value) || 3;
+    const pcs = parseFloat(document.getElementById('detailPcsPack')?.value) || 50;
+    const totalPcs = packs * pcs;
+    const stdRatioInput = document.getElementById('salesUomRatioStdInput');
+    if (stdRatioInput && parseFloat(stdRatioInput.value) <= 1) {
+        stdRatioInput.value = totalPcs;
+        recalcAllPricingMarkups();
+    }
+}
+
+function onCostPriceChanged() {
+    recalcAllPricingMarkups();
+}
+
+// Recalculate On Hand summary
+function recalcInventorySummary() {
+    let totalOnHand = 0;
+    document.querySelectorAll('.loc-stock-input').forEach(input => {
+        const qty = parseFloat(input.value) || 0;
+        totalOnHand += qty;
+    });
+    const lblOnHand = document.getElementById('summaryTotalOnHand');
+    if (lblOnHand) lblOnHand.innerText = totalOnHand.toLocaleString() + ' pcs.';
+}
+
+// Toggle status helper
+function submitToggleStatus() {
+    if (confirm('Are you sure you want to toggle the active status of this product?')) {
+        const form = document.getElementById('toggleStatusForm');
+        if (form) form.submit();
+    }
+}
+
+// Keyboard Shortcut: Ctrl + S to Save, Ctrl + N for New, Ctrl + D for Copy
+document.addEventListener('DOMContentLoaded', function() {
+    if (window.initInflowTabs) {
+        window.initInflowTabs({
+            id: 'prod-{{ product.id }}',
+            type: 'product',
+            title: 'Product: [{{ product.sku }}] {{ product.name }}',
+            label: 'Product',
+            url: window.location.pathname
+        });
+    }
+});
+
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey)) {
+        if (e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            const mainForm = document.getElementById('productMainForm');
+            if (mainForm) mainForm.submit();
+        } else if (e.key.toLowerCase() === 'd') {
+            e.preventDefault();
+            const copyBtn = document.querySelector('a[href*="/copy"]');
+            if (copyBtn) copyBtn.click();
+        }
+    }
+});
+
+// ==========================================
+// PRICING / CURRENCY MODAL LOGIC (Authentic inFlow Parity)
+// ==========================================
+let currentPricingModalSchemes = [];
+let deletedPricingSchemeIds = [];
+let selectedPricingRowElem = null;
+
+function openPricingSchemeModal() {
+    const modal = document.getElementById('pricingSchemeModalOverlay');
+    if (!modal) return;
+    modal.style.display = 'flex';
+    deletedPricingSchemeIds = [];
+    selectedPricingRowElem = null;
+    hidePricingContextMenu();
+    const showAll = document.getElementById('chkShowAllPricing')?.checked || false;
+    loadPricingSchemesModal(showAll);
+}
+
+function closePricingSchemeModal() {
+    const modal = document.getElementById('pricingSchemeModalOverlay');
+    if (modal) modal.style.display = 'none';
+    hidePricingContextMenu();
+}
+
+function loadPricingSchemesModal(showAll) {
+    const tbody = document.getElementById('pricingSchemeModalTbody');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 12px; color: #64748B;">Loading...</td></tr>';
+
+    fetch(`/api/pricing-schemes?all=${showAll ? '1' : '0'}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.schemes) {
+                currentPricingModalSchemes = data.schemes;
+                renderPricingSchemeRows(data.schemes);
+            } else {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">Failed to load pricing schemes</td></tr>';
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: red;">Network error</td></tr>';
+        });
+}
+
+function renderPricingSchemeRows(schemes) {
+    const tbody = document.getElementById('pricingSchemeModalTbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    schemes.forEach((s, idx) => {
+        const row = createPricingRowElement(s, idx === 0);
+        tbody.appendChild(row);
+    });
+
+    // Asterisk row at the end (Matching inFlow desktop *)
+    const asteriskRow = createPricingAsteriskRow();
+    tbody.appendChild(asteriskRow);
+}
+
+function createPricingRowElement(s, isFirstSelected) {
+    const tr = document.createElement('tr');
+    tr.className = 'inflow-grid-row' + (isFirstSelected ? ' inflow-row-selected' : '');
+    tr.setAttribute('data-id', s.id || '');
+    tr.setAttribute('data-active', s.is_active ? '1' : '0');
+    if (isFirstSelected) selectedPricingRowElem = tr;
+
+    tr.onclick = function(e) {
+        if (e.target.tagName !== 'SELECT' && e.target.tagName !== 'BUTTON') {
+            selectPricingRow(tr);
+        }
+    };
+    tr.oncontextmenu = function(e) {
+        e.preventDefault();
+        selectPricingRow(tr);
+        openPricingContextMenu(e);
+    };
+
+    // Column 1: Selector
+    const tdSel = document.createElement('td');
+    tdSel.className = 'inflow-row-sel';
+    tdSel.style.cursor = 'pointer';
+    tdSel.innerText = isFirstSelected ? '▶' : '';
+
+    // Column 2: Name Input
+    const tdName = document.createElement('td');
+    tdName.style.padding = '1px 4px';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.className = 'inflow-grid-input scheme-name-input';
+    nameInput.value = s.name || '';
+    nameInput.style.cssText = 'width: 100%; text-align: left; border: 1px solid transparent; background: transparent; outline: none; font-size: 11.5px; padding: 2px 4px;';
+    nameInput.onfocus = function() {
+        selectPricingRow(tr);
+        nameInput.style.borderColor = '#0078D7';
+        nameInput.style.background = '#FFFFFF';
+        nameInput.style.color = '#000000';
+    };
+    nameInput.onblur = function() {
+        nameInput.style.borderColor = 'transparent';
+        if (tr.classList.contains('inflow-row-selected')) {
+            nameInput.style.background = 'transparent';
+            nameInput.style.color = '#FFFFFF';
+        } else {
+            nameInput.style.background = 'transparent';
+            nameInput.style.color = '#000000';
+        }
+    };
+    tdName.appendChild(nameInput);
+
+    // Column 3: Currency Select
+    const tdCurr = document.createElement('td');
+    tdCurr.style.padding = '1px 4px';
+    const currSelect = document.createElement('select');
+    currSelect.className = 'inflow-combo scheme-curr-select';
+    currSelect.style.cssText = 'width: 100%; height: 21px; font-size: 11.5px; padding: 1px 2px;';
+
+    const currencies = [
+        'US Dollar ($)',
+        'Cambodian Riel (KHR)',
+        'Euro (€)',
+        'British Pound (£)',
+        'Thai Baht (฿)'
+    ];
+    currencies.forEach(curr => {
+        const opt = document.createElement('option');
+        opt.value = curr;
+        opt.innerText = curr;
+        if ((s.currency || 'US Dollar ($)').trim() === curr) {
+            opt.selected = true;
+        }
+        currSelect.appendChild(opt);
+    });
+    tdCurr.appendChild(currSelect);
+
+    // Column 4: Quick Delete Action
+    const tdAct = document.createElement('td');
+    tdAct.style.textAlign = 'center';
+    tdAct.style.padding = '0';
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.title = 'Delete Scheme';
+    delBtn.innerHTML = '&times;';
+    delBtn.style.cssText = 'border: none; background: transparent; color: #94A3B8; font-size: 15px; cursor: pointer; padding: 0 4px; line-height: 1;';
+    delBtn.onmouseover = function() { delBtn.style.color = '#DC2626'; };
+    delBtn.onmouseout = function() { delBtn.style.color = '#94A3B8'; };
+    delBtn.onclick = function(e) {
+        e.stopPropagation();
+        selectPricingRow(tr);
+        deleteSelectedPricingRow();
+    };
+    tdAct.appendChild(delBtn);
+
+    tr.appendChild(tdSel);
+    tr.appendChild(tdName);
+    tr.appendChild(tdCurr);
+    tr.appendChild(tdAct);
+
+    return tr;
+}
+
+function createPricingAsteriskRow() {
+    const tr = document.createElement('tr');
+    tr.className = 'inflow-grid-row';
+    tr.id = 'pricingAsteriskRow';
+
+    const tdSel = document.createElement('td');
+    tdSel.className = 'inflow-row-sel';
+    tdSel.innerText = '*';
+
+    const tdName = document.createElement('td');
+    tdName.style.padding = '1px 4px';
+    const nameInput = document.createElement('input');
+    nameInput.type = 'text';
+    nameInput.placeholder = 'Type to add pricing scheme...';
+    nameInput.className = 'inflow-grid-input';
+    nameInput.style.cssText = 'width: 100%; text-align: left; border: 1px dashed #CBD5E1; background: #FAFAFA; outline: none; font-size: 11.5px; padding: 2px 4px;';
+    
+    const tdCurr = document.createElement('td');
+    tdCurr.style.padding = '1px 4px';
+    const currSelect = document.createElement('select');
+    currSelect.className = 'inflow-combo';
+    currSelect.style.cssText = 'width: 100%; height: 21px; font-size: 11.5px; padding: 1px 2px;';
+    const opt = document.createElement('option');
+    opt.value = 'US Dollar ($)';
+    opt.innerText = 'US Dollar ($)';
+    currSelect.appendChild(opt);
+    tdCurr.appendChild(currSelect);
+
+    nameInput.oninput = function() {
+        if (nameInput.value.trim().length > 0) {
+            const newName = nameInput.value;
+            const newCurr = currSelect.value;
+            const tbody = document.getElementById('pricingSchemeModalTbody');
+
+            tr.remove();
+            const realRow = createPricingRowElement({ id: null, name: newName, currency: newCurr, is_active: true }, false);
+            tbody.appendChild(realRow);
+
+            const newAsterisk = createPricingAsteriskRow();
+            tbody.appendChild(newAsterisk);
+
+            const realInput = realRow.querySelector('.scheme-name-input');
+            if (realInput) {
+                realInput.focus();
+                realInput.setSelectionRange(newName.length, newName.length);
+            }
+        }
+    };
+    tdName.appendChild(nameInput);
+
+    const tdAct = document.createElement('td');
+
+    tr.appendChild(tdSel);
+    tr.appendChild(tdName);
+    tr.appendChild(tdCurr);
+    tr.appendChild(tdAct);
+
+    return tr;
+}
+
+function selectPricingRow(tr) {
+    document.querySelectorAll('#pricingSchemeModalTbody tr.inflow-grid-row').forEach(r => {
+        r.classList.remove('inflow-row-selected');
+        const arrow = r.querySelector('.inflow-row-sel');
+        if (arrow && arrow.innerText === '▶') arrow.innerText = '';
+        const input = r.querySelector('.scheme-name-input');
+        if (input && document.activeElement !== input) {
+            input.style.color = '#000000';
+            input.style.background = 'transparent';
+        }
+    });
+    tr.classList.add('inflow-row-selected');
+    const arrow = tr.querySelector('.inflow-row-sel');
+    if (arrow && arrow.innerText !== '*') arrow.innerText = '▶';
+    const input = tr.querySelector('.scheme-name-input');
+    if (input && document.activeElement !== input) {
+        input.style.color = '#FFFFFF';
+    }
+    selectedPricingRowElem = tr;
+}
+
+function deleteSelectedPricingRow() {
+    if (!selectedPricingRowElem) return;
+    if (selectedPricingRowElem.id === 'pricingAsteriskRow') return;
+
+    const nameInput = selectedPricingRowElem.querySelector('.scheme-name-input');
+    const name = nameInput ? nameInput.value.trim() : 'this scheme';
+    if (!confirm(`Are you sure you want to delete / remove pricing scheme "${name}"?`)) {
+        hidePricingContextMenu();
+        return;
+    }
+
+    const sId = selectedPricingRowElem.getAttribute('data-id');
+    if (sId) {
+        deletedPricingSchemeIds.push(parseInt(sId));
+    }
+
+    const nextRow = selectedPricingRowElem.nextElementSibling || selectedPricingRowElem.previousElementSibling;
+    selectedPricingRowElem.remove();
+    hidePricingContextMenu();
+
+    if (nextRow && nextRow.id !== 'pricingAsteriskRow') {
+        selectPricingRow(nextRow);
+    } else {
+        const first = document.querySelector('#pricingSchemeModalTbody tr.inflow-grid-row:not(#pricingAsteriskRow)');
+        if (first) selectPricingRow(first);
+        else selectedPricingRowElem = null;
+    }
+}
+
+function insertNewPricingRow() {
+    hidePricingContextMenu();
+    const tbody = document.getElementById('pricingSchemeModalTbody');
+    const asteriskRow = document.getElementById('pricingAsteriskRow');
+    const newRow = createPricingRowElement({ id: null, name: '', currency: 'US Dollar ($)', is_active: true }, false);
+    if (selectedPricingRowElem && selectedPricingRowElem !== asteriskRow) {
+        tbody.insertBefore(newRow, selectedPricingRowElem);
+    } else if (asteriskRow) {
+        tbody.insertBefore(newRow, asteriskRow);
+    } else {
+        tbody.appendChild(newRow);
+    }
+    selectPricingRow(newRow);
+    const inp = newRow.querySelector('.scheme-name-input');
+    if (inp) inp.focus();
+}
+
+function moveSelectedPricingRow(direction) {
+    hidePricingContextMenu();
+    if (!selectedPricingRowElem || selectedPricingRowElem.id === 'pricingAsteriskRow') return;
+    const tbody = document.getElementById('pricingSchemeModalTbody');
+    if (direction === -1) {
+        const prev = selectedPricingRowElem.previousElementSibling;
+        if (prev) {
+            tbody.insertBefore(selectedPricingRowElem, prev);
+            selectPricingRow(selectedPricingRowElem);
+        }
+    } else if (direction === 1) {
+        const next = selectedPricingRowElem.nextElementSibling;
+        if (next && next.id !== 'pricingAsteriskRow') {
+            tbody.insertBefore(next, selectedPricingRowElem);
+            selectPricingRow(selectedPricingRowElem);
+        }
+    }
+}
+
+function openPricingContextMenu(e) {
+    const menu = document.getElementById('pricingRowContextMenu');
+    if (!menu) return;
+    menu.style.display = 'block';
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = e.clientY + 'px';
+}
+
+function hidePricingContextMenu() {
+    const menu = document.getElementById('pricingRowContextMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('#pricingRowContextMenu')) {
+        hidePricingContextMenu();
+    }
+});
+
+function savePricingSchemesModal() {
+    const rows = document.querySelectorAll('#pricingSchemeModalTbody tr.inflow-grid-row:not(#pricingAsteriskRow)');
+    const schemesToSave = [];
+
+    rows.forEach(r => {
+        const nameInput = r.querySelector('.scheme-name-input');
+        const currSelect = r.querySelector('.scheme-curr-select');
+        const name = nameInput ? nameInput.value.trim() : '';
+        const currency = currSelect ? currSelect.value.trim() : 'US Dollar ($)';
+        const idAttr = r.getAttribute('data-id');
+        const id = idAttr ? parseInt(idAttr) : null;
+
+        if (name) {
+            schemesToSave.push({
+                id: id,
+                name: name,
+                currency: currency,
+                is_active: true
+            });
+        }
+    });
+
+    const statusEl = document.getElementById('pricingModalStatusMsg');
+    if (statusEl) statusEl.innerText = 'Saving...';
+
+    fetch('/api/pricing-schemes/batch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            schemes: schemesToSave,
+            deleted_ids: deletedPricingSchemeIds
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closePricingSchemeModal();
+            updateProductPricingContainer(data.active_schemes);
+        } else {
+            alert('Error saving pricing schemes: ' + (data.message || 'Unknown error'));
+            if (statusEl) statusEl.innerText = '';
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Network error while saving pricing schemes.');
+        if (statusEl) statusEl.innerText = '';
+    });
+}
+
+function updateProductPricingContainer(activeSchemes) {
+    const container = document.getElementById('pricingSchemeContainer');
+    if (!container) return;
+
+    const existingPrices = {};
+    const existingMarkups = {};
+    container.querySelectorAll('.inflow-pricing-row').forEach(row => {
+        const id = row.getAttribute('data-scheme-id');
+        const pInp = row.querySelector('.scheme-price-input');
+        const mInp = row.querySelector('.scheme-markup-input');
+        if (id) {
+            existingPrices[id] = pInp ? pInp.value : '0.00';
+            existingMarkups[id] = mInp ? mInp.value : '0';
+        }
+    });
+
+    container.innerHTML = '';
+    const effectiveCost = getEffectiveCostPerSalesUnit();
+
+    activeSchemes.forEach(s => {
+        const row = document.createElement('div');
+        row.className = 'inflow-pricing-row';
+        row.id = `pricingRow_${s.id}`;
+        row.setAttribute('data-scheme-id', s.id);
+
+        const priceVal = existingPrices[s.id] !== undefined ? existingPrices[s.id] : '0.00';
+        let markupVal = existingMarkups[s.id] !== undefined ? existingMarkups[s.id] : '0';
+
+        const pNum = parseFloat(priceVal) || 0;
+        if (pNum > 0 && effectiveCost > 0) {
+            const m = ((pNum - effectiveCost) / effectiveCost) * 100;
+            markupVal = formatMarkupValue(m);
+        }
+
+        {% if can_view_costs %}
+        const markupPart = `
+            <span style="margin: 0 4px; color: #555;">=</span>
+            <input type="number" step="0.01" name="scheme_markup_${s.id}" id="markup_${s.id}" value="${markupVal}" class="inflow-markup-num scheme-markup-input" data-scheme-id="${s.id}" oninput="onSchemeMarkupChange(${s.id})">
+            <span style="margin-left: 4px; font-size: 11px; color: #333;">% Markup</span>
+        `;
+        {% else %}
+        const markupPart = '';
+        {% endif %}
+
+        row.innerHTML = `
+            <span class="inflow-tier-name" title="${escapeHtml(s.name)}">${escapeHtml(s.name)}</span>
+            <span style="margin-right: 2px; color: #333;">$</span>
+            <input type="number" step="{{ price_step }}" name="scheme_price_${s.id}" id="price_${s.id}" value="${priceVal}" class="inflow-price-num scheme-price-input" data-scheme-id="${s.id}" oninput="onSchemePriceChange(${s.id})" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed; border-color: #CBD5E1;" title="Selling price editing is restricted by administrator"{% endif %}>
+            ${markupPart}
+        `;
+        container.appendChild(row);
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.innerText = text;
+    return div.innerHTML;
+}
+
+// ==========================================
+// COMBINE & ADD-ON OPTIONS (DETAIL VIEW)
+// ==========================================
+function onCombineTypeSelectChange(type) {
+    const btnCombineTab = document.getElementById('btnTabCombineOptions');
+    if (btnCombineTab) {
+        const badge = btnCombineTab.querySelector('.badge');
+        if (badge) {
+            badge.style.background = type === 'multi' ? '#0284c7' : '#94a3b8';
+        }
+    }
+}
+
+function setProductCombineType(productId, type) {
+    if (!productId) return;
+    fetch(`/api/products/${productId}/combine-type`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ combine_type: type })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const sel = document.getElementById('productCombineTypeSelect');
+            if (sel) sel.value = type;
+            onCombineTypeSelectChange(type);
+            alert(`Product mode set to: ${type === 'multi' ? 'Multi Combine (With Options)' : 'Single Product'}`);
+            setTimeout(() => window.location.reload(), 500);
+        } else {
+            alert(data.message || 'Failed to update combine type');
+        }
+    })
+    .catch(e => alert('Error setting combine type'));
+}
+
+function autoGenerateLidOptions(productId) {
+    if (!productId) {
+        alert('Please save the product first.');
+        return;
+    }
+    if (!confirm('Auto-generate standard 3 packaging options (Without Lid, Flat Lid, Clear PET Lid)?')) return;
+    fetch(`/api/products/${productId}/preset-lid-options`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert('✅ Standard 3 lid options generated successfully!');
+            setTimeout(() => {
+                const url = new URL(window.location.href);
+                url.searchParams.set('tab', 'tabCombineOptions');
+                window.location.href = url.toString();
+            }, 600);
+        } else {
+            alert(data.message || 'Failed to generate lid options');
+        }
+    })
+    .catch(e => alert('Error generating lid options'));
+}
+
+function openAddOptionModal() {
+    document.getElementById('combineOptionModalTitle').innerText = 'Add Combine Option (បន្ថែមជម្រើស)';
+    document.getElementById('editOptionId').value = '';
+    document.getElementById('optNameInput').value = '';
+    document.getElementById('optComponentSelect').value = '';
+    document.getElementById('optComponentQtyInput').value = '1.0';
+    document.getElementById('optPriceModInput').value = '0.00';
+    document.getElementById('optNotesInput').value = '';
+    document.getElementById('optIsDefaultCheck').checked = false;
+    document.getElementById('combineOptionModal').style.display = 'flex';
+}
+
+function editCombineOption(optId, name, compId, qty, priceMod, isDef, notes) {
+    document.getElementById('combineOptionModalTitle').innerText = 'Edit Combine Option (កែប្រែជម្រើស)';
+    document.getElementById('editOptionId').value = optId;
+    document.getElementById('optNameInput').value = name;
+    document.getElementById('optComponentSelect').value = compId || '';
+    document.getElementById('optComponentQtyInput').value = qty || 1.0;
+    document.getElementById('optPriceModInput').value = priceMod || 0.0;
+    document.getElementById('optNotesInput').value = notes || '';
+    document.getElementById('optIsDefaultCheck').checked = !!isDef;
+    document.getElementById('combineOptionModal').style.display = 'flex';
+}
+
+function closeCombineOptionModal() {
+    document.getElementById('combineOptionModal').style.display = 'none';
+}
+
+function onOptionComponentChange(sel) {
+    const opt = sel.options[sel.selectedIndex];
+    if (opt && opt.value) {
+        const p = parseFloat(opt.getAttribute('data-price') || 0.0);
+        const curMod = parseFloat(document.getElementById('optPriceModInput').value || 0.0);
+        if (curMod === 0 && p > 0) {
+            document.getElementById('optPriceModInput').value = p.toFixed(2);
+        }
+    }
+}
+
+function saveCombineOption(productId) {
+    if (!productId) {
+        alert('Please save the product first.');
+        return;
+    }
+    const optId = document.getElementById('editOptionId').value;
+    const name = document.getElementById('optNameInput').value.trim();
+    if (!name) {
+        alert('Please enter Option Name');
+        return;
+    }
+    const compId = document.getElementById('optComponentSelect').value || null;
+    const compQty = parseFloat(document.getElementById('optComponentQtyInput').value || 1.0);
+    const priceMod = parseFloat(document.getElementById('optPriceModInput').value || 0.0);
+    const notes = document.getElementById('optNotesInput').value.trim();
+    const isDef = document.getElementById('optIsDefaultCheck').checked;
+
+    const payload = {
+        option_name: name,
+        component_product_id: compId ? parseInt(compId) : null,
+        component_quantity: compQty,
+        price_modifier: priceMod,
+        notes: notes,
+        is_default: isDef
+    };
+
+    const url = optId 
+        ? `/api/products/${productId}/combine-options/${optId}`
+        : `/api/products/${productId}/combine-options`;
+    const method = optId ? 'PUT' : 'POST';
+
+    fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeCombineOptionModal();
+            setTimeout(() => {
+                const u = new URL(window.location.href);
+                u.searchParams.set('tab', 'tabCombineOptions');
+                window.location.href = u.toString();
+            }, 500);
+        } else {
+            alert(data.message || 'Failed to save option');
+        }
+    })
+    .catch(e => alert('Error saving combine option'));
+}
+
+function deleteCombineOption(productId, optId) {
+    if (!confirm('Are you sure you want to delete this option?')) return;
+    fetch(`/api/products/${productId}/combine-options/${optId}`, {
+        method: 'DELETE'
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            setTimeout(() => {
+                const u = new URL(window.location.href);
+                u.searchParams.set('tab', 'tabCombineOptions');
+                window.location.href = u.toString();
+            }, 500);
+        } else {
+            alert(data.message || 'Failed to delete option');
+        }
+    })
+    .catch(e => alert('Error deleting option'));
+}
+</script>
+
+<!-- Modal: Add / Edit Combine Option -->
+<div class="modal-overlay" id="combineOptionModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="modal-dialog" style="max-width: 520px; width: 95%; background: #FFFFFF; border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); overflow: hidden;">
+        <div class="modal-header" style="background: linear-gradient(135deg, #1E293B, #0F172A); color: #FFFFFF; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="modal-title" id="combineOptionModalTitle" style="font-size: 14px; font-weight: 700; color: #FFFFFF; margin: 0;">Add Combine Option</h2>
+            <button class="modal-close" type="button" onclick="closeCombineOptionModal()" style="color: #94A3B8; background: none; border: none; font-size: 18px; cursor: pointer;">✕</button>
+        </div>
+        <div style="padding: 18px; background: #F8FAFC;">
+            <input type="hidden" id="editOptionId" value="">
+            
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Option Name / ឈ្មោះជម្រើស *</label>
+                <input type="text" id="optNameInput" placeholder="e.g. Without Lid, With Flat Lid, With Clear PET Lid..." style="width: 100%; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 4px; font-size: 12.5px;">
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Linked Component Product / ទំនិញផ្សំក្នុងស្តុក</label>
+                <select id="optComponentSelect" style="width: 100%; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 4px; font-size: 12.5px;" onchange="onOptionComponentChange(this)">
+                    <option value="">(None - Base product only / អត់គម្រប)</option>
+                    {% for p in all_products %}
+                    {% if p.id != product.id %}
+                    <option value="{{ p.id }}" data-price="{{ p.price or 0.0 }}" data-sku="{{ p.sku }}">{{ p.sku }} - {{ p.name }} (${{ "%.2f"|format(p.price or 0.0) }})</option>
+                    {% endif %}
+                    {% endfor %}
+                </select>
+                <div style="font-size: 11px; color: #64748B; margin-top: 3px;">Select the inventory item that will be deducted when fulfilling this option.</div>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Component Qty / ចំនួនថែម</label>
+                    <input type="number" step="any" min="0" id="optComponentQtyInput" value="1.0" style="width: 100%; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 4px; font-size: 12.5px;">
+                </div>
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Price Modifier / តម្លៃបន្ថែម (+$)</label>
+                    <input type="number" step="0.0001" id="optPriceModInput" value="0.00" style="width: 100%; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 4px; font-size: 12.5px;">
+                </div>
+            </div>
+
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Notes / ចំណាំ</label>
+                <input type="text" id="optNotesInput" placeholder="Optional notes or packaging specs..." style="width: 100%; padding: 6px 10px; border: 1px solid #CBD5E1; border-radius: 4px; font-size: 12px;">
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <input type="checkbox" id="optIsDefaultCheck" style="margin: 0;">
+                <label for="optIsDefaultCheck" style="font-size: 12px; font-weight: 600; color: #1E293B; cursor: pointer;">Set as default selected option (ជ្រើសរើសជាលំនាំដើម)</label>
+            </div>
+        </div>
+        <div style="background: #F1F5F9; padding: 10px 18px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
+            <button type="button" class="inflow-win-btn" onclick="closeCombineOptionModal()">Cancel</button>
+            <button type="button" class="inflow-win-btn" onclick="saveCombineOption({{ product.id or 'null' }})" style="background: #2563EB; color: #FFFFFF; font-weight: 600;">Save Option</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Pricing / Currency (Matching desktop inFlow Inventory center_step6.png & center_step13.png) -->
+<div id="pricingSchemeModalOverlay" class="inflow-modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 9999; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.45);">
+    <div class="inflow-modal-box" style="width: 480px; background: #FFFFFF; border-radius: 4px; box-shadow: 0 8px 30px rgba(0,0,0,0.4); overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; border: 1px solid #707070;">
+        <!-- Windows / inFlow Title Bar -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: linear-gradient(180deg, #F0EDE4 0%, #D8D2C4 100%); padding: 5px 8px; border-bottom: 1px solid #ABADB3; user-select: none;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: #222;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                <span>Pricing / Currency</span>
+            </div>
+            <button type="button" onclick="closePricingSchemeModal()" style="border: none; background: transparent; font-size: 14px; font-weight: bold; color: #555; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
+        </div>
+
+        <div style="padding: 16px 18px 12px 18px; background: #FFFFFF;">
+            <!-- Header section with icon & description (Matching center_step6.png) -->
+            <div style="display: flex; gap: 12px; align-items: flex-start; margin-bottom: 12px;">
+                <div style="width: 36px; height: 36px; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 4px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.8"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 15h0M2 9.5h20"/></svg>
+                </div>
+                <div>
+                    <div style="font-size: 16px; font-weight: 600; color: #475569; line-height: 1.2;">Pricing / Currency</div>
+                    <div style="font-size: 11px; color: #64748B; margin-top: 3px; line-height: 1.35;">
+                        Pricing Schemes are different types of prices you charge (e.g. Wholesale price, Retail price), and in what currency.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Grid Container -->
+            <div style="border: 1px solid #ABADB3; background: #FFFFFF; max-height: 200px; overflow-y: auto; position: relative;">
+                <table class="inflow-win-grid" id="pricingSchemeModalTable" style="margin: 0; width: 100%;">
+                    <thead>
+                        <tr>
+                            <th style="width: 22px; min-width: 22px; text-align: center; padding: 2px;"></th>
+                            <th style="text-align: left; width: 220px; padding: 3px 6px;">Pricing / Currency Name</th>
+                            <th style="text-align: left; padding: 3px 6px;">Currency</th>
+                            <th style="width: 28px; text-align: center; padding: 2px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricingSchemeModalTbody">
+                        <!-- Populated dynamically by JS -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Context Menu for row operations (Matching center_step13.png) -->
+            <div id="pricingRowContextMenu" style="display: none; position: fixed; z-index: 10005; background: #FFFFFF; border: 1px solid #94A3B8; box-shadow: 0 4px 14px rgba(0,0,0,0.2); min-width: 170px; font-size: 11.5px; border-radius: 2px; padding: 3px 0;">
+                <div class="inflow-ctx-item" onclick="deleteSelectedPricingRow()" style="padding: 6px 14px; cursor: pointer; color: #DC2626; display: flex; align-items: center; gap: 8px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    <span>Delete Selected Rows</span>
+                </div>
+                <div class="inflow-ctx-item" onclick="insertNewPricingRow()" style="padding: 6px 14px; cursor: pointer; color: #333; display: flex; align-items: center; gap: 8px; border-top: 1px solid #F1F5F9;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>Insert Row</span>
+                </div>
+                <div class="inflow-ctx-item" onclick="moveSelectedPricingRow(-1)" style="padding: 6px 14px; cursor: pointer; color: #333; display: flex; align-items: center; gap: 8px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
+                    <span>Move Up</span>
+                </div>
+                <div class="inflow-ctx-item" onclick="moveSelectedPricingRow(1)" style="padding: 6px 14px; cursor: pointer; color: #333; display: flex; align-items: center; gap: 8px;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                    <span>Move Down</span>
+                </div>
+            </div>
+
+            <!-- Show All Checkbox (Matching center_step6.png) -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <div style="font-size: 11px; color: #64748B;">
+                    <span id="pricingModalStatusMsg"></span>
+                </div>
+                <label style="display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: #333; cursor: pointer; user-select: none;">
+                    <span>Show All</span>
+                    <input type="checkbox" id="chkShowAllPricing" onchange="loadPricingSchemesModal(this.checked)" style="cursor: pointer;">
+                </label>
+            </div>
+        </div>
+
+        <!-- Footer buttons (Matching center_step6.png) -->
+        <div style="background: #F1F5F9; border-top: 1px solid #CBD5E1; padding: 10px 18px; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="inflow-win-btn" onclick="savePricingSchemesModal()" style="min-width: 85px; font-weight: 500;">Save & Close</button>
+            <button type="button" class="inflow-win-btn" onclick="closePricingSchemeModal()" style="min-width: 75px;">Cancel</button>
+        </div>
+    </div>
+</div>
+{% endblock %}

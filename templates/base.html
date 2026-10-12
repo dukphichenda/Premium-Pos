@@ -1,0 +1,1336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}inFlow Premium{% endblock %} | Wholesale & Inventory ERP</title>
+    {% if app_logo_url %}
+    <link rel="icon" href="{{ app_logo_url }}">
+    {% else %}
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect x='11.5' y='2.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 11.5 2.5)' fill='%23F59E0B'/><rect x='4.5' y='9.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 4.5 9.5)' fill='%23FBBF24'/><rect x='18.5' y='9.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 18.5 9.5)' fill='%23D97706'/><rect x='11.5' y='16.5' width='5.5' height='5.5' rx='1.2' transform='rotate(45 11.5 16.5)' fill='%23F59E0B'/></svg>">
+    {% endif %}
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <!-- Chart.js for interactive analytics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <!-- html2canvas & JSZip for High-Res JPG & ZIP Price Cards Export -->
+    <script src="{{ url_for('static', filename='vendor/html2canvas.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/jszip.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='vendor/FileSaver.min.js') }}"></script>
+    <script>
+        const savedLang = localStorage.getItem('inflow_app_lang') || 'en';
+        document.documentElement.setAttribute('data-lang', savedLang);
+        document.documentElement.setAttribute('lang', savedLang);
+
+        if (window.self !== window.top || window.location.search.indexOf('embed=1') !== -1) {
+            document.documentElement.classList.add('is-embedded');
+        }
+        window.INFLOW_STORE_CONTEXT = {
+            is_branch_mode: {{ 'true' if is_branch_mode else 'false' }},
+            current_branch: {{ current_branch|tojson if current_branch else 'null' }},
+            all_branches: {{ all_branches|tojson if all_branches else '[]' }},
+            current_user: {{ current_user|tojson if current_user else 'null' }}
+        };
+    </script>
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    <!-- inFlow Cloud Left Sidebar (Matching media_1791455161109_513ff4d8.png & media_1791455186533_3a653d4a.png) -->
+    <aside class="inflow-cloud-sidebar no-print" id="inflowCloudSidebar">
+        <!-- 1. Top inFlow Brand Logo Squircle -->
+        <div class="inflow-sidebar-logo-item" onclick="handleSidebarLogoClick()" title="inFlow Home">
+            <div class="inflow-logo-squircle" style="overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 2px;">
+                {% if app_logo_url %}
+                <img src="{{ app_logo_url }}" alt="inFlow Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 7px;">
+                {% else %}
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                    <rect x="11.5" y="2.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 2.5)" fill="#F59E0B"/>
+                    <rect x="4.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 4.5 9.5)" fill="#FBBF24"/>
+                    <rect x="18.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 18.5 9.5)" fill="#D97706"/>
+                    <rect x="11.5" y="16.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 16.5)" fill="#F59E0B"/>
+                </svg>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 2. Quick Create '+' Button -->
+        <div class="inflow-sidebar-nav-item" data-menu="create" onclick="toggleSidebarFlyout('create', this)" title="Create New">
+            <div class="inflow-sidebar-btn btn-create">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.5" stroke-linecap="round">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 3. Sales '$' -->
+        <div class="inflow-sidebar-nav-item" data-menu="sales" onclick="toggleSidebarFlyout('sales', this)" title="Sales">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M12 6.5v11M14.5 9.5c0-1.3-1.1-2-2.5-2s-2.5.7-2.5 1.8c0 2.2 5 1.4 5 3.7 0 1.2-1.1 2-2.5 2s-2.5-.9-2.5-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 4. Inventory (3D Cube matching screenshot) -->
+        <div class="inflow-sidebar-nav-item" data-menu="inventory" onclick="toggleSidebarFlyout('inventory', this)" title="Inventory">
+            <div class="inflow-sidebar-btn">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <path d="M12 2.5L3.5 7.2v9.6L12 21.5l8.5-4.7V7.2L12 2.5z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                    <path d="M12 12.2v9.3M12 12.2L3.5 7.2M12 12.2l8.5-5" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+                    <path d="M7.7 4.8l8.6 4.9" stroke="currentColor" stroke-width="1.3" opacity="0.7"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 5. Purchasing (Clipboard with checkmark) -->
+        <div class="inflow-sidebar-nav-item" data-menu="purchasing" onclick="toggleSidebarFlyout('purchasing', this)" title="Purchasing">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <rect x="4" y="3" width="16" height="18" rx="3" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M8.5 12l2.5 2.5 5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 6. Reports (Bar chart) -->
+        <div class="inflow-sidebar-nav-item" data-menu="reports" onclick="toggleSidebarFlyout('reports', this)" title="Reports">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <rect x="3.5" y="3.5" width="17" height="17" rx="3.5" stroke="currentColor" stroke-width="1.8"/>
+                    <line x1="7.5" y1="16" x2="7.5" y2="13.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="10.5" y1="16" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="13.5" y1="16" x2="13.5" y2="8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <line x1="16.5" y1="16" x2="16.5" y2="11.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 7. Expenses & Cash Flow (Wallet / Cash icon) -->
+        <div class="inflow-sidebar-nav-item" data-menu="expenses" onclick="toggleSidebarFlyout('expenses', this)" title="Expenses & Cash Flow">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <rect x="2.5" y="5" width="19" height="14" rx="2.8" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M16 12h4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    <circle cx="17.5" cy="12" r="1.1" fill="currentColor"/>
+                    <path d="M2.5 9h19" stroke="currentColor" stroke-width="1.3" opacity="0.6"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Spacer -->
+        <div class="inflow-sidebar-spacer"></div>
+
+        <!-- 7. Showroom (Storefront) -->
+        <div class="inflow-sidebar-nav-item" data-menu="showroom" onclick="toggleSidebarFlyout('showroom', this)" title="Showroom">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <path d="M3 9l1.5-5h15L21 9M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9M3 9c0 1.4 1.1 2.5 2.5 2.5S8 10.4 8 9c0 1.4 1.1 2.5 2.5 2.5S13 10.4 13 9c0 1.4 1.1 2.5 2.5 2.5S18 10.4 18 9c0 1.4 1.1 2.5 2.5 2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M9 21v-6a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v6" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 8. Integrations / Modules (3 squares + plus sign) -->
+        <div class="inflow-sidebar-nav-item" data-menu="integrations" onclick="toggleSidebarFlyout('integrations', this)" title="Apps & Integrations">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
+                    <rect x="3.5" y="13.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
+                    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M16.7 3.5v6M13.7 6.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 9. Settings (Gear) -->
+        <div class="inflow-sidebar-nav-item" data-menu="settings" onclick="toggleSidebarFlyout('settings', this)" title="Settings">
+            <div class="inflow-sidebar-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
+                    <circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83-2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" stroke="currentColor" stroke-width="1.8"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- 10. User Account / Profile -->
+        <div class="inflow-sidebar-nav-item" data-menu="user" onclick="toggleSidebarFlyout('user', this)" title="Logged in as: {{ current_user.display_name if current_user else 'User' }} ({{ current_user.role if current_user else '' }})">
+            <div class="inflow-sidebar-btn" style="position: relative;">
+                <div style="width: 26px; height: 26px; border-radius: 50%; background: {% if current_user and current_user.is_main_admin %}#10B981{% else %}#0284C7{% endif %}; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; box-shadow: 0 1px 3px rgba(0,0,0,0.25);">
+                    {% if current_user and current_user.is_main_admin %}👑{% else %}👤{% endif %}
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- inFlow Cloud Flyout Popover Menu (Matching media_1791455186533_3a653d4a.png) -->
+    <div class="inflow-sidebar-flyout no-print" id="inflowSidebarFlyout">
+        <!-- CREATE -->
+        <div class="flyout-section" id="flyout-create">
+            <div class="flyout-header">Create new</div>
+            {% if not is_branch_mode or branch_permissions.sales_orders %}
+            <a href="{% if is_branch_mode and current_branch %}{{ url_for('sales_orders.new_order', branch=current_branch.id) }}{% else %}{{ url_for('sales_orders.new_order') }}{% endif %}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                <span class="flyout-label">Sales order</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.purchasing %}
+            <a href="{{ url_for('purchase_orders.create_purchase') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+                <span class="flyout-label">Purchase order</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.inventory %}
+            <a href="{{ url_for('products.new_product') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
+                <span class="flyout-label">Product</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.transfers %}
+            <a href="{{ url_for('inventory.list_transfers') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+                <span class="flyout-label">Stock transfer</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.adjustments %}
+            <a href="{{ url_for('inventory.list_adjustments') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+                <span class="flyout-label">Stock adjustment</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.customers %}
+            <a href="{{ url_for('contacts.list_customers') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="flyout-label">Customer</span>
+            </a>
+            <a href="{{ url_for('sales_orders.list_delivery_men') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
+                <span class="flyout-label">Delivery person</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.purchasing %}
+            <a href="{{ url_for('contacts.list_vendors') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="flyout-label">Vendor</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.expenses %}
+            <a href="{{ url_for('expenses.monthly_expenses') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="15" rx="2.5"/><path d="M12 9v7M8.5 12.5h7"/></svg></span>
+                <span class="flyout-label">Expense record</span>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- SALES -->
+        <div class="flyout-section" id="flyout-sales">
+            <div class="flyout-header">Sales</div>
+            {% if not is_branch_mode or branch_permissions.pos %}
+            <a href="{{ url_for('branches.branch_pos', id=current_branch.id if current_branch else 1) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" style="background: #F0F9FF; color: #0284C7; font-weight: 700;">
+                <span class="flyout-icon">⚡</span>
+                <span class="flyout-label">POS Quick Checkout</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.sales_orders %}
+            <a href="{{ url_for('branches.branch_new_order', id=current_branch.id) if (is_branch_mode and current_branch) else url_for('sales_orders.new_order') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>
+                <span class="flyout-label">New sales order (SO)</span>
+            </a>
+            <a href="{{ url_for('branches.branch_orders', id=current_branch.id) if (is_branch_mode and current_branch) else url_for('sales_orders.list_orders', view='table') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></span>
+                <span class="flyout-label">Sales orders</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.invoices %}
+            <a href="{{ url_for('sales_orders.list_orders', view='table', status='INVOICED') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1-2-1z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/></svg></span>
+                <span class="flyout-label">Invoices</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.customers %}
+            <a href="{{ url_for('branches.branch_customers', id=current_branch.id) if (is_branch_mode and current_branch) else url_for('contacts.list_customers') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></span>
+                <span class="flyout-label">Customers</span>
+            </a>
+            <a href="{{ url_for('sales_orders.list_delivery_men') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></span>
+                <span class="flyout-label">Delivery person list</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.edit_prices %}
+            <a href="{{ url_for('settings.general_settings') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.4-1.3-2-3-2s-3 .6-3 1.8 3 1.2 3 2.7-1.3 2-3 2"/></svg></span>
+                <span class="flyout-label">Pricing & currency</span>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- INVENTORY (Matching media_1791455186533_3a653d4a.png) -->
+        <div class="flyout-section" id="flyout-inventory">
+            <div class="flyout-header">Inventory</div>
+            {% if not is_branch_mode or branch_permissions.inventory %}
+            <a href="{{ url_for('products.list_products') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></span>
+                <span class="flyout-label">Products</span>
+            </a>
+            <a href="{{ url_for('products.list_categories') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg></span>
+                <span class="flyout-label">Product categories</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.purchasing %}
+            <a href="{{ url_for('inventory.reorder_assistant') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+                <span class="flyout-label">Reorder</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.inventory %}
+            <a href="{{ url_for('inventory.overview') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>
+                <span class="flyout-label">Current stock</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.transfers %}
+            <a href="{{ url_for('inventory.list_transfers') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></span>
+                <span class="flyout-label">Stock transfers</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.adjustments %}
+            <a href="{{ url_for('inventory.list_adjustments') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+                <span class="flyout-label">Stock adjustments</span>
+            </a>
+            {% endif %}
+        </div>
+
+        <!-- PURCHASING -->
+        <div class="flyout-section" id="flyout-purchasing">
+            <div class="flyout-header">Purchasing</div>
+            {% if not is_branch_mode or branch_permissions.purchasing %}
+            <a href="{{ url_for('purchase_orders.list_purchases') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></span>
+                <span class="flyout-label">Purchase orders</span>
+            </a>
+            <a href="{{ url_for('contacts.list_vendors') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span class="flyout-label">Vendors</span>
+            </a>
+            <a href="{{ url_for('purchase_orders.list_purchases') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                <span class="flyout-label">Receiving</span>
+            </a>
+            {% else %}
+            <div style="padding: 16px 14px; font-size: 12px; color: #94A3B8; text-align: center;">
+                🔒 Supplier Purchasing is managed centrally by Main Store HQ.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- REPORTS -->
+        <div class="flyout-section" id="flyout-reports">
+            <div class="flyout-header">Reports</div>
+            {% if not is_branch_mode or branch_permissions.dashboard %}
+            <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) if (is_branch_mode and current_branch) else url_for('dashboard.index') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="flyout-label">Dashboard</span>
+            </a>
+            {% endif %}
+            {% if not is_branch_mode or branch_permissions.reports %}
+            {% if is_branch_mode and current_branch %}
+            <a href="{{ url_for('branches.branch_reports', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="flyout-label">Branch Financials</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('reports.view_report', report_key='sales-order-profit') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></span>
+                <span class="flyout-label">Sales reports</span>
+            </a>
+            <a href="{{ url_for('reports.view_report', report_key='inventory-valuation') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></span>
+                <span class="flyout-label">Inventory valuation</span>
+            </a>
+            <a href="{{ url_for('reports.reports_center') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
+                <span class="flyout-label">All reports</span>
+            </a>
+            {% endif %}
+            {% endif %}
+        </div>
+
+        <!-- EXPENSES & CASH FLOW -->
+        <div class="flyout-section" id="flyout-expenses">
+            <div class="flyout-header">Expenses & Cash Flow</div>
+            {% if not is_branch_mode or branch_permissions.expenses %}
+            {% if is_branch_mode and current_branch %}
+            <a href="{{ url_for('branches.branch_expenses', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">💸</span>
+                <span class="flyout-label">{{ current_branch.code }} Expenses Sheet</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('expenses.monthly_expenses') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></span>
+                <span class="flyout-label">Monthly expenses sheet</span>
+            </a>
+            <a href="{{ url_for('expenses.monthly_expenses') }}#newRecord" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg></span>
+                <span class="flyout-label">Record daily expense</span>
+            </a>
+            <a href="{{ url_for('expenses.summary_dashboard') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span class="flyout-label">Summary Dashboard</span>
+            </a>
+            {% endif %}
+            {% else %}
+            <div style="padding: 16px 14px; font-size: 12px; color: #94A3B8; text-align: center;">
+                🔒 Expense recording is restricted for this branch by Main Store HQ.
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- SHOWROOM & STORE BRANCHES -->
+        <div class="flyout-section" id="flyout-showroom">
+            <div class="flyout-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Store Context & Branches</span>
+                {% if is_branch_mode %}
+                <span style="font-size: 10px; background: #0284C7; color: #FFFFFF; padding: 2px 7px; border-radius: 10px; text-transform: none; font-weight: 700;">Branch Mode</span>
+                {% else %}
+                <span style="font-size: 10px; background: #10B981; color: #FFFFFF; padding: 2px 7px; border-radius: 10px; text-transform: none; font-weight: 700;">Main Store HQ</span>
+                {% endif %}
+            </div>
+
+
+
+            <!-- Store Switcher Contexts -->
+            <a href="{{ url_for('branches.switch_branch', id=0) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" {% if not is_branch_mode %}style="background: #F8FAFC; font-weight: 700;"{% endif %}>
+                <span class="flyout-icon">🏢</span>
+                <span class="flyout-label">Main Store (HQ Enterprise) {% if not is_branch_mode %}✓{% endif %}</span>
+            </a>
+            {% for b in all_branches %}
+            <a href="{{ url_for('branches.switch_branch', id=b.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" {% if current_branch and current_branch.id == b.id %}style="background: #F0F9FF; color: #0284C7; font-weight: 700;"{% endif %}>
+                <span class="flyout-icon">🏪</span>
+                <span class="flyout-label">{{ b.name }} ({{ b.code }}) {% if current_branch and current_branch.id == b.id %}✓{% endif %}</span>
+            </a>
+            {% endfor %}
+
+            <div style="border-top: 1px solid #E2E8F0; margin: 6px 0; padding-top: 4px;"></div>
+            <div style="font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase; padding: 4px 14px;">Branch Functions</div>
+
+            {% if is_branch_mode and current_branch %}
+            <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" style="background: #F0F9FF; color: #0369A1; font-weight: 700;">
+                <span class="flyout-icon">🏪</span>
+                <span class="flyout-label">{{ current_branch.code }} Dashboard</span>
+            </a>
+            {% if branch_permissions.pos %}
+            <a href="{{ url_for('branches.branch_pos', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">⚡</span>
+                <span class="flyout-label">Branch POS Counter</span>
+            </a>
+            {% endif %}
+            {% if branch_permissions.sales_orders %}
+            <a href="{{ url_for('branches.branch_new_order', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">➕</span>
+                <span class="flyout-label">Create Sales Order (SO)</span>
+            </a>
+            <a href="{{ url_for('branches.branch_orders', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">📋</span>
+                <span class="flyout-label">Branch Orders</span>
+            </a>
+            {% endif %}
+            {% if branch_permissions.inventory %}
+            <a href="{{ url_for('branches.branch_inventory', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">📦</span>
+                <span class="flyout-label">Branch Stock on Hand</span>
+            </a>
+            {% endif %}
+            {% if branch_permissions.transfers %}
+            <a href="{{ url_for('branches.branch_transfers', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">🔄</span>
+                <span class="flyout-label">Stock Transfers from HQ</span>
+            </a>
+            {% endif %}
+            {% if branch_permissions.expenses %}
+            <a href="{{ url_for('branches.branch_expenses', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">💸</span>
+                <span class="flyout-label">Branch Daily Expenses</span>
+            </a>
+            {% endif %}
+            {% if branch_permissions.reports %}
+            <a href="{{ url_for('branches.branch_reports', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">📊</span>
+                <span class="flyout-label">Branch Financials</span>
+            </a>
+            {% endif %}
+            <a href="{{ url_for('branches.branch_settings', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">⚙️</span>
+                <span class="flyout-label">Branch Settings & Import/Export</span>
+            </a>
+            {% endif %}
+
+            <a href="{{ url_for('branches.list_branches') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">🏬</span>
+                <span class="flyout-label">Manage Store Branches & Perms</span>
+            </a>
+
+        </div>
+
+        <!-- INTEGRATIONS -->
+        <div class="flyout-section" id="flyout-integrations">
+            <div class="flyout-header">Apps & Integrations</div>
+            <a href="{{ url_for('migration.migration_page') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
+                <span class="flyout-label">inFlow SQL Sync</span>
+            </a>
+            <a href="{{ url_for('settings.general_settings') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></span>
+                <span class="flyout-label">Add-ons & plugins</span>
+            </a>
+        </div>
+
+        <!-- SETTINGS -->
+        <div class="flyout-section" id="flyout-settings">
+            <div class="flyout-header">Company Settings</div>
+            <a href="{{ url_for('settings.general_settings', tab='tabCompany') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
+                <span class="flyout-label">Company Profile</span>
+            </a>
+            <a href="{{ url_for('settings.general_settings', tab='tabDecimals') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="17" r="1.5" fill="currentColor"/></svg></span>
+                <span class="flyout-label">Decimal Precision</span>
+            </a>
+            <a href="{{ url_for('settings.general_settings', tab='tabInvoice') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
+                <span class="flyout-label">Invoice Customization</span>
+            </a>
+            {% if current_user and current_user.is_main_admin %}
+            <a href="{{ url_for('settings.general_settings', tab='tabUsers') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="flyout-label">Users & Permissions</span>
+            </a>
+            {% endif %}
+
+            <div class="flyout-header" style="margin-top: 10px;">System Preferences</div>
+            <a href="{{ url_for('locations.list_locations') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
+                <span class="flyout-label">Locations & Warehouses</span>
+            </a>
+            <a href="{{ url_for('products.list_categories') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg></span>
+                <span class="flyout-label">Categories</span>
+            </a>
+            <a href="{{ url_for('data_exchange.import_data') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                <span class="flyout-label">Import Data</span>
+            </a>
+            <a href="{{ url_for('data_exchange.export_data') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
+                <span class="flyout-label">Export Data</span>
+            </a>
+            <a href="{{ url_for('migration.migration_page') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
+                <span class="flyout-label">Data Backup & Sync</span>
+            </a>
+
+            <div style="border-top: 1px solid #E2E8F0; margin: 8px 10px;"></div>
+            <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444;" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">🚪</span>
+                <span class="flyout-label">Log Out</span>
+            </a>
+        </div>
+
+        <!-- USER / PROFILE FLYOUT -->
+        <div class="flyout-section" id="flyout-user">
+            <div class="flyout-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>User Account</span>
+                {% if current_user and current_user.is_main_admin %}
+                <span style="font-size: 10px; background: #DCFCE7; color: #166534; padding: 2px 7px; border-radius: 10px; font-weight: 700;">Main Admin</span>
+                {% else %}
+                <span style="font-size: 10px; background: #E0F2FE; color: #0369A1; padding: 2px 7px; border-radius: 10px; font-weight: 700;">Branch Admin</span>
+                {% endif %}
+            </div>
+
+            <div style="padding: 12px 14px; background: #F8FAFC; border-radius: 8px; margin: 4px 10px 10px; border: 1px solid #E2E8F0;">
+                <div style="font-weight: 800; color: #0F172A; font-size: 13px;">{{ current_user.display_name if current_user else 'Administrator' }}</div>
+                <div style="font-size: 11.5px; color: #64748B; font-family: monospace;">@{{ current_user.username if current_user else 'admin' }}</div>
+                <div style="margin-top: 6px; font-size: 11.5px; color: #334155;">
+                    {% if current_user and current_user.is_main_admin %}
+                    <span style="color: #166534; font-weight: 600;">👑 Controls HQ & All Branches</span>
+                    {% elif current_branch %}
+                    <span style="color: #0369A1; font-weight: 600;">🏪 Allowable: {{ current_branch.name }} ({{ current_branch.code }})</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if current_user and current_user.is_main_admin %}
+            <a href="{{ url_for('settings.general_settings', tab='tabUsers') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">👥</span>
+                <span class="flyout-label">Manage All Users & Roles</span>
+            </a>
+            {% else %}
+            <a href="{{ url_for('branches.branch_settings', id=current_branch.id, tab='users') if current_branch else '#' }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">👥</span>
+                <span class="flyout-label">Manage Branch Staff</span>
+            </a>
+            {% endif %}
+
+            <a href="{{ url_for('auth.login') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">🔄</span>
+                <span class="flyout-label">Switch Account / Sign In</span>
+            </a>
+
+            <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444; font-weight: 700;" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">🚪</span>
+                <span class="flyout-label">Sign Out</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="app-container">
+        <!-- Main Wrapper (Workspace area beside the 56px left sidebar) -->
+        <div class="main-wrapper">
+            <!-- inFlow MDI Top Tab Bar -->
+            <div id="inflowTopTabBar" class="inflow-top-tab-bar no-print"></div>
+
+            <!-- Active Tab Theme Accent Bar (Sub-bar under the tab bar) -->
+            <div id="inflowTabAccentLine" class="inflow-tab-accent-line theme-home no-print"></div>
+
+            <!-- inFlow MDI Tab Workspace (Where all persistent tab iframes live in shell mode) -->
+            <div id="inflowTabWorkspace" class="inflow-tab-workspace no-print"></div>
+
+            <!-- Direct Page Content (Rendered in embedded iframe mode or when JS disabled) -->
+            <div id="inflowDirectContent" class="inflow-direct-content">
+                <!-- Topbar (Hidden in desktop app mode) -->
+                <header class="topbar no-print" style="display: none;"></header>
+
+                {% if is_branch_mode and current_branch %}
+                <!-- Active Branch Mode Indicator Banner -->
+                <div class="branch-context-indicator-bar no-print" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 8px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; border-bottom: 1px solid #0284C7; position: sticky; top: 0; z-index: 9999;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 16px;">🏪</span>
+                        <span>
+                            <strong>Branch Mode Active:</strong> <span class="font-khmer" style="font-weight: 700;">{{ current_branch.name }}</span> (<code>{{ current_branch.code }}</code>)
+                            <span style="opacity: 0.85; margin-left: 8px; font-size: 11.5px;">— Sales deduct live from Central Warehouse</span>
+                        </span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) }}" target="_top" style="background: rgba(255,255,255,0.22); color: #FFFFFF; padding: 4px 10px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 11.5px;">
+                            🏪 Branch Dashboard
+                        </a>
+                        <a href="{{ url_for('branches.switch_branch', id=0) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext(0, event); }" style="background: #FFFFFF; color: #0284C7; padding: 4px 12px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 11.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                            🏢 Return to Main Store (HQ)
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- Flash Notifications (Auto-dismiss in 3s) -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        <div id="globalFlashToastContainer" style="position: fixed; top: 18px; right: 24px; z-index: 100000; display: flex; flex-direction: column; gap: 8px; pointer-events: none;" class="no-print">
+                            {% for category, message in messages %}
+                                <div class="inflow-flash-toast-item" style="pointer-events: auto; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.18); transition: opacity 0.4s ease, transform 0.4s ease; {% if category == 'error' %}background-color: #EF4444; color: #FFFFFF; border: 1px solid #DC2626;{% else %}background-color: #10B981; color: #FFFFFF; border: 1px solid #059669;{% endif %}">
+                                    <span style="font-size: 15px;">{% if category == 'error' %}⚠️{% else %}✓{% endif %}</span>
+                                    <span>{{ message }}</span>
+                                    <button onclick="this.parentElement.remove()" style="background: none; border: none; cursor: pointer; font-size: 14px; color: #FFFFFF; opacity: 0.8; margin-left: 8px;">✕</button>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        <script>
+                            setTimeout(() => {
+                                document.querySelectorAll('.inflow-flash-toast-item').forEach(el => {
+                                    el.style.opacity = '0';
+                                    el.style.transform = 'translateY(-12px)';
+                                    setTimeout(() => el.remove(), 400);
+                                });
+                            }, 3000);
+                        </script>
+                    {% endif %}
+                {% endwith %}
+
+                <!-- Main Content Area -->
+                <main class="content-area">
+                    {% block content %}
+                        {% if not_found %}
+                            <div class="card" style="text-align: center; padding: 60px 20px;">
+                                <h2 style="font-size: 2rem; font-weight: 800; color: #0F172A; margin-bottom: 10px;">Page Not Found (404)</h2>
+                                <p style="color: #64748B; margin-bottom: 24px;">The requested resource or page could not be located in inFlow Premium.</p>
+                                <a href="{{ url_for('dashboard.index') }}" class="btn btn-primary">Return to Dashboard</a>
+                            </div>
+                        {% endif %}
+                    {% endblock %}
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- Global Quick Search Modal (Ctrl + K) -->
+    <div class="modal-overlay" id="globalSearchModal">
+        <div class="modal-dialog" style="max-width: 600px; padding: 20px;">
+            <div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
+                <svg width="20" height="20" fill="none" stroke="#64748B" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="globalSearchInput" placeholder="Search by name, SKU, barcode..." style="border: none; outline: none; font-size: 1rem; width: 100%; font-family: inherit;">
+                <span class="kbd-shortcut">ESC</span>
+            </div>
+            <div id="globalSearchResults" style="max-height: 400px; overflow-y: auto;">
+                <div style="padding: 20px; text-align: center; color: #94A3B8; font-size: 0.88rem;">
+                    Type product name, SKU or barcode to search instantly...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/inflow_tabs.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/google_sheets_datepicker.js') }}"></script>
+    <script>
+        function handleSidebarLogoClick() {
+            closeSidebarFlyout();
+            if (window.inflowMdi && typeof window.inflowMdi.navigateOrOpenTab === 'function') {
+                window.inflowMdi.navigateOrOpenTab('/', 'Homepage', 'home');
+            } else if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
+                window.top.inflowMdi.navigateOrOpenTab('/', 'Homepage', 'home');
+            } else {
+                window.location.href = '/';
+            }
+        }
+
+        function toggleSidebarFlyout(menuKey, triggerEl) {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            if (!flyout) return;
+
+            const isCurrentlyActive = triggerEl && triggerEl.classList.contains('active') && flyout.classList.contains('show');
+            if (isCurrentlyActive) {
+                closeSidebarFlyout();
+                return;
+            }
+
+            // Deactivate other items
+            document.querySelectorAll('.inflow-sidebar-nav-item').forEach(el => el.classList.remove('active'));
+            if (triggerEl) {
+                triggerEl.classList.add('active');
+            }
+
+            // Hide all flyout sections
+            document.querySelectorAll('.flyout-section').forEach(sec => sec.style.display = 'none');
+
+            // Show selected section
+            const targetSec = document.getElementById('flyout-' + menuKey);
+            if (targetSec) {
+                targetSec.style.display = 'block';
+            }
+
+            // Position flyout vertically relative to clicked button
+            if (triggerEl) {
+                const rect = triggerEl.getBoundingClientRect();
+                let topPos = rect.top;
+                const flyoutHeight = 360;
+                if (topPos + flyoutHeight > window.innerHeight - 10) {
+                    topPos = Math.max(10, window.innerHeight - flyoutHeight - 10);
+                }
+                flyout.style.top = topPos + 'px';
+            }
+
+            flyout.classList.add('show');
+        }
+
+        function closeSidebarFlyout() {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            if (flyout) {
+                flyout.classList.remove('show');
+            }
+            document.querySelectorAll('.inflow-sidebar-nav-item').forEach(el => el.classList.remove('active'));
+        }
+
+        window.closeSidebarFlyout = closeSidebarFlyout;
+
+        function onFlyoutNav(event, linkEl) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            closeSidebarFlyout();
+
+            const href = linkEl.getAttribute('href');
+            if (!href) return;
+
+            // Handle store switching directly at top-level window context
+            if (href.includes('/branches/switch/')) {
+                const match = href.match(/\/branches\/switch\/(\d+)/);
+                const branchId = match ? parseInt(match[1], 10) : 0;
+                if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function') {
+                    window.top.inflowMdi.switchStoreContext(branchId, event);
+                } else if (window.inflowMdi && typeof window.inflowMdi.switchStoreContext === 'function') {
+                    window.inflowMdi.switchStoreContext(branchId, event);
+                } else {
+                    window.top.location.href = href;
+                }
+                return;
+            }
+
+            const labelEl = linkEl.querySelector('.flyout-label');
+            const label = labelEl ? labelEl.textContent.trim() : linkEl.textContent.trim();
+
+            if (window.inflowMdi && typeof window.inflowMdi.navigateOrOpenTab === 'function') {
+                window.inflowMdi.navigateOrOpenTab(href, label);
+            } else if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
+                window.top.inflowMdi.navigateOrOpenTab(href, label);
+            } else {
+                window.location.href = href;
+            }
+        }
+
+        document.addEventListener('click', function(e) {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            const sidebar = document.getElementById('inflowCloudSidebar');
+            if (!flyout || !flyout.classList.contains('show')) return;
+
+            if (!flyout.contains(e.target) && !sidebar.contains(e.target)) {
+                closeSidebarFlyout();
+            }
+        });
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeSidebarFlyout();
+            }
+        });
+    </script>
+
+    <!-- inFlow Multi-Language (EN/KM) Translation Engine -->
+    <script>
+        // Comprehensive inFlow UI Dictionary (English <-> Khmer)
+        const INFLOW_I18N_KM = {
+            // Top Navigation & Flyout Sidebar
+            'Sales': 'ការលក់',
+            'Purchasing': 'ការទិញទំនិញ',
+            'Inventory': 'ឃ្លាំងទំនិញ',
+            'Settings': 'ការកំណត់',
+            'Company Settings': 'ការកំណត់ក្រុមហ៊ុន',
+            'System Preferences': 'ចំណង់ចំណូលចិត្តប្រព័ន្ធ',
+            'Reports': 'របាយការណ៍',
+            'Apps & Integrations': 'កម្មវិធី & តំណភ្ជាប់',
+            'Store Context & Branches': 'ទីតាំងហាង & សាខា',
+            'User Account': 'គណនីអ្នកប្រើប្រាស់',
+            'New sale order': 'បង្កើតការបញ្ជាទិញថ្មី',
+            'Sales orders': 'បញ្ជីការបញ្ជាទិញលក់',
+            'Customers': 'បញ្ជីអតិថិជន',
+            'Customer': 'អតិថិជន',
+            'Delivery Persons': 'បញ្ជីអ្នកដឹកជញ្ជូន',
+            'Delivery Person': 'អ្នកដឹកជញ្ជូន',
+            'New purchase order': 'បង្កើតការបញ្ជាទិញចូលថ្មី',
+            'Purchase orders': 'បញ្ជីការបញ្ជាទិញចូល',
+            'Vendors': 'បញ្ជីអ្នកផ្គត់ផ្គង់',
+            'Vendor': 'អ្នកផ្គត់ផ្គង់',
+            'Products': 'បញ្ជីទំនិញ & ស្តុក',
+            'Current stock': 'ទំនិញក្នុងស្តុកបច្ចុប្បន្ន',
+            'Adjust stock': 'កែសម្រួលចំនួនស្តុក',
+            'Transfer stock': 'ផ្ទេរស្តុករវាងសាខា',
+            'Stock reorder': 'ការកុម្ម៉ង់ទំនិញបំពេញស្តុក',
+            'Company Profile': 'ព័ត៌មានក្រុមហ៊ុន',
+            'Decimal Precision': 'កម្រិតខ្ទង់ក្បៀស',
+            'Invoice Customization': 'ទម្រង់វិក្កយបត្រ',
+            'Users & Permissions': 'អ្នកប្រើប្រាស់ & សិទ្ធិ',
+            'Locations & Warehouses': 'ទីតាំង & ឃ្លាំងទំនិញ',
+            'Categories': 'ប្រភេទទំនិញ',
+            'Import Data': 'នាំចូលទិន្នន័យ',
+            'Export Data': 'នាំចេញទិន្នន័យ',
+            'Data Backup & Sync': 'បម្រុងទុក & ធ្វើសមកាលកម្ម',
+            'Log Out': 'ចាកចេញពីប្រព័ន្ធ',
+            'Sign Out': 'ចាកចេញពីប្រព័ន្ធ',
+            'Sign In': 'ចូលប្រើប្រព័ន្ធ',
+            'Manage All Users & Roles': 'គ្រប់គ្រងអ្នកប្រើប្រាស់ & សិទ្ធិ',
+            'Manage Branch Staff': 'គ្រប់គ្រងបុគ្គលិកសាខា',
+            'Switch Account / Sign In': 'ប្តូរគណនី / ចូលប្រើ',
+            'Main Store (HQ Enterprise)': 'ហាងកណ្តាល (HQ Enterprise)',
+            'Manage Store Branches & Perms': 'គ្រប់គ្រងសាខាហាង & សិទ្ធិ',
+
+            // Homepage Workflow Nodes & KPIs
+            'VENDOR': 'អ្នកផ្គត់ផ្គង់',
+            'Purchase Order': 'ការទិញទំនិញចូល',
+            'INVENTORY': 'ឃ្លាំងទំនិញ',
+            'Sales Order': 'ការបញ្ជាទិញលក់',
+            'CUSTOMER': 'អតិថិជន',
+            'EXPENSES': 'ការចំណាយ',
+            'REPORTS': 'របាយការណ៍',
+            '+ New Vendor': '+ បង្កើតអ្នកផ្គត់ផ្គង់ថ្មី',
+            'Vendor List': 'បញ្ជីអ្នកផ្គត់ផ្គង់',
+            '+ New Purchase Order': '+ បង្កើតការទិញចូលថ្មី',
+            'Purchase Order List': 'បញ្ជីការបញ្ជាទិញចូល',
+            '+ New Product': '+ បង្កើតទំនិញថ្មី',
+            'Product List': 'បញ្ជីទំនិញ',
+            '🏷️ Price Cards': '🏷️ កាតតម្លៃទំនិញ',
+            'Price Cards': 'កាតតម្លៃទំនិញ',
+            'Current Stock': 'ទំនិញក្នុងស្តុក',
+            'Adjust Stock': 'កែសម្រួលស្តុក',
+            '+ New Sales Order': '+ បង្កើតការបញ្ជាទិញថ្មី',
+            'Sales Order List': 'បញ្ជីការបញ្ជាទិញ',
+            '+ New Customer': '+ បង្កើតអតិថិជនថ្មី',
+            'Customer List': 'បញ្ជីអតិថិជន',
+            '+ Record Expense': '+ កត់ត្រាការចំណាយ',
+            'Expense Ledger': 'សៀវភៅចំណាយ',
+            'Cash Flow': 'លំហូរសាច់ប្រាក់',
+            'Report Center': 'មជ្ឈមណ្ឌលរបាយការណ៍',
+            'Sales Reports': 'របាយការណ៍លក់',
+            'Valuation': 'តម្លៃសរុបស្តុក',
+            'Homepage': 'ទំព័រដើម',
+            'Home': 'ទំព័រដើម',
+            'Inventory Valuation': 'តម្លៃសរុបស្តុកក្នុងឃ្លាំង',
+
+            // Common Action Buttons & Toolbar
+            '+ Create Sales Order': '+ បង្កើតការបញ្ជាទិញ',
+            'Create Sales Order': 'បង្កើតការបញ្ជាទិញ',
+            'New Sales Order': 'បង្កើតការបញ្ជាទិញថ្មី',
+            '+ Add Customer': '+ បន្ថែមអតិថិជន',
+            '+ Add Delivery Person': '+ បន្ថែមអ្នកដឹកជញ្ជូន',
+            '+ Add Product': '+ បន្ថែមទំនិញ',
+            '+ Add Line': '+ បន្ថែមជួរទំនិញ',
+            '+ Add Row': '+ បន្ថែមជួរ',
+            '+ Add Category': '+ បន្ថែមប្រភេទទំនិញ',
+            '+ Adjust Stock': '+ កែសម្រួលស្តុក',
+            '+ Transfer Stock': '+ ផ្ទេរស្តុក',
+            '+ Create PO': '+ បង្កើតការទិញចូល',
+            'Create PO': 'បង្កើតការទិញចូល',
+            'Import CSV': 'នាំចូល CSV',
+            'Export CSV': 'នាំចេញ CSV',
+            'Save': 'រក្សាទុក',
+            'Save Order': 'រក្សាទុកការបញ្ជាទិញ',
+            'Save Product': 'រក្សាទុកទំនិញ',
+            'Save Changes': 'រក្សាទុកការផ្លាស់ប្តូរ',
+            'Save Customer': 'រក្សាទុកអតិថិជន',
+            'Save Delivery Person': 'រក្សាទុកអ្នកដឹកជញ្ជូន',
+            'Save & Close': 'រក្សាទុក & បិទ',
+            'Save & Print': 'រក្សាទុក & បោះពុម្ព',
+            'Cancel': 'បោះបង់',
+            'Cancel Order': 'បោះបង់ការបញ្ជាទិញ',
+            'Cancel PO': 'បោះបង់ការបញ្ជាទិញចូល',
+            'Delete': 'លុប',
+            'Delete Order': 'លុបការបញ្ជាទិញ',
+            'Close': 'បិទ',
+            'Filter': 'ចម្រាញ់',
+            'Reset': 'កំណត់ឡើងវិញ',
+            'Search': 'ស្វែងរក',
+            'Print': 'បោះពុម្ព',
+            'Print Invoice': 'បោះពុម្ពវិក្កយបត្រ',
+            'Print Invoices': 'បោះពុម្ពវិក្កយបត្រ',
+            'Print PO': 'បោះពុម្ព PO',
+            'Preview': 'មើលគំរូ',
+            'Copy': 'ចម្លង',
+            'Copy SO': 'ចម្លង SO',
+            'Version': 'កំណែប្រែ',
+            'Attachment': 'ឯកសារភ្ជាប់',
+            'Sticky': 'កំណត់ចំណាំ',
+            'Sticky ▾': 'កំណត់ចំណាំ ▾',
+            'Full Screen': 'ពេញអេក្រង់',
+            'Complete & Pay': 'ទូទាត់ប្រាក់ & បញ្ចប់',
+            'Complete & Pay ▾': 'ទូទាត់ប្រាក់ & បញ្ចប់ ▾',
+            'Confirm Complete & Pay': 'បញ្ជាក់ការទូទាត់ & បញ្ចប់',
+            'Re-open Order': 'បើកការបញ្ជាទិញឡើងវិញ',
+            'Done': 'រួចរាល់',
+            'Apply': 'អនុវត្ត',
+            'Refresh': 'ផ្ទុកឡើងវិញ',
+            'View': 'មើល',
+            'Edit': 'កែសម្រួល',
+            'Edit ✎': 'កែសម្រួល ✎',
+            'Detail': 'មើលលម្អិត',
+            'Details': 'ព័ត៌មានលម្អិត',
+            'Next →': 'បន្ទាប់ →',
+            '← Previous': '← ថយក្រោយ',
+            'Orders List': 'បញ្ជីការបញ្ជាទិញ',
+            'Delivery & Label (80x100mm)': '🚚 ដឹកជញ្ជូន & ផ្លាកសញ្ញា (80x100mm)',
+            '+ More': '+ បន្ថែមទៀត',
+            'Select All': 'ជ្រើសរើសទាំងអស់',
+            'Deselect All': 'ដោះការជ្រើសរើសទាំងអស់',
+
+            // Complete & Pay Modal & Payment Options
+            'Complete & Pay Order': 'ទូទាត់ប្រាក់ & បញ្ចប់ការបញ្ជាទិញ',
+            'Cash': 'សាច់ប្រាក់សុទ្ធ (Cash)',
+            'Bank': 'ធនាគារ (Bank)',
+            'ABA Bank': 'ធនាគារ វីង/ABA Bank',
+            'ACLEDA Bank': 'ធនាគារ អេស៊ីលីដា (ACLEDA)',
+            'KB PRASAC': 'ធនាគារ ខេប៊ី ប្រាសាក់ (KB PRASAC)',
+            'Bank Transfer': 'ផ្ទេរតាមធនាគារ',
+            'Paid by': 'ទូទាត់តាមរយៈ',
+            'Completed by': 'បញ្ចប់ដោយ',
+            'Payment Method': 'វិធីសាស្ត្រទូទាត់ប្រាក់',
+            'Amount Received': 'ចំនួនប្រាក់ទទួលបាន',
+            'Amount Received ($)': 'ចំនួនប្រាក់ទទួលបាន ($)',
+            'Change Due': 'ប្រាក់អាប់',
+            'Change Due ($)': 'ប្រាក់អាប់ ($)',
+            'Payment Status:': 'ស្ថានភាពទូទាត់៖',
+            'Payment Terms': 'លក្ខខណ្ឌទូទាត់',
+            'Due on Receipt': 'ទូទាត់ពេលទទួលទំនិញ',
+
+            // Delivery Section & Chips
+            'Delivery Information': 'ព័ត៌មានដឹកជញ្ជូន',
+            'Delivery Fee': 'ថ្លៃដឹកជញ្ជូន',
+            'Delivery Fee (KHR)': 'ថ្លៃដឹកជញ្ជូន (រៀល)',
+            'Delivery Note': 'ចំណាំការដឹកជញ្ជូន',
+            'Delivery By': 'ដឹកជញ្ជូនដោយ',
+            'Select delivery person...': 'ជ្រើសរើសអ្នកដឹកជញ្ជូន...',
+            'ALL Delivery Persons': '👥 អ្នកដឹកជញ្ជូនទាំងអស់',
+            'Divide delivery fee equally to all': 'បែងចែកថ្លៃដឹកជញ្ជូនស្មើៗគ្នា',
+            'Divided equally': 'បែងចែកស្មើគ្នា',
+            'Select One or Multiple:': 'ជ្រើសរើសម្នាក់ ឬច្រើននាក់៖',
+            'Time Period:': 'កាលបរិច្ឆេទ៖',
+            'Any Date:': 'ជ្រើសរើសថ្ងៃ៖',
+            'All Time': 'គ្រប់ពេល',
+            'Today': 'ថ្ងៃនេះ',
+            'Yesterday': 'ម្សិលមិញ',
+            'This Week': 'សប្តាហ៍នេះ',
+            'This Month': 'ខែនេះ',
+            'Last Month': 'ខែមុន',
+            'This Year': 'ឆ្នាំនេះ',
+            'Active Staff': 'បុគ្គលិកកំពុងបម្រើការ',
+            'Orders Handled': 'ការដឹកដែលបានអនុវត្ត',
+            'Total Delivery Fees': 'ថ្លៃដឹកជញ្ជូនសរុប',
+            'Total Personnel': 'បុគ្គលិកសរុប',
+            'Earned Fees (៛)': 'ប្រាក់ចំណូលថ្លៃដឹក (៛)',
+
+            // Status Badges & Pills
+            'Draft': 'ពង្រាង',
+            'Open': 'កំពុងដំណើរការ (Open)',
+            'Quote': 'សម្រង់តម្លៃ (Quote)',
+            'In Progress': 'កំពុងដំណើរការ',
+            'Picked': 'បានរើសទំនិញ',
+            'Packed': 'បានវេចខ្ចប់',
+            'Shipped': 'បានដឹកជញ្ជូន',
+            'Fully Shipped': 'បានដឹកជញ្ជូនរួចរាល់',
+            'Paid': 'បានទូទាត់',
+            'Unpaid': 'មិនទាន់ទូទាត់',
+            'Partial': 'ទូទាត់មួយផ្នែក',
+            'Invoiced': 'បានចេញវិក្កយបត្រ',
+            'Cancelled': 'បានបោះបង់',
+            'In Stock': 'មានក្នុងស្តុក',
+            'Low Stock': 'ជិតអស់ពីស្តុក',
+            'Out of Stock': 'អស់ពីស្តុក',
+            'Active': 'សកម្ម',
+            'Inactive': 'អសកម្ម',
+            'Main Store': 'ហាងធំ (HQ)',
+            'MAIN': 'ហាងធំ',
+            'CENTRAL ACTIVE': 'កណ្តាលសកម្ម',
+
+            // Table Headers & Columns
+            'Order #': 'លេខបញ្ជាទិញ',
+            'Order Date': 'កាលបរិច្ឆេទបញ្ជាទិញ',
+            'Date': 'កាលបរិច្ឆេទ',
+            'Customer': 'អតិថិជន',
+            'Customer Name': 'ឈ្មោះអតិថិជន',
+            'Warehouse / Branch': 'ឃ្លាំង / សាខា',
+            'Lines': 'ចំនួនមុខទំនិញ',
+            'Total Amount': 'ចំនួនទឹកប្រាក់សរុប',
+            'Balance Due': 'ប្រាក់នៅខ្វះ',
+            'Balance': 'ប្រាក់នៅសល់',
+            'Fulfillment': 'ការរៀបចំទំនិញ',
+            'Payment': 'ការទូទាត់',
+            'Actions': 'សកម្មភាព',
+            'Action': 'សកម្មភាព',
+            'SKU': 'កូដទំនិញ (SKU)',
+            'Product Name': 'ឈ្មោះទំនិញ',
+            'Category': 'ប្រភេទទំនិញ',
+            'On Hand': 'ទំនិញក្នុងស្តុក',
+            'Available': 'ទំនិញអាចលក់បាន',
+            'Avg Cost': 'ថ្លៃដើមមធ្យម',
+            'Cost': 'ថ្លៃដើម',
+            'Selling Price': 'តម្លៃលក់',
+            'Price': 'តម្លៃ',
+            'Status': 'ស្ថានភាព',
+            'Phone': 'លេខទូរស័ព្ទ',
+            'Contact Person': 'អ្នកទំនាក់ទំនង',
+            'City / Location': 'រាជធានី / ទីតាំង',
+            'Total Orders': 'ការបញ្ជាទិញសរុប',
+            'Total Spent': 'ការចំណាយសរុប',
+            'Open Balance': 'ប្រាក់នៅជំពាក់',
+            'Name': 'ឈ្មោះ',
+            'Quantity': 'បរិមាណ',
+            'Qty': 'ចំនួន',
+            'Unit Price': 'តម្លៃរាយ',
+            'Subtotal': 'សរុបរង',
+            'Discount': 'បញ្ចុះតម្លៃ',
+            'Tax': 'ពន្ធ',
+            'Item': 'មុខទំនិញ',
+            'Item / Description': 'មុខទំនិញ / ការពិពណ៌នា',
+            'Description': 'ការពិពណ៌នា',
+            'Unit of Measure': 'ខ្នាតទំនិញ',
+            'UOM': 'ខ្នាត',
+            'Barcode': 'បាកូដ',
+            'Location': 'ទីតាំង',
+            'Warehouse': 'ឃ្លាំងទំនិញ',
+
+            // Filter Options
+            'All': 'ទាំងអស់',
+            'All Orders': 'ការបញ្ជាទិញទាំងអស់',
+            'All Categories': 'គ្រប់ប្រភេទទំនិញ',
+            'All Stock Levels': 'គ្រប់កម្រិតស្តុក',
+            'All Payment States': 'គ្រប់ស្ថានភាពទូទាត់',
+            'Store Scope:': 'ដែនកំណត់ហាង៖',
+            'Store Scope': 'ដែនកំណត់ហាង',
+            'All Outlets (ទាំងអស់)': 'គ្រប់សាខាទាំងអស់',
+            'Main Store (ហាងធំ)': 'ហាងធំ (HQ)',
+
+            // Summary Totals
+            'Subtotal:': 'សរុបរង៖',
+            'Items Subtotal:': 'សរុបរងទំនិញ៖',
+            'Lines Subtotal:': 'សរុបរងជួរ៖',
+            'Discount:': 'បញ្ចុះតម្លៃ៖',
+            'Order Discount ($):': 'បញ្ចុះតម្លៃ ($)៖',
+            'Grand Total:': 'សរុបរួម៖',
+            'Grand Total': 'សរុបរួម',
+            'Total:': 'សរុប៖',
+            'Total': 'សរុប',
+            'Balance Due (USD):': 'ប្រាក់នៅខ្វះ (USD)៖',
+
+            // Titles
+            'Products Master Catalog': 'កាតាឡុកទំនិញមេ',
+            'Products Catalog': 'កាតាឡុកទំនិញ',
+            'Customers CRM Directory': 'បញ្ជីអតិថិជន CRM',
+            'Delivery Person Directory': 'បញ្ជីអ្នកដឹកជញ្ជូនទាំងអស់',
+            'Delivery Person List': 'បញ្ជីអ្នកដឹកជញ្ជូន',
+            'Purchase Orders Hub': 'មជ្ឈមណ្ឌលការបញ្ជាទិញចូល',
+            'Monthly Expense & Cash Flow Record': 'កំណត់ត្រាចំណាយប្រចាំខែ & លំហូរសាច់ប្រាក់',
+            'Company Settings': 'ការកំណត់ក្រុមហ៊ុន',
+            'Quick Switch (ប្តូរភាសា)': '⇄ ប្តូរភាសារហ័ស'
+        };
+
+        // Build Reverse Dictionary (Khmer -> English)
+        const INFLOW_I18N_EN = {};
+        for (const [k, v] of Object.entries(INFLOW_I18N_KM)) {
+            if (!INFLOW_I18N_EN[v]) {
+                INFLOW_I18N_EN[v] = k;
+            }
+        }
+
+        // Regex patterns for dynamic badges and counts
+        const INFLOW_REGEX_EN_TO_KM = [
+            { reg: /^All Orders \((\d+)\)$/i, rep: 'ការបញ្ជាទិញទាំងអស់ ($1)' },
+            { reg: /^Open \((\d+)\)$/i, rep: 'កំពុងដំណើរការ ($1)' },
+            { reg: /^Picked \((\d+)\)$/i, rep: 'បានរើសទំនិញ ($1)' },
+            { reg: /^Packed \((\d+)\)$/i, rep: 'បានវេចខ្ចប់ ($1)' },
+            { reg: /^Shipped \((\d+)\)$/i, rep: 'បានដឹកជញ្ជូន ($1)' },
+            { reg: /^Paid \/ Invoiced \((\d+)\)$/i, rep: 'បានទូទាត់ / ចេញវិក្កយបត្រ ($1)' },
+            { reg: /^Cancelled \((\d+)\)$/i, rep: 'បានបោះបង់ ($1)' },
+            { reg: /^All \((\d+)\)$/i, rep: 'ទាំងអស់ ($1)' },
+            { reg: /^Active \((\d+)\)$/i, rep: 'សកម្ម ($1)' },
+            { reg: /^Inactive \((\d+)\)$/i, rep: 'អសកម្ម ($1)' },
+            { reg: /^\+ Create Sales Order \(([^\)]+)\)$/i, rep: '+ បង្កើតការបញ្ជាទិញ ($1)' },
+            { reg: /^Orders List \(([^\)]+)\)$/i, rep: 'បញ្ជីការបញ្ជាទិញ ($1)' },
+            { reg: /^Page (\d+) of (\d+)/i, rep: 'ទំព័រ $1 នៃ $2' },
+            { reg: /^Sales Order: (.+)$/i, rep: 'ការបញ្ជាទិញ៖ $1' },
+            { reg: /^Product: (.+)$/i, rep: 'ទំនិញ៖ $1' },
+            { reg: /^Customer: (.+)$/i, rep: 'អតិថិជន៖ $1' }
+        ];
+
+        const INFLOW_REGEX_KM_TO_EN = [
+            { reg: /^ការបញ្ជាទិញទាំងអស់ \((\d+)\)$/i, rep: 'All Orders ($1)' },
+            { reg: /^កំពុងដំណើរការ \((\d+)\)$/i, rep: 'Open ($1)' },
+            { reg: /^បានរើសទំនិញ \((\d+)\)$/i, rep: 'Picked ($1)' },
+            { reg: /^បានវេចខ្ចប់ \((\d+)\)$/i, rep: 'Packed ($1)' },
+            { reg: /^បានដឹកជញ្ជូន \((\d+)\)$/i, rep: 'Shipped ($1)' },
+            { reg: /^បានទូទាត់ \/ ចេញវិក្កយបត្រ \((\d+)\)$/i, rep: 'Paid / Invoiced ($1)' },
+            { reg: /^បានបោះបង់ \((\d+)\)$/i, rep: 'Cancelled ($1)' },
+            { reg: /^ទាំងអស់ \((\d+)\)$/i, rep: 'All ($1)' },
+            { reg: /^សកម្ម \((\d+)\)$/i, rep: 'Active ($1)' },
+            { reg: /^អសកម្ម \((\d+)\)$/i, rep: 'Inactive ($1)' },
+            { reg: /^\+ បង្កើតការបញ្ជាទិញ \(([^\)]+)\)$/i, rep: '+ Create Sales Order ($1)' },
+            { reg: /^បញ្ជីការបញ្ជាទិញ \(([^\)]+)\)$/i, rep: 'Orders List ($1)' },
+            { reg: /^ទំព័រ (\d+) នៃ (\d+)/i, rep: 'Page $1 of $2' },
+            { reg: /^ការបញ្ជាទិញ៖ (.+)$/i, rep: 'Sales Order: $1' },
+            { reg: /^ទំនិញ៖ (.+)$/i, rep: 'Product: $1' },
+            { reg: /^អតិថិជន៖ (.+)$/i, rep: 'Customer: $1' }
+        ];
+
+        function inflowMatchTranslation(text, targetLang) {
+            if (!text || typeof text !== 'string') return null;
+            const trimmed = text.trim();
+            if (!trimmed) return null;
+
+            if (targetLang === 'km') {
+                if (INFLOW_I18N_KM[trimmed]) return INFLOW_I18N_KM[trimmed];
+                for (let i = 0; i < INFLOW_REGEX_EN_TO_KM.length; i++) {
+                    const rule = INFLOW_REGEX_EN_TO_KM[i];
+                    if (rule.reg.test(trimmed)) {
+                        return trimmed.replace(rule.reg, rule.rep);
+                    }
+                }
+            } else {
+                if (INFLOW_I18N_EN[trimmed]) return INFLOW_I18N_EN[trimmed];
+                for (let i = 0; i < INFLOW_REGEX_KM_TO_EN.length; i++) {
+                    const rule = INFLOW_REGEX_KM_TO_EN[i];
+                    if (rule.reg.test(trimmed)) {
+                        return trimmed.replace(rule.reg, rule.rep);
+                    }
+                }
+            }
+            return null;
+        }
+
+        const INFLOW_TRANSLATE_SELECTORS = [
+            'button', '.btn', '.inflow-tb-btn', '.inflow-win-button', '.inflow-split-btn-action',
+            '.inflow-filter-btn', '.khr-chip-btn', '.inflow-dlg-btn',
+            'th',
+            'label', '.form-label', '.inflow-filter-label', '.inflow-field-label',
+            'h1', 'h2', 'h3', 'h4', 'h5', '.card-title', '.inflow-drawer-title', '.inflow-wf-title',
+            '.badge', '.status-pill', '.kpi-label', '.kpi-subtext',
+            '.flyout-header', '.flyout-label', '.win-menu-text',
+            '.inflow-store-dropdown-header', '.inflow-lang-dropdown-header',
+            '.inflow-wf-links a', '.inflow-drawer-list-header span',
+            '#copyActionLabel', '#previewActionLabel', '#fsBtnLabel', '#dmPopupSplitHint', '#feeSplitNoticeText'
+        ];
+
+        function inflowApplyI18n(lang) {
+            if (!lang) lang = localStorage.getItem('inflow_app_lang') || 'en';
+            const isKhmer = (lang === 'km');
+
+            document.documentElement.setAttribute('data-lang', lang);
+            document.documentElement.setAttribute('lang', lang);
+
+            if (isKhmer) {
+                document.body.classList.add('font-khmer-active');
+            } else {
+                document.body.classList.remove('font-khmer-active');
+            }
+
+            // 1. Process structured UI selectors
+            const targetElements = document.querySelectorAll(INFLOW_TRANSLATE_SELECTORS.join(', '));
+            targetElements.forEach(el => {
+                // If element has element children (e.g. SVG icons or badges), translate text nodes or leaf spans
+                const elementChildren = Array.from(el.children).filter(c => c.tagName !== 'SPAN' || c.children.length > 0);
+                const hasSvgOrComplexChildren = elementChildren.some(c => c.tagName === 'SVG' || c.tagName === 'DIV' || c.tagName === 'INPUT');
+
+                if (hasSvgOrComplexChildren) {
+                    // Walk child text nodes and simple span labels without destroying SVG icons
+                    el.childNodes.forEach(child => {
+                        if (child.nodeType === 3) { // TEXT_NODE
+                            const raw = child.nodeValue;
+                            const t = raw.trim();
+                            if (t) {
+                                if (isKhmer) {
+                                    if (!child._origEn) child._origEn = t;
+                                    const match = inflowMatchTranslation(child._origEn, 'km');
+                                    if (match) child.nodeValue = raw.replace(child._origEn, match);
+                                } else {
+                                    if (child._origEn) {
+                                        child.nodeValue = raw.replace(t, child._origEn);
+                                    } else {
+                                        const rev = inflowMatchTranslation(t, 'en');
+                                        if (rev) child.nodeValue = raw.replace(t, rev);
+                                    }
+                                }
+                            }
+                        } else if (child.nodeType === 1 && child.tagName === 'SPAN' && child.children.length === 0) {
+                            const raw = child.textContent;
+                            const t = raw.trim();
+                            if (t) {
+                                if (isKhmer) {
+                                    if (!child.hasAttribute('data-i18n-orig')) child.setAttribute('data-i18n-orig', t);
+                                    const orig = child.getAttribute('data-i18n-orig');
+                                    const match = inflowMatchTranslation(orig, 'km');
+                                    if (match) child.textContent = match;
+                                } else {
+                                    if (child.hasAttribute('data-i18n-orig')) {
+                                        child.textContent = child.getAttribute('data-i18n-orig');
+                                    } else {
+                                        const rev = inflowMatchTranslation(t, 'en');
+                                        if (rev) child.textContent = rev;
+                                    }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    // Leaf or simple element
+                    const raw = el.textContent;
+                    const t = raw.trim();
+                    if (t) {
+                        if (isKhmer) {
+                            if (!el.hasAttribute('data-i18n-orig')) el.setAttribute('data-i18n-orig', t);
+                            const orig = el.getAttribute('data-i18n-orig');
+                            const match = inflowMatchTranslation(orig, 'km');
+                            if (match) el.textContent = match;
+                        } else {
+                            if (el.hasAttribute('data-i18n-orig')) {
+                                el.textContent = el.getAttribute('data-i18n-orig');
+                            } else {
+                                const rev = inflowMatchTranslation(t, 'en');
+                                if (rev) el.textContent = rev;
+                            }
+                        }
+                    }
+                }
+            });
+
+            // 2. Translate Input and Textarea Placeholders
+            document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(input => {
+                const ph = input.placeholder.trim();
+                if (!ph) return;
+                if (isKhmer) {
+                    if (!input.hasAttribute('data-i18n-orig-ph')) input.setAttribute('data-i18n-orig-ph', ph);
+                    const origPh = input.getAttribute('data-i18n-orig-ph');
+                    const match = inflowMatchTranslation(origPh, 'km');
+                    if (match) input.placeholder = match;
+                } else {
+                    if (input.hasAttribute('data-i18n-orig-ph')) {
+                        input.placeholder = input.getAttribute('data-i18n-orig-ph');
+                    } else {
+                        const rev = inflowMatchTranslation(ph, 'en');
+                        if (rev) input.placeholder = rev;
+                    }
+                }
+            });
+
+            // 3. Translate Select Dropdown Options
+            document.querySelectorAll('select option').forEach(opt => {
+                const txt = opt.text.trim();
+                if (!txt) return;
+                if (isKhmer) {
+                    if (!opt.hasAttribute('data-i18n-orig')) opt.setAttribute('data-i18n-orig', txt);
+                    const orig = opt.getAttribute('data-i18n-orig');
+                    const match = inflowMatchTranslation(orig, 'km');
+                    if (match) opt.text = match;
+                } else {
+                    if (opt.hasAttribute('data-i18n-orig')) {
+                        opt.text = opt.getAttribute('data-i18n-orig');
+                    } else {
+                        const rev = inflowMatchTranslation(txt, 'en');
+                        if (rev) opt.text = rev;
+                    }
+                }
+            });
+        }
+
+        window.inflowApplyI18n = inflowApplyI18n;
+
+        // Debounced MutationObserver for dynamic modals & table rows
+        let _inflowI18nTimer = null;
+        if (typeof MutationObserver !== 'undefined') {
+            const observer = new MutationObserver(function() {
+                const currentLang = localStorage.getItem('inflow_app_lang') || 'en';
+                if (currentLang === 'km') {
+                    clearTimeout(_inflowI18nTimer);
+                    _inflowI18nTimer = setTimeout(function() {
+                        inflowApplyI18n('km');
+                    }, 60);
+                }
+            });
+            if (document.body) {
+                observer.observe(document.body, { childList: true, subtree: true });
+            } else {
+                document.addEventListener('DOMContentLoaded', () => {
+                    observer.observe(document.body, { childList: true, subtree: true });
+                });
+            }
+        }
+
+        // Listen for language change from host window (inside iframe)
+        window.addEventListener('message', function(e) {
+            if (e.data && e.data.type === 'INFLOW_LANG_CHANGE') {
+                inflowApplyI18n(e.data.lang);
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            inflowApplyI18n();
+        });
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

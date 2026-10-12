@@ -1,0 +1,1578 @@
+{% extends 'base.html' %}
+
+{% block title %}POS Billing - {{ branch.name }} | inFlow{% endblock %}
+
+{% block body_class %}pos-modern-body{% endblock %}
+
+{% block content %}
+<style>
+/* Modern POS Layout & Typography matching reference design */
+.pos-modern-body {
+    background-color: #F8F9FA !important;
+}
+
+.pos-container {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 72px);
+    max-height: calc(100vh - 72px);
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1E293B;
+}
+
+/* Left Main Catalog Area */
+.pos-main-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    gap: 16px;
+    height: 100%;
+    overflow: hidden;
+}
+
+/* Top Navigation Bar */
+.pos-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    background: transparent;
+}
+
+.pos-search-wrapper {
+    position: relative;
+    flex: 1;
+    max-width: 460px;
+}
+
+.pos-search-input {
+    width: 100%;
+    height: 46px;
+    background: #FFFFFF;
+    border: 1.5px solid #EEF0F3;
+    border-radius: 9999px;
+    padding: 0 46px 0 20px;
+    font-size: 14px;
+    color: #1E293B;
+    outline: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    transition: all 0.2s ease;
+}
+
+.pos-search-input:focus {
+    border-color: #FF5A5F;
+    box-shadow: 0 0 0 3px rgba(255, 90, 95, 0.12);
+}
+
+.pos-search-icon {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    pointer-events: none;
+}
+
+.pos-topbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Warehouse Selector Pill */
+.pos-wh-selector-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 9999px;
+    padding: 6px 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+    transition: all 0.2s;
+}
+
+.pos-wh-selector-pill:hover {
+    border-color: #CBD5E1;
+}
+
+.pos-wh-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #64748B;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.pos-wh-select {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 800;
+    color: #0F172A;
+    outline: none;
+    cursor: pointer;
+}
+
+/* Cashier Profile Pill */
+.pos-cashier-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #FFFFFF;
+    border: 1.5px solid #EEF0F3;
+    border-radius: 9999px;
+    padding: 4px 14px 4px 6px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+}
+
+.pos-cashier-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #FF8A80, #FF5A5F);
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 5px rgba(255, 90, 95, 0.3);
+}
+
+.pos-cashier-meta {
+    line-height: 1.2;
+}
+
+.pos-cashier-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+.pos-cashier-role {
+    font-size: 11px;
+    color: #94A3B8;
+}
+
+/* Category Carousel Section */
+.pos-category-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.pos-section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.pos-section-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+}
+
+.pos-icon-btn {
+    background: transparent;
+    border: none;
+    color: #94A3B8;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 18px;
+    transition: background 0.15s;
+}
+
+.pos-icon-btn:hover {
+    background: #EDF2F7;
+    color: #475569;
+}
+
+/* Horizontal Category Carousel */
+.pos-category-carousel {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 4px 2px 8px 2px;
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E1 transparent;
+}
+
+.pos-category-carousel::-webkit-scrollbar {
+    height: 5px;
+}
+
+.pos-category-carousel::-webkit-scrollbar-thumb {
+    background: #E2E8F0;
+    border-radius: 10px;
+}
+
+.pos-cat-card {
+    min-width: 96px;
+    height: 88px;
+    background: #FFFFFF;
+    border: 1.5px solid #EEF0F3;
+    border-radius: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.pos-cat-card:hover {
+    transform: translateY(-2px);
+    border-color: #CBD5E1;
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.05);
+}
+
+.pos-cat-card.active {
+    background: #FFF2F2;
+    border: 2px solid #FF5A5F;
+    box-shadow: 0 6px 16px rgba(255, 90, 95, 0.16);
+    transform: translateY(-2px);
+}
+
+.pos-cat-icon {
+    font-size: 26px;
+    line-height: 1;
+    transition: transform 0.2s;
+}
+
+.pos-cat-card:hover .pos-cat-icon {
+    transform: scale(1.1);
+}
+
+.pos-cat-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-align: center;
+    white-space: nowrap;
+    padding: 0 6px;
+}
+
+.pos-cat-card.active .pos-cat-name {
+    color: #FF5A5F;
+    font-weight: 800;
+}
+
+/* Products Menu Section */
+.pos-menu-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 4px;
+}
+
+.pos-menu-title {
+    font-size: 17px;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+}
+
+.pos-sort-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 20px;
+    padding: 4px 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.pos-sort-label {
+    font-size: 11.5px;
+    color: #94A3B8;
+    font-weight: 600;
+}
+
+.pos-sort-select {
+    border: none;
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #475569;
+    outline: none;
+    cursor: pointer;
+}
+
+/* Products Grid */
+.pos-products-grid {
+    flex: 1;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(205px, 1fr));
+    gap: 16px;
+    padding-right: 4px;
+    padding-bottom: 20px;
+    align-content: flex-start;
+}
+
+.pos-product-card {
+    background: #FFFFFF;
+    border: 1.5px solid #EEF0F3;
+    border-radius: 18px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.02);
+    transition: all 0.22s ease;
+    cursor: default;
+    position: relative;
+}
+
+.pos-product-card:hover {
+    transform: translateY(-3px);
+    border-color: #FFCCD0;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+}
+
+.pos-prod-img-wrap {
+    width: 100%;
+    height: 130px;
+    border-radius: 14px;
+    background: #F8FAFC;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+    position: relative;
+}
+
+.pos-prod-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+}
+
+.pos-product-card:hover .pos-prod-img {
+    transform: scale(1.05);
+}
+
+.pos-prod-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #94A3B8;
+    font-size: 34px;
+}
+
+.pos-prod-stock-pill {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    padding: 3px 8px;
+    border-radius: 9999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    backdrop-filter: blur(4px);
+}
+
+.pos-prod-stock-pill.in-stock {
+    background: rgba(236, 253, 245, 0.92);
+    color: #059669;
+    border: 1px solid #A7F3D0;
+}
+
+.pos-prod-stock-pill.out-stock {
+    background: rgba(254, 242, 242, 0.92);
+    color: #DC2626;
+    border: 1px solid #FECACA;
+}
+
+.pos-prod-meta {
+    margin-bottom: 10px;
+}
+
+.pos-prod-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    line-height: 1.3;
+    max-height: 36px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+.pos-prod-sku {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-top: 3px;
+    font-family: monospace;
+}
+
+.pos-prod-price-row {
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.pos-prod-price {
+    font-size: 16px;
+    font-weight: 800;
+    color: #0F172A;
+}
+
+.pos-prod-uom {
+    font-size: 11px;
+    color: #94A3B8;
+    font-weight: 600;
+}
+
+.pos-btn-add {
+    width: 100%;
+    height: 38px;
+    background: #FF5A5F;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 12px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 3px 8px rgba(255, 90, 95, 0.25);
+}
+
+.pos-btn-add:hover {
+    background: #E84C51;
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px rgba(255, 90, 95, 0.35);
+}
+
+.pos-btn-add:active {
+    transform: translateY(1px);
+}
+
+/* ==================================================================== */
+/* Right Side Drawer: "Bills" (Cart & Checkout)                         */
+/* ==================================================================== */
+.pos-bills-panel {
+    width: 380px;
+    background: #FFFFFF;
+    border-radius: 20px;
+    border: 1.5px solid #EEF0F3;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+.pos-bills-header {
+    padding: 16px 20px 12px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #F1F5F9;
+}
+
+.pos-bills-title {
+    font-size: 19px;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+}
+
+/* Customer Selector Capsule */
+.pos-customer-box {
+    padding: 10px 20px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #F1F5F9;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.pos-cust-select {
+    flex: 1;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #1E293B;
+    outline: none;
+}
+
+.pos-cust-btn-new {
+    background: #FF5A5F;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s;
+}
+
+.pos-cust-btn-new:hover {
+    background: #E84C51;
+}
+
+/* Bills Items List */
+.pos-bills-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.pos-bill-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #F8FAFC;
+}
+
+.pos-bill-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    background: #F1F5F9;
+    overflow: hidden;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pos-bill-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.pos-bill-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.pos-bill-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.pos-bill-sub {
+    font-size: 11px;
+    color: #94A3B8;
+    margin-top: 2px;
+}
+
+.pos-bill-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    flex-shrink: 0;
+}
+
+.pos-bill-price {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0F172A;
+}
+
+/* Stepper [-] [qty] [+] */
+.pos-stepper {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.pos-step-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.pos-step-btn.minus {
+    background: #F1F5F9;
+    color: #64748B;
+}
+
+.pos-step-btn.minus:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+.pos-step-qty {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0F172A;
+    min-width: 18px;
+    text-align: center;
+}
+
+.pos-step-btn.plus {
+    background: #FF5A5F;
+    color: #FFFFFF;
+}
+
+.pos-step-btn.plus:hover {
+    background: #E84C51;
+}
+
+.pos-empty-cart {
+    text-align: center;
+    padding: 40px 10px;
+    color: #94A3B8;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Bills Totals & Payment Section */
+.pos-bills-footer {
+    padding: 16px 20px 20px 20px;
+    background: #FFFFFF;
+    border-top: 1px solid #F1F5F9;
+}
+
+.pos-calc-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #64748B;
+    margin-bottom: 6px;
+}
+
+.pos-calc-row strong {
+    color: #0F172A;
+}
+
+.pos-calc-input {
+    width: 70px;
+    padding: 2px 6px;
+    text-align: right;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    outline: none;
+}
+
+.pos-calc-divider {
+    border-top: 1.5px dashed #E2E8F0;
+    margin: 10px 0;
+}
+
+.pos-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 14px;
+}
+
+.pos-total-label {
+    font-size: 15px;
+    font-weight: 800;
+    color: #0F172A;
+}
+
+.pos-total-val {
+    font-size: 22px;
+    font-weight: 900;
+    color: #0F172A;
+    letter-spacing: -0.5px;
+}
+
+/* Payment Method Grid */
+.pos-payment-header {
+    font-size: 13px;
+    font-weight: 800;
+    color: #0F172A;
+    margin-bottom: 8px;
+}
+
+.pos-payment-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.pos-pay-card {
+    background: #FFFFFF;
+    border: 1.5px solid #EEF0F3;
+    border-radius: 12px;
+    padding: 8px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+}
+
+.pos-pay-card:hover {
+    border-color: #CBD5E1;
+}
+
+.pos-pay-card.active {
+    background: #FFF2F2;
+    border: 2px solid #FF5A5F;
+}
+
+.pos-pay-icon {
+    font-size: 16px;
+}
+
+.pos-pay-name {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #64748B;
+    text-align: center;
+}
+
+.pos-pay-card.active .pos-pay-name {
+    color: #FF5A5F;
+    font-weight: 800;
+}
+
+/* Charge CTA Button */
+.pos-btn-charge {
+    width: 100%;
+    height: 48px;
+    background: #FF5A5F;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(255, 90, 95, 0.35);
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.pos-btn-charge:hover {
+    background: #E84C51;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(255, 90, 95, 0.45);
+}
+
+.pos-btn-charge:disabled {
+    background: #CBD5E1;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
+</style>
+
+<div class="pos-container">
+    
+    <!-- ================================================================ -->
+    <!-- LEFT PANEL: Catalog, Category Carousel, Products Grid             -->
+    <!-- ================================================================ -->
+    <div class="pos-main-panel">
+        
+        <!-- Top Bar -->
+        <div class="pos-topbar">
+            <!-- Search Capsule -->
+            <div class="pos-search-wrapper">
+                <input type="text" id="posSearchInput" class="pos-search-input" 
+                       placeholder="Search menu, products, SKU or barcode..." 
+                       oninput="onSearchInput(this.value)">
+                <svg class="pos-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </div>
+
+            <!-- Warehouse Selector & Cashier Profile -->
+            <div class="pos-topbar-actions">
+                <!-- Warehouse Selector (STM Warehouse Default) -->
+                <div class="pos-wh-selector-pill" title="Stock Location / Fulfillment Warehouse">
+                    <span class="pos-wh-label">
+                        <span>🏬</span> WH:
+                    </span>
+                    <select id="posWhSelector" class="pos-wh-select" onchange="onWarehouseChange(this.value)">
+                        {% for wh in warehouses %}
+                        <option value="{{ wh.id }}" {% if selected_warehouse and selected_warehouse.id == wh.id %}selected{% endif %}>
+                            {{ wh.name }}{% if 'STM' in wh.name.upper() %} ⭐ (Default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Back to Branch Dashboard -->
+                <a href="{{ url_for('branches.branch_workspace', id=branch.id) }}" 
+                   class="btn btn-sm btn-secondary" 
+                   style="border-radius: 9999px; padding: 6px 14px; font-weight: 700; text-decoration: none; font-size: 12px; display: flex; align-items: center; gap: 4px;">
+                    <span>🏪</span> {{ branch.name }}
+                </a>
+
+                <!-- Branch Settings Link -->
+                <a href="{{ url_for('branches.branch_settings', id=branch.id) }}" 
+                   class="btn btn-sm btn-secondary" 
+                   style="border-radius: 9999px; padding: 6px 12px; font-weight: 700; text-decoration: none; font-size: 12px; display: flex; align-items: center; gap: 4px;"
+                   title="Branch Settings, Custom Color & CSV Data">
+                    <span>⚙️</span>
+                </a>
+
+                <!-- Cashier Profile Pill -->
+                <div class="pos-cashier-card">
+                    <div class="pos-cashier-avatar">
+                        {{ (branch.manager_name or 'Cashier')[0]|upper }}
+                    </div>
+                    <div class="pos-cashier-meta">
+                        <div class="pos-cashier-name">{{ branch.manager_name or 'Lauren Smith' }}</div>
+                        <div class="pos-cashier-role">Branch Cashier ▾</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Choose Category Section -->
+        <div class="pos-category-section">
+            <div class="pos-section-header">
+                <h3 class="pos-section-title">Choose Category</h3>
+                <button type="button" class="pos-icon-btn" title="Categories Overview" onclick="resetToAllCategory()">•••</button>
+            </div>
+
+            <!-- Horizontal Category Carousel -->
+            <div class="pos-category-carousel" id="posCategoryCarousel">
+                
+                <!-- 1. Default Option: All Products (Active Default) -->
+                <div class="pos-cat-card active" id="catCard-all" onclick="selectCategory('all', 'All Products')">
+                    <span class="pos-cat-icon">🌟</span>
+                    <span class="pos-cat-name">All Products</span>
+                </div>
+
+                <!-- 2. Dynamic Categories with Emojis -->
+                {% for cat in categories %}
+                {% set cname = cat.name %}
+                {% set clow = cname.lower() %}
+                <div class="pos-cat-card" id="catCard-{{ cat.id }}" onclick="selectCategory('{{ cat.id }}', '{{ cname|replace('\'', '\\\'') }}')">
+                    <span class="pos-cat-icon">
+                        {% if 'rice' in clow or 'bowl' in clow %}🍚
+                        {% elif 'cup' in clow or 'drink' in clow or 'beverage' in clow %}🥤
+                        {% elif 'small cup' in clow %}☕
+                        {% elif 'cake' in clow or 'bakery' in clow %}🍰
+                        {% elif 'bottle' in clow %}🍼
+                        {% elif 'folk' in clow or 'spoon' in clow %}🍴
+                        {% elif 'box' in clow or 'aluminium' in clow or 'rec' in clow %}🍱
+                        {% elif 'snack' in clow or 'popcorn' in clow or 'fry' in clow %}🍿
+                        {% elif 'salad' in clow %}🥗
+                        {% elif 'ice' in clow or 'cream' in clow %}🍦
+                        {% elif 'plastic' in clow or 'delivery' in clow or 'bag' in clow %}🛍️
+                        {% elif 'eco' in clow or 'bio' in clow %}🌿
+                        {% else %}📦{% endif %}
+                    </span>
+                    <span class="pos-cat-name">{{ cname }}</span>
+                </div>
+                {% endfor %}
+
+            </div>
+        </div>
+
+        <!-- Menu Title & Sort Header -->
+        <div class="pos-menu-header">
+            <h2 class="pos-menu-title" id="posMenuTitle">All Products Menu</h2>
+
+            <!-- Sort Option (A-Z default, Z-A, Price Low-High, Price High-Low, Stock High-Low) -->
+            <div class="pos-sort-container">
+                <span class="pos-sort-label">Sort by:</span>
+                <select id="posSortSelect" class="pos-sort-select" onchange="onSortChange(this.value)">
+                    <option value="az">Sort by A-Z ▾</option>
+                    <option value="za">Sort by Z-A</option>
+                    <option value="price_asc">Price: Low to High</option>
+                    <option value="price_desc">Price: High to Low</option>
+                    <option value="stock_desc">Stock: High to Low</option>
+                    <option value="stock_asc">Stock: Low to High</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Product Cards Grid -->
+        <div class="pos-products-grid" id="posProductsGrid">
+            {% for p in products %}
+            {% set stock = p.stock_qty|float %}
+            <div class="pos-product-card" 
+                 id="product-card-{{ p.id }}"
+                 data-id="{{ p.id }}" 
+                 data-name="{{ p.name }}" 
+                 data-sku="{{ p.sku or '' }}"
+                 data-barcode="{{ p.barcode or '' }}"
+                 data-category-id="{{ p.category_id or '' }}"
+                 data-price="{{ p.default_price or 0 }}" 
+                 data-stock="{{ stock }}"
+                 data-image="{{ p.image_url or '' }}"
+                 data-uom="{{ p.sales_uom or 'pcs' }}">
+                
+                <div>
+                    <!-- Product Image -->
+                    <div class="pos-prod-img-wrap">
+                        {% if p.image_url %}
+                        <img src="{{ p.image_url }}" alt="{{ p.name }}" class="pos-prod-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                        <div class="pos-prod-placeholder" style="display: none;">📦</div>
+                        {% else %}
+                        <div class="pos-prod-placeholder">
+                            {% set pname = p.name.lower() %}
+                            {% if 'rice' in pname or 'bowl' in pname %}🍚
+                            {% elif 'cup' in pname %}🥤
+                            {% elif 'box' in pname %}🍱
+                            {% elif 'cake' in pname %}🍰
+                            {% elif 'bottle' in pname %}🍼
+                            {% elif 'spoon' in pname or 'fork' in pname %}🍴
+                            {% else %}📦{% endif %}
+                        </div>
+                        {% endif %}
+
+                        <!-- Stock Badge at Selected Warehouse -->
+                        <div class="pos-prod-stock-pill {% if stock > 0 %}in-stock{% else %}out-stock{% endif %}">
+                            {% if stock > 0 %}
+                            ● {{ stock|int }} in stock
+                            {% else %}
+                            ● Out of stock
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Meta -->
+                    <div class="pos-prod-meta">
+                        <div class="pos-prod-name font-khmer" title="{{ p.name }}">{{ p.name }}</div>
+                        <div class="pos-prod-sku">{{ p.sku or 'SKU: -' }}</div>
+                    </div>
+                </div>
+
+                <!-- Price & Add Button -->
+                <div>
+                    <div class="pos-prod-price-row">
+                        <span class="pos-prod-price">${{ '{:.2f}'.format(p.default_price or 0) }}</span>
+                        <span class="pos-prod-uom">/ {{ p.sales_uom or 'portion' }}</span>
+                    </div>
+
+                    <button type="button" class="pos-btn-add" 
+                            onclick="addToCart({{ p.id }}, '{{ p.name|replace('\'', '\\\'') }}', {{ p.default_price or 0 }}, '{{ p.image_url or '' }}', {{ stock }})">
+                        <span>+</span> Add to Billing
+                    </button>
+                </div>
+
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+
+    <!-- ================================================================ -->
+    <!-- RIGHT PANEL: "Bills" (Cart, Stepper, Calculations, Checkout)      -->
+    <!-- ================================================================ -->
+    <div class="pos-bills-panel">
+        
+        <!-- Header -->
+        <div class="pos-bills-header">
+            <h2 class="pos-bills-title">Bills</h2>
+            <button type="button" class="pos-icon-btn" onclick="clearCart()" title="Clear Bills / Reset">•••</button>
+        </div>
+
+        <!-- Customer Selector -->
+        <div class="pos-customer-box">
+            <select id="posCustomerSelect" class="pos-cust-select">
+                <option value="">👤 Walk-in Customer (អតិថិជនទូទៅ)</option>
+                {% for c in customers %}
+                <option value="{{ c.id }}">{{ c.name }} ({{ c.phone or 'No phone' }})</option>
+                {% endfor %}
+            </select>
+            <button type="button" class="pos-cust-btn-new" onclick="openPosAddCustModal()" title="Add New Customer">
+                + New
+            </button>
+        </div>
+
+        <!-- Cart Items List with Stepper [-] [qty] [+] -->
+        <div class="pos-bills-items" id="posBillsItems">
+            <div id="posEmptyCartMsg" class="pos-empty-cart">
+                <span style="font-size: 32px; opacity: 0.5;">🛒</span>
+                <div>No items added yet.<br>Click <strong>Add to Billing</strong> to start.</div>
+            </div>
+        </div>
+
+        <!-- Calculations Summary & Payment -->
+        <div class="pos-bills-footer">
+            
+            <div class="pos-calc-row">
+                <span>Subtotal</span>
+                <strong id="posSubtotalText">$0.00</strong>
+            </div>
+
+            <div class="pos-calc-row">
+                <span>Discount ($)</span>
+                <input type="number" id="posDiscountInput" class="pos-calc-input" value="0.00" step="0.5" min="0" oninput="recalculateTotals()" {% if not perms.edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Discount editing is restricted by administrator / ការបញ្ចុះតម្លៃត្រូវបានបិទ"{% endif %}>
+            </div>
+
+            <div class="pos-calc-row">
+                <span>Tax</span>
+                <strong id="posTaxText">$0.00</strong>
+            </div>
+
+            <div class="pos-calc-divider"></div>
+
+            <div class="pos-total-row">
+                <span class="pos-total-label">Total</span>
+                <span class="pos-total-val" id="posTotalText">$0.00</span>
+            </div>
+
+            <!-- Payment Method Grid -->
+            <div class="pos-payment-header">Payment Method</div>
+            <div class="pos-payment-grid">
+                
+                <div class="pos-pay-card active" id="payMethod-Cash" onclick="selectPaymentMethod('Cash')">
+                    <span class="pos-pay-icon">💵</span>
+                    <span class="pos-pay-name">Cash</span>
+                </div>
+
+                <div class="pos-pay-card" id="payMethod-Debit" onclick="selectPaymentMethod('Debit Card')">
+                    <span class="pos-pay-icon">💳</span>
+                    <span class="pos-pay-name">Debit Card</span>
+                </div>
+
+                <div class="pos-pay-card" id="payMethod-QRIS" onclick="selectPaymentMethod('QRIS / KHQR')">
+                    <span class="pos-pay-icon">📱</span>
+                    <span class="pos-pay-name">QRIS</span>
+                </div>
+
+                <div class="pos-pay-card" id="payMethod-Debt" onclick="selectPaymentMethod('Credit / Debt')">
+                    <span class="pos-pay-icon">📋</span>
+                    <span class="pos-pay-name">Credit</span>
+                </div>
+
+            </div>
+
+            <!-- Hidden Paid Amount Input -->
+            <input type="hidden" id="posPaidAmountInput" value="0.00">
+
+            <!-- Checkout CTA Button -->
+            <button type="button" id="posBtnCharge" class="pos-btn-charge" onclick="submitPosCheckout()">
+                ⚡ Charge $0.00
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<!-- ==================================================================== -->
+<!-- Quick Add Customer Modal                                             -->
+<!-- ==================================================================== -->
+<div id="posAddCustModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; width: 440px; max-width: 90vw; border-radius: 16px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden;">
+        <div style="padding: 14px 18px; border-bottom: 1px solid #EEF0F3; background: #F8FAFC; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 800; font-size: 15px; color: #0F172A;">+ Quick Add Customer (អតិថិជនថ្មី)</div>
+            <button type="button" onclick="closePosAddCustModal()" style="background: none; border: none; font-size: 22px; line-height: 1; color: #94A3B8; cursor: pointer;">&times;</button>
+        </div>
+        <div style="padding: 18px; display: flex; flex-direction: column; gap: 14px;">
+            <div>
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 4px;">Customer / Shop Name *</label>
+                <input type="text" id="posNewCustName" placeholder="e.g. Sok San Coffee & Food" style="width: 100%; padding: 8px 12px; border: 1.5px solid #CBD5E1; border-radius: 8px; font-size: 13px; outline: none;">
+            </div>
+            <div>
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 4px;">Phone Number</label>
+                <input type="text" id="posNewCustPhone" placeholder="012 345 678" style="width: 100%; padding: 8px 12px; border: 1.5px solid #CBD5E1; border-radius: 8px; font-size: 13px; outline: none;">
+            </div>
+            <div>
+                <label style="display: block; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 4px;">Address / Location</label>
+                <input type="text" id="posNewCustAddress" placeholder="Street, Khan/Sangkat, City" style="width: 100%; padding: 8px 12px; border: 1.5px solid #CBD5E1; border-radius: 8px; font-size: 13px; outline: none;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
+                <button type="button" onclick="closePosAddCustModal()" class="btn btn-secondary" style="padding: 8px 14px; font-size: 12.5px; border-radius: 8px;">Cancel</button>
+                <button type="button" id="btnPosSaveCust" onclick="submitPosQuickCust()" style="padding: 8px 16px; background: #FF5A5F; color: #FFFFFF; border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">✓ Save & Select</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- Thermal Receipt Modal                                                -->
+<!-- ==================================================================== -->
+<div id="posReceiptModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div style="background: #FFFFFF; width: 360px; max-width: 95vw; border-radius: 16px; box-shadow: 0 25px 35px -5px rgba(0,0,0,0.3); overflow: hidden; padding: 20px;">
+        <div id="receiptContent" style="font-family: monospace; font-size: 12px; color: #0F172A;">
+            <div style="text-align: center; margin-bottom: 12px;">
+                <div style="font-size: 16px; font-weight: 900;">{{ branch.name }}</div>
+                <div style="font-size: 11px; color: #64748B;">Branch Sales Receipt</div>
+                <div style="font-size: 10px; color: #94A3B8;">Fulfill: <span id="recWhName">STM Warehouse</span></div>
+                <div style="border-top: 1px dashed #CBD5E1; margin: 8px 0;"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                    <span id="recOrderNum">SO-00001</span>
+                    <span id="recDate">Date</span>
+                </div>
+            </div>
+            <div id="recItemsList" style="margin-bottom: 12px;"></div>
+            <div style="border-top: 1px dashed #CBD5E1; margin: 8px 0;"></div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Subtotal:</span><strong id="recSubtotal">$0.00</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                <span>Discount:</span><strong id="recDiscount">$0.00</strong>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 14px; font-weight: 800; margin-top: 6px;">
+                <span>TOTAL:</span><span id="recTotal">$0.00</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; color: #64748B;">
+                <span>Payment:</span><span id="recMethod">Cash</span>
+            </div>
+            <div style="text-align: center; margin-top: 16px; font-size: 11px; color: #94A3B8;">
+                Thank you for your business! 🙏
+            </div>
+        </div>
+        <div style="display: flex; gap: 8px; margin-top: 18px;">
+            <button type="button" onclick="window.print()" class="btn btn-secondary" style="flex: 1; border-radius: 8px; font-weight: 700;">🖨️ Print</button>
+            <button type="button" onclick="closePosReceiptModal()" class="btn btn-primary" style="flex: 1; background: #FF5A5F; border: none; border-radius: 8px; font-weight: 700;">✓ Done</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- JavaScript Logic: Cart, Filter, Sort, Warehouse, Checkout           -->
+<!-- ==================================================================== -->
+<script>
+let currentCategory = 'all';
+let currentSort = 'az';
+let currentSearch = '';
+let selectedPaymentMethod = 'Cash';
+let cart = {};
+
+// Warehouse selection handler
+function onWarehouseChange(whId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('warehouse_id', whId);
+    window.location.href = url.toString();
+}
+
+// Category selection filter
+function selectCategory(catId, catName) {
+    currentCategory = catId;
+    
+    // Update active class on cards
+    document.querySelectorAll('.pos-cat-card').forEach(el => el.classList.remove('active'));
+    const targetCard = document.getElementById(catId === 'all' ? 'catCard-all' : `catCard-${catId}`);
+    if (targetCard) targetCard.classList.add('active');
+
+    // Update section title
+    const titleEl = document.getElementById('posMenuTitle');
+    if (titleEl) {
+        titleEl.textContent = catId === 'all' ? 'All Products Menu' : `${catName} Menu`;
+    }
+
+    applyFiltersAndSort();
+}
+
+function resetToAllCategory() {
+    selectCategory('all', 'All Products');
+}
+
+// Search filter
+function onSearchInput(val) {
+    currentSearch = (val || '').toLowerCase().trim();
+    applyFiltersAndSort();
+}
+
+// Sort change handler
+function onSortChange(sortVal) {
+    currentSort = sortVal;
+    applyFiltersAndSort();
+}
+
+// Unified Filter & Sort
+function applyFiltersAndSort() {
+    const grid = document.getElementById('posProductsGrid');
+    if (!grid) return;
+
+    const cards = Array.from(grid.querySelectorAll('.pos-product-card'));
+
+    cards.forEach(card => {
+        const catId = card.dataset.categoryId || '';
+        const name = (card.dataset.name || '').toLowerCase();
+        const sku = (card.dataset.sku || '').toLowerCase();
+        const barcode = (card.dataset.barcode || '').toLowerCase();
+
+        // 1. Category matching
+        const matchCat = (currentCategory === 'all') || (catId.toString() === currentCategory.toString());
+
+        // 2. Search matching
+        const matchSearch = !currentSearch || name.includes(currentSearch) || sku.includes(currentSearch) || barcode.includes(currentSearch);
+
+        if (matchCat && matchSearch) {
+            card.style.display = 'flex';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+
+    // Sort visible cards
+    cards.sort((a, b) => {
+        const nameA = (a.dataset.name || '').toLowerCase();
+        const nameB = (b.dataset.name || '').toLowerCase();
+        const priceA = parseFloat(a.dataset.price) || 0;
+        const priceB = parseFloat(b.dataset.price) || 0;
+        const stockA = parseFloat(a.dataset.stock) || 0;
+        const stockB = parseFloat(b.dataset.stock) || 0;
+
+        if (currentSort === 'az') {
+            return nameA.localeCompare(nameB);
+        } else if (currentSort === 'za') {
+            return nameB.localeCompare(nameA);
+        } else if (currentSort === 'price_asc') {
+            return priceA - priceB;
+        } else if (currentSort === 'price_desc') {
+            return priceB - priceA;
+        } else if (currentSort === 'stock_desc') {
+            return stockB - stockA;
+        } else if (currentSort === 'stock_asc') {
+            return stockA - stockB;
+        }
+        return 0;
+    });
+
+    // Re-append sorted cards
+    cards.forEach(c => grid.appendChild(c));
+}
+
+// Payment method selection
+function selectPaymentMethod(method) {
+    selectedPaymentMethod = method;
+    document.querySelectorAll('.pos-pay-card').forEach(el => el.classList.remove('active'));
+
+    let id = 'payMethod-Cash';
+    if (method === 'Debit Card') id = 'payMethod-Debit';
+    else if (method === 'QRIS / KHQR') id = 'payMethod-QRIS';
+    else if (method === 'Credit / Debt') id = 'payMethod-Debt';
+
+    const card = document.getElementById(id);
+    if (card) card.classList.add('active');
+}
+
+// Cart management
+function addToCart(id, name, price, img, stock) {
+    if (cart[id]) {
+        cart[id].qty += 1;
+    } else {
+        cart[id] = {
+            id: id,
+            name: name,
+            price: parseFloat(price) || 0,
+            image: img || '',
+            stock: parseFloat(stock) || 0,
+            qty: 1
+        };
+    }
+    renderCart();
+}
+
+function updateQty(id, delta) {
+    if (!cart[id]) return;
+    cart[id].qty += delta;
+    if (cart[id].qty <= 0) {
+        delete cart[id];
+    }
+    renderCart();
+}
+
+function clearCart() {
+    if (Object.keys(cart).length === 0) return;
+    if (confirm('Are you sure you want to clear current bills?')) {
+        cart = {};
+        renderCart();
+    }
+}
+
+function renderCart() {
+    const listEl = document.getElementById('posBillsItems');
+    const emptyMsg = document.getElementById('posEmptyCartMsg');
+    const keys = Object.keys(cart);
+
+    if (keys.length === 0) {
+        listEl.innerHTML = `
+            <div id="posEmptyCartMsg" class="pos-empty-cart">
+                <span style="font-size: 32px; opacity: 0.5;">🛒</span>
+                <div>No items added yet.<br>Click <strong>Add to Billing</strong> to start.</div>
+            </div>
+        `;
+        recalculateTotals();
+        return;
+    }
+
+    let html = '';
+    keys.forEach(k => {
+        const it = cart[k];
+        const lineTotal = it.price * it.qty;
+        
+        let thumbContent = '📦';
+        if (it.image) {
+            thumbContent = `<img src="${it.image}" alt="${it.name}" onerror="this.outerHTML='📦'">`;
+        } else {
+            const low = it.name.toLowerCase();
+            if (low.includes('rice') || low.includes('bowl')) thumbContent = '🍚';
+            else if (low.includes('cup')) thumbContent = '🥤';
+            else if (low.includes('cake')) thumbContent = '🍰';
+            else if (low.includes('box')) thumbContent = '🍱';
+        }
+
+        html += `
+        <div class="pos-bill-row">
+            <div class="pos-bill-thumb">${thumbContent}</div>
+            <div class="pos-bill-info">
+                <div class="pos-bill-name font-khmer" title="${it.name}">${it.name}</div>
+                <div class="pos-bill-sub">$${it.price.toFixed(2)} each</div>
+            </div>
+            <div class="pos-bill-controls">
+                <div class="pos-bill-price">$${lineTotal.toFixed(2)}</div>
+                <div class="pos-stepper">
+                    <button type="button" class="pos-step-btn minus" onclick="updateQty(${it.id}, -1)">-</button>
+                    <span class="pos-step-qty">${it.qty}</span>
+                    <button type="button" class="pos-step-btn plus" onclick="updateQty(${it.id}, 1)">+</button>
+                </div>
+            </div>
+        </div>
+        `;
+    });
+
+    listEl.innerHTML = html;
+    recalculateTotals();
+}
+
+function recalculateTotals() {
+    let subtotal = 0;
+    Object.values(cart).forEach(it => {
+        subtotal += it.price * it.qty;
+    });
+
+    const discount = Math.max(0, parseFloat(document.getElementById('posDiscountInput')?.value) || 0);
+    const tax = 0; // standard tax or configurable
+    const grandTotal = Math.max(0, subtotal - discount + tax);
+
+    document.getElementById('posSubtotalText').textContent = `$${subtotal.toFixed(2)}`;
+    document.getElementById('posTaxText').textContent = `$${tax.toFixed(2)}`;
+    document.getElementById('posTotalText').textContent = `$${grandTotal.toFixed(2)}`;
+    
+    const chargeBtn = document.getElementById('posBtnCharge');
+    if (chargeBtn) {
+        chargeBtn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        chargeBtn.disabled = (Object.keys(cart).length === 0);
+    }
+
+    const paidInput = document.getElementById('posPaidAmountInput');
+    if (paidInput) {
+        paidInput.value = grandTotal.toFixed(2);
+    }
+}
+
+// Submit checkout
+function submitPosCheckout() {
+    const keys = Object.keys(cart);
+    if (keys.length === 0) {
+        alert('Billing cart is empty! Please click "Add to Billing" on items first.');
+        return;
+    }
+
+    const subtotal = Object.values(cart).reduce((sum, it) => sum + (it.price * it.qty), 0);
+    const discount = parseFloat(document.getElementById('posDiscountInput')?.value) || 0;
+    const grandTotal = Math.max(0, subtotal - discount);
+    const custId = document.getElementById('posCustomerSelect')?.value || null;
+    const whId = document.getElementById('posWhSelector')?.value || null;
+
+    const items = Object.values(cart).map(it => ({
+        product_id: it.id,
+        quantity: it.qty,
+        unit_price: it.price
+    }));
+
+    const btn = document.getElementById('posBtnCharge');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Deducting Inventory & Charging...';
+
+    fetch('/branches/{{ branch.id }}/pos/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            items: items,
+            customer_id: custId,
+            warehouse_id: whId,
+            subtotal: subtotal,
+            discount_amount: discount,
+            total_amount: grandTotal,
+            paid_amount: grandTotal,
+            payment_method: selectedPaymentMethod
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        if (data.success) {
+            // Populate Receipt
+            const whSelect = document.getElementById('posWhSelector');
+            const whName = whSelect ? whSelect.options[whSelect.selectedIndex].text : 'STM Warehouse';
+            
+            document.getElementById('recWhName').textContent = whName;
+            document.getElementById('recOrderNum').textContent = data.order_number || 'SO-00001';
+            document.getElementById('recDate').textContent = new Date().toLocaleDateString();
+            document.getElementById('recSubtotal').textContent = `$${subtotal.toFixed(2)}`;
+            document.getElementById('recDiscount').textContent = `$${discount.toFixed(2)}`;
+            document.getElementById('recTotal').textContent = `$${grandTotal.toFixed(2)}`;
+            document.getElementById('recMethod').textContent = selectedPaymentMethod;
+
+            let recItemsHtml = '';
+            Object.values(cart).forEach(it => {
+                recItemsHtml += `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                    <span>${it.qty}x ${it.name}</span>
+                    <span>$${(it.price * it.qty).toFixed(2)}</span>
+                </div>`;
+            });
+            document.getElementById('recItemsList').innerHTML = recItemsHtml;
+
+            // Reset cart
+            cart = {};
+            renderCart();
+
+            // Open Receipt Modal
+            openPosReceiptModal();
+        } else {
+            alert('⚠️ Checkout Error: ' + (data.message || 'Failed to complete sale.'));
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        alert('Checkout error: ' + err);
+    });
+}
+
+// Receipt Modal
+function openPosReceiptModal() {
+    const m = document.getElementById('posReceiptModal');
+    if (m) m.style.display = 'flex';
+}
+
+function closePosReceiptModal() {
+    const m = document.getElementById('posReceiptModal');
+    if (m) m.style.display = 'none';
+}
+
+// Quick Add Customer Modal
+function openPosAddCustModal() {
+    const m = document.getElementById('posAddCustModal');
+    if (m) {
+        m.style.display = 'flex';
+        document.getElementById('posNewCustName').value = '';
+        document.getElementById('posNewCustPhone').value = '';
+        document.getElementById('posNewCustAddress').value = '';
+        document.getElementById('posNewCustName').focus();
+    }
+}
+
+function closePosAddCustModal() {
+    const m = document.getElementById('posAddCustModal');
+    if (m) m.style.display = 'none';
+}
+
+function submitPosQuickCust() {
+    const name = document.getElementById('posNewCustName')?.value.trim();
+    const phone = document.getElementById('posNewCustPhone')?.value.trim();
+    const addr = document.getElementById('posNewCustAddress')?.value.trim();
+
+    if (!name) {
+        alert('Please enter customer name.');
+        return;
+    }
+
+    const btn = document.getElementById('btnPosSaveCust');
+    btn.disabled = true;
+    btn.innerText = 'Saving...';
+
+    fetch('/branches/{{ branch.id }}/customers/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            name: name,
+            phone: phone,
+            address1: addr
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        btn.disabled = false;
+        btn.innerText = '✓ Save & Select';
+        if (data.success && data.customer) {
+            const sel = document.getElementById('posCustomerSelect');
+            const opt = document.createElement('option');
+            opt.value = data.customer.id;
+            opt.textContent = `${data.customer.name} (${data.customer.phone || 'No phone'})`;
+            opt.selected = true;
+            sel.appendChild(opt);
+            closePosAddCustModal();
+        } else {
+            alert(data.message || 'Error saving customer.');
+        }
+    })
+    .catch(e => {
+        btn.disabled = false;
+        btn.innerText = '✓ Save & Select';
+        alert('Error: ' + e);
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', () => {
+    applyFiltersAndSort();
+    recalculateTotals();
+});
+</script>
+{% endblock %}

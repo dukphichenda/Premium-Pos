@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+
+{% block title %}Stock Adjustments - inFlow Premium{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+    <div>
+        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Stock Adjustments & Counts</h1>
+        <p style="color: #64748B; font-size: 0.88rem;">Physical recount reconciliation, write-offs, and stock corrections</p>
+    </div>
+    <div style="display: flex; gap: 10px;">
+        <button onclick="openModal('newAdjustmentModal')" class="btn btn-primary">
+            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            <span>+ New Stock Adjustment</span>
+        </button>
+    </div>
+</div>
+
+<!-- Adjustments History Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+    <div class="table-container" style="border: none;">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Adjustment #</th>
+                    <th>Date</th>
+                    <th>Warehouse Location</th>
+                    <th>Reason</th>
+                    <th style="text-align: right;">Total Units Diff</th>
+                    <th>Status</th>
+                    <th>Notes</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for adj in adjustments %}
+                <tr>
+                    <td style="font-weight: 700; font-family: var(--font-mono); color: #0F766E;">
+                        {{ adj.adjustment_number }}
+                    </td>
+                    <td>{{ adj.adjustment_date | format_date }}</td>
+                    <td style="font-weight: 500;">{{ adj.location_name }}</td>
+                    <td><span class="badge badge-neutral">{{ adj.reason }}</span></td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                        {{ "{:,.0f}".format(adj.total_diff_units or 0) }}
+                    </td>
+                    <td><span class="badge badge-success">{{ adj.status }}</span></td>
+                    <td style="color: #64748B;">{{ adj.notes or '-' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="7" style="text-align: center; color: #94A3B8; padding: 32px;">No stock adjustments performed yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- New Adjustment Modal -->
+<div class="modal-overlay" id="newAdjustmentModal">
+    <div class="modal-dialog">
+        <div class="modal-header">
+            <h2 class="modal-title">+ Record Stock Adjustment</h2>
+            <button class="modal-close" onclick="closeModal('newAdjustmentModal')">×</button>
+        </div>
+        <form action="{{ url_for('inventory.create_adjustment') }}" method="POST">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="form-group">
+                    <label class="form-label">Warehouse Location *</label>
+                    <select name="location_id" required class="form-select" id="adjLocationSelect">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if loc.is_default %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Reason Code *</label>
+                    <select name="reason" class="form-select">
+                        <option value="Recount">Physical Recount / Cycle Count</option>
+                        <option value="Damaged Goods">Damaged / Broken Goods</option>
+                        <option value="Shrinkage">Loss / Shrinkage / Theft</option>
+                        <option value="Found Stock">Found / Discovered Inventory</option>
+                        <option value="Supplier Return">Supplier Return</option>
+                        <option value="Internal Use">Internal Company Use / Testing</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Product Autocomplete Lookup -->
+            <div class="form-group">
+                <label class="form-label">Search Product *</label>
+                <input type="text" id="adjProductSearch" placeholder="Type product name, SKU or scan barcode..." class="form-input">
+                <input type="hidden" name="product_id" id="adjProductId" required>
+                <div id="adjProductSearchResults" style="max-height: 160px; overflow-y: auto; margin-top: 4px;"></div>
+            </div>
+
+            <div id="adjProductSelectedInfo" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                <div style="font-weight: 600; color: #0F172A;" id="adjSelectedName"></div>
+                <div style="font-size: 0.8rem; color: #64748B;" id="adjSelectedDetails"></div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">New Actual Quantity *</label>
+                <input type="number" step="1" name="new_qty" required placeholder="Counted actual units on hand" class="form-input" style="font-size: 1.1rem; font-weight: 700;">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Adjustment Notes</label>
+                <textarea name="notes" rows="2" placeholder="Auditor name, recount justification, or explanation..." class="form-textarea"></textarea>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('newAdjustmentModal')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Apply Adjustment</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('adjProductSearch');
+    const resultsDiv = document.getElementById('adjProductSearchResults');
+    const idInput = document.getElementById('adjProductId');
+    const infoDiv = document.getElementById('adjProductSelectedInfo');
+    const nameSpan = document.getElementById('adjSelectedName');
+    const detailsSpan = document.getElementById('adjSelectedDetails');
+
+    let debounce;
+    searchInput.addEventListener('input', () => {
+        clearTimeout(debounce);
+        const q = searchInput.value.trim();
+        if (q.length < 2) {
+            resultsDiv.innerHTML = '';
+            return;
+        }
+
+        debounce = setTimeout(() => {
+            fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
+                .then(r => r.json())
+                .then(items => {
+                    if (items.length === 0) {
+                        resultsDiv.innerHTML = '<div style="padding: 8px; color: #94A3B8; font-size: 0.8rem;">No products found</div>';
+                        return;
+                    }
+                    let h = '';
+                    items.forEach(it => {
+                        h += `
+                            <div onclick="selectAdjProduct(${it.id}, '${it.name.replace(/'/g, "\\'")}', '${it.sku}', '${it.uom}', ${it.on_hand})" style="padding: 8px 12px; background: white; border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 4px; cursor: pointer;">
+                                <div style="font-weight: 600; font-size: 0.85rem;">${it.name}</div>
+                                <div style="font-size: 0.72rem; color: #64748B;">SKU: ${it.sku} | Total System Stock: ${it.on_hand} ${it.uom}</div>
+                            </div>
+                        `;
+                    });
+                    resultsDiv.innerHTML = h;
+                });
+        }, 200);
+    });
+
+    window.selectAdjProduct = function(id, name, sku, uom, stock) {
+        idInput.value = id;
+        searchInput.value = '';
+        resultsDiv.innerHTML = '';
+        infoDiv.style.display = 'block';
+        nameSpan.innerText = name;
+        detailsSpan.innerText = `SKU: ${sku} | Current System Total: ${stock} ${uom}`;
+    };
+});
+</script>
+{% endblock %}

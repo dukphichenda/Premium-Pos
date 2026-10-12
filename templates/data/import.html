@@ -1,0 +1,767 @@
+{% extends 'base.html' %}
+
+{% block title %}Import Data - inFlow Premium{% endblock %}
+
+{% block content %}
+<div class="inflow-dialog-page-container">
+    <!-- Authentic inFlow Desktop Window Dialog (Matching media_1791620571773_2235dd06.png) -->
+    <div class="inflow-win-window">
+        <!-- Window Titlebar -->
+        <div class="inflow-win-titlebar">
+            <div class="inflow-win-title">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" style="margin-right: 6px;">
+                    <rect x="11.5" y="2.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 2.5)" fill="#F59E0B"/>
+                    <rect x="4.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 4.5 9.5)" fill="#FBBF24"/>
+                    <rect x="18.5" y="9.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 18.5 9.5)" fill="#D97706"/>
+                    <rect x="11.5" y="16.5" width="5.5" height="5.5" rx="1.2" transform="rotate(45 11.5 16.5)" fill="#F59E0B"/>
+                </svg>
+                <span>inFlow - Import Data</span>
+            </div>
+            <div class="inflow-win-controls">
+                <span class="win-btn" title="Minimize">─</span>
+                <span class="win-btn" title="Maximize">□</span>
+                <span class="win-btn close" title="Close" onclick="onCancel()">✕</span>
+            </div>
+        </div>
+
+        <!-- Dialog Body -->
+        <div class="inflow-win-body">
+            <!-- Header with CD Icon and Title -->
+            <div class="inflow-win-header">
+                <!-- Disc with Inward Blue Arrow Icon -->
+                <div class="inflow-cd-icon-box">
+                    <svg width="46" height="46" viewBox="0 0 64 64" fill="none">
+                        <!-- CD Outer Disc (Metallic gradient) -->
+                        <circle cx="32" cy="32" r="28" fill="url(#cdGradient)" stroke="#94A3B8" stroke-width="1.5"/>
+                        <circle cx="32" cy="32" r="18" stroke="#CBD5E1" stroke-width="1" stroke-dasharray="2 3"/>
+                        <!-- Center Ring & Hole -->
+                        <circle cx="32" cy="32" r="9" fill="#E2E8F0" stroke="#94A3B8" stroke-width="1"/>
+                        <circle cx="32" cy="32" r="5" fill="#FFFFFF" stroke="#64748B" stroke-width="1"/>
+                        <!-- 3D Glossy Blue Arrow pointing Left/Inward into CD -->
+                        <path d="M42 26H28V19L15 32L28 45V38H42V26Z" fill="url(#arrowBlue)" stroke="#1D4ED8" stroke-width="1.2"/>
+                        <defs>
+                            <linearGradient id="cdGradient" x1="8" y1="8" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#F8FAFC"/>
+                                <stop offset="35%" stop-color="#E2E8F0"/>
+                                <stop offset="70%" stop-color="#F1F5F9"/>
+                                <stop offset="100%" stop-color="#CBD5E1"/>
+                            </linearGradient>
+                            <linearGradient id="arrowBlue" x1="15" y1="19" x2="42" y2="45" gradientUnits="userSpaceOnUse">
+                                <stop offset="0%" stop-color="#60A5FA"/>
+                                <stop offset="50%" stop-color="#2563EB"/>
+                                <stop offset="100%" stop-color="#1D4ED8"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1 class="inflow-win-heading">Import Data</h1>
+            </div>
+
+            <!-- STEP 1: Select Type & File (Exact replica of screenshot 1) -->
+            <div id="step1Container">
+                <div class="inflow-backup-notice">
+                    <a href="{{ url_for('migration.migration_page') }}" class="inflow-backup-link" target="_blank">You should backup your data before importing.</a>
+                </div>
+
+                <div class="inflow-instruction-text">
+                    Please choose the type of data and the file that you want to import.
+                </div>
+
+                <div class="inflow-form-grid">
+                    <!-- Data Type Row -->
+                    <div class="inflow-form-row">
+                        <label class="inflow-form-label" for="dataTypeSelect">Data Type</label>
+                        <div class="inflow-form-control-group">
+                            <select id="dataTypeSelect" class="inflow-win-dropdown" onchange="onDataTypeChange()">
+                                <option value="product" {% if initial_type == 'product' %}selected{% endif %}>Product</option>
+                                <option value="customer" {% if initial_type == 'customer' %}selected{% endif %}>Customer</option>
+                                <option value="vendor" {% if initial_type == 'vendor' %}selected{% endif %}>Vendor</option>
+                                <option value="inventory" {% if initial_type == 'inventory' %}selected{% endif %}>Stock (Inventory)</option>
+                                <option value="sales_order" {% if initial_type == 'sales_order' %}selected{% endif %}>Sales Order</option>
+                                <option value="purchase_order" {% if initial_type == 'purchase_order' %}selected{% endif %}>Purchase Order</option>
+                            </select>
+                            <div class="inflow-desc-text" id="dataTypeDescription">
+                                Import product information, including item name/code, description, price, etc., but not inventory/stock on hand.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- File Location Row -->
+                    <div class="inflow-form-row" style="margin-top: 18px;">
+                        <label class="inflow-form-label" for="fileLocationDisplay">File Location</label>
+                        <div class="inflow-form-control-group">
+                            <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                                <input type="text" id="fileLocationDisplay" class="inflow-win-textbox" placeholder="Click Browse to choose a CSV file..." readonly>
+                                <input type="file" id="csvFileInput" accept=".csv,text/csv" style="display: none;" onchange="onFileSelected(event)">
+                                <button type="button" class="inflow-win-btn-classic" onclick="document.getElementById('csvFileInput').click()">Browse</button>
+                            </div>
+                            <div class="inflow-template-help">
+                                <a id="sampleTemplateLink" href="{{ url_for('data_exchange.download_template', data_type='product') }}" class="inflow-sample-link">
+                                    📥 Download sample CSV template for <span id="templateTypeName">Product</span>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Header Checkbox Row -->
+                    <div class="inflow-form-row" style="margin-top: 22px;">
+                        <div></div>
+                        <div>
+                            <label class="inflow-checkbox-label">
+                                <input type="checkbox" id="headersCheckbox" checked>
+                                <span>Does your file have column headers in the first row?</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Import Mode (Keep/Add more vs Erase old data) -->
+                    <div class="inflow-form-row" style="margin-top: 20px;">
+                        <label class="inflow-form-label" style="padding-top: 6px;">Import Mode</label>
+                        <div class="inflow-form-control-group">
+                            <div class="inflow-mode-cards-container">
+                                <label class="inflow-mode-card selected" id="cardModeKeep" onclick="selectImportMode('keep')">
+                                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                                        <input type="radio" name="importModeRadio" id="modeKeep" value="keep" checked onchange="onImportModeChange()" style="margin-top: 3px; cursor: pointer;">
+                                        <div>
+                                            <div style="font-weight: 700; color: #1E293B; font-size: 13px;">Keep existing data and add / update records</div>
+                                            <div style="color: #64748B; font-size: 11.5px; margin-top: 2px; line-height: 1.4;">
+                                                Preserves existing records. New items will be added, and matching records will be updated safely.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+
+                                <label class="inflow-mode-card danger" id="cardModeErase" onclick="selectImportMode('erase')">
+                                    <div style="display: flex; align-items: flex-start; gap: 10px;">
+                                        <input type="radio" name="importModeRadio" id="modeErase" value="erase" onchange="onImportModeChange()" style="margin-top: 3px; cursor: pointer;">
+                                        <div>
+                                            <div style="font-weight: 700; color: #DC2626; font-size: 13px;">Erase old data first, then import</div>
+                                            <div style="color: #991B1B; font-size: 11.5px; margin-top: 2px; line-height: 1.4;">
+                                                ⚠️ WARNING: Completely erases all existing <span id="eraseTypeName">Product</span> records before importing the CSV.
+                                            </div>
+                                        </div>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: Preview & Column Verification Grid -->
+            <div id="step2Container" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">
+                        Preview Data & Verification (<span id="previewRowCount">0</span> rows detected)
+                    </div>
+                    <span id="previewStatusBadge" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #DCFCE7; color: #15803D; font-weight: 600;">Ready to Import</span>
+                </div>
+
+                <!-- Mode Banner on Preview Step -->
+                <div id="step2ModeBanner" style="margin-bottom: 12px; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                </div>
+
+                <div class="inflow-preview-table-wrapper">
+                    <table class="inflow-preview-table" id="previewTable">
+                        <thead id="previewTableHead"></thead>
+                        <tbody id="previewTableBody"></tbody>
+                    </table>
+                </div>
+
+                <div id="importResultBox" style="display: none; margin-top: 14px; padding: 12px; border-radius: 6px; font-size: 12.5px;"></div>
+            </div>
+        </div>
+
+        <!-- Dialog Footer (Buttons matching authentic screenshot) -->
+        <div class="inflow-win-footer">
+            <div id="step1Buttons" style="display: flex; gap: 8px;">
+                <button type="button" class="inflow-win-btn-action primary" id="btnNext" onclick="onNextStep()">Next &gt;</button>
+                <button type="button" class="inflow-win-btn-action" onclick="onCancel()">Cancel</button>
+            </div>
+            <div id="step2Buttons" style="display: none; gap: 8px;">
+                <button type="button" class="inflow-win-btn-action" id="btnBack" onclick="onBackStep()">&lt; Back</button>
+                <button type="button" class="inflow-win-btn-action primary" id="btnExecuteImport" onclick="onExecuteImport()">Import Now</button>
+                <button type="button" class="inflow-win-btn-action" id="btnFinish" style="display: none;" onclick="onFinishImport()">Finish</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Authentic inFlow Desktop Windows Dialog Styling */
+.inflow-dialog-page-container {
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 30px 16px;
+    background: #F1F5F9;
+    min-height: calc(100vh - 40px);
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.inflow-win-window {
+    width: 610px;
+    max-width: 100%;
+    background: #FFFFFF;
+    border: 1px solid #7F9DB9;
+    border-radius: 4px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.16);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.inflow-win-titlebar {
+    background: linear-gradient(180deg, #FFFFFF 0%, #E9EEF4 100%);
+    border-bottom: 1px solid #D1D5DB;
+    height: 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 10px 0 10px;
+    user-select: none;
+}
+
+.inflow-win-title {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.inflow-win-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.win-btn {
+    width: 20px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: #4B5563;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.win-btn:hover {
+    background: #E5E7EB;
+}
+.win-btn.close:hover {
+    background: #EF4444;
+    color: #FFFFFF;
+}
+
+.inflow-win-body {
+    padding: 24px 28px 28px 28px;
+    flex: 1;
+}
+
+.inflow-win-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.inflow-cd-icon-box {
+    width: 46px;
+    height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.inflow-win-heading {
+    font-size: 24px;
+    font-weight: 400;
+    color: #4A90E2;
+    letter-spacing: -0.01em;
+    margin: 0;
+}
+
+.inflow-backup-notice {
+    margin-bottom: 16px;
+}
+
+.inflow-backup-link {
+    color: #0066CC;
+    font-size: 12.5px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+.inflow-backup-link:hover {
+    color: #004C99;
+}
+
+.inflow-instruction-text {
+    font-size: 12.5px;
+    color: #262626;
+    margin-bottom: 20px;
+    line-height: 1.4;
+}
+
+.inflow-form-grid {
+    display: flex;
+    flex-direction: column;
+}
+
+.inflow-form-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.inflow-form-label {
+    font-size: 12.5px;
+    color: #262626;
+    padding-top: 4px;
+    text-align: left;
+}
+
+.inflow-form-control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.inflow-win-dropdown {
+    width: 175px;
+    height: 25px;
+    font-size: 12px;
+    border: 1px solid #7F9DB9;
+    border-radius: 2px;
+    padding: 1px 6px;
+    background: #FFFFFF;
+    color: #1E293B;
+}
+
+.inflow-desc-text {
+    font-size: 11.5px;
+    color: #404040;
+    max-width: 320px;
+    line-height: 1.35;
+    margin-top: 2px;
+}
+
+.inflow-win-textbox {
+    flex: 1;
+    height: 25px;
+    border: 1px solid #7F9DB9;
+    border-radius: 2px;
+    padding: 1px 8px;
+    font-size: 12px;
+    color: #1E293B;
+    background: #FFFFFF;
+}
+
+.inflow-win-btn-classic {
+    height: 25px;
+    min-width: 76px;
+    padding: 0 12px;
+    font-size: 12px;
+    color: #1F2937;
+    background: linear-gradient(180deg, #F9FAFB 0%, #E5E7EB 100%);
+    border: 1px solid #9CA3AF;
+    border-radius: 2px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.inflow-win-btn-classic:hover {
+    background: linear-gradient(180deg, #FFFFFF 0%, #D1D5DB 100%);
+    border-color: #6B7280;
+}
+
+.inflow-template-help {
+    margin-top: 4px;
+}
+.inflow-sample-link {
+    font-size: 11.5px;
+    color: #0284C7;
+    text-decoration: none;
+    font-weight: 500;
+}
+.inflow-sample-link:hover {
+    text-decoration: underline;
+}
+
+.inflow-checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #262626;
+    cursor: pointer;
+}
+
+.inflow-preview-table-wrapper {
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    background: #FFFFFF;
+}
+
+.inflow-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+}
+.inflow-preview-table th {
+    background: #F8FAFC;
+    color: #475569;
+    font-weight: 600;
+    padding: 6px 10px;
+    text-align: left;
+    border-bottom: 1px solid #CBD5E1;
+    border-right: 1px solid #E2E8F0;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+}
+.inflow-preview-table td {
+    padding: 6px 10px;
+    border-bottom: 1px solid #F1F5F9;
+    border-right: 1px solid #F1F5F9;
+    color: #1E293B;
+    white-space: nowrap;
+}
+
+.inflow-win-footer {
+    background: #F0F0F0;
+    border-top: 1px solid #D9D9D9;
+    padding: 10px 18px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+.inflow-win-btn-action {
+    min-width: 78px;
+    height: 25px;
+    padding: 0 12px;
+    font-size: 12px;
+    color: #1F2937;
+    background: linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%);
+    border: 1px solid #9CA3AF;
+    border-radius: 2px;
+    cursor: pointer;
+}
+.inflow-win-btn-action:hover {
+    background: linear-gradient(180deg, #FFFFFF 0%, #D1D5DB 100%);
+}
+.inflow-win-btn-action.primary {
+    border-color: #2563EB;
+    font-weight: 600;
+    color: #1E3A8A;
+}
+
+/* Import Mode Cards */
+.inflow-mode-cards-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+.inflow-mode-card {
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 10px 14px;
+    background: #FFFFFF;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    display: block;
+}
+.inflow-mode-card:hover {
+    border-color: #94A3B8;
+    background: #F8FAFC;
+}
+.inflow-mode-card.selected {
+    border-color: #2563EB;
+    background: #EFF6FF;
+    box-shadow: 0 0 0 1px #2563EB inset;
+}
+.inflow-mode-card.danger:hover {
+    border-color: #F87171;
+    background: #FEF2F2;
+}
+.inflow-mode-card.danger.selected {
+    border-color: #DC2626;
+    background: #FEF2F2;
+    box-shadow: 0 0 0 1px #DC2626 inset;
+}
+</style>
+
+<script>
+const DESCRIPTIONS = {
+    'product': 'Import product information, including item name/code, description, price, cost, etc., but not inventory/stock on hand.',
+    'customer': 'Import customer information, including customer name, contact person, phone, email, address, etc.',
+    'vendor': 'Import vendor/supplier details including company name, contact, phone, email, and address.',
+    'inventory': 'Import stock levels on hand for each product and warehouse location.',
+    'sales_order': 'Import your sales orders, including status (Paid, Invoiced, Open, Fully Shipped), customer details, and ordered items.',
+    'purchase_order': 'Import your purchase orders, including status, vendor information, items, quantities, and costs.'
+};
+
+let selectedFile = null;
+let currentImportMode = 'keep';
+
+function onDataTypeChange() {
+    const sel = document.getElementById('dataTypeSelect');
+    const val = sel.value;
+    const desc = document.getElementById('dataTypeDescription');
+    if (desc) desc.textContent = DESCRIPTIONS[val] || '';
+
+    const selText = sel.options[sel.selectedIndex].text;
+    const tmplName = document.getElementById('templateTypeName');
+    if (tmplName) tmplName.textContent = selText;
+
+    const eraseName = document.getElementById('eraseTypeName');
+    if (eraseName) eraseName.textContent = selText;
+
+    const link = document.getElementById('sampleTemplateLink');
+    if (link) link.href = `/data/template/${val}`;
+}
+
+function selectImportMode(mode) {
+    currentImportMode = mode;
+    const rKeep = document.getElementById('modeKeep');
+    const rErase = document.getElementById('modeErase');
+    const cardKeep = document.getElementById('cardModeKeep');
+    const cardErase = document.getElementById('cardModeErase');
+
+    if (mode === 'erase') {
+        rErase.checked = true;
+        rKeep.checked = false;
+        cardErase.classList.add('selected');
+        cardKeep.classList.remove('selected');
+    } else {
+        rKeep.checked = true;
+        rErase.checked = false;
+        cardKeep.classList.add('selected');
+        cardErase.classList.remove('selected');
+    }
+}
+
+function onImportModeChange() {
+    const rErase = document.getElementById('modeErase');
+    selectImportMode(rErase.checked ? 'erase' : 'keep');
+}
+
+function onFileSelected(event) {
+    const file = event.target.files[0];
+    if (file) {
+        selectedFile = file;
+        document.getElementById('fileLocationDisplay').value = file.name;
+    }
+}
+
+async function onNextStep() {
+    if (!selectedFile) {
+        alert('Please browse and select a CSV file first.');
+        return;
+    }
+
+    const sel = document.getElementById('dataTypeSelect');
+    const dataType = sel.value;
+    const selText = sel.options[sel.selectedIndex].text;
+    const hasHeaders = document.getElementById('headersCheckbox').checked;
+
+    if (currentImportMode === 'erase') {
+        const ok = confirm(`⚠️ WARNING: You have selected 'Erase old data first'.\n\nAll existing ${selText} records will be completely deleted before importing.\n\nAre you sure you want to proceed?`);
+        if (!ok) return;
+    }
+
+    const formData = new FormData();
+    formData.append('data_type', dataType);
+    formData.append('has_headers', hasHeaders ? '1' : '0');
+    formData.append('import_mode', currentImportMode);
+    formData.append('file', selectedFile);
+
+    const btnNext = document.getElementById('btnNext');
+    btnNext.disabled = true;
+    btnNext.textContent = 'Analyzing...';
+
+    try {
+        const resp = await fetch("{{ url_for('data_exchange.import_preview_api') }}", {
+            method: 'POST',
+            body: formData
+        });
+        const res = await resp.json();
+
+        if (!res.success) {
+            alert(res.message || 'Error parsing CSV file.');
+            btnNext.disabled = false;
+            btnNext.textContent = 'Next >';
+            return;
+        }
+
+        renderPreviewTable(res.headers, res.preview_rows);
+        document.getElementById('previewRowCount').textContent = res.total_rows;
+
+        // Update Step 2 Mode Banner
+        const banner = document.getElementById('step2ModeBanner');
+        if (currentImportMode === 'erase') {
+            banner.style.background = '#FEF2F2';
+            banner.style.border = '1px solid #FECACA';
+            banner.style.color = '#B91C1C';
+            banner.innerHTML = `⚠️ <span><strong>Erase Mode:</strong> All existing ${escapeHtml(selText)} records will be ERASED before importing.</span>`;
+        } else {
+            banner.style.background = '#F0FDF4';
+            banner.style.border = '1px solid #BBF7D0';
+            banner.style.color = '#15803D';
+            banner.innerHTML = `ℹ️ <span><strong>Safe Mode:</strong> Keep existing ${escapeHtml(selText)} records and add / update new items.</span>`;
+        }
+
+        // Switch to Step 2
+        document.getElementById('step1Container').style.display = 'none';
+        document.getElementById('step2Container').style.display = 'block';
+        document.getElementById('step1Buttons').style.display = 'none';
+        document.getElementById('step2Buttons').style.display = 'flex';
+        document.getElementById('btnExecuteImport').style.display = 'inline-block';
+        document.getElementById('btnFinish').style.display = 'none';
+        document.getElementById('importResultBox').style.display = 'none';
+
+    } catch (e) {
+        alert('Error contacting server: ' + e.message);
+    } finally {
+        btnNext.disabled = false;
+        btnNext.textContent = 'Next >';
+    }
+}
+
+function renderPreviewTable(headers, rows) {
+    const thead = document.getElementById('previewTableHead');
+    const tbody = document.getElementById('previewTableBody');
+
+    let hHtml = '<tr>';
+    headers.forEach(h => {
+        hHtml += `<th>${escapeHtml(h)}</th>`;
+    });
+    hHtml += '</tr>';
+    thead.innerHTML = hHtml;
+
+    let bHtml = '';
+    if (rows && rows.length > 0) {
+        rows.forEach(r => {
+            bHtml += '<tr>';
+            headers.forEach((_, idx) => {
+                bHtml += `<td>${escapeHtml(r[idx] || '')}</td>`;
+            });
+            bHtml += '</tr>';
+        });
+    } else {
+        bHtml = `<tr><td colspan="${headers.length}" style="text-align: center; color: #94A3B8;">No records to preview</td></tr>`;
+    }
+    tbody.innerHTML = bHtml;
+}
+
+function onBackStep() {
+    document.getElementById('step1Container').style.display = 'block';
+    document.getElementById('step2Container').style.display = 'none';
+    document.getElementById('step1Buttons').style.display = 'flex';
+    document.getElementById('step2Buttons').style.display = 'none';
+}
+
+async function onExecuteImport() {
+    if (!selectedFile) return;
+
+    const sel = document.getElementById('dataTypeSelect');
+    const dataType = sel.value;
+    const selText = sel.options[sel.selectedIndex].text;
+    const hasHeaders = document.getElementById('headersCheckbox').checked;
+
+    if (currentImportMode === 'erase') {
+        const finalOk = confirm(`FINAL CONFIRMATION:\n\nErase all existing ${selText} records and import new data from '${selectedFile.name}' now?`);
+        if (!finalOk) return;
+    }
+
+    const formData = new FormData();
+    formData.append('data_type', dataType);
+    formData.append('has_headers', hasHeaders ? '1' : '0');
+    formData.append('import_mode', currentImportMode);
+    formData.append('file', selectedFile);
+
+    const btnExec = document.getElementById('btnExecuteImport');
+    const btnBack = document.getElementById('btnBack');
+    btnExec.disabled = true;
+    btnBack.disabled = true;
+    btnExec.textContent = 'Importing...';
+
+    try {
+        const resp = await fetch("{{ url_for('data_exchange.import_execute_api') }}", {
+            method: 'POST',
+            body: formData
+        });
+        const res = await resp.json();
+
+        const resBox = document.getElementById('importResultBox');
+        resBox.style.display = 'block';
+
+        if (res.success) {
+            resBox.style.background = '#F0FDF4';
+            resBox.style.border = '1px solid #86EFAC';
+            resBox.style.color = '#15803D';
+            
+            let errHtml = '';
+            if (res.errors && res.errors.length > 0) {
+                errHtml = `<div style="margin-top: 8px; font-size: 11px; color: #B45309;">⚠️ Warnings (${res.errors.length}):<br>${res.errors.slice(0, 5).join('<br>')}</div>`;
+            }
+
+            resBox.innerHTML = `<strong>✅ Import Complete!</strong><br>${escapeHtml(res.message)}${errHtml}`;
+
+            document.getElementById('btnExecuteImport').style.display = 'none';
+            document.getElementById('btnBack').style.display = 'none';
+            document.getElementById('btnFinish').style.display = 'inline-block';
+        } else {
+            resBox.style.background = '#FEF2F2';
+            resBox.style.border = '1px solid #FCA5A5';
+            resBox.style.color = '#B91C1C';
+            resBox.innerHTML = `<strong>❌ Import Failed:</strong><br>${escapeHtml(res.message || 'Unknown error')}`;
+            btnExec.disabled = false;
+            btnBack.disabled = false;
+            btnExec.textContent = 'Retry Import';
+        }
+    } catch (e) {
+        alert('Import error: ' + e.message);
+        btnExec.disabled = false;
+        btnBack.disabled = false;
+        btnExec.textContent = 'Import Now';
+    }
+}
+
+function onFinishImport() {
+    // If inside MDI tab, close or refresh
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.closeActiveTab();
+    } else {
+        const dt = document.getElementById('dataTypeSelect').value;
+        if (dt === 'sales_order') {
+            window.location.href = "{{ url_for('sales_orders.list_orders') }}";
+        } else {
+            window.location.href = "{{ url_for('products.list_products') }}";
+        }
+    }
+}
+
+function onCancel() {
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.closeActiveTab();
+    } else {
+        window.history.back();
+    }
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    return String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    onDataTypeChange();
+});
+</script>
+{% endblock %}
