@@ -397,6 +397,7 @@ CREATE TABLE IF NOT EXISTS purchase_order_lines (
     description TEXT,
     vendor_product_code VARCHAR(100),
     quantity NUMERIC(14, 4) NOT NULL DEFAULT 1,
+    uom VARCHAR(50) DEFAULT 'pcs.',
     unit_cost NUMERIC(16, 4) NOT NULL DEFAULT 0,
     discount_percent NUMERIC(6, 2) DEFAULT 0,
     subtotal NUMERIC(16, 4) NOT NULL DEFAULT 0,

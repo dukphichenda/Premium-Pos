@@ -208,14 +208,30 @@ def _get_po_drawer_data(date_filter='All', status_filter='Open, In Progress', ve
 
     products_sql = """
         SELECT 
-            p.id, p.sku, p.name, p.barcode, p.uom,
+            p.id, p.sku, p.name, p.barcode, 
+            COALESCE(p.uom, 'pcs.') as uom,
+            COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
+            COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
             COALESCE(p.last_purchase_cost, p.average_cost, p.standard_cost, 0) as cost_price,
             COALESCE(p.default_price, 0) as unit_price,
-            COALESCE(inv.total_qty, 0) as on_hand
+            COALESCE(inv.total_qty, 0) as on_hand,
+            COALESCE(inv.reserved_qty, 0) as reserved_qty,
+            (COALESCE(inv.total_qty, 0) - COALESCE(inv.reserved_qty, 0)) as avail_qty,
+            COALESCE(po_ord.on_order_qty, 0) as on_order_qty
         FROM products p
         LEFT JOIN (
-            SELECT product_id, SUM(quantity) as total_qty FROM inventory GROUP BY product_id
+            SELECT product_id, SUM(quantity) as total_qty, SUM(COALESCE(reserved_quantity, 0)) as reserved_qty 
+            FROM inventory GROUP BY product_id
         ) inv ON p.id = inv.product_id
+        LEFT JOIN (
+            SELECT pol.product_id, SUM(pol.quantity - pol.received_qty) as on_order_qty
+            FROM purchase_order_lines pol
+            JOIN purchase_orders po ON pol.purchase_order_id = po.id
+            WHERE po.status IN ('ISSUED', 'PARTIAL_RECEIVED')
+            GROUP BY pol.product_id
+        ) po_ord ON p.id = po_ord.product_id
         WHERE p.is_active = TRUE
         ORDER BY p.name ASC;
     """
@@ -365,6 +381,11 @@ def create_purchase():
 
         lines = []
         if prefill_prod:
+            base_u = prefill_prod.get('uom') or 'pcs.'
+            purch_u = prefill_prod.get('purchasing_uom') or base_u
+            purch_r = float(prefill_prod.get('purchasing_uom_ratio_std') or prefill_prod.get('master_pack_qty') or 1.0)
+            sales_u = prefill_prod.get('sales_uom') or base_u
+            sales_r = float(prefill_prod.get('sales_uom_ratio_std') or 1.0)
             lines.append({
                 'id': 0,
                 'line_num': 1,
@@ -372,7 +393,13 @@ def create_purchase():
                 'product_sku': prefill_prod['sku'],
                 'product_name': prefill_prod['name'],
                 'product_barcode': prefill_prod['barcode'],
-                'product_uom': prefill_prod['uom'],
+                'product_uom': base_u,
+                'base_uom': base_u,
+                'line_uom': purch_u,
+                'purchasing_uom': purch_u,
+                'purchasing_ratio': purch_r,
+                'sales_uom': sales_u,
+                'sales_ratio': sales_r,
                 'vendor_product_code': '',
                 'description': prefill_prod['name'],
                 'quantity': 1,
@@ -380,7 +407,11 @@ def create_purchase():
                 'discount_percent': 0.0,
                 'subtotal': float(prefill_prod['purchase_cost']),
                 'received_qty': 0.0,
-                'on_hand_stock': float(prefill_prod['on_hand'])
+                'on_hand_stock': float(prefill_prod['on_hand']),
+                'stock_on_hand': float(prefill_prod['on_hand']),
+                'stock_reserved': 0.0,
+                'stock_avail': float(prefill_prod['on_hand']),
+                'stock_on_order': 0.0
             })
             draft_order['subtotal'] = float(prefill_prod['purchase_cost'])
             draft_order['total_amount'] = float(prefill_prod['purchase_cost'])
@@ -462,6 +493,7 @@ def create_purchase():
             discounts = [l.get('discount_percent', 0) for l in raw_lines]
             descriptions = [l.get('description', '') for l in raw_lines]
             vendor_codes = [l.get('vendor_product_code', '') for l in raw_lines]
+            uoms = [l.get('uom', 'pcs.') for l in raw_lines]
         else:
             prod_ids = request.form.getlist('product_id[]')
             quantities = request.form.getlist('quantity[]')
@@ -469,6 +501,7 @@ def create_purchase():
             discounts = request.form.getlist('discount_percent[]')
             descriptions = request.form.getlist('description[]')
             vendor_codes = request.form.getlist('vendor_product_code[]')
+            uoms = request.form.getlist('uom[]')
 
         if not prod_ids:
             if is_ajax:
@@ -491,10 +524,11 @@ def create_purchase():
             disc_pct = max(0.0, min(100.0, float(discounts[idx] if idx < len(discounts) and discounts[idx] else 0)))
             desc = descriptions[idx] if idx < len(descriptions) else ''
             vcode = vendor_codes[idx] if idx < len(vendor_codes) else ''
+            uom = (uoms[idx] if idx < len(uoms) and uoms[idx] else 'pcs.').strip()
             
             line_sub = qty * cost * (1.0 - (disc_pct / 100.0))
             subtotal += line_sub
-            lines_data.append((idx + 1, pid, desc, vcode, qty, cost, disc_pct, line_sub))
+            lines_data.append((idx + 1, pid, desc, vcode, qty, cost, disc_pct, line_sub, uom))
 
         total_amount = max(0.0, subtotal + shipping_fee - discount_amount)
         balance_due = total_amount
@@ -515,9 +549,9 @@ def create_purchase():
             for line in lines_data:
                 cur.execute("""
                     INSERT INTO purchase_order_lines (
-                        purchase_order_id, line_num, product_id, description, vendor_product_code, quantity, unit_cost, discount_percent, subtotal, received_qty
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0);
-                """, (po_id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7]))
+                        purchase_order_id, line_num, product_id, description, vendor_product_code, quantity, unit_cost, discount_percent, subtotal, received_qty, uom
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0, %s);
+                """, (po_id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], line[8]))
 
             # Update vendor open balance
             cur.execute("""
@@ -575,24 +609,40 @@ def detail_purchase(id):
     lines = query_all("""
         SELECT 
             pol.*,
+            COALESCE(pol.uom, p.purchasing_uom, p.uom, 'pcs.') as line_uom,
             p.name as product_name,
             p.sku as product_sku,
             p.barcode as product_barcode,
-            p.uom as product_uom,
+            COALESCE(p.uom, 'pcs.') as product_uom,
+            COALESCE(p.uom, 'pcs.') as base_uom,
+            COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
+            COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
             p.average_cost as product_avg_cost,
             p.last_purchase_cost as product_last_cost,
-            COALESCE(inv.qty, 0) as on_hand_stock
+            COALESCE(inv.qty, 0) as on_hand_stock,
+            COALESCE(inv.qty, 0) as stock_on_hand,
+            COALESCE(inv.reserved_qty, 0) as stock_reserved,
+            (COALESCE(inv.qty, 0) - COALESCE(inv.reserved_qty, 0)) as stock_avail,
+            COALESCE(po_ord.on_order_qty, 0) as stock_on_order
         FROM purchase_order_lines pol
         JOIN products p ON pol.product_id = p.id
         LEFT JOIN (
-            SELECT product_id, SUM(quantity) as qty 
+            SELECT product_id, SUM(quantity) as qty, SUM(COALESCE(reserved_quantity, 0)) as reserved_qty
             FROM inventory 
-            WHERE location_id = %s
             GROUP BY product_id
         ) inv ON pol.product_id = inv.product_id
+        LEFT JOIN (
+            SELECT pol2.product_id, SUM(pol2.quantity - pol2.received_qty) as on_order_qty
+            FROM purchase_order_lines pol2
+            JOIN purchase_orders po2 ON pol2.purchase_order_id = po2.id
+            WHERE po2.status IN ('ISSUED', 'PARTIAL_RECEIVED')
+            GROUP BY pol2.product_id
+        ) po_ord ON pol.product_id = po_ord.product_id
         WHERE pol.purchase_order_id = %s
         ORDER BY pol.line_num ASC
-    """, (order['location_id'], id))
+    """, (id,))
 
     payments = query_all("""
         SELECT * FROM order_payments 
@@ -716,6 +766,7 @@ def update_purchase(id):
             discounts = [l.get('discount_percent', 0) for l in raw_lines]
             descriptions = [l.get('description', '') for l in raw_lines]
             vendor_codes = [l.get('vendor_product_code', '') for l in raw_lines]
+            uoms = [l.get('uom', 'pcs.') for l in raw_lines]
         else:
             prod_ids = request.form.getlist('product_id[]')
             quantities = request.form.getlist('quantity[]')
@@ -723,6 +774,7 @@ def update_purchase(id):
             discounts = request.form.getlist('discount_percent[]')
             descriptions = request.form.getlist('description[]')
             vendor_codes = request.form.getlist('vendor_product_code[]')
+            uoms = request.form.getlist('uom[]')
 
         if not prod_ids:
             if is_ajax:
@@ -741,10 +793,11 @@ def update_purchase(id):
             disc_pct = max(0.0, min(100.0, float(discounts[idx] if idx < len(discounts) and discounts[idx] else 0)))
             desc = descriptions[idx] if idx < len(descriptions) else ''
             vcode = vendor_codes[idx] if idx < len(vendor_codes) else ''
+            uom = (uoms[idx] if idx < len(uoms) and uoms[idx] else 'pcs.').strip()
             
             line_sub = qty * cost * (1.0 - (disc_pct / 100.0))
             subtotal += line_sub
-            lines_data.append((idx + 1, pid, desc, vcode, qty, cost, disc_pct, line_sub))
+            lines_data.append((idx + 1, pid, desc, vcode, qty, cost, disc_pct, line_sub, uom))
 
         total_amount = max(0.0, subtotal + shipping_fee - discount_amount)
         paid_amount = float(order['paid_amount'] or 0)
@@ -785,9 +838,9 @@ def update_purchase(id):
                 rcv_qty = old_lines_rcv.get(line[1], 0.0)
                 cur.execute("""
                     INSERT INTO purchase_order_lines (
-                        purchase_order_id, line_num, product_id, description, vendor_product_code, quantity, unit_cost, discount_percent, subtotal, received_qty
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """, (id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], rcv_qty))
+                        purchase_order_id, line_num, product_id, description, vendor_product_code, quantity, unit_cost, discount_percent, subtotal, received_qty, uom
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """, (id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], rcv_qty, line[8]))
 
         if is_ajax:
             return jsonify({'success': True, 'message': 'Purchase order saved successfully!'})
@@ -835,9 +888,9 @@ def copy_purchase(id):
             for idx, line in enumerate(lines):
                 cur.execute("""
                     INSERT INTO purchase_order_lines (
-                        purchase_order_id, line_num, product_id, description, quantity, unit_cost, discount_percent, subtotal, received_qty
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0);
-                """, (new_po_id, line.get('line_num') or (idx + 1), line['product_id'], line.get('description') or '', line['quantity'], line['unit_cost'], line.get('discount_percent') or 0, line['subtotal']))
+                        purchase_order_id, line_num, product_id, description, quantity, unit_cost, discount_percent, subtotal, received_qty, uom
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0, %s);
+                """, (new_po_id, line.get('line_num') or (idx + 1), line['product_id'], line.get('description') or '', line['quantity'], line['unit_cost'], line.get('discount_percent') or 0, line['subtotal'], line.get('uom') or 'pcs.'))
 
             if order['vendor_id']:
                 cur.execute("UPDATE vendors SET balance = balance + %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (order['total_amount'], order['vendor_id']))

@@ -248,7 +248,7 @@
         <!-- Compact List View (Default) -->
         <div class="inflow-drawer-compact-view">
             <div class="inflow-drawer-list-header">
-                <span>Order #</span>
+                <span>Order # ▾</span>
             </div>
             <div class="inflow-drawer-list-body" id="poDrawerOrdersListBody">
                 {% for s_ord in sidebar_orders %}
@@ -261,7 +261,7 @@
                 <div style="padding: 12px; font-size: 11px; color: #64748B; text-align: center;">No orders match criteria</div>
                 {% endfor %}
             </div>
-            <div style="padding: 6px 12px; font-size: 10px; color: #64748B; border-top: 1px solid #CCFBF1; background: #F0FDFA; text-align: center;">
+            <div class="inflow-drawer-footer-count" style="padding: 6px 12px; font-size: 10px; text-align: center;">
                 Total: {{ sidebar_orders|length }} Purchase Orders
             </div>
         </div>
@@ -565,10 +565,10 @@
                     <thead>
                         <tr>
                             <th class="inflow-grid-selector-col"></th>
-                            <th style="width: 26%;">Item</th>
-                            <th style="width: 22%;">Description</th>
-                            <th style="width: 15%;">Vendor Product Code</th>
-                            <th style="width: 9%; text-align: right;">Quantity</th>
+                            <th style="width: 25%;">Item</th>
+                            <th style="width: 20%;">Description</th>
+                            <th style="width: 14%;">Vendor Product Code</th>
+                            <th style="width: 13%; text-align: right;">Quantity</th>
                             <th style="width: 10%; text-align: right;">Unit Price</th>
                             <th style="width: 6%; text-align: right;">Discount</th>
                             <th style="width: 12%; text-align: right;">Sub-Total</th>
@@ -591,10 +591,17 @@
                             <td>
                                 <input type="text" name="lines[{{ loop.index0 }}][vendor_product_code]" value="{{ l.vendor_product_code or '' }}" class="inflow-field-input line-vpc" placeholder="Vendor code..." style="border: none; background: transparent; width: 100%;">
                             </td>
-                            <td style="text-align: right;">
-                                <input type="number" step="any" min="0" name="lines[{{ loop.index0 }}][quantity]" value="{{ l.quantity }}" 
-                                       class="inflow-field-input line-qty" style="width: 70px; text-align: right; font-weight: 600;" 
-                                       oninput="recalculatePoTotals(); markPoDirty();">
+                            <td style="position: relative; text-align: right;" class="qty-cell">
+                                <div class="inflow-qty-cell-wrapper">
+                                    <input type="number" step="any" min="0" name="lines[{{ loop.index0 }}][quantity]" value="{{ l.quantity }}" 
+                                           class="inflow-qty-num-input line-qty" 
+                                           oninput="onPoQtyNumberChange(this)" onchange="recalculatePoTotals(); markPoDirty();">
+                                    <div class="inflow-qty-uom-btn" onclick="openPoQtyDropdown(event, this)" title="Choose Unit / Stock">
+                                        <span class="uom-text">{{ l.line_uom or l.product_uom or 'pcs.' }}</span>
+                                        <span class="uom-arrow">▾</span>
+                                    </div>
+                                    <input type="hidden" name="lines[{{ loop.index0 }}][uom]" class="line-uom" value="{{ l.line_uom or l.product_uom or 'pcs.' }}">
+                                </div>
                             </td>
                             <td style="text-align: right;">
                                 <input type="number" step="0.0001" min="0" name="lines[{{ loop.index0 }}][unit_cost]" value="{{ l.unit_cost }}" 
@@ -670,6 +677,42 @@
                             {% endfor %}
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Floating Quantity Unit Conversion & Stock Dropdown Popup (Matching media_1791832885837_b02f69a5.png) -->
+                <div id="poQtyDropdownPopup" class="inflow-qty-dropdown-popup" style="width: 220px;">
+                    <table class="inflow-qty-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 50%;">Quantity</th>
+                                <th style="width: 50%; text-align: right;">Standard Qty</th>
+                            </tr>
+                        </thead>
+                        <tbody id="poQtyDropdownBody">
+                            <!-- Populated dynamically via openPoQtyDropdown -->
+                        </tbody>
+                    </table>
+                    <!-- Stock Info Breakdown Panel matching screenshot -->
+                    <div class="inflow-qty-stock-panel">
+                        <div class="inflow-qty-stock-row">
+                            <span class="stock-label">Qty On Hand:</span>
+                            <span class="stock-val" id="poQtyOnHandVal" onclick="viewPoStockDetails('on_hand')" title="View On Hand Inventory Details">0 pcs.</span>
+                        </div>
+                        <div class="inflow-qty-stock-row">
+                            <span class="stock-label">Qty Available:</span>
+                            <span class="stock-val" id="poQtyAvailVal" onclick="viewPoStockDetails('available')" title="View Available Inventory Details">0 pcs.</span>
+                        </div>
+                        <div class="inflow-qty-stock-row">
+                            <span class="stock-label">Qty Reserved:</span>
+                            <span class="stock-val" id="poQtyReservedVal" onclick="viewPoStockDetails('reserved')" title="View Reserved Inventory Details">0 pcs.</span>
+                        </div>
+                        <div class="inflow-qty-stock-row">
+                            <span class="stock-label">Qty On Order:</span>
+                            <span class="stock-val" id="poQtyOnOrderVal" onclick="viewPoStockDetails('on_order')" title="View On Order Inventory Details">0 pcs.</span>
+                        </div>
+                        <!-- Resize dots handle -->
+                        <div class="inflow-qty-resize-handle"></div>
+                    </div>
                 </div>
             </div>
 
@@ -1062,6 +1105,27 @@
 
 {% block scripts %}
 <script>
+window.poProductsCatalog = {
+    {% for p in all_products %}
+    {{ p.id }}: {
+        id: {{ p.id }},
+        sku: {{ p.sku|tojson }},
+        name: {{ p.name|tojson }},
+        base_uom: {{ (p.uom or 'pcs.')|tojson }},
+        purchasing_uom: {{ (p.purchasing_uom or p.uom or 'pcs.')|tojson }},
+        purchasing_ratio: {{ p.purchasing_ratio or 1.0 }},
+        sales_uom: {{ (p.sales_uom or p.uom or 'pcs.')|tojson }},
+        sales_ratio: {{ p.sales_ratio or 1.0 }},
+        cost_price: {{ p.cost_price or 0.0 }},
+        unit_price: {{ p.unit_price or 0.0 }},
+        stock_on_hand: {{ p.on_hand or 0 }},
+        stock_reserved: {{ p.reserved_qty or 0 }},
+        stock_avail: {{ p.avail_qty or 0 }},
+        stock_on_order: {{ p.on_order_qty or 0 }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+};
+
 let isPoDirty = false;
 function markPoDirty() { isPoDirty = true; }
 
@@ -1301,13 +1365,22 @@ function handlePoItemDropdownKey(e, input) {
     }
 }
 
+function formatQtyNum(num) {
+    if (num === null || num === undefined || isNaN(num)) return '0';
+    const n = parseFloat(num);
+    return n.toLocaleString('en-US', { maximumFractionDigits: 4 });
+}
+
 function selectPoItemForActiveRow(id, sku, name, cost, uom) {
     const popup = document.getElementById('poItemDropdownPopup');
     if (popup) popup.style.display = 'none';
 
+    const prod = (window.poProductsCatalog && window.poProductsCatalog[id]) ? window.poProductsCatalog[id] : null;
+    const itemUom = prod ? (prod.purchasing_uom || prod.base_uom || uom || 'pcs.') : (uom || 'pcs.');
+
     if (activePoRow && activePoRow.id === 'poNewRowEntry') {
         // Create new line from entry row
-        appendPoLineItem(id, sku, name, '', 1, cost, 0);
+        appendPoLineItem(id, sku, name, '', 1, cost, 0, itemUom);
         document.getElementById('poNewItemTextInput').value = '';
     } else if (activePoRow) {
         // Update existing row
@@ -1316,16 +1389,22 @@ function selectPoItemForActiveRow(id, sku, name, cost, uom) {
         activePoRow.querySelector('.grid-item-input').value = `${sku} ${name}`;
         activePoRow.querySelector('.line-desc').value = name;
         activePoRow.querySelector('.line-cost').value = cost;
+        const uomText = activePoRow.querySelector('.uom-text');
+        if (uomText) uomText.innerText = itemUom;
+        const uomInput = activePoRow.querySelector('.line-uom');
+        if (uomInput) uomInput.value = itemUom;
         recalculatePoTotals();
     }
     markPoDirty();
 }
 
-function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc) {
+function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc, uom) {
     const tbody = document.getElementById('poLineItemsBody');
     const newEntry = document.getElementById('poNewRowEntry');
     const index = tbody.querySelectorAll('tr[data-line-index]').length;
     const subtotal = (qty * cost * (1 - disc / 100));
+    const prod = (window.poProductsCatalog && window.poProductsCatalog[productId]) ? window.poProductsCatalog[productId] : null;
+    const itemUom = uom || (prod ? (prod.purchasing_uom || prod.base_uom || 'pcs.') : 'pcs.');
 
     const tr = document.createElement('tr');
     tr.dataset.lineIndex = index;
@@ -1346,10 +1425,17 @@ function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc) {
         <td>
             <input type="text" name="lines[${index}][vendor_product_code]" value="${vpc || ''}" class="inflow-field-input line-vpc" placeholder="Vendor code..." style="border: none; background: transparent; width: 100%;">
         </td>
-        <td style="text-align: right;">
-            <input type="number" step="any" min="0" name="lines[${index}][quantity]" value="${qty}" 
-                   class="inflow-field-input line-qty" style="width: 70px; text-align: right; font-weight: 600;" 
-                   oninput="recalculatePoTotals(); markPoDirty();">
+        <td style="position: relative; text-align: right;" class="qty-cell">
+            <div class="inflow-qty-cell-wrapper">
+                <input type="number" step="any" min="0" name="lines[${index}][quantity]" value="${qty}" 
+                       class="inflow-qty-num-input line-qty" 
+                       oninput="onPoQtyNumberChange(this)" onchange="recalculatePoTotals(); markPoDirty();">
+                <div class="inflow-qty-uom-btn" onclick="openPoQtyDropdown(event, this)" title="Choose Unit / Stock">
+                    <span class="uom-text">${itemUom}</span>
+                    <span class="uom-arrow">▾</span>
+                </div>
+                <input type="hidden" name="lines[${index}][uom]" class="line-uom" value="${itemUom}">
+            </div>
         </td>
         <td style="text-align: right;">
             <input type="number" step="0.0001" min="0" name="lines[${index}][unit_cost]" value="${cost}" 
@@ -1369,6 +1455,132 @@ function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc) {
     selectPoGridRow(tr);
     recalculatePoTotals();
     markPoDirty();
+}
+
+function openPoQtyDropdown(event, btnEl) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const row = btnEl.closest('tr');
+    if (!row) return;
+
+    const pidInput = row.querySelector('.line-product-id');
+    const pid = pidInput ? parseInt(pidInput.value) : (parseInt(row.dataset.productId) || 0);
+    if (!pid || !window.poProductsCatalog || !window.poProductsCatalog[pid]) {
+        return;
+    }
+
+    const prod = window.poProductsCatalog[pid];
+    const qtyInput = row.querySelector('.line-qty');
+    const currentQty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
+    const currentUom = (row.querySelector('.line-uom')?.value || prod.purchasing_uom || prod.base_uom || 'pcs.').trim();
+
+    // Populate units table
+    const tbody = document.getElementById('poQtyDropdownBody');
+    tbody.innerHTML = '';
+
+    const units = [];
+    const baseUom = prod.base_uom || 'pcs.';
+
+    // Purchasing unit (if distinct from base)
+    if (prod.purchasing_uom && prod.purchasing_uom.toLowerCase() !== baseUom.toLowerCase()) {
+        units.push({
+            uom: prod.purchasing_uom,
+            ratio: parseFloat(prod.purchasing_ratio) || 1.0,
+            isBase: false
+        });
+    }
+
+    // Base unit
+    units.push({
+        uom: baseUom,
+        ratio: 1.0,
+        isBase: true
+    });
+
+    // Sales unit if distinct from base and purchasing
+    if (prod.sales_uom && prod.sales_uom.toLowerCase() !== baseUom.toLowerCase() &&
+        (!prod.purchasing_uom || prod.sales_uom.toLowerCase() !== prod.purchasing_uom.toLowerCase())) {
+        units.push({
+            uom: prod.sales_uom,
+            ratio: parseFloat(prod.sales_ratio) || 1.0,
+            isBase: false
+        });
+    }
+
+    units.forEach(u => {
+        const tr = document.createElement('tr');
+        const isActive = (u.uom.toLowerCase() === currentUom.toLowerCase());
+        if (isActive) tr.classList.add('active');
+
+        const stdQty = currentQty * (u.ratio || 1.0);
+        tr.innerHTML = `
+            <td>${formatQtyNum(currentQty)} ${u.uom}</td>
+            <td style="text-align: right;">${formatQtyNum(stdQty)} ${baseUom}</td>
+        `;
+
+        tr.onclick = function(e) {
+            e.stopPropagation();
+            selectPoUnitForLine(row, prod, u.uom, u.ratio, currentQty);
+        };
+        tbody.appendChild(tr);
+    });
+
+    // Populate Stock Info breakdown (matching media_1791832885837_b02f69a5.png)
+    const onHand = prod.stock_on_hand || 0;
+    const reserved = prod.stock_reserved || 0;
+    const avail = prod.stock_avail !== undefined ? prod.stock_avail : (onHand - reserved);
+    const onOrder = prod.stock_on_order || 0;
+
+    document.getElementById('poQtyOnHandVal').innerText = `${formatQtyNum(onHand)} ${baseUom}`;
+    document.getElementById('poQtyAvailVal').innerText = `${formatQtyNum(avail)} ${baseUom}`;
+    document.getElementById('poQtyReservedVal').innerText = `${formatQtyNum(reserved)} ${baseUom}`;
+    document.getElementById('poQtyOnOrderVal').innerText = `${formatQtyNum(onOrder)} ${baseUom}`;
+
+    // Position popup right below the quantity button
+    const popup = document.getElementById('poQtyDropdownPopup');
+    if (popup) {
+        const rect = btnEl.getBoundingClientRect();
+        popup.style.position = 'fixed';
+        popup.style.top = (rect.bottom + 2) + 'px';
+        popup.style.left = Math.max(10, (rect.right - 220)) + 'px';
+        popup.style.zIndex = '99999';
+        popup.classList.add('show');
+    }
+}
+
+function selectPoUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
+    const popup = document.getElementById('poQtyDropdownPopup');
+    if (popup) popup.classList.remove('show');
+
+    // Update UOM display & hidden input
+    const uomText = row.querySelector('.uom-text');
+    if (uomText) uomText.innerText = targetUom;
+    const uomHidden = row.querySelector('.line-uom');
+    if (uomHidden) uomHidden.value = targetUom;
+
+    // Adjust cost according to UOM ratio if switching
+    const costInput = row.querySelector('.line-cost');
+    if (costInput && prod) {
+        const baseCost = prod.cost_price || 0;
+        const newCost = baseCost * (targetRatio || 1.0);
+        costInput.value = (newCost).toFixed(2);
+    }
+
+    recalculatePoTotals();
+    markPoDirty();
+}
+
+function onPoQtyNumberChange(input) {
+    recalculatePoTotals();
+    markPoDirty();
+}
+
+function viewPoStockDetails(type) {
+    const popup = document.getElementById('poQtyDropdownPopup');
+    if (popup) popup.classList.remove('show');
+    window.open("{{ url_for('inventory.overview') }}", "_blank");
 }
 
 function addNewBlankPoLine() {
@@ -1462,7 +1674,8 @@ function savePurchaseOrder() {
                 vendor_product_code: row.querySelector('.line-vpc')?.value || '',
                 quantity: parseFloat(row.querySelector('.line-qty')?.value || 1),
                 unit_cost: parseFloat(row.querySelector('.line-cost')?.value || 0),
-                discount_percent: parseFloat(row.querySelector('.line-disc')?.value || 0)
+                discount_percent: parseFloat(row.querySelector('.line-disc')?.value || 0),
+                uom: row.querySelector('.line-uom')?.value || 'pcs.'
             });
         }
     });
@@ -1655,7 +1868,9 @@ function addSelectedReorderItems() {
         const cost = parseFloat(chk.dataset.cost || 0);
         const row = chk.closest('tr');
         const qty = parseFloat(row.querySelector('.reorder-suggest-qty')?.value || 10);
-        appendPoLineItem(id, sku, name, '', qty, cost, 0);
+        const prod = (window.poProductsCatalog && window.poProductsCatalog[id]) ? window.poProductsCatalog[id] : null;
+        const uom = prod ? (prod.purchasing_uom || prod.base_uom || 'pcs.') : 'pcs.';
+        appendPoLineItem(id, sku, name, '', qty, cost, 0, uom);
     });
     closeReorderModal();
 }
@@ -1688,6 +1903,10 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('.grid-item-input') && !e.target.closest('#poItemDropdownPopup')) {
         const p = document.getElementById('poItemDropdownPopup');
         if (p) p.style.display = 'none';
+    }
+    if (!e.target.closest('.inflow-qty-uom-btn') && !e.target.closest('#poQtyDropdownPopup')) {
+        const p = document.getElementById('poQtyDropdownPopup');
+        if (p) p.classList.remove('show');
     }
     if (!e.target.closest('#poPreviewSplitWrapper')) {
         const m = document.getElementById('poPreviewDropdownMenu');

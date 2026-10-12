@@ -265,6 +265,67 @@ class TestPurchasesModern(unittest.TestCase):
         execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = %s", (saved_po['id'],))
         execute("DELETE FROM purchase_orders WHERE id = %s", (saved_po['id'],))
 
+    def test_po_uom_and_stock_dropdown(self):
+        """Test PO line UOM persistence, stock metrics in detail, and UI elements matching screenshots"""
+        import json
+        lines_data = [{
+            'product_id': self.prod_low,
+            'description': 'Low Stock Item in Cases',
+            'vendor_product_code': 'VEND-CASE-01',
+            'quantity': 10,
+            'unit_cost': 150.00,
+            'discount_percent': 0.0,
+            'uom': 'cases'
+        }]
+        res = self.client.post('/purchases/create', data={
+            'vendor_id': self.vend_id,
+            'location_id': self.loc_main,
+            'order_date': '2026-10-13',
+            'lines_json': json.dumps(lines_data),
+            'notes': 'Test Modern PO with UOM cases'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        saved_po = query_one("SELECT * FROM purchase_orders WHERE notes = 'Test Modern PO with UOM cases'")
+        self.assertIsNotNone(saved_po)
+        po_id = saved_po['id']
+
+        # Verify UOM saved in database
+        saved_line = query_one("SELECT * FROM purchase_order_lines WHERE purchase_order_id = %s", (po_id,))
+        self.assertIsNotNone(saved_line)
+        self.assertEqual(saved_line['uom'], 'cases')
+
+        # Verify detail page render
+        detail_res = self.client.get(f'/purchases/{po_id}')
+        self.assertEqual(detail_res.status_code, 200)
+        html = detail_res.get_data(as_text=True)
+
+        # 1. Left Drawer Header: Order # ▾
+        self.assertIn('Order # ▾', html)
+        self.assertIn('inflow-po-workspace', html)
+
+        # 2. Quantity column & unit button
+        self.assertIn('inflow-qty-cell-wrapper', html)
+        self.assertIn('inflow-qty-uom-btn', html)
+        self.assertIn('cases', html)
+
+        # 3. Floating Quantity popup and stock breakdown elements
+        self.assertIn('id="poQtyDropdownPopup"', html)
+        self.assertIn('Standard Qty', html)
+        self.assertIn('Qty On Hand:', html)
+        self.assertIn('Qty Available:', html)
+        self.assertIn('Qty Reserved:', html)
+        self.assertIn('Qty On Order:', html)
+        self.assertIn('inflow-qty-resize-handle', html)
+
+        # 4. JavaScript Catalog
+        self.assertIn('window.poProductsCatalog', html)
+        self.assertIn('stock_on_hand', html)
+
+        # Clean up
+        execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = %s", (po_id,))
+        execute("DELETE FROM purchase_orders WHERE id = %s", (po_id,))
+
 if __name__ == '__main__':
     unittest.main()
 
