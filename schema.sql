@@ -541,9 +541,26 @@ CREATE TABLE IF NOT EXISTS invoice_settings (
     show_signature BOOLEAN DEFAULT TRUE,
     show_sku BOOLEAN DEFAULT TRUE,
     show_tax BOOLEAN DEFAULT TRUE,
+    qr_size INTEGER DEFAULT 180,
+    qr_position VARCHAR(50) DEFAULT 'left',
+    bank_info_size VARCHAR(50) DEFAULT 'small',
+    bank_info_position VARCHAR(50) DEFAULT 'below_qr',
+    qr_offset_x INTEGER DEFAULT 0,
+    qr_offset_y INTEGER DEFAULT 0,
+    bank_offset_x INTEGER DEFAULT 0,
+    bank_offset_y INTEGER DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS qr_size INTEGER DEFAULT 180;
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS qr_position VARCHAR(50) DEFAULT 'left';
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_info_size VARCHAR(50) DEFAULT 'small';
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_info_position VARCHAR(50) DEFAULT 'below_qr';
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS qr_offset_x INTEGER DEFAULT 0;
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS qr_offset_y INTEGER DEFAULT 0;
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_offset_x INTEGER DEFAULT 0;
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_offset_y INTEGER DEFAULT 0;
 
 -- 23. Delivery Services / Carriers (Cambodia)
 CREATE TABLE IF NOT EXISTS delivery_services (
@@ -644,3 +661,14 @@ ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS delivery_man VARCHAR(150);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS delivery_helper VARCHAR(150);
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS delivery_fee_khr NUMERIC(14, 2) DEFAULT 0;
 ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS payment_method VARCHAR(50);
+
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS contact VARCHAR(255);
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS vendor_address TEXT;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS currency_code VARCHAR(10) DEFAULT 'USD';
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS discount_amount NUMERIC(16, 4) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS non_vendor_costs NUMERIC(16, 4) DEFAULT 0;
+ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS vendor_invoice_no VARCHAR(100);
+
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(6, 2) DEFAULT 0;
+ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS vendor_product_code VARCHAR(100);
