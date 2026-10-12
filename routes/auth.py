@@ -199,8 +199,8 @@ def quick_login(role_or_user):
     """
     Convenience quick-login endpoint for fast demonstration and testing.
     """
-    if role_or_user == 'admin' or role_or_user == 'main':
-        user = query_one("SELECT * FROM users WHERE username = 'admin' LIMIT 1")
+    if role_or_user in ('admin', 'main', 'hq'):
+        user = query_one("SELECT * FROM users WHERE role = 'main_admin' AND is_active = TRUE ORDER BY id ASC LIMIT 1")
     elif role_or_user == 'toulkork' or role_or_user == 'branch1':
         user = query_one("SELECT * FROM users WHERE username = 'toulkork' LIMIT 1")
     elif role_or_user.startswith('branch_'):

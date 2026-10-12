@@ -739,11 +739,11 @@
             <!-- Server Endpoint Configurator -->
             <div class="endpoint-bar" title="Configure your inFlow Premium Application Server URL">
                 <div class="endpoint-icon">⚡</div>
-                <input type="text" id="serverUrlInput" class="endpoint-input" placeholder="http://localhost:5050 or http://your-domain:5050" value="">
+                <input type="text" id="serverUrlInput" class="endpoint-input" placeholder="https://github.com/dukphichenda/inflow-premium.git" value="https://github.com/dukphichenda/inflow-premium.git">
                 <button type="button" class="btn-connect" onclick="connectToServer()">Connect / ភ្ជាប់</button>
             </div>
             <p style="font-size: 0.8rem; color: var(--slate-400); margin-top: 12px; text-align: center;">
-                💡 <strong>Targeting Local Server:</strong> Ensure <code>run.bat</code> is active on your PC. For branch/cloud access, enter your <strong>Cloudflare Tunnel</strong> or server IP above.
+                ⚡ <strong>Target Server:</strong> Configured to <code>https://github.com/dukphichenda/inflow-premium.git</code>. Enter <code>http://localhost:5050</code> or your Cloudflare Tunnel anytime to connect.
             </p>
         </section>
 
@@ -1025,8 +1025,8 @@ server {<br>
                 return window.location.origin;
             }
             
-            // Default target for cloud portals (such as Vercel) or file:// is the local inFlow ERP server
-            return 'http://localhost:5050';
+            // Target server configured to GitHub repository
+            return 'https://github.com/dukphichenda/inflow-premium.git';
         }
 
         const serverUrlInput = document.getElementById('serverUrlInput');
@@ -1035,15 +1035,27 @@ server {<br>
 
         function updateLaunchButtons(url) {
             let base = (url || '').trim().replace(/\/+$/, '');
-            if (!base) base = 'http://localhost:5050';
-            const targetLogin = base + '/login';
+            if (!base) base = 'https://github.com/dukphichenda/inflow-premium.git';
+            
+            const isGitHub = base.includes('github.com');
+            const targetLogin = isGitHub ? base.replace(/\.git$/, '') : (base + '/login');
 
             const navBtn = document.getElementById('navLaunchBtn');
             const heroBtn = document.getElementById('heroLaunchBtn');
             const footerBtn = document.getElementById('footerSignInBtn');
-            if (navBtn) navBtn.href = targetLogin;
-            if (heroBtn) heroBtn.href = targetLogin;
-            if (footerBtn) footerBtn.href = targetLogin;
+            
+            if (navBtn) {
+                navBtn.href = targetLogin;
+                navBtn.target = isGitHub ? '_blank' : '_self';
+            }
+            if (heroBtn) {
+                heroBtn.href = targetLogin;
+                heroBtn.target = isGitHub ? '_blank' : '_self';
+            }
+            if (footerBtn) {
+                footerBtn.href = targetLogin;
+                footerBtn.target = isGitHub ? '_blank' : '_self';
+            }
 
             updateServerStatusIndicator(base);
         }
@@ -1059,22 +1071,29 @@ server {<br>
                 return;
             }
 
+            if (base.includes('github.com')) {
+                statusText.innerHTML = 'Target Server: <a href="' + base.replace(/\.git$/, '') + '" target="_blank" style="color:#60A5FA; text-decoration: underline;">' + base + '</a>';
+                if (dot) dot.style.background = '#38BDF8';
+                return;
+            }
+
             statusText.innerHTML = 'Target Server: <strong style="color:#60A5FA;">' + base + '</strong>';
+            if (dot) dot.style.background = '#10B981';
         }
 
         updateLaunchButtons(resolvedUrl);
 
         function connectToServer() {
             let url = (serverUrlInput.value || '').trim();
-            if (!url) url = 'http://localhost:5050';
+            if (!url) url = 'https://github.com/dukphichenda/inflow-premium.git';
             if (!url.startsWith('http://') && !url.startsWith('https://')) {
-                url = 'http://' + url;
+                url = 'https://' + url;
             }
             serverUrlInput.value = url;
             localStorage.setItem('inflow_server_url', url);
             updateLaunchButtons(url);
 
-            alert('Server URL updated to: ' + url + '\n\nClick "Open inFlow Premium" or "Launch App" to navigate to your server login.');
+            alert('Target Server updated to: ' + url);
         }
 
         // 3. Deployment Modal Controls
