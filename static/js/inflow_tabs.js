@@ -110,6 +110,37 @@
         return url + sep + 'embed=1';
     }
 
+    function getUkFlagSvg(w = 19, h = 13) {
+        return `<svg width="${w}" height="${h}" viewBox="0 0 60 40" style="border-radius: 2px; overflow: hidden; box-shadow: 0 0 1px rgba(0,0,0,0.4); vertical-align: middle; flex-shrink: 0;" aria-label="UK Flag">
+            <rect width="60" height="40" fill="#012169"/>
+            <path stroke="#FFFFFF" stroke-width="7" d="M0 0 L60 40 M60 0 L0 40"/>
+            <path stroke="#C8102E" stroke-width="4" d="M0 0 L60 40 M60 0 L0 40"/>
+            <path fill="#FFFFFF" d="M25 0h10v40H25z M0 15h60v10H0z"/>
+            <path fill="#C8102E" d="M27 0h6v40H27z M0 17h60v6H0z"/>
+        </svg>`;
+    }
+
+    function getKhmerFlagSvg(w = 19, h = 13) {
+        return `<svg width="${w}" height="${h}" viewBox="0 0 60 40" style="border-radius: 2px; overflow: hidden; box-shadow: 0 0 1px rgba(0,0,0,0.4); vertical-align: middle; flex-shrink: 0;" aria-label="Khmer Flag">
+            <rect width="60" height="10" fill="#032EA6"/>
+            <rect y="10" width="60" height="20" fill="#ED1B24"/>
+            <rect y="30" width="60" height="10" fill="#032EA6"/>
+            <g fill="#FFFFFF">
+                <rect x="17" y="26.5" width="26" height="2" rx="0.3"/>
+                <rect x="19" y="24.5" width="22" height="2"/>
+                <rect x="21" y="22.5" width="18" height="2"/>
+                <path d="M28.5 13.5 L31.5 13.5 L32 18 L32.5 22.5 L27.5 22.5 L28 18 Z"/>
+                <polygon points="30,11 28,13.5 32,13.5"/>
+                <path d="M23.5 16 L26.5 16 L27 19.5 L27.5 22.5 L22.5 22.5 L23 19.5 Z"/>
+                <polygon points="25,13.5 23,16 27,16"/>
+                <path d="M33.5 16 L36.5 16 L37 19.5 L37.5 22.5 L32.5 22.5 L33 19.5 Z"/>
+                <polygon points="35,13.5 33,16 37,16"/>
+                <polygon points="20,19.5 19,22.5 21.5,22.5"/>
+                <polygon points="40,19.5 38.5,22.5 41,22.5"/>
+            </g>
+        </svg>`;
+    }
+
     /* ==========================================================================
        HOST SHELL MANAGER (Runs in the top browser window)
        ========================================================================== */
@@ -381,31 +412,33 @@
                             </div>
                         </div>
 
-                        <!-- Language Switcher Circle Icon Button (near user login) -->
+                        <!-- Language Switcher Pill Button (near user login) -->
                         <div class="inflow-bar-right-lang" id="inflowLangContextWrapper" style="position: relative; display: flex; align-items: center; margin-left: 6px; flex-shrink: 0;">
-                            <div class="inflow-lang-circle-btn ${currentLang === 'km' ? 'lang-km' : 'lang-en'}" id="inflowLangBtn" onclick="window.inflowMdi.toggleLangDropdown(event)" title="${currentLang === 'km' ? 'ភាសា៖ ខ្មែរ (ចុចដើម្បីប្តូរ / Click to Switch)' : 'Current Language: English (Default) - Click to Switch'}">
-                                <span id="inflowLangBadgeText">${currentLang === 'km' ? 'KH' : 'EN'}</span>
+                            <div class="inflow-lang-pill-btn ${currentLang === 'km' ? 'lang-km' : 'lang-en'}" id="inflowLangBtn" onclick="window.inflowMdi.toggleLanguageDirect(event)" title="${currentLang === 'km' ? 'ភាសាខ្មែរ (ចុចដើម្បីប្តូរទៅ English / Click for English)' : 'English (Click to Switch to ភាសាខ្មែរ)'}">
+                                <span id="inflowLangFlagIcon" style="display: inline-flex; align-items: center; line-height: 1;">${currentLang === 'km' ? getKhmerFlagSvg(19, 13) : getUkFlagSvg(19, 13)}</span>
+                                <span id="inflowLangBadgeText" style="font-weight: 800; font-size: 11px; margin-left: 2px; line-height: 1;">${currentLang === 'km' ? 'KH' : 'EN'}</span>
+                                <span class="lang-chevron-arrow" onclick="window.inflowMdi.toggleLangDropdown(event)" title="Select Language / ជ្រើសរើសភាសា">▼</span>
                             </div>
                             <div class="inflow-lang-dropdown" id="inflowLangDropdown">
                                 <div class="inflow-lang-dropdown-header">Select Language / ជ្រើសរើសភាសា</div>
-                                <a href="javascript:void(0)" onclick="window.inflowMdi.switchLanguage('en', event)" class="inflow-store-dropdown-item ${currentLang === 'en' ? 'active' : ''}" id="langItemEn" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer;">
-                                    <span style="display: flex; align-items: center; gap: 8px;">
-                                        <span style="font-size: 15px;">🇬🇧</span>
-                                        <span style="font-weight: 700; color: #0F172A;">English</span>
+                                <a href="javascript:void(0)" onclick="window.inflowMdi.switchLanguage('en', event)" class="inflow-store-dropdown-item ${currentLang === 'en' ? 'active' : ''}" id="langItemEn" style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer;">
+                                    <span style="display: flex; align-items: center; gap: 10px;">
+                                        ${getUkFlagSvg(22, 15)}
+                                        <span style="font-weight: 700; color: #0F172A; font-size: 13px;">English</span>
                                         <span style="font-size: 9.5px; background: #E2E8F0; color: #475569; padding: 1px 6px; border-radius: 4px; font-weight: 700;">Default</span>
                                     </span>
-                                    <span class="check" id="langCheckEn" style="color: #0284C7; font-weight: 800; ${currentLang === 'en' ? '' : 'display: none;'}">✓</span>
+                                    <span class="check" id="langCheckEn" style="color: #0284C7; font-weight: 800; font-size: 14px; ${currentLang === 'en' ? '' : 'display: none;'}">✓</span>
                                 </a>
-                                <a href="javascript:void(0)" onclick="window.inflowMdi.switchLanguage('km', event)" class="inflow-store-dropdown-item ${currentLang === 'km' ? 'active' : ''}" id="langItemKm" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; cursor: pointer;">
-                                    <span style="display: flex; align-items: center; gap: 8px;">
-                                        <span style="font-size: 15px;">🇰🇭</span>
-                                        <span style="font-weight: 700; color: #0F172A;">ភាសាខ្មែរ (Khmer)</span>
+                                <a href="javascript:void(0)" onclick="window.inflowMdi.switchLanguage('km', event)" class="inflow-store-dropdown-item ${currentLang === 'km' ? 'active' : ''}" id="langItemKm" style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer;">
+                                    <span style="display: flex; align-items: center; gap: 10px;">
+                                        ${getKhmerFlagSvg(22, 15)}
+                                        <span style="font-weight: 700; color: #0F172A; font-size: 13px;">ភាសាខ្មែរ (Khmer)</span>
                                     </span>
-                                    <span class="check" id="langCheckKm" style="color: #0284C7; font-weight: 800; ${currentLang === 'km' ? '' : 'display: none;'}">✓</span>
+                                    <span class="check" id="langCheckKm" style="color: #0284C7; font-weight: 800; font-size: 14px; ${currentLang === 'km' ? '' : 'display: none;'}">✓</span>
                                 </a>
                                 <div class="inflow-store-dropdown-divider"></div>
                                 <div style="padding: 6px 10px; background: #F8FAFC; text-align: center;">
-                                    <button type="button" onclick="window.inflowMdi.toggleLanguageDirect(event)" style="background: none; border: none; color: #0284C7; font-size: 11px; font-weight: 700; cursor: pointer; padding: 2px 4px; display: inline-flex; align-items: center; gap: 4px;">
+                                    <button type="button" onclick="window.inflowMdi.toggleLanguageDirect(event)" style="background: none; border: none; color: #0284C7; font-size: 11px; font-weight: 700; cursor: pointer; padding: 3px 6px; display: inline-flex; align-items: center; gap: 5px;">
                                         <span>⇄ Quick Switch (ប្តូរភាសា)</span>
                                     </button>
                                 </div>
@@ -503,6 +536,10 @@
                             // Ensure newly loaded iframe receives current language immediately
                             const curAppLang = MdiShell.getLanguage ? MdiShell.getLanguage() : (localStorage.getItem('inflow_app_lang') || 'en');
                             try {
+                                iframe.contentWindow.localStorage.setItem('inflow_app_lang', curAppLang);
+                                if (typeof iframe.contentWindow.inflowApplyI18n === 'function') {
+                                    iframe.contentWindow.inflowApplyI18n(curAppLang);
+                                }
                                 iframe.contentWindow.postMessage({ type: 'INFLOW_LANG_CHANGE', lang: curAppLang }, '*');
                             } catch (e) {}
 
@@ -887,13 +924,19 @@
                 });
             },
 
+            currentLang: null,
+
             getLanguage: function () {
+                if (this.currentLang === 'km' || this.currentLang === 'en') {
+                    return this.currentLang;
+                }
                 try {
                     const saved = localStorage.getItem('inflow_app_lang');
-                    return (saved === 'km') ? 'km' : 'en';
+                    this.currentLang = (saved === 'km') ? 'km' : 'en';
                 } catch(e) {
-                    return 'en';
+                    this.currentLang = 'en';
                 }
+                return this.currentLang;
             },
 
             toggleLangDropdown: function (e) {
@@ -933,6 +976,7 @@
                 }
                 this.closeLangDropdown();
                 const targetLang = (lang === 'km') ? 'km' : 'en';
+                this.currentLang = targetLang;
                 try {
                     localStorage.setItem('inflow_app_lang', targetLang);
                     document.cookie = `inflow_lang=${targetLang}; path=/; max-age=31536000; SameSite=Lax`;
@@ -949,33 +993,39 @@
                 } catch(e) {}
 
                 // Show brief mini toast
-                const toastMsg = targetLang === 'en' ? 'Language: English (Default)' : 'ភាសា៖ ភាសាខ្មែរ (Khmer)';
+                const toastMsg = targetLang === 'en' ? 'Language: English' : 'ភាសា៖ ភាសាខ្មែរ (Khmer)';
                 this.showMiniToast(toastMsg);
             },
 
             updateLangUi: function (lang) {
+                this.currentLang = lang;
                 const badge = document.getElementById('inflowLangBadgeText');
                 const btn = document.getElementById('inflowLangBtn');
+                const flagIcon = document.getElementById('inflowLangFlagIcon');
                 const optEn = document.getElementById('langItemEn');
                 const optKm = document.getElementById('langItemKm');
                 const checkEn = document.getElementById('langCheckEn');
                 const checkKm = document.getElementById('langCheckKm');
 
+                if (flagIcon) {
+                    flagIcon.innerHTML = (lang === 'km') ? getKhmerFlagSvg(19, 13) : getUkFlagSvg(19, 13);
+                }
                 if (badge) {
-                    badge.textContent = lang === 'km' ? 'KH' : 'EN';
+                    badge.textContent = (lang === 'km') ? 'KH' : 'EN';
                 }
                 if (btn) {
-                    btn.className = `inflow-lang-circle-btn ${lang === 'km' ? 'lang-km' : 'lang-en'}`;
+                    btn.className = `inflow-lang-pill-btn ${lang === 'km' ? 'lang-km' : 'lang-en'}`;
                     btn.setAttribute('title', lang === 'km' 
-                        ? 'ភាសា៖ ខ្មែរ (ចុចដើម្បីប្តូរទៅជា English)' 
-                        : 'Current Language: English (Default) - Click to Switch');
+                        ? 'ភាសាខ្មែរ (ចុចដើម្បីប្តូរទៅ English / Click for English)' 
+                        : 'English (Click to Switch to ភាសាខ្មែរ)');
                 }
                 if (optEn) optEn.classList.toggle('active', lang === 'en');
                 if (optKm) optKm.classList.toggle('active', lang === 'km');
-                if (checkEn) checkEn.style.display = lang === 'en' ? 'inline' : 'none';
-                if (checkKm) checkKm.style.display = lang === 'km' ? 'inline' : 'none';
+                if (checkEn) checkEn.style.display = (lang === 'en') ? 'inline' : 'none';
+                if (checkKm) checkKm.style.display = (lang === 'km') ? 'inline' : 'none';
 
                 document.documentElement.setAttribute('data-lang', lang);
+                document.documentElement.setAttribute('lang', lang);
 
                 // Translate or restore all open tab titles in MDI shell
                 this.tabs.forEach(tab => {
@@ -1058,10 +1108,16 @@
             },
 
             broadcastLanguage: function (lang) {
-                // Post message to all iframe viewports
+                // Synchronously update and post message to all iframe viewports
                 document.querySelectorAll('.inflow-tab-viewport iframe').forEach(iframe => {
                     try {
                         if (iframe.contentWindow) {
+                            try {
+                                iframe.contentWindow.localStorage.setItem('inflow_app_lang', lang);
+                                if (typeof iframe.contentWindow.inflowApplyI18n === 'function') {
+                                    iframe.contentWindow.inflowApplyI18n(lang);
+                                }
+                            } catch(e) {}
                             iframe.contentWindow.postMessage({ type: 'INFLOW_LANG_CHANGE', lang: lang }, '*');
                         }
                     } catch(e) {}

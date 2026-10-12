@@ -1178,138 +1178,157 @@
             '#copyActionLabel', '#previewActionLabel', '#fsBtnLabel', '#dmPopupSplitHint', '#feeSplitNoticeText'
         ];
 
+        let _isApplyingI18n = false;
+        let _inflowI18nTimer = null;
+
         function inflowApplyI18n(lang) {
             if (!lang) lang = localStorage.getItem('inflow_app_lang') || 'en';
             const isKhmer = (lang === 'km');
 
-            document.documentElement.setAttribute('data-lang', lang);
-            document.documentElement.setAttribute('lang', lang);
+            try {
+                localStorage.setItem('inflow_app_lang', lang);
+                document.cookie = `inflow_lang=${lang}; path=/; max-age=31536000; SameSite=Lax`;
+            } catch (err) {}
 
-            if (isKhmer) {
-                document.body.classList.add('font-khmer-active');
-            } else {
-                document.body.classList.remove('font-khmer-active');
-            }
+            clearTimeout(_inflowI18nTimer);
+            _isApplyingI18n = true;
 
-            // 1. Process structured UI selectors
-            const targetElements = document.querySelectorAll(INFLOW_TRANSLATE_SELECTORS.join(', '));
-            targetElements.forEach(el => {
-                // If element has element children (e.g. SVG icons or badges), translate text nodes or leaf spans
-                const elementChildren = Array.from(el.children).filter(c => c.tagName !== 'SPAN' || c.children.length > 0);
-                const hasSvgOrComplexChildren = elementChildren.some(c => c.tagName === 'SVG' || c.tagName === 'DIV' || c.tagName === 'INPUT');
+            try {
+                document.documentElement.setAttribute('data-lang', lang);
+                document.documentElement.setAttribute('lang', lang);
 
-                if (hasSvgOrComplexChildren) {
-                    // Walk child text nodes and simple span labels without destroying SVG icons
-                    el.childNodes.forEach(child => {
-                        if (child.nodeType === 3) { // TEXT_NODE
-                            const raw = child.nodeValue;
-                            const t = raw.trim();
-                            if (t) {
-                                if (isKhmer) {
-                                    if (!child._origEn) child._origEn = t;
-                                    const match = inflowMatchTranslation(child._origEn, 'km');
-                                    if (match) child.nodeValue = raw.replace(child._origEn, match);
-                                } else {
-                                    if (child._origEn) {
-                                        child.nodeValue = raw.replace(t, child._origEn);
-                                    } else {
-                                        const rev = inflowMatchTranslation(t, 'en');
-                                        if (rev) child.nodeValue = raw.replace(t, rev);
-                                    }
-                                }
-                            }
-                        } else if (child.nodeType === 1 && child.tagName === 'SPAN' && child.children.length === 0) {
-                            const raw = child.textContent;
-                            const t = raw.trim();
-                            if (t) {
-                                if (isKhmer) {
-                                    if (!child.hasAttribute('data-i18n-orig')) child.setAttribute('data-i18n-orig', t);
-                                    const orig = child.getAttribute('data-i18n-orig');
-                                    const match = inflowMatchTranslation(orig, 'km');
-                                    if (match) child.textContent = match;
-                                } else {
-                                    if (child.hasAttribute('data-i18n-orig')) {
-                                        child.textContent = child.getAttribute('data-i18n-orig');
-                                    } else {
-                                        const rev = inflowMatchTranslation(t, 'en');
-                                        if (rev) child.textContent = rev;
-                                    }
-                                }
-                            }
-                        }
-                    });
+                if (isKhmer) {
+                    document.body.classList.add('font-khmer-active');
                 } else {
-                    // Leaf or simple element
-                    const raw = el.textContent;
-                    const t = raw.trim();
-                    if (t) {
-                        if (isKhmer) {
-                            if (!el.hasAttribute('data-i18n-orig')) el.setAttribute('data-i18n-orig', t);
-                            const orig = el.getAttribute('data-i18n-orig');
-                            const match = inflowMatchTranslation(orig, 'km');
-                            if (match) el.textContent = match;
-                        } else {
-                            if (el.hasAttribute('data-i18n-orig')) {
-                                el.textContent = el.getAttribute('data-i18n-orig');
+                    document.body.classList.remove('font-khmer-active');
+                }
+
+                // 1. Process structured UI selectors
+                const targetElements = document.querySelectorAll(INFLOW_TRANSLATE_SELECTORS.join(', '));
+                targetElements.forEach(el => {
+                    // If element has element children (e.g. SVG icons or badges), translate text nodes or leaf spans
+                    const elementChildren = Array.from(el.children).filter(c => c.tagName !== 'SPAN' || c.children.length > 0);
+                    const hasSvgOrComplexChildren = elementChildren.some(c => c.tagName === 'SVG' || c.tagName === 'DIV' || c.tagName === 'INPUT');
+
+                    if (hasSvgOrComplexChildren) {
+                        // Walk child text nodes and simple span labels without destroying SVG icons
+                        el.childNodes.forEach(child => {
+                            if (child.nodeType === 3) { // TEXT_NODE
+                                const raw = child.nodeValue;
+                                const t = raw.trim();
+                                if (t) {
+                                    if (isKhmer) {
+                                        if (!child._origEn) child._origEn = t;
+                                        const match = inflowMatchTranslation(child._origEn, 'km');
+                                        if (match) child.nodeValue = raw.replace(child._origEn, match);
+                                    } else {
+                                        if (child._origEn) {
+                                            child.nodeValue = raw.replace(t, child._origEn);
+                                        } else {
+                                            const rev = inflowMatchTranslation(t, 'en');
+                                            if (rev) child.nodeValue = raw.replace(t, rev);
+                                        }
+                                    }
+                                }
+                            } else if (child.nodeType === 1 && child.tagName === 'SPAN' && child.children.length === 0) {
+                                const raw = child.textContent;
+                                const t = raw.trim();
+                                if (t) {
+                                    if (isKhmer) {
+                                        if (!child.hasAttribute('data-i18n-orig')) child.setAttribute('data-i18n-orig', t);
+                                        const orig = child.getAttribute('data-i18n-orig');
+                                        const match = inflowMatchTranslation(orig, 'km');
+                                        if (match) child.textContent = match;
+                                    } else {
+                                        if (child.hasAttribute('data-i18n-orig')) {
+                                            child.textContent = child.getAttribute('data-i18n-orig');
+                                        } else {
+                                            const rev = inflowMatchTranslation(t, 'en');
+                                            if (rev) child.textContent = rev;
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } else {
+                        // Leaf or simple element
+                        const raw = el.textContent;
+                        const t = raw.trim();
+                        if (t) {
+                            if (isKhmer) {
+                                if (!el.hasAttribute('data-i18n-orig')) el.setAttribute('data-i18n-orig', t);
+                                const orig = el.getAttribute('data-i18n-orig');
+                                const match = inflowMatchTranslation(orig, 'km');
+                                if (match) el.textContent = match;
                             } else {
-                                const rev = inflowMatchTranslation(t, 'en');
-                                if (rev) el.textContent = rev;
+                                if (el.hasAttribute('data-i18n-orig')) {
+                                    el.textContent = el.getAttribute('data-i18n-orig');
+                                } else {
+                                    const rev = inflowMatchTranslation(t, 'en');
+                                    if (rev) el.textContent = rev;
+                                }
                             }
                         }
                     }
-                }
-            });
+                });
 
-            // 2. Translate Input and Textarea Placeholders
-            document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(input => {
-                const ph = input.placeholder.trim();
-                if (!ph) return;
-                if (isKhmer) {
-                    if (!input.hasAttribute('data-i18n-orig-ph')) input.setAttribute('data-i18n-orig-ph', ph);
-                    const origPh = input.getAttribute('data-i18n-orig-ph');
-                    const match = inflowMatchTranslation(origPh, 'km');
-                    if (match) input.placeholder = match;
-                } else {
-                    if (input.hasAttribute('data-i18n-orig-ph')) {
-                        input.placeholder = input.getAttribute('data-i18n-orig-ph');
+                // 2. Translate Input and Textarea Placeholders
+                document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(input => {
+                    const ph = input.placeholder.trim();
+                    if (!ph) return;
+                    if (isKhmer) {
+                        if (!input.hasAttribute('data-i18n-orig-ph')) input.setAttribute('data-i18n-orig-ph', ph);
+                        const origPh = input.getAttribute('data-i18n-orig-ph');
+                        const match = inflowMatchTranslation(origPh, 'km');
+                        if (match) input.placeholder = match;
                     } else {
-                        const rev = inflowMatchTranslation(ph, 'en');
-                        if (rev) input.placeholder = rev;
+                        if (input.hasAttribute('data-i18n-orig-ph')) {
+                            input.placeholder = input.getAttribute('data-i18n-orig-ph');
+                        } else {
+                            const rev = inflowMatchTranslation(ph, 'en');
+                            if (rev) input.placeholder = rev;
+                        }
                     }
-                }
-            });
+                });
 
-            // 3. Translate Select Dropdown Options
-            document.querySelectorAll('select option').forEach(opt => {
-                const txt = opt.text.trim();
-                if (!txt) return;
-                if (isKhmer) {
-                    if (!opt.hasAttribute('data-i18n-orig')) opt.setAttribute('data-i18n-orig', txt);
-                    const orig = opt.getAttribute('data-i18n-orig');
-                    const match = inflowMatchTranslation(orig, 'km');
-                    if (match) opt.text = match;
-                } else {
-                    if (opt.hasAttribute('data-i18n-orig')) {
-                        opt.text = opt.getAttribute('data-i18n-orig');
+                // 3. Translate Select Dropdown Options
+                document.querySelectorAll('select option').forEach(opt => {
+                    const txt = opt.text.trim();
+                    if (!txt) return;
+                    if (isKhmer) {
+                        if (!opt.hasAttribute('data-i18n-orig')) opt.setAttribute('data-i18n-orig', txt);
+                        const orig = opt.getAttribute('data-i18n-orig');
+                        const match = inflowMatchTranslation(orig, 'km');
+                        if (match) opt.text = match;
                     } else {
-                        const rev = inflowMatchTranslation(txt, 'en');
-                        if (rev) opt.text = rev;
+                        if (opt.hasAttribute('data-i18n-orig')) {
+                            opt.text = opt.getAttribute('data-i18n-orig');
+                        } else {
+                            const rev = inflowMatchTranslation(txt, 'en');
+                            if (rev) opt.text = rev;
+                        }
                     }
-                }
-            });
+                });
+            } finally {
+                setTimeout(function() {
+                    _isApplyingI18n = false;
+                }, 80);
+            }
         }
 
         window.inflowApplyI18n = inflowApplyI18n;
 
         // Debounced MutationObserver for dynamic modals & table rows
-        let _inflowI18nTimer = null;
         if (typeof MutationObserver !== 'undefined') {
             const observer = new MutationObserver(function() {
+                if (_isApplyingI18n) return;
                 const currentLang = localStorage.getItem('inflow_app_lang') || 'en';
                 if (currentLang === 'km') {
                     clearTimeout(_inflowI18nTimer);
                     _inflowI18nTimer = setTimeout(function() {
-                        inflowApplyI18n('km');
+                        if (!_isApplyingI18n) {
+                            inflowApplyI18n('km');
+                        }
                     }, 60);
                 }
             });
@@ -1325,6 +1344,10 @@
         // Listen for language change from host window (inside iframe)
         window.addEventListener('message', function(e) {
             if (e.data && e.data.type === 'INFLOW_LANG_CHANGE') {
+                try {
+                    localStorage.setItem('inflow_app_lang', e.data.lang);
+                } catch(err) {}
+                clearTimeout(_inflowI18nTimer);
                 inflowApplyI18n(e.data.lang);
             }
         });

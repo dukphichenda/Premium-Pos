@@ -23,17 +23,19 @@ echo   [1] Push all changes to GitHub (Auto-triggers Vercel if connected)
 echo   [2] Deploy directly to Vercel (using Vercel CLI)
 echo   [3] All-In-One: Push to GitHub AND Deploy to Vercel
 echo   [4] Check Git Status ^& Remote URLs
-echo   [5] Exit
+echo   [5] Upload Local Database to Neon.tech Cloud
+echo   [6] Exit
 echo.
-set /p CHOICE="Select an option (1-5) [default: 1]: "
+set /p CHOICE="Select an option (1-6) [default: 1]: "
 if "%CHOICE%"=="" set CHOICE=1
 
 if "%CHOICE%"=="1" goto PUSH_GITHUB
 if "%CHOICE%"=="2" goto DEPLOY_VERCEL
 if "%CHOICE%"=="3" goto ALL_IN_ONE
 if "%CHOICE%"=="4" goto CHECK_STATUS
-if "%CHOICE%"=="5" goto EXIT
-echo Invalid choice. Please select 1, 2, 3, 4, or 5.
+if "%CHOICE%"=="5" goto UPLOAD_NEON
+if "%CHOICE%"=="6" goto EXIT
+echo Invalid choice. Please select 1 to 6.
 echo.
 goto MENU
 
@@ -126,6 +128,10 @@ echo Remotes:
 git remote -v
 echo.
 pause
+goto MENU
+
+:UPLOAD_NEON
+call "%~dp0upload_to_neon.bat"
 goto MENU
 
 :EXIT
