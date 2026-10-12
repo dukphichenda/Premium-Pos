@@ -131,6 +131,15 @@ def init_db():
                 if cur.fetchone()[0] == 0:
                     cur.execute("INSERT INTO locations (name, code, is_default) VALUES ('Central Warehouse', 'MAIN', TRUE);")
 
+                cur.execute("SELECT COUNT(*) FROM branches;")
+                if cur.fetchone()[0] == 0:
+                    cur.execute("""
+                        INSERT INTO branches (code, name, manager_name, phone, so_prefix, is_active)
+                        VALUES ('HQ', 'Main Store HQ (កណ្តាល)', 'HQ Admin', '+855 23 888 999', 'SO-', TRUE),
+                               ('TK', 'Toul Kork Branch (ទួលគោក)', 'Branch Manager', '+855 12 345 678', 'SO-TK-', TRUE)
+                        ON CONFLICT DO NOTHING;
+                    """)
+
                 cur.execute("SELECT COUNT(*) FROM users;")
                 if cur.fetchone()[0] == 0:
                     from werkzeug.security import generate_password_hash

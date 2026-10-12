@@ -19,7 +19,12 @@ class Config:
     DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() in ('true', '1', 'yes')
 
     # PostgreSQL Database Configuration (supports local and cloud like Neon / Supabase / Vercel Postgres)
-    _db_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+    _db_url = (
+        os.environ.get('DATABASE_URL') or 
+        os.environ.get('POSTGRES_URL') or 
+        os.environ.get('POSTGRES_URL_NON_POOLING') or 
+        os.environ.get('POSTGRES_PRISMA_URL')
+    )
     RAW_DB_URL = _db_url
     IS_CLOUD_DB = bool(_db_url)
     IS_VERCEL = bool(os.environ.get('VERCEL'))
