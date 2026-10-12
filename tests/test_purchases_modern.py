@@ -208,5 +208,63 @@ class TestPurchasesModern(unittest.TestCase):
         execute("DELETE FROM purchase_order_lines WHERE purchase_order_id IN (%s, %s)", (po_id, new_po['id']))
         execute("DELETE FROM purchase_orders WHERE id IN (%s, %s)", (po_id, new_po['id']))
 
+    def test_vendor_summary_api(self):
+        """API should return vendor summary for the yellow Vendor Info Popover Card"""
+        res = self.client.get(f'/api/vendors/{self.vend_id}/summary')
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data.get('success'))
+        self.assertIn('vendor', data)
+        self.assertEqual(data['vendor']['name'], 'Modern Test Supplier Ltd')
+        self.assertIn('balance', data['vendor'])
+        self.assertIn('last_order_status', data['vendor'])
+
+    def test_purchases_drawer_api(self):
+        """Drawer API should return list of purchase orders for sidebar table"""
+        res = self.client.get('/api/purchases/drawer?date_filter=All&status_filter=All')
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertTrue(data.get('success'))
+        self.assertIsInstance(data.get('orders'), list)
+
+    def test_new_purchase_order_page_rendering(self):
+        """GET /purchases/new should render modern detail.html with preview PO number and drawer data"""
+        res = self.client.get('/purchases/new')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b'inflow-po-workspace', res.data)
+        self.assertIn(b'Vendor Information', res.data)
+        self.assertIn(b'Vendor Product Code', res.data)
+
+    def test_save_po_with_vendor_product_code(self):
+        """Saving PO with lines_json and vendor_product_code should persist correctly"""
+        import json
+        lines_data = [{
+            'product_id': self.prod_low,
+            'description': 'Low Stock Item Custom Desc',
+            'vendor_product_code': 'VEND-SKU-7788',
+            'quantity': 5,
+            'unit_cost': 16.50,
+            'discount_percent': 0.0
+        }]
+        res = self.client.post('/purchases/create', data={
+            'vendor_id': self.vend_id,
+            'location_id': self.loc_main,
+            'order_date': '2026-10-13',
+            'lines_json': json.dumps(lines_data),
+            'notes': 'Test Modern PO with Vendor Product Code'
+        }, follow_redirects=True)
+        self.assertEqual(res.status_code, 200)
+
+        saved_po = query_one("SELECT * FROM purchase_orders WHERE notes = 'Test Modern PO with Vendor Product Code'")
+        self.assertIsNotNone(saved_po)
+        saved_line = query_one("SELECT * FROM purchase_order_lines WHERE purchase_order_id = %s", (saved_po['id'],))
+        self.assertIsNotNone(saved_line)
+        self.assertEqual(saved_line['vendor_product_code'], 'VEND-SKU-7788')
+
+        # Clean up
+        execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = %s", (saved_po['id'],))
+        execute("DELETE FROM purchase_orders WHERE id = %s", (saved_po['id'],))
+
 if __name__ == '__main__':
     unittest.main()
+

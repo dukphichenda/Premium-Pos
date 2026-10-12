@@ -108,12 +108,206 @@ def list_purchases():
                            stats_dict=stats_dict,
                            kpi=kpi_raw)
 
+def _get_po_drawer_data(date_filter='All', status_filter='Open, In Progress', vendor_search='', order_search=''):
+    where_clauses = ["1=1"]
+    params = []
+
+    if order_search:
+        where_clauses.append("(po.order_number ILIKE %s OR COALESCE(po.vendor_invoice_no, '') ILIKE %s)")
+        sp = f"%{order_search}%"
+        params.extend([sp, sp])
+
+    if vendor_search:
+        if str(vendor_search).isdigit():
+            where_clauses.append("po.vendor_id = %s")
+            params.append(int(vendor_search))
+        else:
+            where_clauses.append("v.name ILIKE %s")
+            params.append(f"%{vendor_search}%")
+
+    if date_filter == 'Today':
+        where_clauses.append("po.order_date = CURRENT_DATE")
+    elif date_filter == 'This Week':
+        where_clauses.append("date_trunc('week', po.order_date::timestamp) = date_trunc('week', CURRENT_DATE::timestamp)")
+    elif date_filter == 'This Month':
+        where_clauses.append("date_trunc('month', po.order_date::timestamp) = date_trunc('month', CURRENT_DATE::timestamp)")
+    elif date_filter == 'This Quarter':
+        where_clauses.append("date_trunc('quarter', po.order_date::timestamp) = date_trunc('quarter', CURRENT_DATE::timestamp)")
+    elif date_filter == 'This Year':
+        where_clauses.append("date_trunc('year', po.order_date::timestamp) = date_trunc('year', CURRENT_DATE::timestamp)")
+    elif date_filter == 'Yesterday':
+        where_clauses.append("po.order_date = CURRENT_DATE - INTERVAL '1 day'")
+    elif date_filter == 'Last Week':
+        where_clauses.append("date_trunc('week', po.order_date::timestamp) = date_trunc('week', CURRENT_DATE::timestamp - INTERVAL '1 week')")
+    elif date_filter == 'Last Month':
+        where_clauses.append("date_trunc('month', po.order_date::timestamp) = date_trunc('month', CURRENT_DATE::timestamp - INTERVAL '1 month')")
+    elif date_filter == 'Last Quarter':
+        where_clauses.append("date_trunc('quarter', po.order_date::timestamp) = date_trunc('quarter', CURRENT_DATE::timestamp - INTERVAL '3 months')")
+    elif date_filter == 'Last Year':
+        where_clauses.append("date_trunc('year', po.order_date::timestamp) = date_trunc('year', CURRENT_DATE::timestamp - INTERVAL '1 year')")
+    elif date_filter == 'Last 7 Days':
+        where_clauses.append("po.order_date >= CURRENT_DATE - INTERVAL '7 days' AND po.order_date <= CURRENT_DATE")
+    elif date_filter == 'Last 30 Days':
+        where_clauses.append("po.order_date >= CURRENT_DATE - INTERVAL '30 days' AND po.order_date <= CURRENT_DATE")
+
+    if status_filter and status_filter.strip() != 'All':
+        parts = [p.strip() for p in status_filter.split(',') if p.strip()]
+        status_clauses = []
+        for p in parts:
+            if p == 'Open':
+                status_clauses.append("po.status = 'ISSUED'")
+            elif p in ('In Progress', 'Partial'):
+                status_clauses.append("po.status = 'PARTIAL_RECEIVED'")
+            elif p == 'Received':
+                status_clauses.append("po.status = 'RECEIVED'")
+            elif p == 'Paid':
+                status_clauses.append("(po.status = 'PAID' OR po.payment_status = 'PAID')")
+            elif p == 'Cancelled':
+                status_clauses.append("po.status = 'CANCELLED'")
+        if status_clauses:
+            where_clauses.append("(" + " OR ".join(status_clauses) + ")")
+
+    sql = f"""
+        SELECT 
+            po.id, po.order_number, po.order_date, po.status, po.payment_status,
+            po.vendor_id, po.location_id, po.vendor_invoice_no, po.expected_date,
+            po.subtotal, po.shipping_fee, po.discount_amount, po.total_amount,
+            po.paid_amount, po.balance_due,
+            v.name as vendor_name,
+            l.name as location_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN locations l ON po.location_id = l.id
+        WHERE {' AND '.join(where_clauses)}
+        ORDER BY po.order_date DESC, po.id DESC
+        LIMIT 300;
+    """
+    sidebar_orders = query_all(sql, tuple(params))
+
+    vendors_sql = """
+        SELECT 
+            v.id, v.name, v.phone, v.contact_name, v.balance, v.address1, v.payment_terms,
+            last_po.order_number as last_order_number,
+            last_po.order_date as last_order_date,
+            last_po.status as last_order_status,
+            last_po.total_amount as last_order_total
+        FROM vendors v
+        LEFT JOIN LATERAL (
+            SELECT order_number, order_date, status, total_amount
+            FROM purchase_orders
+            WHERE vendor_id = v.id
+            ORDER BY order_date DESC, id DESC
+            LIMIT 1
+        ) last_po ON TRUE
+        WHERE v.is_active = TRUE
+        ORDER BY v.name ASC;
+    """
+    all_vendors = query_all(vendors_sql)
+
+    all_locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC;")
+
+    products_sql = """
+        SELECT 
+            p.id, p.sku, p.name, p.barcode, p.uom,
+            COALESCE(p.last_purchase_cost, p.average_cost, p.standard_cost, 0) as cost_price,
+            COALESCE(p.default_price, 0) as unit_price,
+            COALESCE(inv.total_qty, 0) as on_hand
+        FROM products p
+        LEFT JOIN (
+            SELECT product_id, SUM(quantity) as total_qty FROM inventory GROUP BY product_id
+        ) inv ON p.id = inv.product_id
+        WHERE p.is_active = TRUE
+        ORDER BY p.name ASC;
+    """
+    all_products = query_all(products_sql)
+
+    return {
+        'sidebar_orders': sidebar_orders,
+        'all_vendors': all_vendors,
+        'all_locations': all_locations,
+        'all_products': all_products
+    }
+
+@purchase_orders_bp.route('/api/vendors/<int:id>/summary')
+def api_vendor_summary(id):
+    v = query_one("""
+        SELECT 
+            v.id, v.name, v.phone, v.contact_name, v.balance, v.address1, v.payment_terms,
+            last_po.order_number as last_order_number,
+            last_po.order_date as last_order_date,
+            last_po.status as last_order_status,
+            last_po.total_amount as last_order_total
+        FROM vendors v
+        LEFT JOIN LATERAL (
+            SELECT order_number, order_date, status, total_amount
+            FROM purchase_orders
+            WHERE vendor_id = v.id
+            ORDER BY order_date DESC, id DESC
+            LIMIT 1
+        ) last_po ON TRUE
+        WHERE v.id = %s;
+    """, (id,))
+    if not v:
+        return jsonify({'success': False, 'message': 'Vendor not found'}), 404
+    
+    last_status = v['last_order_status']
+    if last_status == 'ISSUED':
+        last_status = 'Open'
+    elif last_status == 'PARTIAL_RECEIVED':
+        last_status = 'In Progress'
+
+    return jsonify({
+        'success': True,
+        'vendor': {
+            'id': v['id'],
+            'name': v['name'],
+            'contact_name': v['contact_name'] or '',
+            'phone': v['phone'] or '',
+            'address': v['address1'] or '',
+            'balance': float(v['balance'] or 0),
+            'payment_terms': v['payment_terms'] or 'Net 30',
+            'last_order_number': v['last_order_number'] or '',
+            'last_order_date': v['last_order_date'].strftime('%d-%b-%y') if v['last_order_date'] else '',
+            'last_order_status': last_status or '',
+            'last_order_total': float(v['last_order_total'] or 0)
+        }
+    })
+
+@purchase_orders_bp.route('/api/purchases/drawer')
+def api_purchases_drawer():
+    date_filter = request.args.get('date_filter', 'All')
+    status_filter = request.args.get('status_filter', 'Open, In Progress')
+    vendor_search = request.args.get('vendor_search', '')
+    order_search = request.args.get('order_search', '')
+    data = _get_po_drawer_data(date_filter, status_filter, vendor_search, order_search)
+    return jsonify({
+        'success': True,
+        'orders': [{
+            'id': o['id'],
+            'order_number': o['order_number'],
+            'order_date': o['order_date'].strftime('%d-%b-%y') if o['order_date'] else '',
+            'status': 'Open' if o['status'] == 'ISSUED' else ('In Progress' if o['status'] == 'PARTIAL_RECEIVED' else o['status']),
+            'vendor_name': o['vendor_name'] or '',
+            'vendor_invoice_no': o['vendor_invoice_no'] or '',
+            'location_name': o['location_name'] or '',
+            'expected_date': o['expected_date'].strftime('%d-%b-%y') if o['expected_date'] else '',
+            'total_amount': float(o['total_amount'] or 0),
+            'paid_amount': float(o['paid_amount'] or 0),
+            'balance_due': float(o['balance_due'] or 0)
+        } for o in data['sidebar_orders']]
+    })
+
+@purchase_orders_bp.route('/purchases/new')
 @purchase_orders_bp.route('/purchases/create', methods=['GET', 'POST'])
 def create_purchase():
     if request.method == 'GET':
-        vendors = query_all("SELECT id, name, phone, email, address1, balance, payment_terms FROM vendors WHERE is_active = TRUE ORDER BY name")
-        locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
-        
+        date_filter = request.args.get('date_filter', 'All')
+        status_filter = request.args.get('status_filter', 'Open, In Progress')
+        vendor_search = request.args.get('vendor_search', '')
+        order_search = request.args.get('order_search', '')
+
+        drawer_data = _get_po_drawer_data(date_filter, status_filter, vendor_search, order_search)
+
         # Calculate preview PO number
         try:
             seq_res = query_one("SELECT last_value, is_called FROM po_number_seq;")
@@ -124,6 +318,11 @@ def create_purchase():
         except Exception:
             next_num = 1
         preview_po_number = f"PO-{next_num:06d}"
+
+        prefill_vendor_id = request.args.get('vendor_id')
+        prefill_vendor = None
+        if prefill_vendor_id and str(prefill_vendor_id).isdigit():
+            prefill_vendor = next((v for v in drawer_data['all_vendors'] if v['id'] == int(prefill_vendor_id)), None)
 
         prefill_prod_id = request.args.get('product_id')
         prefill_prod = None
@@ -136,15 +335,75 @@ def create_purchase():
                 LEFT JOIN (SELECT product_id, SUM(quantity) as total_qty FROM inventory GROUP BY product_id) inv ON p.id = inv.product_id
                 WHERE p.id = %s
             """, (prefill_prod_id,))
-        
-        prefill_vendor_id = request.args.get('vendor_id')
 
-        return render_template('purchases/create.html', 
-                               vendors=vendors, 
-                               locations=locations, 
-                               prefill_prod=prefill_prod,
-                               prefill_vendor_id=prefill_vendor_id,
-                               preview_po_number=preview_po_number)
+        default_location = next((l['id'] for l in drawer_data['all_locations'] if l.get('is_default')), drawer_data['all_locations'][0]['id'] if drawer_data['all_locations'] else 1)
+
+        draft_order = {
+            'id': 0,
+            'order_number': preview_po_number,
+            'order_date': date.today(),
+            'status': 'ISSUED',
+            'payment_status': 'UNPAID',
+            'vendor_id': prefill_vendor['id'] if prefill_vendor else None,
+            'vendor_name': prefill_vendor['name'] if prefill_vendor else '',
+            'contact': prefill_vendor['contact_name'] if prefill_vendor else '',
+            'phone': prefill_vendor['phone'] if prefill_vendor else '',
+            'vendor_address': prefill_vendor['address1'] if prefill_vendor else '',
+            'location_id': default_location,
+            'carrier': '',
+            'vendor_invoice_no': '',
+            'subtotal': 0.0,
+            'shipping_fee': 0.0,
+            'discount_amount': 0.0,
+            'total_amount': 0.0,
+            'paid_amount': 0.0,
+            'balance_due': 0.0,
+            'notes': '',
+            'non_vendor_costs': 0.0,
+            'currency_code': 'USD'
+        }
+
+        lines = []
+        if prefill_prod:
+            lines.append({
+                'id': 0,
+                'line_num': 1,
+                'product_id': prefill_prod['id'],
+                'product_sku': prefill_prod['sku'],
+                'product_name': prefill_prod['name'],
+                'product_barcode': prefill_prod['barcode'],
+                'product_uom': prefill_prod['uom'],
+                'vendor_product_code': '',
+                'description': prefill_prod['name'],
+                'quantity': 1,
+                'unit_cost': float(prefill_prod['purchase_cost']),
+                'discount_percent': 0.0,
+                'subtotal': float(prefill_prod['purchase_cost']),
+                'received_qty': 0.0,
+                'on_hand_stock': float(prefill_prod['on_hand'])
+            })
+            draft_order['subtotal'] = float(prefill_prod['purchase_cost'])
+            draft_order['total_amount'] = float(prefill_prod['purchase_cost'])
+            draft_order['balance_due'] = float(prefill_prod['purchase_cost'])
+
+        company = query_one("SELECT * FROM companies LIMIT 1")
+
+        return render_template('purchases/detail.html',
+                               is_new=True,
+                               order=draft_order,
+                               lines=lines,
+                               payments=[],
+                               inventory_logs=[],
+                               total_qty_ordered=sum(l['quantity'] for l in lines),
+                               total_qty_received=0,
+                               receiving_percent=0,
+                               company=company,
+                               date_filter=date_filter,
+                               status_filter=status_filter,
+                               vendor_search=vendor_search,
+                               order_search=order_search,
+                               preview_po_number=preview_po_number,
+                               **drawer_data)
 
     is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
     try:
@@ -175,22 +434,41 @@ def create_purchase():
         carrier = (data.get('carrier') or '').strip()
         vendor_invoice_no = (data.get('vendor_invoice_no') or '').strip()
         notes = (data.get('notes') or '').strip()
+        contact = (data.get('contact') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        vendor_address = (data.get('vendor_address') or '').strip()
+        non_vendor_costs = max(0.0, float(data.get('non_vendor_costs') or 0))
+        currency_code = (data.get('currency_code') or 'USD').strip()
         shipping_fee = max(0.0, float(data.get('shipping_fee') or 0))
         discount_amount = max(0.0, float(data.get('discount_amount') or 0))
 
-        if isinstance(data, dict) and 'lines' in data:
+        # Flexible line parsing supporting lines_json, JSON payload, or form arrays
+        lines_json_raw = data.get('lines_json')
+        if lines_json_raw:
+            try:
+                import json
+                raw_lines = json.loads(lines_json_raw)
+            except Exception:
+                raw_lines = []
+        elif isinstance(data, dict) and 'lines' in data:
             raw_lines = data.get('lines', [])
+        else:
+            raw_lines = None
+
+        if raw_lines is not None:
             prod_ids = [l.get('product_id') for l in raw_lines]
             quantities = [l.get('quantity') for l in raw_lines]
             unit_costs = [l.get('unit_cost') if l.get('unit_cost') is not None else (l.get('unit_price') if l.get('unit_price') is not None else l.get('cost', 0)) for l in raw_lines]
             discounts = [l.get('discount_percent', 0) for l in raw_lines]
             descriptions = [l.get('description', '') for l in raw_lines]
+            vendor_codes = [l.get('vendor_product_code', '') for l in raw_lines]
         else:
             prod_ids = request.form.getlist('product_id[]')
             quantities = request.form.getlist('quantity[]')
             unit_costs = request.form.getlist('unit_cost[]') or request.form.getlist('unit_price[]') or request.form.getlist('cost[]')
             discounts = request.form.getlist('discount_percent[]')
             descriptions = request.form.getlist('description[]')
+            vendor_codes = request.form.getlist('vendor_product_code[]')
 
         if not prod_ids:
             if is_ajax:
@@ -212,10 +490,11 @@ def create_purchase():
             cost = max(0.0, float(unit_costs[idx] or 0))
             disc_pct = max(0.0, min(100.0, float(discounts[idx] if idx < len(discounts) and discounts[idx] else 0)))
             desc = descriptions[idx] if idx < len(descriptions) else ''
+            vcode = vendor_codes[idx] if idx < len(vendor_codes) else ''
             
             line_sub = qty * cost * (1.0 - (disc_pct / 100.0))
             subtotal += line_sub
-            lines_data.append((idx + 1, pid, desc, qty, cost, disc_pct, line_sub))
+            lines_data.append((idx + 1, pid, desc, vcode, qty, cost, disc_pct, line_sub))
 
         total_amount = max(0.0, subtotal + shipping_fee - discount_amount)
         balance_due = total_amount
@@ -224,20 +503,21 @@ def create_purchase():
             cur.execute("""
                 INSERT INTO purchase_orders (
                     order_number, vendor_id, location_id, order_date, expected_date,
-                    carrier, vendor_invoice_no, status, payment_status, 
-                    subtotal, shipping_fee, discount_amount, total_amount, paid_amount, balance_due, notes
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, 'ISSUED', 'UNPAID', %s, %s, %s, %s, 0, %s, %s)
+                    carrier, vendor_invoice_no, contact, phone, vendor_address, non_vendor_costs, currency_code,
+                    status, payment_status, subtotal, shipping_fee, discount_amount, total_amount, paid_amount, balance_due, notes
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'ISSUED', 'UNPAID', %s, %s, %s, %s, 0, %s, %s)
                 RETURNING id;
             """, (order_number, vendor_id, location_id, order_date, expected_date, 
-                  carrier, vendor_invoice_no, subtotal, shipping_fee, discount_amount, total_amount, balance_due, notes))
+                  carrier, vendor_invoice_no, contact, phone, vendor_address, non_vendor_costs, currency_code,
+                  subtotal, shipping_fee, discount_amount, total_amount, balance_due, notes))
             po_id = cur.fetchone()['id']
 
             for line in lines_data:
                 cur.execute("""
                     INSERT INTO purchase_order_lines (
-                        purchase_order_id, line_num, product_id, description, quantity, unit_cost, discount_percent, subtotal, received_qty
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 0);
-                """, (po_id, line[0], line[1], line[2], line[3], line[4], line[5], line[6]))
+                        purchase_order_id, line_num, product_id, description, vendor_product_code, quantity, unit_cost, discount_percent, subtotal, received_qty
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 0);
+                """, (po_id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7]))
 
             # Update vendor open balance
             cur.execute("""
@@ -269,9 +549,9 @@ def detail_purchase(id):
         SELECT 
             po.*,
             v.name as vendor_name,
-            v.phone as vendor_phone,
-            v.email as vendor_email,
-            v.address1 as vendor_address,
+            COALESCE(po.contact, v.contact_name, '') as contact,
+            COALESCE(po.phone, v.phone, '') as phone,
+            COALESCE(po.vendor_address, v.address1, '') as vendor_address,
             v.balance as vendor_balance,
             v.payment_terms as vendor_payment_terms,
             l.name as location_name
@@ -284,6 +564,13 @@ def detail_purchase(id):
     if not order:
         flash("Purchase order not found.", "error")
         return redirect(url_for('purchase_orders.list_purchases'))
+
+    date_filter = request.args.get('date_filter', 'All')
+    status_filter = request.args.get('status_filter', 'Open, In Progress')
+    vendor_search = request.args.get('vendor_search', '')
+    order_search = request.args.get('order_search', '')
+
+    drawer_data = _get_po_drawer_data(date_filter, status_filter, vendor_search, order_search)
 
     lines = query_all("""
         SELECT 
@@ -321,8 +608,6 @@ def detail_purchase(id):
         ORDER BY il.id DESC
     """, (order['order_number'],))
 
-    vendors = query_all("SELECT id, name, phone, email, address1, balance, payment_terms FROM vendors WHERE is_active = TRUE ORDER BY name")
-    locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     company = query_one("SELECT * FROM companies LIMIT 1")
 
     # Receiving summary
@@ -331,19 +616,28 @@ def detail_purchase(id):
     receiving_percent = int((total_qty_received / total_qty_ordered * 100) if total_qty_ordered > 0 else 0)
 
     return render_template('purchases/detail.html', 
+                           is_new=False,
                            order=order, 
                            lines=lines, 
                            payments=payments,
                            inventory_logs=inventory_logs,
-                           vendors=vendors,
-                           locations=locations,
                            company=company,
                            total_qty_ordered=total_qty_ordered,
                            total_qty_received=total_qty_received,
-                           receiving_percent=receiving_percent)
+                           receiving_percent=receiving_percent,
+                           date_filter=date_filter,
+                           status_filter=status_filter,
+                           vendor_search=vendor_search,
+                           order_search=order_search,
+                           preview_po_number=order['order_number'],
+                           **drawer_data)
 
+@purchase_orders_bp.route('/purchases/<int:id>/save', methods=['POST'])
 @purchase_orders_bp.route('/purchases/<int:id>/update', methods=['POST'])
 def update_purchase(id):
+    if id == 0:
+        return create_purchase()
+
     order = query_one("SELECT * FROM purchase_orders WHERE id = %s", (id,))
     if not order:
         return jsonify({'success': False, 'message': 'Purchase order not found.'}), 404
@@ -358,6 +652,11 @@ def update_purchase(id):
         notes = (data.get('notes') or '').strip()
         carrier = (data.get('carrier') or '').strip()
         vendor_invoice_no = (data.get('vendor_invoice_no') or '').strip()
+        contact = (data.get('contact') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        vendor_address = (data.get('vendor_address') or '').strip()
+        non_vendor_costs = max(0.0, float(data.get('non_vendor_costs') or 0))
+        currency_code = (data.get('currency_code') or 'USD').strip()
         raw_expected_date = data.get('expected_date')
         expected_date = None
         if raw_expected_date:
@@ -372,9 +671,11 @@ def update_purchase(id):
         if order['status'] in ('RECEIVED', 'PAID'):
             execute("""
                 UPDATE purchase_orders 
-                SET expected_date = %s, carrier = %s, vendor_invoice_no = %s, notes = %s, updated_at = CURRENT_TIMESTAMP
+                SET expected_date = %s, carrier = %s, vendor_invoice_no = %s, notes = %s,
+                    contact = %s, phone = %s, vendor_address = %s, non_vendor_costs = %s, currency_code = %s,
+                    updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (expected_date, carrier, vendor_invoice_no, notes, id))
+            """, (expected_date, carrier, vendor_invoice_no, notes, contact, phone, vendor_address, non_vendor_costs, currency_code, id))
             if is_ajax:
                 return jsonify({'success': True, 'message': 'Purchase order updated successfully!'})
             flash("Purchase order notes and details updated.", "success")
@@ -396,19 +697,32 @@ def update_purchase(id):
         shipping_fee = max(0.0, float(data.get('shipping_fee') or 0))
         discount_amount = max(0.0, float(data.get('discount_amount') or 0))
 
-        if isinstance(data, dict) and 'lines' in data:
+        lines_json_raw = data.get('lines_json')
+        if lines_json_raw:
+            try:
+                import json
+                raw_lines = json.loads(lines_json_raw)
+            except Exception:
+                raw_lines = []
+        elif isinstance(data, dict) and 'lines' in data:
             raw_lines = data.get('lines', [])
+        else:
+            raw_lines = None
+
+        if raw_lines is not None:
             prod_ids = [l.get('product_id') for l in raw_lines]
             quantities = [l.get('quantity') for l in raw_lines]
-            unit_costs = [l.get('unit_cost') for l in raw_lines]
+            unit_costs = [l.get('unit_cost') if l.get('unit_cost') is not None else (l.get('unit_price') if l.get('unit_price') is not None else l.get('cost', 0)) for l in raw_lines]
             discounts = [l.get('discount_percent', 0) for l in raw_lines]
             descriptions = [l.get('description', '') for l in raw_lines]
+            vendor_codes = [l.get('vendor_product_code', '') for l in raw_lines]
         else:
             prod_ids = request.form.getlist('product_id[]')
             quantities = request.form.getlist('quantity[]')
-            unit_costs = request.form.getlist('unit_cost[]')
+            unit_costs = request.form.getlist('unit_cost[]') or request.form.getlist('unit_price[]') or request.form.getlist('cost[]')
             discounts = request.form.getlist('discount_percent[]')
             descriptions = request.form.getlist('description[]')
+            vendor_codes = request.form.getlist('vendor_product_code[]')
 
         if not prod_ids:
             if is_ajax:
@@ -426,10 +740,11 @@ def update_purchase(id):
             cost = max(0.0, float(unit_costs[idx] or 0))
             disc_pct = max(0.0, min(100.0, float(discounts[idx] if idx < len(discounts) and discounts[idx] else 0)))
             desc = descriptions[idx] if idx < len(descriptions) else ''
+            vcode = vendor_codes[idx] if idx < len(vendor_codes) else ''
             
             line_sub = qty * cost * (1.0 - (disc_pct / 100.0))
             subtotal += line_sub
-            lines_data.append((idx + 1, pid, desc, qty, cost, disc_pct, line_sub))
+            lines_data.append((idx + 1, pid, desc, vcode, qty, cost, disc_pct, line_sub))
 
         total_amount = max(0.0, subtotal + shipping_fee - discount_amount)
         paid_amount = float(order['paid_amount'] or 0)
@@ -451,11 +766,14 @@ def update_purchase(id):
             cur.execute("""
                 UPDATE purchase_orders 
                 SET vendor_id = %s, location_id = %s, order_date = %s, expected_date = %s,
-                    carrier = %s, vendor_invoice_no = %s, subtotal = %s, shipping_fee = %s,
+                    carrier = %s, vendor_invoice_no = %s, contact = %s, phone = %s, vendor_address = %s,
+                    non_vendor_costs = %s, currency_code = %s,
+                    subtotal = %s, shipping_fee = %s,
                     discount_amount = %s, total_amount = %s, balance_due = %s, payment_status = %s,
                     notes = %s, updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (vendor_id, location_id, order_date, expected_date, carrier, vendor_invoice_no,
+                  contact, phone, vendor_address, non_vendor_costs, currency_code,
                   subtotal, shipping_fee, discount_amount, total_amount, new_balance_due, new_pay_status, notes, id))
 
             # Preserve received_qty if lines already partially received
@@ -467,13 +785,19 @@ def update_purchase(id):
                 rcv_qty = old_lines_rcv.get(line[1], 0.0)
                 cur.execute("""
                     INSERT INTO purchase_order_lines (
-                        purchase_order_id, line_num, product_id, description, quantity, unit_cost, discount_percent, subtotal, received_qty
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """, (id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], rcv_qty))
+                        purchase_order_id, line_num, product_id, description, vendor_product_code, quantity, unit_cost, discount_percent, subtotal, received_qty
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """, (id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], rcv_qty))
 
         if is_ajax:
             return jsonify({'success': True, 'message': 'Purchase order saved successfully!'})
         flash("Purchase order updated successfully!", "success")
+        return redirect(url_for('purchase_orders.detail_purchase', id=id))
+
+    except Exception as e:
+        if is_ajax:
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"Error updating PO: {e}", "error")
         return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
     except Exception as e:
@@ -828,34 +1152,43 @@ def api_quick_create_vendor():
     try:
         data = request.get_json(silent=True) or request.form
         name = (data.get('name') or '').strip()
+        contact_name = (data.get('contact_name') or data.get('contact') or '').strip()
         phone = (data.get('phone') or '').strip()
         email = (data.get('email') or '').strip()
-        address1 = (data.get('address1') or '').strip()
+        address1 = (data.get('address1') or data.get('address') or '').strip()
         payment_terms = (data.get('payment_terms') or 'Net 30').strip()
 
         if not name:
             return jsonify({'success': False, 'message': 'Vendor name is required.'}), 400
 
         # Check existing
-        existing = query_one("SELECT id, name FROM vendors WHERE LOWER(name) = LOWER(%s)", (name,))
+        existing = query_one("SELECT id, name, contact_name, phone, address1 FROM vendors WHERE LOWER(name) = LOWER(%s)", (name,))
         if existing:
             return jsonify({
                 'success': True,
-                'vendor': {'id': existing['id'], 'name': existing['name'], 'phone': phone, 'balance': 0},
+                'vendor': {
+                    'id': existing['id'], 
+                    'name': existing['name'], 
+                    'contact_name': existing['contact_name'] or '',
+                    'phone': existing['phone'] or phone, 
+                    'address1': existing['address1'] or address1,
+                    'balance': 0
+                },
                 'message': 'Vendor already exists and was selected.'
             })
 
         vendor_id = execute_returning_id("""
-            INSERT INTO vendors (name, phone, email, address1, payment_terms, balance, is_active)
-            VALUES (%s, %s, %s, %s, %s, 0, TRUE)
+            INSERT INTO vendors (name, contact_name, phone, email, address1, payment_terms, balance, is_active)
+            VALUES (%s, %s, %s, %s, %s, %s, 0, TRUE)
             RETURNING id;
-        """, (name, phone, email, address1, payment_terms))
+        """, (name, contact_name, phone, email, address1, payment_terms))
 
         return jsonify({
             'success': True,
             'vendor': {
                 'id': vendor_id,
                 'name': name,
+                'contact_name': contact_name,
                 'phone': phone,
                 'email': email,
                 'address1': address1,
