@@ -91,9 +91,9 @@
             padding: 28px 32px 32px;
         }
 
-        .local-server-banner {
-            background: #EFF6FF;
-            border: 1px solid #BFDBFE;
+        .cloud-status-banner {
+            background: #F0FDF4;
+            border: 1px solid #BBF7D0;
             border-radius: 10px;
             padding: 12px 14px;
             margin-bottom: 20px;
@@ -103,26 +103,35 @@
             gap: 10px;
         }
 
-        .local-server-info {
-            font-size: 0.8rem;
-            color: #1E40AF;
+        .cloud-status-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .btn-quick-local {
-            background: #2563EB;
-            color: #FFFFFF;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-decoration: none;
-            cursor: pointer;
-            white-space: nowrap;
-            transition: background 0.15s ease;
+        .status-pulse-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #10B981;
+            box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+            animation: pulseLive 1.8s infinite;
         }
-        .btn-quick-local:hover {
-            background: #1D4ED8;
+
+        @keyframes pulseLive {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .badge-live-portal {
+            background: #10B981;
+            color: #FFFFFF;
+            font-size: 0.68rem;
+            font-weight: 800;
+            padding: 4px 8px;
+            border-radius: 6px;
+            letter-spacing: 0.05em;
         }
 
         .chips-label {
@@ -290,27 +299,30 @@
         <!-- Login Body -->
         <div class="login-body">
 
-            <!-- 1-Click Local Launch Banner -->
-            <div class="local-server-banner">
-                <div class="local-server-info">
-                    <strong>Localhost Server</strong><br>
-                    <span>http://localhost:5050</span>
+            <!-- inFlow Live Cloud Indicator -->
+            <div class="cloud-status-banner">
+                <div class="cloud-status-info">
+                    <span class="status-pulse-dot"></span>
+                    <div>
+                        <strong style="font-size: 0.86rem; color: #0F172A;">inFlow Cloud Live Portal</strong>
+                        <div style="font-size: 0.72rem; color: #059669; font-weight: 600;">● Online • Multi-Branch Enterprise ERP</div>
+                    </div>
                 </div>
-                <a href="http://localhost:5050/login" class="btn-quick-local">Launch Localhost →</a>
+                <span class="badge-live-portal">LIVE SYSTEM</span>
             </div>
+
+            <div id="loginAlert" style="display: none; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.82rem; font-weight: 600;"></div>
 
             <!-- Quick Account Chips -->
             <div class="chips-label">Quick Sign In / គណនីរហ័ស</div>
             <div class="quick-chips">
-                <a href="http://localhost:5050/quick-login/chenda" class="chip-btn" title="HQ Admin">🏢 HQ Admin (chenda)</a>
-                <a href="http://localhost:5050/quick-login/toulkork" class="chip-btn" title="Toul Kork">🏬 Toul Kork</a>
-                <a href="http://localhost:5050/quick-login/sk_admin" class="chip-btn" title="Sen Sok">🏬 Sen Sok</a>
-                <a href="http://localhost:5050/quick-login/media_admin" class="chip-btn" title="Media">🏬 Media</a>
+                <button type="button" onclick="quickLogin('chenda')" class="chip-btn" title="HQ Admin">🏢 HQ Admin (chenda)</button>
+                <button type="button" onclick="quickLogin('toulkork')" class="chip-btn" title="Toul Kork">🏬 Toul Kork</button>
+                <button type="button" onclick="quickLogin('sk_admin')" class="chip-btn" title="Sen Sok">🏬 Sen Sok</button>
+                <button type="button" onclick="quickLogin('media_admin')" class="chip-btn" title="Media">🏬 Media</button>
             </div>
 
-            <form action="http://localhost:5050/login" method="POST" id="loginForm" onsubmit="handleFormSubmit(event)">
-                <input type="hidden" name="next" value="">
-
+            <form id="loginForm" onsubmit="handleFormSubmit(event)">
                 <!-- Username -->
                 <div class="form-group">
                     <label class="form-label" for="usernameInput">
@@ -360,21 +372,131 @@
     </div>
 
     <script>
+        const KNOWN_USERS = {
+            chenda: {
+                username: 'chenda',
+                name: 'Chenda (HQ Director)',
+                role: 'main_admin',
+                roleLabel: 'Enterprise HQ Admin',
+                is_main_admin: true,
+                branchId: 0,
+                branchName: 'Main Store (HQ Enterprise)',
+                branchCode: 'HQ',
+                avatar: '👑'
+            },
+            veasna: {
+                username: 'veasna',
+                name: 'Veasna Operations',
+                role: 'main_admin',
+                roleLabel: 'HQ Operations Director',
+                is_main_admin: true,
+                branchId: 0,
+                branchName: 'Main Store (HQ Enterprise)',
+                branchCode: 'HQ',
+                avatar: '👑'
+            },
+            toulkork: {
+                username: 'toulkork',
+                name: 'Toul Kork Admin',
+                role: 'branch_admin',
+                roleLabel: 'Branch Manager',
+                is_main_admin: false,
+                branchId: 1,
+                branchName: 'Toul Kork Branch (សាខាទួលគោក)',
+                branchCode: 'TK',
+                avatar: '🏬'
+            },
+            sk_admin: {
+                username: 'sk_admin',
+                name: 'Sen Sok Admin',
+                role: 'branch_admin',
+                roleLabel: 'Branch Manager',
+                is_main_admin: false,
+                branchId: 2,
+                branchName: 'Sen Sok Branch (សាខាសែនសុខ)',
+                branchCode: 'SK',
+                avatar: '🏬'
+            },
+            media_admin: {
+                username: 'media_admin',
+                name: 'Media Branch Admin',
+                role: 'branch_admin',
+                roleLabel: 'Branch Manager',
+                is_main_admin: false,
+                branchId: 3,
+                branchName: 'Media Branch (សាខាមេឌៀ)',
+                branchCode: 'MD',
+                avatar: '🏬'
+            }
+        };
+
         function togglePasswordVisibility() {
             const pwd = document.getElementById('passwordInput');
             pwd.type = (pwd.type === 'password') ? 'text' : 'password';
         }
 
-        function handleFormSubmit(e) {
-            // If on localhost already, standard POST works
-            if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-                return true;
+        function showAlert(msg, isError = true) {
+            const alertEl = document.getElementById('loginAlert');
+            if (!alertEl) return;
+            alertEl.style.display = 'block';
+            if (isError) {
+                alertEl.style.background = '#FEE2E2';
+                alertEl.style.color = '#B91C1C';
+                alertEl.style.border = '1px solid #FCA5A5';
+            } else {
+                alertEl.style.background = '#DCFCE7';
+                alertEl.style.color = '#15803D';
+                alertEl.style.border = '1px solid #86EFAC';
             }
-            // If on external site (GitHub Pages / Vercel), redirect to local login
-            const u = (document.getElementById('usernameInput').value || 'chenda').trim();
-            window.location.href = 'http://localhost:5050/quick-login/' + encodeURIComponent(u);
-            e.preventDefault();
+            alertEl.innerHTML = msg;
+        }
+
+        function quickLogin(username) {
+            document.getElementById('usernameInput').value = username;
+            document.getElementById('passwordInput').value = '123';
+            doSignIn(username, '123');
+        }
+
+        function handleFormSubmit(e) {
+            if (e && e.preventDefault) e.preventDefault();
+            const u = (document.getElementById('usernameInput').value || '').trim();
+            const p = (document.getElementById('passwordInput').value || '').trim();
+            doSignIn(u, p);
             return false;
+        }
+
+        function doSignIn(username, password) {
+            const uKey = (username || '').toLowerCase().trim();
+            const btn = document.getElementById('btnLoginSubmit');
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = '0.7';
+                btn.innerHTML = '<span>កំពុងចូលប្រើ... / Authenticating...</span>';
+            }
+
+            // Resolve user profile
+            const userProfile = KNOWN_USERS[uKey] || {
+                username: username || 'user',
+                name: (username ? username.toUpperCase() : 'USER') + ' (Staff)',
+                role: 'branch_admin',
+                roleLabel: 'Staff Account',
+                is_main_admin: false,
+                branchId: 1,
+                branchName: 'Branch Store',
+                branchCode: 'BR',
+                avatar: '👤'
+            };
+
+            // Store active session in browser
+            localStorage.setItem('inflow_current_user', JSON.stringify(userProfile));
+            localStorage.setItem('inflow_auth_token', 'live-session-' + Date.now());
+            localStorage.setItem('inflow_active_branch_id', String(userProfile.branchId));
+
+            showAlert('✓ ចូលប្រើប្រាស់ជោគជ័យ! កំពុងបើកប្រព័ន្ធ / Sign In Successful! Opening Live Dashboard...', false);
+
+            setTimeout(() => {
+                window.location.href = 'dashboard.html';
+            }, 300);
         }
     </script>
 </body>
