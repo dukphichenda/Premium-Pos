@@ -1219,12 +1219,41 @@ def new_order():
             if cust_row.get('default_pricing_scheme_id'):
                 order['pricing_scheme_id'] = cust_row['default_pricing_scheme_id']
 
-    date_filter = request.args.get('date_filter', 'All')
-    status_filter = request.args.get('status_filter', 'Open, In Progress, Paid')
-    customer_search = request.args.get('customer_search', '').strip()
+    if 'date_filter' in request.args:
+        date_filter = request.args.get('date_filter', 'All')
+        session['so_date_filter'] = date_filter
+    elif 'so_date_filter' in session:
+        date_filter = session['so_date_filter']
+    else:
+        date_filter = 'All'
+
+    if 'status_filter' in request.args:
+        status_filter = request.args.get('status_filter', 'Open, In Progress, Paid')
+        session['so_status_filter'] = status_filter
+    elif 'so_status_filter' in session:
+        status_filter = session['so_status_filter']
+    else:
+        status_filter = 'Open, In Progress, Paid'
+
+    if 'customer_search' in request.args:
+        customer_search = request.args.get('customer_search', '').strip()
+        session['so_customer_search'] = customer_search
+    elif 'so_customer_search' in session:
+        customer_search = session.get('so_customer_search', '')
+    else:
+        customer_search = ''
+
     customer_filter = request.args.get('customer_id')
 
-    req_branch = str(branch['id']) if branch else (request.args.get('branch') or 'main')
+    if branch:
+        req_branch = str(branch['id'])
+    elif 'branch' in request.args:
+        req_branch = request.args.get('branch') or 'main'
+        session['so_branch_filter'] = req_branch
+    elif 'so_branch_filter' in session:
+        req_branch = session['so_branch_filter']
+    else:
+        req_branch = 'main'
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch)
 
@@ -1330,17 +1359,43 @@ def detail_order(id):
         ORDER BY sol.line_num ASC
     """, (order['location_id'], id))
 
-    date_filter = request.args.get('date_filter', 'All')
-    status_filter = request.args.get('status_filter', 'Open, In Progress, Paid')
-    customer_search = request.args.get('customer_search', '').strip()
+    if 'date_filter' in request.args:
+        date_filter = request.args.get('date_filter', 'All')
+        session['so_date_filter'] = date_filter
+    elif 'so_date_filter' in session:
+        date_filter = session['so_date_filter']
+    else:
+        date_filter = 'All'
+
+    if 'status_filter' in request.args:
+        status_filter = request.args.get('status_filter', 'Open, In Progress, Paid')
+        session['so_status_filter'] = status_filter
+    elif 'so_status_filter' in session:
+        status_filter = session['so_status_filter']
+    else:
+        status_filter = 'Open, In Progress, Paid'
+
+    if 'customer_search' in request.args:
+        customer_search = request.args.get('customer_search', '').strip()
+        session['so_customer_search'] = customer_search
+    elif 'so_customer_search' in session:
+        customer_search = session.get('so_customer_search', '')
+    else:
+        customer_search = ''
+
     customer_filter = request.args.get('customer_id')
 
     # Allow user to switch branch filter in drawer or default to the order's branch scope
     if session_bid:
         branch_scope = str(session_bid)
+    elif 'branch' in request.args:
+        branch_scope = request.args.get('branch') or 'main'
+        session['so_branch_filter'] = branch_scope
+    elif 'so_branch_filter' in session:
+        branch_scope = session['so_branch_filter']
     else:
         default_branch = str(order['branch_id']) if order.get('branch_id') else 'main'
-        branch_scope = request.args.get('branch') or default_branch
+        branch_scope = default_branch
 
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope)
@@ -1754,9 +1809,22 @@ def save_order(id=0):
                         WHERE id = %s
                     """, (balance_due, customer_id))
 
-        cust_search = request.form.get('customer_search') or request.args.get('customer_search') or ''
-        branch_param = str(branch_id) if branch_id else 'main'
-        redirect_kwargs = {'id': id, 'branch': branch_param}
+        cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+        date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+        status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+        branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
+
+        session['so_date_filter'] = date_filter
+        session['so_status_filter'] = status_filter
+        session['so_customer_search'] = cust_search
+        session['so_branch_filter'] = branch_param
+
+        redirect_kwargs = {
+            'id': id,
+            'branch': branch_param,
+            'date_filter': date_filter,
+            'status_filter': status_filter
+        }
         if cust_search:
             redirect_kwargs['customer_search'] = cust_search
         redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
@@ -1770,8 +1838,17 @@ def save_order(id=0):
         if request.is_json:
             return jsonify({'error': str(e)}), 400
         flash(f"Error saving order: {e}", "error")
-        cust_search = request.form.get('customer_search') or request.args.get('customer_search') or ''
-        err_kwargs = {'customer_search': cust_search} if cust_search else {}
+        cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+        date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+        status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+        branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
+        err_kwargs = {
+            'branch': branch_param,
+            'date_filter': date_filter,
+            'status_filter': status_filter
+        }
+        if cust_search:
+            err_kwargs['customer_search'] = cust_search
         return redirect(url_for('sales_orders.new_order', **err_kwargs) if is_new else url_for('sales_orders.detail_order', id=id, **err_kwargs))
 
 @sales_orders_bp.route('/sales/<int:id>/complete_pay', methods=['POST'])
@@ -1829,11 +1906,31 @@ def complete_pay(id):
                 VALUES ('SO', %s, %s, %s, %s)
             """, (id, rem, payment_method, f"Completed by {user_login_name}"))
 
+    date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+    cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+    branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(order.get('branch_id')) if order.get('branch_id') else 'main')
+
+    session['so_date_filter'] = date_filter
+    session['so_status_filter'] = status_filter
+    session['so_customer_search'] = cust_search
+    session['so_branch_filter'] = branch_param
+
+    redirect_kwargs = {
+        'id': id,
+        'branch': branch_param,
+        'date_filter': date_filter,
+        'status_filter': status_filter
+    }
+    if cust_search:
+        redirect_kwargs['customer_search'] = cust_search
+    redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
+
     if request.is_json:
-        return jsonify({'success': True, 'message': f'Order completed and marked paid by {payment_method}!', 'payment_method': payment_method})
+        return jsonify({'success': True, 'message': f'Order completed and marked paid by {payment_method}!', 'payment_method': payment_method, 'redirect_url': redirect_url})
 
     flash(f"Order is shipped and paid by {payment_method}!", "success")
-    return redirect(url_for('sales_orders.detail_order', id=id))
+    return redirect(redirect_url)
 
 @sales_orders_bp.route('/sales/<int:id>/reopen', methods=['POST'])
 def reopen_order(id):
@@ -1873,8 +1970,31 @@ def reopen_order(id):
 
         cur.execute("DELETE FROM order_payments WHERE order_type = 'SO' AND order_id = %s", (id,))
 
+    date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+    cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+    branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(order.get('branch_id')) if order.get('branch_id') else 'main')
+
+    session['so_date_filter'] = date_filter
+    session['so_status_filter'] = status_filter
+    session['so_customer_search'] = cust_search
+    session['so_branch_filter'] = branch_param
+
+    redirect_kwargs = {
+        'id': id,
+        'branch': branch_param,
+        'date_filter': date_filter,
+        'status_filter': status_filter
+    }
+    if cust_search:
+        redirect_kwargs['customer_search'] = cust_search
+    redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
+
+    if request.is_json:
+        return jsonify({'success': True, 'message': 'Order is Re-opened! You can now edit the order.', 'redirect_url': redirect_url})
+
     flash("Order is Re-opened! You can now edit the order.", "success")
-    return redirect(url_for('sales_orders.detail_order', id=id))
+    return redirect(redirect_url)
 
 @sales_orders_bp.route('/sales/<int:id>/cancel_order', methods=['POST'])
 def cancel_order_direct(id):
@@ -1886,8 +2006,32 @@ def cancel_order_direct(id):
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (id,))
+
+    date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+    cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+    branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or 'main'
+
+    session['so_date_filter'] = date_filter
+    session['so_status_filter'] = status_filter
+    session['so_customer_search'] = cust_search
+    session['so_branch_filter'] = branch_param
+
+    redirect_kwargs = {
+        'id': id,
+        'branch': branch_param,
+        'date_filter': date_filter,
+        'status_filter': status_filter
+    }
+    if cust_search:
+        redirect_kwargs['customer_search'] = cust_search
+    redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
+
+    if request.is_json:
+        return jsonify({'success': True, 'message': 'Order cancelled.', 'redirect_url': redirect_url})
+
     flash("Order cancelled.", "warning")
-    return redirect(url_for('sales_orders.detail_order', id=id))
+    return redirect(redirect_url)
 
 @sales_orders_bp.route('/sales/<int:id>/delete', methods=['POST'])
 def delete_order(id):
@@ -2112,8 +2256,22 @@ def update_status(id):
 
             cur.execute("UPDATE sales_orders SET status = 'CANCELLED', balance_due = 0, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (id,))
 
+    date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+    cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+    branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(order.get('branch_id')) if order.get('branch_id') else 'main')
+
+    redirect_kwargs = {
+        'id': id,
+        'branch': branch_param,
+        'date_filter': date_filter,
+        'status_filter': status_filter
+    }
+    if cust_search:
+        redirect_kwargs['customer_search'] = cust_search
+
     flash(f"Order status updated to {new_status}!", "success")
-    return redirect(url_for('sales_orders.detail_order', id=id))
+    return redirect(url_for('sales_orders.detail_order', **redirect_kwargs))
 
 @sales_orders_bp.route('/sales/<int:id>/pay', methods=['POST'])
 def record_payment(id):
@@ -2164,12 +2322,33 @@ def record_payment(id):
                     WHERE id = %s;
                 """, (amount, order['customer_id']))
 
+        date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+        status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+        cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+        branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(order.get('branch_id')) if order.get('branch_id') else 'main')
+
+        redirect_kwargs = {
+            'id': id,
+            'branch': branch_param,
+            'date_filter': date_filter,
+            'status_filter': status_filter
+        }
+        if cust_search:
+            redirect_kwargs['customer_search'] = cust_search
+
         flash(f"Payment of ${amount:.2f} ({method}) recorded! Balance remaining: ${new_balance:.2f}", "success")
-        return redirect(url_for('sales_orders.detail_order', id=id))
+        return redirect(url_for('sales_orders.detail_order', **redirect_kwargs))
 
     except Exception as e:
         flash(f"Error recording payment: {e}", "error")
-        return redirect(url_for('sales_orders.detail_order', id=id))
+        date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+        status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+        cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+        branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or 'main'
+        err_kwargs = {'id': id, 'branch': branch_param, 'date_filter': date_filter, 'status_filter': status_filter}
+        if cust_search:
+            err_kwargs['customer_search'] = cust_search
+        return redirect(url_for('sales_orders.detail_order', **err_kwargs))
 
 @sales_orders_bp.route('/sales/<int:id>/print')
 def print_invoice(id):

@@ -180,7 +180,7 @@
                 <!-- Store Scope Selector: Isolates Main Store vs Branches -->
                 <div class="inflow-filter-row" style="background: #F1F5F9; border-radius: 4px; padding: 4px 6px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
                     <span class="inflow-filter-label" style="font-weight: 700; color: #334155; white-space: nowrap; font-size: 11px;">Store Scope</span>
-                    <select name="branch" id="drawerBranchSelect" class="inflow-filter-select" onchange="document.getElementById('drawerFilterForm').submit()" style="font-weight: 700; color: #0284C7; background: #FFFFFF; flex: 1; width: 100%; max-width: 120px; text-overflow: ellipsis; overflow: hidden; padding: 2px 4px; height: 24px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 4px; cursor: pointer;">
+                    <select name="branch" id="drawerBranchSelect" class="inflow-filter-select" onchange="syncDrawerFiltersToStorage(); document.getElementById('drawerFilterForm').submit()" style="font-weight: 700; color: #0284C7; background: #FFFFFF; flex: 1; width: 100%; max-width: 120px; text-overflow: ellipsis; overflow: hidden; padding: 2px 4px; height: 24px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 4px; cursor: pointer;">
                         {% if not is_branch_mode %}
                         <option value="main" {% if branch_scope == 'main' or not branch_scope %}selected{% endif %} title="Main Store">MAIN</option>
                         {% for br in all_branches %}
@@ -193,7 +193,7 @@
                 </div>
                 <div class="inflow-filter-row">
                     <span class="inflow-filter-label">Order Date</span>
-                    <select name="date_filter" id="drawerDateFilterSelect" class="inflow-filter-select" onchange="document.getElementById('drawerFilterForm').submit()">
+                    <select name="date_filter" id="drawerDateFilterSelect" class="inflow-filter-select" onchange="syncDrawerFiltersToStorage(); document.getElementById('drawerFilterForm').submit()">
                         <option value="All" {% if date_filter == 'All' %}selected{% endif %}>All</option>
                         <option value="Today" {% if date_filter == 'Today' %}selected{% endif %}>Today</option>
                         <option value="This Week" {% if date_filter == 'This Week' %}selected{% endif %}>This Week</option>
@@ -1465,6 +1465,9 @@ function updateStatusInputFromCheckboxes() {
         } else {
             input.value = checked.join(', ');
         }
+        try {
+            sessionStorage.setItem('inflow_so_status_filter', input.value);
+        } catch (e) {}
     }
 }
 
@@ -1797,6 +1800,88 @@ window.handleTabCloseAttempt = function(targetUrl) {
     return false;
 };
 
+/* ==========================================================================
+   Drawer Filter State Synchronization across Actions (Copy, New, Save, Pay)
+   ========================================================================== */
+function getDrawerFilterParams() {
+    const dateSelect = document.getElementById('drawerDateFilterSelect');
+    let dateVal = (dateSelect ? dateSelect.value : '') ||
+                  sessionStorage.getItem('inflow_so_date_filter') || '{{ date_filter }}' || 'All';
+
+    const statusInput = document.getElementById('drawerStatusFilterInput');
+    let statusVal = (statusInput ? statusInput.value : '') ||
+                    sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter }}' || 'Open, In Progress, Paid';
+
+    const custInput = document.getElementById('drawerCustomerSearchInput');
+    let custVal = (custInput ? custInput.value : '')?.trim() ||
+                  sessionStorage.getItem('inflow_so_drawer_customer_search') || '{{ customer_search or "" }}';
+
+    const branchSelect = document.getElementById('drawerBranchSelect');
+    let branchVal = (branchSelect ? branchSelect.value : '') ||
+                    sessionStorage.getItem('inflow_so_branch_filter') || '{{ branch_scope or "main" }}';
+
+    return {
+        date_filter: dateVal,
+        status_filter: statusVal,
+        customer_search: custVal,
+        branch: branchVal
+    };
+}
+
+function syncDrawerFiltersToStorage() {
+    const params = getDrawerFilterParams();
+    try {
+        if (params.date_filter) sessionStorage.setItem('inflow_so_date_filter', params.date_filter);
+        if (params.status_filter) sessionStorage.setItem('inflow_so_status_filter', params.status_filter);
+        if (params.customer_search) {
+            sessionStorage.setItem('inflow_so_drawer_customer_search', params.customer_search);
+        } else {
+            sessionStorage.removeItem('inflow_so_drawer_customer_search');
+        }
+        if (params.branch) sessionStorage.setItem('inflow_so_branch_filter', params.branch);
+    } catch(e) {}
+}
+
+function buildUrlWithFilters(baseUrl, extraParams = {}) {
+    const filters = getDrawerFilterParams();
+    let url;
+    try {
+        url = new URL(baseUrl, window.location.origin);
+    } catch (e) {
+        url = new URL(window.location.origin + baseUrl);
+    }
+    const params = new URLSearchParams(url.search);
+
+    if (filters.date_filter && !params.has('date_filter')) params.set('date_filter', filters.date_filter);
+    if (filters.status_filter && !params.has('status_filter')) params.set('status_filter', filters.status_filter);
+    if (filters.customer_search && !params.has('customer_search')) params.set('customer_search', filters.customer_search);
+    if (filters.branch && !params.has('branch')) params.set('branch', filters.branch);
+
+    for (const key in extraParams) {
+        if (extraParams[key] !== undefined && extraParams[key] !== null) {
+            params.set(key, extraParams[key]);
+        }
+    }
+
+    return url.pathname + '?' + params.toString();
+}
+
+function attachFiltersToForm(form) {
+    if (!form) return;
+    const filters = getDrawerFilterParams();
+    const fields = ['date_filter', 'status_filter', 'customer_search', 'branch'];
+    fields.forEach(field => {
+        let input = form.querySelector(`input[name="${field}"]`);
+        if (!input) {
+            input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = field;
+            form.appendChild(input);
+        }
+        input.value = filters[field] || '';
+    });
+}
+
 // Instant Direct Navigation (Zero Animation Latency - Appear As Fast As Possible)
 function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
     if (!targetUrl) return;
@@ -1813,13 +1898,8 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
         clickedEl.classList.add('active');
     }
 
-    // Ensure customer_search is included in targetUrl if not already present
-    const savedCust = sessionStorage.getItem('inflow_so_drawer_customer_search');
-    let finalUrl = targetUrl;
-    if (savedCust && savedCust.trim() && !finalUrl.includes('customer_search=')) {
-        const joinChar = finalUrl.includes('?') ? '&' : '?';
-        finalUrl = finalUrl + joinChar + 'customer_search=' + encodeURIComponent(savedCust.trim());
-    }
+    syncDrawerFiltersToStorage();
+    const finalUrl = buildUrlWithFilters(targetUrl);
 
     // Navigate immediately (0ms delay)
     if (window.top && window.top.inflowMdi) {
@@ -1891,13 +1971,16 @@ function handleCloseOrder(event) {
 }
 
 function createNewOrderInTab() {
+    syncDrawerFiltersToStorage();
     {% if is_branch_mode and current_branch %}
-    const targetUrl = "{{ url_for('sales_orders.new_order', branch=current_branch.id) }}";
+    const baseNew = "{{ url_for('sales_orders.new_order', branch=current_branch.id) }}";
     {% elif order.branch_id or (branch_scope and branch_scope != 'main') %}
-    const targetUrl = "{{ url_for('sales_orders.new_order', branch=order.branch_id or branch_scope) }}";
+    const baseNew = "{{ url_for('sales_orders.new_order', branch=order.branch_id or branch_scope) }}";
     {% else %}
-    const targetUrl = "{{ url_for('sales_orders.new_order') }}";
+    const baseNew = "{{ url_for('sales_orders.new_order') }}";
     {% endif %}
+    const targetUrl = buildUrlWithFilters(baseNew);
+
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
@@ -1921,6 +2004,9 @@ function createNewOrderInTab() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    // Synchronize drawer filters with storage
+    syncDrawerFiltersToStorage();
+
     // Initialize inFlow Tab System
     if (window.initInflowTabs) {
         window.initInflowTabs({
@@ -1935,19 +2021,32 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize status filter checkboxes
     initStatusCheckboxes();
 
+    // Form submit listener to always capture current drawer filters
+    const drawerForm = document.getElementById('drawerFilterForm');
+    if (drawerForm) {
+        drawerForm.addEventListener('submit', function() {
+            syncDrawerFiltersToStorage();
+        });
+    }
+
     // Persist drawer customer search across copy SO, save SO, and navigation
     const drawerCustInput = document.getElementById('drawerCustomerSearchInput');
+    const urlParams = new URLSearchParams(window.location.search);
     const savedCust = sessionStorage.getItem('inflow_so_drawer_customer_search');
+
     if (drawerCustInput) {
         if (drawerCustInput.value && drawerCustInput.value.trim()) {
             sessionStorage.setItem('inflow_so_drawer_customer_search', drawerCustInput.value.trim());
+        } else if (urlParams.has('customer_search') && !urlParams.get('customer_search')) {
+            // User intentionally cleared search
+            sessionStorage.removeItem('inflow_so_drawer_customer_search');
         } else if (savedCust && savedCust.trim()) {
             drawerCustInput.value = savedCust.trim();
-            onDrawerCustomerType(savedCust.trim());
-            const urlParams = new URLSearchParams(window.location.search);
+            if (typeof onDrawerCustomerType === 'function') {
+                onDrawerCustomerType(savedCust.trim());
+            }
             if (!urlParams.has('customer_search') || urlParams.get('customer_search') !== savedCust.trim()) {
-                const form = document.getElementById('drawerFilterForm');
-                if (form) form.submit();
+                if (drawerForm) drawerForm.submit();
             }
         }
 
@@ -1958,7 +2057,9 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 sessionStorage.setItem('inflow_so_drawer_customer_search', v);
             }
-            onDrawerCustomerType(v);
+            if (typeof onDrawerCustomerType === 'function') {
+                onDrawerCustomerType(v);
+            }
         });
     }
 
@@ -2128,6 +2229,7 @@ function selectDrawerCustomer(name) {
     } else {
         sessionStorage.removeItem('inflow_so_drawer_customer_search');
     }
+    syncDrawerFiltersToStorage();
 
     // Auto-refresh drawer list for selected customer matching inFlow behavior
     const form = document.getElementById('drawerFilterForm');
@@ -2699,27 +2801,8 @@ function saveSalesOrder() {
 
     const form = document.getElementById('salesOrderForm');
     if (form) {
-        const savedCustSearch = sessionStorage.getItem('inflow_so_drawer_customer_search') || (document.getElementById('drawerCustomerSearchInput')?.value || '').trim();
-        let custSearchInput = form.querySelector('input[name="customer_search"]');
-        if (!custSearchInput) {
-            custSearchInput = document.createElement('input');
-            custSearchInput.type = 'hidden';
-            custSearchInput.name = 'customer_search';
-            form.appendChild(custSearchInput);
-        }
-        custSearchInput.value = savedCustSearch;
-
-        if (isNewOrder) {
-            const activeBranch = document.getElementById('drawerBranchSelect')?.value || 'main';
-            let branchInput = form.querySelector('input[name="branch"]');
-            if (!branchInput) {
-                branchInput = document.createElement('input');
-                branchInput.type = 'hidden';
-                branchInput.name = 'branch';
-                form.appendChild(branchInput);
-            }
-            branchInput.value = activeBranch;
-        }
+        syncDrawerFiltersToStorage();
+        attachFiltersToForm(form);
 
         isDirty = false;
         form.submit();
@@ -2751,7 +2834,12 @@ function cancelOrderAction() {
         return;
     }
     if (confirm('Are you sure you want to cancel this order?')) {
-        document.getElementById('cancelOrderForm').submit();
+        syncDrawerFiltersToStorage();
+        const cancelForm = document.getElementById('cancelOrderForm');
+        if (cancelForm) {
+            attachFiltersToForm(cancelForm);
+            cancelForm.submit();
+        }
     }
 }
 
@@ -2769,7 +2857,12 @@ function deleteOrderAction() {
     }
     if (confirm('Permanently delete this sales order? This action cannot be undone.')) {
         isDirty = false;
-        document.getElementById('deleteOrderForm').submit();
+        syncDrawerFiltersToStorage();
+        const delForm = document.getElementById('deleteOrderForm');
+        if (delForm) {
+            attachFiltersToForm(delForm);
+            delForm.submit();
+        }
     }
 }
 
@@ -2791,7 +2884,11 @@ function closeReopenPromptModal() {
 function submitReopenOrder() {
     closeReopenPromptModal();
     const form = document.getElementById('reopenOrderForm');
-    if (form) form.submit();
+    if (form) {
+        syncDrawerFiltersToStorage();
+        attachFiltersToForm(form);
+        form.submit();
+    }
 }
 
 /* ==========================================================================
@@ -2897,17 +2994,14 @@ function executeCopyAction(action) {
     }
 
     if (action === 'copy-so') {
-        const custSearch = sessionStorage.getItem('inflow_so_drawer_customer_search') || (document.getElementById('drawerCustomerSearchInput')?.value || '').trim();
-        const activeBranch = document.getElementById('drawerBranchSelect')?.value || 'main';
-        let targetUrl = '/sales/new?copy_from=' + orderId;
-        if (custSearch) targetUrl += '&customer_search=' + encodeURIComponent(custSearch);
-        if (activeBranch) targetUrl += '&branch=' + encodeURIComponent(activeBranch);
+        syncDrawerFiltersToStorage();
+        const targetUrl = buildUrlWithFilters('/sales/new', { copy_from: orderId });
 
         const proceedCopy = function() {
             if (window.top && window.top.inflowMdi) {
                 window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'New Sales Order', 'sales', false);
             } else {
-                window.location.href = targetUrl;
+                executeAnimatedOrderNavigation(targetUrl);
             }
         };
 
@@ -3740,6 +3834,8 @@ function confirmCompletePayAction() {
     const methodHidden = document.getElementById('orderPaymentMethodHidden');
     if (methodHidden) methodHidden.value = finalMethod;
 
+    syncDrawerFiltersToStorage();
+
     if (isNewOrder) {
         const cpInput = document.getElementById('markCompletePayInput');
         if (cpInput) cpInput.value = '1';
@@ -3759,6 +3855,7 @@ function confirmCompletePayAction() {
             cpForm.appendChild(pInput);
         }
         pInput.value = finalMethod;
+        attachFiltersToForm(cpForm);
         closeCompletePayModal();
         cpForm.submit();
     }
