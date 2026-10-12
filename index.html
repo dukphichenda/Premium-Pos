@@ -742,6 +742,9 @@
                 <input type="text" id="serverUrlInput" class="endpoint-input" placeholder="http://localhost:5050 or http://your-domain:5050" value="">
                 <button type="button" class="btn-connect" onclick="connectToServer()">Connect / ភ្ជាប់</button>
             </div>
+            <p style="font-size: 0.8rem; color: var(--slate-400); margin-top: 12px; text-align: center;">
+                💡 <strong>Targeting Local Server:</strong> Ensure <code>run.bat</code> is active on your PC. For branch/cloud access, enter your <strong>Cloudflare Tunnel</strong> or server IP above.
+            </p>
         </section>
 
         <!-- Metrics Overview Grid -->
@@ -933,7 +936,7 @@
             </div>
             <ul class="footer-links">
                 <li><a href="javascript:void(0)" onclick="openDeployModal()">Hosting Guide</a></li>
-                <li><a href="/login">Sign In</a></li>
+                <li><a id="footerSignInBtn" href="http://localhost:5050/login">Sign In</a></li>
             </ul>
         </div>
     </footer>
@@ -969,8 +972,13 @@ server {<br>
 }
                 </div>
 
-                <h4 style="color: #FBBF24; font-size: 0.95rem; margin-top: 16px;">Option 3: Web Hosting (cPanel / Apache)</h4>
-                <p>Upload this <code>index.html</code> to your <code>public_html/</code> directory. Visitors can use the Connect bar to link to your backend server or point directly to the application host.</p>
+                <h4 style="color: #FBBF24; font-size: 0.95rem; margin-top: 16px;">Option 3: Web Hosting (Vercel / Netlify / cPanel)</h4>
+                <p>Deploy this <code>index.html</code> to Vercel or cPanel. Visitors and branch staff can use the <strong>⚡ Connect</strong> bar to link to your backend server or Cloudflare tunnel.</p>
+
+                <h4 style="color: #FBBF24; font-size: 0.95rem; margin-top: 16px;">Option 4: Cloudflare Tunnel (Instant Secure HTTPS to Local Server)</h4>
+                <p>To securely access your local inFlow server from any remote device or branch without exposing open ports:</p>
+                <div class="code-block">cloudflared tunnel --url http://localhost:5050</div>
+                <p>Copy the generated <code>https://xxxx.trycloudflare.com</code> URL and paste it into the <strong>⚡ Connect</strong> bar on this portal.</p>
             </div>
         </div>
     </div>
@@ -1003,15 +1011,21 @@ server {<br>
         setLanguage(savedLang);
 
         // 2. Server URL Auto-Detection & Connector
+        function isLocalHostOrLan() {
+            const h = window.location.hostname;
+            return h === 'localhost' || h === '127.0.0.1' || h.startsWith('192.168.') || h.startsWith('10.') || (h.startsWith('172.') && parseInt(h.split('.')[1] || '0') >= 16 && parseInt(h.split('.')[1] || '0') <= 31);
+        }
+
         function getResolvedServerUrl() {
-            const stored = localStorage.getItem('inflow_server_url');
+            const stored = (localStorage.getItem('inflow_server_url') || '').trim();
             if (stored) return stored;
             
-            // If running on a web server directly (http/https), use origin
-            if (window.location.protocol.startsWith('http')) {
+            // If running directly on a local server or LAN server (e.g. localhost:5050)
+            if (isLocalHostOrLan() && window.location.port === '5050') {
                 return window.location.origin;
             }
-            // Fallback for file:// or local testing
+            
+            // Default target for cloud portals (such as Vercel) or file:// is the local inFlow ERP server
             return 'http://localhost:5050';
         }
 
@@ -1026,28 +1040,41 @@ server {<br>
 
             const navBtn = document.getElementById('navLaunchBtn');
             const heroBtn = document.getElementById('heroLaunchBtn');
+            const footerBtn = document.getElementById('footerSignInBtn');
             if (navBtn) navBtn.href = targetLogin;
             if (heroBtn) heroBtn.href = targetLogin;
+            if (footerBtn) footerBtn.href = targetLogin;
+
+            updateServerStatusIndicator(base);
+        }
+
+        function updateServerStatusIndicator(base) {
+            const statusText = document.getElementById('serverStatusText');
+            const dot = document.querySelector('.status-indicator-dot');
+            if (!statusText) return;
+
+            if (isLocalHostOrLan() && window.location.origin === base) {
+                statusText.innerHTML = 'System Online &bull; PostgreSQL 16 &bull; Port 5050';
+                if (dot) dot.style.background = '#10B981';
+                return;
+            }
+
+            statusText.innerHTML = 'Target Server: <strong style="color:#60A5FA;">' + base + '</strong>';
         }
 
         updateLaunchButtons(resolvedUrl);
 
         function connectToServer() {
-            const url = (serverUrlInput.value || '').trim();
-            if (!url) return;
+            let url = (serverUrlInput.value || '').trim();
+            if (!url) url = 'http://localhost:5050';
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'http://' + url;
+            }
+            serverUrlInput.value = url;
             localStorage.setItem('inflow_server_url', url);
             updateLaunchButtons(url);
-            
-            // Quick ping test
-            fetch(url + '/login', { mode: 'no-cors' })
-                .then(() => {
-                    alert('Connecting to inFlow Premium: ' + url);
-                    window.location.href = url + '/login';
-                })
-                .catch(() => {
-                    // Navigate anyway
-                    window.location.href = url + '/login';
-                });
+
+            alert('Server URL updated to: ' + url + '\n\nClick "Open inFlow Premium" or "Launch App" to navigate to your server login.');
         }
 
         // 3. Deployment Modal Controls
