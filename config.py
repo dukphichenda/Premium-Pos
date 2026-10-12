@@ -20,6 +20,9 @@ class Config:
 
     # PostgreSQL Database Configuration (supports local and cloud like Neon / Supabase / Vercel Postgres)
     _db_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+    RAW_DB_URL = _db_url
+    IS_CLOUD_DB = bool(_db_url)
+    IS_VERCEL = bool(os.environ.get('VERCEL'))
     if _db_url:
         from urllib.parse import urlparse
         _parsed = urlparse(_db_url)

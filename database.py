@@ -14,18 +14,25 @@ def get_connection_pool():
     global _connection_pool
     if _connection_pool is None:
         try:
-            pool_kwargs = {
-                'minconn': Config.PG_MIN_CONN,
-                'maxconn': Config.PG_MAX_CONN,
-                'host': Config.PG_HOST,
-                'port': Config.PG_PORT,
-                'user': Config.PG_USER,
-                'password': Config.PG_PASSWORD,
-                'dbname': Config.PG_DATABASE
-            }
-            if getattr(Config, 'PG_SSLMODE', None):
-                pool_kwargs['sslmode'] = Config.PG_SSLMODE
-            _connection_pool = pool.ThreadedConnectionPool(**pool_kwargs)
+            if getattr(Config, 'RAW_DB_URL', None):
+                _connection_pool = pool.ThreadedConnectionPool(
+                    Config.PG_MIN_CONN,
+                    Config.PG_MAX_CONN,
+                    dsn=Config.RAW_DB_URL
+                )
+            else:
+                pool_kwargs = {
+                    'minconn': Config.PG_MIN_CONN,
+                    'maxconn': Config.PG_MAX_CONN,
+                    'host': Config.PG_HOST,
+                    'port': Config.PG_PORT,
+                    'user': Config.PG_USER,
+                    'password': Config.PG_PASSWORD,
+                    'dbname': Config.PG_DATABASE
+                }
+                if getattr(Config, 'PG_SSLMODE', None):
+                    pool_kwargs['sslmode'] = Config.PG_SSLMODE
+                _connection_pool = pool.ThreadedConnectionPool(**pool_kwargs)
             logger.info("PostgreSQL connection pool initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to initialize PostgreSQL pool: {e}")
@@ -113,6 +120,29 @@ def init_db():
                     IF m > 0 THEN PERFORM setval('trf_number_seq', m, true); END IF;
                 END $$;
             """)
+
+            # Ensure essential initial seed records exist if table is fresh
+            try:
+                cur.execute("SELECT COUNT(*) FROM companies;")
+                if cur.fetchone()[0] == 0:
+                    cur.execute("INSERT INTO companies (name, currency, currency_symbol) VALUES ('inFlow Premium Wholesale', 'USD', '$');")
+
+                cur.execute("SELECT COUNT(*) FROM locations;")
+                if cur.fetchone()[0] == 0:
+                    cur.execute("INSERT INTO locations (name, code, is_default) VALUES ('Central Warehouse', 'MAIN', TRUE);")
+
+                cur.execute("SELECT COUNT(*) FROM users;")
+                if cur.fetchone()[0] == 0:
+                    from werkzeug.security import generate_password_hash
+                    pwd_hash = generate_password_hash('123')
+                    cur.execute("""
+                        INSERT INTO users (username, password_hash, display_name, email, role, is_active)
+                        VALUES ('admin', %s, 'HQ Administrator', 'admin@inflow.com', 'main_admin', TRUE),
+                               ('chenda', %s, 'Dok Chenda (HQ Admin)', 'chenda@inflow.com', 'main_admin', TRUE);
+                    """, (pwd_hash, pwd_hash))
+            except Exception as seed_err:
+                logger.warning(f"Initial seed records notice: {seed_err}")
+
         conn.commit()
     logger.info("inFlow Premium PostgreSQL database schema initialized successfully.")
 
