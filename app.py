@@ -360,9 +360,7 @@ def create_app():
     @app.route('/landing')
     @app.route('/portal')
     def landing_portal():
-        from flask import send_from_directory
-        import os
-        return send_from_directory(os.path.dirname(os.path.abspath(__file__)), 'index.html')
+        return redirect(url_for('dashboard.index'))
 
     return app
 

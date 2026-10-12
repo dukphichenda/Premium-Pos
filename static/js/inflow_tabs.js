@@ -115,6 +115,15 @@
        ========================================================================== */
     if (isHostShell) {
         document.body.classList.add('inflow-mdi-host');
+        document.documentElement.classList.add('is-shell-host');
+        document.body.classList.remove('sales-order-body-fullscreen');
+
+        // Clean up direct content in host shell so no duplicate elements or split view exist
+        const directContent = document.getElementById('inflowDirectContent');
+        if (directContent) {
+            directContent.style.display = 'none';
+            directContent.innerHTML = '';
+        }
 
         const MdiShell = {
             tabs: [],
@@ -163,7 +172,21 @@
                         this.activeTabId = this.tabs[0].id;
                     }
                 } else {
-                    if (!this.activeTabId || !this.tabs.find(t => t.id === this.activeTabId)) {
+                    if (cleanCurrent !== '/' && cleanCurrent !== '') {
+                        let existing = this.tabs.find(t => {
+                            const tu = (t.url || '').replace(/[?&]embed=1/, '');
+                            return tu === cleanCurrent;
+                        });
+                        if (existing) {
+                            this.activeTabId = existing.id;
+                        } else {
+                            const type = detectTypeFromUrl(cleanCurrent);
+                            const title = this.guessTitle(cleanCurrent, type);
+                            const newTab = { id: 'tab-init-' + Date.now(), type: type, title: title, label: title, url: cleanCurrent };
+                            this.tabs.push(newTab);
+                            this.activeTabId = newTab.id;
+                        }
+                    } else if (!this.activeTabId || !this.tabs.find(t => t.id === this.activeTabId)) {
                         this.activeTabId = this.tabs[0].id;
                     }
                 }
