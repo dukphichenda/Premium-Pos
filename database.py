@@ -14,15 +14,18 @@ def get_connection_pool():
     global _connection_pool
     if _connection_pool is None:
         try:
-            _connection_pool = pool.ThreadedConnectionPool(
-                minconn=Config.PG_MIN_CONN,
-                maxconn=Config.PG_MAX_CONN,
-                host=Config.PG_HOST,
-                port=Config.PG_PORT,
-                user=Config.PG_USER,
-                password=Config.PG_PASSWORD,
-                dbname=Config.PG_DATABASE
-            )
+            pool_kwargs = {
+                'minconn': Config.PG_MIN_CONN,
+                'maxconn': Config.PG_MAX_CONN,
+                'host': Config.PG_HOST,
+                'port': Config.PG_PORT,
+                'user': Config.PG_USER,
+                'password': Config.PG_PASSWORD,
+                'dbname': Config.PG_DATABASE
+            }
+            if getattr(Config, 'PG_SSLMODE', None):
+                pool_kwargs['sslmode'] = Config.PG_SSLMODE
+            _connection_pool = pool.ThreadedConnectionPool(**pool_kwargs)
             logger.info("PostgreSQL connection pool initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to initialize PostgreSQL pool: {e}")
@@ -81,7 +84,8 @@ def get_next_sequence_val(seq_name):
 def init_db():
     schema_file = os.path.join(os.path.dirname(__file__), 'schema.sql')
     if not os.path.exists(schema_file):
-        raise FileNotFoundError(f"Schema file not found at {schema_file}")
+        logger.warning(f"Schema file not found at {schema_file}, skipping automatic initialization.")
+        return
     
     with open(schema_file, 'r', encoding='utf-8') as f:
         schema_sql = f.read()

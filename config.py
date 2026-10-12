@@ -18,14 +18,27 @@ class Config:
     HOST = os.environ.get('HOST', '0.0.0.0')
     DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() in ('true', '1', 'yes')
 
-    # PostgreSQL Database Configuration
-    PG_HOST = os.environ.get('PG_HOST', '127.0.0.1')
-    PG_PORT = int(os.environ.get('PG_PORT', 5432))
-    PG_USER = os.environ.get('PG_USER', 'odoo')
-    PG_PASSWORD = os.environ.get('PG_PASSWORD', 'odoo')
-    PG_DATABASE = os.environ.get('PG_DATABASE', 'inflow_premium')
-    PG_MIN_CONN = int(os.environ.get('PG_MIN_CONN', 2))
-    PG_MAX_CONN = int(os.environ.get('PG_MAX_CONN', 20))
+    # PostgreSQL Database Configuration (supports local and cloud like Neon / Supabase / Vercel Postgres)
+    _db_url = os.environ.get('DATABASE_URL') or os.environ.get('POSTGRES_URL')
+    if _db_url:
+        from urllib.parse import urlparse
+        _parsed = urlparse(_db_url)
+        PG_HOST = _parsed.hostname or '127.0.0.1'
+        PG_PORT = _parsed.port or 5432
+        PG_USER = _parsed.username or 'odoo'
+        PG_PASSWORD = _parsed.password or 'odoo'
+        PG_DATABASE = (_parsed.path or '/inflow_premium').lstrip('/')
+        PG_SSLMODE = os.environ.get('PG_SSLMODE', 'require')
+    else:
+        PG_HOST = os.environ.get('PG_HOST', '127.0.0.1')
+        PG_PORT = int(os.environ.get('PG_PORT', 5432))
+        PG_USER = os.environ.get('PG_USER', 'odoo')
+        PG_PASSWORD = os.environ.get('PG_PASSWORD', 'odoo')
+        PG_DATABASE = os.environ.get('PG_DATABASE', 'inflow_premium')
+        PG_SSLMODE = os.environ.get('PG_SSLMODE', None)
+
+    PG_MIN_CONN = int(os.environ.get('PG_MIN_CONN', 1))
+    PG_MAX_CONN = int(os.environ.get('PG_MAX_CONN', 10))
 
     # Legacy inFlow SQL Server Configuration
     SQLSERVER_HOST = os.environ.get('SQLSERVER_HOST', r'.\INFLOWSQL')

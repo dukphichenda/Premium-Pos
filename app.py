@@ -27,7 +27,12 @@ logging.basicConfig(
 logger = logging.getLogger('inflow.app')
 
 def create_app():
-    app = Flask(__name__, static_folder='static', template_folder='templates')
+    base_dir = os.path.abspath(os.path.dirname(__file__))
+    app = Flask(
+        __name__,
+        static_folder=os.path.join(base_dir, 'static'),
+        template_folder=os.path.join(base_dir, 'templates')
+    )
     app.config.from_object(Config)
 
     # Initialize Database Schema
@@ -364,8 +369,9 @@ def create_app():
 
     return app
 
+app = create_app()
+
 if __name__ == '__main__':
-    app = create_app()
     logger.info("==================================================================")
     logger.info(f" inFlow Premium Web Application starting on http://localhost:{Config.PORT}")
     logger.info(" High performance enterprise PostgreSQL backend active.")

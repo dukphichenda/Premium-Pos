@@ -8,7 +8,10 @@ if sys.stdout.encoding != 'utf-8':
         pass
 
 import logging
-import pyodbc
+try:
+    import pyodbc
+except ImportError:
+    pyodbc = None
 import psycopg2
 from psycopg2.extras import execute_values
 from config import Config
@@ -17,6 +20,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger('inflow.so_uom_sync')
 
 def get_sqlserver_connection():
+    if pyodbc is None:
+        raise RuntimeError("pyodbc is not installed in this environment.")
     conn_str = (
         f"Driver={{SQL Server}};"
         f"Server={Config.SQLSERVER_HOST};"

@@ -1,6 +1,11 @@
 from flask import Blueprint, render_template, request, jsonify, flash, redirect, url_for
 from database import query_one
-from migrate_inflow import migrate_all, get_sqlserver_connection
+try:
+    from migrate_inflow import migrate_all, get_sqlserver_connection
+except ImportError:
+    migrate_all = None
+    def get_sqlserver_connection():
+        raise RuntimeError("migrate_inflow module is not available in this environment.")
 from config import Config
 import logging
 

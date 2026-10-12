@@ -9,7 +9,10 @@ if sys.stdout.encoding != 'utf-8':
 import re
 import logging
 from datetime import datetime
-import pyodbc
+try:
+    import pyodbc
+except ImportError:
+    pyodbc = None
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from config import Config
@@ -25,6 +28,8 @@ def clean_str(s):
     return s.strip().lower()
 
 def get_sqlserver_connection():
+    if pyodbc is None:
+        raise RuntimeError("pyodbc is not installed in this environment.")
     conn_str = (
         f"Driver={{SQL Server}};"
         f"Server={Config.SQLSERVER_HOST};"

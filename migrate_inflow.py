@@ -2,7 +2,10 @@ import sys
 import logging
 import time
 from datetime import datetime
-import pyodbc
+try:
+    import pyodbc
+except ImportError:
+    pyodbc = None
 import psycopg2
 from psycopg2.extras import execute_values, RealDictCursor
 from config import Config
@@ -19,6 +22,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(me
 logger = logging.getLogger('inflow.migrate')
 
 def get_sqlserver_connection():
+    if pyodbc is None:
+        raise RuntimeError("pyodbc is not installed in this environment. SQL Server migration requires a local Windows environment with pyodbc.")
     conn_str = (
         f"Driver={{SQL Server}};"
         f"Server={Config.SQLSERVER_HOST};"
