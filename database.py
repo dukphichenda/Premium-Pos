@@ -63,14 +63,44 @@ def get_db_cursor(commit=False):
             cursor.close()
 
 def query_all(query, params=None):
-    with get_db_cursor(commit=False) as cur:
-        cur.execute(query, params or ())
-        return cur.fetchall()
+    try:
+        with get_db_cursor(commit=False) as cur:
+            cur.execute(query, params or ())
+            return cur.fetchall()
+    except Exception as e:
+        if 'does not exist' in str(e).lower() and not getattr(query_all, '_in_init', False):
+            logger.info("Undefined table detected. Running init_db() to provision schema...")
+            query_all._in_init = True
+            try:
+                init_db()
+                with get_db_cursor(commit=False) as cur:
+                    cur.execute(query, params or ())
+                    return cur.fetchall()
+            except Exception as retry_err:
+                logger.error(f"Failed to auto-provision schema on query_all: {retry_err}")
+            finally:
+                query_all._in_init = False
+        raise
 
 def query_one(query, params=None):
-    with get_db_cursor(commit=False) as cur:
-        cur.execute(query, params or ())
-        return cur.fetchone()
+    try:
+        with get_db_cursor(commit=False) as cur:
+            cur.execute(query, params or ())
+            return cur.fetchone()
+    except Exception as e:
+        if 'does not exist' in str(e).lower() and not getattr(query_one, '_in_init', False):
+            logger.info("Undefined table detected. Running init_db() to provision schema...")
+            query_one._in_init = True
+            try:
+                init_db()
+                with get_db_cursor(commit=False) as cur:
+                    cur.execute(query, params or ())
+                    return cur.fetchone()
+            except Exception as retry_err:
+                logger.error(f"Failed to auto-provision schema on query_one: {retry_err}")
+            finally:
+                query_one._in_init = False
+        raise
 
 def execute(query, params=None):
     with get_db_cursor(commit=True) as cur:
@@ -102,30 +132,33 @@ def init_db():
             cur.execute(schema_sql)
             
             # Resynchronize custom numbering sequences with current max IDs
-            cur.execute(r"""
-                DO $$
-                DECLARE
-                    m bigint;
-                BEGIN
-                    SELECT GREATEST(COALESCE(MAX(id), 0), COALESCE(MAX(NULLIF(regexp_replace(order_number, '\D', '', 'g'), '')::bigint), 0)) INTO m FROM sales_orders;
-                    IF m > 0 THEN PERFORM setval('so_number_seq', m, true); END IF;
-                    
-                    SELECT GREATEST(COALESCE(MAX(id), 0), COALESCE(MAX(NULLIF(regexp_replace(order_number, '\D', '', 'g'), '')::bigint), 0)) INTO m FROM purchase_orders;
-                    IF m > 0 THEN PERFORM setval('po_number_seq', m, true); END IF;
+            try:
+                cur.execute(r"""
+                    DO $$
+                    DECLARE
+                        m bigint;
+                    BEGIN
+                        SELECT GREATEST(COALESCE(MAX(id), 0), COALESCE(MAX(NULLIF(regexp_replace(order_number, '\D', '', 'g'), '')::bigint), 0)) INTO m FROM sales_orders;
+                        IF m > 0 THEN PERFORM setval('so_number_seq', m, true); END IF;
+                        
+                        SELECT GREATEST(COALESCE(MAX(id), 0), COALESCE(MAX(NULLIF(regexp_replace(order_number, '\D', '', 'g'), '')::bigint), 0)) INTO m FROM purchase_orders;
+                        IF m > 0 THEN PERFORM setval('po_number_seq', m, true); END IF;
 
-                    SELECT COALESCE(MAX(id), 0) INTO m FROM stock_adjustments;
-                    IF m > 0 THEN PERFORM setval('adj_number_seq', m, true); END IF;
+                        SELECT COALESCE(MAX(id), 0) INTO m FROM stock_adjustments;
+                        IF m > 0 THEN PERFORM setval('adj_number_seq', m, true); END IF;
 
-                    SELECT COALESCE(MAX(id), 0) INTO m FROM stock_transfers;
-                    IF m > 0 THEN PERFORM setval('trf_number_seq', m, true); END IF;
-                END $$;
-            """)
+                        SELECT COALESCE(MAX(id), 0) INTO m FROM stock_transfers;
+                        IF m > 0 THEN PERFORM setval('trf_number_seq', m, true); END IF;
+                    END $$;
+                """)
+            except Exception as seq_err:
+                logger.warning(f"Sequence sync warning: {seq_err}")
 
             # Ensure essential initial seed records exist if table is fresh
             try:
                 cur.execute("SELECT COUNT(*) FROM companies;")
                 if cur.fetchone()[0] == 0:
-                    cur.execute("INSERT INTO companies (name, currency, currency_symbol) VALUES ('inFlow Premium Wholesale', 'USD', '$');")
+                    cur.execute("INSERT INTO companies (name, currency_code, currency_symbol) VALUES ('inFlow Premium Wholesale', 'USD', '$');")
 
                 cur.execute("SELECT COUNT(*) FROM locations;")
                 if cur.fetchone()[0] == 0:

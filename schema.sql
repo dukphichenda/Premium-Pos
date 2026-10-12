@@ -86,6 +86,26 @@ CREATE TABLE IF NOT EXISTS pricing_schemes (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 5b. Vendors / Suppliers
+CREATE TABLE IF NOT EXISTS vendors (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(500) NOT NULL,
+    contact_name VARCHAR(255),
+    phone VARCHAR(100),
+    email VARCHAR(255),
+    address1 TEXT,
+    address2 TEXT,
+    city VARCHAR(100),
+    country VARCHAR(100) DEFAULT 'Cambodia',
+    postal_code VARCHAR(50),
+    payment_terms VARCHAR(100) DEFAULT 'Net 30',
+    currency_code VARCHAR(10) DEFAULT 'USD',
+    balance NUMERIC(16, 4) DEFAULT 0,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 6. Products Master Table
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
@@ -269,25 +289,7 @@ CREATE TABLE IF NOT EXISTS customers (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 11. Vendors / Suppliers
-CREATE TABLE IF NOT EXISTS vendors (
-    id SERIAL PRIMARY KEY,
-    name VARCHAR(500) NOT NULL,
-    contact_name VARCHAR(255),
-    phone VARCHAR(100),
-    email VARCHAR(255),
-    address1 TEXT,
-    address2 TEXT,
-    city VARCHAR(100),
-    country VARCHAR(100) DEFAULT 'Cambodia',
-    postal_code VARCHAR(50),
-    payment_terms VARCHAR(100) DEFAULT 'Net 30',
-    currency_code VARCHAR(10) DEFAULT 'USD',
-    balance NUMERIC(16, 4) DEFAULT 0,
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
+-- 11. Vendors / Suppliers (defined above for foreign key integrity)
 
 -- 11b. Product Vendors Catalog (BASE_VendorItem mapping)
 CREATE TABLE IF NOT EXISTS product_vendors (
