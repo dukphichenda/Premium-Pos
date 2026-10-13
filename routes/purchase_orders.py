@@ -150,20 +150,20 @@ def _get_po_drawer_data(date_filter='All', status_filter='Open, In Progress', ve
     elif date_filter == 'Last 30 Days':
         where_clauses.append("po.order_date >= CURRENT_DATE - INTERVAL '30 days' AND po.order_date <= CURRENT_DATE")
 
-    if status_filter and status_filter.strip() != 'All':
+    if status_filter and status_filter.strip() not in ('All', ''):
         parts = [p.strip() for p in status_filter.split(',') if p.strip()]
         status_clauses = []
         for p in parts:
             if p == 'Open':
-                status_clauses.append("po.status = 'ISSUED'")
+                status_clauses.append("po.status IN ('ISSUED', 'OPEN')")
             elif p in ('In Progress', 'Partial'):
-                status_clauses.append("po.status = 'PARTIAL_RECEIVED'")
+                status_clauses.append("po.status IN ('PARTIAL_RECEIVED', 'IN_PROGRESS', 'PARTIAL')")
             elif p == 'Received':
-                status_clauses.append("po.status = 'RECEIVED'")
+                status_clauses.append("po.status IN ('RECEIVED', 'FULFILLED')")
             elif p == 'Paid':
                 status_clauses.append("(po.status = 'PAID' OR po.payment_status = 'PAID')")
             elif p == 'Cancelled':
-                status_clauses.append("po.status = 'CANCELLED'")
+                status_clauses.append("po.status IN ('CANCELLED', 'VOID')")
         if status_clauses:
             where_clauses.append("(" + " OR ".join(status_clauses) + ")")
 
@@ -180,7 +180,7 @@ def _get_po_drawer_data(date_filter='All', status_filter='Open, In Progress', ve
         LEFT JOIN locations l ON po.location_id = l.id
         WHERE {' AND '.join(where_clauses)}
         ORDER BY po.order_date DESC, po.id DESC
-        LIMIT 300;
+        LIMIT 1000;
     """
     sidebar_orders = query_all(sql, tuple(params))
 
@@ -292,7 +292,7 @@ def api_vendor_summary(id):
 @purchase_orders_bp.route('/api/purchases/drawer')
 def api_purchases_drawer():
     date_filter = request.args.get('date_filter', 'All')
-    status_filter = request.args.get('status_filter', 'Open, In Progress')
+    status_filter = request.args.get('status_filter', 'All')
     vendor_search = request.args.get('vendor_search', '')
     order_search = request.args.get('order_search', '')
     data = _get_po_drawer_data(date_filter, status_filter, vendor_search, order_search)
@@ -302,7 +302,7 @@ def api_purchases_drawer():
             'id': o['id'],
             'order_number': o['order_number'],
             'order_date': o['order_date'].strftime('%d-%b-%y') if o['order_date'] else '',
-            'status': 'Open' if o['status'] == 'ISSUED' else ('In Progress' if o['status'] == 'PARTIAL_RECEIVED' else o['status']),
+            'status': 'Open' if o['status'] in ('ISSUED', 'OPEN') else ('In Progress' if o['status'] == 'PARTIAL_RECEIVED' else o['status']),
             'vendor_name': o['vendor_name'] or '',
             'vendor_invoice_no': o['vendor_invoice_no'] or '',
             'location_name': o['location_name'] or '',
@@ -318,7 +318,7 @@ def api_purchases_drawer():
 def create_purchase():
     if request.method == 'GET':
         date_filter = request.args.get('date_filter', 'All')
-        status_filter = request.args.get('status_filter', 'Open, In Progress')
+        status_filter = request.args.get('status_filter', 'All')
         vendor_search = request.args.get('vendor_search', '')
         order_search = request.args.get('order_search', '')
 
@@ -600,7 +600,7 @@ def detail_purchase(id):
         return redirect(url_for('purchase_orders.list_purchases'))
 
     date_filter = request.args.get('date_filter', 'All')
-    status_filter = request.args.get('status_filter', 'Open, In Progress')
+    status_filter = request.args.get('status_filter', 'All')
     vendor_search = request.args.get('vendor_search', '')
     order_search = request.args.get('order_search', '')
 

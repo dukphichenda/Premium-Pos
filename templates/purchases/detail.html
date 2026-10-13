@@ -247,8 +247,11 @@
 
         <!-- Compact List View (Default) -->
         <div class="inflow-drawer-compact-view">
-            <div class="inflow-drawer-list-header">
+            <div class="inflow-drawer-list-header" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px;">
                 <span>Order # ▾</span>
+                <span class="inflow-drawer-total-tag" style="font-size: 10.5px; font-weight: 700; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; padding: 1px 7px; border-radius: 10px;">
+                    Total: <b id="poDrawerListHeaderCount">{{ sidebar_orders|length }}</b>
+                </span>
             </div>
             <div class="inflow-drawer-list-body" id="poDrawerOrdersListBody">
                 {% for s_ord in sidebar_orders %}
@@ -262,7 +265,7 @@
                 {% endfor %}
             </div>
             <div class="inflow-drawer-footer-count" style="padding: 6px 12px; font-size: 10px; text-align: center;">
-                Total: {{ sidebar_orders|length }} Purchase Orders
+                Total: <span id="poDrawerListFooterCount">{{ sidebar_orders|length }}</span> Purchase Orders
             </div>
         </div>
 
@@ -565,13 +568,12 @@
                     <thead>
                         <tr>
                             <th class="inflow-grid-selector-col"></th>
-                            <th style="width: 25%;">Item</th>
-                            <th style="width: 20%;">Description</th>
-                            <th style="width: 14%;">Vendor Product Code</th>
-                            <th style="width: 13%; text-align: right;">Quantity</th>
-                            <th style="width: 10%; text-align: right;">Unit Price</th>
+                            <th style="width: 38%;">Item</th>
+                            <th style="width: 18%;">Vendor Product Code</th>
+                            <th style="width: 15%; text-align: right;">Quantity</th>
+                            <th style="width: 12%; text-align: right;">Unit Price</th>
                             <th style="width: 6%; text-align: right;">Discount</th>
-                            <th style="width: 12%; text-align: right;">Sub-Total</th>
+                            <th style="width: 11%; text-align: right;">Sub-Total</th>
                         </tr>
                     </thead>
                     <tbody id="poLineItemsBody">
@@ -580,13 +582,11 @@
                             <td class="inflow-grid-selector-col">{% if loop.first %}▶{% endif %}</td>
                             <td style="position: relative;">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}" class="line-product-id">
+                                <input type="hidden" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or l.product_name or '' }}" class="line-desc">
                                 <input type="text" class="inflow-field-input grid-item-input" value="{{ l.product_sku }} {{ l.product_name }}" 
                                        placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
                                        onfocus="openPoItemDropdown(this)" oninput="filterPoItemDropdown(this.value)"
                                        onkeydown="handlePoItemDropdownKey(event, this)">
-                            </td>
-                            <td>
-                                <input type="text" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or l.product_name or '' }}" class="inflow-field-input line-desc" style="border: none; background: transparent; width: 100%;">
                             </td>
                             <td>
                                 <input type="text" name="lines[{{ loop.index0 }}][vendor_product_code]" value="{{ l.vendor_product_code or '' }}" class="inflow-field-input line-vpc" placeholder="Vendor code..." style="border: none; background: transparent; width: 100%;">
@@ -633,14 +633,12 @@
                             <td></td>
                             <td></td>
                             <td></td>
-                            <td></td>
                         </tr>
 
                         <!-- Empty Desktop Grid Rows for visual authentic inFlow look -->
                         {% for i in range(5) %}
                         <tr>
                             <td class="inflow-grid-selector-col"></td>
-                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
@@ -1167,10 +1165,32 @@ function syncPoDrawerFilters() {
         const vendorF = document.getElementById('poDrawerVendorSearchInput')?.value;
         const orderF = document.getElementById('poDrawerOrderSearchInput')?.value;
         sessionStorage.setItem('po_date_filter', dateF || 'All');
-        sessionStorage.setItem('po_status_filter', statusF || 'Open, In Progress');
+        sessionStorage.setItem('po_status_filter', statusF || 'All');
         sessionStorage.setItem('po_vendor_search', vendorF || '');
         sessionStorage.setItem('po_order_search', orderF || '');
     } catch(e) {}
+}
+
+function initPoStatusCheckboxes() {
+    if (sessionStorage.getItem('po_status_filter') === 'Open, In Progress') {
+        sessionStorage.setItem('po_status_filter', 'All');
+    }
+    const input = document.getElementById('poDrawerStatusFilterInput');
+    const val = input ? (input.value || 'All').trim() : 'All';
+    if (val === 'All' || !val) {
+        const chkAll = document.getElementById('chkPoStatusAll');
+        if (chkAll) chkAll.checked = true;
+        document.querySelectorAll('.po-status-option-chk').forEach(c => c.checked = true);
+        if (input) input.value = 'All';
+    } else {
+        const parts = val.split(',').map(s => s.trim().toLowerCase());
+        document.querySelectorAll('.po-status-option-chk').forEach(c => {
+            c.checked = parts.includes(c.value.toLowerCase());
+        });
+        const allChecked = Array.from(document.querySelectorAll('.po-status-option-chk')).every(c => c.checked);
+        const chkAll = document.getElementById('chkPoStatusAll');
+        if (chkAll) chkAll.checked = allChecked;
+    }
 }
 
 // --- Status Filter Dropdown Checkboxes ---
@@ -1414,13 +1434,11 @@ function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc, uom) {
         <td class="inflow-grid-selector-col"></td>
         <td style="position: relative;">
             <input type="hidden" name="lines[${index}][product_id]" value="${productId}" class="line-product-id">
+            <input type="hidden" name="lines[${index}][description]" value="${name}" class="line-desc">
             <input type="text" class="inflow-field-input grid-item-input" value="${sku} ${name}" 
                    placeholder="Type item..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
                    onfocus="openPoItemDropdown(this)" oninput="filterPoItemDropdown(this.value)"
                    onkeydown="handlePoItemDropdownKey(event, this)">
-        </td>
-        <td>
-            <input type="text" name="lines[${index}][description]" value="${name}" class="inflow-field-input line-desc" style="border: none; background: transparent; width: 100%;">
         </td>
         <td>
             <input type="text" name="lines[${index}][vendor_product_code]" value="${vpc || ''}" class="inflow-field-input line-vpc" placeholder="Vendor code..." style="border: none; background: transparent; width: 100%;">
@@ -1931,6 +1949,7 @@ document.addEventListener('keydown', (e) => {
 
 // Auto-select first line on load
 document.addEventListener('DOMContentLoaded', () => {
+    initPoStatusCheckboxes();
     const firstRow = document.querySelector('#poLineItemsBody tr[data-line-index]');
     if (firstRow) selectPoGridRow(firstRow);
 });
