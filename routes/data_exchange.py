@@ -45,16 +45,39 @@ def import_preview_api():
 @data_exchange_bp.route('/data/import/execute', methods=['POST'])
 def import_execute_api():
     try:
+        import json
         data_type = request.form.get('data_type', 'product')
         has_headers = request.form.get('has_headers', '1') in ['1', 'true', 'on']
         import_mode = request.form.get('import_mode', 'keep').strip().lower()
+        
+        selected_orders_raw = request.form.get('selected_orders')
+        selected_orders = None
+        if selected_orders_raw:
+            try:
+                selected_orders = json.loads(selected_orders_raw)
+            except Exception:
+                selected_orders = [s.strip() for s in selected_orders_raw.split(',') if s.strip()]
+
+        selected_rows_raw = request.form.get('selected_rows')
+        selected_rows = None
+        if selected_rows_raw:
+            try:
+                selected_rows = json.loads(selected_rows_raw)
+            except Exception:
+                selected_rows = [int(s.strip()) for s in selected_rows_raw.split(',') if s.strip().isdigit()]
         
         file = request.files.get('file')
         if not file or not file.filename:
             return jsonify({'success': False, 'message': 'Please select a CSV file to import.'}), 400
 
         content = file.read()
-        res = execute_import_data(data_type, content, has_headers=has_headers, import_mode=import_mode)
+        res = execute_import_data(
+            data_type, content, 
+            has_headers=has_headers, 
+            import_mode=import_mode,
+            selected_orders=selected_orders,
+            selected_rows=selected_rows
+        )
         return jsonify(res)
     except Exception as e:
         logger.error(f"Import execution error: {e}", exc_info=True)

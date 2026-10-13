@@ -148,24 +148,89 @@
                 </div>
             </div>
 
-            <!-- STEP 2: Preview & Column Verification Grid -->
+            <!-- STEP 2: Preview & Order Selection Grid -->
             <div id="step2Container" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                    <div style="font-size: 13px; font-weight: 700; color: #0F172A;">
-                        Preview Data & Verification (<span id="previewRowCount">0</span> rows detected)
-                    </div>
-                    <span id="previewStatusBadge" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #DCFCE7; color: #15803D; font-weight: 600;">Ready to Import</span>
-                </div>
-
                 <!-- Mode Banner on Preview Step -->
                 <div id="step2ModeBanner" style="margin-bottom: 12px; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
                 </div>
 
-                <div class="inflow-preview-table-wrapper">
-                    <table class="inflow-preview-table" id="previewTable">
-                        <thead id="previewTableHead"></thead>
-                        <tbody id="previewTableBody"></tbody>
-                    </table>
+                <!-- ORDER SELECTION SECTION (Shown for SO & PO) -->
+                <div id="orderSelectionCard" style="display: none; margin-bottom: 14px;">
+                    <div class="order-selection-card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <div>
+                                <div style="font-size: 13px; font-weight: 700; color: #0F172A; display: flex; align-items: center; gap: 6px;">
+                                    <span>Select Orders to Import</span>
+                                    <span id="orderSelectionTypeBadge" class="order-badge-type">Sales Orders</span>
+                                </div>
+                                <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">
+                                    Tick the orders you wish to import. Unchecked orders will remain untouched in your database.
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 12px; font-weight: 600; color: #1E293B;">
+                                    Selected: <span id="selectedOrdersCount" style="color: #2563EB;">0</span> / <span id="totalOrdersCount">0</span>
+                                </span>
+                                <button type="button" class="inflow-win-btn-sm" onclick="selectAllOrders(true)">Select All</button>
+                                <button type="button" class="inflow-win-btn-sm" onclick="selectAllOrders(false)">Deselect All</button>
+                            </div>
+                        </div>
+
+                        <!-- Search and Quick Filter Bar -->
+                        <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center;">
+                            <div style="position: relative; flex: 1;">
+                                <input type="text" id="orderSearchInput" class="inflow-win-textbox" placeholder="Search by Order #, Customer/Vendor, or Status..." oninput="onFilterOrders(this.value)" style="width: 100%; padding-left: 28px; font-size: 12px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" style="position: absolute; left: 8px; top: 6px; pointer-events: none;">
+                                    <circle cx="11" cy="11" r="8"></circle>
+                                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                                </svg>
+                            </div>
+                            <span id="orderFilteredNotice" style="display: none; font-size: 11px; color: #64748B;"></span>
+                        </div>
+                    </div>
+
+                    <!-- Orders Table with Checkboxes -->
+                    <div class="inflow-preview-table-wrapper" style="max-height: 290px;">
+                        <table class="inflow-preview-table" id="orderSelectionTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 36px; text-align: center;">
+                                        <input type="checkbox" id="masterOrderCheckbox" onchange="toggleMasterOrderCheckbox(this.checked)" checked title="Select/Deselect All">
+                                    </th>
+                                    <th style="width: 110px;">Order #</th>
+                                    <th id="colPartyHeader">Customer</th>
+                                    <th style="width: 95px;">Date</th>
+                                    <th style="width: 95px;">Status</th>
+                                    <th style="width: 75px; text-align: center;">Items</th>
+                                    <th style="width: 105px; text-align: right;">Total Amount</th>
+                                    <th style="width: 155px; text-align: center;">Action / DB Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderSelectionTableBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- RAW CSV ROWS SECTION -->
+                <div id="rawPreviewSection">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <div id="rawPreviewHeaderTitle" style="font-size: 13px; font-weight: 700; color: #0F172A;">
+                            Preview Data & Verification (<span id="previewRowCount">0</span> rows detected)
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" id="btnToggleRawPreview" class="btn-toggle-raw" onclick="toggleRawPreview()" style="display: none;">
+                                <span id="rawToggleIcon">▶</span> <span id="rawToggleText">Show Raw CSV Rows</span>
+                            </button>
+                            <span id="previewStatusBadge" style="font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #DCFCE7; color: #15803D; font-weight: 600;">Ready to Import</span>
+                        </div>
+                    </div>
+
+                    <div class="inflow-preview-table-wrapper" id="rawPreviewTableWrapper">
+                        <table class="inflow-preview-table" id="previewTable">
+                            <thead id="previewTableHead"></thead>
+                            <tbody id="previewTableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
 
                 <div id="importResultBox" style="display: none; margin-top: 14px; padding: 12px; border-radius: 6px; font-size: 12.5px;"></div>
@@ -494,6 +559,126 @@
     background: #FEF2F2;
     box-shadow: 0 0 0 1px #DC2626 inset;
 }
+
+/* Widen window in Step 2 */
+.inflow-win-window.wide-mode {
+    width: 920px;
+    max-width: 96vw;
+    transition: width 0.2s ease-in-out;
+}
+
+.inflow-win-btn-sm {
+    height: 23px;
+    padding: 0 9px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #1F2937;
+    background: linear-gradient(180deg, #FFFFFF 0%, #E5E7EB 100%);
+    border: 1px solid #9CA3AF;
+    border-radius: 2px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.inflow-win-btn-sm:hover {
+    background: linear-gradient(180deg, #FFFFFF 0%, #D1D5DB 100%);
+    border-color: #6B7280;
+}
+
+.order-selection-card {
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+}
+
+.order-badge-type {
+    background: #E0E7FF;
+    color: #3730A3;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+}
+
+.order-row {
+    cursor: pointer;
+    transition: background-color 0.1s ease;
+}
+.order-row:hover {
+    background-color: #F8FAFC;
+}
+.order-row.selected {
+    background-color: #F0F9FF;
+}
+
+.order-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+}
+.badge-update {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid #BFDBFE;
+}
+.badge-new {
+    background: #ECFDF5;
+    color: #047857;
+    border: 1px solid #A7F3D0;
+}
+
+.status-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
+.status-tag.open, .status-tag.partial {
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FDE68A;
+}
+.status-tag.paid, .status-tag.invoiced, .status-tag.shipped {
+    background: #DCFCE7;
+    color: #166534;
+    border: 1px solid #BBF7D0;
+}
+.status-tag.draft, .status-tag.quote {
+    background: #F1F5F9;
+    color: #475569;
+    border: 1px solid #E2E8F0;
+}
+.status-tag.cancelled {
+    background: #FEE2E2;
+    color: #991B1B;
+    border: 1px solid #FECACA;
+}
+
+.btn-toggle-raw {
+    background: none;
+    border: none;
+    color: #0066CC;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+}
+.btn-toggle-raw:hover {
+    text-decoration: underline;
+}
 </style>
 
 <script>
@@ -508,6 +693,8 @@ const DESCRIPTIONS = {
 
 let selectedFile = null;
 let currentImportMode = 'keep';
+let currentOrdersSummary = null;
+let isRawPreviewExpanded = false;
 
 function onDataTypeChange() {
     const sel = document.getElementById('dataTypeSelect');
@@ -613,7 +800,37 @@ async function onNextStep() {
             banner.style.background = '#F0FDF4';
             banner.style.border = '1px solid #BBF7D0';
             banner.style.color = '#15803D';
-            banner.innerHTML = `ℹ️ <span><strong>Safe Mode:</strong> Keep existing ${escapeHtml(selText)} records and add / update new items.</span>`;
+            banner.innerHTML = `ℹ️ <span><strong>Safe Mode:</strong> Keep existing ${escapeHtml(selText)} records and add / update chosen orders.</span>`;
+        }
+
+        const winBox = document.querySelector('.inflow-win-window');
+        if (winBox) winBox.classList.add('wide-mode');
+
+        // Check if order selection is available (SO and PO)
+        if (res.orders_summary && res.orders_summary.length > 0) {
+            currentOrdersSummary = res.orders_summary;
+            document.getElementById('orderSelectionCard').style.display = 'block';
+
+            const isPO = (dataType === 'purchase_order');
+            document.getElementById('orderSelectionTypeBadge').textContent = isPO ? 'Purchase Orders' : 'Sales Orders';
+            document.getElementById('colPartyHeader').textContent = isPO ? 'Vendor' : 'Customer';
+
+            renderOrderSelectionTable(res.orders_summary);
+
+            // Collapse raw preview by default when order list is present
+            document.getElementById('btnToggleRawPreview').style.display = 'inline-flex';
+            document.getElementById('rawPreviewTableWrapper').style.display = 'none';
+            document.getElementById('rawToggleIcon').textContent = '▶';
+            document.getElementById('rawToggleText').textContent = `Show Raw CSV Rows (${res.total_rows})`;
+            document.getElementById('rawPreviewHeaderTitle').style.display = 'none';
+            isRawPreviewExpanded = false;
+        } else {
+            currentOrdersSummary = null;
+            document.getElementById('orderSelectionCard').style.display = 'none';
+            document.getElementById('btnToggleRawPreview').style.display = 'none';
+            document.getElementById('rawPreviewTableWrapper').style.display = 'block';
+            document.getElementById('rawPreviewHeaderTitle').style.display = 'block';
+            document.getElementById('rawPreviewHeaderTitle').innerHTML = `Preview Data & Verification (<span id="previewRowCount">${res.total_rows}</span> rows detected)`;
         }
 
         // Switch to Step 2
@@ -630,6 +847,145 @@ async function onNextStep() {
     } finally {
         btnNext.disabled = false;
         btnNext.textContent = 'Next >';
+    }
+}
+
+function renderOrderSelectionTable(orders) {
+    const tbody = document.getElementById('orderSelectionTableBody');
+    let html = '';
+
+    orders.forEach((ord, index) => {
+        const st = (ord.status || 'OPEN').toUpperCase();
+        let stClass = 'open';
+        if (['PAID', 'INVOICED', 'SHIPPED'].includes(st)) stClass = 'paid';
+        else if (['DRAFT', 'QUOTE'].includes(st)) stClass = 'draft';
+        else if (['CANCELLED', 'CANCELED'].includes(st)) stClass = 'cancelled';
+        else if (['PARTIAL', 'IN_PROGRESS', 'PICKED'].includes(st)) stClass = 'partial';
+
+        const dbBadge = ord.is_existing 
+            ? `<span class="order-status-badge badge-update" title="Already exists in database. It will be updated.">🔄 Existing (Will Update)</span>`
+            : `<span class="order-status-badge badge-new" title="New order not found in database. It will be added.">➕ New Order (Will Add)</span>`;
+
+        const fmtTotal = '$' + (Number(ord.total_amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        html += `
+            <tr class="order-row selected" data-idx="${index}" onclick="onOrderRowClick(event, this)">
+                <td style="text-align: center;" onclick="event.stopPropagation()">
+                    <input type="checkbox" class="order-chk" data-order="${escapeHtml(ord.order_number)}" checked onchange="onOrderCheckboxChange(this)">
+                </td>
+                <td><strong>${escapeHtml(ord.order_number)}</strong></td>
+                <td>${escapeHtml(ord.party_name)}</td>
+                <td>${escapeHtml(ord.order_date)}</td>
+                <td><span class="status-tag ${stClass}">${escapeHtml(ord.status)}</span></td>
+                <td style="text-align: center;" title="${escapeHtml(ord.items_summary || '')}">${ord.item_count} items</td>
+                <td style="text-align: right; font-weight: 600;">${fmtTotal}</td>
+                <td style="text-align: center;">${dbBadge}</td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+    document.getElementById('totalOrdersCount').textContent = orders.length;
+    document.getElementById('masterOrderCheckbox').checked = true;
+    document.getElementById('orderSearchInput').value = '';
+    document.getElementById('orderFilteredNotice').style.display = 'none';
+    updateSelectedOrdersCounter();
+}
+
+function onOrderRowClick(event, row) {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'BUTTON') return;
+    const chk = row.querySelector('.order-chk');
+    if (chk) {
+        chk.checked = !chk.checked;
+        onOrderCheckboxChange(chk);
+    }
+}
+
+function onOrderCheckboxChange(chk) {
+    const row = chk.closest('tr');
+    if (row) {
+        if (chk.checked) row.classList.add('selected');
+        else row.classList.remove('selected');
+    }
+    updateSelectedOrdersCounter();
+}
+
+function updateSelectedOrdersCounter() {
+    const allChks = document.querySelectorAll('.order-chk');
+    const checkedChks = document.querySelectorAll('.order-chk:checked');
+    const countEl = document.getElementById('selectedOrdersCount');
+    if (countEl) countEl.textContent = checkedChks.length;
+
+    const masterChk = document.getElementById('masterOrderCheckbox');
+    if (masterChk) {
+        if (checkedChks.length === 0) {
+            masterChk.checked = false;
+            masterChk.indeterminate = false;
+        } else if (checkedChks.length === allChks.length) {
+            masterChk.checked = true;
+            masterChk.indeterminate = false;
+        } else {
+            masterChk.checked = false;
+            masterChk.indeterminate = true;
+        }
+    }
+}
+
+function selectAllOrders(state) {
+    const rows = document.querySelectorAll('#orderSelectionTableBody tr');
+    rows.forEach(r => {
+        if (r.style.display !== 'none') {
+            const chk = r.querySelector('.order-chk');
+            if (chk) {
+                chk.checked = state;
+                if (state) r.classList.add('selected');
+                else r.classList.remove('selected');
+            }
+        }
+    });
+    updateSelectedOrdersCounter();
+}
+
+function toggleMasterOrderCheckbox(state) {
+    selectAllOrders(state);
+}
+
+function onFilterOrders(query) {
+    const q = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#orderSelectionTableBody tr');
+    let visibleCnt = 0;
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        if (!q || text.includes(q)) {
+            r.style.display = '';
+            visibleCnt++;
+        } else {
+            r.style.display = 'none';
+        }
+    });
+    const notice = document.getElementById('orderFilteredNotice');
+    if (q) {
+        notice.style.display = 'inline';
+        notice.textContent = `Showing ${visibleCnt} of ${rows.length}`;
+    } else {
+        notice.style.display = 'none';
+    }
+}
+
+function toggleRawPreview() {
+    isRawPreviewExpanded = !isRawPreviewExpanded;
+    const wrapper = document.getElementById('rawPreviewTableWrapper');
+    const icon = document.getElementById('rawToggleIcon');
+    const txt = document.getElementById('rawToggleText');
+    const totalRows = document.getElementById('previewRowCount').textContent;
+    if (isRawPreviewExpanded) {
+        wrapper.style.display = 'block';
+        icon.textContent = '▼';
+        txt.textContent = 'Hide Raw CSV Rows';
+    } else {
+        wrapper.style.display = 'none';
+        icon.textContent = '▶';
+        txt.textContent = `Show Raw CSV Rows (${totalRows})`;
     }
 }
 
@@ -660,6 +1016,9 @@ function renderPreviewTable(headers, rows) {
 }
 
 function onBackStep() {
+    const winBox = document.querySelector('.inflow-win-window');
+    if (winBox) winBox.classList.remove('wide-mode');
+
     document.getElementById('step1Container').style.display = 'block';
     document.getElementById('step2Container').style.display = 'none';
     document.getElementById('step1Buttons').style.display = 'flex';
@@ -684,6 +1043,17 @@ async function onExecuteImport() {
     formData.append('has_headers', hasHeaders ? '1' : '0');
     formData.append('import_mode', currentImportMode);
     formData.append('file', selectedFile);
+
+    // If order selection is active, gather selected orders
+    if (currentOrdersSummary && currentOrdersSummary.length > 0) {
+        const checkedChks = document.querySelectorAll('.order-chk:checked');
+        if (checkedChks.length === 0) {
+            alert('Please select at least one order to import, or click Cancel.');
+            return;
+        }
+        const checkedOrders = Array.from(checkedChks).map(el => el.getAttribute('data-order'));
+        formData.append('selected_orders', JSON.stringify(checkedOrders));
+    }
 
     const btnExec = document.getElementById('btnExecuteImport');
     const btnBack = document.getElementById('btnBack');
@@ -741,6 +1111,8 @@ function onFinishImport() {
         const dt = document.getElementById('dataTypeSelect').value;
         if (dt === 'sales_order') {
             window.location.href = "{{ url_for('sales_orders.list_orders') }}";
+        } else if (dt === 'purchase_order') {
+            window.location.href = "{{ url_for('purchase_orders.list_purchases') }}";
         } else {
             window.location.href = "{{ url_for('products.list_products') }}";
         }

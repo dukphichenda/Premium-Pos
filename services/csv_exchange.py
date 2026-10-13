@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import re
 import logging
 from datetime import datetime
@@ -351,7 +352,7 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
     preview_limit = 6
     preview = data_rows[:preview_limit]
     
-    return {
+    result = {
         'data_type': key,
         'data_type_name': meta['display_name'],
         'headers': headers,
@@ -361,8 +362,116 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
         'import_mode': import_mode
     }
 
+    # For Sales Orders and Purchase Orders, group rows by order number
+    # and provide order summary metadata with existing database checks for user selection
+    if key in ('sales_order', 'purchase_order') and data_rows:
+        norm_headers = [normalize_header(h) for h in headers]
 
-def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep'):
+        def get_val_preview(row, header_aliases, default=''):
+            norm_aliases = [normalize_header(a) for a in header_aliases]
+            for target in norm_aliases:
+                if target in norm_headers:
+                    idx = norm_headers.index(target)
+                    if idx < len(row):
+                        val = row[idx].strip()
+                        val = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', val).strip()
+                        if val != '':
+                            return val
+            return default
+
+        existing_order_nums = set()
+        try:
+            if key == 'sales_order':
+                rows = query_all("SELECT order_number FROM sales_orders WHERE order_number IS NOT NULL;")
+            else:
+                rows = query_all("SELECT order_number FROM purchase_orders WHERE order_number IS NOT NULL;")
+            for r in (rows or []):
+                if r.get('order_number'):
+                    existing_order_nums.add(str(r['order_number']).strip().lower())
+        except Exception as e:
+            logger.warning(f"Could not load existing {key} numbers for preview: {e}")
+
+        orders_grouped = {}
+        for r in data_rows:
+            if key == 'sales_order':
+                ord_num = get_val_preview(r, ['OrderNumber', 'Order Number', 'SO Number', 'Invoice Number', 'Order #'])
+                if not ord_num:
+                    continue
+                if ord_num not in orders_grouped:
+                    orders_grouped[ord_num] = {
+                        'order_number': ord_num,
+                        'party_name': get_val_preview(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer'),
+                        'order_date': get_val_preview(r, ['OrderDate', 'Order Date', 'Date'], ''),
+                        'status': get_val_preview(r, ['OrderStatus', 'Order Status', 'Status', 'State'], 'OPEN').upper(),
+                        'freight': clean_num_val(get_val_preview(r, ['Freight', 'Shipping Fee', 'OrderFreight', 'Shipping']), 0.0),
+                        'line_subtotals': 0.0,
+                        'total_line_count': 0,
+                        'items': []
+                    }
+                item_name = get_val_preview(r, ['ItemName', 'Item Name', 'Item Code', 'ItemCode', 'SKU', 'Product Name'], 'Item')
+                qty = clean_num_val(get_val_preview(r, ['ItemQuantity', 'Quantity', 'Qty']), 1.0)
+                price = clean_num_val(get_val_preview(r, ['ItemUnitPrice', 'Unit Price', 'Price']), 0.0)
+                disc_raw = str(get_val_preview(r, ['ItemDiscount', 'Discount'], '')).strip()
+                disc_pct = clean_num_val(disc_raw.replace('%', ''), 0.0) if disc_raw else 0.0
+                subtot_raw = clean_num_val(get_val_preview(r, ['ItemSubtotal', 'Subtotal']), None)
+                if subtot_raw is not None:
+                    line_sub = subtot_raw
+                else:
+                    line_sub = qty * price * (1.0 - (disc_pct / 100.0))
+                orders_grouped[ord_num]['line_subtotals'] += line_sub
+                orders_grouped[ord_num]['total_line_count'] += 1
+                if len(orders_grouped[ord_num]['items']) < 3:
+                    orders_grouped[ord_num]['items'].append(f"{item_name} ({qty:g})")
+            else:  # purchase_order
+                ord_num = get_val_preview(r, ['OrderNumber', 'Order Number', 'PO Number', 'Order #'])
+                if not ord_num:
+                    continue
+                if ord_num not in orders_grouped:
+                    orders_grouped[ord_num] = {
+                        'order_number': ord_num,
+                        'party_name': get_val_preview(r, ['Vendor', 'VendorName', 'Vendor Name', 'Supplier'], 'General Supplier'),
+                        'order_date': get_val_preview(r, ['OrderDate', 'Order Date', 'Date'], ''),
+                        'status': get_val_preview(r, ['OrderStatus', 'Order Status', 'Status'], 'DRAFT').upper(),
+                        'freight': 0.0,
+                        'line_subtotals': 0.0,
+                        'total_line_count': 0,
+                        'items': []
+                    }
+                item_name = get_val_preview(r, ['ItemName', 'Item Name', 'Item Code', 'ItemCode', 'SKU', 'VendorItemCode'], 'Item')
+                qty = clean_num_val(get_val_preview(r, ['ItemQuantity', 'Quantity', 'Qty']), 1.0)
+                cost = clean_num_val(get_val_preview(r, ['ItemUnitPrice', 'Unit Cost', 'Cost']), 0.0)
+                subtot_raw = clean_num_val(get_val_preview(r, ['ItemSubtotal', 'Subtotal']), None)
+                line_sub = subtot_raw if subtot_raw is not None else (qty * cost)
+                orders_grouped[ord_num]['line_subtotals'] += line_sub
+                orders_grouped[ord_num]['total_line_count'] += 1
+                if len(orders_grouped[ord_num]['items']) < 3:
+                    orders_grouped[ord_num]['items'].append(f"{item_name} ({qty:g})")
+
+        orders_summary = []
+        for ord_num, odata in orders_grouped.items():
+            total = round(odata['line_subtotals'] + odata['freight'], 2)
+            is_exist = (str(ord_num).strip().lower() in existing_order_nums)
+            items_str = ", ".join(odata['items'])
+            if odata['total_line_count'] > len(odata['items']):
+                items_str += f", +{odata['total_line_count'] - len(odata['items'])} more"
+            orders_summary.append({
+                'order_number': ord_num,
+                'party_name': odata['party_name'],
+                'order_date': odata['order_date'] or '-',
+                'status': odata['status'],
+                'item_count': odata['total_line_count'],
+                'total_amount': total,
+                'is_existing': is_exist,
+                'items_summary': items_str
+            })
+
+        result['orders_summary'] = orders_summary
+        result['total_orders'] = len(orders_summary)
+
+    return result
+
+
+def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep', selected_orders=None, selected_rows=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
 
@@ -392,7 +501,19 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
     imported_cnt = 0
     updated_cnt = 0
+    skipped_orders_cnt = 0
     errors = []
+
+    # Parse and normalize selected_orders filter if provided
+    selected_orders_set = None
+    if selected_orders is not None:
+        if isinstance(selected_orders, (str, bytes)):
+            try:
+                selected_orders = json.loads(selected_orders)
+            except Exception:
+                selected_orders = [s.strip() for s in str(selected_orders).split(',') if s.strip()]
+        if isinstance(selected_orders, (list, tuple, set)):
+            selected_orders_set = {str(x).strip().lower() for x in selected_orders if str(x).strip()}
 
     # Fast header getter helper
     norm_headers = [normalize_header(h) for h in headers]
@@ -680,6 +801,16 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 'subtotal_raw': clean_num_val(get_val(r, ['ItemSubtotal', 'Subtotal']), None)
             })
 
+        # Filter orders if user selected specific orders to import
+        if selected_orders_set is not None:
+            filtered_orders = {}
+            for so_num, ord_data in orders_map.items():
+                if str(so_num).strip().lower() in selected_orders_set:
+                    filtered_orders[so_num] = ord_data
+                else:
+                    skipped_orders_cnt += 1
+            orders_map = filtered_orders
+
         # Cache existing customers, products, and locations
         cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers;")}
         prod_map = {}
@@ -935,6 +1066,16 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 'subtotal_raw': clean_num_val(get_val(r, ['ItemSubtotal', 'Subtotal']), None)
             })
 
+        # Filter orders if user selected specific orders to import
+        if selected_orders_set is not None:
+            filtered_orders = {}
+            for po_num, ord_data in orders_map.items():
+                if str(po_num).strip().lower() in selected_orders_set:
+                    filtered_orders[po_num] = ord_data
+                else:
+                    skipped_orders_cnt += 1
+            orders_map = filtered_orders
+
         vend_map = {v['name'].lower().strip(): v['id'] for v in query_all("SELECT id, name FROM vendors;")}
         prod_map = {p['sku'].lower().strip(): p for p in query_all("SELECT id, sku, name, standard_cost FROM products WHERE sku IS NOT NULL;")}
         for p in query_all("SELECT id, name, standard_cost FROM products;"):
@@ -996,11 +1137,17 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             (total_subtotal, total_subtotal, po_id))
 
     mode_text = "cleanly replaced" if is_erase_mode else "processed"
+    msg = f"Import completed successfully! {imported_cnt} records added, {updated_cnt} updated"
+    if skipped_orders_cnt > 0:
+        msg += f", {skipped_orders_cnt} skipped"
+    msg += f" ({mode_text} under '{import_mode}' mode)."
+
     return {
         'success': True,
         'imported': imported_cnt,
         'updated': updated_cnt,
+        'skipped': skipped_orders_cnt,
         'mode': import_mode,
         'errors': errors[:50],  # cap returned error messages
-        'message': f"Import completed successfully! {imported_cnt} records added, {updated_cnt} updated ({mode_text} under '{import_mode}' mode)."
+        'message': msg
     }
