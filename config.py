@@ -12,6 +12,8 @@ class Config:
     SESSION_REFRESH_EACH_REQUEST = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_PATH = '/'
+    SESSION_COOKIE_NAME = 'inflow_session'
     
     # Server configuration
     PORT = int(os.environ.get('PORT', 5050))

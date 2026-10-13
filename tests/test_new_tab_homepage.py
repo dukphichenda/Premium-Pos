@@ -51,5 +51,37 @@ class TestNewTabHomepageFeature(unittest.TestCase):
         # Verify '+' button invokes addNewHomepageTab directly without dropdown menu
         self.assertIn('onclick="window.addNewHomepageTab(event)"', js_content)
 
+        # Verify iframe login intercept prevents login screen in tabs
+        self.assertIn("iframe.contentWindow.location.replace('/dashboard?embed=1')", js_content)
+        self.assertIn("cleanCurrent.startsWith('/login')", js_content)
+
+    def test_remember_token_generation_and_verification(self):
+        """Verify HMAC remember token generates and verifies correctly"""
+        from routes.auth import generate_remember_token, verify_remember_token
+        tok = generate_remember_token(1, 'admin')
+        self.assertTrue(bool(tok))
+        verified_uid = verify_remember_token(tok)
+        self.assertEqual(verified_uid, 1)
+
+        # Tampered token fails
+        bad_tok = tok + 'tampered'
+        self.assertIsNone(verify_remember_token(bad_tok))
+
+    def test_login_embed_redirects_to_dashboard(self):
+        """Verify /login?embed=1 immediately redirects to /dashboard?embed=1 without rendering login form"""
+        response = self.client.get('/login?embed=1')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/dashboard?embed=1', response.headers.get('Location', ''))
+
+    def test_authenticated_user_login_get_redirects_to_dashboard(self):
+        """Verify logged in user requesting /login is redirected to /dashboard"""
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['role'] = 'main_admin'
+        response = self.client.get('/login')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/dashboard', response.headers.get('Location', ''))
+
 if __name__ == '__main__':
     unittest.main()

@@ -189,7 +189,7 @@
                             { id: 'tab-branch-home-' + Date.now(), type: 'home', title: `${bCode} Workspace`, label: `${bCode} Workspace`, url: homeUrl }
                         ];
                         this.activeTabId = this.tabs[0].id;
-                    } else if (cleanCurrent !== '/' && cleanCurrent !== '') {
+                    } else if (cleanCurrent !== '/' && cleanCurrent !== '' && !cleanCurrent.startsWith('/login')) {
                         const type = detectTypeFromUrl(cleanCurrent);
                         const title = this.guessTitle(cleanCurrent, type);
                         this.tabs = [
@@ -205,7 +205,7 @@
                         this.activeTabId = this.tabs[0].id;
                     }
                 } else {
-                    if (cleanCurrent !== '/' && cleanCurrent !== '') {
+                    if (cleanCurrent !== '/' && cleanCurrent !== '' && !cleanCurrent.startsWith('/login')) {
                         let existing = this.tabs.find(t => {
                             const tu = (t.url || '').replace(/[?&]embed=1/, '');
                             return tu === cleanCurrent;
@@ -278,7 +278,7 @@
                         if (Array.isArray(parsed) && parsed.length > 0) {
                             this.tabs = parsed.map(t => {
                                 const clean = (t.url || '').replace(/[?&]embed=1/, '');
-                                if (!clean || clean === '/' || clean.startsWith('/login')) {
+                                if (!clean || clean === '/' || clean.startsWith('/login') || (t.title && t.title.toLowerCase().includes('sign in'))) {
                                     return {
                                         ...t,
                                         url: '/dashboard',
@@ -289,7 +289,7 @@
                                     };
                                 }
                                 return t;
-                            });
+                            }).filter(t => t && t.url && !t.url.startsWith('/login'));
                         }
                     }
                     this.activeTabId = localStorage.getItem(ACTIVE_TAB_KEY);
@@ -534,6 +534,18 @@
                             });
 
                             const newPath = iframe.contentWindow.location.pathname;
+
+                            // Prevent tab from ever displaying /login inside inFlow workspace
+                            if (newPath && newPath.startsWith('/login')) {
+                                console.warn('Tab iframe redirected to /login. Redirecting tab to /dashboard...');
+                                tab.url = '/dashboard';
+                                tab.title = 'Main Store Dashboard';
+                                tab.label = 'Main Store Dashboard';
+                                tab.type = 'home';
+                                iframe.contentWindow.location.replace('/dashboard?embed=1');
+                                return;
+                            }
+
                             tab.url = newPath + iframe.contentWindow.location.search;
 
                             const docTitle = frameDoc.title || '';

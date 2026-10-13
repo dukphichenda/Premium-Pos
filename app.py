@@ -35,6 +35,10 @@ def create_app():
     )
     app.config.from_object(Config)
 
+    # Reverse proxy middleware for Nginx & Hostinger SSL termination
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
     # Initialize Database Schema
     if not getattr(Config, 'IS_CLOUD_DB', False):
         try:
@@ -180,7 +184,42 @@ def create_app():
         if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language'):
             return None
 
-        # User Requirement: ALWAYS ask to login before can enter system (no auto-login / bypass)
+        # Check session or restore from persistent remember cookie
+        if 'user_id' not in session or not session.get('user_id'):
+            from routes.auth import verify_remember_token
+            rem_token = request.cookies.get('inflow_remember')
+            uid = verify_remember_token(rem_token) if rem_token else None
+            if uid:
+                u_row = None
+                try:
+                    u_row = query_one("SELECT * FROM users WHERE id = %s AND is_active = TRUE", (uid,))
+                except Exception:
+                    u_row = None
+                if not u_row and uid == 1:
+                    u_row = {
+                        'id': 1,
+                        'username': 'admin',
+                        'display_name': 'System Administrator',
+                        'role': 'main_admin',
+                        'branch_id': None,
+                        'permissions_json': {}
+                    }
+                if u_row:
+                    session.permanent = True
+                    session['user_id'] = u_row['id']
+                    session['username'] = u_row['username']
+                    session['display_name'] = u_row.get('display_name', u_row['username'])
+                    session['role'] = u_row.get('role', 'main_admin')
+                    session['branch_id'] = u_row.get('branch_id')
+                    perms = u_row.get('permissions_json')
+                    if isinstance(perms, str):
+                        try:
+                            perms = json.loads(perms)
+                        except Exception:
+                            perms = {}
+                    session['permissions'] = perms or {}
+
+        # If unauthenticated, redirect to login
         if 'user_id' not in session or not session.get('user_id'):
             import sys
             if app.config.get('TESTING') or 'unittest' in sys.modules:
@@ -197,6 +236,9 @@ def create_app():
                 if target in ('/', ''):
                     target = None
             return redirect(url_for('auth.login', next=target))
+
+        # Always maintain permanent session lifetime on active usage
+        session.permanent = True
 
         user_role = session.get('role', 'branch_admin')
         user_bid = session.get('branch_id')

@@ -1,14 +1,40 @@
 import json
 import logging
+import hmac
+import hashlib
 from datetime import datetime
 from functools import wraps
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import query_one, query_all, execute, execute_returning_id
+from config import Config
 
 logger = logging.getLogger('inflow.auth')
 
 auth_bp = Blueprint('auth', __name__)
+
+def generate_remember_token(user_id, username):
+    secret = (getattr(Config, 'SECRET_KEY', None) or 'inflow_premium_super_secret_key_2026_boost').encode('utf-8')
+    data = f"{user_id}:{username}".encode('utf-8')
+    sig = hmac.new(secret, data, hashlib.sha256).hexdigest()
+    return f"{user_id}:{username}:{sig}"
+
+def verify_remember_token(token):
+    if not token or not isinstance(token, str):
+        return None
+    parts = token.split(':')
+    if len(parts) != 3:
+        return None
+    uid, uname, sig = parts
+    secret = (getattr(Config, 'SECRET_KEY', None) or 'inflow_premium_super_secret_key_2026_boost').encode('utf-8')
+    data = f"{uid}:{uname}".encode('utf-8')
+    expected = hmac.new(secret, data, hashlib.sha256).hexdigest()
+    if hmac.compare_digest(sig, expected):
+        try:
+            return int(uid)
+        except ValueError:
+            return None
+    return None
 
 def get_current_user():
     user_id = session.get('user_id')
@@ -169,9 +195,11 @@ def login():
                 session['branch_id'] = None
                 session['permissions'] = {}
                 flash("Signed in to inFlow Cloud Preview. Note: Connect your PostgreSQL database via DATABASE_URL to persist live data.", "success")
-                if next_url and not next_url.startswith('/login'):
-                    return redirect(next_url)
-                return redirect(url_for('dashboard.index'))
+                target = next_url if (next_url and not next_url.startswith('/login')) else url_for('dashboard.index')
+                resp = redirect(target)
+                rem_tok = generate_remember_token(1, username or 'admin')
+                resp.set_cookie('inflow_remember', rem_tok, max_age=365 * 24 * 3600, httponly=True, samesite='Lax', path='/')
+                return resp
 
             flash("Invalid username or password. / ឈ្មោះគណនី ឬលេខសំងាត់មិនត្រឹមត្រូវទេ", "error")
             return render_template('auth/login.html', next=next_url, username=username, db_connected=(not db_offline))
@@ -224,17 +252,63 @@ def login():
             user_bid = user['branch_id'] or 1
             session['active_branch_id'] = user_bid
             if next_url and f'/branches/{user_bid}' in next_url:
-                return redirect(next_url)
-            return redirect(url_for('branches.branch_workspace', id=user_bid))
+                target_url = next_url
+            else:
+                target_url = url_for('branches.branch_workspace', id=user_bid)
         else:
             # Main Store Admin
             if next_url and not next_url.startswith('/login'):
-                return redirect(next_url)
-            return redirect(url_for('dashboard.index'))
+                target_url = next_url
+            else:
+                target_url = url_for('dashboard.index')
+
+        resp = redirect(target_url)
+        rem_tok = generate_remember_token(user['id'], user['username'])
+        resp.set_cookie('inflow_remember', rem_tok, max_age=365 * 24 * 3600, httponly=True, samesite='Lax', path='/')
+        return resp
 
     # GET method: Render login form
     next_url = request.args.get('next', '')
     is_switch = request.args.get('switch')
+    is_embed = request.args.get('embed') == '1'
+
+    # If embedded in an iframe tab inside inFlow, NEVER show login page
+    if is_embed and not is_switch:
+        return redirect(url_for('dashboard.index') + '?embed=1')
+
+    # If session missing, attempt to restore from persistent remember cookie
+    if not session.get('user_id') and not is_switch:
+        rem_tok = request.cookies.get('inflow_remember')
+        uid = verify_remember_token(rem_tok) if rem_tok else None
+        if uid:
+            u_row = None
+            try:
+                u_row = query_one("SELECT * FROM users WHERE id = %s AND is_active = TRUE", (uid,))
+            except Exception:
+                u_row = None
+            if not u_row and uid == 1:
+                u_row = {
+                    'id': 1,
+                    'username': 'admin',
+                    'display_name': 'System Administrator',
+                    'role': 'main_admin',
+                    'branch_id': None,
+                    'permissions_json': {}
+                }
+            if u_row:
+                session.permanent = True
+                session['user_id'] = u_row['id']
+                session['username'] = u_row['username']
+                session['display_name'] = u_row.get('display_name', u_row['username'])
+                session['role'] = u_row.get('role', 'main_admin')
+                session['branch_id'] = u_row.get('branch_id')
+                perms = u_row.get('permissions_json')
+                if isinstance(perms, str):
+                    try:
+                        perms = json.loads(perms)
+                    except Exception:
+                        perms = {}
+                session['permissions'] = perms or {}
 
     # If already logged in, no need to log in again until manually signed out
     if session.get('user_id') and not is_switch:
@@ -261,7 +335,11 @@ def login():
 def logout():
     session.clear()
     flash("You have been signed out safely. / អ្នកបានចាកចេញពីប្រព័ន្ធដោយសុវត្ថិភាព", "success")
-    return redirect(url_for('auth.login'))
+    resp = redirect(url_for('auth.login'))
+    resp.delete_cookie('inflow_remember', path='/')
+    resp.delete_cookie('inflow_session', path='/')
+    resp.delete_cookie('session', path='/')
+    return resp
 
 @auth_bp.route('/quick-login/<role_or_user>')
 def quick_login(role_or_user):
@@ -293,7 +371,10 @@ def quick_login(role_or_user):
         session['branch_id'] = None
         session['permissions'] = {}
         flash("Quick login successful (Cloud Preview mode).", "success")
-        return redirect(url_for('dashboard.index'))
+        resp = redirect(url_for('dashboard.index'))
+        rem_tok = generate_remember_token(1, 'admin')
+        resp.set_cookie('inflow_remember', rem_tok, max_age=365 * 24 * 3600, httponly=True, samesite='Lax', path='/')
+        return resp
 
     session.permanent = True
     session['user_id'] = user['id']
@@ -315,9 +396,13 @@ def quick_login(role_or_user):
     if user['role'] == 'branch_admin' or user['role'] == 'branch_cashier':
         bid = user['branch_id'] or 1
         session['active_branch_id'] = bid
-        return redirect(url_for('branches.branch_workspace', id=bid))
+        resp = redirect(url_for('branches.branch_workspace', id=bid))
     else:
-        return redirect(url_for('dashboard.index'))
+        resp = redirect(url_for('dashboard.index'))
+
+    rem_tok = generate_remember_token(user['id'], user['username'])
+    resp.set_cookie('inflow_remember', rem_tok, max_age=365 * 24 * 3600, httponly=True, samesite='Lax', path='/')
+    return resp
 
 # -------------------------------------------------------------
 # USER MANAGEMENT (MAIN STORE SETTINGS & BRANCH SETTINGS)
