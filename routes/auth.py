@@ -200,8 +200,8 @@ def login():
         except Exception:
             pass
 
-        # Session lasts for current browser session
-        session.permanent = False
+        # Session lasts permanently until explicit logout
+        session.permanent = True
         session['user_id'] = user['id']
         session['username'] = user['username']
         session['display_name'] = user['display_name']
@@ -234,6 +234,19 @@ def login():
 
     # GET method: Render login form
     next_url = request.args.get('next', '')
+    is_switch = request.args.get('switch')
+
+    # If already logged in, no need to log in again until manually signed out
+    if session.get('user_id') and not is_switch:
+        if next_url and not next_url.startswith('/login') and not next_url.startswith('/logout') and next_url != '/':
+            return redirect(next_url)
+        user_role = session.get('role', 'main_admin')
+        user_bid = session.get('branch_id')
+        active_bid = session.get('active_branch_id') or (user_bid if user_role in ('branch_admin', 'branch_cashier') else None)
+        if user_role in ('branch_admin', 'branch_cashier') and active_bid:
+            return redirect(url_for('branches.branch_workspace', id=active_bid))
+        return redirect(url_for('dashboard.index'))
+
     branches = []
     db_connected = False
     try:

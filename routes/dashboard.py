@@ -5,12 +5,14 @@ from datetime import datetime
 dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/')
-def root():
-    return redirect(url_for('auth.login'))
-
 @dashboard_bp.route('/dashboard')
 def index():
-    active_bid = session.get('active_branch_id')
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login'))
+
+    user_role = session.get('role', 'main_admin')
+    user_bid = session.get('branch_id')
+    active_bid = session.get('active_branch_id') or (user_bid if user_role in ('branch_admin', 'branch_cashier') else None)
     if active_bid:
         return redirect(url_for('branches.branch_workspace', id=active_bid))
 

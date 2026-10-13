@@ -175,9 +175,9 @@ def create_app():
         import json
 
         # Public endpoints and static assets
-        if request.endpoint in ('static', 'health_check', 'auth.login', 'auth.logout', 'auth.quick_login', 'dashboard.root'):
+        if request.endpoint in ('static', 'health_check', 'auth.login', 'auth.logout', 'auth.quick_login'):
             return None
-        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language') or request.path == '/':
+        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language'):
             return None
 
         # User Requirement: ALWAYS ask to login before can enter system (no auto-login / bypass)

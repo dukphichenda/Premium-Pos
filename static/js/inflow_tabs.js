@@ -197,8 +197,10 @@
                         ];
                         this.activeTabId = this.tabs[0].id;
                     } else {
+                        // Default tab: Homepage / Main Store Dashboard
+                        // title: 'Homepage'
                         this.tabs = [
-                            { id: 'tab-home-' + Date.now(), type: 'home', title: 'Homepage', label: 'Homepage', url: '/' }
+                            { id: 'tab-home-' + Date.now(), type: 'home', title: 'Main Store Dashboard', label: 'Main Store Dashboard', url: '/dashboard' }
                         ];
                         this.activeTabId = this.tabs[0].id;
                     }
@@ -274,7 +276,20 @@
                     if (raw) {
                         const parsed = JSON.parse(raw);
                         if (Array.isArray(parsed) && parsed.length > 0) {
-                            this.tabs = parsed;
+                            this.tabs = parsed.map(t => {
+                                const clean = (t.url || '').replace(/[?&]embed=1/, '');
+                                if (!clean || clean === '/' || clean.startsWith('/login')) {
+                                    return {
+                                        ...t,
+                                        url: '/dashboard',
+                                        title: 'Main Store Dashboard',
+                                        label: 'Main Store Dashboard',
+                                        origTitleEn: 'Main Store Dashboard',
+                                        type: 'home'
+                                    };
+                                }
+                                return t;
+                            });
                         }
                     }
                     this.activeTabId = localStorage.getItem(ACTIVE_TAB_KEY);
@@ -340,7 +355,7 @@
 
                 html += `
                         <div class="inflow-tab-add-wrapper">
-                            <button type="button" class="inflow-tab-add-btn" id="inflowTabAddBtn" onclick="window.inflowMdi.addNewHomepageTab(event)" title="New Tab (Homepage)">+</button>
+                            <button type="button" class="inflow-tab-add-btn" id="inflowTabAddBtn" onclick="window.addNewHomepageTab(event)" title="New Tab (Homepage)">+</button>
                         </div>
                     </div>
                 `;
@@ -461,11 +476,11 @@
                                 <a href="/branches/${currentBranch ? currentBranch.id : 1}/settings?tab=users" onclick="window.inflowMdi.openTabOrNavigateTop('/branches/${currentBranch ? currentBranch.id : 1}/settings?tab=users', 'Branch Settings', event)" class="inflow-store-dropdown-item" style="color: #334155; font-weight: 600; padding: 8px 14px;">
                                     <span>👥 Branch Users</span>
                                 </a>`}
-                                <a href="/login" class="inflow-store-dropdown-item" style="color: #0284C7; font-weight: 600; padding: 8px 14px;">
+                                <a href="/login?switch=1" target="_top" class="inflow-store-dropdown-item" style="color: #0284C7; font-weight: 600; padding: 8px 14px;">
                                     <span>🔄 Switch Account / Login</span>
                                 </a>
                                 <div class="inflow-store-dropdown-divider"></div>
-                                <a href="/logout" class="inflow-store-dropdown-item" style="color: #EF4444; font-weight: 700; padding: 8px 14px;">
+                                <a href="/logout" target="_top" class="inflow-store-dropdown-item" style="color: #EF4444; font-weight: 700; padding: 8px 14px;">
                                     <span>🚪 Sign Out</span>
                                 </a>
                             </div>
@@ -786,7 +801,7 @@
                         const bCode = currentBranch.code || 'STM';
                         this.transformTab(this.tabs[0].id, `/branches/${currentBranch.id}/workspace`, `${bCode} Workspace`, 'home');
                     } else {
-                        this.transformTab(this.tabs[0].id, '/', 'Homepage', 'home');
+                        this.transformTab(this.tabs[0].id, '/dashboard', 'Main Store Dashboard', 'home');
                     }
                     return;
                 }
@@ -830,7 +845,7 @@
                     const bCode = currentBranch.code || 'STM';
                     this.createTab(`/branches/${currentBranch.id}/workspace`, `${bCode} Workspace`, 'home');
                 } else {
-                    this.createTab('/', 'Homepage', 'home');
+                    this.createTab('/dashboard', 'Main Store Dashboard', 'home');
                 }
             },
 
