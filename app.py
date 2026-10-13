@@ -35,11 +35,12 @@ def create_app():
     )
     app.config.from_object(Config)
 
-    # Initialize Database Schema
-    try:
-        init_db()
-    except Exception as e:
-        logger.error(f"Error during database startup check: {e}")
+    # Initialize Database Schema (local development only; cloud DBs like Neon are pre-provisioned)
+    if not getattr(Config, 'IS_VERCEL', False) and not getattr(Config, 'IS_CLOUD_DB', False):
+        try:
+            init_db()
+        except Exception as e:
+            logger.error(f"Error during database startup check: {e}")
 
     # Register Blueprints
     from routes.dashboard import dashboard_bp
