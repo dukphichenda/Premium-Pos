@@ -1,18 +1,17 @@
-# inFlow Premium Enterprise - PowerShell GitHub & Vercel Deployment Bridge
+# inFlow Premium Enterprise - PowerShell GitHub Sync & Cloudflare Tunnel Bridge
 [CmdletBinding()]
 param (
     [string]$CommitMessage = "",
-    [switch]$Deploy,
     [switch]$StatusOnly
 )
 
-$Host.UI.RawUI.WindowTitle = "inFlow Premium - GitHub & Vercel Bridge"
+$Host.UI.RawUI.WindowTitle = "inFlow Premium - GitHub Sync & Cloudflare Tunnel"
 
 function Write-Header {
     Write-Host ""
     Write-Host "=====================================================================" -ForegroundColor Cyan
     Write-Host "         inFlow Premium Enterprise - Cloud Bridge" -ForegroundColor Yellow
-    Write-Host "         GitHub Sync & Vercel Cloud Serverless Deployment" -ForegroundColor White
+    Write-Host "         GitHub Sync & Cloudflare Remote Access Tunnel" -ForegroundColor White
     Write-Host "=====================================================================" -ForegroundColor Cyan
     Write-Host ""
 }
@@ -75,14 +74,5 @@ Write-Host "`nGitHub upload complete!" -ForegroundColor Green
 Write-Host "Repositories:" -ForegroundColor White
 Write-Host "  - https://github.com/dukphichenda/Premium-Pos" -ForegroundColor Cyan
 Write-Host "  - https://github.com/dukphichenda/inflow-premium" -ForegroundColor Cyan
-
-# Vercel Deployment Check
-if ($Deploy -or (Read-Host "`nWould you like to deploy directly to Vercel now? (y/N)").ToLower() -eq 'y') {
-    Write-Host "`nTriggering Vercel deployment..." -ForegroundColor Cyan
-    cmd.exe /c vercel --prod
-} else {
-    Write-Host "`nTip: If your GitHub repo is connected to Vercel at https://vercel.com," -ForegroundColor Yellow
-    Write-Host "Vercel is now building and deploying your commit automatically!" -ForegroundColor Yellow
-}
 
 Write-Host "`nDone!" -ForegroundColor Green

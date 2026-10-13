@@ -1,10 +1,11 @@
 @echo off
 setlocal enabledelayedexpansion
-title inFlow Premium - GitHub ^& Vercel Deployment Bridge
+title inFlow Premium - GitHub Sync ^& Cloudflare Remote Access
+color 0B
 
 echo =====================================================================
-echo          inFlow Premium Enterprise - Deployment Bridge
-echo          Sync to GitHub ^& Deploy to Vercel (Cloud Hosting)
+echo          inFlow Premium Enterprise - Cloud Bridge
+echo          Sync to GitHub ^& Cloudflare Remote Access Tunnel
 echo =====================================================================
 echo.
 
@@ -19,23 +20,21 @@ if %ERRORLEVEL% neq 0 (
 
 :MENU
 echo What would you like to do?
-echo   [1] Push all changes to GitHub (Auto-triggers Vercel if connected)
-echo   [2] Deploy directly to Vercel (using Vercel CLI)
-echo   [3] All-In-One: Push to GitHub AND Deploy to Vercel
-echo   [4] Check Git Status ^& Remote URLs
-echo   [5] Upload Local Database to Neon.tech Cloud
-echo   [6] Exit
+echo   [1] Push all changes to GitHub (origin ^& inflow-repo)
+echo   [2] Launch Cloudflare Remote Access Tunnel (share_online.bat)
+echo   [3] Check Git Status ^& Remote URLs
+echo   [4] Install Cloudflare Tunnel as 24/7 Windows Service
+echo   [5] Exit
 echo.
-set /p CHOICE="Select an option (1-6) [default: 1]: "
+set /p CHOICE="Select an option (1-5) [default: 1]: "
 if "%CHOICE%"=="" set CHOICE=1
 
 if "%CHOICE%"=="1" goto PUSH_GITHUB
-if "%CHOICE%"=="2" goto DEPLOY_VERCEL
-if "%CHOICE%"=="3" goto ALL_IN_ONE
-if "%CHOICE%"=="4" goto CHECK_STATUS
-if "%CHOICE%"=="5" goto UPLOAD_NEON
-if "%CHOICE%"=="6" goto EXIT
-echo Invalid choice. Please select 1 to 6.
+if "%CHOICE%"=="2" goto LAUNCH_TUNNEL
+if "%CHOICE%"=="3" goto CHECK_STATUS
+if "%CHOICE%"=="4" goto INSTALL_SERVICE
+if "%CHOICE%"=="5" goto EXIT
+echo Invalid choice. Please select 1 to 5.
 echo.
 goto MENU
 
@@ -47,7 +46,7 @@ echo =====================================================================
 set /p COMMIT_MSG="Enter commit message (Press Enter for auto timestamp): "
 if "%COMMIT_MSG%"=="" (
     for /f "tokens=1-4 delims=/ " %%a in ("%DATE%") do set TDATE=%%a-%%b-%%c
-    set COMMIT_MSG=feat: update and sync inFlow Premium project - !DATE! !TIME!
+    set COMMIT_MSG=feat: update and sync inFlow Premium - !DATE! !TIME!
 )
 
 git add .
@@ -62,7 +61,7 @@ git push origin main
 if %ERRORLEVEL% equ 0 (
     echo [OK] Successfully pushed to origin!
 ) else (
-    echo [WARNING] Push to origin encountered an issue. Check your connection or token.
+    echo [WARNING] Push to origin encountered an issue. Check connection or token.
 )
 
 echo.
@@ -71,50 +70,22 @@ git push inflow-repo main
 if %ERRORLEVEL% equ 0 (
     echo [OK] Successfully pushed to inflow-repo!
 ) else (
-    echo [NOTE] inflow-repo remote might not be set or requires authorization.
+    echo [NOTE] inflow-repo remote might not be set or already in sync.
 )
 
 echo.
 echo =====================================================================
 echo  GitHub Sync Completed!
 echo =====================================================================
-echo If your Vercel project is connected to GitHub, your deployment will
-echo trigger automatically at: https://vercel.com/dashboard
+echo Repositories updated:
+echo   - https://github.com/dukphichenda/Premium-Pos
+echo   - https://github.com/dukphichenda/inflow-premium
 echo.
 pause
 goto MENU
 
-:DEPLOY_VERCEL
-echo.
-echo =====================================================================
-echo  Deploying directly to Vercel CLI
-echo =====================================================================
-call cmd.exe /c vercel --prod
-echo.
-pause
-goto MENU
-
-:ALL_IN_ONE
-echo.
-echo =====================================================================
-echo  Running All-In-One: Git Push + Vercel Deployment
-echo =====================================================================
-set /p COMMIT_MSG="Enter commit message (Press Enter for auto timestamp): "
-if "%COMMIT_MSG%"=="" (
-    set COMMIT_MSG=feat: update inFlow Premium and deploy to Vercel - !DATE! !TIME!
-)
-
-git add .
-git commit -m "%COMMIT_MSG%"
-echo Pushing to GitHub...
-git push origin main
-git push inflow-repo main
-
-echo.
-echo Triggering Vercel deployment...
-call cmd.exe /c vercel --prod
-echo.
-pause
+:LAUNCH_TUNNEL
+call "%~dp0share_online.bat"
 goto MENU
 
 :CHECK_STATUS
@@ -130,8 +101,33 @@ echo.
 pause
 goto MENU
 
-:UPLOAD_NEON
-call "%~dp0upload_to_neon.bat"
+:INSTALL_SERVICE
+echo.
+echo =====================================================================
+echo  Cloudflare Tunnel - 24/7 Windows Background Service Setup
+echo =====================================================================
+echo 1. Go to Cloudflare Zero Trust: https://dash.cloudflare.com
+echo 2. Go to: Networks -^> Tunnels -^> Create a Tunnel (Cloudflared)
+echo 3. Choose Windows 64-bit and copy your tunnel token.
+echo.
+set /p CF_TOKEN="Paste your Cloudflare Tunnel Token here (or press Enter to cancel): "
+if "%CF_TOKEN%"=="" (
+    echo Operation cancelled.
+    pause
+    goto MENU
+)
+
+set CLOUDFLARED_BIN=C:\Program Files (x86)\cloudflared\cloudflared.exe
+if not exist "%CLOUDFLARED_BIN%" set CLOUDFLARED_BIN=cloudflared
+
+echo Installing service...
+"%CLOUDFLARED_BIN%" service install %CF_TOKEN%
+if %ERRORLEVEL% equ 0 (
+    echo [OK] Cloudflare Tunnel Windows Service installed and running 24/7!
+) else (
+    echo [ERROR] Installation failed. Make sure you run this script as Administrator.
+)
+pause
 goto MENU
 
 :EXIT

@@ -35,8 +35,8 @@ def create_app():
     )
     app.config.from_object(Config)
 
-    # Initialize Database Schema (local development only; cloud DBs like Neon are pre-provisioned)
-    if not getattr(Config, 'IS_VERCEL', False) and not getattr(Config, 'IS_CLOUD_DB', False):
+    # Initialize Database Schema
+    if not getattr(Config, 'IS_CLOUD_DB', False):
         try:
             init_db()
         except Exception as e:

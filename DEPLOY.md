@@ -1,96 +1,58 @@
-# inFlow Premium Enterprise - GitHub & Vercel Deployment Guide
+# inFlow Premium Enterprise - Remote Access & Cloudflare Tunnel Guide
 
-This guide explains how to use the deployment bridge to push inFlow Premium to GitHub and host it live on Vercel.
-
----
-
-## 🚀 1. The Deployment Bridge
-
-The project includes an automated deployment bridge script:
-- **Windows Batch**: Double-click `deploy_bridge.bat` or run `.\deploy_bridge.bat` from terminal.
-- **PowerShell**: Run `powershell -ExecutionPolicy Bypass -File .\deploy_bridge.ps1`
-
-### What the Bridge Does:
-1. **Checks Git status** for any new or modified files.
-2. **Prompts for an optional commit message** (or creates an automatic timestamped message).
-3. **Stages and commits** all changes cleanly.
-4. **Pushes to your GitHub repositories**:
-   - `origin` (`https://github.com/dukphichenda/Premium-Pos`)
-   - `inflow-repo` (`https://github.com/dukphichenda/inflow-premium`)
-5. **Triggers Vercel deployment** automatically if GitHub integration is active, or prompts to run `vercel --prod` via CLI.
+This guide explains how to share and access your local inFlow Premium ERP (and PostgreSQL 16 database) from any device anywhere in the world using **Cloudflare Tunnel (`cloudflared`)**.
 
 ---
 
-## 🌐 2. Deploying on Vercel (Step-by-Step)
+## ⚡ Option 1: Instant Quick Tunnel (5 Seconds — No Signup Needed)
 
-### Option A: Automatic Git-Connected Deployment (Recommended)
-1. Go to [vercel.com](https://vercel.com/) and sign in with your GitHub account (`dukphichenda`).
-2. Click **"Add New..."** → **"Project"** ([vercel.com/new](https://vercel.com/new)).
-3. Find and select your GitHub repository:
-   - `dukphichenda/Premium-Pos` or `dukphichenda/inflow-premium`
-4. In the Project Configuration:
-   - **Framework Preset**: Other (Vercel automatically detects Python serverless from `vercel.json` and `api/index.py`)
-   - **Root Directory**: `./` (leave default)
-5. Under **Environment Variables**, add:
-   - `DATABASE_URL`: Your cloud PostgreSQL connection string (see Section 3 below).
-   - `SECRET_KEY`: Any secure random string (e.g. `inflow_prod_secret_2026`).
-6. Click **"Deploy"**.
-7. Vercel will build the project and give you a live production URL (e.g. `https://inflow-premium.vercel.app`).
-8. **From now on**: Every time you run `deploy_bridge.bat` or `git push`, Vercel deploys your changes automatically within seconds!
+Use this method to generate a quick, temporary HTTPS link to test on a phone, iPad, or remote laptop:
+
+1. **Start the local server**:
+   Double-click `run.bat` (Server starts on `http://localhost:5050`).
+2. **Launch the Tunnel**:
+   Double-click `share_online.bat`.
+3. **Copy the generated HTTPS URL**:
+   Cloudflare generates an encrypted public link:
+   ```
+   https://random-words.trycloudflare.com
+   ```
+4. Keep the `share_online.bat` terminal open while using the link.
 
 ---
 
-### Option B: Deploy via Vercel CLI
-If you prefer deploying directly from your computer terminal:
-```bash
-# 1. Log in to Vercel (one time only)
-cmd /c vercel login
+## 🌐 Option 2: Permanent Custom Domain (24/7 Production Setup)
 
-# 2. Deploy to production
-cmd /c vercel --prod
+To connect your own domain (e.g. `pos.yourcompany.com`) so it stays online 24/7 without opening terminal windows:
+
+### 1. Create Tunnel in Cloudflare Zero Trust
+1. Log in to [dash.cloudflare.com](https://dash.cloudflare.com).
+2. Go to **Zero Trust** → **Networks** → **Tunnels**.
+3. Click **Create a tunnel** → Choose **Cloudflared** → Name it `inflow-pos`.
+
+### 2. Install the Windows Connector Service
+Under **Choose your environment**, select **Windows** (64-bit).
+Copy the command provided or run option `[4]` in `deploy_bridge.bat` and paste your tunnel token:
+```powershell
+& "C:\Program Files (x86)\cloudflared\cloudflared.exe" service install <YOUR_TOKEN>
 ```
+Cloudflare Tunnel is now installed as a **Windows Background Service** that auto-starts on computer boot!
+
+### 3. Add Public Hostname
+In Cloudflare Tunnel settings under **Public Hostname**:
+- **Subdomain**: `pos`
+- **Domain**: `yourcompany.com`
+- **Service Type**: `HTTP`
+- **URL**: `localhost:5050`
+
+Save and open `https://pos.yourcompany.com` on any smartphone, tablet, or PC worldwide!
 
 ---
 
-## 🗄️ 3. Cloud Database Configuration
+## 🔄 GitHub Repository Synchronization
 
-On your local machine, the app connects to local PostgreSQL (`localhost:5432`). On Vercel, serverless functions run in the cloud, so they require an accessible cloud PostgreSQL database.
-
-### Free Cloud PostgreSQL Providers (Takes 60 seconds to set up):
-1. **[Neon.tech](https://neon.tech/)** (Recommended - Serverless Postgres, generous free tier):
-   - Sign up with GitHub.
-   - Click "New Project" → Name it `inflow-premium`.
-   - Copy the Connection String URI:
-     `postgresql://username:password@ep-xyz.us-east-2.aws.neon.tech/inflow_premium?sslmode=require`
-2. **[Supabase](https://supabase.com/)**:
-   - Create a project → Go to Settings → Database → Connection String (URI).
-3. **[Vercel Postgres](https://vercel.com/docs/storage/vercel-postgres)**:
-   - Directly inside your Vercel Dashboard → Storage tab → Create Database → Attach to Project. Vercel sets `POSTGRES_URL` automatically!
-
-### Automatic Database Initialization:
-When your cloud database is connected, inFlow Premium's `init_db()` automatically runs `schema.sql` on first startup:
-- Creates all tables, sequences, indexes, and branches.
-- Sets up default company settings and warehouse.
-- Seeds default Administrator accounts:
-  - **Username**: `admin` or `chenda`
-  - **Password**: `123`
-
----
-
-## 📂 4. Project Serverless Architecture for Vercel
-
-```
-inflow-premium/
-├── api/
-│   └── index.py             # Serverless WSGI entrypoint for Vercel (@vercel/python)
-├── static/                  # Static assets (CSS, JS, icons) served by Vercel CDN
-├── templates/               # Jinja2 HTML templates
-├── routes/                  # Flask blueprints (sales, purchase, products, reports, etc.)
-├── database.py              # PostgreSQL pooled database driver with cloud DSN support
-├── config.py                # Environment configuration (DATABASE_URL / POSTGRES_URL)
-├── requirements.txt         # Python dependencies (Flask, psycopg2-binary, etc.)
-├── vercel.json              # Vercel routing rules & rewrites
-├── .vercelignore            # Files excluded from serverless bundle
-├── deploy_bridge.bat        # Windows Batch deployment tool
-└── deploy_bridge.ps1        # PowerShell deployment tool
-```
+To push code changes to GitHub:
+Double-click `deploy_bridge.bat` and choose option `[1]`.
+It stages, commits, and pushes to both:
+- `dukphichenda/Premium-Pos`
+- `dukphichenda/inflow-premium`
