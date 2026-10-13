@@ -574,7 +574,11 @@
                 <table class="inflow-grid-table" id="poLineItemsTable">
                     <thead>
                         <tr>
-                            <th class="inflow-grid-selector-col"></th>
+                            <th class="inflow-grid-selector-col" style="width: 48px; text-align: center; vertical-align: middle;">
+                                <div class="inflow-selector-header-content">
+                                    <input type="checkbox" id="masterSelectAllPoLines" class="inflow-master-chk" title="Select all items" onchange="toggleSelectAllPoLines(this.checked)" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                                </div>
+                            </th>
                             <th style="width: 38%;">Item</th>
                             <th style="width: 18%;">Vendor Product Code</th>
                             <th style="width: 15%; text-align: right;">Quantity</th>
@@ -586,7 +590,12 @@
                     <tbody id="poLineItemsBody">
                         {% for l in lines %}
                         <tr data-line-index="{{ loop.index0 }}" onclick="selectPoGridRow(this)" data-product-id="{{ l.product_id }}">
-                            <td class="inflow-grid-selector-col">{% if loop.first %}▶{% endif %}</td>
+                            <td class="inflow-grid-selector-col">
+                                <div class="inflow-selector-cell-content">
+                                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onPoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificPoLine(this, event)" title="Delete this line">✕</button>
+                                </div>
+                            </td>
                             <td style="position: relative;">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}" class="line-product-id">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or l.product_name or '' }}" class="line-desc">
@@ -1594,13 +1603,12 @@ function closePoVendorPopover() {
 let activePoRow = null;
 
 function selectPoGridRow(row) {
-    if (activePoRow) {
-        const ind = activePoRow.querySelector('.inflow-grid-selector-col');
-        if (ind && activePoRow.id !== 'poNewRowEntry') ind.innerText = '';
-    }
+    if (!row) return;
+    document.querySelectorAll('#poLineItemsBody tr').forEach(r => {
+        r.classList.remove('is-active-row');
+    });
     activePoRow = row;
-    const ind = row.querySelector('.inflow-grid-selector-col');
-    if (ind && row.id !== 'poNewRowEntry') ind.innerText = '▶';
+    row.classList.add('is-active-row');
 }
 
 function openPoItemDropdown(input) {
@@ -1678,7 +1686,12 @@ function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc, uom) {
     tr.dataset.productId = productId;
     tr.onclick = function() { selectPoGridRow(tr); };
     tr.innerHTML = `
-        <td class="inflow-grid-selector-col"></td>
+        <td class="inflow-grid-selector-col">
+            <div class="inflow-selector-cell-content">
+                <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onPoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificPoLine(this, event)" title="Delete this line">✕</button>
+            </div>
+        </td>
         <td style="position: relative;">
             <input type="hidden" name="lines[${index}][product_id]" value="${productId}" class="line-product-id">
             <input type="hidden" name="lines[${index}][description]" value="${name}" class="line-desc">
@@ -1720,6 +1733,7 @@ function appendPoLineItem(productId, sku, name, vpc, qty, cost, disc, uom) {
     selectPoGridRow(tr);
     recalculatePoTotals();
     markPoDirty();
+    syncPoSelectAllCheckbox();
 }
 
 function openPoQtyDropdown(event, btnEl) {
@@ -1856,13 +1870,77 @@ function addNewBlankPoLine() {
     }
 }
 
+function deleteSpecificPoLine(btn, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const row = btn.closest('tr');
+    if (!row) return;
+
+    if (activePoRow === row) {
+        activePoRow = null;
+    }
+    row.remove();
+    recalculatePoTotals();
+    markPoDirty();
+    syncPoSelectAllCheckbox();
+}
+
 function deleteSelectedPoLine() {
-    if (activePoRow && activePoRow.dataset.lineIndex !== undefined) {
+    const checkedBoxes = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk:checked');
+    if (checkedBoxes.length > 0) {
+        checkedBoxes.forEach(chk => {
+            const row = chk.closest('tr');
+            if (row) {
+                if (activePoRow === row) activePoRow = null;
+                row.remove();
+            }
+        });
+        recalculatePoTotals();
+        markPoDirty();
+        syncPoSelectAllCheckbox();
+    } else if (activePoRow && activePoRow.dataset.lineIndex !== undefined) {
         activePoRow.remove();
         activePoRow = null;
         recalculatePoTotals();
         markPoDirty();
+        syncPoSelectAllCheckbox();
     }
+}
+
+function toggleSelectAllPoLines(checked) {
+    const rows = document.querySelectorAll('#poLineItemsBody tr[data-line-index]');
+    rows.forEach(r => {
+        const chk = r.querySelector('.line-select-chk');
+        if (chk) {
+            chk.checked = checked;
+            r.classList.toggle('is-selected-row', checked);
+        }
+    });
+}
+
+function onPoLineCheckboxChange(chk, event) {
+    if (event) event.stopPropagation();
+    const row = chk.closest('tr');
+    if (row) {
+        row.classList.toggle('is-selected-row', chk.checked);
+    }
+    syncPoSelectAllCheckbox();
+}
+
+function syncPoSelectAllCheckbox() {
+    const masterChk = document.getElementById('masterSelectAllPoLines');
+    if (!masterChk) return;
+    const allRowChks = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk');
+    if (allRowChks.length === 0) {
+        masterChk.checked = false;
+        masterChk.indeterminate = false;
+        return;
+    }
+    const checkedCount = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk:checked').length;
+    masterChk.checked = (checkedCount === allRowChks.length);
+    masterChk.indeterminate = (checkedCount > 0 && checkedCount < allRowChks.length);
 }
 
 function moveSelectedPoLineUp() {
@@ -2183,7 +2261,7 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Keyboard shortcuts: Ctrl+S and F11
+// Keyboard shortcuts: Ctrl+S, F11, and Delete key
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
@@ -2191,6 +2269,21 @@ document.addEventListener('keydown', (e) => {
     } else if (e.key === 'F11') {
         e.preventDefault();
         togglePoFullScreen();
+    } else if (e.key === 'Delete') {
+        const activeEl = document.activeElement;
+        const isTextInput = activeEl && (
+            (activeEl.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(activeEl.type)) ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.isContentEditable
+        );
+        if (!isTextInput) {
+            const hasChecked = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk:checked').length > 0;
+            const hasActive = activePoRow && activePoRow.dataset.lineIndex !== undefined;
+            if (hasChecked || hasActive) {
+                e.preventDefault();
+                deleteSelectedPoLine();
+            }
+        }
     }
 });
 
@@ -2200,6 +2293,7 @@ document.addEventListener('DOMContentLoaded', () => {
     applyPoDrawerFilters();
     const firstRow = document.querySelector('#poLineItemsBody tr[data-line-index]');
     if (firstRow) selectPoGridRow(firstRow);
+    syncPoSelectAllCheckbox();
 });
 </script>
 {% endblock %}

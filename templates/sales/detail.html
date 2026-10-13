@@ -672,7 +672,11 @@
                 <table class="inflow-grid-table" id="lineItemsTable">
                     <thead>
                         <tr>
-                            <th class="inflow-grid-selector-col"></th>
+                            <th class="inflow-grid-selector-col" style="width: 48px; text-align: center; vertical-align: middle;">
+                                <div class="inflow-selector-header-content">
+                                    <input type="checkbox" id="masterSelectAllSoLines" class="inflow-master-chk" title="Select all items" onchange="toggleSelectAllSoLines(this.checked)" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
+                                </div>
+                            </th>
                             <th style="width: 30%;">Item</th>
                             <th style="width: 16%;">Description</th>
                             <th style="width: 14%;">Quantity</th>
@@ -685,7 +689,14 @@
                     <tbody id="lineItemsBody">
                         {% for l in lines %}
                         <tr data-line-index="{{ loop.index0 }}" onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
-                            <td class="inflow-grid-selector-col">{% if loop.first %}▶{% endif %}</td>
+                            <td class="inflow-grid-selector-col">
+                                <div class="inflow-selector-cell-content">
+                                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onSoLineCheckboxChange(this, event)" title="Select item" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
+                                    {% if not is_paid %}
+                                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
+                                    {% endif %}
+                                </div>
+                            </td>
                             <td style="position: relative;">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_product_id]" class="line-addon-product-id" value="{{ l.addon_product_id or '' }}">
@@ -2100,11 +2111,28 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }, true);
 
-    // Keyboard Shortcut Ctrl+S to save
+    // Keyboard Shortcut Ctrl+S to save, Delete key to delete selected rows
     document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
             e.preventDefault();
             saveSalesOrder();
+        } else if (e.key === 'Delete') {
+            {% if not is_paid %}
+            const activeEl = document.activeElement;
+            const isTextInput = activeEl && (
+                (activeEl.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(activeEl.type)) ||
+                activeEl.tagName === 'TEXTAREA' ||
+                activeEl.isContentEditable
+            );
+            if (!isTextInput) {
+                const hasChecked = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked').length > 0;
+                const hasActive = activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index');
+                if (hasChecked || hasActive) {
+                    e.preventDefault();
+                    deleteSelectedLine();
+                }
+            }
+            {% endif %}
         }
     });
 
@@ -2142,6 +2170,10 @@ document.addEventListener('DOMContentLoaded', function () {
             itemPopup.classList.remove('show');
         }
     });
+
+    const firstRow = document.querySelector('#lineItemsBody tr[data-line-index]');
+    if (firstRow) selectGridRow(firstRow);
+    syncSoSelectAllCheckbox();
 });
 
 /* ==========================================================================
@@ -2532,7 +2564,12 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         tr.setAttribute('data-combine-option-id', '');
         tr.onclick = function() { selectGridRow(this); };
         tr.innerHTML = `
-            <td class="inflow-grid-selector-col">▶</td>
+            <td class="inflow-grid-selector-col">
+                <div class="inflow-selector-cell-content">
+                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onSoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
+                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
+                </div>
+            </td>
             <td style="position: relative;">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
@@ -2578,6 +2615,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         tbody.insertBefore(tr, newRowEntry);
         document.getElementById('newItemTextInput').value = '';
         selectGridRow(tr);
+        syncSoSelectAllCheckbox();
 
         // Check backorder status for initial quantity = 1
         onQtyNumberChange(tr.querySelector('.line-qty'));
@@ -2621,15 +2659,9 @@ function selectGridRow(rowEl) {
     if (!rowEl) return;
     activeGridRowEl = rowEl;
     document.querySelectorAll('#lineItemsBody tr').forEach(r => {
-        const col = r.querySelector('.inflow-grid-selector-col');
-        if (col && r.id !== 'newRowEntry') {
-            col.innerText = '';
-        }
+        r.classList.remove('is-active-row');
     });
-    const selCol = rowEl.querySelector('.inflow-grid-selector-col');
-    if (selCol && rowEl.id !== 'newRowEntry') {
-        selCol.innerText = '▶';
-    }
+    rowEl.classList.add('is-active-row');
 }
 
 function addNewBlankLine() {
@@ -2640,12 +2672,86 @@ function addNewBlankLine() {
     }
 }
 
+function deleteSpecificSoLine(btn, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    {% if is_paid %}
+    return;
+    {% endif %}
+    const row = btn.closest('tr');
+    if (!row) return;
+
+    if (activeGridRowEl === row) {
+        activeGridRowEl = null;
+    }
+    row.remove();
+    recalculateTotals();
+    markDirty();
+    syncSoSelectAllCheckbox();
+}
+
 function deleteSelectedLine() {
-    if (activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index')) {
-        activeGridRowEl.remove();
+    {% if is_paid %}
+    return;
+    {% endif %}
+    const checkedBoxes = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked');
+    if (checkedBoxes.length > 0) {
+        checkedBoxes.forEach(chk => {
+            const row = chk.closest('tr');
+            if (row) {
+                if (activeGridRowEl === row) activeGridRowEl = null;
+                row.remove();
+            }
+        });
         recalculateTotals();
         markDirty();
+        syncSoSelectAllCheckbox();
+    } else if (activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index')) {
+        activeGridRowEl.remove();
+        activeGridRowEl = null;
+        recalculateTotals();
+        markDirty();
+        syncSoSelectAllCheckbox();
     }
+}
+
+function toggleSelectAllSoLines(checked) {
+    {% if is_paid %}
+    return;
+    {% endif %}
+    const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
+    rows.forEach(r => {
+        const chk = r.querySelector('.line-select-chk');
+        if (chk && !chk.disabled) {
+            chk.checked = checked;
+            r.classList.toggle('is-selected-row', checked);
+        }
+    });
+}
+
+function onSoLineCheckboxChange(chk, event) {
+    if (event) event.stopPropagation();
+    const row = chk.closest('tr');
+    if (row) {
+        row.classList.toggle('is-selected-row', chk.checked);
+    }
+    syncSoSelectAllCheckbox();
+}
+
+function syncSoSelectAllCheckbox() {
+    const masterChk = document.getElementById('masterSelectAllSoLines');
+    if (!masterChk) return;
+    const allRowChks = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk');
+    if (allRowChks.length === 0) {
+        masterChk.checked = false;
+        masterChk.indeterminate = false;
+        return;
+    }
+    const checkedCount = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked').length;
+    masterChk.checked = (checkedCount === allRowChks.length);
+    masterChk.indeterminate = (checkedCount > 0 && checkedCount < allRowChks.length);
 }
 
 function moveSelectedLineUp() {
