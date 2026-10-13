@@ -125,29 +125,24 @@ sudo apt install -y python3 python3-pip python3-venv postgresql postgresql-contr
    exit
    ```
 
-2. **Upload your local database dump to Hostinger VPS:**
-   Open a **new PowerShell window** on your Windows PC and run:
-   ```powershell
-   scp "F:\inflow premium\inflow_premium_backup.sql" root@<YOUR_HOSTINGER_SERVER_IP>:/tmp/inflow_premium_backup.sql
-   ```
-
-3. **Restore the database on Hostinger VPS:**
-   Back in your VPS SSH session:
-   ```bash
-   sudo -u postgres psql -d inflow_premium -f /tmp/inflow_premium_backup.sql
-   ```
-   *All tables, schemas, and records will be instantly restored.*
-
----
-
-### Step 6: Clone and Configure inFlow Premium
-
-1. **Clone your repository:**
+2. **Clone your repository:**
    ```bash
    sudo mkdir -p /var/www/inflow
    sudo git clone https://github.com/dukphichenda/Premium-Pos.git /var/www/inflow
    cd /var/www/inflow
    ```
+
+3. **Restore the database on Hostinger VPS:**
+   Since `inflow_premium_backup.sql` is already in the repository, simply run:
+   ```bash
+   sudo -u postgres psql -d inflow_premium -f /var/www/inflow/inflow_premium_backup.sql
+   ```
+   *All tables, schemas, and records will be instantly restored.*
+
+---
+
+### Step 6: Configure inFlow Premium Application
+
 
 2. **Create Python virtual environment & install requirements:**
    ```bash
