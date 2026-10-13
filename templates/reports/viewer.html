@@ -27,7 +27,7 @@
                 <span>Export ▾</span>
             </button>
             <div id="reportExportMenu" class="inflow-tab-dropdown-menu">
-                <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope) }}" download data-no-tab="true">
+                <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency) }}" download data-no-tab="true">
                     📊 Microsoft Excel (*.csv)
                 </a>
                 <a href="javascript:void(0)" onclick="window.print()">
@@ -203,6 +203,70 @@
                     </select>
                 </div>
                 {% endif %}
+                {% elif cat.key == 'branch' or report_key == 'branch-sales-summary' %}
+                <div class="inflow-rep-param-row">
+                    <span class="inflow-rep-param-label">Branch / Store</span>
+                    <select name="branch" class="inflow-rep-param-select" style="font-weight: 600; color: #1E3A8A; background: #EFF6FF; border-color: #BFDBFE;">
+                        <option value="all" {% if branch_scope == 'all' or not branch_scope %}selected{% endif %}>🌐 All Branches (Consolidated)</option>
+                        <option value="main" {% if branch_scope == 'main' %}selected{% endif %}>🏢 Main Store Only</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b.id }}" {% if branch_scope == b.id|string %}selected{% endif %}>🏬 {{ b.code }} - {{ b.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="inflow-rep-param-row">
+                    <span class="inflow-rep-param-label">Costing Sheet</span>
+                    <select name="costing_scheme_id" class="inflow-rep-param-select" style="font-weight: 600; color: #047857; background: #ECFDF5; border-color: #A7F3D0;">
+                        {% for ps in all_pricing_schemes %}
+                        <option value="{{ ps.id }}" {% if costing_scheme_id == ps.id %}selected{% endif %}>
+                            {{ ps.name }}{% if ps.name == 'Branch Costing' %} (Default HQ Cost){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="inflow-rep-param-row">
+                    <span class="inflow-rep-param-label">Currency</span>
+                    <select name="currency" class="inflow-rep-param-select" style="font-weight: 600; color: #7C2D12; background: #FFFBEB; border-color: #FDE68A;">
+                        <option value="USD" {% if currency == 'USD' %}selected{% endif %}>USD ($) - US Dollar</option>
+                        <option value="KHR" {% if currency == 'KHR' %}selected{% endif %}>KHR (៛) - Khmer Riel @ {{ "{:,.0f}".format(khr_rate) }}</option>
+                    </select>
+                </div>
+                <div class="inflow-rep-param-row">
+                    <span class="inflow-rep-param-label">Category</span>
+                    <select name="category_id" class="inflow-rep-param-select">
+                        <option value="" {% if not category_id %}selected{% endif %}>&lt;All&gt;</option>
+                        {% for cat_item in all_categories %}
+                        <option value="{{ cat_item.id }}" {% if category_id == cat_item.id|string %}selected{% endif %}>{{ cat_item.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="inflow-rep-param-row">
+                    <span class="inflow-rep-param-label">Order Date</span>
+                    <select name="date_range" id="dateRangeSelect" class="inflow-rep-param-select" onchange="toggleCustomDates(this.value)">
+                        <option value="This Month" {% if date_range == 'This Month' %}selected{% endif %}>This Month</option>
+                        <option value="Today" {% if date_range == 'Today' %}selected{% endif %}>Today</option>
+                        <option value="This Week" {% if date_range == 'This Week' %}selected{% endif %}>This Week</option>
+                        <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
+                        <option value="This Year" {% if date_range == 'This Year' %}selected{% endif %}>This Year</option>
+                        <option value="All" {% if date_range == 'All' %}selected{% endif %}>All</option>
+                        <option value="Custom" {% if date_range == 'Custom' %}selected{% endif %}>Custom...</option>
+                    </select>
+                </div>
+                <div id="customDatesWrapper" class="inflow-rep-param-row" style="display: {% if date_range == 'Custom' %}flex{% else %}none{% endif %}; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; gap: 4px;">
+                        <input type="date" name="date_from" value="{{ date_from }}" class="inflow-rep-param-input" style="width: 50%;">
+                        <input type="date" name="date_to" value="{{ date_to }}" class="inflow-rep-param-input" style="width: 50%;">
+                    </div>
+                </div>
+                <div class="inflow-rep-param-row">
+                    <span class="inflow-rep-param-label">Status</span>
+                    <select name="status" class="inflow-rep-param-select">
+                        <option value="Paid" {% if status == 'Paid' %}selected{% endif %}>Paid</option>
+                        <option value="Invoiced" {% if status == 'Invoiced' %}selected{% endif %}>Invoiced</option>
+                        <option value="Open" {% if status == 'Open' %}selected{% endif %}>Open</option>
+                        <option value="All" {% if status == 'All' %}selected{% endif %}>All</option>
+                    </select>
+                </div>
                 {% endif %}
             </div>
 
@@ -327,6 +391,13 @@
                             {% endif %}
                         </div>
                         {% endif %}
+                        {% if cat.key == 'branch' or report_key == 'branch-sales-summary' %}
+                        <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; font-weight: 600; color: #1E40AF; margin-top: 2px; margin-bottom: 4px;">
+                            <span>Scope: <strong>{{ branch_scope_label }}</strong></span>
+                            <span>Costing Sheet: <strong style="color: #047857;">{{ active_scheme.name if active_scheme else 'Branch Costing' }}</strong></span>
+                            <span>Currency: <strong style="color: #7C2D12;">{{ currency }} ({{ curr_symbol }}){% if currency == 'KHR' %} @ {{ "{:,.0f}".format(khr_rate) }}{% endif %}</strong></span>
+                        </div>
+                        {% endif %}
                         <div class="inflow-crys-sheet-printed">
                             <span class="label">Report Printed:</span>
                             <span class="date">{{ today_str }}</span>
@@ -336,6 +407,34 @@
                         page <span class="num">{{ page }} / {{ total_pages }}</span>
                     </div>
                 </div>
+
+                {% if report_key == 'branch-sales-summary' %}
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px;">
+                    <div style="border-left: 3px solid #2563EB; padding-left: 8px;">
+                        <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Quantity Sold</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #0F172A;">{{ "{:,.2f}".format(totals.quantity_sold or 0) if (totals.quantity_sold or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or 0) }}</div>
+                    </div>
+                    <div style="border-left: 3px solid #059669; padding-left: 8px;">
+                        <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Sales Money</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #059669;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
+                        </div>
+                    </div>
+                    <div style="border-left: 3px solid #D97706; padding-left: 8px;">
+                        <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Branch Cost (Qty × Cost)</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #D97706;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}
+                        </div>
+                    </div>
+                    <div style="border-left: 3px solid #7C3AED; padding-left: 8px;">
+                        <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Branch Gross Profit</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #7C3AED;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.branch_profit or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.branch_profit or 0) }}{% endif %}
+                            <span style="font-size: 11px; font-weight: 500; color: #6B7280;">({{ "%.1f"|format(totals.margin_pct or 0) }}%)</span>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
 
                 <!-- Report Data Table -->
                 <table class="inflow-crystal-table" id="reportDataTable">
@@ -1101,6 +1200,62 @@
                         <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">All products are adequately stocked above reorder points!</td></tr>
                         {% endfor %}
                     </tbody>
+
+                    {% elif report_key == 'branch-sales-summary' %}
+                    <thead>
+                        <tr>
+                            <th style="width: 12%;">CATEGORY</th>
+                            <th style="width: 13%;">SKU</th>
+                            <th style="width: 22%;">ITEM NAME</th>
+                            <th style="width: 9%; text-align: right;">QTY SOLD</th>
+                            <th style="width: 6%;">UOM</th>
+                            <th style="width: 12%; text-align: right;">TOTAL SALES</th>
+                            <th style="width: 11%; text-align: right;">BRANCH COST</th>
+                            <th style="width: 15%; text-align: right;">TOTAL COST (QTY×COST)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in rows %}
+                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                            <td>{{ r.category_name or 'General' }}</td>
+                            <td style="font-weight: 500;">
+                                <a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a>
+                            </td>
+                            <td style="font-weight: 500;">{{ r.item_name }}</td>
+                            <td style="text-align: right; font-weight: 600;">{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }}</td>
+                            <td>{{ r.uom or 'ea' }}</td>
+                            <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
+                            </td>
+                            <td style="text-align: right; color: #047857; font-weight: 500;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_unit_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_unit_cost) }}{% endif %}
+                            </td>
+                            <td style="text-align: right; font-weight: 600; color: #065F46;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales records found for this branch and filter criteria.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if page == total_pages and rows %}
+                    <tfoot>
+                        <tr class="inflow-crys-totals-row">
+                            <td colspan="3" style="font-weight: bold; text-align: right;">GRAND TOTALS:</td>
+                            <td style="text-align: right; font-weight: bold;">
+                                {{ "{:,.2f}".format(totals.quantity_sold or totals.quantity or 0) if (totals.quantity_sold or totals.quantity or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or totals.quantity or 0) }}
+                            </td>
+                            <td></td>
+                            <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
+                            </td>
+                            <td></td>
+                            <td style="text-align: right; font-weight: bold; color: #065F46;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or totals.branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or totals.branch_cost or 0) }}{% endif %}
+                            </td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
 
                     {% else %}
                     <thead>

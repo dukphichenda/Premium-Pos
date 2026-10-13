@@ -153,6 +153,18 @@ REPORT_CATALOG = {
                 'icon': '⚠️'
             }
         ]
+    },
+    'branch': {
+        'name': 'Branch Reports',
+        'key': 'branch',
+        'items': [
+            {
+                'key': 'branch-sales-summary',
+                'title': 'Branch Sales Summary',
+                'description': 'Summary of branch sales by product, total money sold, and Branch Costing sheet calculation.',
+                'icon': '🏬'
+            }
+        ]
     }
 }
 
@@ -246,12 +258,52 @@ def view_report(report_key):
     custom_from = request.args.get('date_from', '')
     custom_to = request.args.get('date_to', '')
     status = request.args.get('status', 'Paid' if report_key == 'sales-order-profit' else 'All')
-    sort_by = request.args.get('sort_by', 'Order Number')
-    orientation = request.args.get('orientation', 'Landscape' if report_key in ['sales-order-operational', 'sales-by-product-details', 'inventory-valuation'] else 'Portrait')
+    sort_by = request.args.get('sort_by', 'Total Sales' if report_key == 'branch-sales-summary' else 'Order Number')
+    orientation = request.args.get('orientation', 'Landscape' if report_key in ['sales-order-operational', 'sales-by-product-details', 'inventory-valuation', 'branch-sales-summary'] else 'Portrait')
     group_by = request.args.get('group_by', 'None')
     page = max(1, int(request.args.get('page', 1)))
     per_page = 36 # Rows per page matching printed sheet size
-    branch_scope = request.args.get('branch', 'main').strip().lower()
+    
+    # Store Scope: Default to 'all' for branch report, 'main' for other reports
+    if report_key == 'branch-sales-summary':
+        branch_scope = request.args.get('branch', 'all').strip().lower()
+    else:
+        branch_scope = request.args.get('branch', 'main').strip().lower()
+
+    # Costing Tier / Price Sheet selection (Defaults to Branch Costing)
+    all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Costing%%' THEN 0 ELSE 1 END, name ASC")
+    default_costing_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE name ILIKE '%%Branch Costing%%' LIMIT 1")
+    default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+    costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
+    try:
+        costing_scheme_id = int(costing_scheme_id_param) if costing_scheme_id_param else default_costing_scheme_id
+    except ValueError:
+        costing_scheme_id = default_costing_scheme_id
+
+    active_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE id = %s", (costing_scheme_id,))
+    if not active_scheme:
+        active_scheme = default_costing_scheme or {'id': default_costing_scheme_id, 'name': 'Branch Costing', 'currency': 'US Dollar ($)'}
+
+    # Currency selection (USD or KHR)
+    currency = request.args.get('currency', 'USD').strip().upper()
+    if currency not in ['USD', 'KHR']:
+        currency = 'USD'
+
+    inv_set = query_one("SELECT khr_exchange_rate FROM invoice_settings LIMIT 1")
+    khr_rate = float(inv_set.get('khr_exchange_rate') or 4100.0) if inv_set else 4100.0
+    curr_multiplier = khr_rate if currency == 'KHR' else 1.0
+    curr_symbol = '៛' if currency == 'KHR' else '$'
+
+    if branch_scope == 'all':
+        branch_scope_label = 'All Outlets (Consolidated)'
+    elif branch_scope == 'main':
+        branch_scope_label = 'Main Store (Headquarters)'
+    else:
+        try:
+            b_row = query_one("SELECT code, name FROM branches WHERE id = %s", (int(branch_scope),))
+            branch_scope_label = f"{b_row['code']} - {b_row['name']}" if b_row else f"Branch #{branch_scope}"
+        except Exception:
+            branch_scope_label = 'All Outlets'
 
     start_date, end_date = calculate_date_range(date_range, custom_from, custom_to)
 
@@ -1378,6 +1430,140 @@ def view_report(report_key):
         """
         rows = query_all(data_sql, tuple(query_params))
 
+    # 17. BRANCH SALES SUMMARY REPORT
+    elif report_key == 'branch-sales-summary':
+        base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
+        params = [start_date, end_date]
+
+        if branch_scope == 'main':
+            base_where.append("so.branch_id IS NULL")
+        elif branch_scope != 'all':
+            try:
+                base_where.append("so.branch_id = %s")
+                params.append(int(branch_scope))
+            except ValueError:
+                pass
+
+        if category_id and category_id != 'all':
+            base_where.append("p.category_id = %s")
+            params.append(int(category_id))
+
+        if status == 'Paid':
+            base_where.append("so.payment_status = 'PAID'")
+        elif status == 'Invoiced':
+            base_where.append("so.status = 'INVOICED'")
+        elif status == 'Open':
+            base_where.append("so.status = 'OPEN'")
+        elif status != 'All':
+            base_where.append("so.status = %s")
+            params.append(status)
+
+        where_sql = " AND ".join(base_where)
+
+        count_sql = f"""
+            SELECT COUNT(DISTINCT sol.product_id) as cnt
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            JOIN products p ON sol.product_id = p.id
+            WHERE {where_sql}
+        """
+        total_count = query_one(count_sql, tuple(params))['cnt']
+        total_pages = max(1, math.ceil(total_count / per_page))
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+
+        totals_sql = f"""
+            SELECT 
+                COALESCE(SUM(sol.quantity), 0) as total_qty,
+                COALESCE(SUM(sol.subtotal), 0) as total_sales,
+                COALESCE(SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)), 0) as total_branch_cost,
+                COALESCE(SUM(sol.subtotal - (sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0))), 0) as total_branch_profit
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
+            WHERE {where_sql}
+        """
+        t_params = [costing_scheme_id] + params
+        t = query_one(totals_sql, tuple(t_params))
+        raw_qty = float(t['total_qty'] or 0)
+        raw_sales = float(t['total_sales'] or 0)
+        raw_cost = float(t['total_branch_cost'] or 0)
+        raw_profit = float(t['total_branch_profit'] or 0)
+        margin_pct = (raw_profit / raw_sales * 100.0) if raw_sales > 0 else 0.0
+
+        totals = {
+            'quantity': raw_qty,
+            'quantity_sold': raw_qty,
+            'sales_amount': raw_sales * curr_multiplier,
+            'branch_cost': raw_cost * curr_multiplier,
+            'total_branch_cost': raw_cost * curr_multiplier,
+            'profit': raw_profit * curr_multiplier,
+            'branch_profit': raw_profit * curr_multiplier,
+            'margin_pct': margin_pct
+        }
+
+        order_clause = "sales_amount DESC"
+        if sort_by == 'Total Cost':
+            order_clause = "total_branch_cost DESC"
+        elif sort_by == 'Quantity Sold':
+            order_clause = "quantity_sold DESC"
+        elif sort_by == 'Profit':
+            order_clause = "branch_profit DESC"
+        elif sort_by == 'Item Name':
+            order_clause = "p.name ASC"
+
+        data_sql = f"""
+            SELECT 
+                p.id, p.sku, p.name as item_name,
+                COALESCE(c.name, 'General') as category_name,
+                COALESCE(sol.uom, p.uom, 'pcs') as uom,
+                SUM(sol.quantity) as quantity_sold,
+                SUM(sol.subtotal) as sales_amount,
+                COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0) as raw_branch_cost,
+                SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as total_branch_cost,
+                SUM(sol.subtotal) - SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as branch_profit
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            JOIN products p ON sol.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
+            WHERE {where_sql}
+            GROUP BY p.id, p.sku, p.name, c.name, COALESCE(sol.uom, p.uom, 'pcs'), pp.unit_price, p.default_price
+            ORDER BY {order_clause}
+            LIMIT %s OFFSET %s
+        """
+        d_params = [costing_scheme_id] + params + [per_page, offset]
+        raw_rows = query_all(data_sql, tuple(d_params))
+
+        rows = []
+        for r in raw_rows:
+            qty = float(r['quantity_sold'] or 0)
+            sales = float(r['sales_amount'] or 0)
+            cost_unit = float(r['raw_branch_cost'] or 0)
+            total_cost = float(r['total_branch_cost'] or 0)
+            profit = float(r['branch_profit'] or 0)
+            avg_price = (sales / qty) if qty > 0 else 0.0
+            m_pct = (profit / sales * 100.0) if sales > 0 else 0.0
+
+            rows.append({
+                'id': r['id'],
+                'product_id': r['id'],
+                'sku': r['sku'],
+                'item_name': r['item_name'],
+                'product_name': r['item_name'],
+                'category_name': r['category_name'],
+                'uom': r['uom'],
+                'quantity_sold': qty,
+                'quantity': qty,
+                'avg_sale_price': avg_price * curr_multiplier,
+                'sales_amount': sales * curr_multiplier,
+                'branch_unit_cost': cost_unit * curr_multiplier,
+                'total_branch_cost': total_cost * curr_multiplier,
+                'branch_profit': profit * curr_multiplier,
+                'margin_pct': m_pct
+            })
+
     else:
         # Fallback generic sales orders list
         total_count = query_one("SELECT COUNT(*) as cnt FROM sales_orders")['cnt']
@@ -1421,7 +1607,14 @@ def view_report(report_key):
                            orientation=orientation,
                            group_by=group_by,
                            branch_scope=branch_scope,
+                           branch_scope_label=branch_scope_label,
                            all_branches=all_branches,
+                           all_pricing_schemes=all_pricing_schemes,
+                           costing_scheme_id=costing_scheme_id,
+                           active_scheme=active_scheme,
+                           currency=currency,
+                           curr_symbol=curr_symbol,
+                           khr_rate=khr_rate,
                            category_groups=locals().get('category_groups', []),
                            customer_groups=locals().get('customer_groups', []),
                            today_str=today_str)
@@ -1439,7 +1632,7 @@ def export_report(report_key):
     vendor_id = request.args.get('vendor_id', '')
     category_id = request.args.get('category_id', '')
     location_id = request.args.get('location_id', '')
-    branch_scope = request.args.get('branch', 'main').strip().lower()
+    branch_scope = request.args.get('branch', 'all' if report_key == 'branch-sales-summary' else 'main').strip().lower()
 
     start_date, end_date = calculate_date_range(date_range, custom_from, custom_to)
 
@@ -1635,6 +1828,83 @@ def export_report(report_key):
         for r in rows:
             writer.writerow([r['name'], r['contact_name'], r['phone'], r['email'], r['address1'], r['city'], f"{float(r['balance'] or 0):.2f}"])
         filename = "Customer_List.csv"
+
+    elif report_key == 'branch-sales-summary':
+        costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
+        default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Costing%%' LIMIT 1")
+        default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+        try:
+            costing_scheme_id = int(costing_scheme_id_param) if costing_scheme_id_param else default_costing_scheme_id
+        except ValueError:
+            costing_scheme_id = default_costing_scheme_id
+
+        currency = request.args.get('currency', 'USD').strip().upper()
+        if currency not in ['USD', 'KHR']:
+            currency = 'USD'
+        inv_set = query_one("SELECT khr_exchange_rate FROM invoice_settings LIMIT 1")
+        khr_rate = float(inv_set.get('khr_exchange_rate') or 4100.0) if inv_set else 4100.0
+        curr_mult = khr_rate if currency == 'KHR' else 1.0
+        curr_sym = '៛' if currency == 'KHR' else '$'
+
+        writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'UOM', f'Total Sales ({curr_sym})', f'Branch Unit Cost ({curr_sym})', f'Total Branch Cost ({curr_sym})', f'Branch Profit ({curr_sym})', 'Margin %'])
+
+        where_branch = "1=1"
+        if branch_scope == 'main':
+            where_branch = "so.branch_id IS NULL"
+        elif branch_scope != 'all' and branch_scope.isdigit():
+            where_branch = f"so.branch_id = {int(branch_scope)}"
+
+        where_cat = f"p.category_id = {int(category_id)}" if (category_id and category_id.isdigit()) else "1=1"
+        where_stat = "1=1"
+        if status == 'Paid':
+            where_stat = "so.payment_status = 'PAID'"
+        elif status == 'Invoiced':
+            where_stat = "so.status = 'INVOICED'"
+        elif status == 'Open':
+            where_stat = "so.status = 'OPEN'"
+
+        rows = query_all(f"""
+            SELECT 
+                p.id, p.sku, p.name as item_name,
+                COALESCE(c.name, 'General') as category_name,
+                COALESCE(sol.uom, p.uom, 'pcs') as uom,
+                SUM(sol.quantity) as quantity_sold,
+                SUM(sol.subtotal) as sales_amount,
+                COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0) as raw_branch_cost,
+                SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as total_branch_cost,
+                SUM(sol.subtotal) - SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as branch_profit
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            JOIN products p ON sol.product_id = p.id
+            LEFT JOIN categories c ON p.category_id = c.id
+            LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
+            WHERE so.order_date >= %s AND so.order_date <= %s AND so.status != 'CANCELLED'
+              AND {where_branch} AND {where_cat} AND {where_stat}
+            GROUP BY p.id, p.sku, p.name, c.name, COALESCE(sol.uom, p.uom, 'pcs'), pp.unit_price, p.default_price
+            ORDER BY sales_amount DESC
+        """, (costing_scheme_id, start_date, end_date))
+
+        for r in rows:
+            qty = float(r['quantity_sold'] or 0)
+            sales = float(r['sales_amount'] or 0) * curr_mult
+            b_cost = float(r['raw_branch_cost'] or 0) * curr_mult
+            tot_cost = float(r['total_branch_cost'] or 0) * curr_mult
+            profit = float(r['branch_profit'] or 0) * curr_mult
+            m_pct = (profit / sales * 100.0) if sales > 0 else 0.0
+
+            writer.writerow([
+                r['category_name'],
+                r['sku'],
+                r['item_name'],
+                f"{qty:.0f}",
+                r['uom'],
+                f"{sales:,.2f}" if currency == 'USD' else f"{sales:,.0f}",
+                f"{b_cost:,.2f}" if currency == 'USD' else f"{b_cost:,.0f}",
+                f"{tot_cost:,.2f}" if currency == 'USD' else f"{tot_cost:,.0f}",
+                f"{profit:,.2f}" if currency == 'USD' else f"{profit:,.0f}",
+                f"{m_pct:.1f}%"
+            ])
+        filename = f"Branch_Sales_Summary_{start_date}_{end_date}.csv"
 
     else:
         writer.writerow(['Order Number', 'Date', 'Customer', 'Status', 'Total Amount ($)'])
