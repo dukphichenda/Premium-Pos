@@ -139,6 +139,28 @@ sudo apt install -y python3 python3-pip python3-venv postgresql postgresql-contr
    ```
    *All tables, schemas, and records will be instantly restored.*
 
+4. **Grant permissions & assign table ownership to `inflow_user`:**
+   ```bash
+   sudo -u postgres psql -d inflow_premium -c "
+   ALTER DATABASE inflow_premium OWNER TO inflow_user;
+   GRANT ALL ON SCHEMA public TO inflow_user;
+   GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO inflow_user;
+   GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO inflow_user;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO inflow_user;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO inflow_user;
+   DO \$\$ 
+   DECLARE r RECORD;
+   BEGIN
+       FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
+           EXECUTE 'ALTER TABLE public.' || quote_ident(r.tablename) || ' OWNER TO inflow_user;';
+       END LOOP;
+       FOR r IN (SELECT sequence_name FROM information_schema.sequences WHERE sequence_schema = 'public') LOOP
+           EXECUTE 'ALTER SEQUENCE public.' || quote_ident(r.sequence_name) || ' OWNER TO inflow_user;';
+       END LOOP;
+   END \$\$;
+   "
+   ```
+
 ---
 
 ### Step 6: Configure inFlow Premium Application
