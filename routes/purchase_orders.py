@@ -108,7 +108,7 @@ def list_purchases():
                            stats_dict=stats_dict,
                            kpi=kpi_raw)
 
-def _get_po_drawer_data(date_filter='All', status_filter='Open, In Progress', vendor_search='', order_search=''):
+def _get_po_drawer_data(date_filter='All', status_filter='All', vendor_search='', order_search=''):
     where_clauses = ["1=1"]
     params = []
 
@@ -289,6 +289,21 @@ def api_vendor_summary(id):
         }
     })
 
+def _format_po_status_label(o):
+    st = o.get('status') or ''
+    pay_st = o.get('payment_status') or ''
+    if st == 'PAID' or pay_st == 'PAID':
+        return 'Paid'
+    if st in ('ISSUED', 'OPEN'):
+        return 'Open'
+    if st in ('PARTIAL_RECEIVED', 'IN_PROGRESS'):
+        return 'In Progress'
+    if st in ('RECEIVED', 'FULFILLED'):
+        return 'Received'
+    if st in ('CANCELLED', 'VOID'):
+        return 'Cancelled'
+    return st or 'Open'
+
 @purchase_orders_bp.route('/api/purchases/drawer')
 def api_purchases_drawer():
     date_filter = request.args.get('date_filter', 'All')
@@ -302,7 +317,10 @@ def api_purchases_drawer():
             'id': o['id'],
             'order_number': o['order_number'],
             'order_date': o['order_date'].strftime('%d-%b-%y') if o['order_date'] else '',
-            'status': 'Open' if o['status'] in ('ISSUED', 'OPEN') else ('In Progress' if o['status'] == 'PARTIAL_RECEIVED' else o['status']),
+            'raw_date': o['order_date'].strftime('%Y-%m-%d') if o['order_date'] else '',
+            'status': _format_po_status_label(o),
+            'raw_status': o['status'],
+            'payment_status': o['payment_status'] or '',
             'vendor_name': o['vendor_name'] or '',
             'vendor_invoice_no': o['vendor_invoice_no'] or '',
             'location_name': o['location_name'] or '',

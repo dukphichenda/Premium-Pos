@@ -132,10 +132,10 @@
                     </button>
                 </div>
             </div>
-            <form method="GET" action="{% if is_new %}{{ url_for('purchase_orders.create_purchase') }}{% else %}{{ url_for('purchase_orders.detail_purchase', id=order.id) }}{% endif %}" class="inflow-drawer-filters" id="poDrawerFilterForm">
+            <form method="GET" action="{% if is_new %}{{ url_for('purchase_orders.create_purchase') }}{% else %}{{ url_for('purchase_orders.detail_purchase', id=order.id) }}{% endif %}" class="inflow-drawer-filters" id="poDrawerFilterForm" onsubmit="event.preventDefault(); applyPoDrawerFilters();">
                 <div class="inflow-filter-row">
                     <span class="inflow-filter-label">Order Date</span>
-                    <select name="date_filter" id="poDrawerDateFilter" class="inflow-filter-select" onchange="syncPoDrawerFilters(); document.getElementById('poDrawerFilterForm').submit()">
+                    <select name="date_filter" id="poDrawerDateFilter" class="inflow-filter-select" onchange="applyPoDrawerFilters()">
                         <option value="All" {% if date_filter == 'All' %}selected{% endif %}>All</option>
                         <option value="Today" {% if date_filter == 'Today' %}selected{% endif %}>Today</option>
                         <option value="This Week" {% if date_filter == 'This Week' %}selected{% endif %}>This Week</option>
@@ -197,7 +197,7 @@
                                class="inflow-filter-input" autocomplete="off"
                                placeholder="" value="{{ vendor_search or '' }}" 
                                onfocus="openPoDrawerVendorDropdown()"
-                               oninput="filterPoDrawerVendorDropdown(this.value)"
+                               oninput="handlePoDrawerVendorInput(this.value)"
                                onkeydown="handlePoDrawerVendorKey(event)">
                         <button type="button" class="inflow-combo-arrow" onclick="togglePoDrawerVendorDropdown()" title="Select Vendor">▾</button>
 
@@ -238,31 +238,34 @@
                 <!-- Order # Filter Input -->
                 <div class="inflow-filter-row">
                     <span class="inflow-filter-label">Order #</span>
-                    <input type="text" name="order_search" id="poDrawerOrderSearchInput" class="inflow-filter-input" placeholder="PO # or Invoice..." value="{{ order_search or '' }}">
+                    <input type="text" name="order_search" id="poDrawerOrderSearchInput" class="inflow-filter-input" placeholder="PO # or Invoice..." value="{{ order_search or '' }}" oninput="applyPoDrawerFilters()" onkeydown="handlePoDrawerOrderKey(event)">
                 </div>
 
-                <button type="submit" class="inflow-filter-btn" id="poDrawerRefreshBtn" style="background: #0F766E; border-color: #0D9488;">Refresh</button>
+                <button type="button" class="inflow-filter-btn" id="poDrawerRefreshBtn" onclick="refreshPoDrawerList(event)" title="Refresh Orders List">Refresh</button>
             </form>
         </div>
 
         <!-- Compact List View (Default) -->
         <div class="inflow-drawer-compact-view">
-            <div class="inflow-drawer-list-header" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px;">
-                <span>Order # ▾</span>
+            <div class="inflow-drawer-list-header" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px; cursor: pointer;" onclick="togglePoDrawerSortOrder()" title="Click to sort orders">
+                <span id="poDrawerOrderHdrTitle">Order # ▾</span>
                 <span class="inflow-drawer-total-tag" style="font-size: 10.5px; font-weight: 700; color: #92400E; background: #FEF3C7; border: 1px solid #FDE68A; padding: 1px 7px; border-radius: 10px;">
                     Total: <b id="poDrawerListHeaderCount">{{ sidebar_orders|length }}</b>
                 </span>
             </div>
             <div class="inflow-drawer-list-body" id="poDrawerOrdersListBody">
                 {% for s_ord in sidebar_orders %}
-                <a href="javascript:void(0)" onclick="handleSelectPoOrder('{{ url_for('purchase_orders.detail_purchase', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, vendor_search=vendor_search, order_search=order_search) }}', this)" 
+                <a href="javascript:void(0)" onclick="handleSelectPoOrder('{{ url_for('purchase_orders.detail_purchase', id=s_ord.id) }}', this)" 
                    class="inflow-drawer-row {% if not is_new and s_ord.id == order.id %}active{% endif %}"
-                   data-vendor="{{ (s_ord.vendor_name or '')|lower }}">
+                   data-order="{{ (s_ord.order_number or '')|lower }}"
+                   data-invoice="{{ (s_ord.vendor_invoice_no or '')|lower }}"
+                   data-vendor="{{ (s_ord.vendor_name or '')|lower }}"
+                   data-date="{{ s_ord.order_date.strftime('%Y-%m-%d') if s_ord.order_date else '' }}"
+                   data-status="{% if s_ord.payment_status == 'PAID' or s_ord.status == 'PAID' %}paid{% elif s_ord.status in ('ISSUED', 'OPEN') %}open{% elif s_ord.status in ('PARTIAL_RECEIVED', 'IN_PROGRESS') %}in progress{% elif s_ord.status == 'RECEIVED' %}received{% elif s_ord.status == 'CANCELLED' %}cancelled{% else %}{{ s_ord.status|lower }}{% endif %}">
                     <span>{{ s_ord.order_number }}</span>
                 </a>
-                {% else %}
-                <div style="padding: 12px; font-size: 11px; color: #64748B; text-align: center;">No orders match criteria</div>
                 {% endfor %}
+                <div id="poDrawerNoOrdersMatch" style="display: {% if sidebar_orders|length == 0 %}block{% else %}none{% endif %}; padding: 12px; font-size: 11px; color: #64748B; text-align: center;">No orders match criteria</div>
             </div>
             <div class="inflow-drawer-footer-count" style="padding: 6px 12px; font-size: 10px; text-align: center;">
                 Total: <span id="poDrawerListFooterCount">{{ sidebar_orders|length }}</span> Purchase Orders
@@ -286,10 +289,15 @@
                         <th style="width: 85px; text-align: right;">Balance</th>
                     </tr>
                 </thead>
-                <tbody>
+                <tbody id="poDrawerExpandedTableBody">
                     {% for s_ord in sidebar_orders %}
                     <tr class="inflow-expanded-row {% if not is_new and s_ord.id == order.id %}active{% endif %}"
-                        onclick="handleSelectPoOrder('{{ url_for('purchase_orders.detail_purchase', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, vendor_search=vendor_search, order_search=order_search) }}', this)">
+                        data-order="{{ (s_ord.order_number or '')|lower }}"
+                        data-invoice="{{ (s_ord.vendor_invoice_no or '')|lower }}"
+                        data-vendor="{{ (s_ord.vendor_name or '')|lower }}"
+                        data-date="{{ s_ord.order_date.strftime('%Y-%m-%d') if s_ord.order_date else '' }}"
+                        data-status="{% if s_ord.payment_status == 'PAID' or s_ord.status == 'PAID' %}paid{% elif s_ord.status in ('ISSUED', 'OPEN') %}open{% elif s_ord.status in ('PARTIAL_RECEIVED', 'IN_PROGRESS') %}in progress{% elif s_ord.status == 'RECEIVED' %}received{% elif s_ord.status == 'CANCELLED' %}cancelled{% else %}{{ s_ord.status|lower }}{% endif %}"
+                        onclick="handleSelectPoOrder('{{ url_for('purchase_orders.detail_purchase', id=s_ord.id) }}', this)">
                         <td style="font-weight: 600; color: #0F766E;">{{ s_ord.order_number }}</td>
                         <td>{{ s_ord.order_date.strftime('%d-%b-%y') if s_ord.order_date else '' }}</td>
                         <td><span class="inflow-status-pill {{ s_ord.status|lower|replace(' ', '_') }}">{{ s_ord.status }}</span></td>
@@ -301,15 +309,14 @@
                         <td style="text-align: right; color: #10B981;">${{ "%.2f"|format(s_ord.paid_amount or 0) }}</td>
                         <td style="text-align: right; font-weight: 600; color: {% if (s_ord.balance_due or 0) > 0 %}#EF4444{% else %}#10B981{% endif %};">${{ "%.2f"|format(s_ord.balance_due or 0) }}</td>
                     </tr>
-                    {% else %}
-                    <tr>
+                    {% endfor %}
+                    <tr id="poExpandedNoOrdersMatch" style="display: {% if sidebar_orders|length == 0 %}table-row{% else %}none{% endif %};">
                         <td colspan="10" style="padding: 24px; text-align: center; color: #64748B;">No purchase orders match criteria</td>
                     </tr>
-                    {% endfor %}
                 </tbody>
             </table>
             <div style="padding: 8px 16px; font-size: 11px; font-weight: 600; color: #475569; border-top: 1px solid #CBD5E1; background: #F8FAFC;">
-                Total number of Purchase Orders displayed: {{ sidebar_orders|length }}
+                Total number of Purchase Orders displayed: <span id="poDrawerExpandedTotalCount">{{ sidebar_orders|length }}</span>
             </div>
         </div>
     </aside>
@@ -1150,6 +1157,39 @@ function togglePoDrawerExpand() {
     }
 }
 
+let poDrawerSortAsc = false;
+
+function togglePoDrawerSortOrder() {
+    poDrawerSortAsc = !poDrawerSortAsc;
+    const hdrTitle = document.getElementById('poDrawerOrderHdrTitle');
+    if (hdrTitle) hdrTitle.innerText = poDrawerSortAsc ? 'Order # ▴' : 'Order # ▾';
+    
+    const body = document.getElementById('poDrawerOrdersListBody');
+    if (!body) return;
+    const rows = Array.from(body.querySelectorAll('.inflow-drawer-row'));
+    rows.sort((a, b) => {
+        const ordA = a.dataset.order || '';
+        const ordB = b.dataset.order || '';
+        return poDrawerSortAsc ? ordA.localeCompare(ordB) : ordB.localeCompare(ordA);
+    });
+    const emptyMsg = document.getElementById('poDrawerNoOrdersMatch');
+    rows.forEach(r => body.appendChild(r));
+    if (emptyMsg) body.appendChild(emptyMsg);
+
+    const expBody = document.getElementById('poDrawerExpandedTableBody');
+    if (expBody) {
+        const expRows = Array.from(expBody.querySelectorAll('.inflow-expanded-row'));
+        expRows.sort((a, b) => {
+            const ordA = a.dataset.order || '';
+            const ordB = b.dataset.order || '';
+            return poDrawerSortAsc ? ordA.localeCompare(ordB) : ordB.localeCompare(ordA);
+        });
+        const expEmpty = document.getElementById('poExpandedNoOrdersMatch');
+        expRows.forEach(r => expBody.appendChild(r));
+        if (expEmpty) expBody.appendChild(expEmpty);
+    }
+}
+
 function handleSelectPoOrder(url, rowEl) {
     if (isPoDirty && !confirm('You have unsaved changes. Discard changes and view selected order?')) {
         return;
@@ -1169,6 +1209,198 @@ function syncPoDrawerFilters() {
         sessionStorage.setItem('po_vendor_search', vendorF || '');
         sessionStorage.setItem('po_order_search', orderF || '');
     } catch(e) {}
+}
+
+function checkPoDateFilterMatch(dateStr, filter) {
+    if (!filter || filter === 'All') return true;
+    if (!dateStr) return false;
+    
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return false;
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    const orderDate = new Date(y, m, d);
+    orderDate.setHours(0, 0, 0, 0);
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    today.setHours(0, 0, 0, 0);
+
+    const msInDay = 86400000;
+    const diffDays = Math.round((today - orderDate) / msInDay);
+
+    if (filter === 'Today') {
+        return diffDays === 0;
+    } else if (filter === 'Yesterday') {
+        return diffDays === 1;
+    } else if (filter === 'Last 7 Days') {
+        return diffDays >= 0 && diffDays <= 7;
+    } else if (filter === 'Last 30 Days') {
+        return diffDays >= 0 && diffDays <= 30;
+    } else if (filter === 'This Month') {
+        return orderDate.getFullYear() === today.getFullYear() && orderDate.getMonth() === today.getMonth();
+    } else if (filter === 'Last Month') {
+        const lastMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+        return orderDate.getFullYear() === lastMonthDate.getFullYear() && orderDate.getMonth() === lastMonthDate.getMonth();
+    } else if (filter === 'This Year') {
+        return orderDate.getFullYear() === today.getFullYear();
+    } else if (filter === 'This Week') {
+        const day = today.getDay();
+        const diffToMon = (day === 0 ? -6 : 1) - day;
+        const monday = new Date(today.getTime() + diffToMon * msInDay);
+        monday.setHours(0, 0, 0, 0);
+        const sunday = new Date(monday.getTime() + 6 * msInDay);
+        sunday.setHours(23, 59, 59, 999);
+        return orderDate >= monday && orderDate <= sunday;
+    } else if (filter === 'Last Week') {
+        const day = today.getDay();
+        const diffToMon = (day === 0 ? -6 : 1) - day - 7;
+        const lastMon = new Date(today.getTime() + diffToMon * msInDay);
+        lastMon.setHours(0, 0, 0, 0);
+        const lastSun = new Date(lastMon.getTime() + 6 * msInDay);
+        lastSun.setHours(23, 59, 59, 999);
+        return orderDate >= lastMon && orderDate <= lastSun;
+    } else if (filter === 'This Quarter') {
+        const curQ = Math.floor(today.getMonth() / 3);
+        const ordQ = Math.floor(orderDate.getMonth() / 3);
+        return orderDate.getFullYear() === today.getFullYear() && curQ === ordQ;
+    }
+    return true;
+}
+
+function checkPoStatusFilterMatch(rowStatus, filterVal) {
+    if (!filterVal || filterVal === 'All') return true;
+    const selected = filterVal.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    if (selected.length === 0 || selected.includes('all')) return true;
+    
+    return selected.some(sel => {
+        if (sel === 'open') return rowStatus === 'open' || rowStatus === 'issued';
+        if (sel === 'paid') return rowStatus === 'paid';
+        if (sel === 'in progress') return rowStatus === 'in progress' || rowStatus === 'partial' || rowStatus === 'partial_received';
+        if (sel === 'received') return rowStatus === 'received' || rowStatus === 'fulfilled';
+        if (sel === 'cancelled') return rowStatus === 'cancelled' || rowStatus === 'void';
+        return rowStatus === sel;
+    });
+}
+
+function applyPoDrawerFilters() {
+    const dateVal = document.getElementById('poDrawerDateFilter')?.value || 'All';
+    const statusVal = (document.getElementById('poDrawerStatusFilterInput')?.value || 'All').trim();
+    const vendorVal = (document.getElementById('poDrawerVendorSearchInput')?.value || '').trim().toLowerCase();
+    const orderRaw = (document.getElementById('poDrawerOrderSearchInput')?.value || '').trim().toLowerCase();
+    const orderClean = orderRaw.replace(/[^a-z0-9]/g, '');
+
+    let visibleCount = 0;
+    const compactRows = document.querySelectorAll('#poDrawerOrdersListBody .inflow-drawer-row');
+    compactRows.forEach(row => {
+        const rOrder = (row.dataset.order || '').toLowerCase();
+        const rOrderClean = rOrder.replace(/[^a-z0-9]/g, '');
+        const rInvoice = (row.dataset.invoice || '').toLowerCase();
+        const rVendor = (row.dataset.vendor || '').toLowerCase();
+        const rStatus = (row.dataset.status || '').toLowerCase();
+        const rDate = row.dataset.date || '';
+
+        const matchVendor = !vendorVal || rVendor.includes(vendorVal);
+        const matchOrder = !orderRaw || rOrder.includes(orderRaw) || (orderClean && rOrderClean.includes(orderClean)) || rInvoice.includes(orderRaw);
+        const matchStatus = checkPoStatusFilterMatch(rStatus, statusVal);
+        const matchDate = checkPoDateFilterMatch(rDate, dateVal);
+
+        if (matchVendor && matchOrder && matchStatus && matchDate) {
+            row.style.display = 'flex';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const emptyMsg = document.getElementById('poDrawerNoOrdersMatch');
+    if (emptyMsg) {
+        emptyMsg.style.display = visibleCount === 0 ? 'block' : 'none';
+    }
+
+    const expRows = document.querySelectorAll('#poDrawerExpandedTableBody .inflow-expanded-row');
+    expRows.forEach(row => {
+        const rOrder = (row.dataset.order || '').toLowerCase();
+        const rOrderClean = rOrder.replace(/[^a-z0-9]/g, '');
+        const rInvoice = (row.dataset.invoice || '').toLowerCase();
+        const rVendor = (row.dataset.vendor || '').toLowerCase();
+        const rStatus = (row.dataset.status || '').toLowerCase();
+        const rDate = row.dataset.date || '';
+
+        const matchVendor = !vendorVal || rVendor.includes(vendorVal);
+        const matchOrder = !orderRaw || rOrder.includes(orderRaw) || (orderClean && rOrderClean.includes(orderClean)) || rInvoice.includes(orderRaw);
+        const matchStatus = checkPoStatusFilterMatch(rStatus, statusVal);
+        const matchDate = checkPoDateFilterMatch(rDate, dateVal);
+
+        row.style.display = (matchVendor && matchOrder && matchStatus && matchDate) ? '' : 'none';
+    });
+
+    const expEmpty = document.getElementById('poExpandedNoOrdersMatch');
+    if (expEmpty) {
+        expEmpty.style.display = visibleCount === 0 ? 'table-row' : 'none';
+    }
+
+    const hdrCount = document.getElementById('poDrawerListHeaderCount');
+    if (hdrCount) hdrCount.innerText = visibleCount;
+    const ftrCount = document.getElementById('poDrawerListFooterCount');
+    if (ftrCount) ftrCount.innerText = visibleCount;
+    const expFtrCount = document.getElementById('poDrawerExpandedTotalCount');
+    if (expFtrCount) expFtrCount.innerText = visibleCount;
+
+    syncPoDrawerFilters();
+}
+
+function refreshPoDrawerList(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const btn = document.getElementById('poDrawerRefreshBtn');
+    if (btn) {
+        btn.innerText = 'Refreshing...';
+    }
+
+    applyPoDrawerFilters();
+
+    fetch('/api/purchases/drawer?date_filter=All&status_filter=All')
+        .then(r => r.json())
+        .then(res => {
+            if (res.success && Array.isArray(res.orders)) {
+                updatePoDrawerDomRows(res.orders);
+            }
+        })
+        .catch(() => {})
+        .finally(() => {
+            if (btn) {
+                btn.innerText = 'Refresh';
+            }
+            applyPoDrawerFilters();
+        });
+}
+
+function updatePoDrawerDomRows(orders) {
+    const body = document.getElementById('poDrawerOrdersListBody');
+    if (!body || !orders) return;
+    const existingOrders = new Set();
+    body.querySelectorAll('.inflow-drawer-row').forEach(r => {
+        existingOrders.add((r.dataset.order || '').toLowerCase());
+    });
+
+    orders.forEach(o => {
+        const ordLower = (o.order_number || '').toLowerCase();
+        if (!existingOrders.has(ordLower)) {
+            const a = document.createElement('a');
+            a.href = 'javascript:void(0)';
+            a.onclick = function() { handleSelectPoOrder(`/purchases/${o.id}`, a); };
+            a.className = 'inflow-drawer-row';
+            a.dataset.order = ordLower;
+            a.dataset.invoice = (o.vendor_invoice_no || '').toLowerCase();
+            a.dataset.vendor = (o.vendor_name || '').toLowerCase();
+            a.dataset.date = o.raw_date || o.order_date || '';
+            a.dataset.status = (o.status || '').toLowerCase();
+            a.innerHTML = `<span>${o.order_number}</span>`;
+            const emptyMsg = document.getElementById('poDrawerNoOrdersMatch');
+            body.insertBefore(a, emptyMsg || body.firstChild);
+        }
+    });
 }
 
 function initPoStatusCheckboxes() {
@@ -1202,6 +1434,7 @@ function togglePoDrawerStatusDropdown() {
 function onPoStatusAllToggle(el) {
     document.querySelectorAll('.po-status-option-chk').forEach(c => c.checked = el.checked);
     updatePoStatusInputText();
+    applyPoDrawerFilters();
 }
 
 function onPoStatusOptionChange() {
@@ -1210,6 +1443,7 @@ function onPoStatusOptionChange() {
     const chkAll = document.getElementById('chkPoStatusAll');
     if (chkAll) chkAll.checked = allChecked;
     updatePoStatusInputText();
+    applyPoDrawerFilters();
 }
 
 function updatePoStatusInputText() {
@@ -1240,18 +1474,31 @@ function filterPoDrawerVendorDropdown(val) {
     });
 }
 
+function handlePoDrawerVendorInput(val) {
+    filterPoDrawerVendorDropdown(val);
+    applyPoDrawerFilters();
+}
+
 function selectPoDrawerVendorRow(row) {
     const name = row.dataset.vname || '';
     const inp = document.getElementById('poDrawerVendorSearchInput');
     if (inp) inp.value = name;
     const p = document.getElementById('poDrawerVendorDropdownPopup');
     if (p) p.style.display = 'none';
+    applyPoDrawerFilters();
 }
 
 function handlePoDrawerVendorKey(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
-        document.getElementById('poDrawerFilterForm')?.submit();
+        applyPoDrawerFilters();
+    }
+}
+
+function handlePoDrawerOrderKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        applyPoDrawerFilters();
     }
 }
 
@@ -1950,6 +2197,7 @@ document.addEventListener('keydown', (e) => {
 // Auto-select first line on load
 document.addEventListener('DOMContentLoaded', () => {
     initPoStatusCheckboxes();
+    applyPoDrawerFilters();
     const firstRow = document.querySelector('#poLineItemsBody tr[data-line-index]');
     if (firstRow) selectPoGridRow(firstRow);
 });
