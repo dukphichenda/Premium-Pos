@@ -6,6 +6,22 @@ from routes.auth import user_can_edit_prices, user_can_view_costs
 
 sales_orders_bp = Blueprint('sales_orders', __name__)
 
+def _match_uom(uom1, uom2):
+    """Checks whether two UOM strings refer to the same unit (case vs cases, pack vs packs, pcs vs pcs.)."""
+    if not uom1 or not uom2:
+        return False
+    u1 = str(uom1).strip().lower().rstrip('.')
+    u2 = str(uom2).strip().lower().rstrip('.')
+    if u1 == u2:
+        return True
+    if u1 in ('case', 'cases', 'box', 'boxes', 'carton', 'cartons', 'កេស', 'កាតុង') and u2 in ('case', 'cases', 'box', 'boxes', 'carton', 'cartons', 'កេស', 'កាតុង'):
+        return True
+    if u1 in ('pack', 'packs', 'packet', 'packets', 'ដុំ', 'កញ្ចប់') and u2 in ('pack', 'packs', 'packet', 'packets', 'ដុំ', 'កញ្ចប់'):
+        return True
+    if u1 in ('pc', 'pcs', 'piece', 'pieces', 'each', 'ea', 'ចាន', 'កែវ', 'ដប', 'កំប៉ុង', 'គ្រាប់', 'សន្លឹក') and u2 in ('pc', 'pcs', 'piece', 'pieces', 'each', 'ea', 'ចាន', 'កែវ', 'ដប', 'កំប៉ុង', 'គ្រាប់', 'សន្លឹក'):
+        return True
+    return False
+
 def _get_product_bom_components(cur, product_id):
     """
     Returns list of BOM components for product_id if it's a combined product:
@@ -1400,12 +1416,29 @@ def detail_order(id):
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope)
 
-    # Mark backorder flag if stock is insufficient and resolve case price
+    # Mark backorder flag if stock is insufficient and resolve case price / display UOM
     for l in lines:
         l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
         pid = l['product_id']
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
+
+        # Self-heal legacy display UOM if missing or generic
+        suom = (l.get('sales_uom') or '').strip()
+        sratio = float(l.get('sales_uom_ratio_std') or 1.0)
+        curr_uom = (l.get('display_uom') or '').strip()
+        if suom and sratio > 1:
+            if not curr_uom or curr_uom.lower() in ('pcs', 'pcs.', ''):
+                case_pr = float(l['case_price'] or 0)
+                unit_pr = float(l.get('unit_price') or 0)
+                qty = float(l.get('quantity') or 0)
+                disp_q = float(l.get('display_qty') or 0)
+                if case_pr > 0 and abs(unit_pr - case_pr) < (case_pr * 0.15):
+                    l['display_uom'] = suom
+                    if disp_q == qty and qty >= sratio and (qty % sratio == 0):
+                        l['display_qty'] = qty / sratio
+            elif _match_uom(curr_uom, suom):
+                l['display_uom'] = suom
 
     # Payment receipts history
     payments = query_all("""
@@ -1695,9 +1728,9 @@ def save_order(id=0):
                     prow = cur.fetchone()
                     ratio = 1.0
                     if prow:
-                        if uom and prow.get('sales_uom') and uom.lower() == str(prow.get('sales_uom') or '').lower():
+                        if uom and prow.get('sales_uom') and _match_uom(uom, prow.get('sales_uom')):
                             ratio = float(prow.get('sales_uom_ratio_std') or 1.0)
-                        elif uom and prow.get('purchasing_uom') and uom.lower() == str(prow.get('purchasing_uom') or '').lower():
+                        elif uom and prow.get('purchasing_uom') and _match_uom(uom, prow.get('purchasing_uom')):
                             ratio = float(prow.get('purchasing_uom_ratio_std') or 1.0)
 
                     line_scheme_id = int(item.get('pricing_scheme_id') or pricing_scheme_id or 100)
@@ -2807,9 +2840,9 @@ def copy_order(id):
             ratio = 1.0
             resolved_uom = pl['uom']
             if prow:
-                if resolved_uom and prow.get('sales_uom') and resolved_uom.lower() == str(prow.get('sales_uom') or '').lower():
+                if resolved_uom and prow.get('sales_uom') and _match_uom(resolved_uom, prow.get('sales_uom')):
                     ratio = float(prow.get('sales_uom_ratio_std') or 1.0)
-                elif resolved_uom and prow.get('purchasing_uom') and resolved_uom.lower() == str(prow.get('purchasing_uom') or '').lower():
+                elif resolved_uom and prow.get('purchasing_uom') and _match_uom(resolved_uom, prow.get('purchasing_uom')):
                     ratio = float(prow.get('purchasing_uom_ratio_std') or 1.0)
                 elif not resolved_uom and prow.get('uom'):
                     resolved_uom = prow.get('uom')

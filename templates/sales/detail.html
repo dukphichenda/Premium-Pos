@@ -677,12 +677,11 @@
                                     <input type="checkbox" id="masterSelectAllSoLines" class="inflow-master-chk" title="Select all items" onchange="toggleSelectAllSoLines(this.checked)" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
                                 </div>
                             </th>
-                            <th style="width: 30%;">Item</th>
-                            <th style="width: 16%;">Description</th>
-                            <th style="width: 14%;">Quantity</th>
-                            <th style="width: 13%;">Price Tier</th>
-                            <th style="width: 9%;">Unit Price {% if not can_edit_prices %}<span title="Unit price editing is restricted by administrator / ការកែប្រែតម្លៃលក់ត្រូវបានបិទ" style="font-size: 11px; color: #EF4444; margin-left: 2px;">🔒</span>{% endif %}</th>
-                            <th style="width: 6%;">Discount</th>
+                            <th style="width: 44%;">Item</th>
+                            <th style="width: 15%;">Quantity</th>
+                            <th style="width: 14%;">Price Tier</th>
+                            <th style="width: 10%;">Unit Price {% if not can_edit_prices %}<span title="Unit price editing is restricted by administrator / ការកែប្រែតម្លៃលក់ត្រូវបានបិទ" style="font-size: 11px; color: #EF4444; margin-left: 2px;">🔒</span>{% endif %}</th>
+                            <th style="width: 5%;">Discount</th>
                             <th style="width: 12%;">Sub-Total</th>
                         </tr>
                     </thead>
@@ -699,6 +698,7 @@
                             </td>
                             <td style="position: relative;">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}">
+                                <input type="hidden" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or '' }}">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_product_id]" class="line-addon-product-id" value="{{ l.addon_product_id or '' }}">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_quantity]" class="line-addon-quantity" value="{{ l.addon_quantity or 1.0 }}">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][combine_option_id]" class="line-combine-option-id" value="{{ l.combine_option_id or '' }}">
@@ -706,9 +706,6 @@
                                        placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
                                        onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                                        onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>
-                            </td>
-                            <td>
-                                <input type="text" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or '' }}" class="inflow-field-input" style="border: none; background: transparent; width: 100%;" {% if is_paid %}readonly{% endif %}>
                             </td>
                             <td style="position: relative;" class="qty-cell">
                                 <div class="inflow-qty-cell-wrapper">
@@ -755,7 +752,6 @@
                                        onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                                        onkeydown="handleItemDropdownKey(event, this)">
                             </td>
-                            <td></td>
                             <td><span style="color: #6B7280; margin-left: 20px;">0</span></td>
                             <td>
                                 <select id="newItemSchemeSelect" class="inflow-field-select line-scheme-select" style="width: 100%; font-size: 11px; padding: 1px 2px; height: 20px; background: transparent; border: 1px solid #D1D5DB; border-radius: 2px;">
@@ -775,7 +771,6 @@
                         {% for i in range(6) %}
                         <tr>
                             <td class="inflow-grid-selector-col"></td>
-                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
@@ -2572,6 +2567,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
             </td>
             <td style="position: relative;">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
+                <input type="hidden" name="lines[${existingCount}][description]" value="${desc}">
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
                 <input type="hidden" name="lines[${existingCount}][addon_quantity]" class="line-addon-quantity" value="1">
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
@@ -2579,9 +2575,6 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                        placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
                        onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                        onkeydown="handleItemDropdownKey(event, this)">
-            </td>
-            <td>
-                <input type="text" name="lines[${existingCount}][description]" value="${desc}" class="inflow-field-input" style="border: none; background: transparent; width: 100%;">
             </td>
             <td style="position: relative;" class="qty-cell">
                 <div class="inflow-qty-cell-wrapper">
@@ -2629,7 +2622,8 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         activeGridRowEl.setAttribute('data-combine-option-id', '');
         activeGridRowEl.querySelector('input[name*="[product_id]"]').value = pid;
         activeGridRowEl.querySelector('.grid-item-input').value = `${sku} ${name}`;
-        activeGridRowEl.querySelector('input[name*="[description]"]').value = desc;
+        const descInput = activeGridRowEl.querySelector('input[name*="[description]"]');
+        if (descInput) descInput.value = desc;
         const aPid = activeGridRowEl.querySelector('.line-addon-product-id');
         if (aPid) aPid.value = '';
         const aQty = activeGridRowEl.querySelector('.line-addon-quantity');

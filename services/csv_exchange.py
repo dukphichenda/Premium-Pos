@@ -287,6 +287,222 @@ def clean_num_val(val_str, default=0.0):
         return default
 
 
+UOM_HEADER_ALIASES = [
+    'ItemQuantityUoM', 'Item Quantity UoM', 'Item Quantity UOM',
+    'ItemQuantityUnit', 'Item Quantity Unit', 'ItemQuantityUOM',
+    'ItemUoM', 'Item UoM', 'Item UOM', 'ItemUnit', 'Item Unit',
+    'QuantityUoM', 'Quantity UoM', 'Quantity UOM',
+    'QuantityUnit', 'Quantity Unit',
+    'OrderUoM', 'Order UoM', 'Order Unit',
+    'SalesUoM', 'Sales UoM', 'Sales UOM', 'SalesUnit', 'Sales Unit',
+    'PurchasingUoM', 'Purchasing UoM', 'Purchasing Unit',
+    'Unit of Measure', 'UnitOfMeasure',
+    'UOM', 'UoM', 'Unit', 'Units', 'Meas.', 'Measure', 'ខ្នាត', 'ឯកតា'
+]
+
+
+def extract_packaging_spec(text):
+    """
+    Extracts packaging specifications such as '300ចាន/កេស' (case), '900សន្លឹក/ដុំ' (pack),
+    '1000pcs/case', '50/pack' from product name or description.
+    Returns dict: {'type': 'case'|'pack', 'ratio': float|None} or None
+    """
+    if not text:
+        return None
+    text_str = str(text)
+
+    # 1. Regex for Case patterns (e.g. 300ចាន/កេស, 180ចាន/កេស, 90ចាន/កេស, 600pcs/កេស, 400ប្រអប់/កេស, 500/case, 1000 pcs / ctn)
+    m_case = re.search(r'(\d+(?:\.\d+)?)\s*(?:[^\w\s/]|ចាន|ប្រអប់|កែវ|សន្លឹក|ដុំ|គ្រាប់|pcs|pc|ea)?\s*/\s*(?:កេស|case|cs|carton|ctn|box)\b', text_str, re.IGNORECASE)
+    if not m_case:
+        m_case = re.search(r'\(?\s*(\d+(?:\.\d+)?)\s*(?:pcs|pc|ea|ចាន|ដុំ)?\s*/\s*(?:កេស|case|cs|ctn|box)\s*\)?', text_str, re.IGNORECASE)
+
+    # 2. Regex for Pack patterns (e.g. 900សន្លឹក/ដុំ, 500pcs/pack, 50/pk, 100/កញ្ចប់)
+    m_pack = re.search(r'(\d+(?:\.\d+)?)\s*(?:[^\w\s/]|ចាន|ប្រអប់|កែវ|សន្លឹក|ដុំ|គ្រាប់|pcs|pc|ea)?\s*/\s*(?:កញ្ចប់|pack|pk|pkg|packet|ដុំ)\b', text_str, re.IGNORECASE)
+    if not m_pack:
+        m_pack = re.search(r'\(?\s*(\d+(?:\.\d+)?)\s*(?:pcs|pc|ea|ចាន|សន្លឹក)?\s*/\s*(?:កញ្ចប់|pack|pk|pkg|packet|ដុំ)\s*\)?', text_str, re.IGNORECASE)
+
+    if m_case:
+        try:
+            r_val = float(m_case.group(1))
+            if r_val > 1:
+                return {'type': 'case', 'ratio': r_val}
+        except Exception:
+            pass
+
+    if m_pack:
+        try:
+            r_val = float(m_pack.group(1))
+            if r_val > 1:
+                return {'type': 'pack', 'ratio': r_val}
+        except Exception:
+            pass
+
+    # Keyword check without explicit ratio number
+    t_lower = text_str.lower()
+    if 'កេស' in text_str or '/case' in t_lower or '/cs' in t_lower or 'per case' in t_lower or 'per ctn' in t_lower or 'per box' in t_lower:
+        return {'type': 'case', 'ratio': None}
+    if 'កញ្ចប់' in text_str or '/pack' in t_lower or '/pk' in t_lower or 'per pack' in t_lower:
+        return {'type': 'pack', 'ratio': None}
+
+    return None
+
+
+def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
+    """
+    Intelligently checks and resolves whether the line's unit is 'cases', 'packs', or 'pcs.'.
+    Returns a 3-tuple: (final_uom, display_qty, std_qty)
+    - final_uom: normalized canonical UOM ('cases', 'packs', or product's base uom e.g. 'pcs.')
+    - display_qty: display quantity for the line item (e.g. 1.0 case)
+    - std_qty: standard base inventory quantity (display_qty * ratio, e.g. 300.0 pcs)
+    """
+    u_str = (raw_uom or '').strip().lower().rstrip('.')
+    combined_text = f"{item_name or ''} {desc or ''}".strip()
+    pkg_spec = extract_packaging_spec(combined_text)
+
+    # Catalog product attributes
+    base_uom = (p_info.get('uom') or 'pcs.').strip() if p_info else 'pcs.'
+    sales_uom = (p_info.get('sales_uom') or '').strip() if p_info else ''
+    purch_uom = (p_info.get('purchasing_uom') or '').strip() if p_info else ''
+    cat_sales_ratio = float(p_info.get('sales_uom_ratio_std') or 1.0) if p_info else 1.0
+    cat_purch_ratio = float(p_info.get('purchasing_uom_ratio_std') or 1.0) if p_info else 1.0
+    cat_price = float(p_info.get('default_price') or 0.0) if p_info else 0.0
+
+    CASE_KEYWORDS = {
+        'case', 'cases', 'cs', 'box', 'boxes', 'bx', 'carton', 'cartons',
+        'ctn', 'ctns', 'កេស', 'បាវ', 'ធុង'
+    }
+    PACK_KEYWORDS = {
+        'pack', 'packs', 'pk', 'pks', 'pkg', 'pkgs', 'packet', 'packets',
+        'bundle', 'bundles', 'កញ្ចប់'
+    }
+    PCS_KEYWORDS = {
+        'pcs', 'pc', 'piece', 'pieces', 'ea', 'each', 'unit', 'units',
+        'ដុំ', 'ចាន', 'កែវ', 'សន្លឹក', 'គ្រាប់'
+    }
+
+    target_category = None  # 'case', 'pack', 'pcs', or 'custom'
+
+    # Step 1: Explicit keyword matching in raw_uom
+    if u_str:
+        if u_str in CASE_KEYWORDS or any(kw in u_str for kw in ('case', 'ctn', 'carton', 'កេស')):
+            target_category = 'case'
+        elif u_str in PACK_KEYWORDS or any(kw in u_str for kw in ('pack', 'pkg', 'កញ្ចប់')):
+            target_category = 'pack'
+        elif u_str in PCS_KEYWORDS:
+            # Could be genuine loose pieces, OR default 'pcs' export when item packaging/pricing dictates otherwise
+            target_category = None
+        else:
+            target_category = 'custom'
+
+    # Step 2: Contextual detection if raw_uom is missing, empty, or generic 'pcs'
+    if not target_category:
+        # Check packaging spec in item name / description
+        if pkg_spec and pkg_spec['type'] == 'case':
+            ratio_val = pkg_spec['ratio'] or cat_sales_ratio
+            if cat_price > 0 and ratio_val > 1:
+                if unit_price >= (cat_price * 0.35) or unit_price >= 5.0:
+                    target_category = 'case'
+                elif unit_price <= ((cat_price / ratio_val) * 1.5):
+                    target_category = 'pcs'
+                else:
+                    target_category = 'case'
+            else:
+                if unit_price >= 1.0 or not u_str:
+                    target_category = 'case'
+                else:
+                    target_category = 'pcs'
+
+        elif pkg_spec and pkg_spec['type'] == 'pack':
+            ratio_val = pkg_spec['ratio'] or cat_purch_ratio or cat_sales_ratio
+            if cat_price > 0 and ratio_val > 1:
+                if unit_price >= (cat_price * 0.35) or unit_price >= 3.0:
+                    target_category = 'pack'
+                else:
+                    target_category = 'pcs'
+            else:
+                if unit_price >= 1.0 or not u_str:
+                    target_category = 'pack'
+                else:
+                    target_category = 'pcs'
+
+        elif sales_uom and cat_sales_ratio > 1 and any(kw in sales_uom.lower() for kw in CASE_KEYWORDS):
+            # Product in catalog is configured with sales_uom = 'cases'
+            if cat_price > 0:
+                if unit_price >= (cat_price * 0.35) or unit_price >= 5.0:
+                    target_category = 'case'
+                else:
+                    target_category = 'pcs'
+            else:
+                if unit_price >= 5.0:
+                    target_category = 'case'
+                else:
+                    target_category = 'pcs' if (u_str and u_str in PCS_KEYWORDS) else 'case'
+
+        elif sales_uom and cat_sales_ratio > 1 and any(kw in sales_uom.lower() for kw in PACK_KEYWORDS):
+            target_category = 'pack'
+
+        else:
+            target_category = 'pcs'
+
+    # Step 3: Compute final canonical UOM and ratio
+    display_qty = max(0.0001, float(qty or 1.0))
+    ratio = 1.0
+    final_uom = base_uom
+
+    if target_category == 'case':
+        if sales_uom and any(kw in sales_uom.lower() for kw in ('case', 'កេស', 'box', 'ctn')):
+            final_uom = sales_uom
+        else:
+            final_uom = 'cases'
+
+        if cat_sales_ratio > 1:
+            ratio = cat_sales_ratio
+        elif pkg_spec and pkg_spec['ratio'] and pkg_spec['ratio'] > 1:
+            ratio = pkg_spec['ratio']
+        elif p_info and p_info.get('packs_per_case') and p_info.get('pcs_per_pack'):
+            p_case = float(p_info.get('packs_per_case') or 0)
+            p_pack = float(p_info.get('pcs_per_pack') or 0)
+            if p_case > 0 and p_pack > 0:
+                ratio = p_case * p_pack
+        else:
+            ratio = 1.0
+
+    elif target_category == 'pack':
+        if sales_uom and any(kw in sales_uom.lower() for kw in ('pack', 'កញ្ចប់', 'pk')):
+            final_uom = sales_uom
+        elif purch_uom and any(kw in purch_uom.lower() for kw in ('pack', 'កញ្ចប់', 'pk')):
+            final_uom = purch_uom
+        else:
+            final_uom = 'packs'
+
+        if cat_sales_ratio > 1 and sales_uom and 'pack' in sales_uom.lower():
+            ratio = cat_sales_ratio
+        elif cat_purch_ratio > 1 and purch_uom and 'pack' in purch_uom.lower():
+            ratio = cat_purch_ratio
+        elif pkg_spec and pkg_spec['ratio'] and pkg_spec['ratio'] > 1:
+            ratio = pkg_spec['ratio']
+        elif p_info and p_info.get('pcs_per_pack') and float(p_info.get('pcs_per_pack') or 0) > 1:
+            ratio = float(p_info.get('pcs_per_pack'))
+        else:
+            ratio = 1.0
+
+    elif target_category == 'custom':
+        final_uom = (raw_uom or base_uom).strip()
+        if sales_uom and final_uom.lower() == sales_uom.lower():
+            ratio = cat_sales_ratio
+        elif purch_uom and final_uom.lower() == purch_uom.lower():
+            ratio = cat_purch_ratio
+        else:
+            ratio = 1.0
+
+    else:  # 'pcs'
+        final_uom = base_uom if base_uom else 'pcs.'
+        ratio = 1.0
+
+    std_qty = display_qty * ratio
+    return final_uom, display_qty, std_qty
+
+
 def erase_existing_data(data_type_key):
     """
     Safely deletes all records for the chosen data type before importing.
@@ -421,7 +637,10 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 orders_grouped[ord_num]['line_subtotals'] += line_sub
                 orders_grouped[ord_num]['total_line_count'] += 1
                 if len(orders_grouped[ord_num]['items']) < 3:
-                    orders_grouped[ord_num]['items'].append(f"{item_name} ({qty:g})")
+                    raw_uom = get_val_preview(r, UOM_HEADER_ALIASES, '')
+                    p_desc = get_val_preview(r, ['ItemDescription', 'Description', 'Item Description'], '')
+                    uom_tag, _, _ = resolve_order_line_uom(raw_uom, item_name, p_desc, None, price, qty)
+                    orders_grouped[ord_num]['items'].append(f"{item_name} ({qty:g} {uom_tag})")
             else:  # purchase_order
                 ord_num = get_val_preview(r, ['OrderNumber', 'Order Number', 'PO Number', 'Order #'])
                 if not ord_num:
@@ -445,7 +664,10 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 orders_grouped[ord_num]['line_subtotals'] += line_sub
                 orders_grouped[ord_num]['total_line_count'] += 1
                 if len(orders_grouped[ord_num]['items']) < 3:
-                    orders_grouped[ord_num]['items'].append(f"{item_name} ({qty:g})")
+                    raw_uom = get_val_preview(r, UOM_HEADER_ALIASES, '')
+                    p_desc = get_val_preview(r, ['ItemDescription', 'Description', 'Item Description'], '')
+                    uom_tag, _, _ = resolve_order_line_uom(raw_uom, item_name, p_desc, None, cost, qty)
+                    orders_grouped[ord_num]['items'].append(f"{item_name} ({qty:g} {uom_tag})")
 
         orders_summary = []
         for ord_num, odata in orders_grouped.items():
@@ -552,7 +774,15 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 barcode = get_val(r, ['Barcode', 'BarCode', 'UPC', 'EAN'])
                 price_val = clean_num_val(get_val(r, ['UnitPrice', 'Unit Price', 'Default Price', 'Price', 'Sale Price']), 0.0)
                 cost_val = clean_num_val(get_val(r, ['ManualCost', 'Standard Cost', 'StandardCost', 'Cost', 'Unit Cost', 'MovingAverageCost', 'LastPurchaseCost']), 0.0)
-                uom = get_val(r, ['Uom', 'UOM', 'Unit', 'Unit of Measure', 'SalesUom'], 'pcs')
+                uom = get_val(r, ['Uom', 'UOM', 'Unit', 'Unit of Measure', 'BaseUom', 'Base UOM'], 'pcs.')
+                sales_uom_val = get_val(r, ['SalesUom', 'Sales UoM', 'Sales Unit', 'SalesUOM'])
+                sales_ratio_val = clean_num_val(get_val(r, ['SalesUomRatio', 'Sales UoM Ratio', 'Sales Ratio', 'PcsPerCase']), 0.0)
+                pkg_spec = extract_packaging_spec(f"{name} {desc or ''}")
+                if not sales_uom_val and pkg_spec:
+                    sales_uom_val = 'cases' if pkg_spec['type'] == 'case' else 'packs'
+                if sales_ratio_val <= 1 and pkg_spec and pkg_spec['ratio']:
+                    sales_ratio_val = pkg_spec['ratio']
+
                 remarks = get_val(r, ['Remarks', 'Note', 'Notes'])
                 is_active_raw = get_val(r, ['IsActive', 'Active', 'Status'], 'True')
                 is_active = str(is_active_raw).lower() in ('true', '1', 'yes', 't')
@@ -594,16 +824,27 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             uom = COALESCE(NULLIF(%s, ''), uom),
                             remarks = COALESCE(NULLIF(%s, ''), remarks),
                             is_active = %s,
+                            sales_uom = COALESCE(NULLIF(%s, ''), sales_uom),
+                            sales_uom_ratio_std = CASE WHEN %s > 1 THEN %s ELSE sales_uom_ratio_std END,
+                            purchasing_uom = COALESCE(NULLIF(%s, ''), purchasing_uom),
+                            purchasing_uom_ratio_std = CASE WHEN %s > 1 THEN %s ELSE purchasing_uom_ratio_std END,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
-                    """, (name, desc, cat_id, barcode, price_val, cost_val, uom, remarks, is_active, existing_id))
+                    """, (name, desc, cat_id, barcode, price_val, cost_val, uom, remarks, is_active,
+                          sales_uom_val, sales_ratio_val, sales_ratio_val,
+                          sales_uom_val, sales_ratio_val, sales_ratio_val, existing_id))
                     updated_cnt += 1
                 else:
                     cur.execute("""
-                        INSERT INTO products (sku, name, description, category_id, barcode, default_price, standard_cost, uom, remarks, is_active)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        INSERT INTO products (
+                            sku, name, description, category_id, barcode, default_price, standard_cost,
+                            uom, remarks, is_active, sales_uom, sales_uom_ratio_std, purchasing_uom, purchasing_uom_ratio_std
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id;
-                    """, (sku, name, desc, cat_id, barcode, price_val, cost_val, uom, remarks, is_active))
+                    """, (sku, name, desc, cat_id, barcode, price_val, cost_val, uom, remarks, is_active,
+                          sales_uom_val, sales_ratio_val if sales_ratio_val > 1 else 1.0,
+                          sales_uom_val, sales_ratio_val if sales_ratio_val > 1 else 1.0))
                     new_id = cur.fetchone()['id']
                     prod_map[sku.lower().strip()] = new_id
                     prod_map[name.lower().strip()] = new_id
@@ -795,7 +1036,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 'item_name': get_val(r, ['ItemName', 'Item Name', 'Item Code', 'ItemCode', 'SKU', 'Product Name']),
                 'desc': get_val(r, ['ItemDescription', 'Description', 'Item Description']),
                 'qty': clean_num_val(get_val(r, ['ItemQuantity', 'Quantity', 'Qty']), 1.0),
-                'uom': get_val(r, ['ItemQuantityUoM', 'UOM', 'Unit'], 'pcs'),
+                'uom': get_val(r, UOM_HEADER_ALIASES, ''),
                 'price': clean_num_val(get_val(r, ['ItemUnitPrice', 'Unit Price', 'Price']), 0.0),
                 'discount_raw': get_val(r, ['ItemDiscount', 'Discount']),
                 'subtotal_raw': clean_num_val(get_val(r, ['ItemSubtotal', 'Subtotal']), None)
@@ -814,7 +1055,12 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
         # Cache existing customers, products, and locations
         cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers;")}
         prod_map = {}
-        for p in query_all("SELECT id, sku, name, default_price FROM products;"):
+        for p in query_all("""
+            SELECT id, sku, name, default_price, standard_cost, average_cost, uom,
+                   sales_uom, sales_uom_ratio_std, purchasing_uom, purchasing_uom_ratio_std,
+                   packs_per_case, pcs_per_pack
+            FROM products;
+        """):
             if p.get('sku'):
                 prod_map[p['sku'].lower().strip()] = p
             if p.get('name'):
@@ -870,20 +1116,81 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     p_info = prod_map.get(item_name.lower()) if item_name else None
                     prod_id = p_info['id'] if p_info else None
 
+                    # Check packaging spec from item_name and desc
+                    pkg_spec = extract_packaging_spec(f"{item_name} {line['desc'] or ''}")
+
                     # Auto-create missing product in catalog
                     if not prod_id and item_name:
+                        if pkg_spec and pkg_spec['type'] == 'case' and pkg_spec['ratio']:
+                            new_base = 'pcs.'
+                            new_sales = 'cases'
+                            new_ratio = pkg_spec['ratio']
+                        elif pkg_spec and pkg_spec['type'] == 'pack' and pkg_spec['ratio']:
+                            new_base = 'pcs.'
+                            new_sales = 'packs'
+                            new_ratio = pkg_spec['ratio']
+                        else:
+                            new_base = 'pcs.'
+                            new_sales = None
+                            new_ratio = 1.0
+
                         cur.execute("""
-                            INSERT INTO products (sku, name, default_price, uom, is_active)
-                            VALUES (%s, %s, %s, %s, TRUE)
-                            RETURNING id, default_price;
-                        """, (item_name[:50], item_name, line['price'], line['uom']))
+                            INSERT INTO products (
+                                sku, name, default_price, uom, sales_uom, sales_uom_ratio_std,
+                                purchasing_uom, purchasing_uom_ratio_std, is_active
+                            )
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                            RETURNING id, default_price, uom, sales_uom, sales_uom_ratio_std;
+                        """, (item_name[:50], item_name, line['price'], new_base, new_sales, new_ratio, new_sales, new_ratio))
                         created_p = cur.fetchone()
                         prod_id = created_p['id']
-                        prod_map[item_name.lower()] = {'id': prod_id, 'sku': item_name[:50], 'name': item_name, 'default_price': line['price']}
+                        prod_map[item_name.lower()] = {
+                            'id': prod_id,
+                            'sku': item_name[:50],
+                            'name': item_name,
+                            'default_price': line['price'],
+                            'standard_cost': 0.0,
+                            'average_cost': 0.0,
+                            'uom': new_base,
+                            'sales_uom': new_sales,
+                            'sales_uom_ratio_std': new_ratio,
+                            'purchasing_uom': new_sales,
+                            'purchasing_uom_ratio_std': new_ratio,
+                            'packs_per_case': 3,
+                            'pcs_per_pack': 50
+                        }
+                        p_info = prod_map[item_name.lower()]
+                    elif p_info:
+                        # If product exists in catalog but had sales_uom empty/null and ratio <= 1, self-heal it
+                        if pkg_spec and pkg_spec['ratio'] and pkg_spec['ratio'] > 1:
+                            curr_ratio = float(p_info.get('sales_uom_ratio_std') or 1.0)
+                            curr_sales = (p_info.get('sales_uom') or '').strip()
+                            if not curr_sales or curr_ratio <= 1:
+                                u_name = 'cases' if pkg_spec['type'] == 'case' else 'packs'
+                                cur.execute("""
+                                    UPDATE products
+                                    SET sales_uom = %s,
+                                        sales_uom_ratio_std = %s,
+                                        purchasing_uom = COALESCE(NULLIF(purchasing_uom, ''), %s),
+                                        purchasing_uom_ratio_std = CASE WHEN (purchasing_uom_ratio_std IS NULL OR purchasing_uom_ratio_std <= 1) THEN %s ELSE purchasing_uom_ratio_std END
+                                    WHERE id = %s;
+                                """, (u_name, pkg_spec['ratio'], u_name, pkg_spec['ratio'], prod_id))
+                                p_info['sales_uom'] = u_name
+                                p_info['sales_uom_ratio_std'] = pkg_spec['ratio']
 
                     qty = line['qty']
                     unit_p = line['price'] if line['price'] > 0 else (float(p_info['default_price']) if p_info and p_info.get('default_price') else 0.0)
-                    
+
+                    # Intelligently resolve unit: pcs, case, or pack
+                    final_uom, display_qty, std_qty = resolve_order_line_uom(
+                        raw_uom=line['uom'],
+                        item_name=item_name,
+                        desc=line['desc'],
+                        p_info=p_info,
+                        unit_price=unit_p,
+                        qty=qty
+                    )
+
                     # Discount parsing
                     disc_pct = 0.0
                     disc_raw = str(line['discount_raw'] or '').strip()
@@ -895,15 +1202,20 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     if line['subtotal_raw'] is not None:
                         subtot = line['subtotal_raw']
                     else:
-                        subtot = qty * unit_p * (1.0 - (disc_pct / 100.0))
+                        subtot = display_qty * unit_p * (1.0 - (disc_pct / 100.0))
 
                     calculated_subtotal += subtot
                     desc = line['desc'] or (p_info['name'] if p_info else item_name)
+                    cost_p = float(p_info.get('standard_cost') or p_info.get('average_cost') or 0.0) if p_info else 0.0
                     parsed_lines.append({
                         'prod_id': prod_id,
                         'desc': desc,
                         'qty': qty,
+                        'display_qty': display_qty,
+                        'std_qty': std_qty,
+                        'uom': final_uom,
                         'unit_price': unit_p,
+                        'cost_price': cost_p,
                         'discount': disc_pct,
                         'subtotal': subtot
                     })
@@ -1034,10 +1346,15 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     cur.execute("""
                         INSERT INTO sales_order_lines (
                             sales_order_id, line_num, product_id, description,
-                            quantity, unit_price, discount_percent, subtotal
+                            quantity, unit_price, discount_percent, subtotal, cost_price,
+                            uom, quantity_display, pricing_scheme_id
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
-                    """, (so_id, l_idx, pline['prod_id'], pline['desc'], pline['qty'], pline['unit_price'], pline['discount'], pline['subtotal']))
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 100);
+                    """, (
+                        so_id, l_idx, pline['prod_id'], pline['desc'],
+                        pline['std_qty'], pline['unit_price'], pline['discount'], pline['subtotal'], pline['cost_price'],
+                        pline['uom'], pline['display_qty']
+                    ))
 
     # =========================================================================
     # 6. PURCHASE ORDER IMPORT
@@ -1062,6 +1379,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 'item_name': get_val(r, ['ItemName', 'Item Name', 'Item Code', 'ItemCode', 'SKU', 'VendorItemCode']),
                 'desc': get_val(r, ['ItemDescription', 'Description', 'Item Description']),
                 'qty': clean_num_val(get_val(r, ['ItemQuantity', 'Quantity', 'Qty']), 1.0),
+                'uom': get_val(r, UOM_HEADER_ALIASES, ''),
                 'cost': clean_num_val(get_val(r, ['ItemUnitPrice', 'Unit Cost', 'Cost']), 0.0),
                 'subtotal_raw': clean_num_val(get_val(r, ['ItemSubtotal', 'Subtotal']), None)
             })
@@ -1077,9 +1395,17 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             orders_map = filtered_orders
 
         vend_map = {v['name'].lower().strip(): v['id'] for v in query_all("SELECT id, name FROM vendors;")}
-        prod_map = {p['sku'].lower().strip(): p for p in query_all("SELECT id, sku, name, standard_cost FROM products WHERE sku IS NOT NULL;")}
-        for p in query_all("SELECT id, name, standard_cost FROM products;"):
-            prod_map[p['name'].lower().strip()] = p
+        prod_map = {}
+        for p in query_all("""
+            SELECT id, sku, name, standard_cost, average_cost, uom,
+                   sales_uom, sales_uom_ratio_std, purchasing_uom, purchasing_uom_ratio_std,
+                   packs_per_case, pcs_per_pack
+            FROM products;
+        """):
+            if p.get('sku'):
+                prod_map[p['sku'].lower().strip()] = p
+            if p.get('name'):
+                prod_map[p['name'].lower().strip()] = p
 
         with get_db_cursor(commit=True) as cur:
             for po_num, order_data in orders_map.items():
@@ -1128,10 +1454,19 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     total_subtotal += subtot
                     desc = line['desc'] or (p_info['name'] if p_info else item_name)
 
+                    final_uom, display_qty, std_qty = resolve_order_line_uom(
+                        raw_uom=line.get('uom', ''),
+                        item_name=item_name,
+                        desc=desc,
+                        p_info=p_info,
+                        unit_price=cost,
+                        qty=qty
+                    )
+
                     cur.execute("""
-                        INSERT INTO purchase_order_lines (purchase_order_id, line_num, product_id, description, quantity, unit_cost, subtotal)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s);
-                    """, (po_id, l_idx, prod_id, desc, qty, cost, subtot))
+                        INSERT INTO purchase_order_lines (purchase_order_id, line_num, product_id, description, quantity, unit_cost, subtotal, uom)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s);
+                    """, (po_id, l_idx, prod_id, desc, qty, cost, subtot, final_uom))
 
                 cur.execute("UPDATE purchase_orders SET subtotal = %s, total_amount = %s WHERE id = %s;",
                             (total_subtotal, total_subtotal, po_id))
