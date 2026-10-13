@@ -200,8 +200,8 @@ def login():
         except Exception:
             pass
 
-        # Populate permanent session (never auto logout)
-        session.permanent = True
+        # Session lasts for current browser session
+        session.permanent = False
         session['user_id'] = user['id']
         session['username'] = user['username']
         session['display_name'] = user['display_name']
@@ -246,13 +246,7 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
-    session.pop('user_id', None)
-    session.pop('username', None)
-    session.pop('display_name', None)
-    session.pop('role', None)
-    session.pop('branch_id', None)
-    session.pop('permissions', None)
-    session.pop('active_branch_id', None)
+    session.clear()
     flash("You have been signed out safely. / អ្នកបានចាកចេញពីប្រព័ន្ធដោយសុវត្ថិភាព", "success")
     return redirect(url_for('auth.login'))
 

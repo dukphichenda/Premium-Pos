@@ -5,6 +5,10 @@ from datetime import datetime
 dashboard_bp = Blueprint('dashboard', __name__)
 
 @dashboard_bp.route('/')
+def root():
+    return redirect(url_for('auth.login'))
+
+@dashboard_bp.route('/dashboard')
 def index():
     active_bid = session.get('active_branch_id')
     if active_bid:

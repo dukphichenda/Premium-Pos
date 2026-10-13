@@ -175,9 +175,9 @@ def create_app():
         import json
 
         # Public endpoints and static assets
-        if request.endpoint in ('static', 'health_check', 'auth.login', 'auth.logout', 'auth.quick_login'):
+        if request.endpoint in ('static', 'health_check', 'auth.login', 'auth.logout', 'auth.quick_login', 'dashboard.root'):
             return None
-        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language'):
+        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language') or request.path == '/':
             return None
 
         # User Requirement: ALWAYS ask to login before can enter system (no auto-login / bypass)
@@ -191,13 +191,12 @@ def create_app():
                 return None
             session.pop('username', None)
             session.pop('role', None)
-            target = request.full_path if (request.method == 'GET' and request.path not in ('/login', '/logout')) else None
-            if target and target.endswith('?'):
-                target = target[:-1]
+            target = request.full_path if (request.method == 'GET' and request.path not in ('/login', '/logout', '/')) else None
+            if target:
+                target = target.rstrip('?')
+                if target in ('/', ''):
+                    target = None
             return redirect(url_for('auth.login', next=target))
-
-        # User Requirement: "no need auto log out" -> keep session permanent once logged in
-        session.permanent = True
 
         user_role = session.get('role', 'branch_admin')
         user_bid = session.get('branch_id')
