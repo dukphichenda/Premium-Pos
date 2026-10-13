@@ -262,7 +262,7 @@ def view_report(report_key):
     orientation = request.args.get('orientation', 'Landscape' if report_key in ['sales-order-operational', 'sales-by-product-details', 'inventory-valuation', 'branch-sales-summary'] else 'Portrait')
     group_by = request.args.get('group_by', 'None')
     page = max(1, int(request.args.get('page', 1)))
-    per_page = 36 # Rows per page matching printed sheet size
+    per_page = 150 if group_by == 'Category' else 36 # Rows per page matching printed sheet size
     
     # Store Scope: Default to 'all' for branch report, 'main' for other reports
     if report_key == 'branch-sales-summary':
@@ -329,6 +329,8 @@ def view_report(report_key):
     total_count = 0
     total_pages = 1
     totals = {}
+    category_groups = []
+    customer_groups = []
 
     # 1. SALES ORDER PROFIT REPORT
     if report_key == 'sales-order-profit':
@@ -464,6 +466,24 @@ def view_report(report_key):
         }
 
         query_params = list(params) + [per_page, offset]
+        if sort_by in ['Order Number', 'SKU', 'Order Number / SKU']:
+            prod_sort = "p.sku ASC"
+        elif sort_by in ['Item Name', 'Product Name', 'Name']:
+            prod_sort = "p.name ASC"
+        elif sort_by == 'Category':
+            prod_sort = "category_name ASC, p.name ASC"
+        elif sort_by in ['Quantity Sold', 'Quantity Sold (Pcs)', 'Quantity']:
+            prod_sort = "quantity_sold DESC"
+        elif sort_by in ['Gross Profit', 'Profit', 'Gross Profit / Asset Value']:
+            prod_sort = "gross_profit DESC"
+        else:
+            prod_sort = "sales_amount DESC"
+
+        if group_by == 'Category':
+            prod_order_clause = f"c.name ASC, {prod_sort}"
+        else:
+            prod_order_clause = prod_sort
+
         data_sql = f"""
             SELECT 
                 p.id, p.sku, p.name as item_name,
@@ -478,10 +498,28 @@ def view_report(report_key):
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE {where_sql}
             GROUP BY p.id, p.sku, p.name, c.name, COALESCE(sol.uom, p.uom, 'pcs')
-            ORDER BY sales_amount DESC
+            ORDER BY {prod_order_clause}
             LIMIT %s OFFSET %s
         """
         rows = query_all(data_sql, tuple(query_params))
+
+        if group_by == 'Category':
+            cat_groups = {}
+            for r in rows:
+                cname = r.get('category_name') or 'General'
+                if cname not in cat_groups:
+                    cat_groups[cname] = {
+                        'category_name': cname,
+                        'lines': [],
+                        'subtotal_qty': 0.0,
+                        'subtotal_sales': 0.0,
+                        'subtotal_profit': 0.0
+                    }
+                cat_groups[cname]['lines'].append(r)
+                cat_groups[cname]['subtotal_qty'] += float(r.get('quantity_sold') or 0)
+                cat_groups[cname]['subtotal_sales'] += float(r.get('sales_amount') or 0)
+                cat_groups[cname]['subtotal_profit'] += float(r.get('gross_profit') or 0)
+            category_groups = list(cat_groups.values())
 
     # 3. SALES BY PRODUCT DETAILS
     elif report_key == 'sales-by-product-details':
@@ -1472,12 +1510,26 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
+        cost_unit_expr = """
+            CASE 
+                WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 AND p.sales_uom_ratio_std > 1 
+                    THEN (pp.unit_price / p.sales_uom_ratio_std) 
+                WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 
+                    THEN pp.unit_price 
+                WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0 
+                    THEN p.standard_cost 
+                WHEN p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
+                ELSE 0 
+            END
+        """
+
         totals_sql = f"""
             SELECT 
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
                 COALESCE(SUM(sol.subtotal), 0) as total_sales,
-                COALESCE(SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)), 0) as total_branch_cost,
-                COALESCE(SUM(sol.subtotal - (sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0))), 0) as total_branch_profit
+                COALESCE(SUM(sol.quantity * ({cost_unit_expr})), 0) as total_branch_cost,
+                COALESCE(SUM(sol.subtotal - (sol.quantity * ({cost_unit_expr}))), 0) as total_branch_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -1495,6 +1547,7 @@ def view_report(report_key):
         totals = {
             'quantity': raw_qty,
             'quantity_sold': raw_qty,
+            'quantity_sold_pcs': raw_qty,
             'sales_amount': raw_sales * curr_multiplier,
             'branch_cost': raw_cost * curr_multiplier,
             'total_branch_cost': raw_cost * curr_multiplier,
@@ -1503,33 +1556,48 @@ def view_report(report_key):
             'margin_pct': margin_pct
         }
 
-        order_clause = "sales_amount DESC"
-        if sort_by == 'Total Cost':
-            order_clause = "total_branch_cost DESC"
-        elif sort_by == 'Quantity Sold':
-            order_clause = "quantity_sold DESC"
-        elif sort_by == 'Profit':
-            order_clause = "branch_profit DESC"
-        elif sort_by == 'Item Name':
-            order_clause = "p.name ASC"
+        if sort_by in ['Order Number', 'SKU', 'Order Number / SKU']:
+            sort_order = "p.sku ASC"
+        elif sort_by in ['Item Name', 'Product Name', 'Name']:
+            sort_order = "p.name ASC"
+        elif sort_by == 'Category':
+            sort_order = "c.name ASC, p.name ASC"
+        elif sort_by in ['Quantity Sold', 'Quantity Sold (Pcs)', 'Quantity']:
+            sort_order = "quantity_sold DESC"
+        elif sort_by in ['Price / PCS', 'Price']:
+            sort_order = "(SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) DESC"
+        elif sort_by in ['Total Cost', 'Branch Cost', 'Total Branch Cost']:
+            sort_order = "total_branch_cost DESC"
+        elif sort_by in ['Gross Profit', 'Profit', 'Gross Profit / Asset Value']:
+            sort_order = "branch_profit DESC"
+        else:
+            sort_order = "sales_amount DESC"
+
+        if group_by == 'Category':
+            order_clause = f"COALESCE(c.name, 'General') ASC, {sort_order}"
+        else:
+            order_clause = sort_order
 
         data_sql = f"""
             SELECT 
                 p.id, p.sku, p.name as item_name,
                 COALESCE(c.name, 'General') as category_name,
-                COALESCE(sol.uom, p.uom, 'pcs') as uom,
+                COALESCE(p.uom, 'pcs') as base_uom,
+                COALESCE(p.sales_uom, 'cases') as sales_uom,
+                COALESCE(p.sales_uom_ratio_std, 1.0) as pcs_per_case,
+                COALESCE(pp.unit_price, 0) as sheet_price,
                 SUM(sol.quantity) as quantity_sold,
                 SUM(sol.subtotal) as sales_amount,
-                COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0) as raw_branch_cost,
-                SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as total_branch_cost,
-                SUM(sol.subtotal) - SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as branch_profit
+                {cost_unit_expr} as raw_branch_cost_pc,
+                SUM(sol.quantity * ({cost_unit_expr})) as total_branch_cost,
+                SUM(sol.subtotal) - SUM(sol.quantity * ({cost_unit_expr})) as branch_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
             WHERE {where_sql}
-            GROUP BY p.id, p.sku, p.name, c.name, COALESCE(sol.uom, p.uom, 'pcs'), pp.unit_price, p.default_price
+            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost
             ORDER BY {order_clause}
             LIMIT %s OFFSET %s
         """
@@ -1538,13 +1606,19 @@ def view_report(report_key):
 
         rows = []
         for r in raw_rows:
-            qty = float(r['quantity_sold'] or 0)
+            qty_pcs = float(r['quantity_sold'] or 0)
             sales = float(r['sales_amount'] or 0)
-            cost_unit = float(r['raw_branch_cost'] or 0)
+            cost_pc = float(r['raw_branch_cost_pc'] or 0)
             total_cost = float(r['total_branch_cost'] or 0)
             profit = float(r['branch_profit'] or 0)
-            avg_price = (sales / qty) if qty > 0 else 0.0
+            price_pc = (sales / qty_pcs) if qty_pcs > 0 else 0.0
             m_pct = (profit / sales * 100.0) if sales > 0 else 0.0
+
+            pcs_ratio = float(r['pcs_per_case'] or 1.0)
+            case_sheet_price = float(r['sheet_price'] or 0.0)
+            cases_equivalent = (qty_pcs / pcs_ratio) if pcs_ratio > 1 else None
+            price_case = (price_pc * pcs_ratio) if pcs_ratio > 1 else None
+            cost_case = (cost_pc * pcs_ratio) if pcs_ratio > 1 else None
 
             rows.append({
                 'id': r['id'],
@@ -1553,16 +1627,55 @@ def view_report(report_key):
                 'item_name': r['item_name'],
                 'product_name': r['item_name'],
                 'category_name': r['category_name'],
-                'uom': r['uom'],
-                'quantity_sold': qty,
-                'quantity': qty,
-                'avg_sale_price': avg_price * curr_multiplier,
+                'uom': 'pcs',
+                'quantity_sold': qty_pcs,
+                'quantity_sold_pcs': qty_pcs,
+                'pcs_per_case': pcs_ratio,
+                'cases_equivalent': cases_equivalent,
+                'avg_sale_price': price_pc * curr_multiplier,
+                'sale_price_pc': price_pc * curr_multiplier,
+                'sale_price_case': price_case * curr_multiplier if price_case else None,
                 'sales_amount': sales * curr_multiplier,
-                'branch_unit_cost': cost_unit * curr_multiplier,
+                'branch_unit_cost': cost_pc * curr_multiplier,
+                'branch_cost_pc': cost_pc * curr_multiplier,
+                'branch_cost_case': cost_case * curr_multiplier if cost_case else None,
                 'total_branch_cost': total_cost * curr_multiplier,
                 'branch_profit': profit * curr_multiplier,
                 'margin_pct': m_pct
             })
+
+        if group_by == 'Category':
+            cat_groups = {}
+            for r in rows:
+                cname = r.get('category_name') or 'General'
+                if cname not in cat_groups:
+                    cat_groups[cname] = {
+                        'category_name': cname,
+                        'lines': [],
+                        'subtotal_qty': 0.0,
+                        'subtotal_sales': 0.0,
+                        'subtotal_cost': 0.0,
+                        'subtotal_profit': 0.0,
+                        'subtotal_margin': 0.0,
+                        'avg_price_pc': 0.0,
+                        'avg_cost_pc': 0.0
+                    }
+                cat_groups[cname]['lines'].append(r)
+                cat_groups[cname]['subtotal_qty'] += float(r.get('quantity_sold') or 0)
+                cat_groups[cname]['subtotal_sales'] += float(r.get('sales_amount') or 0)
+                cat_groups[cname]['subtotal_cost'] += float(r.get('total_branch_cost') or 0)
+                cat_groups[cname]['subtotal_profit'] += float(r.get('branch_profit') or 0)
+
+            for cg in cat_groups.values():
+                sqty = cg['subtotal_qty']
+                ssales = cg['subtotal_sales']
+                scost = cg['subtotal_cost']
+                sprofit = cg['subtotal_profit']
+                cg['subtotal_margin'] = (sprofit / ssales * 100.0) if ssales > 0 else 0.0
+                cg['avg_price_pc'] = (ssales / sqty) if sqty > 0 else 0.0
+                cg['avg_cost_pc'] = (scost / sqty) if sqty > 0 else 0.0
+
+            category_groups = list(cat_groups.values())
 
     else:
         # Fallback generic sales orders list
@@ -1633,6 +1746,8 @@ def export_report(report_key):
     category_id = request.args.get('category_id', '')
     location_id = request.args.get('location_id', '')
     branch_scope = request.args.get('branch', 'all' if report_key == 'branch-sales-summary' else 'main').strip().lower()
+    sort_by = request.args.get('sort_by', 'Sales Amount').strip()
+    group_by = request.args.get('group_by', '').strip()
 
     start_date, end_date = calculate_date_range(date_range, custom_from, custom_to)
 
@@ -1682,9 +1797,28 @@ def export_report(report_key):
     elif report_key == 'sales-by-product-summary':
         writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'UOM', 'Total Sales ($)', 'Gross Profit ($)'])
         where_branch = "so.branch_id IS NULL" if branch_scope == 'main' else (f"so.branch_id = {int(branch_scope)}" if branch_scope.isdigit() else "1=1")
+
+        if sort_by in ['Order Number', 'SKU', 'Order Number / SKU']:
+            prod_sort = "p.sku ASC"
+        elif sort_by in ['Item Name', 'Product Name', 'Name']:
+            prod_sort = "p.name ASC"
+        elif sort_by == 'Category':
+            prod_sort = "category_name ASC, p.name ASC"
+        elif sort_by in ['Quantity Sold', 'Quantity Sold (Pcs)', 'Quantity']:
+            prod_sort = "quantity_sold DESC"
+        elif sort_by in ['Gross Profit', 'Profit', 'Gross Profit / Asset Value']:
+            prod_sort = "gross_profit DESC"
+        else:
+            prod_sort = "sales_amount DESC"
+
+        if group_by == 'Category':
+            prod_order_clause = f"COALESCE(c.name, 'General') ASC, {prod_sort}"
+        else:
+            prod_order_clause = prod_sort
+
         rows = query_all(f"""
             SELECT 
-                c.name as category_name, p.sku, p.name as item_name,
+                COALESCE(c.name, 'General') as category_name, p.sku, p.name as item_name,
                 SUM(sol.quantity) as quantity_sold,
                 COALESCE(sol.uom, p.uom, 'pcs') as uom,
                 SUM(sol.subtotal) as sales_amount,
@@ -1695,7 +1829,7 @@ def export_report(report_key):
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE so.order_date >= %s AND so.order_date <= %s AND so.status != 'CANCELLED' AND {where_branch}
             GROUP BY c.name, p.sku, p.name, COALESCE(sol.uom, p.uom, 'pcs')
-            ORDER BY sales_amount DESC
+            ORDER BY {prod_order_clause}
         """, (start_date, end_date))
         for r in rows:
             writer.writerow([r['category_name'] or '', r['sku'], r['item_name'], f"{float(r['quantity_sold'] or 0):.0f}", r['uom'], f"{float(r['sales_amount'] or 0):.2f}", f"{float(r['gross_profit'] or 0):.2f}"])
@@ -1846,7 +1980,7 @@ def export_report(report_key):
         curr_mult = khr_rate if currency == 'KHR' else 1.0
         curr_sym = '៛' if currency == 'KHR' else '$'
 
-        writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'UOM', f'Total Sales ({curr_sym})', f'Branch Unit Cost ({curr_sym})', f'Total Branch Cost ({curr_sym})', f'Branch Profit ({curr_sym})', 'Margin %'])
+        writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'Packaging', f'Sale Price / Pcs ({curr_sym})', f'Branch Unit Cost ({curr_sym})', f'Total Sales ({curr_sym})', f'Total Branch Cost ({curr_sym})', f'Branch Profit ({curr_sym})', 'Margin %'])
 
         where_branch = "1=1"
         if branch_scope == 'main':
@@ -1863,16 +1997,53 @@ def export_report(report_key):
         elif status == 'Open':
             where_stat = "so.status = 'OPEN'"
 
+        cost_unit_expr = """
+            CASE 
+                WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 AND p.sales_uom_ratio_std > 1 
+                    THEN (pp.unit_price / p.sales_uom_ratio_std) 
+                WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 
+                    THEN pp.unit_price 
+                WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0 
+                    THEN p.standard_cost 
+                WHEN p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
+                ELSE 0 
+            END
+        """
+
+        if sort_by in ['Order Number', 'SKU', 'Order Number / SKU']:
+            sort_order = "p.sku ASC"
+        elif sort_by in ['Item Name', 'Product Name', 'Name']:
+            sort_order = "p.name ASC"
+        elif sort_by == 'Category':
+            sort_order = "c.name ASC, p.name ASC"
+        elif sort_by in ['Quantity Sold', 'Quantity Sold (Pcs)', 'Quantity']:
+            sort_order = "quantity_sold DESC"
+        elif sort_by in ['Price / PCS', 'Price']:
+            sort_order = "(SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) DESC"
+        elif sort_by in ['Total Cost', 'Branch Cost', 'Total Branch Cost']:
+            sort_order = "total_branch_cost DESC"
+        elif sort_by in ['Gross Profit', 'Profit', 'Gross Profit / Asset Value']:
+            sort_order = "branch_profit DESC"
+        else:
+            sort_order = "sales_amount DESC"
+
+        if group_by == 'Category':
+            order_clause = f"COALESCE(c.name, 'General') ASC, {sort_order}"
+        else:
+            order_clause = sort_order
+
         rows = query_all(f"""
             SELECT 
                 p.id, p.sku, p.name as item_name,
                 COALESCE(c.name, 'General') as category_name,
-                COALESCE(sol.uom, p.uom, 'pcs') as uom,
+                COALESCE(p.uom, 'pcs') as base_uom,
+                COALESCE(p.sales_uom_ratio_std, 1.0) as pcs_per_case,
                 SUM(sol.quantity) as quantity_sold,
                 SUM(sol.subtotal) as sales_amount,
-                COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0) as raw_branch_cost,
-                SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as total_branch_cost,
-                SUM(sol.subtotal) - SUM(sol.quantity * COALESCE(NULLIF(pp.unit_price, 0), NULLIF(p.default_price, 0), 0)) as branch_profit
+                {cost_unit_expr} as raw_branch_cost_pc,
+                SUM(sol.quantity * ({cost_unit_expr})) as total_branch_cost,
+                SUM(sol.subtotal) - SUM(sol.quantity * ({cost_unit_expr})) as branch_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -1880,26 +2051,33 @@ def export_report(report_key):
             LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
             WHERE so.order_date >= %s AND so.order_date <= %s AND so.status != 'CANCELLED'
               AND {where_branch} AND {where_cat} AND {where_stat}
-            GROUP BY p.id, p.sku, p.name, c.name, COALESCE(sol.uom, p.uom, 'pcs'), pp.unit_price, p.default_price
-            ORDER BY sales_amount DESC
+            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost
+            ORDER BY {order_clause}
         """, (costing_scheme_id, start_date, end_date))
 
         for r in rows:
-            qty = float(r['quantity_sold'] or 0)
+            qty_pcs = float(r['quantity_sold'] or 0)
             sales = float(r['sales_amount'] or 0) * curr_mult
-            b_cost = float(r['raw_branch_cost'] or 0) * curr_mult
+            b_cost = float(r['raw_branch_cost_pc'] or 0) * curr_mult
             tot_cost = float(r['total_branch_cost'] or 0) * curr_mult
             profit = float(r['branch_profit'] or 0) * curr_mult
+            price_pc = (sales / qty_pcs) if qty_pcs > 0 else 0.0
             m_pct = (profit / sales * 100.0) if sales > 0 else 0.0
+            pcs_ratio = float(r['pcs_per_case'] or 1.0)
+            pack_str = f"{pcs_ratio:.0f} pcs/cs" if pcs_ratio > 1 else "1 pc"
+
+            price_pc_str = f"{price_pc:,.3f}" if currency == 'USD' else f"{price_pc:,.0f}"
+            cost_pc_str = f"{b_cost:,.3f}" if currency == 'USD' else f"{b_cost:,.0f}"
 
             writer.writerow([
                 r['category_name'],
                 r['sku'],
                 r['item_name'],
-                f"{qty:.0f}",
-                r['uom'],
+                f"{qty_pcs:.0f}",
+                pack_str,
+                price_pc_str,
+                cost_pc_str,
                 f"{sales:,.2f}" if currency == 'USD' else f"{sales:,.0f}",
-                f"{b_cost:,.2f}" if currency == 'USD' else f"{b_cost:,.0f}",
                 f"{tot_cost:,.2f}" if currency == 'USD' else f"{tot_cost:,.0f}",
                 f"{profit:,.2f}" if currency == 'USD' else f"{profit:,.0f}",
                 f"{m_pct:.1f}%"

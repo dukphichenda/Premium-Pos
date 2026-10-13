@@ -63,9 +63,11 @@ class TestBranchSalesReport(unittest.TestCase):
 
         # Check table columns
         self.assertIn('QTY SOLD', html)
+        self.assertIn('PRICE / PCS', html)
         self.assertIn('TOTAL SALES', html)
         self.assertIn('BRANCH COST', html)
         self.assertIn('TOTAL COST (QTY×COST)', html)
+        self.assertIn('pcs', html)
 
     def test_view_branch_sales_summary_khr_currency(self):
         """Verify switching currency to KHR displays Khmer Riel symbol and exchange rate."""
@@ -99,6 +101,7 @@ class TestBranchSalesReport(unittest.TestCase):
         self.assertIn('Item SKU', csv_text)
         self.assertIn('Item Name', csv_text)
         self.assertIn('Quantity Sold', csv_text)
+        self.assertIn('Sale Price / Pcs ($)', csv_text)
         self.assertIn('Total Sales ($)', csv_text)
         self.assertIn('Branch Unit Cost ($)', csv_text)
         self.assertIn('Total Branch Cost ($)', csv_text)
@@ -110,10 +113,41 @@ class TestBranchSalesReport(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertIn('text/csv', resp.mimetype)
         csv_text = resp.get_data(as_text=True)
+        self.assertIn('Sale Price / Pcs (៛)', csv_text)
         self.assertIn('Total Sales (៛)', csv_text)
         self.assertIn('Branch Unit Cost (៛)', csv_text)
         self.assertIn('Total Branch Cost (៛)', csv_text)
         self.assertIn('Branch Profit (៛)', csv_text)
 
+    def test_view_branch_sales_summary_group_by_category(self):
+        """Verify Group By Category renders category banner rows and subtotal rows."""
+        resp = self.client.get('/reports/view/branch-sales-summary?date_range=All&group_by=Category&sort_by=Order+Number')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn('inflow-rep-cat-banner', html)
+        self.assertIn('inflow-rep-subtotal-row', html)
+        self.assertIn('Subtotal for', html)
+
+    def test_view_branch_sales_summary_sort_by_options(self):
+        """Verify various sort_by parameters work without error."""
+        for sort_val in ['Order Number', 'Item Name', 'Category', 'Quantity Sold', 'Sales Amount', 'Total Cost', 'Gross Profit']:
+            resp = self.client.get(f'/reports/view/branch-sales-summary?date_range=All&sort_by={sort_val.replace(" ", "+")}')
+            self.assertEqual(resp.status_code, 200)
+
+    def test_view_sales_by_product_summary_group_by_category(self):
+        """Verify Sales by Product Summary also supports Group By Category."""
+        resp = self.client.get('/reports/view/sales-by-product-summary?date_range=All&group_by=Category&sort_by=Order+Number')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn('inflow-rep-cat-banner', html)
+        self.assertIn('Subtotal for', html)
+
+    def test_export_branch_sales_summary_grouped_and_sorted(self):
+        """Verify CSV export accepts group_by and sort_by parameters."""
+        resp = self.client.get('/reports/export/branch-sales-summary?date_range=All&group_by=Category&sort_by=Order+Number')
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn('text/csv', resp.mimetype)
+
 if __name__ == '__main__':
     unittest.main()
+

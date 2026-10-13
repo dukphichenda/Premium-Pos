@@ -27,7 +27,7 @@
                 <span>Export ▾</span>
             </button>
             <div id="reportExportMenu" class="inflow-tab-dropdown-menu">
-                <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency) }}" download data-no-tab="true">
+                <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by) }}" download data-no-tab="true">
                     📊 Microsoft Excel (*.csv)
                 </a>
                 <a href="javascript:void(0)" onclick="window.print()">
@@ -298,11 +298,15 @@
                 <div class="inflow-rep-param-row">
                     <span class="inflow-rep-param-label">First Sort By</span>
                     <select name="sort_by" class="inflow-rep-param-select">
-                        <option value="Order Number" {% if sort_by == 'Order Number' %}selected{% endif %}>Order Number / SKU</option>
+                        <option value="Order Number" {% if sort_by in ['Order Number', 'SKU', 'Order Number / SKU'] %}selected{% endif %}>Order Number / SKU</option>
+                        <option value="Item Name" {% if sort_by in ['Item Name', 'Product Name'] %}selected{% endif %}>Item Name</option>
+                        <option value="Category" {% if sort_by == 'Category' %}selected{% endif %}>Category</option>
+                        <option value="Quantity Sold" {% if sort_by in ['Quantity Sold', 'Quantity'] %}selected{% endif %}>Quantity Sold</option>
+                        <option value="Sales Amount" {% if sort_by in ['Sales Amount', 'Total Sales'] %}selected{% endif %}>Sales Amount</option>
+                        <option value="Total Cost" {% if sort_by in ['Total Cost', 'Branch Cost'] %}selected{% endif %}>Total Cost</option>
+                        <option value="Gross Profit" {% if sort_by in ['Gross Profit', 'Profit'] %}selected{% endif %}>Gross Profit</option>
                         <option value="Order Date" {% if sort_by == 'Order Date' %}selected{% endif %}>Order Date</option>
                         <option value="Customer" {% if sort_by == 'Customer' %}selected{% endif %}>Customer / Vendor</option>
-                        <option value="Sales Amount" {% if sort_by == 'Sales Amount' %}selected{% endif %}>Sales / PO Amount</option>
-                        <option value="Gross Profit" {% if sort_by == 'Gross Profit' %}selected{% endif %}>Gross Profit / Asset Value</option>
                     </select>
                 </div>
                 <div class="inflow-rep-param-row">
@@ -412,19 +416,31 @@
                 <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px;">
                     <div style="border-left: 3px solid #2563EB; padding-left: 8px;">
                         <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Quantity Sold</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #0F172A;">{{ "{:,.2f}".format(totals.quantity_sold or 0) if (totals.quantity_sold or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or 0) }}</div>
+                        <div style="font-size: 16px; font-weight: 700; color: #0F172A;">
+                            {{ "{:,.2f}".format(totals.quantity_sold or 0) if (totals.quantity_sold or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or 0) }} <span style="font-size: 11px; font-weight: 600; color: #2563EB;">pcs</span>
+                        </div>
                     </div>
                     <div style="border-left: 3px solid #059669; padding-left: 8px;">
                         <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Sales Money</div>
                         <div style="font-size: 16px; font-weight: 700; color: #059669;">
                             {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
                         </div>
+                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                        <div style="font-size: 11px; color: #059669; font-weight: 500;">
+                            Avg: {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.sales_amount / totals.quantity_sold) }}{% endif %}/pc
+                        </div>
+                        {% endif %}
                     </div>
                     <div style="border-left: 3px solid #D97706; padding-left: 8px;">
                         <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Branch Cost (Qty × Cost)</div>
                         <div style="font-size: 16px; font-weight: 700; color: #D97706;">
                             {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}
                         </div>
+                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                        <div style="font-size: 11px; color: #D97706; font-weight: 500;">
+                            Avg: {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_branch_cost / totals.quantity_sold) }}{% endif %}/pc
+                        </div>
+                        {% endif %}
                     </div>
                     <div style="border-left: 3px solid #7C3AED; padding-left: 8px;">
                         <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Branch Gross Profit</div>
@@ -489,18 +505,48 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="color: #64748B;">{{ r.category_name or 'GENERAL' }}</td>
-                            <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
-                            <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.quantity_sold) }}</td>
-                            <td>{{ r.uom or 'pcs' }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
-                        </tr>
+                        {% if group_by == 'Category' and category_groups %}
+                            {% for grp in category_groups %}
+                            <tr class="inflow-rep-cat-banner">
+                                <td colspan="6">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <span style="font-size: 13.5px; font-weight: 700; color: #1E40AF;">📁 Category: {{ grp.category_name }}</span>
+                                        <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} product{% if grp.lines|length > 1 %}s{% endif %}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% for r in grp.lines %}
+                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                                <td style="color: #64748B;">{{ r.category_name or 'GENERAL' }}</td>
+                                <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
+                                <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.quantity_sold) }}</td>
+                                <td>{{ r.uom or 'pcs' }}</td>
+                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="inflow-rep-subtotal-row">
+                                <td colspan="2" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
+                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">{{ "%.0f"|format(grp.subtotal_qty) }}</td>
+                                <td></td>
+                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">${{ "%.2f"|format(grp.subtotal_sales) }}</td>
+                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">${{ "%.2f"|format(grp.subtotal_profit) }}</td>
+                            </tr>
+                            {% endfor %}
                         {% else %}
-                        <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No product sales records found.</td></tr>
-                        {% endfor %}
+                            {% for r in rows %}
+                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                                <td style="color: #64748B;">{{ r.category_name or 'GENERAL' }}</td>
+                                <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
+                                <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.quantity_sold) }}</td>
+                                <td>{{ r.uom or 'pcs' }}</td>
+                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No product sales records found.</td></tr>
+                            {% endfor %}
+                        {% endif %}
                     </tbody>
                     {% if page == total_pages and rows %}
                     <tfoot>
@@ -1204,52 +1250,190 @@
                     {% elif report_key == 'branch-sales-summary' %}
                     <thead>
                         <tr>
-                            <th style="width: 12%;">CATEGORY</th>
-                            <th style="width: 13%;">SKU</th>
-                            <th style="width: 22%;">ITEM NAME</th>
-                            <th style="width: 9%; text-align: right;">QTY SOLD</th>
-                            <th style="width: 6%;">UOM</th>
-                            <th style="width: 12%; text-align: right;">TOTAL SALES</th>
+                            <th style="width: 11%;">CATEGORY</th>
+                            <th style="width: 12%;">SKU</th>
+                            <th style="width: 19%;">ITEM NAME</th>
+                            <th style="width: 11%; text-align: right;">QTY SOLD</th>
+                            <th style="width: 10%; text-align: right;">PRICE / PCS</th>
                             <th style="width: 11%; text-align: right;">BRANCH COST</th>
-                            <th style="width: 15%; text-align: right;">TOTAL COST (QTY×COST)</th>
+                            <th style="width: 12%; text-align: right;">TOTAL SALES</th>
+                            <th style="width: 14%; text-align: right;">TOTAL COST (QTY×COST)</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td>{{ r.category_name or 'General' }}</td>
-                            <td style="font-weight: 500;">
-                                <a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a>
-                            </td>
-                            <td style="font-weight: 500;">{{ r.item_name }}</td>
-                            <td style="text-align: right; font-weight: 600;">{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }}</td>
-                            <td>{{ r.uom or 'ea' }}</td>
-                            <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
-                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
-                            </td>
-                            <td style="text-align: right; color: #047857; font-weight: 500;">
-                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_unit_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_unit_cost) }}{% endif %}
-                            </td>
-                            <td style="text-align: right; font-weight: 600; color: #065F46;">
-                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}
-                            </td>
-                        </tr>
+                        {% if group_by == 'Category' and category_groups %}
+                            {% for grp in category_groups %}
+                            <!-- Category Banner Row -->
+                            <tr class="inflow-rep-cat-banner">
+                                <td colspan="8">
+                                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                                        <span style="font-size: 13.5px; font-weight: 700; color: #1E40AF;">📁 Category: {{ grp.category_name }}</span>
+                                        <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} item{% if grp.lines|length > 1 %}s{% endif %}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% for r in grp.lines %}
+                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                                <td>{{ r.category_name or 'General' }}</td>
+                                <td style="font-weight: 500;">
+                                    <a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a>
+                                </td>
+                                <td style="font-weight: 500;">
+                                    <div>{{ r.item_name }}</div>
+                                    {% if r.pcs_per_case > 1 %}
+                                    <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600;">
+                                    <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
+                                    {% if r.cases_equivalent %}
+                                    <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                                    <div>
+                                        {% if currency == 'KHR' %}
+                                            {{ "{:,.0f}".format(r.sale_price_pc) }} ៛
+                                        {% else %}
+                                            ${{ "{:,.3f}".format(r.sale_price_pc) if r.sale_price_pc < 1 else "{:,.2f}".format(r.sale_price_pc) }}
+                                        {% endif %}
+                                    </div>
+                                    {% if r.sale_price_case %}
+                                    <div style="font-size: 10.5px; color: #64748B;">
+                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sale_price_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.sale_price_case) }}/cs{% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; color: #047857; font-weight: 600;">
+                                    <div>
+                                        {% if currency == 'KHR' %}
+                                            {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
+                                        {% else %}
+                                            ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
+                                        {% endif %}
+                                    </div>
+                                    {% if r.branch_cost_case %}
+                                    <div style="font-size: 10.5px; color: #047857;">
+                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #065F46;">
+                                    <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
+                                    <div style="font-size: 10.5px; color: #6B7280; font-weight: 500;">
+                                        Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_profit) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_profit) }}{% endif %} ({{ "%.1f"|format(r.margin_pct) }}%)
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                            <!-- Category Subtotal Row -->
+                            <tr class="inflow-rep-subtotal-row">
+                                <td colspan="3" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
+                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                                    {{ "{:,.2f}".format(grp.subtotal_qty) if grp.subtotal_qty % 1 != 0 else "{:,.0f}".format(grp.subtotal_qty) }} pcs
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_price_pc) }} ៛{% else %}${{ "{:,.3f}".format(grp.avg_price_pc) if grp.avg_price_pc < 1 else "{:,.2f}".format(grp.avg_price_pc) }}{% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #047857;">
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_cost_pc) }} ៛{% else %}${{ "{:,.4f}".format(grp.avg_cost_pc) if grp.avg_cost_pc < 1 else "{:,.2f}".format(grp.avg_cost_pc) }}{% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_sales) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_sales) }}{% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #065F46;">
+                                    <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_cost) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_cost) }}{% endif %}</div>
+                                    <div style="font-size: 10.5px; font-weight: 600; color: #4B5563;">
+                                        Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_profit) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_profit) }}{% endif %} ({{ "%.1f"|format(grp.subtotal_margin) }}%)
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
                         {% else %}
-                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales records found for this branch and filter criteria.</td></tr>
-                        {% endfor %}
+                            {% for r in rows %}
+                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                                <td>{{ r.category_name or 'General' }}</td>
+                                <td style="font-weight: 500;">
+                                    <a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a>
+                                </td>
+                                <td style="font-weight: 500;">
+                                    <div>{{ r.item_name }}</div>
+                                    {% if r.pcs_per_case > 1 %}
+                                    <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600;">
+                                    <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
+                                    {% if r.cases_equivalent %}
+                                    <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                                    <div>
+                                        {% if currency == 'KHR' %}
+                                            {{ "{:,.0f}".format(r.sale_price_pc) }} ៛
+                                        {% else %}
+                                            ${{ "{:,.3f}".format(r.sale_price_pc) if r.sale_price_pc < 1 else "{:,.2f}".format(r.sale_price_pc) }}
+                                        {% endif %}
+                                    </div>
+                                    {% if r.sale_price_case %}
+                                    <div style="font-size: 10.5px; color: #64748B;">
+                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sale_price_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.sale_price_case) }}/cs{% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; color: #047857; font-weight: 600;">
+                                    <div>
+                                        {% if currency == 'KHR' %}
+                                            {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
+                                        {% else %}
+                                            ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
+                                        {% endif %}
+                                    </div>
+                                    {% if r.branch_cost_case %}
+                                    <div style="font-size: 10.5px; color: #047857;">
+                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
+                                    </div>
+                                    {% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
+                                </td>
+                                <td style="text-align: right; font-weight: 600; color: #065F46;">
+                                    <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
+                                    <div style="font-size: 10.5px; color: #6B7280; font-weight: 500;">
+                                        Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_profit) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_profit) }}{% endif %} ({{ "%.1f"|format(r.margin_pct) }}%)
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales records found for this branch and filter criteria.</td></tr>
+                            {% endfor %}
+                        {% endif %}
                     </tbody>
                     {% if page == total_pages and rows %}
                     <tfoot>
                         <tr class="inflow-crys-totals-row">
                             <td colspan="3" style="font-weight: bold; text-align: right;">GRAND TOTALS:</td>
                             <td style="text-align: right; font-weight: bold;">
-                                {{ "{:,.2f}".format(totals.quantity_sold or totals.quantity or 0) if (totals.quantity_sold or totals.quantity or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or totals.quantity or 0) }}
+                                {{ "{:,.2f}".format(totals.quantity_sold or totals.quantity or 0) if (totals.quantity_sold or totals.quantity or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or totals.quantity or 0) }} pcs
                             </td>
-                            <td></td>
+                            <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
+                                {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.sales_amount / totals.quantity_sold) }}{% endif %}
+                                {% else %}-{% endif %}
+                            </td>
+                            <td style="text-align: right; font-weight: bold; color: #047857;">
+                                {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_branch_cost / totals.quantity_sold) }}{% endif %}
+                                {% else %}-{% endif %}
+                            </td>
                             <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
                                 {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
                             </td>
-                            <td></td>
                             <td style="text-align: right; font-weight: bold; color: #065F46;">
                                 {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or totals.branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or totals.branch_cost or 0) }}{% endif %}
                             </td>

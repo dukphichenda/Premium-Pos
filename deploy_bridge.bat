@@ -24,19 +24,26 @@ echo   [1] Push all changes to GitHub (origin ^& inflow-repo)
 echo   [2] Launch Cloudflare Remote Access Tunnel (share_online.bat)
 echo   [3] Check Git Status ^& Remote URLs
 echo   [4] Install Cloudflare Tunnel as 24/7 Windows Service
-echo   [5] Exit
+echo   [5] Export PostgreSQL Database (for Hostinger/Production)
+echo   [6] Exit
 echo.
-set /p CHOICE="Select an option (1-5) [default: 1]: "
+set /p CHOICE="Select an option (1-6) [default: 1]: "
 if "%CHOICE%"=="" set CHOICE=1
 
 if "%CHOICE%"=="1" goto PUSH_GITHUB
 if "%CHOICE%"=="2" goto LAUNCH_TUNNEL
 if "%CHOICE%"=="3" goto CHECK_STATUS
 if "%CHOICE%"=="4" goto INSTALL_SERVICE
-if "%CHOICE%"=="5" goto EXIT
-echo Invalid choice. Please select 1 to 5.
+if "%CHOICE%"=="5" goto EXPORT_DB
+if "%CHOICE%"=="6" goto EXIT
+echo Invalid choice. Please select 1 to 6.
 echo.
 goto MENU
+
+:EXPORT_DB
+call "%~dp0backup_database.bat"
+goto MENU
+
 
 :PUSH_GITHUB
 echo.
