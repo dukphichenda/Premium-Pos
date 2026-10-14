@@ -1098,7 +1098,12 @@
                     <td style="text-align: center; color: #94A3B8; font-weight: 600;">{{ loop.index }}</td>
                     <td>
                         <div class="item-name">
-                            <span>{{ line.product_name or line.name or 'Item' }}</span>{% set d = (line.line_description or line.description or '').strip() %}{% if d and d != (line.product_name or line.name or '').strip() %} <span class="item-desc-inline" style="font-weight: 500; color: #475569;">({% if d.startswith('(') and d.endswith(')') %}{{ d[1:-1].strip() }}{% else %}{{ d }}{% endif %})</span>{% endif %}
+                            {% set sku_val = (line.product_sku or line.sku or '').strip() %}
+                            {% set prod_name = (line.product_name or line.name or 'Item').strip() %}
+                            {% if sku_val and not prod_name.startswith(sku_val) %}
+                            <span class="item-sku" style="font-weight: 700; color: #0F172A; margin-right: 5px;">{{ sku_val }}</span>
+                            {% endif %}
+                            <span>{{ prod_name }}</span>{% set d = (line.line_description or line.description or '').strip() %}{% if d and d != prod_name and (not sku_val or d != sku_val) %} <span class="item-desc-inline" style="font-weight: 500; color: #475569;">({% if d.startswith('(') and d.endswith(')') %}{{ d[1:-1].strip() }}{% else %}{{ d }}{% endif %})</span>{% endif %}
                         </div>
                     </td>
                     <td style="text-align: right; font-weight: 700; color: #0F172A;">
