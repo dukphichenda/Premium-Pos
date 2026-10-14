@@ -316,6 +316,7 @@
                 {% for s_ord in sidebar_orders %}
                 <a href="javascript:void(0)" onclick="handleSelectOrder('{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, customer_search=customer_search, branch=branch_scope) }}', this)" 
                    class="inflow-drawer-row {% if not is_new and s_ord.id == order.id %}active{% endif %}"
+                   data-order-id="{{ s_ord.id }}"
                    data-cust="{{ (s_ord.customer_name or '')|lower }}">
                     <span>{{ s_ord.order_number }}</span>
                 </a>
@@ -356,6 +357,7 @@
                 <tbody>
                     {% for s_ord in sidebar_orders %}
                     <tr class="inflow-expanded-row {% if not is_new and s_ord.id == order.id %}active{% endif %}"
+                        data-order-id="{{ s_ord.id }}"
                         onclick="handleSelectOrder('{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, customer_search=customer_search, branch=branch_scope) }}', this)">
                         <td style="font-weight: 600; color: #0F766E;">{{ s_ord.order_number }}</td>
                         <td>{{ s_ord.order_date.strftime('%d-%b-%y') if s_ord.order_date else '' }}</td>
@@ -1869,6 +1871,36 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
     return url.pathname + '?' + params.toString();
 }
 
+function getUpperOrAdjacentOrderId() {
+    // 1. Try compact drawer list
+    const compactRows = Array.from(document.querySelectorAll('#drawerOrdersListBody .inflow-drawer-row'));
+    let activeIdx = compactRows.findIndex(r => r.classList.contains('active'));
+    if (activeIdx !== -1) {
+        // Move up to upper order if one exists above
+        if (activeIdx > 0) {
+            return compactRows[activeIdx - 1].getAttribute('data-order-id');
+        }
+        // If current is top-most order, move down to next order below
+        if (compactRows.length > 1) {
+            return compactRows[1].getAttribute('data-order-id');
+        }
+    }
+
+    // 2. Try expanded drawer table
+    const expandedRows = Array.from(document.querySelectorAll('.inflow-expanded-table tbody tr.inflow-expanded-row'));
+    activeIdx = expandedRows.findIndex(r => r.classList.contains('active'));
+    if (activeIdx !== -1) {
+        if (activeIdx > 0) {
+            return expandedRows[activeIdx - 1].getAttribute('data-order-id');
+        }
+        if (expandedRows.length > 1) {
+            return expandedRows[1].getAttribute('data-order-id');
+        }
+    }
+
+    return null;
+}
+
 function attachFiltersToForm(form) {
     if (!form) return;
     const filters = getDrawerFilterParams();
@@ -1883,6 +1915,18 @@ function attachFiltersToForm(form) {
         }
         input.value = filters[field] || '';
     });
+
+    const upperId = getUpperOrAdjacentOrderId();
+    if (upperId) {
+        let upInput = form.querySelector('input[name="upper_order_id"]');
+        if (!upInput) {
+            upInput = document.createElement('input');
+            upInput.type = 'hidden';
+            upInput.name = 'upper_order_id';
+            form.appendChild(upInput);
+        }
+        upInput.value = upperId;
+    }
 }
 
 // Instant Direct Navigation (Zero Animation Latency - Appear As Fast As Possible)
@@ -3967,6 +4011,12 @@ function openCombineAddonModalForLine() {}
 function closeCombineAddonModal() {}
 function removeLineAddon() {}
 
-document.addEventListener('DOMContentLoaded', initPreviewToolbar);
+document.addEventListener('DOMContentLoaded', function() {
+    initPreviewToolbar();
+    const activeRow = document.querySelector('#drawerOrdersListBody .inflow-drawer-row.active, .inflow-expanded-table tbody tr.inflow-expanded-row.active');
+    if (activeRow && activeRow.scrollIntoView) {
+        activeRow.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    }
+});
 </script>
 {% endblock %}

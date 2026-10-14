@@ -750,6 +750,97 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         'active_branch_filter': branch_id or 'main'
     }
 
+def _find_upper_or_adjacent_order(current_id, date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', branch_id=None, requested_upper_id=None):
+    """
+    Finds the upper (order immediately above current_id in the drawer list) or adjacent order
+    so that when deleting or completing an SO, the view stays on the detail page and moves to the upper order.
+    """
+    # 1. If explicit upper_id was passed from frontend DOM
+    if requested_upper_id:
+        try:
+            req_id = int(requested_upper_id)
+            if req_id != current_id:
+                chk = query_one("SELECT id FROM sales_orders WHERE id = %s", (req_id,))
+                if chk:
+                    return chk['id']
+        except (ValueError, TypeError):
+            pass
+
+    # 2. Query drawer list with exact current filter settings
+    try:
+        drawer_data = _get_drawer_and_metadata(
+            date_filter=date_filter,
+            status_filter=status_filter,
+            customer_search=customer_search,
+            customer_filter=None,
+            scheme_id=100,
+            branch_id=branch_id
+        )
+        sidebar_orders = drawer_data.get('sidebar_orders', [])
+        order_ids = [o['id'] for o in sidebar_orders]
+
+        if current_id in order_ids:
+            idx = order_ids.index(current_id)
+            # Move up to upper order if one exists above
+            if idx > 0:
+                return order_ids[idx - 1]
+            # If current is top-most order, move down to next order below
+            if len(order_ids) > 1:
+                return order_ids[1]
+        elif order_ids:
+            # Current id wasn't in list (e.g., status filter already excluded it), pick the first order
+            for oid in order_ids:
+                if oid != current_id:
+                    return oid
+    except Exception as e:
+        logger.warning(f"Error finding upper order via drawer metadata: {e}")
+
+    # 3. Database-level fallback: Find upper order (id > current_id in same branch scope)
+    try:
+        is_main = _is_main_admin()
+        user_bid = _get_user_branch_id()
+        where_clauses = ["id != %s"]
+        params = [current_id]
+
+        if not is_main:
+            if user_bid:
+                where_clauses.append("branch_id = %s")
+                params.append(user_bid)
+            else:
+                where_clauses.append("branch_id IS NULL")
+        else:
+            if branch_id is None or str(branch_id).lower() == 'main':
+                where_clauses.append("branch_id IS NULL")
+            elif str(branch_id).lower() == 'all':
+                pass
+            else:
+                try:
+                    where_clauses.append("branch_id = %s")
+                    params.append(int(branch_id))
+                except (ValueError, TypeError):
+                    where_clauses.append("branch_id IS NULL")
+
+        where_sql = " AND ".join(where_clauses)
+
+        # Upper order in DESC list is the next higher ID (id > current_id ORDER BY id ASC)
+        upper = query_one(f"SELECT id FROM sales_orders WHERE {where_sql} AND id > %s ORDER BY id ASC LIMIT 1", tuple(params + [current_id]))
+        if upper:
+            return upper['id']
+
+        # Next order below in DESC list is the next lower ID (id < current_id ORDER BY id DESC)
+        lower = query_one(f"SELECT id FROM sales_orders WHERE {where_sql} AND id < %s ORDER BY id DESC LIMIT 1", tuple(params + [current_id]))
+        if lower:
+            return lower['id']
+
+        # Any remaining order
+        any_ord = query_one(f"SELECT id FROM sales_orders WHERE {where_sql} ORDER BY id DESC LIMIT 1", tuple(params))
+        if any_ord:
+            return any_ord['id']
+    except Exception as e:
+        logger.warning(f"Database fallback error finding upper order: {e}")
+
+    return None
+
 @sales_orders_bp.route('/sales/delivery_men', methods=['GET'], endpoint='list_delivery_men')
 @sales_orders_bp.route('/sales/delivery_men_json', methods=['GET'], endpoint='get_delivery_men')
 def list_delivery_men():
@@ -1953,8 +2044,22 @@ def save_order(id=0):
         session['so_customer_search'] = cust_search
         session['so_branch_filter'] = branch_param
 
+        target_id = id
+        if mark_complete_pay and not is_new:
+            req_upper_id = request.form.get('upper_order_id') or (data.get('upper_order_id') if isinstance(data, dict) else None)
+            upper_target = _find_upper_or_adjacent_order(
+                current_id=id,
+                date_filter=date_filter,
+                status_filter=status_filter,
+                customer_search=cust_search,
+                branch_id=branch_param,
+                requested_upper_id=req_upper_id
+            )
+            if upper_target:
+                target_id = upper_target
+
         redirect_kwargs = {
-            'id': id,
+            'id': target_id,
             'branch': branch_param,
             'date_filter': date_filter,
             'status_filter': status_filter
@@ -2055,8 +2160,20 @@ def complete_pay(id):
     session['so_customer_search'] = cust_search
     session['so_branch_filter'] = branch_param
 
+    req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
+    target_id = _find_upper_or_adjacent_order(
+        current_id=id,
+        date_filter=date_filter,
+        status_filter=status_filter,
+        customer_search=cust_search,
+        branch_id=branch_param,
+        requested_upper_id=req_upper_id
+    )
+    if not target_id:
+        target_id = id
+
     redirect_kwargs = {
-        'id': id,
+        'id': target_id,
         'branch': branch_param,
         'date_filter': date_filter,
         'status_filter': status_filter
@@ -2066,9 +2183,15 @@ def complete_pay(id):
     redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
 
     if request.is_json:
-        return jsonify({'success': True, 'message': f'Order completed and marked paid by {payment_method}!', 'payment_method': payment_method, 'redirect_url': redirect_url})
+        return jsonify({
+            'success': True,
+            'message': f"Order {order['order_number']} completed and marked paid by {payment_method}!",
+            'payment_method': payment_method,
+            'redirect_url': redirect_url,
+            'next_order_id': target_id
+        })
 
-    flash(f"Order is shipped and paid by {payment_method}!", "success")
+    flash(f"Order {order['order_number']} is shipped and paid by {payment_method}!", "success")
     return redirect(redirect_url)
 
 @sales_orders_bp.route('/sales/<int:id>/reopen', methods=['POST'])
@@ -2208,6 +2331,28 @@ def delete_order(id):
     branch_id = order.get('branch_id')
     status = (order.get('status') or '').upper()
 
+    date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
+    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+    cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
+    branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
+
+    session['so_date_filter'] = date_filter
+    session['so_status_filter'] = status_filter
+    session['so_customer_search'] = cust_search
+    session['so_branch_filter'] = branch_param
+
+    req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
+
+    # Find upper or adjacent order BEFORE deleting the record
+    target_id = _find_upper_or_adjacent_order(
+        current_id=id,
+        date_filter=date_filter,
+        status_filter=status_filter,
+        customer_search=cust_search,
+        branch_id=branch_param,
+        requested_upper_id=req_upper_id
+    )
+
     try:
         with get_db_cursor(commit=True) as cur:
             # 1. Revert reserved or deducted inventory (auto-handles kit components)
@@ -2252,14 +2397,29 @@ def delete_order(id):
             # 4. Re-synchronize numbering sequences so new orders continue properly without gaps
             resync_all_sequences(cur=cur)
 
+        if target_id:
+            redirect_kwargs = {
+                'id': target_id,
+                'branch': branch_param,
+                'date_filter': date_filter,
+                'status_filter': status_filter
+            }
+            if cust_search:
+                redirect_kwargs['customer_search'] = cust_search
+            redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
+        else:
+            # If no remaining orders in drawer/system, stay in sales order workspace with a new order form
+            redirect_url = url_for('sales_orders.new_order', branch=branch_param)
+
         if request.is_json:
-            return jsonify({'success': True, 'message': f'Order {order_number} deleted successfully.'})
-        flash(f"Order {order_number} deleted successfully. Records cleaned and numbering resynchronized.", "success")
-        if branch_id:
-            return redirect(url_for('branches.branch_orders', id=branch_id))
-        elif session.get('active_branch_id'):
-            return redirect(url_for('branches.branch_orders', id=session['active_branch_id']))
-        return redirect(url_for('sales_orders.list_orders', view='table', branch='main'))
+            return jsonify({
+                'success': True,
+                'message': f'Order {order_number} deleted successfully.',
+                'redirect_url': redirect_url,
+                'next_order_id': target_id
+            })
+        flash(f"Order {order_number} deleted successfully.", "success")
+        return redirect(redirect_url)
 
     except Exception as e:
         logger.error(f"Error deleting sales order {id}: {e}", exc_info=True)
