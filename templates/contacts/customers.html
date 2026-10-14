@@ -16,13 +16,32 @@
     </div>
 </div>
 
-<!-- Search Bar -->
+<!-- Search Bar & Branch Filter -->
+{% if is_main_admin %}
+<div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
+    <a href="{{ url_for('contacts.list_customers', branch='all', search=search) }}" class="btn btn-sm {% if current_branch_param == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 20px; font-weight: 700;">
+        🌐 All Customers (HQ + Branches)
+    </a>
+    <a href="{{ url_for('contacts.list_customers', branch='main', search=search) }}" class="btn btn-sm {% if current_branch_param == 'main' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 20px; font-weight: 700;">
+        🏢 Main Store (HQ)
+    </a>
+    {% for b in branches %}
+    <a href="{{ url_for('contacts.list_customers', branch=b.id, search=search) }}" class="btn btn-sm {% if current_branch_param == b.id|string %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 20px; font-weight: 700;">
+        🏪 {{ b.name }} ({{ b.code }})
+    </a>
+    {% endfor %}
+</div>
+{% endif %}
+
 <div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
     <form method="GET" action="{{ url_for('contacts.list_customers') }}" style="display: flex; gap: 14px;">
+        {% if is_main_admin and current_branch_param %}
+        <input type="hidden" name="branch" value="{{ current_branch_param }}">
+        {% endif %}
         <input type="text" name="search" value="{{ search }}" placeholder="Search customer name, phone number, or contact person..." class="form-input" style="flex: 1;">
         <button type="submit" class="btn btn-secondary">Search</button>
         {% if search %}
-        <a href="{{ url_for('contacts.list_customers') }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
+        <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None) }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
         {% endif %}
     </form>
 </div>
@@ -34,6 +53,9 @@
             <thead>
                 <tr>
                     <th>Customer Name</th>
+                    {% if is_main_admin %}
+                    <th>Branch / Store</th>
+                    {% endif %}
                     <th>Phone</th>
                     <th>Contact Person</th>
                     <th>City / Location</th>
@@ -54,6 +76,19 @@
                         <div style="font-size: 0.72rem; color: #64748B;">{{ c.email }}</div>
                         {% endif %}
                     </td>
+                    {% if is_main_admin %}
+                    <td>
+                        {% if c.branch_name %}
+                        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">
+                            🏪 {{ c.branch_code or c.branch_name }}
+                        </span>
+                        {% else %}
+                        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;">
+                            🏢 Main Store
+                        </span>
+                        {% endif %}
+                    </td>
+                    {% endif %}
                     <td style="font-family: monospace; font-size: 0.85rem;">{{ c.phone or '-' }}</td>
                     <td style="color: #475569;">{{ c.contact_name or '-' }}</td>
                     <td style="color: #64748B;">{{ c.city or '-' }}</td>
@@ -72,7 +107,7 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="8" style="text-align: center; color: #94A3B8; padding: 32px;">No customers found.</td>
+                    <td colspan="{% if is_main_admin %}9{% else %}8{% endif %}" style="text-align: center; color: #94A3B8; padding: 32px;">No customers found.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -84,10 +119,10 @@
         <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} customers)</span>
         <div style="display: flex; gap: 8px;">
             {% if page > 1 %}
-            <a href="{{ url_for('contacts.list_customers', page=page-1, search=search) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            <a href="{{ url_for('contacts.list_customers', page=page-1, search=search, branch=current_branch_param if is_main_admin else None) }}" class="btn btn-secondary btn-sm">← Previous</a>
             {% endif %}
             {% if page < total_pages %}
-            <a href="{{ url_for('contacts.list_customers', page=page+1, search=search) }}" class="btn btn-secondary btn-sm">Next →</a>
+            <a href="{{ url_for('contacts.list_customers', page=page+1, search=search, branch=current_branch_param if is_main_admin else None) }}" class="btn btn-secondary btn-sm">Next →</a>
             {% endif %}
         </div>
     </div>
@@ -149,6 +184,18 @@
                     </select>
                 </div>
             </div>
+
+            {% if is_main_admin %}
+            <div class="form-group">
+                <label class="form-label">Store / Branch Location</label>
+                <select name="branch_id" class="form-select">
+                    <option value="">🏢 Main Store (HQ)</option>
+                    {% for b in branches %}
+                    <option value="{{ b.id }}" {% if current_branch_param == b.id|string %}selected{% endif %}>🏪 {{ b.name }} ({{ b.code }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
 
             <div style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button type="button" class="btn btn-secondary" onclick="closeModal('newCustomerModal')">Cancel</button>

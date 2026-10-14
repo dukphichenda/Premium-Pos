@@ -87,11 +87,19 @@ def generate_sample_csv(data_type):
     return output.getvalue().encode('utf-8-sig'), meta['default_filename']
 
 
-def export_data_to_csv(data_type):
+def export_data_to_csv(data_type, branch_id=None):
     key, meta = get_meta(data_type)
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(meta['headers'])
+
+    # Normalize branch_id
+    bid = None
+    if branch_id is not None and str(branch_id).strip().lower() not in ('all', '', 'none'):
+        try:
+            bid = int(branch_id)
+        except (ValueError, TypeError):
+            bid = None
 
     if key == 'product':
         rows = query_all("""
@@ -116,12 +124,27 @@ def export_data_to_csv(data_type):
             ])
 
     elif key == 'customer':
-        rows = query_all("""
-            SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
-            FROM customers
-            WHERE is_active = TRUE
-            ORDER BY name ASC;
-        """)
+        if str(branch_id).strip().lower() == 'all':
+            rows = query_all("""
+                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
+                FROM customers
+                WHERE is_active = TRUE
+                ORDER BY name ASC;
+            """)
+        elif bid is not None:
+            rows = query_all("""
+                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
+                FROM customers
+                WHERE is_active = TRUE AND branch_id = %s
+                ORDER BY name ASC;
+            """, (bid,))
+        else:
+            rows = query_all("""
+                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
+                FROM customers
+                WHERE is_active = TRUE AND branch_id IS NULL
+                ORDER BY name ASC;
+            """)
         for r in rows:
             writer.writerow([
                 r['name'] or '',
@@ -170,16 +193,41 @@ def export_data_to_csv(data_type):
             ])
 
     elif key == 'sales_order':
-        rows = query_all("""
-            SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
-                   c.name as customer_name, p.sku, sol.description, sol.quantity,
-                   sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
-            FROM sales_orders so
-            LEFT JOIN customers c ON so.customer_id = c.id
-            JOIN sales_order_lines sol ON sol.sales_order_id = so.id
-            LEFT JOIN products p ON sol.product_id = p.id
-            ORDER BY so.id DESC, sol.line_num ASC;
-        """)
+        if str(branch_id).strip().lower() == 'all':
+            rows = query_all("""
+                SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
+                       c.name as customer_name, p.sku, sol.description, sol.quantity,
+                       sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
+                FROM sales_orders so
+                LEFT JOIN customers c ON so.customer_id = c.id
+                JOIN sales_order_lines sol ON sol.sales_order_id = so.id
+                LEFT JOIN products p ON sol.product_id = p.id
+                ORDER BY so.id DESC, sol.line_num ASC;
+            """)
+        elif bid is not None:
+            rows = query_all("""
+                SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
+                       c.name as customer_name, p.sku, sol.description, sol.quantity,
+                       sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
+                FROM sales_orders so
+                LEFT JOIN customers c ON so.customer_id = c.id
+                JOIN sales_order_lines sol ON sol.sales_order_id = so.id
+                LEFT JOIN products p ON sol.product_id = p.id
+                WHERE so.branch_id = %s
+                ORDER BY so.id DESC, sol.line_num ASC;
+            """, (bid,))
+        else:
+            rows = query_all("""
+                SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
+                       c.name as customer_name, p.sku, sol.description, sol.quantity,
+                       sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
+                FROM sales_orders so
+                LEFT JOIN customers c ON so.customer_id = c.id
+                JOIN sales_order_lines sol ON sol.sales_order_id = so.id
+                LEFT JOIN products p ON sol.product_id = p.id
+                WHERE so.branch_id IS NULL
+                ORDER BY so.id DESC, sol.line_num ASC;
+            """)
         for r in rows:
             writer.writerow([
                 r['order_number'] or '',
@@ -503,26 +551,59 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
     return final_uom, display_qty, std_qty
 
 
-def erase_existing_data(data_type_key):
+def erase_existing_data(data_type_key, branch_id=None):
     """
-    Safely deletes all records for the chosen data type before importing.
-    Handles cascading relationships and foreign key constraints cleanly.
+    Safely deletes records for the chosen data type before importing.
+    Handles cascading relationships and branch isolation cleanly.
     """
     key = data_type_key.lower().strip()
+    bid = None
+    if branch_id is not None and str(branch_id).strip().lower() not in ('all', '', 'none'):
+        try:
+            bid = int(branch_id)
+        except (ValueError, TypeError):
+            bid = None
+
     with get_db_cursor(commit=True) as cur:
         if key == 'sales_order':
-            cur.execute("DELETE FROM order_payments WHERE order_type = 'SO';")
-            cur.execute("DELETE FROM sales_order_lines;")
-            cur.execute("DELETE FROM sales_orders;")
-            cur.execute("ALTER SEQUENCE IF EXISTS sales_orders_id_seq RESTART WITH 1;")
-            logger.info("Erased all sales_orders, sales_order_lines, and SO payments.")
+            if bid is not None:
+                cur.execute("""
+                    DELETE FROM order_payments 
+                    WHERE order_type = 'SO' 
+                      AND order_id IN (SELECT id FROM sales_orders WHERE branch_id = %s);
+                """, (bid,))
+                cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id IN (SELECT id FROM sales_orders WHERE branch_id = %s);", (bid,))
+                cur.execute("DELETE FROM sales_orders WHERE branch_id = %s;", (bid,))
+                logger.info(f"Erased sales_orders, sales_order_lines, and SO payments for Branch ID {bid}.")
+            else:
+                cur.execute("""
+                    DELETE FROM order_payments 
+                    WHERE order_type = 'SO' 
+                      AND order_id IN (SELECT id FROM sales_orders WHERE branch_id IS NULL);
+                """)
+                cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id IN (SELECT id FROM sales_orders WHERE branch_id IS NULL);")
+                cur.execute("DELETE FROM sales_orders WHERE branch_id IS NULL;")
+                logger.info("Erased sales_orders, sales_order_lines, and SO payments for Main HQ (branch_id IS NULL).")
 
         elif key == 'purchase_order':
-            cur.execute("DELETE FROM order_payments WHERE order_type = 'PO';")
-            cur.execute("DELETE FROM purchase_order_lines;")
-            cur.execute("DELETE FROM purchase_orders;")
-            cur.execute("ALTER SEQUENCE IF EXISTS purchase_orders_id_seq RESTART WITH 1;")
-            logger.info("Erased all purchase_orders, purchase_order_lines, and PO payments.")
+            if bid is not None:
+                cur.execute("""
+                    DELETE FROM order_payments 
+                    WHERE order_type = 'PO' 
+                      AND order_id IN (SELECT id FROM purchase_orders WHERE branch_id = %s);
+                """, (bid,))
+                cur.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id IN (SELECT id FROM purchase_orders WHERE branch_id = %s);", (bid,))
+                cur.execute("DELETE FROM purchase_orders WHERE branch_id = %s;", (bid,))
+                logger.info(f"Erased purchase_orders for Branch ID {bid}.")
+            else:
+                cur.execute("""
+                    DELETE FROM order_payments 
+                    WHERE order_type = 'PO' 
+                      AND order_id IN (SELECT id FROM purchase_orders WHERE branch_id IS NULL);
+                """)
+                cur.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id IN (SELECT id FROM purchase_orders WHERE branch_id IS NULL);")
+                cur.execute("DELETE FROM purchase_orders WHERE branch_id IS NULL;")
+                logger.info("Erased purchase_orders for Main HQ.")
 
         elif key == 'product':
             # Detach product foreign keys that have RESTRICT rules
@@ -542,10 +623,14 @@ def erase_existing_data(data_type_key):
             logger.info("Erased all products, inventory, and product pricing/vendors.")
 
         elif key == 'customer':
-            cur.execute("UPDATE sales_orders SET customer_id = NULL;")
-            cur.execute("DELETE FROM customers;")
-            cur.execute("ALTER SEQUENCE IF EXISTS customers_id_seq RESTART WITH 1;")
-            logger.info("Erased all customers.")
+            if bid is not None:
+                cur.execute("UPDATE sales_orders SET customer_id = NULL WHERE branch_id = %s;", (bid,))
+                cur.execute("DELETE FROM customers WHERE branch_id = %s;", (bid,))
+                logger.info(f"Erased all customers for Branch ID {bid}.")
+            else:
+                cur.execute("UPDATE sales_orders SET customer_id = NULL WHERE branch_id IS NULL;")
+                cur.execute("DELETE FROM customers WHERE branch_id IS NULL;")
+                logger.info("Erased all customers for Main HQ (branch_id IS NULL).")
 
         elif key == 'vendor':
             cur.execute("UPDATE purchase_orders SET vendor_id = NULL;")
@@ -556,15 +641,29 @@ def erase_existing_data(data_type_key):
             logger.info("Erased all vendors.")
 
         elif key == 'inventory':
-            cur.execute("DELETE FROM inventory;")
-            cur.execute("DELETE FROM inventory_logs WHERE reference_type = 'CSV_IMPORT' OR movement_type = 'INITIAL';")
-            logger.info("Erased all inventory stock records.")
+            if bid is not None:
+                b_row = query_one("SELECT location_id FROM branches WHERE id = %s", (bid,))
+                b_loc = b_row.get('location_id') if b_row else None
+                if b_loc:
+                    cur.execute("DELETE FROM inventory WHERE location_id = %s;", (b_loc,))
+                    cur.execute("DELETE FROM inventory_logs WHERE to_location_id = %s OR from_location_id = %s;", (b_loc, b_loc))
+            else:
+                cur.execute("DELETE FROM inventory;")
+                cur.execute("DELETE FROM inventory_logs WHERE reference_type = 'CSV_IMPORT' OR movement_type = 'INITIAL';")
+            logger.info("Erased inventory stock records.")
 
 
-def preview_import_data(data_type, file_content, has_headers=True, import_mode='keep'):
+def preview_import_data(data_type, file_content, has_headers=True, import_mode='keep', branch_id=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
     
+    bid = None
+    if branch_id is not None and str(branch_id).strip().lower() not in ('all', '', 'none'):
+        try:
+            bid = int(branch_id)
+        except (ValueError, TypeError):
+            bid = None
+
     preview_limit = 6
     preview = data_rows[:preview_limit]
     
@@ -575,7 +674,8 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
         'expected_headers': meta['headers'],
         'preview_rows': preview,
         'total_rows': len(data_rows),
-        'import_mode': import_mode
+        'import_mode': import_mode,
+        'branch_id': bid
     }
 
     # For Sales Orders and Purchase Orders, group rows by order number
@@ -598,9 +698,15 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
         existing_order_nums = set()
         try:
             if key == 'sales_order':
-                rows = query_all("SELECT order_number FROM sales_orders WHERE order_number IS NOT NULL;")
+                if bid is not None:
+                    rows = query_all("SELECT order_number FROM sales_orders WHERE branch_id = %s AND order_number IS NOT NULL;", (bid,))
+                else:
+                    rows = query_all("SELECT order_number FROM sales_orders WHERE branch_id IS NULL AND order_number IS NOT NULL;")
             else:
-                rows = query_all("SELECT order_number FROM purchase_orders WHERE order_number IS NOT NULL;")
+                if bid is not None:
+                    rows = query_all("SELECT order_number FROM purchase_orders WHERE branch_id = %s AND order_number IS NOT NULL;", (bid,))
+                else:
+                    rows = query_all("SELECT order_number FROM purchase_orders WHERE branch_id IS NULL AND order_number IS NOT NULL;")
             for r in (rows or []):
                 if r.get('order_number'):
                     existing_order_nums.add(str(r['order_number']).strip().lower())
@@ -693,9 +799,16 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
     return result
 
 
-def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep', selected_orders=None, selected_rows=None):
+def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep', selected_orders=None, selected_rows=None, branch_id=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
+
+    bid = None
+    if branch_id is not None and str(branch_id).strip().lower() not in ('all', '', 'none'):
+        try:
+            bid = int(branch_id)
+        except (ValueError, TypeError):
+            bid = None
 
     if not data_rows:
         return {
@@ -710,7 +823,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
     is_erase_mode = (str(import_mode).lower().strip() == 'erase')
     if is_erase_mode:
         try:
-            erase_existing_data(key)
+            erase_existing_data(key, branch_id=bid)
         except Exception as e:
             logger.error(f"Failed to erase existing data for {key}: {e}", exc_info=True)
             return {
@@ -854,7 +967,10 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
     # 2. CUSTOMER IMPORT
     # =========================================================================
     elif key == 'customer':
-        cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers;")}
+        if bid is not None:
+            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id = %s;", (bid,))}
+        else:
+            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id IS NULL;")}
         with get_db_cursor(commit=True) as cur:
             for row_idx, r in enumerate(data_rows, start=2 if has_headers else 1):
                 name = get_val(r, ['Customer Name', 'CustomerName', 'Customer', 'Name', 'Company Name'])
@@ -884,16 +1000,17 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             city = COALESCE(NULLIF(%s, ''), city),
                             country = COALESCE(NULLIF(%s, ''), country),
                             payment_terms = COALESCE(NULLIF(%s, ''), payment_terms),
+                            branch_id = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
-                    """, (contact, phone, email, address, city, country, terms, existing_id))
+                    """, (contact, phone, email, address, city, country, terms, bid, existing_id))
                     updated_cnt += 1
                 else:
                     cur.execute("""
-                        INSERT INTO customers (name, contact_name, phone, email, address1, city, country, payment_terms, is_active)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                        INSERT INTO customers (name, contact_name, phone, email, address1, city, country, payment_terms, branch_id, is_active)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                         RETURNING id;
-                    """, (name, contact, phone, email, address, city, country, terms))
+                    """, (name, contact, phone, email, address, city, country, terms, bid))
                     new_id = cur.fetchone()['id']
                     cust_map[name.lower().strip()] = new_id
                     imported_cnt += 1
@@ -1054,7 +1171,10 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             orders_map = filtered_orders
 
         # Cache existing customers, products, and locations
-        cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers;")}
+        if bid is not None:
+            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id = %s;", (bid,))}
+        else:
+            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id IS NULL;")}
         prod_map = {}
         for p in query_all("""
             SELECT id, sku, name, default_price, standard_cost, average_cost, uom,
@@ -1081,11 +1201,11 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     cust_id = cust_map[cn_clean]
                 else:
                     cur.execute("""
-                        INSERT INTO customers (name, contact_name, phone, email, address1, city, country, payment_terms, is_active)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                        INSERT INTO customers (name, contact_name, phone, email, address1, city, country, payment_terms, branch_id, is_active)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                         RETURNING id;
                     """, (cust_name, order_data['contact_name'], order_data['phone'], order_data['email'],
-                          order_data['address'], order_data['city'], order_data['country'], order_data['payment_terms']))
+                          order_data['address'], order_data['city'], order_data['country'], order_data['payment_terms'], bid))
                     cust_id = cur.fetchone()['id']
                     cust_map[cn_clean] = cust_id
 
@@ -1101,6 +1221,9 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                                     (loc_name, loc_name.upper()[:10]))
                         loc_id = cur.fetchone()['id']
                         loc_map[ln_clean] = loc_id
+                elif bid is not None:
+                    branch_row = query_one("SELECT location_id FROM branches WHERE id = %s", (bid,))
+                    loc_id = branch_row.get('location_id') if branch_row else None
 
                 # Robust Date parsing
                 dt_order = parse_date_val(order_data['order_date_raw'])
@@ -1301,10 +1424,13 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     invoiced_date = dt_order or datetime.now()
 
                 # Upsert Sales Order
-                cur.execute("SELECT id FROM sales_orders WHERE order_number = %s;", (so_num,))
+                cur.execute("SELECT id, branch_id FROM sales_orders WHERE order_number = %s;", (so_num,))
                 existing_so = cur.fetchone()
 
                 if existing_so and not is_erase_mode:
+                    if existing_so.get('branch_id') != bid:
+                        errors.append(f"Order #{so_num}: Belongs to another branch or HQ. Cannot overwrite across branches.")
+                        continue
                     so_id = existing_so['id']
                     cur.execute("""
                         UPDATE sales_orders
@@ -1323,11 +1449,12 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             po_number = COALESCE(NULLIF(%s, ''), po_number),
                             notes = COALESCE(NULLIF(%s, ''), notes),
                             invoiced_date = %s,
+                            branch_id = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
                     """, (cust_id, loc_id, ord_date, due_date, so_status, payment_status,
                           calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
-                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, so_id))
+                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid, so_id))
                     cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = %s;", (so_id,))
                     updated_cnt += 1
                 else:
@@ -1335,13 +1462,14 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                         INSERT INTO sales_orders (
                             order_number, customer_id, location_id, order_date, due_date,
                             status, payment_status, subtotal, shipping_fee, total_amount,
-                            paid_amount, balance_due, sales_rep, po_number, notes, invoiced_date
+                            paid_amount, balance_due, sales_rep, po_number, notes, invoiced_date,
+                            branch_id
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id;
                     """, (so_num, cust_id, loc_id, ord_date, due_date, so_status, payment_status,
                           calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
-                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date))
+                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid))
                     so_id = cur.fetchone()['id']
                     imported_cnt += 1
 

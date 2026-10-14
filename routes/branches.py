@@ -156,6 +156,39 @@ def _get_central_location_id(cur=None):
 # 1. MAIN STORE BRANCH DIRECTORY & MANAGEMENT
 # ====================================================================
 
+@branches_bp.before_request
+def check_branch_route_access():
+    """
+    Enforces strict branch isolation across all branch routes:
+    - Branch users can only access their assigned branch (id == user_bid) and cannot access HQ branch directory.
+    - HQ (main_admin) can access all branches unrestricted.
+    """
+    user_role = session.get('role', 'branch_admin')
+    if user_role == 'main_admin':
+        return None  # HQ admin has unrestricted access to all branches
+
+    user_bid = session.get('branch_id')
+
+    # If branch user tries to view the overall branches directory (branches.list_branches)
+    if request.endpoint == 'branches.list_branches':
+        if user_bid:
+            return redirect(url_for('branches.branch_workspace', id=user_bid))
+        return redirect(url_for('sales_orders.list_orders'))
+
+    # If an id parameter is in view_args, verify it matches the user's assigned branch
+    if request.view_args and 'id' in request.view_args:
+        try:
+            target_bid = int(request.view_args['id'])
+            if user_bid and int(user_bid) != target_bid:
+                flash("You do not have permission to access another branch. / អ្នកមិនមានសិទ្ធិចូលមើលសាខាផ្សេងទេ", "warning")
+                if request.is_json:
+                    return jsonify({'error': 'Access denied: cannot access another branch'}), 403
+                return redirect(url_for('branches.branch_workspace', id=user_bid))
+        except (ValueError, TypeError):
+            pass
+
+    return None
+
 @branches_bp.route('/branches')
 def list_branches():
     """List all store branches with aggregated sales & expense performance."""
@@ -865,7 +898,7 @@ def branch_pos(id):
         ORDER BY p.name ASC
     """, (selected_wh_id,))
 
-    customers = query_all("SELECT id, name, phone, balance FROM customers WHERE is_active = TRUE ORDER BY name ASC")
+    customers = query_all("SELECT id, name, phone, balance FROM customers WHERE is_active = TRUE AND branch_id = %s ORDER BY name ASC", (id,))
 
     return render_template('branches/pos.html',
                            branch=branch,
@@ -1263,7 +1296,7 @@ def branch_customers(id):
     per_page = int(request.args.get('per_page', 25) or 25)
     offset = (page - 1) * per_page
 
-    # Overall KPI Stats
+    # Overall KPI Stats strictly scoped to this branch
     stats = query_one("""
         SELECT 
             COUNT(*) as total_all,
@@ -1271,8 +1304,8 @@ def branch_customers(id):
             COUNT(CASE WHEN balance > 0 THEN 1 END) as with_balance,
             COALESCE(SUM(CASE WHEN balance > 0 THEN balance ELSE 0 END), 0) as total_debt
         FROM customers
-        WHERE is_active = TRUE
-    """, (id,)) or {'total_all': 0, 'branch_registered': 0, 'with_balance': 0, 'total_debt': 0}
+        WHERE is_active = TRUE AND branch_id = %s
+    """, (id, id)) or {'total_all': 0, 'branch_registered': 0, 'with_balance': 0, 'total_debt': 0}
 
     # Branch orders impact on clients
     branch_orders_stats = query_one("""
@@ -1283,13 +1316,11 @@ def branch_customers(id):
         WHERE branch_id = %s AND status != 'CANCELLED'
     """, (id,)) or {'branch_active_clients': 0, 'branch_total_revenue': 0}
 
-    where_clauses = ["c.is_active = TRUE"]
-    count_params = []
+    # Branch can ONLY view their own branch customers - no mix with other branches or HQ!
+    where_clauses = ["c.is_active = TRUE", "c.branch_id = %s"]
+    count_params = [id]
 
-    if tab == 'branch':
-        where_clauses.append("c.branch_id = %s")
-        count_params.append(id)
-    elif tab == 'debt':
+    if tab == 'debt':
         where_clauses.append("c.balance > 0")
 
     if search:
@@ -1315,10 +1346,10 @@ def branch_customers(id):
         LEFT JOIN sales_orders so ON c.id = so.customer_id
         WHERE {where_sql}
         GROUP BY c.id, b.name, b.code
-        ORDER BY (CASE WHEN c.branch_id = %s THEN 0 ELSE 1 END), c.name ASC
+        ORDER BY c.name ASC
         LIMIT %s OFFSET %s
     """
-    rows_params = [id, id] + count_params + [id, per_page, offset]
+    rows_params = [id, id] + count_params + [per_page, offset]
     customers = query_all(list_sql, tuple(rows_params))
 
     pricing_schemes = query_all("SELECT id, name FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
@@ -1458,9 +1489,9 @@ def branch_edit_customer(id, cust_id):
                 default_pricing_scheme_id = %s,
                 payment_terms = %s,
                 updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s
+            WHERE id = %s AND branch_id = %s
         """, (name, contact_name, phone, email, address1, city, shipping_address, billing_address,
-              discount_percent, pricing_scheme_id, payment_terms, cust_id))
+              discount_percent, pricing_scheme_id, payment_terms, cust_id, id))
 
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': True, 'message': f"Customer '{name}' updated successfully!"})
@@ -1477,12 +1508,12 @@ def branch_edit_customer(id, cust_id):
 def branch_customers_search_api(id):
     """JSON API to search customers for POS and Sales Order live autocomplete."""
     q = request.args.get('q', '').strip()
-    where_sql = "WHERE is_active = TRUE"
-    params = []
+    where_sql = "WHERE is_active = TRUE AND branch_id = %s"
+    params = [id]
     if q:
         where_sql += " AND (name ILIKE %s OR phone ILIKE %s OR contact_name ILIKE %s)"
         sp = f"%{q}%"
-        params = [sp, sp, sp]
+        params.extend([sp, sp, sp])
 
     custs = query_all(f"""
         SELECT id, name, phone, contact_name, balance, discount_percent, default_pricing_scheme_id, branch_id
@@ -2185,7 +2216,7 @@ def branch_import_csv(id, import_type):
                     address = row[header_map['cust_address']].strip() if 'cust_address' in header_map and len(row) > header_map['cust_address'] else ''
                     city = row[header_map['cust_city']].strip() if 'cust_city' in header_map and len(row) > header_map['cust_city'] else 'Phnom Penh'
 
-                    cur.execute("SELECT id FROM customers WHERE UPPER(name) = UPPER(%s)", (cust_name,))
+                    cur.execute("SELECT id FROM customers WHERE UPPER(name) = UPPER(%s) AND branch_id = %s", (cust_name, id))
                     exist_cust = cur.fetchone()
                     if exist_cust:
                         cur.execute("""
@@ -2195,9 +2226,10 @@ def branch_import_csv(id, import_type):
                                 email = COALESCE(NULLIF(%s, ''), email),
                                 address1 = COALESCE(NULLIF(%s, ''), address1),
                                 city = COALESCE(NULLIF(%s, ''), city),
+                                branch_id = %s,
                                 updated_at = CURRENT_TIMESTAMP
                             WHERE id = %s
-                        """, (contact, phone, email, address, city, exist_cust['id']))
+                        """, (contact, phone, email, address, city, id, exist_cust['id']))
                         updated += 1
                     else:
                         cur.execute("""

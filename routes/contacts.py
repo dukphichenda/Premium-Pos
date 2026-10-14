@@ -6,6 +6,10 @@ contacts_bp = Blueprint('contacts', __name__)
 
 @contacts_bp.route('/customers')
 def list_customers():
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 25))
     offset = (page - 1) * per_page
@@ -13,6 +17,29 @@ def list_customers():
 
     where_clauses = ["c.is_active = TRUE"]
     params = []
+
+    # Branch Isolation: Branch users can ONLY view their own branch!
+    # HQ (main_admin) can see all, or filter by Main Store (main) or specific branch ID.
+    if not is_main_admin:
+        if user_bid:
+            where_clauses.append("c.branch_id = %s")
+            params.append(int(user_bid))
+        else:
+            where_clauses.append("c.branch_id IS NULL")
+        current_branch_param = str(user_bid or 'main')
+        branches = []
+    else:
+        branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        raw_branch = request.args.get('branch', 'all').strip().lower()
+        if raw_branch == 'main':
+            where_clauses.append("c.branch_id IS NULL")
+            current_branch_param = 'main'
+        elif raw_branch.isdigit():
+            where_clauses.append("c.branch_id = %s")
+            params.append(int(raw_branch))
+            current_branch_param = raw_branch
+        else:
+            current_branch_param = 'all'  # HQ sees all!
 
     if search:
         where_clauses.append("(c.name ILIKE %s OR c.phone ILIKE %s OR c.contact_name ILIKE %s)")
@@ -28,13 +55,16 @@ def list_customers():
     list_sql = f"""
         SELECT 
             c.*,
+            b.name as branch_name,
+            b.code as branch_code,
             COUNT(so.id) as order_count,
             COALESCE(SUM(so.total_amount), 0) as total_spent,
             COALESCE(SUM(so.balance_due), 0) as open_balance
         FROM customers c
+        LEFT JOIN branches b ON c.branch_id = b.id
         LEFT JOIN sales_orders so ON c.id = so.customer_id AND so.status != 'CANCELLED'
         WHERE {where_sql}
-        GROUP BY c.id
+        GROUP BY c.id, b.name, b.code
         ORDER BY c.name ASC
         LIMIT %s OFFSET %s
     """
@@ -51,11 +81,20 @@ def list_customers():
                            per_page=per_page,
                            total_count=total_count,
                            total_pages=total_pages,
-                           pricing_schemes=pricing_schemes)
+                           pricing_schemes=pricing_schemes,
+                           branches=branches,
+                           current_branch_param=current_branch_param,
+                           is_main_admin=is_main_admin)
 
 @contacts_bp.route('/customers/new')
 def new_customer():
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
     pricing_schemes = query_all("SELECT id, name FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
+    branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC") if is_main_admin else []
+    
     customer = {
         'id': 0,
         'name': '',
@@ -70,46 +109,88 @@ def new_customer():
         'billing_address': '',
         'default_pricing_scheme_id': 100,
         'discount_percent': 0.0,
-        'payment_terms': 'Due on Receipt'
+        'payment_terms': 'Due on Receipt',
+        'branch_id': user_bid if not is_main_admin else None
     }
     return render_template('contacts/customer_detail.html',
                            customer=customer,
                            orders=[],
                            pricing_schemes=pricing_schemes,
+                           branches=branches,
+                           is_main_admin=is_main_admin,
                            is_new=True)
 
 @contacts_bp.route('/customers/<int:id>')
 def detail_customer(id):
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
     customer = query_one("""
-        SELECT *, 
-               COALESCE(NULLIF(address1, ''), NULLIF(shipping_address, ''), '') as display_address 
-        FROM customers 
-        WHERE id = %s
+        SELECT c.*, 
+               b.name as branch_name, b.code as branch_code,
+               COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), '') as display_address 
+        FROM customers c
+        LEFT JOIN branches b ON c.branch_id = b.id
+        WHERE c.id = %s
     """, (id,))
     if not customer:
         flash("Customer not found.", "error")
         return redirect(url_for('contacts.list_customers'))
 
-    orders = query_all("""
-        SELECT so.*, l.name as location_name
-        FROM sales_orders so
-        LEFT JOIN locations l ON so.location_id = l.id
-        WHERE so.customer_id = %s
-        ORDER BY so.order_date DESC, so.id DESC
-        LIMIT 50
-    """, (id,))
+    # Security rule: Branch user can ONLY view their own branch's customers
+    if not is_main_admin:
+        if customer.get('branch_id') != user_bid:
+            flash("🔒 Access Denied: You do not have permission to view customers outside your branch. / សិទ្ធិត្រូវបានកំណត់៖ អ្នកអាចមើលបានតែអតិថិជនក្នុងសាខារបស់អ្នកប៉ុណ្ណោះ", "error")
+            return redirect(url_for('contacts.list_customers'))
+
+    if not is_main_admin and user_bid:
+        orders = query_all("""
+            SELECT so.*, l.name as location_name
+            FROM sales_orders so
+            LEFT JOIN locations l ON so.location_id = l.id
+            WHERE so.customer_id = %s AND so.branch_id = %s
+            ORDER BY so.order_date DESC, so.id DESC
+            LIMIT 50
+        """, (id, user_bid))
+    else:
+        orders = query_all("""
+            SELECT so.*, l.name as location_name
+            FROM sales_orders so
+            LEFT JOIN locations l ON so.location_id = l.id
+            WHERE so.customer_id = %s
+            ORDER BY so.order_date DESC, so.id DESC
+            LIMIT 50
+        """, (id,))
 
     pricing_schemes = query_all("SELECT id, name FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
+    branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC") if is_main_admin else []
 
     return render_template('contacts/customer_detail.html',
                            customer=customer,
                            orders=orders,
                            pricing_schemes=pricing_schemes,
+                           branches=branches,
+                           is_main_admin=is_main_admin,
                            is_new=False)
 
 @contacts_bp.route('/customers/<int:id>/save', methods=['POST'])
 def save_customer(id):
     try:
+        user_role = session.get('role', 'branch_admin')
+        user_bid = session.get('branch_id')
+        is_main_admin = (user_role == 'main_admin')
+
+        existing = query_one("SELECT id, branch_id FROM customers WHERE id = %s", (id,))
+        if not existing:
+            flash("Customer not found.", "error")
+            return redirect(url_for('contacts.list_customers'))
+
+        # Security check: Branch user cannot edit other branch or HQ customers
+        if not is_main_admin and existing.get('branch_id') != user_bid:
+            flash("🔒 Permission denied: Cannot edit customers of other branches or HQ.", "error")
+            return redirect(url_for('contacts.list_customers'))
+
         name = request.form.get('name', '').strip()
         contact_name = request.form.get('contact_name', '').strip()
         phone = request.form.get('phone', '').strip()
@@ -122,6 +203,12 @@ def save_customer(id):
         discount_percent = float(request.form.get('discount_percent', 0) or 0)
         pricing_scheme_id = int(request.form.get('default_pricing_scheme_id') or 0) or None
         payment_terms = request.form.get('payment_terms', 'Due on Receipt').strip()
+
+        if is_main_admin:
+            raw_b = request.form.get('branch_id')
+            target_branch_id = int(raw_b) if raw_b and str(raw_b).isdigit() else None
+        else:
+            target_branch_id = user_bid
 
         if not name:
             flash("Customer Name is required.", "error")
@@ -141,9 +228,10 @@ def save_customer(id):
                 default_pricing_scheme_id = %s,
                 discount_percent = %s,
                 payment_terms = %s,
+                branch_id = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (name, contact_name, phone, fax, email, website, address1, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, id))
+        """, (name, contact_name, phone, fax, email, website, address1, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, target_branch_id, id))
 
         flash(f"Customer '{name}' saved successfully!", "success")
         return redirect(url_for('contacts.detail_customer', id=id))
@@ -155,6 +243,10 @@ def save_customer(id):
 @contacts_bp.route('/customers/create', methods=['POST'])
 def create_customer():
     try:
+        user_role = session.get('role', 'branch_admin')
+        user_bid = session.get('branch_id')
+        is_main_admin = (user_role == 'main_admin')
+
         name = request.form.get('name', '').strip()
         contact_name = request.form.get('contact_name', '').strip()
         phone = request.form.get('phone', '').strip()
@@ -172,8 +264,11 @@ def create_customer():
             flash("Customer Name is required.", "error")
             return redirect(url_for('contacts.list_customers'))
 
-        branch_id = request.form.get('branch_id') or session.get('active_branch_id')
-        branch_id = int(branch_id) if branch_id else None
+        if is_main_admin:
+            raw_b = request.form.get('branch_id') or session.get('active_branch_id')
+            branch_id = int(raw_b) if raw_b and str(raw_b).isdigit() else None
+        else:
+            branch_id = user_bid
 
         new_id = execute_returning_id("""
             INSERT INTO customers (
@@ -195,8 +290,20 @@ def create_customer():
 @contacts_bp.route('/customers/<int:id>/delete', methods=['POST'])
 def delete_customer(id):
     try:
-        customer = query_one("SELECT name FROM customers WHERE id = %s", (id,))
-        cust_name = customer['name'] if customer else f"#{id}"
+        user_role = session.get('role', 'branch_admin')
+        user_bid = session.get('branch_id')
+        is_main_admin = (user_role == 'main_admin')
+
+        customer = query_one("SELECT name, branch_id FROM customers WHERE id = %s", (id,))
+        if not customer:
+            flash("Customer not found.", "error")
+            return redirect(url_for('contacts.list_customers'))
+
+        if not is_main_admin and customer.get('branch_id') != user_bid:
+            flash("🔒 Permission denied: Cannot delete customer belonging to another branch.", "error")
+            return redirect(url_for('contacts.list_customers'))
+
+        cust_name = customer['name'] or f"#{id}"
 
         # Check if customer has any sales orders
         order_count = query_one("SELECT COUNT(*) as count FROM sales_orders WHERE customer_id = %s", (id,))
@@ -261,14 +368,37 @@ def search_customers_json():
     if not query:
         return jsonify([])
 
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
+    where_clauses = ["is_active = TRUE", "(name ILIKE %s OR phone ILIKE %s)"]
     param = f"%{query}%"
-    results = query_all("""
-        SELECT id, name, phone, email, address1, city, discount_percent
+    params = [param, param]
+
+    if not is_main_admin:
+        if user_bid:
+            where_clauses.append("branch_id = %s")
+            params.append(int(user_bid))
+        else:
+            where_clauses.append("branch_id IS NULL")
+    else:
+        req_b = request.args.get('branch_id') or session.get('active_branch_id')
+        if req_b and str(req_b).strip().lower() == 'main':
+            where_clauses.append("branch_id IS NULL")
+        elif req_b and str(req_b).strip().isdigit():
+            where_clauses.append("branch_id = %s")
+            params.append(int(req_b))
+        # If 'all' or empty, HQ sees all!
+
+    where_sql = " AND ".join(where_clauses)
+    results = query_all(f"""
+        SELECT id, name, phone, email, address1, city, discount_percent, branch_id
         FROM customers
-        WHERE is_active = TRUE AND (name ILIKE %s OR phone ILIKE %s)
+        WHERE {where_sql}
         ORDER BY name ASC
         LIMIT 20
-    """, (param, param))
+    """, tuple(params))
 
     return jsonify([dict(r) for r in results])
 
@@ -276,6 +406,10 @@ def search_customers_json():
 @contacts_bp.route('/api/customers/quick-add', methods=['POST'])
 def quick_add_customer_ajax():
     try:
+        user_role = session.get('role', 'branch_admin')
+        user_bid = session.get('branch_id')
+        is_main_admin = (user_role == 'main_admin')
+
         data = request.get_json(silent=True) or request.form
         name = (data.get('name') or '').strip()
         contact_name = (data.get('contact_name') or '').strip()
@@ -286,14 +420,17 @@ def quick_add_customer_ajax():
         if not name:
             return jsonify({'success': False, 'message': 'Customer name is required'}), 400
 
-        branch_id = data.get('branch_id') or session.get('active_branch_id')
-        if branch_id and str(branch_id).lower() not in ('main', 'none', ''):
-            try:
-                branch_id = int(branch_id)
-            except (ValueError, TypeError):
-                branch_id = None
+        if not is_main_admin:
+            branch_id = user_bid
         else:
-            branch_id = None
+            raw_b = data.get('branch_id') or session.get('active_branch_id')
+            if raw_b and str(raw_b).lower() not in ('main', 'none', '', 'all'):
+                try:
+                    branch_id = int(raw_b)
+                except (ValueError, TypeError):
+                    branch_id = None
+            else:
+                branch_id = None
 
         new_id = execute_returning_id("""
             INSERT INTO customers (
@@ -310,7 +447,8 @@ def quick_add_customer_ajax():
             'phone': phone,
             'address': address,
             'address1': address,
-            'pricing_scheme_id': pricing_scheme_id
+            'pricing_scheme_id': pricing_scheme_id,
+            'branch_id': branch_id
         }
 
         return jsonify({'success': True, 'customer': customer})
@@ -323,6 +461,10 @@ def print_customer_label(id):
     from datetime import date
     from routes.settings import get_invoice_settings
     
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
     customer = query_one("""
         SELECT *, 
                COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), '') as display_address 
@@ -331,6 +473,10 @@ def print_customer_label(id):
     """, (id,))
     if not customer:
         flash("Customer not found.", "error")
+        return redirect(url_for('contacts.list_customers'))
+
+    if not is_main_admin and customer.get('branch_id') != user_bid:
+        flash("🔒 Access Denied: You cannot print label for customers outside your branch.", "error")
         return redirect(url_for('contacts.list_customers'))
     
     company = query_one("SELECT * FROM companies LIMIT 1") or {}

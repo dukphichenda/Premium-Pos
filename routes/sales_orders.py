@@ -6,6 +6,28 @@ from routes.auth import user_can_edit_prices, user_can_view_costs
 
 sales_orders_bp = Blueprint('sales_orders', __name__)
 
+def _is_main_admin():
+    return session.get('role') == 'main_admin'
+
+def _get_user_branch_id():
+    bid = session.get('branch_id') or session.get('active_branch_id')
+    if bid and str(bid).isdigit():
+        return int(bid)
+    return None
+
+def _check_order_branch_access(order):
+    """
+    Enforces multi-branch isolation on sales orders:
+    - Main store HQ admin (role == 'main_admin') has unrestricted visibility and rights across all orders.
+    - Branch users (branch_admin, branch_cashier) are strictly locked to orders of their own branch.
+    """
+    if _is_main_admin():
+        return True
+    user_bid = _get_user_branch_id()
+    if not user_bid:
+        return False
+    return order.get('branch_id') == user_bid
+
 def _match_uom(uom1, uom2):
     """Checks whether two UOM strings refer to the same unit (case vs cases, pack vs packs, pcs vs pcs.)."""
     if not uom1 or not uom2:
@@ -198,22 +220,34 @@ def _revert_order_stock(cur, location_id, product_id, qty, was_shipped=False):
 @sales_orders_bp.route('/sales')
 def list_orders():
     view_mode = request.args.get('view', '').strip()
-    session_branch_id = session.get('active_branch_id')
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
     raw_branch = request.args.get('branch')
-    if raw_branch is not None:
-        branch_filter = raw_branch.strip().lower()
-    elif session_branch_id:
-        branch_filter = str(session_branch_id)
+
+    if not is_main:
+        # Branch users are strictly locked to their assigned branch: cannot view HQ or other branches!
+        branch_filter = str(user_bid) if user_bid else 'main'
     else:
-        branch_filter = 'main'
+        # HQ (main_admin) can see all, main, or any specific branch
+        if raw_branch is not None:
+            branch_filter = raw_branch.strip().lower()
+        elif session.get('active_branch_id'):
+            branch_filter = str(session.get('active_branch_id'))
+        else:
+            branch_filter = 'all'  # HQ default overview: sees all orders
 
     if view_mode != 'table' and not request.args.get('search') and not request.args.get('status') and not request.args.get('page') and raw_branch is None:
-        if session_branch_id:
-            latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (int(session_branch_id),))
+        if not is_main:
+            if user_bid:
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,))
+            else:
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+            if latest:
+                return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
         else:
-            latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
-        if latest:
-            return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
+            latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
+            if latest:
+                return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
 
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 25))
@@ -331,7 +365,12 @@ def list_orders():
     status_counts = query_all(status_sql, tuple(status_p))
     stats_dict = {r['norm_status']: r['cnt'] for r in status_counts}
 
-    branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+    if is_main:
+        branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+    else:
+        branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,))
+
+    current_branch = query_one("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,)) if user_bid else None
 
     return render_template('sales/list.html',
                            orders=orders,
@@ -344,12 +383,24 @@ def list_orders():
                            total_pages=total_pages,
                            stats_dict=stats_dict,
                            branches=branches,
-                           branch_filter=branch_filter)
+                           branch_filter=branch_filter,
+                           is_branch_user=(not is_main),
+                           current_branch=current_branch)
 
 @sales_orders_bp.route('/sales/create', methods=['GET', 'POST'])
 def create_order():
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+    branch_id = user_bid if not is_main else None
+
     if request.method == 'GET':
-        customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE ORDER BY name LIMIT 500")
+        if not is_main:
+            if user_bid:
+                customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE AND branch_id = %s ORDER BY name LIMIT 500", (user_bid,))
+            else:
+                customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE AND branch_id IS NULL ORDER BY name LIMIT 500")
+        else:
+            customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE ORDER BY name LIMIT 500")
         locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
         return render_template('sales/create.html', customers=customers, locations=locations)
 
@@ -386,7 +437,7 @@ def create_order():
             return redirect(url_for('sales_orders.create_order'))
 
         # Generate unique order number auto-generated from last SO
-        order_number = get_next_order_number('SO')
+        order_number = get_next_order_number('SO', branch_id=branch_id)
 
         # Calculate totals & validate items
         subtotal = 0.0
@@ -440,14 +491,14 @@ def create_order():
                     order_number, customer_id, location_id, order_date,
                     status, payment_status, subtotal, tax_rate, tax_amount,
                     discount_amount, shipping_fee, total_amount, paid_amount, balance_due,
-                    sales_rep, notes
-                ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', %s, %s, %s, %s, %s, %s, 0, %s, %s, %s)
+                    sales_rep, notes, branch_id
+                ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s)
                 RETURNING id;
             """, (
                 order_number, customer_id, location_id, order_date,
                 subtotal, tax_rate, tax_amount,
                 discount_amount, shipping_fee, total_amount, balance_due,
-                sales_rep, notes
+                sales_rep, notes, branch_id
             ))
             order_id = cur.fetchone()['id']
 
@@ -484,21 +535,31 @@ def create_order():
         return redirect(url_for('sales_orders.create_order'))
 
 def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None):
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
     drawer_where = ["1=1"]
     drawer_params = []
 
     # Branch isolation: drawer sidebar strictly isolates branch orders vs main store orders
-    if branch_id is None or str(branch_id).lower() == 'main':
-        drawer_where.append("so.branch_id IS NULL")
-    elif str(branch_id).lower() == 'all':
-        pass
-    else:
-        try:
-            bid = int(branch_id)
+    if not is_main:
+        if user_bid:
             drawer_where.append("so.branch_id = %s")
-            drawer_params.append(bid)
-        except (ValueError, TypeError):
+            drawer_params.append(user_bid)
+        else:
             drawer_where.append("so.branch_id IS NULL")
+    else:
+        if branch_id is None or str(branch_id).lower() == 'main':
+            drawer_where.append("so.branch_id IS NULL")
+        elif str(branch_id).lower() == 'all':
+            pass
+        else:
+            try:
+                bid = int(branch_id)
+                drawer_where.append("so.branch_id = %s")
+                drawer_params.append(bid)
+            except (ValueError, TypeError):
+                drawer_where.append("so.branch_id IS NULL")
 
     # Filter drawer orders
     if customer_search:
@@ -602,16 +663,37 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     """
     sidebar_orders = query_all(drawer_sql, tuple(drawer_params))
 
-    all_customers = query_all("""
+    cust_where = ["is_active = TRUE"]
+    cust_params = []
+    if not is_main:
+        if user_bid:
+            cust_where.append("branch_id = %s")
+            cust_params.append(user_bid)
+        else:
+            cust_where.append("branch_id IS NULL")
+    else:
+        if str(branch_id).lower() == 'main':
+            cust_where.append("branch_id IS NULL")
+        elif str(branch_id).lower() == 'all':
+            pass
+        elif branch_id is not None:
+            try:
+                bid = int(branch_id)
+                cust_where.append("branch_id = %s")
+                cust_params.append(bid)
+            except (ValueError, TypeError):
+                cust_where.append("branch_id IS NULL")
+
+    all_customers = query_all(f"""
         SELECT 
-            id, name, contact_name, phone, 
+            id, name, contact_name, phone, branch_id,
             COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as customer_address,
             COALESCE(NULLIF(address1, ''), NULLIF(shipping_address, ''), '') as address1,
             balance 
         FROM customers 
-        WHERE is_active = TRUE 
+        WHERE {' AND '.join(cust_where)}
         ORDER BY name ASC
-    """)
+    """, tuple(cust_params))
     all_locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY id")
     pricing_schemes = query_all("SELECT id, name, is_active FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
     if not pricing_schemes:
@@ -649,7 +731,10 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     """, (scheme_id,))
 
     company = query_one("SELECT * FROM companies LIMIT 1")
-    all_branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+    if is_main:
+        all_branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+    else:
+        all_branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,))
     all_delivery_men = query_all("SELECT id, name, phone FROM delivery_men WHERE is_active = TRUE ORDER BY name ASC")
 
     return {
@@ -1024,18 +1109,24 @@ def delete_delivery_man(id):
 
 @sales_orders_bp.route('/sales/new')
 def new_order():
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
     # Resolve active branch context
-    branch_param = request.args.get('branch')
-    session_branch_id = session.get('active_branch_id')
-    branch_id = None
-    if session_branch_id:
-        try:
-            branch_id = int(session_branch_id)
-        except (ValueError, TypeError):
-            branch_id = None
-    elif branch_param:
-        if str(branch_param).lower() not in ('main', 'all', 'none', '') and str(branch_param).isdigit():
-            branch_id = int(branch_param)
+    if not is_main:
+        branch_id = user_bid
+    else:
+        branch_param = request.args.get('branch')
+        session_branch_id = session.get('active_branch_id')
+        branch_id = None
+        if branch_param:
+            if str(branch_param).lower() not in ('main', 'all', 'none', '') and str(branch_param).isdigit():
+                branch_id = int(branch_param)
+        elif session_branch_id:
+            try:
+                branch_id = int(session_branch_id)
+            except (ValueError, TypeError):
+                branch_id = None
 
     branch = query_one("SELECT * FROM branches WHERE id = %s", (branch_id,)) if branch_id else None
 
@@ -1260,15 +1351,17 @@ def new_order():
 
     customer_filter = request.args.get('customer_id')
 
-    if branch:
+    if not is_main:
+        req_branch = str(user_bid) if user_bid else 'main'
+    elif branch:
         req_branch = str(branch['id'])
     elif 'branch' in request.args:
-        req_branch = request.args.get('branch') or 'main'
+        req_branch = request.args.get('branch') or 'all'
         session['so_branch_filter'] = req_branch
     elif 'so_branch_filter' in session:
         req_branch = session['so_branch_filter']
     else:
-        req_branch = 'main'
+        req_branch = 'all'
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch)
 
@@ -1335,15 +1428,12 @@ def detail_order(id):
         flash("Order not found.", "error")
         return redirect(url_for('sales_orders.list_orders'))
 
-    session_bid = session.get('active_branch_id')
-    if session_bid:
-        try:
-            s_bid = int(session_bid)
-            if order.get('branch_id') != s_bid:
-                flash("You do not have permission to view orders from another store or Main Store.", "warning")
-                return redirect(url_for('branches.branch_orders', id=s_bid))
-        except (ValueError, TypeError):
-            pass
+    if not _check_order_branch_access(order):
+        flash("You do not have permission to view orders from another store or Main Store. / អ្នកមិនមានសិទ្ធិមើលការបញ្ជាទិញរបស់សាខាផ្សេង ឬហាងធំទេ", "warning")
+        user_bid = _get_user_branch_id()
+        if user_bid:
+            return redirect(url_for('branches.branch_orders', id=user_bid))
+        return redirect(url_for('sales_orders.list_orders'))
 
     lines = query_all("""
         SELECT 
@@ -1403,16 +1493,21 @@ def detail_order(id):
 
     customer_filter = request.args.get('customer_id')
 
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
     # Allow user to switch branch filter in drawer or default to the order's branch scope
-    if session_bid:
-        branch_scope = str(session_bid)
+    if not is_main:
+        branch_scope = str(user_bid) if user_bid else 'main'
     elif 'branch' in request.args:
-        branch_scope = request.args.get('branch') or 'main'
+        branch_scope = request.args.get('branch') or 'all'
         session['so_branch_filter'] = branch_scope
     elif 'so_branch_filter' in session:
         branch_scope = session['so_branch_filter']
+    elif session.get('active_branch_id'):
+        branch_scope = str(session.get('active_branch_id'))
     else:
-        default_branch = str(order['branch_id']) if order.get('branch_id') else 'main'
+        default_branch = str(order['branch_id']) if order.get('branch_id') else 'all'
         branch_scope = default_branch
 
     scheme_id = order.get('pricing_scheme_id') or 100
@@ -1612,22 +1707,41 @@ def save_order(id=0):
                 if lines_dict:
                     lines_data = [lines_dict[i] for i in sorted(lines_dict.keys())]
 
-        # Resolve branch context
+        # Resolve branch context & enforce branch isolation
+        is_main = _is_main_admin()
+        user_bid = _get_user_branch_id()
+
         if not is_new:
             # Existing sales orders maintain immutable branch ownership
             branch_id = order['branch_id']
+            if not _check_order_branch_access(order):
+                if request.is_json:
+                    return jsonify({'success': False, 'message': 'Access denied: Cannot edit order belonging to another branch.'}), 403
+                flash("Access denied: Cannot edit order belonging to another branch.", "error")
+                return redirect(url_for('sales_orders.list_orders'))
         else:
-            if session.get('active_branch_id'):
-                try:
-                    branch_id = int(session['active_branch_id'])
-                except (ValueError, TypeError):
-                    branch_id = None
+            if not is_main:
+                branch_id = user_bid
             else:
                 raw_b = data.get('branch_id') or request.form.get('branch_id') or data.get('branch') or request.form.get('branch')
                 if raw_b and str(raw_b).lower() not in ('main', 'all', 'none', '') and str(raw_b).isdigit():
                     branch_id = int(raw_b)
+                elif session.get('active_branch_id'):
+                    try:
+                        branch_id = int(session['active_branch_id'])
+                    except (ValueError, TypeError):
+                        branch_id = None
                 else:
                     branch_id = None
+
+        # Verify customer belongs to the target branch (prevent cross-branch customer assignment)
+        if customer_id and not is_main:
+            cust_check = query_one("SELECT branch_id FROM customers WHERE id = %s", (customer_id,))
+            if cust_check and cust_check.get('branch_id') != branch_id:
+                if request.is_json:
+                    return jsonify({'success': False, 'message': 'Access denied: Customer does not belong to your branch.'}), 403
+                flash("Access denied: Selected customer belongs to another branch.", "error")
+                return redirect(url_for('sales_orders.list_orders'))
 
         with get_db_cursor(commit=True) as cur:
             # Auto-save delivery personnel into delivery_men table so they are permanently saved in the list
@@ -1879,6 +1993,11 @@ def complete_pay(id):
             return jsonify({'success': False, 'message': 'Order not found'}), 404
         flash("Order not found.", "error")
         return redirect(url_for('sales_orders.list_orders'))
+    if not _check_order_branch_access(order):
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Access denied: Order belongs to another branch.'}), 403
+        flash("Access denied: Order belongs to another branch.", "error")
+        return redirect(url_for('sales_orders.list_orders'))
 
     data = request.get_json(silent=True) or request.form or {}
     payment_method = (data.get('payment_method') or order.get('payment_method') or 'Cash').strip()
@@ -1958,6 +2077,9 @@ def reopen_order(id):
     if not order:
         flash("Order not found.", "error")
         return redirect(url_for('sales_orders.list_orders'))
+    if not _check_order_branch_access(order):
+        flash("Access denied: Order belongs to another branch.", "error")
+        return redirect(url_for('sales_orders.list_orders'))
 
     with get_db_cursor(commit=True) as cur:
         # Reverse inventory movements: add back stock and re-reserve (handles kit components)
@@ -2018,6 +2140,18 @@ def reopen_order(id):
 
 @sales_orders_bp.route('/sales/<int:id>/cancel_order', methods=['POST'])
 def cancel_order_direct(id):
+    order = query_one("SELECT * FROM sales_orders WHERE id = %s", (id,))
+    if not order:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Order not found'}), 404
+        flash("Order not found.", "error")
+        return redirect(url_for('sales_orders.list_orders'))
+    if not _check_order_branch_access(order):
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Access denied: Order belongs to another branch.'}), 403
+        flash("Access denied: Order belongs to another branch.", "error")
+        return redirect(url_for('sales_orders.list_orders'))
+
     with get_db_cursor(commit=True) as cur:
         cur.execute("""
             UPDATE sales_orders
@@ -2060,6 +2194,11 @@ def delete_order(id):
         if request.is_json:
             return jsonify({'error': 'Order not found'}), 404
         flash("Order not found.", "error")
+        return redirect(url_for('sales_orders.list_orders', view='table'))
+    if not _check_order_branch_access(order):
+        if request.is_json:
+            return jsonify({'error': 'Access denied: Order belongs to another branch.'}), 403
+        flash("Access denied: Order belongs to another branch.", "error")
         return redirect(url_for('sales_orders.list_orders', view='table'))
 
     order_number = order['order_number']
@@ -2135,6 +2274,9 @@ def update_status(id):
     order = query_one("SELECT * FROM sales_orders WHERE id = %s", (id,))
     if not order:
         flash("Order not found.", "error")
+        return redirect(url_for('sales_orders.list_orders'))
+    if not _check_order_branch_access(order):
+        flash("Access denied: Order belongs to another branch.", "error")
         return redirect(url_for('sales_orders.list_orders'))
 
     allowed_statuses = ('PICKED', 'PACKED', 'SHIPPED', 'INVOICED', 'CANCELLED')
@@ -2285,6 +2427,9 @@ def record_payment(id):
         if not order:
             flash("Order not found.", "error")
             return redirect(url_for('sales_orders.list_orders'))
+        if not _check_order_branch_access(order):
+            flash("Access denied: Order belongs to another branch.", "error")
+            return redirect(url_for('sales_orders.list_orders'))
 
         if order['status'] == 'CANCELLED':
             flash("Cannot record payment for a cancelled order.", "error")
@@ -2368,6 +2513,8 @@ def print_invoice(id):
 
     if not order:
         return "Order not found", 404
+    if not _check_order_branch_access(order):
+        return "Access denied: Order belongs to another branch.", 403
 
     lines = query_all("""
         SELECT 
@@ -2559,6 +2706,10 @@ def delete_delivery_service(id):
 
 @sales_orders_bp.route('/sales/<int:id>/update-shipping', methods=['POST'])
 def update_sales_shipping(id):
+    order = query_one("SELECT * FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'message': 'Access denied or order not found'}), 403
+
     data = request.get_json(silent=True) or request.form
     carrier = (data.get('carrier') or '').strip()
     province = (data.get('destination_province') or '').strip()
@@ -2583,6 +2734,10 @@ def update_sales_shipping(id):
 @sales_orders_bp.route('/sales/<int:id>/update-delivery', methods=['POST'])
 def update_sales_delivery(id):
     try:
+        order = query_one("SELECT * FROM sales_orders WHERE id = %s", (id,))
+        if not order or not _check_order_branch_access(order):
+            return jsonify({'success': False, 'error': 'Access denied or order not found'}), 403
+
         data = request.get_json(silent=True) or request.form
         delivery_man = (data.get('delivery_man') or '').strip()
         if delivery_man.lower() in ('none', '-- none (unassigned) --', 'null', ''):
@@ -2627,8 +2782,8 @@ def export_sales_order(id):
         LEFT JOIN locations l ON so.location_id = l.id
         WHERE so.id = %s
     """, (id,))
-    if not order:
-        return "Order not found", 404
+    if not order or not _check_order_branch_access(order):
+        return "Access denied or order not found", 403
     lines = query_all("""
         SELECT sol.*, p.sku, COALESCE(p.name, 'Item') as name,
             COALESCE(NULLIF(sol.description, ''), NULLIF(p.description, ''), '') as line_description
@@ -2687,6 +2842,13 @@ def export_sales_order(id):
 
 @sales_orders_bp.route('/sales/<int:id>/copy', methods=['POST', 'GET'])
 def copy_order(id):
+    order = query_one("SELECT * FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        if request.is_json:
+            return jsonify({'success': False, 'error': 'Access denied or order not found'}), 403
+        flash("Access denied or order not found.", "error")
+        return redirect(url_for('sales_orders.list_orders'))
+
     if request.method == 'GET':
         cust_search = request.args.get('customer_search', '').strip()
         branch_id = request.args.get('branch', '').strip()
@@ -2696,13 +2858,6 @@ def copy_order(id):
         if branch_id:
             params['branch'] = branch_id
         return redirect(url_for('sales_orders.new_order', **params))
-
-    order = query_one("SELECT * FROM sales_orders WHERE id = %s", (id,))
-    if not order:
-        if request.is_json:
-            return jsonify({'success': False, 'error': 'Sales order not found'}), 404
-        flash("Sales order not found.", "error")
-        return redirect(url_for('sales_orders.list_orders'))
 
     req_data = request.get_json(silent=True) or {}
     source_lines = query_all("SELECT * FROM sales_order_lines WHERE sales_order_id = %s ORDER BY line_num ASC", (id,))

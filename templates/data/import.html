@@ -86,6 +86,36 @@
                         </div>
                     </div>
 
+                    <!-- Destination Branch Row -->
+                    <div class="inflow-form-row" style="margin-top: 18px;" id="branchDestinationRow">
+                        <label class="inflow-form-label" for="branchSelect">Branch Target</label>
+                        <div class="inflow-form-control-group">
+                            {% if is_branch_user %}
+                                {% for b in branches %}
+                                    {% if b.id|string == active_branch_id|string %}
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="text" class="inflow-win-textbox" value="🔒 {{ b.name }} ({{ b.code }})" readonly style="background: #F1F5F9; font-weight: 700; color: #1E293B;">
+                                        <input type="hidden" id="branchSelect" value="{{ b.id }}">
+                                    </div>
+                                    <div class="inflow-desc-text" style="color: #2563EB;">
+                                        Data imported will strictly be stored under your branch (<strong>{{ b.name }}</strong>) and isolated from HQ or other branches.
+                                    </div>
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <select id="branchSelect" class="inflow-win-dropdown">
+                                    <option value="" {% if not active_branch_id or active_branch_id == 'main' %}selected{% endif %}>🏢 Main Store (HQ)</option>
+                                    {% for b in branches %}
+                                    <option value="{{ b.id }}" {% if active_branch_id|string == b.id|string %}selected{% endif %}>🏪 {{ b.name }} ({{ b.code }})</option>
+                                    {% endfor %}
+                                </select>
+                                <div class="inflow-desc-text">
+                                    Target branch for Customers and Sales Orders. Data will be stored separately for this branch.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
                     <!-- File Location Row -->
                     <div class="inflow-form-row" style="margin-top: 18px;">
                         <label class="inflow-form-label" for="fileLocationDisplay">File Location</label>
@@ -768,6 +798,11 @@ async function onNextStep() {
     formData.append('import_mode', currentImportMode);
     formData.append('file', selectedFile);
 
+    const branchEl = document.getElementById('branchSelect');
+    if (branchEl && branchEl.value) {
+        formData.append('branch_id', branchEl.value);
+    }
+
     const btnNext = document.getElementById('btnNext');
     btnNext.disabled = true;
     btnNext.textContent = 'Analyzing...';
@@ -1043,6 +1078,11 @@ async function onExecuteImport() {
     formData.append('has_headers', hasHeaders ? '1' : '0');
     formData.append('import_mode', currentImportMode);
     formData.append('file', selectedFile);
+
+    const branchEl = document.getElementById('branchSelect');
+    if (branchEl && branchEl.value) {
+        formData.append('branch_id', branchEl.value);
+    }
 
     // If order selection is active, gather selected orders
     if (currentOrdersSummary && currentOrdersSummary.length > 0) {

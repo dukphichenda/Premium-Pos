@@ -100,6 +100,23 @@
                     <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Balance</label>
                     <input type="text" readonly value="{{ customer.balance | currency }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #F8FAFC; color: {% if customer.balance > 0 %}#DC2626{% else %}#1E293B{% endif %}; font-weight: 600;">
                 </div>
+
+                {% if is_main_admin %}
+                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Branch</label>
+                    <select name="branch_id" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
+                        <option value="">🏢 Main Store (HQ)</option>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}" {% if customer.branch_id|string == b.id|string %}selected{% endif %}>🏪 {{ b.name }} ({{ b.code }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% else %}
+                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Branch</label>
+                    <input type="text" readonly value="🏪 {{ customer.branch_name or 'This Branch' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #F8FAFC; color: #2563EB; font-weight: 600;">
+                </div>
+                {% endif %}
             </div>
 
             <!-- 2. ADDRESSES SECTION (Top Right) -->

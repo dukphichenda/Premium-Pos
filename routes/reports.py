@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, Response, jsonify, redirect, url_for
+from flask import Blueprint, render_template, request, Response, jsonify, redirect, url_for, session
 from database import query_one, query_all
 import csv
 import io
@@ -264,8 +264,14 @@ def view_report(report_key):
     page = max(1, int(request.args.get('page', 1)))
     per_page = 150 if group_by == 'Category' else 36 # Rows per page matching printed sheet size
     
-    # Store Scope: Default to 'all' for branch report, 'main' for other reports
-    if report_key == 'branch-sales-summary':
+    # Store Scope: Branch users strictly locked to their branch; HQ defaults to 'all' or 'main'
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id') or session.get('active_branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
+    if not is_main_admin:
+        branch_scope = str(user_bid) if user_bid else 'main'
+    elif report_key == 'branch-sales-summary':
         branch_scope = request.args.get('branch', 'all').strip().lower()
     else:
         branch_scope = request.args.get('branch', 'main').strip().lower()
@@ -308,7 +314,12 @@ def view_report(report_key):
     start_date, end_date = calculate_date_range(date_range, custom_from, custom_to)
 
     # Master Lookup Lists for Filter Dropdowns
-    all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE ORDER BY name")
+    if not is_main_admin and user_bid:
+        all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE AND branch_id = %s ORDER BY name", (int(user_bid),))
+    elif not is_main_admin:
+        all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE AND branch_id IS NULL ORDER BY name")
+    else:
+        all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE ORDER BY name")
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name")
     all_categories = query_all("SELECT id, name FROM categories WHERE is_active = TRUE ORDER BY name")
     all_locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")

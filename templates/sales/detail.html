@@ -23,13 +23,18 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
             <span>Orders List ({{ current_branch.code }})</span>
         </a>
-        {% elif order.branch_id or (branch_scope and branch_scope != 'main') %}
-        <a href="{{ url_for('branches.branch_orders', id=order.branch_id or branch_scope) }}" class="inflow-tb-btn" title="View {{ order.branch_name or 'Branch' }} sales orders">
+        {% elif order.branch_id %}
+        <a href="{{ url_for('branches.branch_orders', id=order.branch_id) }}" class="inflow-tb-btn" title="View {{ order.branch_name or 'Branch' }} sales orders">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
             <span>Orders List ({{ order.branch_code or 'Branch' }})</span>
         </a>
+        {% elif branch_scope and branch_scope != 'all' and branch_scope != 'main' and branch_scope|int != 0 %}
+        <a href="{{ url_for('branches.branch_orders', id=branch_scope|int) }}" class="inflow-tb-btn" title="View Branch sales orders">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <span>Orders List</span>
+        </a>
         {% else %}
-        <a href="{{ url_for('sales_orders.list_orders', view='table', branch='main') }}" class="inflow-tb-btn" title="View Main Store sales orders">
+        <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_scope or 'main') }}" class="inflow-tb-btn" title="View sales orders">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
             <span>Orders List</span>
         </a>
@@ -1944,10 +1949,12 @@ function handleCloseOrder(event) {
                 } else {
                     {% if is_branch_mode and current_branch %}
                     window.location.href = "{{ url_for('branches.branch_orders', id=current_branch.id) }}";
-                    {% elif order.branch_id or (branch_scope and branch_scope != 'main') %}
-                    window.location.href = "{{ url_for('branches.branch_orders', id=order.branch_id or branch_scope) }}";
+                    {% elif order.branch_id %}
+                    window.location.href = "{{ url_for('branches.branch_orders', id=order.branch_id) }}";
+                    {% elif branch_scope and branch_scope != 'all' and branch_scope != 'main' and branch_scope|int != 0 %}
+                    window.location.href = "{{ url_for('branches.branch_orders', id=branch_scope|int) }}";
                     {% else %}
-                    window.location.href = "{{ url_for('sales_orders.list_orders', view='table') }}";
+                    window.location.href = "{{ url_for('sales_orders.list_orders', view='table', branch=branch_scope or 'main') }}";
                     {% endif %}
                 }
             },
@@ -1959,10 +1966,12 @@ function handleCloseOrder(event) {
         } else {
             {% if is_branch_mode and current_branch %}
             window.location.href = "{{ url_for('branches.branch_orders', id=current_branch.id) }}";
-            {% elif order.branch_id or (branch_scope and branch_scope != 'main') %}
-            window.location.href = "{{ url_for('branches.branch_orders', id=order.branch_id or branch_scope) }}";
+            {% elif order.branch_id %}
+            window.location.href = "{{ url_for('branches.branch_orders', id=order.branch_id) }}";
+            {% elif branch_scope and branch_scope != 'all' and branch_scope != 'main' and branch_scope|int != 0 %}
+            window.location.href = "{{ url_for('branches.branch_orders', id=branch_scope|int) }}";
             {% else %}
-            window.location.href = "{{ url_for('sales_orders.list_orders', view='table') }}";
+            window.location.href = "{{ url_for('sales_orders.list_orders', view='table', branch=branch_scope or 'main') }}";
             {% endif %}
         }
     }
