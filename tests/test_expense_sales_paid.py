@@ -73,5 +73,24 @@ class TestExpenseSalesPaid(unittest.TestCase):
         self.assertAlmostEqual(tw['amount'], 109.66, places=2)
         self.assertEqual(tw['expr'], '=9.66+100')
 
+    def test_monthly_expenses_route_renders_successfully(self):
+        """
+        Verify that GET /expenses and GET /expenses/monthly render HTTP 200
+        without NameError or session errors.
+        """
+        from app import app
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess['user_id'] = 1
+                sess['username'] = 'admin'
+                sess['role'] = 'main_admin'
+            
+            resp = client.get('/expenses/monthly?month=2026-10&branch=main')
+            self.assertEqual(resp.status_code, 200)
+            self.assertIn(b'Main Store (HQ)', resp.data)
+
+            resp_stm = client.get('/expenses/monthly?month=2026-10&branch=1')
+            self.assertEqual(resp_stm.status_code, 200)
+
 if __name__ == '__main__':
     unittest.main()

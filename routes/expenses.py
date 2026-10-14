@@ -1,7 +1,7 @@
 import json
 from datetime import datetime, date
 from decimal import Decimal
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, send_file, session
 from database import query_one, query_all, execute, execute_returning_id
 from services.expense_exporter import generate_monthly_excel, generate_monthly_pdf
 
