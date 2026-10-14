@@ -148,6 +148,14 @@ def _row_val(row, key, idx=0):
     except (IndexError, KeyError, TypeError):
         return None
 
+def _ensure_sequence_exists(c, seq_name):
+    try:
+        c.execute("SELECT 1 FROM pg_sequences WHERE sequencename = %s;", (seq_name,))
+        if not c.fetchone():
+            c.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq_name} START 1;")
+    except Exception:
+        pass
+
 def get_next_order_number(order_type='SO', branch_id=None, cur=None):
     """
     Auto-generates the next sequential order number (SO or PO) strictly derived from
@@ -187,7 +195,7 @@ def get_next_order_number(order_type='SO', branch_id=None, cur=None):
             raise ValueError(f"Unsupported order_type: {order_type}")
 
         # 1. Ensure the sequence exists
-        c.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq_name} START 1;")
+        _ensure_sequence_exists(c, seq_name)
 
         # 2. Find the highest existing sequence number in the database matching this prefix
         pattern = r'^' + re.escape(prefix) + r'([0-9]+)$'
@@ -309,7 +317,7 @@ def resync_all_sequences(cur=None):
 
     def _resync(c):
         # 1. Main store SO sequence
-        c.execute(r"CREATE SEQUENCE IF NOT EXISTS so_number_seq START 1;")
+        _ensure_sequence_exists(c, 'so_number_seq')
         c.execute(r"SELECT MAX(SUBSTRING(order_number FROM '^SO-([0-9]+)$')::bigint) as m FROM sales_orders WHERE order_number ~ '^SO-[0-9]+$';")
         m_row = c.fetchone()
         m_so = _row_val(m_row, 'm', 0) or 0
@@ -317,7 +325,7 @@ def resync_all_sequences(cur=None):
             c.execute("SELECT setval('so_number_seq', %s, true);", (m_so,))
 
         # 2. Purchase orders sequence
-        c.execute(r"CREATE SEQUENCE IF NOT EXISTS po_number_seq START 1;")
+        _ensure_sequence_exists(c, 'po_number_seq')
         c.execute(r"SELECT MAX(SUBSTRING(order_number FROM '^PO-([0-9]+)$')::bigint) as m FROM purchase_orders WHERE order_number ~ '^PO-[0-9]+$';")
         p_row = c.fetchone()
         m_po = _row_val(p_row, 'm', 0) or 0
@@ -336,7 +344,7 @@ def resync_all_sequences(cur=None):
                 if not prefix.endswith('-'):
                     prefix += '-'
                 seq_name = f"so_branch_{b_id}_seq"
-                c.execute(f"CREATE SEQUENCE IF NOT EXISTS {seq_name} START 1;")
+                _ensure_sequence_exists(c, seq_name)
                 pattern = r'^' + re.escape(prefix) + r'([0-9]+)$'
                 c.execute(f"""
                     SELECT MAX(SUBSTRING(order_number FROM %s)::bigint) as m
@@ -352,13 +360,13 @@ def resync_all_sequences(cur=None):
 
         # 4. Stock adjustments & transfers
         try:
-            c.execute("CREATE SEQUENCE IF NOT EXISTS adj_number_seq START 1;")
+            _ensure_sequence_exists(c, 'adj_number_seq')
             c.execute("SELECT COALESCE(MAX(id), 0) as m FROM stock_adjustments;")
             m_adj = _row_val(c.fetchone(), 'm', 0) or 0
             if m_adj > 0:
                 c.execute("SELECT setval('adj_number_seq', %s, true);", (m_adj,))
 
-            c.execute("CREATE SEQUENCE IF NOT EXISTS trf_number_seq START 1;")
+            _ensure_sequence_exists(c, 'trf_number_seq')
             c.execute("SELECT COALESCE(MAX(id), 0) as m FROM stock_transfers;")
             m_trf = _row_val(c.fetchone(), 'm', 0) or 0
             if m_trf > 0:
