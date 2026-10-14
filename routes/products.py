@@ -903,7 +903,8 @@ def update_product_ajax(id):
             'shipping_cost', 'shipping_cost_formula',
             'costing_sheet_pcs', 'costing_sheet_pcs_formula',
             'costing_sheet_cost', 'costing_sheet_formula',
-            'combine_type'
+            'combine_type',
+            'price_decimals', 'cost_decimals', 'qty_decimals'
         ]
         
         # Handle 'cost_formula' and formula evaluation
@@ -930,6 +931,8 @@ def update_product_ajax(id):
                 val = data[field]
                 if field in ('category_id', 'default_location_id', 'last_vendor_id'):
                     val = int(val) if val and str(val).strip() != '' else None
+                elif field in ('price_decimals', 'cost_decimals', 'qty_decimals'):
+                    val = int(val) if val is not None and str(val).strip() not in ('', 'None', 'null', '-1') else None
                 elif field in ('tier_qty_1', 'tier_qty_2', 'tier_qty_3'):
                     val = int(safe_eval_math(val)) if val and str(val).strip() != '' else (100 if field == 'tier_qty_1' else (400 if field == 'tier_qty_2' else 800))
                 elif field in ('length', 'width', 'height', 'weight', 'reorder_point', 'reorder_quantity',
@@ -988,7 +991,9 @@ def update_product_ajax(id):
             'success': True,
             'message': 'Product updated successfully.',
             'price_card': updated_price_card,
-            'standard_cost': float(updated_prod['standard_cost'] or 0) if updated_prod else 0
+            'standard_cost': float(updated_prod['standard_cost'] or 0) if updated_prod else 0,
+            'price_decimals': updated_prod['price_decimals'] if updated_prod else None,
+            'cost_decimals': updated_prod['cost_decimals'] if updated_prod else None
         })
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400

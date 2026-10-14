@@ -541,7 +541,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     drawer_where = ["1=1"]
     drawer_params = []
 
-    # Branch isolation: drawer sidebar strictly isolates branch orders vs main store orders
+    # Branch isolation: branch users strictly locked to their branch; main admin sees all orders unless explicitly filtered
     if not is_main:
         if user_bid:
             drawer_where.append("so.branch_id = %s")
@@ -549,17 +549,13 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         else:
             drawer_where.append("so.branch_id IS NULL")
     else:
-        if branch_id is None or str(branch_id).lower() == 'main':
-            drawer_where.append("so.branch_id IS NULL")
-        elif str(branch_id).lower() == 'all':
-            pass
-        else:
+        if branch_id and str(branch_id).lower() not in ('all', 'main', 'none', ''):
             try:
                 bid = int(branch_id)
                 drawer_where.append("so.branch_id = %s")
                 drawer_params.append(bid)
             except (ValueError, TypeError):
-                drawer_where.append("so.branch_id IS NULL")
+                pass
 
     # Filter drawer orders
     if customer_search:
@@ -672,17 +668,13 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         else:
             cust_where.append("branch_id IS NULL")
     else:
-        if str(branch_id).lower() == 'main':
-            cust_where.append("branch_id IS NULL")
-        elif str(branch_id).lower() == 'all':
-            pass
-        elif branch_id is not None:
+        if branch_id and str(branch_id).lower() not in ('all', 'main', 'none', ''):
             try:
                 bid = int(branch_id)
                 cust_where.append("branch_id = %s")
                 cust_params.append(bid)
             except (ValueError, TypeError):
-                cust_where.append("branch_id IS NULL")
+                pass
 
     all_customers = query_all(f"""
         SELECT 
@@ -747,7 +739,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         'company': company,
         'all_branches': all_branches,
         'all_delivery_men': all_delivery_men,
-        'active_branch_filter': branch_id or 'main'
+        'active_branch_filter': branch_id or ('all' if is_main else 'main')
     }
 
 def _find_upper_or_adjacent_order(current_id, date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', branch_id=None, requested_upper_id=None):
@@ -1443,14 +1435,11 @@ def new_order():
     customer_filter = request.args.get('customer_id')
 
     if not is_main:
-        req_branch = str(user_bid) if user_bid else 'main'
+        req_branch = str(user_bid) if user_bid else None
     elif branch:
         req_branch = str(branch['id'])
-    elif 'branch' in request.args:
-        req_branch = request.args.get('branch') or 'all'
-        session['so_branch_filter'] = req_branch
-    elif 'so_branch_filter' in session:
-        req_branch = session['so_branch_filter']
+    elif 'branch' in request.args and request.args.get('branch') not in ('', 'all', 'main'):
+        req_branch = request.args.get('branch')
     else:
         req_branch = 'all'
     scheme_id = order.get('pricing_scheme_id') or 100
@@ -1589,17 +1578,11 @@ def detail_order(id):
 
     # Allow user to switch branch filter in drawer or default to the order's branch scope
     if not is_main:
-        branch_scope = str(user_bid) if user_bid else 'main'
-    elif 'branch' in request.args:
-        branch_scope = request.args.get('branch') or 'all'
-        session['so_branch_filter'] = branch_scope
-    elif 'so_branch_filter' in session:
-        branch_scope = session['so_branch_filter']
-    elif session.get('active_branch_id'):
-        branch_scope = str(session.get('active_branch_id'))
+        branch_scope = str(user_bid) if user_bid else None
+    elif 'branch' in request.args and request.args.get('branch') not in ('', 'all', 'main'):
+        branch_scope = request.args.get('branch')
     else:
-        default_branch = str(order['branch_id']) if order.get('branch_id') else 'all'
-        branch_scope = default_branch
+        branch_scope = 'all'
 
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope)

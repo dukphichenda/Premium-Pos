@@ -178,20 +178,6 @@
                 </div>
             </div>
             <form method="GET" action="{% if is_new %}{{ url_for('sales_orders.new_order') }}{% else %}{{ url_for('sales_orders.detail_order', id=order.id) }}{% endif %}" class="inflow-drawer-filters" id="drawerFilterForm">
-                <!-- Store Scope Selector: Isolates Main Store vs Branches -->
-                <div class="inflow-filter-row" style="background: #F1F5F9; border-radius: 4px; padding: 4px 6px; margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; gap: 6px;">
-                    <span class="inflow-filter-label" style="font-weight: 700; color: #334155; white-space: nowrap; font-size: 11px;">Store Scope</span>
-                    <select name="branch" id="drawerBranchSelect" class="inflow-filter-select" onchange="syncDrawerFiltersToStorage(); document.getElementById('drawerFilterForm').submit()" style="font-weight: 700; color: #0284C7; background: #FFFFFF; flex: 1; width: 100%; max-width: 120px; text-overflow: ellipsis; overflow: hidden; padding: 2px 4px; height: 24px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 4px; cursor: pointer;">
-                        {% if not is_branch_mode %}
-                        <option value="main" {% if branch_scope == 'main' or not branch_scope %}selected{% endif %} title="Main Store">MAIN</option>
-                        {% for br in all_branches %}
-                        <option value="{{ br.id }}" {% if branch_scope == (br.id|string) %}selected{% endif %} title="{{ br.name }}">{{ br.code or br.name }}</option>
-                        {% endfor %}
-                        {% else %}
-                        <option value="{{ current_branch.id }}" selected title="{{ current_branch.name }}">{{ current_branch.code or current_branch.name }}</option>
-                        {% endif %}
-                    </select>
-                </div>
                 <div class="inflow-filter-row">
                     <span class="inflow-filter-label">Order Date</span>
                     <select name="date_filter" id="drawerDateFilterSelect" class="inflow-filter-select" onchange="syncDrawerFiltersToStorage(); document.getElementById('drawerFilterForm').submit()">
@@ -611,24 +597,7 @@
                             {% endif %}
                         </span>
                     </div>
-                    <div class="inflow-field-row" style="justify-content: flex-end;">
-                        <span style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Store Scope</span>
-                        <span style="font-size: 11.5px; width: 110px; text-align: left;">
-                            {% if order.branch_code or order.branch_name %}
-                            <span class="badge" style="background: #E0F2FE; color: #0284C7; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;" title="{{ order.branch_name }}">
-                                🏬 {{ order.branch_code }}
-                            </span>
-                            {% elif current_branch %}
-                            <span class="badge" style="background: #E0F2FE; color: #0284C7; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;" title="{{ current_branch.name }}">
-                                🏬 {{ current_branch.code }}
-                            </span>
-                            {% else %}
-                            <span class="badge" style="background: #F1F5F9; color: #475569; font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px;" title="Headquarters Main Store">
-                                🏢 Main Store
-                            </span>
-                            {% endif %}
-                        </span>
-                    </div>
+
                     <div class="inflow-field-row" style="justify-content: flex-end;">
                         <span style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Date</span>
                         <div class="gs-datepicker-wrapper" style="width: 110px;">
@@ -1821,15 +1790,10 @@ function getDrawerFilterParams() {
     let custVal = (custInput ? custInput.value : '')?.trim() ||
                   sessionStorage.getItem('inflow_so_drawer_customer_search') || '{{ customer_search or "" }}';
 
-    const branchSelect = document.getElementById('drawerBranchSelect');
-    let branchVal = (branchSelect ? branchSelect.value : '') ||
-                    sessionStorage.getItem('inflow_so_branch_filter') || '{{ branch_scope or "main" }}';
-
     return {
         date_filter: dateVal,
         status_filter: statusVal,
-        customer_search: custVal,
-        branch: branchVal
+        customer_search: custVal
     };
 }
 
@@ -1843,7 +1807,7 @@ function syncDrawerFiltersToStorage() {
         } else {
             sessionStorage.removeItem('inflow_so_drawer_customer_search');
         }
-        if (params.branch) sessionStorage.setItem('inflow_so_branch_filter', params.branch);
+        sessionStorage.removeItem('inflow_so_branch_filter');
     } catch(e) {}
 }
 
@@ -1860,7 +1824,6 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
     if (filters.date_filter && !params.has('date_filter')) params.set('date_filter', filters.date_filter);
     if (filters.status_filter && !params.has('status_filter')) params.set('status_filter', filters.status_filter);
     if (filters.customer_search && !params.has('customer_search')) params.set('customer_search', filters.customer_search);
-    if (filters.branch && !params.has('branch')) params.set('branch', filters.branch);
 
     for (const key in extraParams) {
         if (extraParams[key] !== undefined && extraParams[key] !== null) {
