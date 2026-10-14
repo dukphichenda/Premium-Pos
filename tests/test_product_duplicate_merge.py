@@ -129,6 +129,11 @@ class TestProductDuplicateMerge(unittest.TestCase):
             self.assertEqual(result['sales_orders_relinked'], 1)
             self.assertEqual(result['purchase_orders_relinked'], 1)
             self.assertEqual(result['stock_units_consolidated'], 30.0)
+            self.assertIn('deleted_products', result)
+            self.assertEqual(len(result['deleted_products']), 1)
+            self.assertEqual(result['deleted_products'][0]['id'], dup_id)
+            self.assertIn('category_name', result['deleted_products'][0])
+            self.assertIn('master_category_name', result)
 
             # Verify Sales Order still exists with 2 lines, BOTH pointing to master_id
             so_check = query_one("SELECT * FROM sales_orders WHERE id = %s", (so_id,))

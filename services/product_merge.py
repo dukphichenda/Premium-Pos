@@ -91,7 +91,7 @@ def find_duplicate_groups(threshold=0.75, limit=100):
     prods = query_all("""
         SELECT 
             p.id, p.sku, p.name, p.barcode, p.uom, p.default_price, p.standard_cost,
-            p.image_url, p.category_id, c.name as category_name,
+            p.image_url, p.category_id, COALESCE(c.name, 'Uncategorized') as category_name,
             COALESCE(inv.total_qty, 0) as stock_qty,
             COALESCE(so.order_count, 0) as sales_order_count,
             COALESCE(so.total_revenue, 0) as sales_revenue,
@@ -208,7 +208,7 @@ def search_products_for_merge(keyword, limit=25):
     rows = query_all("""
         SELECT 
             p.id, p.sku, p.name, p.barcode, p.uom, p.default_price, p.standard_cost,
-            p.image_url, p.category_id, c.name as category_name,
+            p.image_url, p.category_id, COALESCE(c.name, 'Uncategorized') as category_name,
             COALESCE(inv.total_qty, 0) as stock_qty,
             COALESCE(so.order_count, 0) as sales_order_count,
             COALESCE(so.total_revenue, 0) as sales_revenue,
@@ -268,16 +268,33 @@ def execute_product_merge(master_id, source_ids, overrides=None):
     overrides = overrides or {}
 
     with get_db_cursor(commit=True) as cur:
-        # 1. Fetch Master and Source products
-        cur.execute("SELECT * FROM products WHERE id = %s", (master_id,))
+        # 1. Fetch Master and Source products with Category details
+        cur.execute("""
+            SELECT p.*, COALESCE(c.name, 'Uncategorized') as category_name 
+            FROM products p 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE p.id = %s
+        """, (master_id,))
         master = cur.fetchone()
         if not master:
             raise ValueError(f"Master product #{master_id} not found.")
 
-        cur.execute("SELECT * FROM products WHERE id = ANY(%s)", (source_ids,))
+        cur.execute("""
+            SELECT p.*, COALESCE(c.name, 'Uncategorized') as category_name 
+            FROM products p 
+            LEFT JOIN categories c ON p.category_id = c.id 
+            WHERE p.id = ANY(%s)
+        """, (source_ids,))
         sources = cur.fetchall()
         if not sources:
             raise ValueError("No valid duplicate products found to merge.")
+
+        sources_summary = [{
+            'id': s['id'],
+            'name': s['name'],
+            'sku': s.get('sku') or 'NO-SKU',
+            'category_name': s.get('category_name') or 'Uncategorized'
+        } for s in sources]
 
         total_so_relinked = 0
         total_po_relinked = 0
@@ -349,6 +366,9 @@ def execute_product_merge(master_id, source_ids, overrides=None):
                         WHERE id = %s
                     """, (master_id, sinv['id']))
 
+            # Clean any remaining inventory records for src_id
+            cur.execute("DELETE FROM inventory WHERE product_id = %s", (src_id,))
+
             # 5. Relink Inventory Logs
             cur.execute("UPDATE inventory_logs SET product_id = %s WHERE product_id = %s", (master_id, src_id))
 
@@ -358,13 +378,18 @@ def execute_product_merge(master_id, source_ids, overrides=None):
 
             # 7. Relink Product Attachments & Versions
             cur.execute("UPDATE product_attachments SET product_id = %s WHERE product_id = %s", (master_id, src_id))
-            cur.execute("UPDATE product_versions SET product_id = %s WHERE product_id = %s", (master_id, src_id))
+            cur.execute("DELETE FROM product_versions WHERE product_id = %s", (src_id,))
 
-            # 8. Relink BOMs & Combos
+            # 8. Relink BOMs & Combos (prevent circular self-references)
+            cur.execute("DELETE FROM product_boms WHERE (product_id = %s AND component_product_id = %s) OR (product_id = %s AND component_product_id = %s)", (src_id, master_id, master_id, src_id))
             cur.execute("UPDATE product_boms SET product_id = %s WHERE product_id = %s", (master_id, src_id))
             cur.execute("UPDATE product_boms SET component_product_id = %s WHERE component_product_id = %s", (master_id, src_id))
+            cur.execute("DELETE FROM product_boms WHERE product_id = component_product_id")
+
+            cur.execute("DELETE FROM product_combine_options WHERE (product_id = %s AND component_product_id = %s) OR (product_id = %s AND component_product_id = %s)", (src_id, master_id, master_id, src_id))
             cur.execute("UPDATE product_combine_options SET product_id = %s WHERE product_id = %s", (master_id, src_id))
             cur.execute("UPDATE product_combine_options SET component_product_id = %s WHERE component_product_id = %s", (master_id, src_id))
+            cur.execute("DELETE FROM product_combine_options WHERE product_id = component_product_id")
 
             # 9. Product Prices (Tiers)
             cur.execute("SELECT * FROM product_prices WHERE product_id = %s", (src_id,))
@@ -377,6 +402,7 @@ def execute_product_merge(master_id, source_ids, overrides=None):
                     cur.execute("DELETE FROM product_prices WHERE id = %s", (sp['id'],))
                 else:
                     cur.execute("UPDATE product_prices SET product_id = %s WHERE id = %s", (master_id, sp['id']))
+            cur.execute("DELETE FROM product_prices WHERE product_id = %s", (src_id,))
 
             # 10. Product Vendors
             cur.execute("SELECT * FROM product_vendors WHERE product_id = %s", (src_id,))
@@ -389,9 +415,15 @@ def execute_product_merge(master_id, source_ids, overrides=None):
                     cur.execute("DELETE FROM product_vendors WHERE id = %s", (sv['id'],))
                 else:
                     cur.execute("UPDATE product_vendors SET product_id = %s WHERE id = %s", (master_id, sv['id']))
+            cur.execute("DELETE FROM product_vendors WHERE product_id = %s", (src_id,))
 
-            # 11. Delete the duplicate product record
+            # 11. Delete the duplicate product record permanently so ONLY master is kept
             cur.execute("DELETE FROM products WHERE id = %s", (src_id,))
+
+            # Verify deletion
+            cur.execute("SELECT id FROM products WHERE id = %s", (src_id,))
+            if cur.fetchone():
+                raise RuntimeError(f"Failed to delete duplicate product #{src_id}")
 
         # 12. Apply any field overrides to Master Product
         update_fields = []
@@ -400,6 +432,14 @@ def execute_product_merge(master_id, source_ids, overrides=None):
             if field in overrides and overrides[field]:
                 update_fields.append(f"{field} = %s")
                 update_params.append(overrides[field])
+
+        # If master product has no category assigned, adopt category from first source product with one
+        if not master.get('category_id') and 'category_id' not in overrides:
+            for s in sources:
+                if s.get('category_id'):
+                    update_fields.append("category_id = %s")
+                    update_params.append(s['category_id'])
+                    break
 
         # Append merged SKUs and barcodes to remarks for searchability
         if merged_skus or merged_barcodes:
@@ -424,7 +464,7 @@ def execute_product_merge(master_id, source_ids, overrides=None):
 
     # Fetch updated master product
     updated_master = query_one("""
-        SELECT p.*, c.name as category_name,
+        SELECT p.*, COALESCE(c.name, 'Uncategorized') as category_name,
                COALESCE(inv.total_qty, 0) as current_qty
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
@@ -439,7 +479,9 @@ def execute_product_merge(master_id, source_ids, overrides=None):
         'master_id': master_id,
         'master_name': updated_master['name'] if updated_master else master['name'],
         'master_sku': updated_master['sku'] if updated_master else master['sku'],
+        'master_category_name': updated_master['category_name'] if updated_master else (master.get('category_name') or 'Uncategorized'),
         'merged_source_ids': source_ids,
+        'deleted_products': sources_summary,
         'sales_orders_relinked': total_so_relinked,
         'purchase_orders_relinked': total_po_relinked,
         'stock_units_consolidated': total_stock_moved,
