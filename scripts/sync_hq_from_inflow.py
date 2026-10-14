@@ -247,7 +247,9 @@ def sync_hq():
                 p.ItemType,
                 p.ItemTaxCodeId,
                 ISNULL(c.CostingMethod, 1) as CostingMethod,
-                p.PictureFileAttachmentId
+                p.PictureFileAttachmentId,
+                p.SoUomName, p.SoUomRatioStd, p.SoUomRatio,
+                p.PoUomName, p.PoUomRatioStd, p.PoUomRatio
             FROM BASE_Product p
             LEFT JOIN BASE_InventoryCost c ON p.ProdId = c.ProdId
             LEFT JOIN BASE_ItemPrice pr ON p.ProdId = pr.ProdId AND pr.PricingSchemeId = 1
@@ -259,15 +261,89 @@ def sync_hq():
         tax_map = {100: 'Taxable', 101: 'Non-Taxable'}
         costing_map = {1: 'Manual', 2: 'Average', 3: 'Standard', 4: 'FIFO'}
 
-        prod_insert_data = []
+        # Pre-process SKUs to ensure uniqueness
+        from collections import Counter
+        sku_counter = Counter()
+        pre_processed = []
+
         for p in prod_rows:
             prod_id = p[0]
-            sku = f"SKU-{prod_id:04d}"
-            name = (p[1] or f"Product {prod_id}").strip()
+            orig_name = (p[1] or f"Product {prod_id}").strip()
+
+            # Extract SKU by deleting English prefix from start of name
+            khmer_match = re.search(r'[\u1780-\u17FF]', orig_name)
+            if khmer_match and khmer_match.start() > 0:
+                prefix = orig_name[:khmer_match.start()].strip().rstrip(' -_:/')
+                rem = orig_name[khmer_match.start():].strip()
+                if prefix and re.search(r'[A-Za-z]', prefix):
+                    raw_sku = prefix
+                    clean_name = rem
+                else:
+                    raw_sku = f"SKU-{prod_id:04d}"
+                    clean_name = orig_name
+            else:
+                raw_sku = f"SKU-{prod_id:04d}"
+                clean_name = orig_name
+
+            # UOM and Ratios
+            base_uom = (p[5] or 'pcs').strip()
+            so_uom = (p[23] or '').strip()
+            so_ratio_std = float(p[24]) if p[24] is not None else 1.0
+            so_ratio = float(p[25]) if p[25] is not None else 1.0
+            m_pack = float(p[6]) if p[6] else 1.0
+
+            if so_ratio_std <= 1.0:
+                name_pack_match = re.search(r'(\d+)\s*(?:ចាន|ប្រអប់|កែវ|ដប|គ្រាប់|ថង់|កំប៉ុង|សន្លឹក|pcs|ដុំ|គូរ)?\s*[/／]\s*(កេស|Case|Pack|ដុំ|បេ)', orig_name, re.IGNORECASE)
+                if name_pack_match:
+                    extracted_num = float(name_pack_match.group(1))
+                    pack_type = name_pack_match.group(2).lower()
+                    if extracted_num > 1.0:
+                        so_ratio_std = extracted_num
+                        if not so_uom:
+                            so_uom = 'packs' if pack_type in ('pack', 'ដុំ') else 'cases'
+                elif m_pack > 1.0:
+                    so_ratio_std = m_pack
+                    if not so_uom:
+                        so_uom = 'cases'
+
+            if not so_uom:
+                so_uom = 'cases' if so_ratio_std > 1.0 else base_uom
+
+            # Purchasing UOM is identical to Sales UOM
+            po_uom = so_uom
+            po_ratio = so_ratio
+            po_ratio_std = so_ratio_std
+
+            pre_processed.append({
+                'p': p,
+                'prod_id': prod_id,
+                'raw_sku': raw_sku,
+                'clean_name': clean_name,
+                'base_uom': base_uom,
+                'so_uom': so_uom,
+                'so_ratio': so_ratio,
+                'so_ratio_std': so_ratio_std,
+                'po_uom': po_uom,
+                'po_ratio': po_ratio,
+                'po_ratio_std': po_ratio_std
+            })
+
+        prod_insert_data = []
+        for item in pre_processed:
+            p = item['p']
+            prod_id = item['prod_id']
+            raw_sku = item['raw_sku']
+            sku_counter[raw_sku] += 1
+            if sku_counter[raw_sku] > 1:
+                final_sku = f"{raw_sku}-{sku_counter[raw_sku]}"
+            else:
+                final_sku = raw_sku
+
+            name = item['clean_name']
             desc = (p[2] or '').strip()
             barcode = (p[3] or '').strip() or None
             cat_id = p[4]
-            uom = (p[5] or 'pcs').strip()
+            uom = item['base_uom']
             m_pack = float(p[6]) if p[6] else 1.0
             i_pack = float(p[7]) if p[7] else 1.0
             def_loc = p[8] if p[8] else 100
@@ -287,11 +363,13 @@ def sync_hq():
             custom_attr = f'{{"inflow_prod_id": {prod_id}}}'
 
             prod_insert_data.append((
-                prod_id, sku, name, desc, barcode, cat_id, uom,
+                prod_id, final_sku, name, desc, barcode, cat_id, uom,
                 m_pack, i_pack, def_loc, reorder_pt, reorder_qty,
                 std_cost, avg_cost, last_cost, def_price,
                 sellable, purchasable, active,
                 item_type, tax_code, costing_method, img_url,
+                item['so_uom'], item['so_ratio'], item['so_ratio_std'],
+                item['po_uom'], item['po_ratio'], item['po_ratio_std'],
                 custom_attr
             ))
 
@@ -302,9 +380,11 @@ def sync_hq():
                 standard_cost, average_cost, last_purchase_cost, default_price,
                 is_sellable, is_purchaseable, is_active,
                 item_type, tax_code, costing_method, image_url,
+                sales_uom, sales_uom_ratio, sales_uom_ratio_std,
+                purchasing_uom, purchasing_uom_ratio, purchasing_uom_ratio_std,
                 custom_attributes
             ) VALUES %s
-        """, prod_insert_data, template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)")
+        """, prod_insert_data, template="(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb)")
         stats['products'] = len(prod_rows)
         logger.info(f"Inserted {stats['products']} products.")
 
