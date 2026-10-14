@@ -45,6 +45,13 @@ def create_app():
             init_db()
         except Exception as e:
             logger.error(f"Error during database startup check: {e}")
+    else:
+        # On cloud/Hostinger environments, ensure numbering sequences are always in sync with max orders
+        try:
+            from database import resync_all_sequences
+            resync_all_sequences()
+        except Exception as e:
+            logger.error(f"Error during sequence synchronization startup check: {e}")
 
     # Register Blueprints
     from routes.dashboard import dashboard_bp

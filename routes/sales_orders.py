@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
-from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val
+from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number, resync_all_sequences
 from datetime import datetime, date, timedelta
 import re
 from routes.auth import user_can_edit_prices, user_can_view_costs
@@ -385,9 +385,8 @@ def create_order():
             flash("Please add at least one line item.", "error")
             return redirect(url_for('sales_orders.create_order'))
 
-        # Generate unique order number using database sequence
-        seq_val = get_next_sequence_val('so_number_seq')
-        order_number = f"SO-{seq_val:06d}"
+        # Generate unique order number auto-generated from last SO
+        order_number = get_next_order_number('SO')
 
         # Calculate totals & validate items
         subtotal = 0.0
@@ -1279,6 +1278,8 @@ def new_order():
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
 
+    preview_so_number = preview_order_number('SO', branch_id=branch['id'] if branch else None)
+
     return render_template('sales/detail.html',
                            order=order,
                            lines=lines,
@@ -1302,7 +1303,8 @@ def new_order():
                            is_new=True,
                            is_copied_draft=is_copied_draft,
                            current_branch=branch,
-                           is_branch_order=bool(branch))
+                           is_branch_order=bool(branch),
+                           preview_so_number=preview_so_number)
 
 @sales_orders_bp.route('/sales/<int:id>')
 def detail_order(id):
@@ -1646,22 +1648,7 @@ def save_order(id=0):
                     """, (dm_name,))
 
             if is_new:
-                if branch_id:
-                    branch = query_one("SELECT * FROM branches WHERE id = %s", (branch_id,))
-                    if branch:
-                        prefix = (branch.get('so_prefix') or f"SO-{branch['code']}-").strip().upper()
-                        if not prefix.endswith('-'):
-                            prefix += '-'
-                        cur.execute(f"CREATE SEQUENCE IF NOT EXISTS so_branch_{branch_id}_seq START 1;")
-                        cur.execute(f"SELECT nextval('so_branch_{branch_id}_seq') as seq;")
-                        seq_val = cur.fetchone()['seq']
-                        order_number = f"{prefix}{seq_val:05d}"
-                    else:
-                        seq_val = get_next_sequence_val('so_number_seq')
-                        order_number = f"SO-{seq_val:06d}"
-                else:
-                    seq_val = get_next_sequence_val('so_number_seq')
-                    order_number = f"SO-{seq_val:06d}"
+                order_number = get_next_order_number('SO', branch_id=branch_id, cur=cur)
 
                 cur.execute("""
                     INSERT INTO sales_orders (
@@ -2123,32 +2110,8 @@ def delete_order(id):
             cur.execute("DELETE FROM order_payments WHERE order_type = 'SO' AND order_id = %s", (id,))
             cur.execute("DELETE FROM sales_orders WHERE id = %s", (id,))
 
-            # 4. Re-synchronize numbering sequence so new orders continue properly without gaps
-            if branch_id:
-                cur.execute(f"CREATE SEQUENCE IF NOT EXISTS so_branch_{branch_id}_seq START 1;")
-                cur.execute("""
-                    SELECT COALESCE(MAX(NULLIF(regexp_replace(order_number, '\\D', '', 'g'), '')::bigint), 0) as max_seq
-                    FROM sales_orders
-                    WHERE branch_id = %s
-                """, (branch_id,))
-                max_b_row = cur.fetchone()
-                max_b = max_b_row['max_seq'] if max_b_row and max_b_row.get('max_seq') is not None else 0
-                if max_b > 0:
-                    cur.execute(f"SELECT setval('so_branch_{branch_id}_seq', %s, true);", (max_b,))
-                else:
-                    cur.execute(f"SELECT setval('so_branch_{branch_id}_seq', 1, false);")
-            else:
-                cur.execute("""
-                    SELECT COALESCE(MAX(NULLIF(regexp_replace(order_number, '^SO-0*', ''), '')::bigint), 0) as max_seq
-                    FROM sales_orders
-                    WHERE branch_id IS NULL AND order_number ~ '^SO-\\d+';
-                """)
-                max_m_row = cur.fetchone()
-                max_m = max_m_row['max_seq'] if max_m_row and max_m_row.get('max_seq') is not None else 0
-                if max_m > 0:
-                    cur.execute("SELECT setval('so_number_seq', %s, true);", (max_m,))
-                else:
-                    cur.execute("SELECT setval('so_number_seq', 1, false);")
+            # 4. Re-synchronize numbering sequences so new orders continue properly without gaps
+            resync_all_sequences(cur=cur)
 
         if request.is_json:
             return jsonify({'success': True, 'message': f'Order {order_number} deleted successfully.'})
@@ -2744,8 +2707,7 @@ def copy_order(id):
     req_data = request.get_json(silent=True) or {}
     source_lines = query_all("SELECT * FROM sales_order_lines WHERE sales_order_id = %s ORDER BY line_num ASC", (id,))
 
-    seq_val = get_next_sequence_val('so_number_seq')
-    new_order_number = f"SO-{seq_val:06d}"
+    new_order_number = get_next_order_number('SO', branch_id=order.get('branch_id'))
 
     import re
     raw_notes = (req_data.get('notes') if 'notes' in req_data else order.get('notes') or '').strip()
@@ -2954,8 +2916,7 @@ def create_po_from_sales(id):
         flash("No active vendor found. Please create a vendor first.", "error")
         return redirect(url_for('sales_orders.detail_order', id=id))
 
-    seq_val = get_next_sequence_val('po_number_seq')
-    po_number = f"PO-{seq_val:06d}"
+    po_number = get_next_order_number('PO')
 
     location_id = order.get('location_id')
     if not location_id:
@@ -3059,8 +3020,7 @@ def create_dropship_po_from_sales(id):
         flash("No active vendor found. Please create a vendor first.", "error")
         return redirect(url_for('sales_orders.detail_order', id=id))
 
-    seq_val = get_next_sequence_val('po_number_seq')
-    po_number = f"PO-{seq_val:06d}"
+    po_number = get_next_order_number('PO')
 
     location_id = order.get('location_id')
     if not location_id:

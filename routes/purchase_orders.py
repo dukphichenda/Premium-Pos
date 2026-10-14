@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
-from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val
+from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number
 from datetime import datetime, date
 
 purchase_orders_bp = Blueprint('purchase_orders', __name__)
@@ -343,15 +343,7 @@ def create_purchase():
         drawer_data = _get_po_drawer_data(date_filter, status_filter, vendor_search, order_search)
 
         # Calculate preview PO number
-        try:
-            seq_res = query_one("SELECT last_value, is_called FROM po_number_seq;")
-            if seq_res:
-                next_num = seq_res['last_value'] + (1 if seq_res['is_called'] else 0)
-            else:
-                next_num = 1
-        except Exception:
-            next_num = 1
-        preview_po_number = f"PO-{next_num:06d}"
+        preview_po_number = preview_order_number('PO')
 
         prefill_vendor_id = request.args.get('vendor_id')
         prefill_vendor = None
@@ -527,8 +519,7 @@ def create_purchase():
             flash("Please add at least one line item.", "error")
             return redirect(url_for('purchase_orders.create_purchase'))
 
-        seq_val = get_next_sequence_val('po_number_seq')
-        order_number = f"PO-{seq_val:06d}"
+        order_number = get_next_order_number('PO')
 
         subtotal = 0.0
         lines_data = []
@@ -887,8 +878,7 @@ def copy_purchase(id):
 
         lines = query_all("SELECT * FROM purchase_order_lines WHERE purchase_order_id = %s ORDER BY line_num ASC", (id,))
         
-        seq_val = get_next_sequence_val('po_number_seq')
-        new_order_number = f"PO-{seq_val:06d}"
+        new_order_number = get_next_order_number('PO')
         
         with get_db_cursor(commit=True) as cur:
             cur.execute("""

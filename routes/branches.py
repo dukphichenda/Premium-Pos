@@ -7,7 +7,7 @@ import uuid
 import json
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, current_app
-from database import query_one, query_all, execute, get_db_cursor, get_next_sequence_val, execute_returning_id
+from database import query_one, query_all, execute, get_db_cursor, get_next_sequence_val, execute_returning_id, get_next_order_number
 
 branches_bp = Blueprint('branches', __name__)
 
@@ -919,13 +919,7 @@ def branch_checkout(id):
             target_loc_id = wh_row['id'] if wh_row else 101
             target_loc_name = wh_row['name'] if wh_row else 'STM Warehouse'
 
-            cur.execute(f"CREATE SEQUENCE IF NOT EXISTS so_branch_{id}_seq START 1;")
-            cur.execute(f"SELECT nextval('so_branch_{id}_seq') as seq;")
-            seq_val = cur.fetchone()['seq']
-            prefix = (branch.get('so_prefix') or f"SO-{branch['code']}-").strip().upper()
-            if not prefix.endswith('-'):
-                prefix += '-'
-            order_number = f"{prefix}{seq_val:05d}"
+            order_number = get_next_order_number('SO', branch_id=id, cur=cur)
 
             # 1. Lock and validate inventory at target warehouse & verify official prices
             calc_subtotal = 0.0

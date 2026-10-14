@@ -5,7 +5,7 @@ import re
 import logging
 from datetime import datetime
 import dateutil.parser
-from database import query_all, query_one, execute, execute_returning_id, get_db_cursor
+from database import query_all, query_one, execute, execute_returning_id, get_db_cursor, resync_all_sequences
 
 logger = logging.getLogger('inflow.csv_exchange')
 
@@ -1365,6 +1365,9 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     cur.connection.commit()
                     logger.info(f"Sales order import progress: {batch_count}/{total_orders} orders committed.")
 
+            # Automatically resynchronize sequences after importing sales orders
+            resync_all_sequences(cur=cur)
+
     # =========================================================================
     # 6. PURCHASE ORDER IMPORT
     # =========================================================================
@@ -1479,6 +1482,9 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
                 cur.execute("UPDATE purchase_orders SET subtotal = %s, total_amount = %s WHERE id = %s;",
                             (total_subtotal, total_subtotal, po_id))
+
+            # Automatically resynchronize sequences after importing purchase orders
+            resync_all_sequences(cur=cur)
 
     mode_text = "cleanly replaced" if is_erase_mode else "processed"
     msg = f"Import completed successfully! {imported_cnt} records added, {updated_cnt} updated"
