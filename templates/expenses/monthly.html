@@ -86,7 +86,7 @@
                 <span>Summary Dashboard</span>
             </a>
             {% for tab in month_tabs %}
-            <a href="{{ url_for('expenses.monthly_expenses', month=tab.key) }}" 
+            <a href="{{ url_for('expenses.monthly_expenses', month=tab.key, branch=branch_scope) }}" 
                class="sheet-tab-item {% if tab.key == current_month %}active{% endif %}">
                 <span class="sheet-tab-icon">📊</span>
                 <span>{{ tab.label }}</span>
@@ -99,6 +99,38 @@
                 +
             </button>
         </div>
+    </div>
+
+    <!-- Store Scope Bar (Separate HQ from Branches) -->
+    <div style="background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 16px;">🏪</span>
+            <span style="font-size: 13px; font-weight: 700; color: #1E293B;" class="font-khmer">Store Scope (ទិន្នន័យតាមហាង / សាខា):</span>
+            <span style="font-size: 12px; font-weight: 800; color: #0284C7; background: #E0F2FE; padding: 2px 8px; border-radius: 4px; border: 1px solid #BAE6FD;">{{ current_store_name }}</span>
+        </div>
+        {% if is_main_admin %}
+        <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap;">
+            <a href="{{ url_for('expenses.monthly_expenses', month=current_month, branch='main') }}"
+               class="btn btn-sm {% if branch_scope == 'main' %}btn-primary{% else %}btn-outline{% endif %}"
+               style="font-size: 11.5px; font-weight: 700; text-decoration: none; padding: 4px 11px; border-radius: 6px; {% if branch_scope == 'main' %}background: #0284C7; border-color: #0284C7; color: #FFF;{% endif %}">
+                🏢 Main Store (HQ)
+            </a>
+            <a href="{{ url_for('expenses.monthly_expenses', month=current_month, branch='all') }}"
+               class="btn btn-sm {% if branch_scope == 'all' %}btn-primary{% else %}btn-outline{% endif %}"
+               style="font-size: 11.5px; font-weight: 700; text-decoration: none; padding: 4px 11px; border-radius: 6px; {% if branch_scope == 'all' %}background: #0284C7; border-color: #0284C7; color: #FFF;{% endif %}">
+                🌐 All Combined
+            </a>
+            {% for br in branches %}
+            <a href="{{ url_for('expenses.monthly_expenses', month=current_month, branch=br.id) }}"
+               class="btn btn-sm {% if branch_scope == br.id|string %}btn-primary{% else %}btn-outline{% endif %}"
+               style="font-size: 11.5px; font-weight: 700; text-decoration: none; padding: 4px 11px; border-radius: 6px; {% if branch_scope == br.id|string %}background: #0284C7; border-color: #0284C7; color: #FFF;{% endif %}">
+                🏪 {{ br.code }} ({{ br.name }})
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <span style="font-size: 11.5px; color: #64748B; font-weight: 600;">🔒 Locked to {{ current_store_name }}</span>
+        {% endif %}
     </div>
 
     <!-- Executive Financial KPI Summary Cards (Matching Columns A-I of Google Sheet) -->
@@ -166,12 +198,19 @@
         <!-- 5. Customer Receipts (លុយលក់) -->
         <div class="expense-kpi-card teal-accent">
             <div class="kpi-card-header">
-                <span class="kpi-label">លុយលក់ (Sales)</span>
-                <span class="kpi-tag teal">{% if is_custom_sales %}Custom{% else %}inFlow Live{% endif %}</span>
+                <span class="kpi-label">លុយលក់ ({{ current_store_name }})</span>
+                <span class="kpi-tag teal">{% if is_custom_sales %}Custom{% else %}inFlow Live{% if current_store_code %} ({{ current_store_code }}){% endif %}{% endif %}</span>
             </div>
             <div class="kpi-card-value teal-text">${{ "{:,.2f}".format(sales_received) }}</div>
             <div class="kpi-card-sub">
                 Invoiced: ${{ "{:,.2f}".format(inflow_data.total_invoiced) }} ({{ inflow_data.paid_invoice_count }} paid)
+                {% if branch_scope == 'main' %}
+                <span style="display: block; font-size: 11px; color: #0284C7; margin-top: 2px;">• HQ Store Only (No Branch Mix)</span>
+                {% elif branch_scope == 'all' %}
+                <span style="display: block; font-size: 11px; color: #64748B; margin-top: 2px;">• All Branches Combined</span>
+                {% else %}
+                <span style="display: block; font-size: 11px; color: #10B981; margin-top: 2px;">• {{ current_store_name }} Only</span>
+                {% endif %}
             </div>
         </div>
 

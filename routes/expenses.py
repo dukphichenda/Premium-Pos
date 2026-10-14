@@ -104,12 +104,25 @@ def _get_available_months():
         months.insert(0, current_ym)
     return sorted(list(set(months)), reverse=True)
 
-def _get_inflow_sales_data(month_key):
+def _get_inflow_sales_data(month_key, branch_id='main'):
     """
-    Returns inFlow sales metrics for a given month.
-    Takes only paid sales money for that month (excluding CANCELLED orders).
+    Returns inFlow sales metrics for a given month scoped to a store/branch:
+    - 'main' or None: strictly Main Store HQ sales (branch_id IS NULL)
+    - digit or int: strictly that branch (branch_id = %s)
+    - 'all': all stores combined
     """
-    so_stats = query_one("""
+    if str(branch_id).lower() == 'all':
+        branch_clause = ""
+        params = (month_key,)
+    elif branch_id and str(branch_id).isdigit():
+        branch_clause = "AND branch_id = %s"
+        params = (month_key, int(branch_id))
+    else:
+        # Default is Main Store HQ only (branch_id IS NULL)
+        branch_clause = "AND branch_id IS NULL"
+        params = (month_key,)
+
+    so_stats = query_one(f"""
         SELECT 
             COUNT(*) as invoice_count,
             COUNT(CASE WHEN status = 'PAID' OR payment_status = 'PAID' THEN 1 END) as paid_invoice_count,
@@ -118,7 +131,8 @@ def _get_inflow_sales_data(month_key):
         FROM sales_orders
         WHERE TO_CHAR(order_date, 'YYYY-MM') = %s
           AND status != 'CANCELLED'
-    """, (month_key,))
+          {branch_clause}
+    """, params)
 
     invoiced = float(so_stats['total_invoiced'] if so_stats else 0.0)
     paid = float(so_stats['total_paid'] if so_stats else 0.0)
@@ -130,7 +144,7 @@ def _get_inflow_sales_data(month_key):
         'total_paid': paid
     }
 
-def _calculate_month_money_in_hand(month_key, visited=None):
+def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
     """
     Calculate Money in Hand for a month:
     Money in Hand = (Opening Balance + Clear STM + Media Total + Customer Receipts) - Total Expenses
@@ -157,7 +171,7 @@ def _calculate_month_money_in_hand(month_key, visited=None):
             closest = query_one("SELECT month_key FROM monthly_cash_summaries WHERE month_key < %s ORDER BY month_key DESC LIMIT 1", (month_key,))
             if closest:
                 prev_m = closest['month_key']
-        opening = _calculate_month_money_in_hand(prev_m, visited) if prev_m else 0.0
+        opening = _calculate_month_money_in_hand(prev_m, visited, branch_id=branch_id) if prev_m else 0.0
 
     # 2. Clear STM
     stm = float(summary['clear_stm'] or 0) if summary else 0.0
@@ -179,7 +193,7 @@ def _calculate_month_money_in_hand(month_key, visited=None):
     if summary and summary.get('custom_sales_income') is not None:
         sales = float(summary['custom_sales_income'] or 0)
     else:
-        sales = _get_inflow_sales_data(month_key)['total_paid']
+        sales = _get_inflow_sales_data(month_key, branch_id=branch_id)['total_paid']
 
     # 5. Total Expenses
     exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s", (month_key,))
@@ -204,17 +218,31 @@ def _get_or_create_monthly_summary(month_key):
 
     return summary
 
-def _get_monthly_report_data(month_key):
-    """Calculates and aggregates complete financial data for a given month."""
+def _get_monthly_report_data(month_key, branch_id='main'):
+    """Calculates and aggregates complete financial data for a given month and branch/store scope."""
     summary = _get_or_create_monthly_summary(month_key)
-    inflow_data = _get_inflow_sales_data(month_key)
+    inflow_data = _get_inflow_sales_data(month_key, branch_id=branch_id)
 
     # 1. Daily expenses
-    expenses = query_all("""
-        SELECT * FROM expenses
-        WHERE month_key = %s
-        ORDER BY expense_date ASC, id ASC
-    """, (month_key,))
+    if branch_id and str(branch_id).isdigit():
+        expenses = query_all("""
+            SELECT * FROM expenses
+            WHERE month_key = %s AND branch_id = %s
+            ORDER BY expense_date ASC, id ASC
+        """, (month_key, int(branch_id)))
+    elif str(branch_id).lower() == 'all':
+        expenses = query_all("""
+            SELECT * FROM expenses
+            WHERE month_key = %s
+            ORDER BY expense_date ASC, id ASC
+        """, (month_key,))
+    else:
+        # Default Main Store (branch_id IS NULL or 0)
+        expenses = query_all("""
+            SELECT * FROM expenses
+            WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)
+            ORDER BY expense_date ASC, id ASC
+        """, (month_key,))
     total_expenses = sum(float(e['total_price'] or 0) for e in expenses)
 
     # 2. Media receipts & Media money logic
@@ -237,7 +265,7 @@ def _get_monthly_report_data(month_key):
 
     # 3. Dynamic Opening Balance logic
     prev_m = _get_previous_month_key(month_key)
-    prev_money_in_hand = _calculate_month_money_in_hand(prev_m) if prev_m else 0.0
+    prev_money_in_hand = _calculate_month_money_in_hand(prev_m, branch_id=branch_id) if prev_m else 0.0
 
     is_manual_opening = (summary.get('manual_opening_balance') is not None)
     if is_manual_opening:
@@ -295,6 +323,29 @@ def _get_monthly_report_data(month_key):
 @expenses_bp.route('/expenses')
 @expenses_bp.route('/expenses/monthly')
 def monthly_expenses():
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role == 'main_admin')
+
+    if not is_main_admin and user_bid:
+        branch_scope = str(user_bid)
+        branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,))
+    else:
+        branch_scope = request.args.get('branch', 'main').strip().lower()
+        branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+
+    # Resolve store names
+    if branch_scope == 'main':
+        current_store_name = 'Main Store (HQ)'
+        current_store_code = 'HQ'
+    elif branch_scope == 'all':
+        current_store_name = 'All Combined'
+        current_store_code = 'ALL'
+    else:
+        matching = next((b for b in branches if str(b['id']) == branch_scope), None)
+        current_store_name = f"{matching['code']} - {matching['name']}" if matching else f"Branch {branch_scope}"
+        current_store_code = matching['code'] if matching else 'Branch'
+
     month_key = request.args.get('month', '').strip()
     if not month_key:
         month_key = _get_current_month_key()
@@ -304,7 +355,7 @@ def monthly_expenses():
         all_months.insert(0, month_key)
 
     month_tabs = [{'key': m, 'label': _format_month_display(m)} for m in all_months]
-    report_data = _get_monthly_report_data(month_key)
+    report_data = _get_monthly_report_data(month_key, branch_id=branch_scope)
 
     # Categories list
     categories = query_all("SELECT DISTINCT category FROM expenses WHERE category IS NOT NULL AND category != '' ORDER BY category ASC")
@@ -324,6 +375,11 @@ def monthly_expenses():
                            current_month=month_key,
                            month_tabs=month_tabs,
                            month_display=report_data['month_display'],
+                           branch_scope=branch_scope,
+                           branches=branches,
+                           current_store_name=current_store_name,
+                           current_store_code=current_store_code,
+                           is_main_admin=is_main_admin,
                            expenses=report_data['expenses'],
                            summary=report_data['summary'],
                            inflow_data=report_data['inflow_data'],

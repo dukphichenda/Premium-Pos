@@ -6,27 +6,62 @@
 <!-- Top Accent Bar (inFlow Gold/Orange for Main Store Homepage) -->
 <div class="inflow-top-accent-bar home"></div>
 
-<!-- Main Store (HQ) Enterprise Header Banner -->
+<!-- Store Scope Selector Bar (Separate Data for Each Store) -->
+<div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 5px;">
+            <span>🏪</span> Store Scope (ទិន្នន័យតាមហាង):
+        </span>
+        <a href="{{ url_for('dashboard.index', branch='main') }}" 
+           style="padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid {% if branch_scope == 'main' %}#0284C7{% else %}#CBD5E1{% endif %}; background: {% if branch_scope == 'main' %}#E0F2FE{% else %}#F8FAFC{% endif %}; color: {% if branch_scope == 'main' %}#0369A1{% else %}#475569{% endif %};">
+            <span>🏢</span> Main Store (HQ)
+        </a>
+        {% for b in branches %}
+        <a href="{{ url_for('dashboard.index', branch=b.id) }}" 
+           style="padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid {% if branch_scope == b.id|string %}#10B981{% else %}#CBD5E1{% endif %}; background: {% if branch_scope == b.id|string %}#D1FAE5{% else %}#F8FAFC{% endif %}; color: {% if branch_scope == b.id|string %}#065F46{% else %}#475569{% endif %};">
+            <span>🏪</span> {{ b.code }} ({{ b.name }})
+        </a>
+        {% endfor %}
+        <a href="{{ url_for('dashboard.index', branch='all') }}" 
+           style="padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid {% if branch_scope == 'all' %}#6366F1{% else %}#CBD5E1{% endif %}; background: {% if branch_scope == 'all' %}#EEF2FF{% else %}#F8FAFC{% endif %}; color: {% if branch_scope == 'all' %}#4338CA{% else %}#475569{% endif %};">
+            <span>🌐</span> All Outlets Combined
+        </a>
+    </div>
+    <div style="font-size: 12px; color: #64748B;">
+        Active Store: <strong style="color: #0F172A;">{{ current_store_name }}</strong>
+        <span style="background: #FEF3C7; color: #B45309; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-left: 6px;">ISOLATED DATA</span>
+    </div>
+</div>
+
+<!-- Enterprise Store Header Banner -->
 <div style="background: linear-gradient(90deg, #1E293B 0%, #0F172A 100%); color: #FFFFFF; border-radius: 8px; padding: 18px 22px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; box-shadow: 0 4px 14px rgba(15, 23, 42, 0.25); border: 1px solid #334155;">
     <div style="display: flex; align-items: center; gap: 14px;">
-        <div style="width: 48px; height: 48px; border-radius: 10px; background: rgba(245, 158, 11, 0.18); border: 1px solid rgba(245, 158, 11, 0.4); display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;">
-            🏢
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: {% if branch_scope == 'main' %}rgba(245, 158, 11, 0.18){% elif branch_scope == 'all' %}rgba(99, 102, 241, 0.2){% else %}rgba(16, 185, 129, 0.2){% endif %}; border: 1px solid {% if branch_scope == 'main' %}rgba(245, 158, 11, 0.4){% elif branch_scope == 'all' %}rgba(99, 102, 241, 0.4){% else %}rgba(16, 185, 129, 0.4){% endif %}; display: flex; align-items: center; justify-content: center; font-size: 26px; flex-shrink: 0;">
+            {% if branch_scope == 'main' %}🏢{% elif branch_scope == 'all' %}🌐{% else %}🏪{% endif %}
         </div>
         <div>
             <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                <h1 style="font-size: 1.45rem; font-weight: 800; color: #FFFFFF; margin: 0; line-height: 1.2;" class="font-khmer">Main Store (Headquarters & Central Fulfillment)</h1>
+                <h1 style="font-size: 1.45rem; font-weight: 800; color: #FFFFFF; margin: 0; line-height: 1.2;" class="font-khmer">
+                    {{ current_store_name }}
+                </h1>
+                {% if branch_scope == 'main' %}
                 <span style="background: rgba(245, 158, 11, 0.2); color: #FBBF24; border: 1px solid rgba(245, 158, 11, 0.4); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: 0.05em;">ENTERPRISE HQ</span>
+                {% elif branch_scope == 'all' %}
+                <span style="background: rgba(99, 102, 241, 0.2); color: #A5B4FC; border: 1px solid rgba(99, 102, 241, 0.4); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: 0.05em;">ALL OUTLETS COMBINED</span>
+                {% else %}
+                <span style="background: rgba(16, 185, 129, 0.2); color: #6EE7B7; border: 1px solid rgba(16, 185, 129, 0.4); font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 4px; font-family: monospace; letter-spacing: 0.05em;">BRANCH {{ current_store_code }}</span>
+                {% endif %}
                 <span style="background: #22C55E; color: #FFFFFF; font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 4px; display: flex; align-items: center; gap: 4px;">
                     <span style="width: 6px; height: 6px; background: #FFFFFF; border-radius: 50%; display: inline-block;"></span>
-                    CENTRAL ACTIVE
+                    ISOLATED SCOPE
                 </span>
             </div>
             <div style="font-size: 12.5px; color: #94A3B8; margin-top: 5px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                <span>📍 Central Fulfillment Location: <strong style="color: #F1F5F9;">{{ central_wh.name if central_wh else 'Central Warehouse' }}</strong></span>
+                <span>📍 Fulfillment Warehouse: <strong style="color: #F1F5F9;">{{ central_wh.name if central_wh else 'Central Warehouse' }}</strong></span>
                 <span>•</span>
                 <span>📦 Catalog: <strong style="color: #F1F5F9;">{{ kpis.total_products }} Products</strong></span>
                 <span>•</span>
-                <span>🏪 Network: <strong style="color: #F1F5F9;">{{ kpis.active_branches_count }} Active Branches</strong></span>
+                <span>🏪 Registered Branches: <strong style="color: #F1F5F9;">{{ kpis.active_branches_count }} Active Outlets</strong></span>
                 <span>•</span>
                 <span>💵 Currency: <strong style="color: #F1F5F9;">USD ($)</strong></span>
             </div>
@@ -254,25 +289,27 @@
     <!-- 3. Month Invoiced Sales -->
     <div class="kpi-card">
         <div class="kpi-header">
-            <span class="kpi-label">Month Sales</span>
+            <span class="kpi-label">Month Sales ({{ current_store_code }})</span>
             <div class="kpi-icon" style="background-color: #D1FAE5; color: #059669;">
                 <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
             </div>
         </div>
         <div class="kpi-value" style="color: #059669;">{{ kpis.month_sales_total | currency }}</div>
-        <div class="kpi-subtext">{{ kpis.pending_sales_orders }} orders in fulfillment</div>
+        <div class="kpi-subtext">
+            Paid: <strong style="color: #0284C7;">${{ "{:,.2f}".format(kpis.month_paid_total or 0) }}</strong> • {{ kpis.pending_sales_orders }} open
+        </div>
     </div>
 
     <!-- 4. Customer Receivables (A/R) -->
     <div class="kpi-card">
         <div class="kpi-header">
-            <span class="kpi-label">Customer Receivables</span>
+            <span class="kpi-label">Receivables ({{ current_store_code }})</span>
             <div class="kpi-icon" style="background-color: #FEF3C7; color: #D97706;">
                 <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
             </div>
         </div>
         <div class="kpi-value" style="color: #D97706;">{{ kpis.total_receivables | currency }}</div>
-        <div class="kpi-subtext">Outstanding balances due</div>
+        <div class="kpi-subtext">Uncollected balance for {{ current_store_code }}</div>
     </div>
 
     <!-- 5. Low Stock Alerts -->
@@ -308,10 +345,10 @@
     <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
             <div>
-                <h2 class="card-title" style="margin: 0;">Monthly Sales & Profit Breakdown</h2>
+                <h2 class="card-title" style="margin: 0;">Monthly Sales & Profit Breakdown - {{ current_store_name }}</h2>
                 <div style="font-size: 0.78rem; color: #64748B;">Total Paid Sale, Open Sale & Profit (Last 12 Months)</div>
             </div>
-            <span class="badge" style="background: #E0F2FE; color: #0284C7; font-weight: 700; font-size: 11px;">HQ DIRECT SALES</span>
+            <span class="badge" style="background: #E0F2FE; color: #0284C7; font-weight: 700; font-size: 11px;">{{ current_store_code }} DIRECT SALES</span>
         </div>
         <div style="height: 280px;">
             <canvas id="revenueTrendChart"></canvas>
@@ -333,73 +370,138 @@
     </div>
 </div>
 
-<!-- Multi-Store Branch Outlets & Network Performance Overview (Clean Enterprise Widget) -->
+<!-- Multi-Store Outlets & Separate Performance Overview (Strict Store Isolation) -->
 <div class="card" style="margin-bottom: 24px; padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">
     <div style="padding: 14px 18px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div style="display: flex; align-items: center; gap: 10px;">
             <div style="width: 32px; height: 32px; border-radius: 6px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center; font-size: 17px;">🏪</div>
             <div>
-                <h3 style="font-size: 14px; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">Branch Outlets Network & Fulfillment (បណ្តាញសាខាហាង)</h3>
-                <div style="font-size: 11.5px; color: #64748B;">All retail branches deduct stock atomically in real time from Central Warehouse</div>
+                <h3 style="font-size: 14px; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">Separate Store & Branch Performance (ទិន្នន័យដាច់ដោយឡែកតាមសាខា)</h3>
+                <div style="font-size: 11.5px; color: #64748B;">Each store's monthly sales, customer receipts (paid), daily volume, and receivables shown separately</div>
             </div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
             <a href="{{ url_for('branches.list_branches') }}" style="font-size: 12px; color: #0284C7; font-weight: 700; text-decoration: none;">Manage All Branches →</a>
         </div>
     </div>
+
+    <!-- Side-by-Side Store Performance Cards Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; padding: 16px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+        {% for sp in store_performances %}
+        <div style="background: #FFFFFF; border: 1.5px solid {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}#0284C7{% else %}#E2E8F0{% endif %}; border-radius: 8px; padding: 14px 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <!-- Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-weight: 800; font-family: monospace; background: {% if sp.is_hq %}#FEF3C7; color: #B45309;{% else %}#E0F2FE; color: #0369A1;{% endif %} padding: 3px 8px; border-radius: 4px; font-size: 11.5px;">
+                            {{ sp.code }}
+                        </span>
+                        <div>
+                            <div style="font-weight: 800; font-size: 13.5px; color: #0F172A;" class="font-khmer">{{ sp.name }}</div>
+                            <div style="font-size: 11px; color: #64748B;">📍 {{ sp.location_name }}</div>
+                        </div>
+                    </div>
+                    {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}
+                    <span style="background: #0284C7; color: #FFFFFF; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 4px;">CURRENT</span>
+                    {% endif %}
+                </div>
+
+                <!-- Month Sales & Paid Inflow -->
+                <div style="background: #F8FAFC; border: 1px solid #EEF2F6; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                        <span style="font-size: 11.5px; font-weight: 600; color: #475569;">Month Invoiced:</span>
+                        <strong style="font-size: 13.5px; color: #059669;">${{ "{:,.2f}".format(sp.month_sales) }}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                        <span style="font-size: 11.5px; font-weight: 700; color: #0284C7;">Customer Paid (លុយលក់):</span>
+                        <strong style="font-size: 13.5px; color: #0284C7;">${{ "{:,.2f}".format(sp.month_paid) }}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; color: #64748B;">
+                        <span>Month Orders:</span>
+                        <span style="font-weight: 600;">{{ sp.month_orders }} orders</span>
+                    </div>
+                </div>
+
+                <!-- Today & Receivables -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; font-size: 11.5px;">
+                    <div style="background: #F1F5F9; border-radius: 5px; padding: 6px 8px;">
+                        <div style="color: #64748B; font-size: 10.5px;">Today Sales:</div>
+                        <div style="font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(sp.today_sales) }} <span style="font-size: 10px; color: #64748B;">({{ sp.today_orders }})</span></div>
+                    </div>
+                    <div style="background: #FEF3C7; border-radius: 5px; padding: 6px 8px;">
+                        <div style="color: #92400E; font-size: 10.5px;">Balance Due:</div>
+                        <div style="font-weight: 700; color: #B45309;">${{ "{:,.2f}".format(sp.all_receivables) }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Actions -->
+            <div style="display: flex; gap: 6px; align-items: center; justify-content: space-between; border-top: 1px solid #F1F5F9; padding-top: 10px;">
+                <a href="{{ url_for('dashboard.index', branch=sp.id) }}" class="btn btn-sm" style="font-size: 11px; font-weight: 700; text-decoration: none; padding: 4px 10px; border-radius: 4px; {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}background: #E2E8F0; color: #475569; pointer-events: none;{% else %}background: #0284C7; color: #FFFFFF;{% endif %}">
+                    {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}✓ Active Scope{% else %}View {{ sp.code }} Dashboard →{% endif %}
+                </a>
+                <a href="{% if sp.is_hq %}{{ url_for('sales_orders.list_orders') }}{% else %}{{ url_for('sales_orders.list_orders', branch=sp.id) }}{% endif %}" style="font-size: 11px; color: #0284C7; font-weight: 600; text-decoration: none;">
+                    Orders ({{ sp.all_orders }}) →
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Detailed Store Matrix Table -->
     <div class="table-container" style="border: none;">
         <table class="data-table" style="width: 100%; border-collapse: collapse;">
             <thead>
                 <tr style="background: #F1F5F9; font-size: 11.5px; color: #475569;">
-                    <th style="padding: 10px 16px; text-align: left;">Branch</th>
-                    <th style="padding: 10px 14px; text-align: left;">Fulfillment Warehouse</th>
-                    <th style="padding: 10px 14px; text-align: left;">Manager / Contact</th>
+                    <th style="padding: 10px 16px; text-align: left;">Store / Branch</th>
+                    <th style="padding: 10px 14px; text-align: left;">Warehouse</th>
+                    <th style="padding: 10px 14px; text-align: right;">Month Invoiced</th>
+                    <th style="padding: 10px 14px; text-align: right;">Month Paid (Receipts)</th>
+                    <th style="padding: 10px 14px; text-align: right;">Today Sales</th>
                     <th style="padding: 10px 14px; text-align: right;">Total Orders</th>
                     <th style="padding: 10px 14px; text-align: right;">Total Revenue</th>
-                    <th style="padding: 10px 14px; text-align: center;">Status</th>
-                    <th style="padding: 10px 16px; text-align: center;">Actions</th>
+                    <th style="padding: 10px 14px; text-align: right;">Receivables Due</th>
+                    <th style="padding: 10px 16px; text-align: center;">Dashboard View</th>
                 </tr>
             </thead>
             <tbody>
-                {% for b in branch_summaries %}
-                <tr style="border-bottom: 1px solid #F1F5F9; font-size: 12.5px;">
+                {% for sp in store_performances %}
+                <tr style="border-bottom: 1px solid #F1F5F9; font-size: 12.5px; {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}background: #F0F9FF;{% endif %}">
                     <td style="padding: 12px 16px;">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span style="font-weight: 800; font-family: monospace; background: #E0F2FE; color: #0369A1; padding: 2px 7px; border-radius: 4px; font-size: 11px;">{{ b.code }}</span>
-                            <span style="font-weight: 700; color: #0F172A;" class="font-khmer">{{ b.name }}</span>
+                            <span style="font-weight: 800; font-family: monospace; background: {% if sp.is_hq %}#FEF3C7; color: #B45309;{% else %}#E0F2FE; color: #0369A1;{% endif %} padding: 2px 7px; border-radius: 4px; font-size: 11px;">{{ sp.code }}</span>
+                            <span style="font-weight: 700; color: #0F172A;" class="font-khmer">{{ sp.name }}</span>
+                            {% if sp.is_hq %}
+                            <span style="background: #F59E0B; color: #FFFFFF; font-size: 10px; font-weight: 800; padding: 1px 5px; border-radius: 3px;">HQ</span>
+                            {% endif %}
                         </div>
                     </td>
                     <td style="padding: 12px 14px; color: #475569;">
-                        {{ b.location_name or 'Main Warehouse' }}
+                        {{ sp.location_name }}
                     </td>
-                    <td style="padding: 12px 14px; color: #334155;">
-                        <div>{{ b.manager_name or 'Store Staff' }}</div>
-                        {% if b.phone %}
-                        <div style="font-size: 11px; color: #64748B;">{{ b.phone }}</div>
-                        {% endif %}
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #059669;">
+                        ${{ "{:,.2f}".format(sp.month_sales) }}
                     </td>
                     <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #0284C7;">
-                        {{ b.total_orders }}
+                        ${{ "{:,.2f}".format(sp.month_paid) }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 600; color: #0F172A;">
+                        ${{ "{:,.2f}".format(sp.today_sales) }}
+                    </td>
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #0284C7;">
+                        {{ sp.all_orders }}
                     </td>
                     <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: #10B981;">
-                        {{ b.total_revenue | currency }}
+                        ${{ "{:,.2f}".format(sp.all_revenue) }}
                     </td>
-                    <td style="padding: 12px 14px; text-align: center;">
-                        {% if b.is_active %}
-                        <span class="badge" style="background: #DCFCE7; color: #15803D; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">ACTIVE</span>
-                        {% else %}
-                        <span class="badge" style="background: #F1F5F9; color: #64748B; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">INACTIVE</span>
-                        {% endif %}
+                    <td style="padding: 12px 14px; text-align: right; font-weight: 700; color: {% if sp.all_receivables > 0 %}#D97706{% else %}#64748B{% endif %};">
+                        ${{ "{:,.2f}".format(sp.all_receivables) }}
                     </td>
                     <td style="padding: 12px 16px; text-align: center;">
-                        <a href="{{ url_for('branches.view_branch', id=b.id) }}" class="btn btn-sm btn-secondary" style="font-size: 11px; font-weight: 600; text-decoration: none; padding: 3px 10px;">
-                            View Details
+                        <a href="{{ url_for('dashboard.index', branch=sp.id) }}" class="btn btn-sm btn-secondary" style="font-size: 11px; font-weight: 600; text-decoration: none; padding: 3px 10px; {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}background: #0284C7; color: #FFFFFF; border-color: #0284C7;{% endif %}">
+                            {% if (sp.is_hq and branch_scope == 'main') or branch_scope == sp.id %}Active View{% else %}Switch View →{% endif %}
                         </a>
                     </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" style="text-align: center; color: #94A3B8; padding: 24px;">No branch stores registered yet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -462,8 +564,8 @@
     <!-- Recent Sales Orders -->
     <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="card-title" style="margin: 0;">Recent Sales Orders (HQ)</h2>
-            <a href="{{ url_for('sales_orders.list_orders') }}" style="font-size: 0.8rem; color: #0284C7; font-weight: 700; text-decoration: none;">View All Orders →</a>
+            <h2 class="card-title" style="margin: 0;">Recent Sales Orders ({{ current_store_code }})</h2>
+            <a href="{% if branch_scope == 'main' %}{{ url_for('sales_orders.list_orders') }}{% else %}{{ url_for('sales_orders.list_orders', branch=branch_scope) }}{% endif %}" style="font-size: 0.8rem; color: #0284C7; font-weight: 700; text-decoration: none;">View All Orders →</a>
         </div>
         <div class="table-container" style="border: none;">
             <table class="data-table">
@@ -506,7 +608,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="4" style="text-align: center; color: #94A3B8; padding: 24px;">No sales orders recorded yet.</td>
+                        <td colspan="4" style="text-align: center; color: #94A3B8; padding: 24px;">No sales orders recorded yet for {{ current_store_name }}.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -565,7 +667,7 @@
     <!-- Top Selling Products -->
     <div class="card">
         <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
-            <h2 class="card-title" style="margin: 0;">Top Selling Products</h2>
+            <h2 class="card-title" style="margin: 0;">Top Selling Products ({{ current_store_code }})</h2>
             <a href="{{ url_for('products.list_products') }}" style="font-size: 0.8rem; color: #0284C7; font-weight: 700; text-decoration: none;">Catalog →</a>
         </div>
         <div class="table-container" style="border: none;">
@@ -608,7 +710,7 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    fetch('/api/dashboard/charts')
+    fetch('/api/dashboard/charts?branch=' + encodeURIComponent('{{ branch_scope }}'))
         .then(res => res.json())
         .then(data => {
             // 3-Column Monthly Financial Breakdown Chart (Total Paid Sale, Open Sale, Profit)

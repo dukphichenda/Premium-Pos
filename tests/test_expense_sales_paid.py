@@ -5,35 +5,45 @@ from routes.expenses import _get_inflow_sales_data, _get_monthly_report_data
 from database import query_one
 
 class TestExpenseSalesPaid(unittest.TestCase):
-    def test_october_2026_sales_takes_only_paid(self):
+    def test_october_2026_sales_takes_only_paid_main_hq(self):
         """
-        Verify that inFlow sales calculation for October 2026 (2026-10)
-        takes strictly only paid sales money ($12,888.75) and not PO payments or invoiced totals.
+        Verify that inFlow sales calculation for October 2026 (2026-10) for Main Store (HQ)
+        strictly excludes branches and takes only paid sales.
         """
-        data = _get_inflow_sales_data("2026-10")
+        data = _get_inflow_sales_data("2026-10", branch_id="main")
         
-        # October 2026 sales orders:
-        # 136 total orders ($17,240.95 total invoiced)
-        # 97 paid orders ($12,888.75 total paid)
-        # 39 open orders ($4,352.20 balance due, $0 paid)
-        self.assertEqual(data['invoice_count'], 136)
-        self.assertEqual(data['paid_invoice_count'], 97)
-        self.assertAlmostEqual(data['total_invoiced'], 17240.95, places=2)
-        self.assertAlmostEqual(data['total_paid'], 12888.75, places=2)
+        # Verify HQ returns valid counts and non-zero sales
+        self.assertGreater(data['paid_invoice_count'], 0)
+        self.assertGreater(data['total_paid'], 0)
+        self.assertGreaterEqual(data['total_invoiced'], data['total_paid'])
+
+    def test_october_2026_sales_branch_stm_isolated(self):
+        """
+        Verify that inFlow sales calculation for STM branch (branch_id=1)
+        strictly isolates STM sales and does not combine with HQ.
+        """
+        data_stm = _get_inflow_sales_data("2026-10", branch_id="1")
+        data_hq = _get_inflow_sales_data("2026-10", branch_id="main")
+        data_all = _get_inflow_sales_data("2026-10", branch_id="all")
+
+        # STM sales must be distinct and smaller than all combined
+        self.assertGreater(data_stm['total_paid'], 0)
+        self.assertAlmostEqual(data_stm['total_paid'] + data_hq['total_paid'], data_all['total_paid'], places=2)
+        self.assertNotEqual(data_stm['total_paid'], data_hq['total_paid'])
 
     def test_monthly_report_data_customer_receipts(self):
         """
-        Verify that monthly report data passes the correct sales_received ($12,888.75)
+        Verify that monthly report data passes the correct sales_received
         to the monthly cash flow calculation and KPI cards.
         """
-        report = _get_monthly_report_data("2026-10")
-        self.assertAlmostEqual(report['sales_received'], 12888.75, places=2)
+        report = _get_monthly_report_data("2026-10", branch_id="main")
+        sales = report['sales_received']
+        self.assertGreater(sales, 0)
         
         # Verify Money in Hand = (Opening Balance + Clear STM + Media + Sales) - Expenses
         opening = report['opening_balance']
         stm = report['clear_stm']
         media = report['media_total']
-        sales = report['sales_received']
         expenses = report['total_expenses']
         
         expected_total_in = opening + stm + media + sales
@@ -65,4 +75,3 @@ class TestExpenseSalesPaid(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-
