@@ -178,6 +178,7 @@
                 </div>
             </div>
             <form method="GET" action="{% if is_new %}{{ url_for('sales_orders.new_order') }}{% else %}{{ url_for('sales_orders.detail_order', id=order.id) }}{% endif %}" class="inflow-drawer-filters" id="drawerFilterForm">
+                <input type="hidden" name="branch" id="drawerBranchFilterInput" value="{{ branch_scope or '' }}">
                 <div class="inflow-filter-row">
                     <span class="inflow-filter-label">Order Date</span>
                     <select name="date_filter" id="drawerDateFilterSelect" class="inflow-filter-select" onchange="syncDrawerFiltersToStorage(); document.getElementById('drawerFilterForm').submit()">
@@ -1790,10 +1791,15 @@ function getDrawerFilterParams() {
     let custVal = (custInput ? custInput.value : '')?.trim() ||
                   sessionStorage.getItem('inflow_so_drawer_customer_search') || '{{ customer_search or "" }}';
 
+    const branchInput = document.getElementById('drawerBranchFilterInput');
+    let branchVal = (branchInput ? branchInput.value : '') ||
+                    sessionStorage.getItem('inflow_so_branch_filter') || '{{ branch_scope or "" }}';
+
     return {
         date_filter: dateVal,
         status_filter: statusVal,
-        customer_search: custVal
+        customer_search: custVal,
+        branch: branchVal
     };
 }
 
@@ -1807,7 +1813,11 @@ function syncDrawerFiltersToStorage() {
         } else {
             sessionStorage.removeItem('inflow_so_drawer_customer_search');
         }
-        sessionStorage.removeItem('inflow_so_branch_filter');
+        if (params.branch) {
+            sessionStorage.setItem('inflow_so_branch_filter', params.branch);
+        } else {
+            sessionStorage.removeItem('inflow_so_branch_filter');
+        }
     } catch(e) {}
 }
 
@@ -1824,6 +1834,7 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
     if (filters.date_filter && !params.has('date_filter')) params.set('date_filter', filters.date_filter);
     if (filters.status_filter && !params.has('status_filter')) params.set('status_filter', filters.status_filter);
     if (filters.customer_search && !params.has('customer_search')) params.set('customer_search', filters.customer_search);
+    if (filters.branch && !params.has('branch')) params.set('branch', filters.branch);
 
     for (const key in extraParams) {
         if (extraParams[key] !== undefined && extraParams[key] !== null) {

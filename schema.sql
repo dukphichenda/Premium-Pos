@@ -586,16 +586,20 @@ CREATE TABLE IF NOT EXISTS expenses (
     payment_account VARCHAR(100) DEFAULT 'Cash',
     notes TEXT,
     month_key VARCHAR(7) NOT NULL, -- e.g. '2026-10'
+    branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE expenses ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES branches(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_expenses_month ON expenses(month_key);
 CREATE INDEX IF NOT EXISTS idx_expenses_date ON expenses(expense_date);
+CREATE INDEX IF NOT EXISTS idx_expenses_branch ON expenses(branch_id);
 
--- 25. Monthly Cash & Financial Summaries (Monthly report settings & bank/cash breakdown)
+-- 25. Monthly Cash & Financial Summaries (Monthly report settings & bank/cash breakdown per store/branch)
 CREATE TABLE IF NOT EXISTS monthly_cash_summaries (
     id SERIAL PRIMARY KEY,
-    month_key VARCHAR(7) UNIQUE NOT NULL, -- e.g. '2026-10'
+    month_key VARCHAR(7) NOT NULL, -- e.g. '2026-10'
+    branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE,
     opening_balance NUMERIC(16, 2) DEFAULT 0, -- លុយចាស់ (Calculated or saved)
     manual_opening_balance NUMERIC(16, 2), -- User manual override if filled; if null/empty auto-uses previous month money in hand
     media_expense NUMERIC(16, 2) DEFAULT 0, -- Media legacy/cached field
@@ -607,6 +611,10 @@ CREATE TABLE IF NOT EXISTS monthly_cash_summaries (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE monthly_cash_summaries ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE;
+ALTER TABLE monthly_cash_summaries DROP CONSTRAINT IF EXISTS monthly_cash_summaries_month_key_key;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_monthly_cash_summaries_month_branch ON monthly_cash_summaries(month_key, COALESCE(branch_id, 0));
+CREATE INDEX IF NOT EXISTS idx_monthly_cash_summaries_branch ON monthly_cash_summaries(branch_id);
 
 -- 26. Media Receipts / Money Received from Media (ប្រាក់ទទួលបានពី Media)
 CREATE TABLE IF NOT EXISTS media_receipts (

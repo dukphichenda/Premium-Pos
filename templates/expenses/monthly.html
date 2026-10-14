@@ -165,7 +165,8 @@
             </div>
         </div>
 
-        <!-- 3. Clear STM -->
+        <!-- 3. Clear STM (HQ only) -->
+        {% if not is_branch %}
         <div class="expense-kpi-card teal-accent">
             <div class="kpi-card-header">
                 <span class="kpi-label">Clear STM</span>
@@ -175,7 +176,7 @@
             <div class="kpi-card-sub">Bank/STM cleared settlement</div>
         </div>
 
-        <!-- 4. Media Total (ប្រាក់ទទួលបានពី Media: Auto from Sheet or Manual) -->
+        <!-- 4. Media Total (HQ only: ប្រាក់ទទួលបានពី Media) -->
         <div class="expense-kpi-card green-accent">
             <div class="kpi-card-header">
                 <span class="kpi-label">Media (ប្រាក់ពី Media)</span>
@@ -194,6 +195,7 @@
                 {% endif %}
             </div>
         </div>
+        {% endif %}
 
         <!-- 5. Customer Receipts (លុយលក់) -->
         <div class="expense-kpi-card teal-accent">
@@ -214,14 +216,24 @@
             </div>
         </div>
 
-        <!-- 6. Total Cash Inflow (លុយសរុប: ចាស់ + STM + Media + លក់) -->
+        <!-- 6. Total Cash Inflow (លុយសរុប) -->
         <div class="expense-kpi-card blue-accent">
             <div class="kpi-card-header">
                 <span class="kpi-label">លុយសរុប (Total Inflow)</span>
+                {% if is_branch %}
+                <span class="kpi-tag blue">ចាស់ + លក់</span>
+                {% else %}
                 <span class="kpi-tag blue">ចាស់+STM+Media+លក់</span>
+                {% endif %}
             </div>
             <div class="kpi-card-value blue-text">${{ "{:,.2f}".format(total_money_in) }}</div>
-            <div class="kpi-card-sub">Opening + Clear STM + Media + Sales</div>
+            <div class="kpi-card-sub">
+                {% if is_branch %}
+                Opening + Sales (Customer Receipts)
+                {% else %}
+                Opening + Clear STM + Media + Sales
+                {% endif %}
+            </div>
         </div>
 
         <!-- 7. Money in Hand / Remaining (លុយសល់: លុយសរុប - ចំណាយ) -->
@@ -249,7 +261,13 @@
             <div class="kpi-card-value {% if net_operating_income >= 0 %}green-text{% else %}red-text{% endif %}">
                 ${{ "{:,.2f}".format(net_operating_income) }}
             </div>
-            <div class="kpi-card-sub">Sales + STM + Media minus Expenses</div>
+            <div class="kpi-card-sub">
+                {% if is_branch %}
+                Sales minus Expenses
+                {% else %}
+                Sales + STM + Media minus Expenses
+                {% endif %}
+            </div>
         </div>
     </div>
 
@@ -500,7 +518,8 @@
         </div>
     </div>
 
-    <!-- BOTTOM SHEET: Money Received from Media (ប្រាក់ទទួលបានពី Media) -->
+    <!-- BOTTOM SHEET: Money Received from Media (ប្រាក់ទទួលបានពី Media - HQ Only) -->
+    {% if not is_branch %}
     <div class="media-sheet-panel" id="mediaReceiptsSection">
         <div class="media-sheet-header">
             <div class="media-sheet-title">
@@ -585,6 +604,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 </div>
 
 <!-- Datalists for autocomplete -->
@@ -610,6 +630,7 @@
             <button type="button" class="modal-close-btn" onclick="closeModal('recordExpenseModal')">✕</button>
         </div>
         <form method="POST" action="{{ url_for('expenses.add_expense') }}">
+            <input type="hidden" name="branch_id" value="{{ branch_scope }}">
             <div class="form-group mb-3">
                 <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Item Name / Description (មុខទំនិញ/ការចំណាយ) *</label>
                 <input type="text" name="item" class="form-control" required placeholder="e.g. Vegetables, TTK Order, Staff Salary...">
@@ -724,7 +745,7 @@
 <div class="modal-overlay" id="balanceModal">
     <div class="modal-dialog" style="max-width: 500px; padding: 22px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
-            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances & STM for {{ month_display }}</h3>
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances {% if not is_branch %}& STM {% endif %}for {{ month_display }} ({{ current_store_name }})</h3>
             <button type="button" class="modal-close-btn" onclick="closeModal('balanceModal')">✕</button>
         </div>
         <form id="summaryBalanceForm" onsubmit="handleSummaryBalanceSubmit(event)">
@@ -750,6 +771,7 @@
                 </small>
             </div>
 
+            {% if not is_branch %}
             <div class="form-group mb-3">
                 <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Clear STM ($)</label>
                 <input type="number" step="0.01" id="inputClearStm" class="form-control" value="{{ "{:.2f}".format(clear_stm) }}">
@@ -776,6 +798,7 @@
                     {% endif %}
                 </small>
             </div>
+            {% endif %}
 
             <div class="form-group mb-3">
                 <label class="form-label" style="font-size: 11.5px; font-weight: 600;">
@@ -829,14 +852,17 @@
             <div style="background: #FEF2F2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 10px 12px; font-size: 11.5px; color: #991B1B; line-height: 1.45;">
                 ⚠️ <strong>Permanent Action:</strong> This will delete all data for this period:
                 <ul style="margin: 6px 0 0 16px; padding: 0;">
-                    <li><strong>{{ expenses|length }}</strong> daily recorded expenses</li>
+                    <li><strong>{{ expenses|length }}</strong> daily recorded expenses for {{ current_store_name }}</li>
+                    {% if not is_branch %}
                     <li><strong>{{ media_receipts|length }}</strong> recorded media customer receipts</li>
+                    {% endif %}
                     <li>Cash & bank reconciliation counts and settings</li>
                 </ul>
             </div>
         </div>
         <form method="POST" action="{{ url_for('expenses.delete_month') }}">
             <input type="hidden" name="month_key" value="{{ current_month }}">
+            <input type="hidden" name="branch_scope" value="{{ branch_scope }}">
             <div style="display: flex; justify-content: flex-end; gap: 8px;">
                 <button type="button" class="btn btn-outline" onclick="closeModal('deleteMonthModal')">Cancel</button>
                 <button type="submit" class="btn btn-danger" style="background: #DC2626; border-color: #B91C1C; color: #FFFFFF; font-weight: 600;">

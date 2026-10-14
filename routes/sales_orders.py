@@ -226,7 +226,7 @@ def list_orders():
 
     if not is_main:
         # Branch users are strictly locked to their assigned branch: cannot view HQ or other branches!
-        branch_filter = str(user_bid) if user_bid else 'main'
+        branch_filter = str(user_bid) if user_bid else '-1'
     else:
         # HQ (main_admin) can see all, main, or any specific branch
         if raw_branch is not None:
@@ -241,11 +241,16 @@ def list_orders():
             if user_bid:
                 latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,))
             else:
-                latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+                latest = None
             if latest:
                 return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
         else:
-            latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
+            if branch_filter == 'main':
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+            elif branch_filter.isdigit():
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (int(branch_filter),))
+            else:
+                latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
             if latest:
                 return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
 
@@ -262,18 +267,25 @@ def list_orders():
     params = []
 
     # Branch isolation: Main store orders (branch_id IS NULL) are kept strictly separate from branch orders
-    if branch_filter == 'main':
-        where_clauses.append("so.branch_id IS NULL")
-    elif branch_filter == 'all':
-        pass  # Show all combined (Main HQ enterprise overview)
-    else:
-        try:
-            b_id = int(branch_filter)
+    if not is_main:
+        if user_bid:
             where_clauses.append("so.branch_id = %s")
-            params.append(b_id)
-        except ValueError:
+            params.append(user_bid)
+        else:
+            where_clauses.append("1=0")
+    else:
+        if branch_filter == 'main':
             where_clauses.append("so.branch_id IS NULL")
-            branch_filter = 'main'
+        elif branch_filter == 'all':
+            pass  # Show all combined (Main HQ enterprise overview)
+        else:
+            try:
+                b_id = int(branch_filter)
+                where_clauses.append("so.branch_id = %s")
+                params.append(b_id)
+            except ValueError:
+                where_clauses.append("so.branch_id IS NULL")
+                branch_filter = 'main'
 
     if status:
         st_upper = status.strip().upper()
@@ -547,15 +559,19 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             drawer_where.append("so.branch_id = %s")
             drawer_params.append(user_bid)
         else:
-            drawer_where.append("so.branch_id IS NULL")
+            drawer_where.append("1=0")
     else:
-        if branch_id and str(branch_id).lower() not in ('all', 'main', 'none', ''):
-            try:
-                bid = int(branch_id)
-                drawer_where.append("so.branch_id = %s")
-                drawer_params.append(bid)
-            except (ValueError, TypeError):
-                pass
+        if branch_id:
+            b_str = str(branch_id).strip().lower()
+            if b_str == 'main':
+                drawer_where.append("so.branch_id IS NULL")
+            elif b_str not in ('all', 'none', ''):
+                try:
+                    bid = int(b_str)
+                    drawer_where.append("so.branch_id = %s")
+                    drawer_params.append(bid)
+                except (ValueError, TypeError):
+                    pass
 
     # Filter drawer orders
     if customer_search:
@@ -666,15 +682,19 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             cust_where.append("branch_id = %s")
             cust_params.append(user_bid)
         else:
-            cust_where.append("branch_id IS NULL")
+            cust_where.append("1=0")
     else:
-        if branch_id and str(branch_id).lower() not in ('all', 'main', 'none', ''):
-            try:
-                bid = int(branch_id)
-                cust_where.append("branch_id = %s")
-                cust_params.append(bid)
-            except (ValueError, TypeError):
-                pass
+        if branch_id:
+            b_str = str(branch_id).strip().lower()
+            if b_str == 'main':
+                cust_where.append("branch_id IS NULL")
+            elif b_str not in ('all', 'none', ''):
+                try:
+                    bid = int(b_str)
+                    cust_where.append("branch_id = %s")
+                    cust_params.append(bid)
+                except (ValueError, TypeError):
+                    pass
 
     all_customers = query_all(f"""
         SELECT 
@@ -1435,13 +1455,19 @@ def new_order():
     customer_filter = request.args.get('customer_id')
 
     if not is_main:
-        req_branch = str(user_bid) if user_bid else None
+        req_branch = str(user_bid or -1)
     elif branch:
         req_branch = str(branch['id'])
-    elif 'branch' in request.args and request.args.get('branch') not in ('', 'all', 'main'):
-        req_branch = request.args.get('branch')
+    elif 'branch' in request.args and request.args.get('branch'):
+        b_arg = request.args.get('branch').strip().lower()
+        if b_arg in ('all', 'main') or b_arg.isdigit():
+            req_branch = b_arg
+        else:
+            req_branch = 'main'
+    elif session.get('active_branch_id'):
+        req_branch = str(session['active_branch_id'])
     else:
-        req_branch = 'all'
+        req_branch = 'main'
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch)
 
@@ -1578,11 +1604,21 @@ def detail_order(id):
 
     # Allow user to switch branch filter in drawer or default to the order's branch scope
     if not is_main:
-        branch_scope = str(user_bid) if user_bid else None
-    elif 'branch' in request.args and request.args.get('branch') not in ('', 'all', 'main'):
-        branch_scope = request.args.get('branch')
+        branch_scope = str(user_bid or order.get('branch_id') or -1)
     else:
-        branch_scope = 'all'
+        raw_b = request.args.get('branch')
+        if raw_b and raw_b.strip().lower() in ('all', 'main'):
+            branch_scope = raw_b.strip().lower()
+        elif raw_b and raw_b.strip().isdigit():
+            branch_scope = raw_b.strip()
+        elif order.get('branch_id'):
+            # When viewing a branch order, strictly scope drawer to that branch!
+            branch_scope = str(order['branch_id'])
+        elif session.get('active_branch_id'):
+            branch_scope = str(session['active_branch_id'])
+        else:
+            # HQ order (branch_id IS NULL)
+            branch_scope = 'main'
 
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope)

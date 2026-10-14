@@ -147,7 +147,8 @@ def _get_inflow_sales_data(month_key, branch_id='main'):
 def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
     """
     Calculate Money in Hand for a month:
-    Money in Hand = (Opening Balance + Clear STM + Media Total + Customer Receipts) - Total Expenses
+    - For HQ: (Opening Balance + Clear STM + Media Total + Customer Receipts) - Total Expenses
+    - For Branch: (Opening Balance + Customer Receipts) - Total Expenses (Clear STM & Media are 0)
     """
     if not month_key:
         return 0.0
@@ -157,7 +158,15 @@ def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
         return 0.0
     visited.add(month_key)
 
-    summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s", (month_key,))
+    is_branch = (branch_id and str(branch_id).lower() not in ('main', 'all'))
+    branch_id_val = int(branch_id) if is_branch and str(branch_id).isdigit() else None
+
+    if branch_id_val is not None:
+        summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id_val))
+    elif str(branch_id).lower() == 'all':
+        summary = None
+    else:
+        summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
 
     # 1. Opening balance
     if summary and summary.get('manual_opening_balance') is not None:
@@ -166,70 +175,98 @@ def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
         opening = float(summary['opening_balance'])
     else:
         prev_m = _get_previous_month_key(month_key)
-        prev_summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s", (prev_m,)) if prev_m else None
-        if not prev_summary:
-            closest = query_one("SELECT month_key FROM monthly_cash_summaries WHERE month_key < %s ORDER BY month_key DESC LIMIT 1", (month_key,))
-            if closest:
-                prev_m = closest['month_key']
-        opening = _calculate_month_money_in_hand(prev_m, visited, branch_id=branch_id) if prev_m else 0.0
+        if prev_m:
+            opening = _calculate_month_money_in_hand(prev_m, visited, branch_id=branch_id)
+        else:
+            opening = 0.0
 
-    # 2. Clear STM
-    stm = float(summary['clear_stm'] or 0) if summary else 0.0
-
-    # 3. Media Total (Manual override if filled, else sum from media_receipts)
-    media_rec = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
-    media_sheet_total = float(media_rec['tot'] or 0) if media_rec else 0.0
-
-    if summary and summary.get('manual_media_income') is not None:
-        media_total = float(summary['manual_media_income'])
-    elif media_sheet_total > 0:
-        media_total = media_sheet_total
-    elif summary and summary.get('media_expense') and float(summary['media_expense']) > 0:
-        media_total = float(summary['media_expense'])
-    else:
+    # 2. Clear STM and Media Total (Branch has NO STM and NO Media)
+    if is_branch:
+        stm = 0.0
         media_total = 0.0
+    else:
+        stm = float(summary['clear_stm'] or 0) if summary else 0.0
+        media_rec = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
+        media_sheet_total = float(media_rec['tot'] or 0) if media_rec else 0.0
 
-    # 4. Sales Received
+        if summary and summary.get('manual_media_income') is not None:
+            media_total = float(summary['manual_media_income'])
+        elif media_sheet_total > 0:
+            media_total = media_sheet_total
+        elif summary and summary.get('media_expense') and float(summary['media_expense']) > 0:
+            media_total = float(summary['media_expense'])
+        else:
+            media_total = 0.0
+
+    # 3. Sales Received
     if summary and summary.get('custom_sales_income') is not None:
         sales = float(summary['custom_sales_income'] or 0)
     else:
         sales = _get_inflow_sales_data(month_key, branch_id=branch_id)['total_paid']
 
-    # 5. Total Expenses
-    exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s", (month_key,))
+    # 4. Total Expenses
+    if branch_id_val is not None:
+        exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s AND branch_id = %s", (month_key, branch_id_val))
+    elif str(branch_id).lower() == 'all':
+        exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s", (month_key,))
+    else:
+        exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
     total_exp = float(exp_res['tot'] or 0) if exp_res else 0.0
 
     total_inflow = opening + stm + media_total + sales
     money_in_hand = total_inflow - total_exp
     return money_in_hand
 
-def _get_or_create_monthly_summary(month_key):
-    summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s", (month_key,))
+def _get_or_create_monthly_summary(month_key, branch_id='main'):
+    is_branch = (branch_id and str(branch_id).lower() not in ('main', 'all'))
+    branch_id_val = int(branch_id) if is_branch and str(branch_id).isdigit() else None
+
+    if branch_id_val is not None:
+        summary = query_one(
+            "SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s",
+            (month_key, branch_id_val)
+        )
+    else:
+        summary = query_one(
+            "SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)",
+            (month_key,)
+        )
+
     if not summary:
         prev_m = _get_previous_month_key(month_key)
-        carried_opening = _calculate_month_money_in_hand(prev_m) if prev_m else 0.0
+        scope_arg = str(branch_id_val) if branch_id_val is not None else 'main'
+        carried_opening = _calculate_month_money_in_hand(prev_m, branch_id=scope_arg) if prev_m else 0.0
 
-        execute("""
-            INSERT INTO monthly_cash_summaries (month_key, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, accounts_json)
-            VALUES (%s, %s, NULL, 0.0, NULL, 0.0, %s)
-            ON CONFLICT (month_key) DO NOTHING
-        """, (month_key, carried_opening, json.dumps(DEFAULT_ACCOUNTS_LIST)))
-        summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s", (month_key,))
+        if branch_id_val is not None:
+            execute("""
+                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, accounts_json)
+                VALUES (%s, %s, %s, NULL, 0.0, NULL, 0.0, %s)
+            """, (month_key, branch_id_val, carried_opening, json.dumps(DEFAULT_ACCOUNTS_LIST)))
+            summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id_val))
+        else:
+            execute("""
+                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, accounts_json)
+                VALUES (%s, NULL, %s, NULL, 0.0, NULL, 0.0, %s)
+            """, (month_key, carried_opening, json.dumps(DEFAULT_ACCOUNTS_LIST)))
+            summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
 
     return summary
 
 def _get_monthly_report_data(month_key, branch_id='main'):
     """Calculates and aggregates complete financial data for a given month and branch/store scope."""
-    summary = _get_or_create_monthly_summary(month_key)
+    is_branch = (branch_id and str(branch_id).lower() not in ('main', 'all'))
+    branch_id_val = int(branch_id) if is_branch and str(branch_id).isdigit() else None
+
+    summary = _get_or_create_monthly_summary(month_key, branch_id=branch_id)
     inflow_data = _get_inflow_sales_data(month_key, branch_id=branch_id)
 
     # 1. Daily expenses
-    if branch_id and str(branch_id).isdigit():
+    if branch_id_val is not None:
         expenses = query_all("""
             SELECT * FROM expenses
             WHERE month_key = %s AND branch_id = %s
             ORDER BY expense_date ASC, id ASC
-        """, (month_key, int(branch_id)))
+        """, (month_key, branch_id_val))
     elif str(branch_id).lower() == 'all':
         expenses = query_all("""
             SELECT * FROM expenses
@@ -245,23 +282,33 @@ def _get_monthly_report_data(month_key, branch_id='main'):
         """, (month_key,))
     total_expenses = sum(float(e['total_price'] or 0) for e in expenses)
 
-    # 2. Media receipts & Media money logic
-    # If manual_media_income is empty/null, auto-take total from media_receipts sheet
-    media_receipts = query_all("""
-        SELECT * FROM media_receipts
-        WHERE month_key = %s
-        ORDER BY receipt_date ASC, id ASC
-    """, (month_key,))
-    media_sheet_total = sum(float(r['amount'] or 0) for r in media_receipts)
-
-    is_manual_media = (summary.get('manual_media_income') is not None)
-    if is_manual_media:
-        media_total = float(summary['manual_media_income'])
+    # 2. Media receipts & Clear STM logic
+    if is_branch:
+        # Branches do not have Clear STM or Media money
+        media_receipts = []
+        media_sheet_total = 0.0
+        media_total = 0.0
+        is_manual_media = False
+        clear_stm = 0.0
     else:
-        media_total = media_sheet_total
-        # Keep media_expense cached in summary
-        execute("UPDATE monthly_cash_summaries SET media_expense = %s WHERE month_key = %s", (media_total, month_key))
-        summary['media_expense'] = media_total
+        # HQ / Main Store
+        media_receipts = query_all("""
+            SELECT * FROM media_receipts
+            WHERE month_key = %s
+            ORDER BY receipt_date ASC, id ASC
+        """, (month_key,))
+        media_sheet_total = sum(float(r['amount'] or 0) for r in media_receipts)
+
+        is_manual_media = (summary.get('manual_media_income') is not None)
+        if is_manual_media:
+            media_total = float(summary['manual_media_income'])
+        else:
+            media_total = media_sheet_total
+            if summary and summary.get('id'):
+                execute("UPDATE monthly_cash_summaries SET media_expense = %s WHERE id = %s", (media_total, summary['id']))
+                summary['media_expense'] = media_total
+
+        clear_stm = float(summary.get('clear_stm') or 0)
 
     # 3. Dynamic Opening Balance logic
     prev_m = _get_previous_month_key(month_key)
@@ -272,10 +319,9 @@ def _get_monthly_report_data(month_key, branch_id='main'):
         opening_balance = float(summary['manual_opening_balance'])
     else:
         opening_balance = prev_money_in_hand
-        execute("UPDATE monthly_cash_summaries SET opening_balance = %s WHERE month_key = %s", (opening_balance, month_key))
-        summary['opening_balance'] = opening_balance
-
-    clear_stm = float(summary.get('clear_stm') or 0)
+        if summary and summary.get('id'):
+            execute("UPDATE monthly_cash_summaries SET opening_balance = %s WHERE id = %s", (opening_balance, summary['id']))
+            summary['opening_balance'] = opening_balance
 
     # 4. Sales Receipts
     is_custom_sales = (summary.get('custom_sales_income') is not None)
@@ -287,7 +333,11 @@ def _get_monthly_report_data(month_key, branch_id='main'):
     # 5. Inflow & Balances
     total_money_in = opening_balance + clear_stm + media_total + sales_received
     money_in_hand = total_money_in - total_expenses
-    net_operating_income = (sales_received + clear_stm + media_total) - total_expenses
+    if is_branch:
+        # Branch net operating income is strictly Sales minus Expenses
+        net_operating_income = sales_received - total_expenses
+    else:
+        net_operating_income = (sales_received + clear_stm + media_total) - total_expenses
 
     # 6. Accounts Reconciliation
     accounts = _normalize_accounts(summary.get('accounts_json'))
@@ -297,6 +347,8 @@ def _get_monthly_report_data(month_key, branch_id='main'):
     return {
         'month_key': month_key,
         'month_display': _format_month_display(month_key),
+        'branch_id': branch_id,
+        'is_branch': is_branch,
         'summary': summary,
         'inflow_data': inflow_data,
         'expenses': expenses,
@@ -376,6 +428,7 @@ def monthly_expenses():
                            month_tabs=month_tabs,
                            month_display=report_data['month_display'],
                            branch_scope=branch_scope,
+                           is_branch=report_data['is_branch'],
                            branches=branches,
                            current_store_name=current_store_name,
                            current_store_code=current_store_code,
@@ -419,25 +472,37 @@ def delete_month():
             flash('Month key is required.', 'error')
             return redirect(url_for('expenses.monthly_expenses'))
 
-        # Delete all records for this month
-        execute("DELETE FROM expenses WHERE month_key = %s", (month_key,))
-        execute("DELETE FROM media_receipts WHERE month_key = %s", (month_key,))
-        execute("DELETE FROM monthly_cash_summaries WHERE month_key = %s", (month_key,))
+        bid_raw = data.get('branch_scope') or data.get('branch_id') or request.args.get('branch')
+        if bid_raw and str(bid_raw).isdigit():
+            branch_id = int(bid_raw)
+            execute("DELETE FROM expenses WHERE month_key = %s AND branch_id = %s", (month_key, branch_id))
+            execute("DELETE FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id))
+            branch_param = str(branch_id)
+        elif str(bid_raw).lower() == 'all':
+            execute("DELETE FROM expenses WHERE month_key = %s", (month_key,))
+            execute("DELETE FROM media_receipts WHERE month_key = %s", (month_key,))
+            execute("DELETE FROM monthly_cash_summaries WHERE month_key = %s", (month_key,))
+            branch_param = 'all'
+        else:
+            execute("DELETE FROM expenses WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
+            execute("DELETE FROM media_receipts WHERE month_key = %s", (month_key,))
+            execute("DELETE FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
+            branch_param = 'main'
 
         month_display = _format_month_display(month_key)
 
         if request.is_json:
             return jsonify({'success': True, 'message': f"Monthly sheet '{month_display}' was deleted successfully."})
 
-        flash(f"Monthly sheet '{month_display}' and all associated entries were deleted successfully.", 'success')
+        flash(f"Monthly sheet '{month_display}' entries were deleted successfully.", 'success')
 
         remaining_months = _get_available_months()
         if remaining_months:
             curr = _get_current_month_key()
             target = curr if curr in remaining_months else remaining_months[0]
-            return redirect(url_for('expenses.monthly_expenses', month=target))
+            return redirect(url_for('expenses.monthly_expenses', month=target, branch=branch_param))
         else:
-            return redirect(url_for('expenses.monthly_expenses'))
+            return redirect(url_for('expenses.monthly_expenses', branch=branch_param))
 
     except Exception as e:
         if request.is_json:
@@ -451,9 +516,10 @@ def delete_month():
 def export_monthly_excel():
     try:
         month_key = request.args.get('month', '').strip() or _get_current_month_key()
-        report_data = _get_monthly_report_data(month_key)
+        branch_scope = request.args.get('branch', 'main').strip().lower()
+        report_data = _get_monthly_report_data(month_key, branch_id=branch_scope)
         excel_buf = generate_monthly_excel(report_data)
-        filename = f"inFlow_Monthly_Report_{month_key}.xlsx"
+        filename = f"inFlow_Monthly_Report_{month_key}_{branch_scope}.xlsx"
         return send_file(
             excel_buf,
             as_attachment=True,
@@ -468,9 +534,10 @@ def export_monthly_excel():
 def export_monthly_pdf():
     try:
         month_key = request.args.get('month', '').strip() or _get_current_month_key()
-        report_data = _get_monthly_report_data(month_key)
+        branch_scope = request.args.get('branch', 'main').strip().lower()
+        report_data = _get_monthly_report_data(month_key, branch_id=branch_scope)
         pdf_buf = generate_monthly_pdf(report_data)
-        filename = f"inFlow_Monthly_Report_{month_key}.pdf"
+        filename = f"inFlow_Monthly_Report_{month_key}_{branch_scope}.pdf"
         return send_file(
             pdf_buf,
             as_attachment=True,
@@ -484,10 +551,13 @@ def export_monthly_pdf():
 @expenses_bp.route('/expenses/print')
 def print_monthly_report():
     month_key = request.args.get('month', '').strip() or _get_current_month_key()
-    report_data = _get_monthly_report_data(month_key)
+    branch_scope = request.args.get('branch', 'main').strip().lower()
+    report_data = _get_monthly_report_data(month_key, branch_id=branch_scope)
     return render_template(
         'expenses/print.html',
         current_month=month_key,
+        branch_scope=branch_scope,
+        is_branch=report_data['is_branch'],
         month_display=report_data['month_display'],
         expenses=report_data['expenses'],
         total_expenses=report_data['total_expenses'],
@@ -537,13 +607,24 @@ def add_expense():
         notes = data.get('notes', '').strip()
         month_key = data.get('month_key', '').strip() or exp_date.strftime('%Y-%m')
 
-        new_id = execute_returning_id("""
-            INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """, (exp_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key))
+        bid_raw = data.get('branch_id')
+        if bid_raw is None or bid_raw == '':
+            bid_raw = request.args.get('branch')
+        if bid_raw is None or bid_raw == '':
+            bid_raw = session.get('branch_id')
 
-        _get_or_create_monthly_summary(month_key)
+        if bid_raw and str(bid_raw).isdigit():
+            branch_id = int(bid_raw)
+        else:
+            branch_id = None
+
+        new_id = execute_returning_id("""
+            INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key, branch_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+        """, (exp_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key, branch_id))
+
+        _get_or_create_monthly_summary(month_key, branch_id=str(branch_id) if branch_id else 'main')
 
         if request.is_json:
             return jsonify({
@@ -553,7 +634,14 @@ def add_expense():
             })
 
         flash(f"Recorded expense '{item}' (${total_price:,.2f}) successfully!", 'success')
-        return redirect(url_for('expenses.monthly_expenses', month=month_key))
+        branch_param = str(branch_id) if branch_id else 'main'
+        return redirect(url_for('expenses.monthly_expenses', month=month_key, branch=branch_param))
+
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash(f"Error adding expense: {e}", 'error')
+        return redirect(request.referrer or url_for('expenses.monthly_expenses'))
 
     except Exception as e:
         if request.is_json:
@@ -756,27 +844,41 @@ def update_monthly_summary():
         if not month_key:
             return jsonify({'success': False, 'error': 'Month key required'}), 400
 
+        bid_raw = data.get('branch_id')
+        if bid_raw is None or bid_raw == '':
+            bid_raw = request.args.get('branch')
+        if bid_raw and str(bid_raw).isdigit():
+            branch_id = int(bid_raw)
+            is_branch = True
+        else:
+            branch_id = None
+            is_branch = False
+
         # 1. Opening Balance: Manual vs Auto
         mob_raw = data.get('manual_opening_balance')
+        scope_arg = str(branch_id) if branch_id else 'main'
         if mob_raw is not None and str(mob_raw).strip() != '':
             manual_opening = float(mob_raw)
             opening_balance = manual_opening
         else:
             manual_opening = None
             prev_m = _get_previous_month_key(month_key)
-            opening_balance = _calculate_month_money_in_hand(prev_m) if prev_m else 0.0
+            opening_balance = _calculate_month_money_in_hand(prev_m, branch_id=scope_arg) if prev_m else 0.0
 
-        clear_stm = float(data.get('clear_stm', 0) or 0)
-
-        # 2. Media Money: Manual vs Auto (Auto-takes sum from media_receipts sheet unless filled)
-        mmi_raw = data.get('manual_media_income')
-        if mmi_raw is not None and str(mmi_raw).strip() != '':
-            manual_media = float(mmi_raw)
-            media_total = manual_media
-        else:
+        if is_branch:
+            clear_stm = 0.0
+            media_total = 0.0
             manual_media = None
-            med_tot = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
-            media_total = float(med_tot['tot'] if med_tot else 0)
+        else:
+            clear_stm = float(data.get('clear_stm', 0) or 0)
+            mmi_raw = data.get('manual_media_income')
+            if mmi_raw is not None and str(mmi_raw).strip() != '':
+                manual_media = float(mmi_raw)
+                media_total = manual_media
+            else:
+                manual_media = None
+                med_tot = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
+                media_total = float(med_tot['tot'] if med_tot else 0)
         
         custom_sales = data.get('custom_sales_income')
         if custom_sales is not None and str(custom_sales).strip() != '':
@@ -787,19 +889,29 @@ def update_monthly_summary():
         accounts_data = data.get('accounts_json')
         accounts_list = _normalize_accounts(accounts_data)
 
-        execute("""
-            INSERT INTO monthly_cash_summaries (month_key, opening_balance, manual_opening_balance, clear_stm, media_expense, manual_media_income, custom_sales_income, accounts_json, updated_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            ON CONFLICT (month_key) DO UPDATE SET
-                opening_balance = EXCLUDED.opening_balance,
-                manual_opening_balance = EXCLUDED.manual_opening_balance,
-                clear_stm = EXCLUDED.clear_stm,
-                media_expense = EXCLUDED.media_expense,
-                manual_media_income = EXCLUDED.manual_media_income,
-                custom_sales_income = EXCLUDED.custom_sales_income,
-                accounts_json = EXCLUDED.accounts_json,
-                updated_at = CURRENT_TIMESTAMP
-        """, (month_key, opening_balance, manual_opening, clear_stm, media_total, manual_media, custom_sales, json.dumps(accounts_list)))
+        if branch_id is not None:
+            existing = query_one("SELECT id FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id))
+        else:
+            existing = query_one("SELECT id FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
+
+        if existing:
+            execute("""
+                UPDATE monthly_cash_summaries
+                SET opening_balance = %s,
+                    manual_opening_balance = %s,
+                    clear_stm = %s,
+                    media_expense = %s,
+                    manual_media_income = %s,
+                    custom_sales_income = %s,
+                    accounts_json = %s,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (opening_balance, manual_opening, clear_stm, media_total, manual_media, custom_sales, json.dumps(accounts_list), existing['id']))
+        else:
+            execute("""
+                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, clear_stm, media_expense, manual_media_income, custom_sales_income, accounts_json, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (month_key, branch_id, opening_balance, manual_opening, clear_stm, media_total, manual_media, custom_sales, json.dumps(accounts_list)))
 
         return jsonify({
             'success': True,
@@ -807,7 +919,8 @@ def update_monthly_summary():
             'opening_balance': opening_balance,
             'is_manual_opening': (manual_opening is not None),
             'media_total': media_total,
-            'is_manual_media': (manual_media is not None)
+            'is_manual_media': (manual_media is not None),
+            'branch_id': branch_id
         })
 
     except Exception as e:
