@@ -3004,6 +3004,21 @@ def api_execute_merge():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@products_bp.route('/api/products/bulk-merge-all', methods=['POST'])
+def api_bulk_merge_all():
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        from services.product_merge import bulk_merge_all_duplicates
+        data = request.get_json() or {}
+        threshold = float(data.get('threshold') or 0.85)
+        only_category_master = bool(data.get('only_category_master', False))
+
+        result = bulk_merge_all_duplicates(threshold=threshold, only_category_master=only_category_master)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
 

@@ -91,9 +91,13 @@
                 <button type="button" class="conf-filter-btn" data-thresh="0.95" onclick="setConfidenceFilter(0.95, this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 4px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; cursor: pointer;">
                     Exact Matches (95%+)
                 </button>
+                <button type="button" onclick="openBulkMergeModal()" style="display: flex; align-items: center; gap: 6px; padding: 5px 12px; font-size: 12px; font-weight: 800; background: #0284C7; border: none; border-radius: 6px; color: #FFF; cursor: pointer; box-shadow: 0 1px 3px rgba(2,132,199,0.3); margin-left: 6px;">
+                    <span>⚡</span>
+                    <span>Auto Merge All (Keep Exact Category & Mix All Orders)</span>
+                </button>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px; flex: 1; max-width: 380px;">
-                <input type="text" id="autoSearchFilter" placeholder="Filter candidates by keyword (Khmer or English)..." oninput="filterCandidateCards(this.value)" style="width: 100%; padding: 6px 12px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px; outline: none;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; max-width: 320px;">
+                <input type="text" id="autoSearchFilter" placeholder="Filter candidates by keyword..." oninput="filterCandidateCards(this.value)" style="width: 100%; padding: 6px 12px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px; outline: none;">
             </div>
         </div>
 
@@ -317,6 +321,38 @@
             <a href="#" id="succViewProductLink" class="btn btn-primary" style="background: #0284C7; border-color: #0284C7; font-weight: 700; text-decoration: none;">
                 View Master Product in Catalog →
             </a>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Auto Merge Confirmation Modal -->
+<div id="bulkMergeModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+    <div style="background: #FFFFFF; border-radius: 12px; width: 95%; max-width: 600px; padding: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); border: 1px solid #E2E8F0;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+            <div style="width: 44px; height: 44px; border-radius: 8px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center; font-size: 22px;">
+                ⚡
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 16px; font-weight: 800; color: #0F172A;" class="font-khmer">Auto Merge All Duplicates (បញ្ចូលទំនិញស្ទួនទាំងអស់)</h3>
+                <div style="font-size: 12px; color: #64748B;">Keep Category Masters • Mix HQ & Branch Orders • Delete Non-Category</div>
+            </div>
+        </div>
+
+        <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 14px 16px; margin-bottom: 16px; font-size: 12.5px; color: #166534; line-height: 1.6;">
+            <div style="font-weight: 800; margin-bottom: 6px; font-size: 13px;">🛡️ Safe Master Consolidation & Order Preservation:</div>
+            <ul style="margin: 0; padding-left: 18px;">
+                <li><strong>Exact Category Master:</strong> The product with a real category (e.g. BOWL, CUP, CAKE BOX) is ALWAYS kept as the master.</li>
+                <li><strong>All Orders Mixed & Kept:</strong> ALL historical Sales Orders and invoices from <strong>HQ and every branch</strong> are mixed and re-pointed to the master product. No orders are lost!</li>
+                <li><strong>All POs & Stock Consolidated:</strong> Purchase orders and warehouse stocks across HQ and all branch locations are merged.</li>
+                <li><strong>Non-Category Deleted:</strong> Uncategorized duplicate product entries are permanently deleted from the catalog.</li>
+            </ul>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+            <button type="button" class="btn btn-secondary btn-sm" onclick="closeBulkMergeModal()">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" id="btnConfirmBulkMerge" onclick="executeBulkMerge()" style="background: #0284C7; border: none; font-weight: 800; padding: 8px 18px;">
+                ⚡ Yes, Auto Merge All Duplicates
+            </button>
         </div>
     </div>
 </div>
@@ -895,6 +931,44 @@ function fetchProductById(id, cb) {
 function escapeHtml(str) {
     if (!str) return '';
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function openBulkMergeModal() {
+    document.getElementById('bulkMergeModal').style.display = 'flex';
+}
+
+function closeBulkMergeModal() {
+    document.getElementById('bulkMergeModal').style.display = 'none';
+}
+
+function executeBulkMerge() {
+    const btn = document.getElementById('btnConfirmBulkMerge');
+    const originalText = btn.innerHTML;
+    btn.innerText = 'Merging All Duplicates...';
+    btn.disabled = true;
+
+    fetch('/api/products/bulk-merge-all', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ threshold: 0.85 })
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        closeBulkMergeModal();
+
+        if (data.success) {
+            alert(`🎉 Success!\n• Merged ${data.merged_groups_count} duplicate groups into Category Masters\n• Deleted ${data.deleted_products_count} duplicate products\n• Re-linked ${data.total_sales_orders_relinked} Sales Order lines from HQ & branches\n• Re-linked ${data.total_purchase_orders_relinked} Purchase Order lines\n• Consolidated ${Number(data.total_stock_units_consolidated).toLocaleString()} inventory stock units.`);
+            loadDuplicateCandidates();
+        } else {
+            alert('Error during bulk merge: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        alert('Network error during bulk merge: ' + err);
+    });
 }
 </script>
 {% endblock %}

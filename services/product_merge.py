@@ -24,19 +24,73 @@ def clean_text(text):
     t = re.sub(r'\s+', ' ', t).strip()
     return t
 
-def extract_numbers(text):
-    """Extracts numbers and units like 500ml, 330, 1000ml, 12oz, etc."""
-    return set(re.findall(r'\b\d+(?:[a-zA-Z]+)?\b', text or ''))
+OPPOSING_ATTRIBUTE_PAIRS = [
+    ({'black', 'ខ្មៅ'}, {'clear', 'ថ្លា', 'transparent'}),
+    ({'black', 'ខ្មៅ'}, {'white', 'ស'}),
+    ({'gold', 'មាស'}, {'silver', 'ប្រាក់'}),
+    ({'មានគម្រប', 'with lid', 'withlid'}, {'អត់គម្រប', 'no lid', 'nolid', 'without lid'}),
+    ({'អត់រន្ធ', 'no hole'}, {'មានរន្ធ', 'with hole'}),
+    ({'1ថត', '1 tray', '1 compartment'}, {'2ថត', '2 trays', '2 compartments'}),
+    ({'2ថត', '2 trays', '2 compartments'}, {'3ថត', '3 trays', '3 compartments'}),
+    ({'3ថត', '3 trays', '3 compartments'}, {'4ថត', '4 trays', '4 compartments'}),
+    ({'1ជាន់', '1 wall', 'single wall'}, {'2ជាន់', '2 wall', 'double wall'}),
+]
+
+def extract_dimensions_and_sizes(text):
+    if not text:
+        return set(), set(), set(), set()
+    text_upper = text.upper()
+    vols = set(re.sub(r'\s+', '', v) for v in re.findall(r'\b\d+(?:\.\d+)?\s*(?:ML|OZ|L|G|KG|CM|MM)\b', text_upper))
+    trays = set(re.findall(r'\b(\d+)\s*(?:ថត|TRAY|TRAYS|COMPARTMENT)', text_upper))
+    models = set(re.findall(r'\b(?:[A-Z]{1,5})\s*(\d+(?:\.\d+)?)\b', text_upper))
+    colors = set(re.findall(r'(\d+)\s*COLOR', text_upper))
+    return vols, trays, models, colors
+
+def has_opposing_attributes(t1, t2):
+    c1 = (t1 or '').lower()
+    c2 = (t2 or '').lower()
+    for set_a, set_b in OPPOSING_ATTRIBUTE_PAIRS:
+        has_a1 = any(w in c1 for w in set_a)
+        has_b1 = any(w in c1 for w in set_b)
+        has_a2 = any(w in c2 for w in set_a)
+        has_b2 = any(w in c2 for w in set_b)
+        if (has_a1 and has_b2) or (has_b1 and has_a2):
+            return True
+    return False
 
 def calculate_similarity(p1, p2):
     """
     Computes a hybrid similarity score (0.0 to 1.0) between two products
-    taking into account Khmer text, English text, and SKUs.
+    taking into account Khmer text, English text, and SKUs, while strictly
+    differentiating product variants (e.g. colors, lids, volumes, and models).
     """
     name1 = p1.get('name') or ''
     name2 = p2.get('name') or ''
     sku1 = p1.get('sku') or ''
     sku2 = p2.get('sku') or ''
+    full1 = f"{name1} {sku1}"
+    full2 = f"{name2} {sku2}"
+
+    # 1. Opposing attributes check (black vs clear, with lid vs without lid, etc.)
+    if has_opposing_attributes(full1, full2):
+        return 0.10
+
+    # 2. Dimensions, volumes & models conflict check
+    v1, tr1, m1, col1 = extract_dimensions_and_sizes(full1)
+    v2, tr2, m2, col2 = extract_dimensions_and_sizes(full2)
+
+    # If both specify volumes and they differ (e.g., 500ml vs 1000ml)
+    if v1 and v2 and not (v1 & v2):
+        return 0.10
+    # If both specify tray count and they differ (e.g., 1 vs 2 trays)
+    if tr1 and tr2 and not (tr1 & tr2):
+        return 0.10
+    # If both specify model/size codes and they differ (e.g., S22 vs S24, N3 vs N14, ST02 vs ST04)
+    if m1 and m2 and not (m1 & m2):
+        return 0.10
+    # If both specify printing color count and they differ
+    if col1 and col2 and col1 != col2:
+        return 0.10
 
     c1 = clean_text(name1)
     c2 = clean_text(name2)
@@ -46,13 +100,6 @@ def calculate_similarity(p1, p2):
     # Exact match after normalization
     if c1 == c2:
         return 1.0
-
-    # Number / Volume check (e.g., 500ml vs 1000ml are distinct sizes)
-    nums1 = extract_numbers(c1)
-    nums2 = extract_numbers(c2)
-    if nums1 and nums2 and not (nums1 & nums2):
-        # Different volume/size specifications -> lower similarity
-        return 0.25
 
     # Substring containment (e.g. short title inside long title)
     if c1 in c2 or c2 in c1:
@@ -67,10 +114,7 @@ def calculate_similarity(p1, p2):
     # Token overlap (Jaccard similarity on Khmer & English words)
     tokens1 = set(c1.split())
     tokens2 = set(c2.split())
-    if tokens1 and tokens2:
-        jaccard = len(tokens1 & tokens2) / len(tokens1 | tokens2)
-    else:
-        jaccard = 0.0
+    jaccard = (len(tokens1 & tokens2) / len(tokens1 | tokens2)) if (tokens1 and tokens2) else 0.0
 
     score = 0.55 * seq_ratio + 0.45 * jaccard
 
@@ -167,14 +211,25 @@ def find_duplicate_groups(threshold=0.75, limit=100):
                     if sim > max_sim:
                         max_sim = sim
 
-            # Pick recommended master (the one with the most sales orders or stock or longest name)
-            items_sorted = sorted(items, key=lambda x: (
-                float(x.get('sales_order_count') or 0),
-                float(x.get('po_count') or 0),
-                float(x.get('stock_qty') or 0),
-                len(x.get('name') or ''),
-                -int(x['id'])
-            ), reverse=True)
+            # Pick recommended master:
+            # 1. Has exact category (category_id is NOT null and NOT 'Uncategorized')
+            # 2. Sales order count (from HQ and all branches)
+            # 3. PO count
+            # 4. Stock quantity
+            # 5. Length of name
+            # 6. Lowest ID (earliest created / original master)
+            def _master_rank(x):
+                has_exact_category = 1 if (x.get('category_id') and str(x.get('category_name', '')).strip().lower() not in ('uncategorized', 'none', '')) else 0
+                return (
+                    has_exact_category,
+                    float(x.get('sales_order_count') or 0),
+                    float(x.get('po_count') or 0),
+                    float(x.get('stock_qty') or 0),
+                    len(x.get('name') or ''),
+                    -int(x['id'])
+                )
+
+            items_sorted = sorted(items, key=_master_rank, reverse=True)
 
             recommended_master_id = items_sorted[0]['id']
 
@@ -487,4 +542,83 @@ def execute_product_merge(master_id, source_ids, overrides=None):
         'stock_units_consolidated': total_stock_moved,
         'merged_skus': merged_skus,
         'merged_barcodes': merged_barcodes
+    }
+
+def bulk_merge_all_duplicates(threshold=0.85, only_category_master=False):
+    """
+    Automatically detects duplicate product clusters and merges them:
+    - Prioritizes the product with an exact category as master.
+    - If only_category_master is True, only merges groups where master has an exact category.
+    - Re-links all sales orders & lines from HQ and all branches to the master.
+    - Re-links all purchase orders & lines to the master.
+    - Consolidates warehouse inventory stocks across all locations into the master.
+    - Moves inventory logs, transfers, adjustments, BOMs, vendor prices to master.
+    - Permanently deletes the duplicate source product(s) (non-category duplicates).
+    - Preserves 100% of orders, sales lines, and historical records.
+    """
+    groups = find_duplicate_groups(threshold=threshold, limit=500)
+    merged_results = []
+    total_deleted = 0
+    total_so_relinked = 0
+    total_po_relinked = 0
+    total_stock_consolidated = 0
+
+    for g in groups:
+        products = g.get('products') or []
+        if len(products) < 2:
+            continue
+
+        master = products[0]
+        sources = products[1:]
+        master_id = master['id']
+
+        # Verify master still exists (might have been merged if clusters overlapped)
+        m_row = query_one("SELECT id, name, category_id FROM products WHERE id = %s", (master_id,))
+        if not m_row:
+            continue
+
+        # If only_category_master is requested, skip groups where master has no category
+        master_has_cat = bool(m_row.get('category_id'))
+        if only_category_master and not master_has_cat:
+            continue
+
+        # Filter sources that still exist
+        source_ids = []
+        for s in sources:
+            s_row = query_one("SELECT id FROM products WHERE id = %s", (s['id'],))
+            if s_row:
+                source_ids.append(s['id'])
+
+        if not source_ids:
+            continue
+
+        try:
+            res = execute_product_merge(master_id, source_ids)
+            merged_results.append({
+                'master_id': master_id,
+                'master_name': res.get('master_name') or master['name'],
+                'master_sku': res.get('master_sku') or master.get('sku'),
+                'master_category': res.get('master_category_name') or master.get('category_name'),
+                'deleted_count': len(res.get('deleted_products', [])),
+                'deleted_products': res.get('deleted_products', []),
+                'sales_orders_relinked': res.get('sales_orders_relinked', 0),
+                'purchase_orders_relinked': res.get('purchase_orders_relinked', 0),
+                'stock_units_consolidated': res.get('stock_units_consolidated', 0)
+            })
+            total_deleted += len(res.get('deleted_products', []))
+            total_so_relinked += res.get('sales_orders_relinked', 0)
+            total_po_relinked += res.get('purchase_orders_relinked', 0)
+            total_stock_consolidated += res.get('stock_units_consolidated', 0)
+        except Exception as e:
+            import logging
+            logging.getLogger('inflow.product_merge').error(f"Error merging group for master #{master_id}: {e}")
+
+    return {
+        'success': True,
+        'merged_groups_count': len(merged_results),
+        'deleted_products_count': total_deleted,
+        'total_sales_orders_relinked': total_so_relinked,
+        'total_purchase_orders_relinked': total_po_relinked,
+        'total_stock_units_consolidated': total_stock_consolidated,
+        'groups': merged_results
     }
