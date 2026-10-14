@@ -758,7 +758,8 @@ def sync_hq():
             prod_name = (str(sol[11]).strip() if sol[11] else '')
             cost_price = float(sol[12] or 0)
 
-            final_desc = inflow_desc if inflow_desc else prod_name
+            # User requirement: sale order no need description to import
+            final_desc = None if prod_id else (inflow_desc or prod_name or None)
 
             sol_insert_data.append((
                 lid, so_id, line_num, prod_id, final_desc,
