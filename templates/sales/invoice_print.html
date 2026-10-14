@@ -801,7 +801,15 @@
             .no-print-toolbar {
                 display: none !important;
             }
+            .invoice-zoom-container {
+                padding: 0 !important;
+                margin: 0 !important;
+                overflow: visible !important;
+                width: 100% !important;
+            }
             .invoice-paper {
+                zoom: 1 !important;
+                transform: none !important;
                 box-shadow: none !important;
                 border-radius: 0 !important;
                 padding: 2mm 3mm !important;
@@ -820,8 +828,30 @@
     <!-- Non-printable Top Action Bar -->
     <div class="no-print-toolbar">
         <div class="tb-left">
-            <a href="javascript:window.history.back()" class="tb-btn">← Back</a>
+            <a href="javascript:window.history.back()" class="tb-btn" title="Back to previous page">← Back</a>
             
+            <!-- Zoom Percentage Controls -->
+            <div class="zoom-control-box" title="Invoice Preview Zoom Percentage">
+                <span class="zoom-label">🔍 Zoom:</span>
+                <button type="button" class="zoom-btn" onclick="adjustZoom(-10)" title="Zoom Out (−10%)" aria-label="Zoom Out">−</button>
+                <select id="invoiceZoomSelect" class="zoom-select" onchange="setInvoiceZoom(this.value)" title="Select Zoom Percentage">
+                    <option value="50">50%</option>
+                    <option value="67">67%</option>
+                    <option value="75">75%</option>
+                    <option value="80">80%</option>
+                    <option value="90">90%</option>
+                    <option value="100" selected>100%</option>
+                    <option value="110">110%</option>
+                    <option value="125">125%</option>
+                    <option value="150">150%</option>
+                    <option value="175">175%</option>
+                    <option value="200">200%</option>
+                    <option value="fit">Fit Width</option>
+                </select>
+                <button type="button" class="zoom-btn" onclick="adjustZoom(10)" title="Zoom In (+10%)" aria-label="Zoom In">+</button>
+                <button type="button" class="zoom-btn reset-btn" onclick="setInvoiceZoom(100)" title="Reset Zoom to 100%">100%</button>
+            </div>
+
             <!-- Live Exchange Rate Modifier -->
             <div class="rate-control-box" title="Adjust USD to KHR exchange rate live on this invoice">
                 <span>Rate 1$ =</span>
@@ -830,7 +860,7 @@
             </div>
 
             <!-- Toggle KHR Display -->
-            <label style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; cursor: pointer; color: #475569;">
+            <label style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; cursor: pointer; color: #475569; user-select: none;">
                 <input type="checkbox" id="chkShowKhr" {% if inv_settings.enable_khr_total %}checked{% endif %} onchange="toggleKhrDisplay(this.checked)">
                 <span>Show Khmer Riel Total</span>
             </label>
@@ -846,8 +876,10 @@
         </div>
     </div>
 
-    <!-- Printable Invoice Sheet (A5) -->
-    <div class="invoice-paper style-{{ inv_settings.template_style or 'modern' }}" id="invoiceSheet">
+    <!-- Invoice Preview Viewport Container -->
+    <div class="invoice-zoom-container" id="invoiceZoomContainer">
+        <!-- Printable Invoice Sheet (A5) -->
+        <div class="invoice-paper style-{{ inv_settings.template_style or 'modern' }}" id="invoiceSheet">
         <!-- Top Colored Accent Bar -->
         <div class="top-accent-bar"></div>
 
@@ -1385,6 +1417,7 @@
             <div>សូមអរគុណចំពោះការគាំទ្ររបស់លោកអ្នក! Thank you for choosing {{ inv_settings.shop_name_en or company.name or 'inFlow Premium' }}.</div>
         </div>
     </div>
+    </div> <!-- end #invoiceZoomContainer -->
 
     <!-- Live Dynamic Calculation Scripts -->
     <script>
@@ -1431,6 +1464,125 @@
                 setTimeout(() => window.print(), 400);
             });
         }
+
+        /* ==========================================================================
+           Zoom Percentage Controls for Invoice Preview
+           ========================================================================== */
+        let currentZoomLevel = 100;
+        let isFitMode = false;
+
+        function applyZoomToSheet(percent) {
+            const sheet = document.getElementById('invoiceSheet');
+            if (!sheet) return;
+
+            const factor = percent / 100;
+            
+            // Modern browsers (Chrome, Edge, Safari, Firefox 126+) support CSS zoom
+            if ('zoom' in sheet.style) {
+                sheet.style.zoom = factor;
+                sheet.style.transform = 'none';
+            } else {
+                sheet.style.transform = `scale(${factor})`;
+                sheet.style.transformOrigin = 'top center';
+            }
+        }
+
+        function calculateFitWidthPercent() {
+            const sheet = document.getElementById('invoiceSheet');
+            if (!sheet) return 100;
+
+            const isThermal = sheet.classList.contains('style-thermal_80mm');
+            const baseWidth = isThermal ? 320 : 580;
+            
+            const availableWidth = Math.max(300, window.innerWidth - 64);
+            const fitPercent = Math.round((availableWidth / baseWidth) * 100);
+            return Math.min(250, Math.max(50, fitPercent));
+        }
+
+        function setInvoiceZoom(val, skipStorage) {
+            const select = document.getElementById('invoiceZoomSelect');
+            
+            if (val === 'fit') {
+                isFitMode = true;
+                const fitPercent = calculateFitWidthPercent();
+                currentZoomLevel = fitPercent;
+                applyZoomToSheet(fitPercent);
+                if (select) select.value = 'fit';
+                if (!skipStorage) {
+                    try { localStorage.setItem('inflow_invoice_zoom', 'fit'); } catch(e){}
+                }
+                return;
+            }
+
+            isFitMode = false;
+            let percent = parseInt(val, 10);
+            if (isNaN(percent)) percent = 100;
+            percent = Math.min(250, Math.max(50, percent));
+            currentZoomLevel = percent;
+
+            applyZoomToSheet(percent);
+
+            if (select) {
+                let found = false;
+                for (let i = 0; i < select.options.length; i++) {
+                    if (select.options[i].value === String(percent)) {
+                        select.selectedIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    let customOpt = select.querySelector('option[data-custom="true"]');
+                    if (!customOpt) {
+                        customOpt = document.createElement('option');
+                        customOpt.setAttribute('data-custom', 'true');
+                        select.appendChild(customOpt);
+                    }
+                    customOpt.value = percent;
+                    customOpt.textContent = percent + '%';
+                    select.value = String(percent);
+                }
+            }
+
+            if (!skipStorage) {
+                try { localStorage.setItem('inflow_invoice_zoom', String(percent)); } catch(e){}
+            }
+        }
+
+        function adjustZoom(delta) {
+            isFitMode = false;
+            const newPercent = Math.round((currentZoomLevel + delta) / 10) * 10;
+            setInvoiceZoom(newPercent);
+        }
+
+        // Recalculate zoom when Fit Width is active and window resizes
+        window.addEventListener('resize', () => {
+            if (isFitMode) {
+                setInvoiceZoom('fit', true);
+            }
+        });
+
+        // Ctrl + Mouse Wheel Zoom
+        window.addEventListener('wheel', (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                adjustZoom(e.deltaY < 0 ? 10 : -10);
+            }
+        }, { passive: false });
+
+        // Initialize Zoom on Load
+        (function initInvoiceZoom() {
+            try {
+                const saved = localStorage.getItem('inflow_invoice_zoom');
+                if (saved) {
+                    setInvoiceZoom(saved);
+                } else {
+                    setInvoiceZoom(100);
+                }
+            } catch(e) {
+                setInvoiceZoom(100);
+            }
+        })();
     </script>
 </body>
 </html>
