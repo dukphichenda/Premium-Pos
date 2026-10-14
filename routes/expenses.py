@@ -856,6 +856,8 @@ def update_monthly_summary():
 
         # 1. Opening Balance: Manual vs Auto
         mob_raw = data.get('manual_opening_balance')
+        if mob_raw is None or str(mob_raw).strip() == '':
+            mob_raw = data.get('opening_balance')
         scope_arg = str(branch_id) if branch_id else 'main'
         if mob_raw is not None and str(mob_raw).strip() != '':
             manual_opening = float(mob_raw)
@@ -872,6 +874,10 @@ def update_monthly_summary():
         else:
             clear_stm = float(data.get('clear_stm', 0) or 0)
             mmi_raw = data.get('manual_media_income')
+            if mmi_raw is None or str(mmi_raw).strip() == '':
+                mmi_raw = data.get('media')
+            if mmi_raw is None or str(mmi_raw).strip() == '':
+                mmi_raw = data.get('media_expense')
             if mmi_raw is not None and str(mmi_raw).strip() != '':
                 manual_media = float(mmi_raw)
                 media_total = manual_media
@@ -881,12 +887,16 @@ def update_monthly_summary():
                 media_total = float(med_tot['tot'] if med_tot else 0)
         
         custom_sales = data.get('custom_sales_income')
+        if custom_sales is None or str(custom_sales).strip() == '':
+            custom_sales = data.get('inflow_sales')
         if custom_sales is not None and str(custom_sales).strip() != '':
             custom_sales = float(custom_sales)
         else:
             custom_sales = None
 
         accounts_data = data.get('accounts_json')
+        if accounts_data is None:
+            accounts_data = data.get('accounts')
         accounts_list = _normalize_accounts(accounts_data)
 
         if branch_id is not None:

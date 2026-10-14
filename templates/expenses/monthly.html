@@ -49,7 +49,7 @@
                             <div style="font-size: 10px; color: #64748B;">Landscape document</div>
                         </div>
                     </a>
-                    <a href="{{ url_for('expenses.print_monthly_report', month=current_month) }}" target="_blank" data-no-tab="true" onclick="closeExportMenu()" class="dropdown-item-custom" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 12px; color: #1E293B; text-decoration: none; cursor: pointer;">
+                    <a href="{{ url_for('expenses.print_monthly_report', month=current_month, branch=branch_scope) }}" target="_blank" data-no-tab="true" onclick="closeExportMenu()" class="dropdown-item-custom" style="display: flex; align-items: center; gap: 8px; padding: 9px 12px; font-size: 12px; color: #1E293B; text-decoration: none; cursor: pointer;">
                         <span style="font-size: 15px;">🖨️</span>
                         <div>
                             <div style="font-weight: 700; color: #2563EB;">Print / High-DPI View</div>
@@ -59,9 +59,9 @@
                 </div>
             </div>
 
-            <button type="button" class="btn btn-outline" onclick="openBalanceModal()" title="Edit Opening Balance, STM & Sales">
+            <button type="button" class="btn btn-outline" onclick="openBalanceModal()" title="Edit Opening Balance & Sales">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>Edit Balances (លុយចាស់ / STM)</span>
+                <span>Edit Balances ({% if is_branch %}លុយចាស់ / លក់{% else %}លុយចាស់ / STM{% endif %})</span>
             </button>
             <button type="button" class="btn btn-outline" onclick="openNewMonthModal()" title="Add another month sheet">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
@@ -875,6 +875,8 @@
 
 <script>
     const CURRENT_MONTH = "{{ current_month }}";
+    const BRANCH_SCOPE = "{{ branch_scope }}";
+    const IS_BRANCH = {{ 'true' if is_branch else 'false' }};
     const EXPECTED_MONEY_IN_HAND = {{ money_in_hand }};
     const PREV_MONEY_IN_HAND = {{ prev_money_in_hand }};
     const MEDIA_SHEET_TOTAL = {{ media_sheet_total }};
@@ -896,7 +898,7 @@
 
     function triggerMonthlyExport(type) {
         closeExportMenu();
-        const url = `/expenses/export/${type}?month=${encodeURIComponent(CURRENT_MONTH)}`;
+        const url = `/expenses/export/${type}?month=${encodeURIComponent(CURRENT_MONTH)}&branch=${encodeURIComponent(BRANCH_SCOPE)}`;
         window.location.href = url;
     }
 
@@ -1027,7 +1029,8 @@
                     total_price: total,
                     expense_date: dateVal,
                     paid_by: payer,
-                    category: category
+                    category: category,
+                    branch_id: BRANCH_SCOPE
                 })
             });
             const data = await resp.json();
@@ -1301,10 +1304,11 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     month_key: CURRENT_MONTH,
+                    branch_id: BRANCH_SCOPE,
                     manual_opening_balance: {% if is_manual_opening %}{{ opening_balance }}{% else %}null{% endif %},
-                    clear_stm: {{ clear_stm }},
-                    media_expense: {{ media_total }},
-                    manual_media_income: {% if is_manual_media %}{{ media_total }}{% else %}null{% endif %},
+                    clear_stm: {% if is_branch %}0{% else %}{{ clear_stm }}{% endif %},
+                    media_expense: {% if is_branch %}0{% else %}{{ media_total }}{% endif %},
+                    manual_media_income: {% if is_branch or not is_manual_media %}null{% else %}{{ media_total }}{% endif %},
                     custom_sales_income: {% if is_custom_sales %}{{ sales_received }}{% else %}null{% endif %},
                     accounts_json: accountsList
                 })
@@ -1349,7 +1353,8 @@
 
     // Reset media money in modal to auto from media sheet
     function resetMediaToAuto() {
-        document.getElementById('inputMedia').value = '';
+        const mediaInput = document.getElementById('inputMedia');
+        if (mediaInput) mediaInput.value = '';
         const note = document.getElementById('mediaMoneyNote');
         if (note) {
             note.innerHTML = `<span style="color: #16A34A; font-weight: 700;">● Reset to Auto:</span> will automatically use $${MEDIA_SHEET_TOTAL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from Media sheet upon saving.`;
@@ -1361,10 +1366,11 @@
         e.preventDefault();
         const openVal = document.getElementById('inputOpeningBalance').value.trim();
         const manualOpening = openVal !== '' ? parseFloat(openVal) : null;
-        const stm = parseFloat(document.getElementById('inputClearStm').value) || 0;
+        const stmEl = document.getElementById('inputClearStm');
+        const stm = stmEl ? (parseFloat(stmEl.value) || 0) : 0;
         
-        const mediaVal = document.getElementById('inputMedia').value.trim();
-        const manualMedia = mediaVal !== '' ? parseFloat(mediaVal) : null;
+        const mediaEl = document.getElementById('inputMedia');
+        const manualMedia = (mediaEl && mediaEl.value.trim() !== '') ? parseFloat(mediaEl.value.trim()) : null;
 
         const customSalesVal = document.getElementById('inputCustomSales').value.trim();
         const customSales = customSalesVal !== '' ? parseFloat(customSalesVal) : null;
@@ -1395,6 +1401,7 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     month_key: CURRENT_MONTH,
+                    branch_id: BRANCH_SCOPE,
                     manual_opening_balance: manualOpening,
                     clear_stm: stm,
                     manual_media_income: manualMedia,
