@@ -1062,10 +1062,37 @@ async function onExecuteImport() {
     btnExec.textContent = 'Importing...';
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000);  // 10 minute timeout
+
         const resp = await fetch("{{ url_for('data_exchange.import_execute_api') }}", {
             method: 'POST',
-            body: formData
+            body: formData,
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
+
+        // Check if server returned HTML instead of JSON (Nginx timeout/error page)
+        const contentType = resp.headers.get('content-type') || '';
+        if (!resp.ok || !contentType.includes('application/json')) {
+            const errorText = await resp.text();
+            const isTimeout = resp.status === 502 || resp.status === 504 || resp.status === 408;
+            const resBox = document.getElementById('importResultBox');
+            resBox.style.display = 'block';
+            resBox.style.background = '#FEF2F2';
+            resBox.style.border = '1px solid #FCA5A5';
+            resBox.style.color = '#B91C1C';
+            if (isTimeout) {
+                resBox.innerHTML = `<strong>⏱️ Server Timeout</strong><br>The import is taking too long for the server to process in one request. The data may have been partially imported.<br><br>💡 <strong>Tip:</strong> Try importing in smaller batches (e.g., select fewer orders).`;
+            } else {
+                resBox.innerHTML = `<strong>❌ Server Error (${resp.status})</strong><br>The server returned an unexpected response. Please try again or import fewer orders at a time.`;
+            }
+            btnExec.disabled = false;
+            btnBack.disabled = false;
+            btnExec.textContent = 'Retry Import';
+            return;
+        }
+
         const res = await resp.json();
 
         const resBox = document.getElementById('importResultBox');
@@ -1096,10 +1123,22 @@ async function onExecuteImport() {
             btnExec.textContent = 'Retry Import';
         }
     } catch (e) {
-        alert('Import error: ' + e.message);
+        const resBox = document.getElementById('importResultBox');
+        resBox.style.display = 'block';
+        if (e.name === 'AbortError') {
+            resBox.style.background = '#FEF2F2';
+            resBox.style.border = '1px solid #FCA5A5';
+            resBox.style.color = '#B91C1C';
+            resBox.innerHTML = `<strong>⏱️ Request Timeout</strong><br>The import took too long. The data may have been partially imported. Try refreshing and importing fewer orders.`;
+        } else {
+            resBox.style.background = '#FEF2F2';
+            resBox.style.border = '1px solid #FCA5A5';
+            resBox.style.color = '#B91C1C';
+            resBox.innerHTML = `<strong>❌ Import Error:</strong><br>${escapeHtml(e.message)}`;
+        }
         btnExec.disabled = false;
         btnBack.disabled = false;
-        btnExec.textContent = 'Import Now';
+        btnExec.textContent = 'Retry Import';
     }
 }
 

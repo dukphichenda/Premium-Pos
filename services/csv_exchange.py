@@ -1000,6 +1000,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
     # 5. SALES ORDER IMPORT (With Authentic inFlow Status, Amounts & Lines)
     # =========================================================================
     elif key == 'sales_order':
+        BATCH_SIZE = 500  # Commit every N orders to avoid timeout on large imports
         orders_map = {}
         for row_idx, r in enumerate(data_rows, start=2 if has_headers else 1):
             so_num = get_val(r, ['OrderNumber', 'Order Number', 'SO Number', 'Invoice Number', 'Order #'])
@@ -1068,8 +1069,11 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
         loc_map = {l['name'].lower().strip(): l['id'] for l in query_all("SELECT id, name FROM locations;")}
 
+        batch_count = 0
+        total_orders = len(orders_map)
         with get_db_cursor(commit=True) as cur:
             for so_num, order_data in orders_map.items():
+                batch_count += 1
                 # Customer handling
                 cust_name = (order_data['customer_name'] or 'Walk-in Customer').strip()
                 cn_clean = cust_name.lower()
@@ -1355,6 +1359,11 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                         pline['std_qty'], pline['unit_price'], pline['discount'], pline['subtotal'], pline['cost_price'],
                         pline['uom'], pline['display_qty']
                     ))
+
+                # Periodic batch commit to avoid timeout on large imports
+                if batch_count % BATCH_SIZE == 0:
+                    cur.connection.commit()
+                    logger.info(f"Sales order import progress: {batch_count}/{total_orders} orders committed.")
 
     # =========================================================================
     # 6. PURCHASE ORDER IMPORT
