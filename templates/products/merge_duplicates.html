@@ -1,0 +1,806 @@
+{% extends 'base.html' %}
+
+{% block title %}Merge Duplicate Products - inFlow Premium{% endblock %}
+
+{% block content %}
+<div class="inflow-top-accent-bar home"></div>
+
+<div style="max-width: 1400px; margin: 0 auto; padding: 10px 4px 50px 4px;">
+
+    <!-- Top Header & Breadcrumb -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; margin-bottom: 18px;">
+        <div>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #64748B; margin-bottom: 6px;">
+                <a href="{{ url_for('products.list_products') }}" style="color: #0284C7; text-decoration: none; font-weight: 600;">Products Catalog</a>
+                <span>›</span>
+                <span style="color: #0F172A; font-weight: 700;">Merge Duplicate Products</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <h1 style="font-size: 1.55rem; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">
+                    Merge Duplicate Products (បញ្ចូលទំនិញស្ទួនចូលគ្នា)
+                </h1>
+                <span class="badge" style="background: #EEF2FF; color: #4F46E5; font-size: 11.5px; font-weight: 800; padding: 3px 8px; border-radius: 4px;">
+                    BILINGUAL KHMER & ENGLISH
+                </span>
+            </div>
+        </div>
+        <div style="display: flex; gap: 10px; align-items: center;">
+            <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary btn-sm" style="font-weight: 600; text-decoration: none; padding: 7px 14px;">
+                ← Back to Catalog
+            </a>
+        </div>
+    </div>
+
+    <!-- Assurance Banner (Zero Order Loss & Stock Consolidation) -->
+    <div style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); border-radius: 8px; padding: 16px 20px; color: #FFFFFF; margin-bottom: 22px; box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15); border: 1px solid #334155;">
+        <div style="display: flex; gap: 16px; align-items: flex-start;">
+            <div style="width: 44px; height: 44px; border-radius: 8px; background: rgba(99, 102, 241, 0.2); border: 1px solid rgba(99, 102, 241, 0.4); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0;">
+                🔀
+            </div>
+            <div style="flex: 1;">
+                <div style="font-weight: 800; font-size: 14px; margin-bottom: 4px; color: #F8FAFC;">
+                    Safe Duplicate Product Consolidation Engine (ប្រព័ន្ធបញ្ចូលទំនិញស្ទួនដោយសុវត្ថិភាព)
+                </div>
+                <div style="font-size: 12.5px; color: #CBD5E1; line-height: 1.5;">
+                    Combine duplicate items caused by typing variations, imports, or legacy branch entries into a single master product.
+                    <span style="color: #FBBF24; font-weight: 700;">All historical Sales Orders, Invoices, Purchase Orders, and Stock logs are 100% preserved and combined together</span> — no transactions are ever deleted!
+                </div>
+                <div style="display: flex; gap: 20px; margin-top: 10px; font-size: 11.5px; flex-wrap: wrap;">
+                    <span style="display: flex; align-items: center; gap: 6px; color: #86EFAC;">
+                        <span>✓</span> Sales Orders & Invoices Re-linked
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 6px; color: #86EFAC;">
+                        <span>✓</span> Purchase Orders (POs) Re-linked
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 6px; color: #86EFAC;">
+                        <span>✓</span> Warehouse Inventory Consolidated
+                    </span>
+                    <span style="display: flex; align-items: center; gap: 6px; color: #86EFAC;">
+                        <span>✓</span> Alternate Barcodes & SKUs Saved for Search
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mode Selector Tabs -->
+    <div style="display: flex; gap: 8px; border-bottom: 2px solid #E2E8F0; margin-bottom: 22px;">
+        <button type="button" class="merge-tab-btn active" id="tabAutoBtn" onclick="switchMergeTab('auto')" style="padding: 10px 18px; font-size: 13.5px; font-weight: 700; border: none; background: none; cursor: pointer; border-bottom: 3px solid #0284C7; color: #0284C7; margin-bottom: -2px; display: flex; align-items: center; gap: 8px;">
+            <span>🤖</span>
+            <span>Auto-Detected Duplicates (រកឃើញទំនិញស្ទួន)</span>
+            <span class="badge" id="detectedCountBadge" style="background: #E0F2FE; color: #0369A1; font-size: 11px; padding: 2px 7px; border-radius: 10px;">Scanning...</span>
+        </button>
+        <button type="button" class="merge-tab-btn" id="tabManualBtn" onclick="switchMergeTab('manual')" style="padding: 10px 18px; font-size: 13.5px; font-weight: 700; border: none; background: none; cursor: pointer; border-bottom: 3px solid transparent; color: #64748B; margin-bottom: -2px; display: flex; align-items: center; gap: 8px;">
+            <span>✍️</span>
+            <span>Manual Custom Merge (ជ្រើសរើសបញ្ចូលដោយដៃ)</span>
+        </button>
+    </div>
+
+    <!-- TAB 1: AUTO DETECTED DUPLICATES -->
+    <div id="viewAutoMerge">
+        <!-- Filter and Search Toolbar -->
+        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 16px; margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                <span style="font-size: 12px; font-weight: 700; color: #475569;">Confidence Filter:</span>
+                <button type="button" class="conf-filter-btn active" data-thresh="0.75" onclick="setConfidenceFilter(0.75, this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 4px; border: 1px solid #0284C7; background: #E0F2FE; color: #0369A1; cursor: pointer;">
+                    All Candidates (75%+)
+                </button>
+                <button type="button" class="conf-filter-btn" data-thresh="0.85" onclick="setConfidenceFilter(0.85, this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 4px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; cursor: pointer;">
+                    High Confidence (85%+)
+                </button>
+                <button type="button" class="conf-filter-btn" data-thresh="0.95" onclick="setConfidenceFilter(0.95, this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 4px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; cursor: pointer;">
+                    Exact Matches (95%+)
+                </button>
+            </div>
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; max-width: 380px;">
+                <input type="text" id="autoSearchFilter" placeholder="Filter candidates by keyword (Khmer or English)..." oninput="filterCandidateCards(this.value)" style="width: 100%; padding: 6px 12px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px; outline: none;">
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="autoLoadingState" style="text-align: center; padding: 60px 20px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px;">
+            <div style="font-size: 32px; margin-bottom: 12px; animation: pulse 1.5s infinite;">🔍</div>
+            <div style="font-weight: 700; font-size: 15px; color: #0F172A;">Analyzing product catalog for duplicates...</div>
+            <div style="font-size: 12.5px; color: #64748B; margin-top: 4px;">Evaluating Khmer and English titles, volumes, packaging specs, and SKUs.</div>
+        </div>
+
+        <!-- Empty State -->
+        <div id="autoEmptyState" style="display: none; text-align: center; padding: 60px 20px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px;">
+            <div style="font-size: 36px; margin-bottom: 10px;">🎉</div>
+            <div style="font-weight: 800; font-size: 16px; color: #0F172A;">No duplicate candidate clusters found!</div>
+            <div style="font-size: 13px; color: #64748B; margin-top: 5px;">Your catalog is clean. If you wish to merge any two specific products, use the "Manual Custom Merge" tab.</div>
+        </div>
+
+        <!-- Clusters Container -->
+        <div id="autoClustersContainer" style="display: none; display: flex; flex-direction: column; gap: 16px;"></div>
+    </div>
+
+    <!-- TAB 2: MANUAL CUSTOM MERGE -->
+    <div id="viewManualMerge" style="display: none;">
+        <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.05); margin-bottom: 22px;">
+            <div style="font-weight: 800; font-size: 15px; color: #0F172A; margin-bottom: 6px;" class="font-khmer">
+                Select Products to Merge Manually (ជ្រើសរើសទំនិញបញ្ចូលគ្នា)
+            </div>
+            <div style="font-size: 12.5px; color: #64748B; margin-bottom: 20px;">
+                Search by typing Khmer text, English letters, SKU, or Barcode to select the master product you want to keep and the duplicate product(s) to merge into it.
+            </div>
+
+            <!-- Two-Column Product Picker -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+                <!-- Column 1: MASTER PRODUCT (KEEP) -->
+                <div style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px; padding: 18px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="font-weight: 800; font-size: 13.5px; color: #166534; display: flex; align-items: center; gap: 6px;">
+                            <span>👑</span> 1. Master Product (Keep this product)
+                        </span>
+                        <span style="background: #DCFCE7; color: #15803D; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">
+                            TARGET / MASTER
+                        </span>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div style="position: relative; margin-bottom: 14px;">
+                        <input type="text" id="manualMasterSearch" placeholder="Search Master Product by Khmer / English name / SKU..." oninput="onSearchManualMaster(this.value)" autocomplete="off" style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid #86EFAC; border-radius: 6px; outline: none; background: #FFFFFF;">
+                        <div id="manualMasterDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 280px; overflow-y: auto; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; margin-top: 4px;"></div>
+                    </div>
+
+                    <!-- Selected Master Card -->
+                    <div id="selectedMasterCard" style="display: none; background: #FFFFFF; border: 1px solid #BBF7D0; border-radius: 6px; padding: 14px;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <span id="mSku" style="font-family: monospace; font-size: 11px; font-weight: 700; background: #DCFCE7; color: #166534; padding: 2px 6px; border-radius: 4px;"></span>
+                                <h3 id="mName" style="font-size: 14px; font-weight: 800; color: #0F172A; margin: 6px 0 2px 0;" class="font-khmer"></h3>
+                                <div id="mCategory" style="font-size: 11.5px; color: #64748B;"></div>
+                            </div>
+                            <button type="button" onclick="clearSelectedMaster()" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 14px;" title="Remove selection">✕</button>
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 12px; font-size: 11.5px; background: #F8FAFC; border-radius: 5px; padding: 8px 10px;">
+                            <div>
+                                <div style="color: #64748B;">Stock:</div>
+                                <strong id="mStock" style="color: #0F172A;"></strong>
+                            </div>
+                            <div>
+                                <div style="color: #64748B;">Sales Orders:</div>
+                                <strong id="mOrders" style="color: #0284C7;"></strong>
+                            </div>
+                            <div>
+                                <div style="color: #64748B;">Purchase Orders:</div>
+                                <strong id="mPOs" style="color: #9333EA;"></strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div id="noMasterSelectedMsg" style="font-size: 12px; color: #64748B; text-align: center; padding: 20px 10px; border: 1px dashed #86EFAC; border-radius: 6px; background: rgba(255,255,255,0.6);">
+                        No master product selected yet. Type in the box above to pick the product to keep.
+                    </div>
+                </div>
+
+                <!-- Column 2: DUPLICATE PRODUCT(S) (MERGE IN) -->
+                <div style="background: #FFFBEB; border: 1.5px solid #FDE68A; border-radius: 8px; padding: 18px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <span style="font-weight: 800; font-size: 13.5px; color: #92400E; display: flex; align-items: center; gap: 6px;">
+                            <span>📦</span> 2. Duplicate Product(s) to Merge In
+                        </span>
+                        <span style="background: #FEF3C7; color: #B45309; font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px;">
+                            SOURCE / MERGE
+                        </span>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div style="position: relative; margin-bottom: 14px;">
+                        <input type="text" id="manualSourceSearch" placeholder="Search duplicate product by Khmer / English / SKU..." oninput="onSearchManualSource(this.value)" autocomplete="off" style="width: 100%; padding: 8px 12px; font-size: 13px; border: 1px solid #FDE68A; border-radius: 6px; outline: none; background: #FFFFFF;">
+                        <div id="manualSourceDropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 280px; overflow-y: auto; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 50; margin-top: 4px;"></div>
+                    </div>
+
+                    <!-- List of Selected Duplicates -->
+                    <div id="selectedSourceContainer" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                    <div id="noSourceSelectedMsg" style="font-size: 12px; color: #64748B; text-align: center; padding: 20px 10px; border: 1px dashed #FDE68A; border-radius: 6px; background: rgba(255,255,255,0.6);">
+                        No duplicate products selected yet. Search above to choose one or more products to merge into master.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Merge Summary & Action Bar -->
+            <div id="manualMergeActionBox" style="display: none; margin-top: 24px; padding: 16px 20px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
+                <div>
+                    <div style="font-weight: 800; font-size: 13.5px; color: #0F172A;" id="manualActionTitle">
+                        Ready to merge products
+                    </div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 2px;" id="manualActionSubtitle">
+                        All sales orders, POs, and stock will combine seamlessly under the master product.
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="resetManualForm()">Reset</button>
+                    <button type="button" class="btn btn-primary" onclick="confirmManualMerge()" style="background: linear-gradient(90deg, #4F46E5 0%, #3730A3 100%); border-color: #3730A3; font-weight: 700; padding: 8px 18px; border-radius: 6px; box-shadow: 0 2px 6px rgba(79, 70, 229, 0.3);">
+                        🔀 Execute Merge Products
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Merge Confirmation Modal -->
+<div id="mergeConfirmModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #FFFFFF; border-radius: 10px; max-width: 540px; width: 100%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); border: 1px solid #CBD5E1;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: #EEF2FF; color: #4F46E5; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                🔀
+            </div>
+            <div>
+                <h3 style="font-size: 16px; font-weight: 800; color: #0F172A; margin: 0;" class="font-khmer">
+                    Confirm Product Merge (បញ្ជាក់ការបញ្ចូលទំនិញ)
+                </h3>
+                <div style="font-size: 12px; color: #64748B;">This action re-links all historical transactions to the master product.</div>
+            </div>
+        </div>
+
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px 14px; margin-bottom: 16px; font-size: 12.5px;">
+            <div style="margin-bottom: 6px;">
+                <span style="color: #64748B;">Master Product (Keep):</span>
+                <strong id="modalMasterName" style="color: #0F172A; display: block; margin-top: 2px;"></strong>
+            </div>
+            <div style="border-top: 1px dashed #CBD5E1; padding-top: 6px; margin-top: 6px;">
+                <span style="color: #64748B;">Duplicate Product(s) to Merge In:</span>
+                <div id="modalSourceNames" style="margin-top: 2px; font-weight: 600; color: #B45309;"></div>
+            </div>
+        </div>
+
+        <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 6px; padding: 10px 12px; margin-bottom: 18px; font-size: 12px; color: #991B1B;">
+            <strong style="display: block; margin-bottom: 2px;">🛡️ Safe Merge Checklist:</strong>
+            • All Sales Orders & Invoices will be preserved and mixed together on Master.<br>
+            • All Purchase Orders (POs) will be preserved on Master.<br>
+            • Warehouse stock counts will be added into Master.<br>
+            • Duplicate item record will be removed from product catalog.
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeMergeModal()">Cancel</button>
+            <button type="button" class="btn btn-primary" id="btnConfirmExecuteMerge" onclick="executeCurrentMerge()" style="background: #4F46E5; border-color: #4338CA; font-weight: 700; padding: 7px 18px;">
+                Yes, Merge Products Now
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Merge Success Modal -->
+<div id="mergeSuccessModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.6); z-index: 9999; align-items: center; justify-content: center; padding: 16px;">
+    <div style="background: #FFFFFF; border-radius: 10px; max-width: 500px; width: 100%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.25); text-align: center;">
+        <div style="width: 50px; height: 50px; border-radius: 50%; background: #DCFCE7; color: #16A34A; display: flex; align-items: center; justify-content: center; font-size: 26px; margin: 0 auto 14px auto;">
+            ✓
+        </div>
+        <h3 style="font-size: 17px; font-weight: 800; color: #0F172A; margin: 0 0 6px 0;" class="font-khmer">
+            Products Merged Successfully!
+        </h3>
+        <div style="font-size: 13px; color: #475569; margin-bottom: 18px;" id="successModalSummary"></div>
+
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 12px; margin-bottom: 20px; font-size: 12px;">
+            <div>
+                <div style="color: #64748B;">SOs Mixed:</div>
+                <strong id="succSoCount" style="color: #0284C7; font-size: 15px;"></strong>
+            </div>
+            <div>
+                <div style="color: #64748B;">POs Mixed:</div>
+                <strong id="succPoCount" style="color: #9333EA; font-size: 15px;"></strong>
+            </div>
+            <div>
+                <div style="color: #64748B;">Stock Added:</div>
+                <strong id="succStockCount" style="color: #059669; font-size: 15px;"></strong>
+            </div>
+        </div>
+
+        <div style="display: flex; justify-content: center; gap: 10px;">
+            <button type="button" class="btn btn-secondary" onclick="closeSuccessModal()">Stay on Merge Tool</button>
+            <a href="#" id="succViewProductLink" class="btn btn-primary" style="background: #0284C7; border-color: #0284C7; font-weight: 700; text-decoration: none;">
+                View Master Product in Catalog →
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.merge-tab-btn.active {
+    border-bottom: 3px solid #0284C7 !important;
+    color: #0284C7 !important;
+}
+.conf-filter-btn.active {
+    background: #E0F2FE !important;
+    border-color: #0284C7 !important;
+    color: #0369A1 !important;
+}
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 0.8; }
+    50% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 0.8; }
+}
+.cluster-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 16px 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: border-color 0.15s ease;
+}
+.cluster-card:hover {
+    border-color: #CBD5E1;
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let gClusters = [];
+let gCurrentThreshold = 0.75;
+let gPendingMergeData = null;
+
+let gSelectedMaster = null;
+let gSelectedSources = [];
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadDuplicateCandidates();
+
+    // Check if an ID was passed in query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const preselectedId = urlParams.get('id');
+    if (preselectedId) {
+        // Switch to manual tab and prefill as master
+        switchMergeTab('manual');
+        fetchProductById(preselectedId, (prod) => {
+            if (prod) selectManualMaster(prod);
+        });
+    }
+});
+
+function switchMergeTab(tab) {
+    const tabAutoBtn = document.getElementById('tabAutoBtn');
+    const tabManualBtn = document.getElementById('tabManualBtn');
+    const viewAuto = document.getElementById('viewAutoMerge');
+    const viewManual = document.getElementById('viewManualMerge');
+
+    if (tab === 'auto') {
+        tabAutoBtn.classList.add('active');
+        tabManualBtn.classList.remove('active');
+        viewAuto.style.display = 'block';
+        viewManual.style.display = 'none';
+    } else {
+        tabManualBtn.classList.add('active');
+        tabAutoBtn.classList.remove('active');
+        viewAuto.style.display = 'none';
+        viewManual.style.display = 'block';
+    }
+}
+
+function loadDuplicateCandidates() {
+    const loading = document.getElementById('autoLoadingState');
+    const empty = document.getElementById('autoEmptyState');
+    const container = document.getElementById('autoClustersContainer');
+    const badge = document.getElementById('detectedCountBadge');
+
+    loading.style.display = 'block';
+    empty.style.display = 'none';
+    container.style.display = 'none';
+
+    fetch('/api/products/duplicate-candidates?threshold=' + gCurrentThreshold)
+        .then(res => res.json())
+        .then(data => {
+            loading.style.display = 'none';
+            if (data.success && data.groups && data.groups.length > 0) {
+                gClusters = data.groups;
+                badge.innerText = data.groups.length + ' Groups Found';
+                badge.style.background = '#FEE2E2';
+                badge.style.color = '#DC2626';
+                renderClusters(data.groups);
+            } else {
+                gClusters = [];
+                badge.innerText = '0 Groups';
+                badge.style.background = '#DCFCE7';
+                badge.style.color = '#15803D';
+                empty.style.display = 'block';
+            }
+        })
+        .catch(err => {
+            loading.style.display = 'none';
+            console.error('Error loading duplicate candidates:', err);
+        });
+}
+
+function setConfidenceFilter(threshold, btn) {
+    document.querySelectorAll('.conf-filter-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.background = '#FFFFFF';
+        b.style.borderColor = '#CBD5E1';
+        b.style.color = '#475569';
+    });
+    btn.classList.add('active');
+    btn.style.background = '#E0F2FE';
+    btn.style.borderColor = '#0284C7';
+    btn.style.color = '#0369A1';
+
+    gCurrentThreshold = threshold;
+    loadDuplicateCandidates();
+}
+
+function filterCandidateCards(text) {
+    const q = (text || '').toLowerCase().trim();
+    const cards = document.querySelectorAll('.cluster-card');
+    cards.forEach(card => {
+        const str = card.getAttribute('data-search-text') || '';
+        if (!q || str.includes(q)) {
+            card.style.display = 'block';
+        } else {
+            card.style.display = 'none';
+        }
+    });
+}
+
+function renderClusters(groups) {
+    const container = document.getElementById('autoClustersContainer');
+    container.innerHTML = '';
+    container.style.display = 'flex';
+
+    groups.forEach((group, gIdx) => {
+        const card = document.createElement('div');
+        card.className = 'cluster-card';
+        
+        let searchText = group.products.map(p => `${p.name} ${p.sku}`).join(' ').toLowerCase();
+        card.setAttribute('data-search-text', searchText);
+
+        const scoreColor = group.similarity_score >= 95 ? '#10B981' : (group.similarity_score >= 85 ? '#0284C7' : '#F59E0B');
+        const scoreBg = group.similarity_score >= 95 ? '#DCFCE7' : (group.similarity_score >= 85 ? '#E0F2FE' : '#FEF3C7');
+        const scoreLabel = group.similarity_score >= 95 ? 'Exact Match' : (group.similarity_score >= 85 ? 'High Confidence' : 'Similar Names');
+
+        let rowsHtml = '';
+        group.products.forEach((p, pIdx) => {
+            const isMaster = (p.id === group.recommended_master_id);
+            rowsHtml += `
+                <div style="background: ${isMaster ? '#F0FDF4' : '#FFFFFF'}; border: 1.5px solid ${isMaster ? '#86EFAC' : '#E2E8F0'}; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                    <div style="display: flex; align-items: center; gap: 12px; flex: 1; min-width: 280px;">
+                        <input type="radio" name="master_cluster_${gIdx}" value="${p.id}" ${isMaster ? 'checked' : ''} onchange="onClusterMasterChanged(${gIdx}, ${p.id})" style="transform: scale(1.2); cursor: pointer;" title="Choose this product as Master to keep">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-weight: 800; font-family: monospace; font-size: 11px; background: #F1F5F9; color: #334155; padding: 2px 6px; border-radius: 4px;">${escapeHtml(p.sku || 'NO-SKU')}</span>
+                                ${p.category_name ? `<span style="font-size: 10.5px; color: #64748B;">• ${escapeHtml(p.category_name)}</span>` : ''}
+                                ${isMaster ? `<span style="background: #10B981; color: #FFFFFF; font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 3px;">KEEP AS MASTER</span>` : `<span style="color: #94A3B8; font-size: 10.5px;">(will merge in)</span>`}
+                            </div>
+                            <div style="font-weight: 700; font-size: 13.5px; color: #0F172A; margin-top: 3px;" class="font-khmer">
+                                ${escapeHtml(p.name)}
+                            </div>
+                            <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
+                                ID: #${p.id} ${p.barcode ? `• Barcode: <code>${p.barcode}</code>` : ''} • Price: $${Number(p.default_price || 0).toFixed(2)}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 14px; font-size: 12px;">
+                        <div style="text-align: right;">
+                            <div style="color: #64748B; font-size: 10.5px;">Stock On Hand</div>
+                            <strong style="color: #0F172A;">${Number(p.stock_qty || 0).toLocaleString()} ${escapeHtml(p.uom || 'pcs')}</strong>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: #64748B; font-size: 10.5px;">Sales Orders</div>
+                            <strong style="color: #0284C7;">${p.sales_order_count || 0} orders</strong>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="color: #64748B; font-size: 10.5px;">Purchase Orders</div>
+                            <strong style="color: #9333EA;">${p.po_count || 0} POs</strong>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        card.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 800; font-size: 12px; background: ${scoreBg}; color: ${scoreColor}; padding: 3px 8px; border-radius: 4px;">
+                        ${group.similarity_score}% ${scoreLabel}
+                    </span>
+                    <span style="font-size: 12.5px; color: #475569; font-weight: 600;">
+                        ${group.products.length} Duplicate Products Detected
+                    </span>
+                </div>
+                <div style="font-size: 11.5px; color: #64748B;">
+                    Combined Stock: <strong style="color: #0F172A;">${group.total_combined_stock.toLocaleString()}</strong> • 
+                    Total Orders: <strong style="color: #0284C7;">${group.total_combined_orders}</strong> • 
+                    Total POs: <strong style="color: #9333EA;">${group.total_combined_pos}</strong>
+                </div>
+            </div>
+
+            <div id="clusterRows_${gIdx}">
+                ${rowsHtml}
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid #F1F5F9; flex-wrap: wrap; gap: 10px;">
+                <div style="font-size: 11.5px; color: #059669; font-weight: 600;">
+                    🛡️ Merge preserves all orders & POs without deleting historical sales records.
+                </div>
+                <button type="button" class="btn btn-sm btn-primary" onclick="triggerClusterMerge(${gIdx})" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); border-color: #0369A1; font-weight: 700; padding: 6px 14px; border-radius: 5px;">
+                    🔀 Merge Group into Master
+                </button>
+            </div>
+        `;
+
+        container.appendChild(card);
+    });
+}
+
+function onClusterMasterChanged(gIdx, newMasterId) {
+    if (gClusters[gIdx]) {
+        gClusters[gIdx].recommended_master_id = newMasterId;
+        renderClusters(gClusters);
+    }
+}
+
+function triggerClusterMerge(gIdx) {
+    const group = gClusters[gIdx];
+    if (!group) return;
+
+    const masterId = group.recommended_master_id;
+    const master = group.products.find(p => p.id === masterId);
+    const sources = group.products.filter(p => p.id !== masterId);
+
+    gPendingMergeData = {
+        master_id: masterId,
+        source_ids: sources.map(p => p.id),
+        master_name: master ? master.name : `Product #${masterId}`,
+        source_names: sources.map(p => `${p.name} (#${p.id})`).join('<br>')
+    };
+
+    openMergeModal();
+}
+
+// --- Manual Custom Merge Logic ---
+
+function onSearchManualMaster(val) {
+    const q = (val || '').trim();
+    const dropdown = document.getElementById('manualMasterDropdown');
+    if (!q) {
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    fetch('/api/products/search-for-merge?q=' + encodeURIComponent(q))
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.results && data.results.length > 0) {
+                dropdown.innerHTML = '';
+                dropdown.style.display = 'block';
+                data.results.forEach(p => {
+                    const item = document.createElement('div');
+                    item.style = 'padding: 8px 12px; border-bottom: 1px solid #F1F5F9; cursor: pointer; display: flex; justify-content: space-between; align-items: center;';
+                    item.onmouseover = () => item.style.background = '#F0F9FF';
+                    item.onmouseout = () => item.style.background = '#FFFFFF';
+                    item.onclick = () => selectManualMaster(p);
+                    item.innerHTML = `
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;" class="font-khmer">${escapeHtml(p.name)}</div>
+                            <div style="font-size: 11px; color: #64748B;">SKU: ${escapeHtml(p.sku || '')} • Stock: ${p.stock_qty} • Price: $${Number(p.default_price || 0).toFixed(2)}</div>
+                        </div>
+                        <span class="badge" style="background: #E0F2FE; color: #0369A1; font-size: 10px;">Select Master</span>
+                    `;
+                    dropdown.appendChild(item);
+                });
+            } else {
+                dropdown.innerHTML = '<div style="padding: 10px; font-size: 11.5px; color: #94A3B8; text-align: center;">No matching products found</div>';
+                dropdown.style.display = 'block';
+            }
+        });
+}
+
+function selectManualMaster(p) {
+    gSelectedMaster = p;
+    document.getElementById('manualMasterDropdown').style.display = 'none';
+    document.getElementById('manualMasterSearch').value = '';
+    
+    document.getElementById('mSku').innerText = p.sku || 'NO-SKU';
+    document.getElementById('mName').innerText = p.name;
+    document.getElementById('mCategory').innerText = p.category_name || 'Uncategorized';
+    document.getElementById('mStock').innerText = `${Number(p.stock_qty || 0).toLocaleString()} ${p.uom || 'pcs'}`;
+    document.getElementById('mOrders').innerText = `${p.sales_order_count || 0} orders`;
+    document.getElementById('mPOs').innerText = `${p.po_count || 0} POs`;
+
+    document.getElementById('selectedMasterCard').style.display = 'block';
+    document.getElementById('noMasterSelectedMsg').style.display = 'none';
+
+    updateManualActionBox();
+}
+
+function clearSelectedMaster() {
+    gSelectedMaster = null;
+    document.getElementById('selectedMasterCard').style.display = 'none';
+    document.getElementById('noMasterSelectedMsg').style.display = 'block';
+    updateManualActionBox();
+}
+
+function onSearchManualSource(val) {
+    const q = (val || '').trim();
+    const dropdown = document.getElementById('manualSourceDropdown');
+    if (!q) {
+        dropdown.style.display = 'none';
+        return;
+    }
+
+    fetch('/api/products/search-for-merge?q=' + encodeURIComponent(q))
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.results && data.results.length > 0) {
+                dropdown.innerHTML = '';
+                dropdown.style.display = 'block';
+                data.results.forEach(p => {
+                    // Don't allow picking the master as source
+                    if (gSelectedMaster && p.id === gSelectedMaster.id) return;
+                    if (gSelectedSources.some(s => s.id === p.id)) return;
+
+                    const item = document.createElement('div');
+                    item.style = 'padding: 8px 12px; border-bottom: 1px solid #F1F5F9; cursor: pointer; display: flex; justify-content: space-between; align-items: center;';
+                    item.onmouseover = () => item.style.background = '#FFFBEB';
+                    item.onmouseout = () => item.style.background = '#FFFFFF';
+                    item.onclick = () => addManualSource(p);
+                    item.innerHTML = `
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;" class="font-khmer">${escapeHtml(p.name)}</div>
+                            <div style="font-size: 11px; color: #64748B;">SKU: ${escapeHtml(p.sku || '')} • Stock: ${p.stock_qty} • Price: $${Number(p.default_price || 0).toFixed(2)}</div>
+                        </div>
+                        <span class="badge" style="background: #FEF3C7; color: #B45309; font-size: 10px;">+ Add Duplicate</span>
+                    `;
+                    dropdown.appendChild(item);
+                });
+            } else {
+                dropdown.innerHTML = '<div style="padding: 10px; font-size: 11.5px; color: #94A3B8; text-align: center;">No matching products found</div>';
+                dropdown.style.display = 'block';
+            }
+        });
+}
+
+function addManualSource(p) {
+    gSelectedSources.push(p);
+    document.getElementById('manualSourceDropdown').style.display = 'none';
+    document.getElementById('manualSourceSearch').value = '';
+    renderSelectedSources();
+    updateManualActionBox();
+}
+
+function removeManualSource(pId) {
+    gSelectedSources = gSelectedSources.filter(s => s.id !== pId);
+    renderSelectedSources();
+    updateManualActionBox();
+}
+
+function renderSelectedSources() {
+    const container = document.getElementById('selectedSourceContainer');
+    const emptyMsg = document.getElementById('noSourceSelectedMsg');
+
+    if (gSelectedSources.length === 0) {
+        container.innerHTML = '';
+        emptyMsg.style.display = 'block';
+        return;
+    }
+
+    emptyMsg.style.display = 'none';
+    container.innerHTML = '';
+
+    gSelectedSources.forEach(p => {
+        const item = document.createElement('div');
+        item.style = 'background: #FFFFFF; border: 1px solid #FDE68A; border-radius: 6px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center;';
+        item.innerHTML = `
+            <div>
+                <span style="font-family: monospace; font-size: 10.5px; font-weight: 700; background: #FEF3C7; color: #B45309; padding: 1px 5px; border-radius: 3px;">${escapeHtml(p.sku || 'NO-SKU')}</span>
+                <div style="font-weight: 700; font-size: 13px; color: #0F172A; margin-top: 2px;" class="font-khmer">${escapeHtml(p.name)}</div>
+                <div style="font-size: 11px; color: #64748B;">Stock: ${p.stock_qty} • ${p.sales_order_count || 0} orders • ${p.po_count || 0} POs</div>
+            </div>
+            <button type="button" onclick="removeManualSource(${p.id})" style="background: none; border: none; color: #94A3B8; cursor: pointer; font-size: 14px;" title="Remove">✕</button>
+        `;
+        container.appendChild(item);
+    });
+}
+
+function updateManualActionBox() {
+    const box = document.getElementById('manualMergeActionBox');
+    if (gSelectedMaster && gSelectedSources.length > 0) {
+        box.style.display = 'flex';
+        document.getElementById('manualActionTitle').innerText = `Merge ${gSelectedSources.length} duplicate product(s) into Master '${gSelectedMaster.name}'`;
+    } else {
+        box.style.display = 'none';
+    }
+}
+
+function resetManualForm() {
+    clearSelectedMaster();
+    gSelectedSources = [];
+    renderSelectedSources();
+    updateManualActionBox();
+}
+
+function confirmManualMerge() {
+    if (!gSelectedMaster || gSelectedSources.length === 0) return;
+
+    gPendingMergeData = {
+        master_id: gSelectedMaster.id,
+        source_ids: gSelectedSources.map(p => p.id),
+        master_name: gSelectedMaster.name,
+        source_names: gSelectedSources.map(p => `${p.name} (#${p.id})`).join('<br>')
+    };
+
+    openMergeModal();
+}
+
+function openMergeModal() {
+    if (!gPendingMergeData) return;
+    document.getElementById('modalMasterName').innerText = gPendingMergeData.master_name;
+    document.getElementById('modalSourceNames').innerHTML = gPendingMergeData.source_names;
+    document.getElementById('mergeConfirmModal').style.display = 'flex';
+}
+
+function closeMergeModal() {
+    document.getElementById('mergeConfirmModal').style.display = 'none';
+    gPendingMergeData = null;
+}
+
+function executeCurrentMerge() {
+    if (!gPendingMergeData) return;
+
+    const btn = document.getElementById('btnConfirmExecuteMerge');
+    btn.innerText = 'Merging...';
+    btn.disabled = true;
+
+    fetch('/api/products/merge', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            master_id: gPendingMergeData.master_id,
+            source_ids: gPendingMergeData.source_ids
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        btn.innerText = 'Yes, Merge Products Now';
+        btn.disabled = false;
+        closeMergeModal();
+
+        if (data.success) {
+            document.getElementById('succSoCount').innerText = (data.sales_orders_relinked || 0);
+            document.getElementById('succPoCount').innerText = (data.purchase_orders_relinked || 0);
+            document.getElementById('succStockCount').innerText = Number(data.stock_units_consolidated || 0).toLocaleString();
+            document.getElementById('successModalSummary').innerHTML = `
+                Master Product <strong>${escapeHtml(data.master_name)}</strong> (#${data.master_id}) has absorbed all transactions and stock.
+            `;
+            document.getElementById('succViewProductLink').href = `/products?id=${data.master_id}`;
+            document.getElementById('mergeSuccessModal').style.display = 'flex';
+
+            // Refresh auto-detection list or manual form
+            loadDuplicateCandidates();
+            resetManualForm();
+        } else {
+            alert('Error merging products: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        btn.innerText = 'Yes, Merge Products Now';
+        btn.disabled = false;
+        alert('Network error merging products: ' + err);
+    });
+}
+
+function closeSuccessModal() {
+    document.getElementById('mergeSuccessModal').style.display = 'none';
+}
+
+function fetchProductById(id, cb) {
+    fetch('/api/products/search-for-merge?q=' + encodeURIComponent(id))
+        .then(res => res.json())
+        .then(data => {
+            if (data.success && data.results) {
+                const found = data.results.find(p => p.id === parseInt(id));
+                cb(found || data.results[0]);
+            } else {
+                cb(null);
+            }
+        })
+        .catch(() => cb(null));
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+{% endblock %}

@@ -2932,4 +2932,73 @@ def create_combined_product_ajax():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+# --- Merge Duplicate Products Feature (Bilingual Khmer & English Detection) ---
+
+@products_bp.route('/products/merge-duplicates')
+def merge_duplicates_view():
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login'))
+    
+    is_main_admin = session.get('role') == 'main_admin'
+    selected_id = request.args.get('id', type=int)
+    
+    return render_template('products/merge_duplicates.html',
+                           selected_id=selected_id,
+                           is_main_admin=is_main_admin)
+
+@products_bp.route('/api/products/duplicate-candidates')
+def api_duplicate_candidates():
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        from services.product_merge import find_duplicate_groups
+        threshold = float(request.args.get('threshold', 0.75))
+        limit = int(request.args.get('limit', 100))
+        groups = find_duplicate_groups(threshold=threshold, limit=limit)
+        return jsonify({
+            'success': True,
+            'count': len(groups),
+            'groups': groups
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@products_bp.route('/api/products/search-for-merge')
+def api_search_for_merge():
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        from services.product_merge import search_products_for_merge
+        query = request.args.get('q', '').strip()
+        results = search_products_for_merge(query, limit=30)
+        return jsonify({
+            'success': True,
+            'results': results
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@products_bp.route('/api/products/merge', methods=['POST'])
+def api_execute_merge():
+    if not session.get('user_id'):
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+    try:
+        from services.product_merge import execute_product_merge
+        data = request.get_json() or {}
+        master_id = data.get('master_id')
+        source_ids = data.get('source_ids') or []
+        overrides = data.get('overrides') or {}
+
+        if not master_id:
+            return jsonify({'success': False, 'error': 'Please select a master product to keep.'}), 400
+        if not source_ids:
+            return jsonify({'success': False, 'error': 'Please select at least one duplicate product to merge into the master.'}), 400
+
+        result = execute_product_merge(master_id, source_ids, overrides=overrides)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+
 
