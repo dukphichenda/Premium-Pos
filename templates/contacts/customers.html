@@ -110,7 +110,7 @@
                 <span>Filters</span>
                 <span id="activeFiltersBadge" class="cust-badge-dot" style="display: {% if search_name or search_phone or search_address or with_balance or scheme_filter %}inline-block{% else %}none{% endif %};"></span>
             </button>
-            <span style="font-size: 11px; color: #94A3B8; font-weight: 600;" id="custCounterLabel">{{ customers|length }} Customers</span>
+            <span style="font-size: 11px; color: #94A3B8; font-weight: 600;" id="custCounterLabel">{{ "{:,}".format(customers|length) if customers else '0' }} Customers</span>
         </div>
 
         <!-- Collapsible Advanced Filters Drawer -->
@@ -1170,6 +1170,8 @@
     cursor: pointer;
     position: relative;
     transition: background 0.15s ease;
+    content-visibility: auto;
+    contain-intrinsic-size: auto 54px;
 }
 .cust-list-card:hover {
     background: #F8FAFC;
@@ -2582,7 +2584,12 @@ function handleLiveSearch(query) {
     });
 
     const noMatch = document.getElementById('custNoMatchFilterMsg');
-    if (noMatch) noMatch.style.display = (localMatches === 0 && !q) ? 'block' : 'none';
+    if (noMatch) noMatch.style.display = (localMatches === 0 && q) ? 'block' : 'none';
+
+    const counter = document.getElementById('custCounterLabel');
+    if (counter && q) {
+        counter.textContent = localMatches.toLocaleString() + ' Customers found';
+    }
 
     // 2. Clear previous debounce timer
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
@@ -2593,9 +2600,11 @@ function handleLiveSearch(query) {
             cardListEl.innerHTML = originalCardListHtml;
             document.querySelectorAll('.cust-list-card').forEach(c => c.style.display = 'block');
             const total = document.querySelectorAll('.cust-list-card').length;
-            const counter = document.getElementById('custCounterLabel');
-            if (counter) counter.textContent = total + ' Customers';
+            if (counter) counter.textContent = total.toLocaleString() + ' Customers';
             if (noMatch) noMatch.style.display = 'none';
+        } else if (counter) {
+            const total = document.querySelectorAll('.cust-list-card').length;
+            counter.textContent = total.toLocaleString() + ' Customers';
         }
         return;
     }
@@ -2637,7 +2646,7 @@ function triggerServerSearch(q) {
             }
 
             if (noMatchEl) noMatchEl.style.display = 'none';
-            if (counter) counter.textContent = data.customers.length + ' Customers found';
+            if (counter) counter.textContent = data.customers.length.toLocaleString() + ' Customers found';
 
             let html = '';
             data.customers.forEach((c, idx) => {

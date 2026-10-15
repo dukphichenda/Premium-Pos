@@ -45,6 +45,13 @@ class TestCustomerMasterDetailUI(unittest.TestCase):
         self.assertIn('bottomSummaryBalance', html)
         self.assertIn('btnSaveCustomer', html)
 
+        # Verify ALL active customers are listed in the sidebar (not truncated to 50)
+        import re
+        cards = re.findall(r'id=.custCard_\d+.', html)
+        total_in_db = query_one("SELECT count(*) as cnt FROM customers WHERE is_active = TRUE")['cnt']
+        self.assertEqual(len(cards), total_in_db)
+        self.assertGreater(len(cards), 50)
+
     def test_02_customer_details_json_api(self):
         """Test GET /api/customers/<id>/details returns JSON with customer and orders"""
         with self.client.session_transaction() as sess:

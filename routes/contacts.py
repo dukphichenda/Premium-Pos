@@ -81,7 +81,7 @@ def _get_sidebar_customers(search_name='', search_contact='', search_phone='', s
         WHERE {' AND '.join(where)}
         GROUP BY c.id, ps.name, b.name, b.code
         ORDER BY c.name ASC
-        LIMIT 500
+        LIMIT 10000
     """
     return query_all(sql, tuple(params))
 
@@ -167,7 +167,7 @@ def list_customers(selected_id_override=None):
     user_bid = _get_user_branch_id()
 
     page = int(request.args.get('page', 1))
-    per_page_raw = request.args.get('per_page', '50').strip().lower()
+    per_page_raw = request.args.get('per_page', 'all').strip().lower()
     
     search = request.args.get('search', '').strip()
     search_name = request.args.get('search_name', '').strip()
@@ -301,16 +301,16 @@ def list_customers(selected_id_override=None):
 
     total_count = query_one(count_sql, tuple(count_params))['cnt']
     
-    if per_page_raw == 'all':
+    if per_page_raw in ('all', ''):
         per_page = max(1, total_count)
         page = 1
         offset = 0
         total_pages = 1
     else:
         try:
-            per_page = max(10, min(500, int(per_page_raw)))
+            per_page = max(10, min(10000, int(per_page_raw)))
         except ValueError:
-            per_page = 50
+            per_page = max(1, total_count)
         offset = (page - 1) * per_page
         total_pages = max(1, (total_count + per_page - 1) // per_page)
 
