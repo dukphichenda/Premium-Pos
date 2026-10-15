@@ -231,8 +231,11 @@
         
         <!-- Top Action Toolbar Matching Screenshot -->
         <div class="cust-detail-toolbar">
-            <!-- Left: Close Button [ ✕ ] -->
-            <div class="cust-toolbar-left">
+            <!-- Left: Back Button (Mobile) & Close Button [ ✕ ] -->
+            <div class="cust-toolbar-left" style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="cust-mobile-back-btn" onclick="backToCustomerList()" title="Back to customer list">
+                    <span>← Customers</span>
+                </button>
                 <button type="button" class="cust-tb-close-btn" onclick="handleToolbarClose()" title="Close details / Return">
                     ✕
                 </button>
@@ -2040,6 +2043,10 @@ function selectCustomer(id) {
     if (!id) return;
     currentCustomerId = id;
 
+    // Mobile: Show detail canvas
+    const ws = document.querySelector('.inflow-cust-split-workspace');
+    if (ws) ws.classList.add('show-detail');
+
     // 1. Highlight active card in left list (fast single query without looping 3,000 cards)
     const prevActive = document.querySelector('.cust-list-card.active');
     if (prevActive) prevActive.classList.remove('active');
@@ -2481,6 +2488,8 @@ function saveCustomerData() {
 
 // Start New Customer Mode
 function startNewCustomer() {
+    const ws = document.querySelector('.inflow-cust-split-workspace');
+    if (ws) ws.classList.add('show-detail');
     const viewCont = document.getElementById('custViewContainer');
     if (viewCont) viewCont.style.display = 'none';
     const newCont = document.getElementById('custNewContainer');
@@ -2500,6 +2509,11 @@ function cancelNewCustomer() {
         const c = document.getElementById('custCard_' + currentCustomerId);
         if (c) c.classList.add('active');
     }
+}
+
+function backToCustomerList() {
+    const ws = document.querySelector('.inflow-cust-split-workspace');
+    if (ws) ws.classList.remove('show-detail');
 }
 
 // Submit New Customer via AJAX

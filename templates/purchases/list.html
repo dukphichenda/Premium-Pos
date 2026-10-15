@@ -153,7 +153,7 @@
     </div>
 
     <!-- PO Table Card -->
-    <div class="card" style="padding: 0; overflow: hidden; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #CBD5E1;">
+    <div class="card desktop-po-table" style="padding: 0; overflow: hidden; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.06); border: 1px solid #CBD5E1;">
         <div class="table-container" style="border: none; margin: 0;">
             <table class="data-table" style="width: 100%; border-collapse: collapse;">
                 <thead>
@@ -274,6 +274,49 @@
                 </tbody>
             </table>
         </div>
+
+    <!-- Mobile PO Cards (<1024px or .is-mobile-view) -->
+    <div class="mobile-po-cards">
+        {% for o in orders %}
+        <div class="mobile-record-card" onclick="window.location.href='{{ url_for('purchase_orders.detail_purchase', id=o.id) }}'">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: 800; font-family: var(--font-mono); font-size: 14px; color: #0F766E;">{{ o.order_number }}</span>
+                <span style="font-size: 11.5px; color: #64748B;">{{ o.order_date | format_date }}</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-top: 4px;">
+                <div>
+                    <div style="font-weight: 700; font-size: 13.5px; color: #0F172A;">{{ o.vendor_name or 'Supplier' }}</div>
+                    <div style="font-size: 11.5px; color: #64748B;">Dest: {{ o.location_name or 'Main Warehouse' }}</div>
+                </div>
+                <div>
+                    {% if o.receiving_status == 'RECEIVED' %}
+                        <span class="badge" style="background: #D1FAE5; color: #065F46; font-size: 10.5px; font-weight: 700;">RECEIVED</span>
+                    {% elif o.receiving_status == 'PARTIAL' %}
+                        <span class="badge" style="background: #FEF3C7; color: #92400E; font-size: 10.5px; font-weight: 700;">PARTIAL</span>
+                    {% else %}
+                        <span class="badge" style="background: #F1F5F9; color: #475569; font-size: 10.5px; font-weight: 700;">{{ o.receiving_status or 'ISSUED' }}</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #E2E8F0;">
+                <div>
+                    <div style="font-size: 11px; color: #64748B;">Total:</div>
+                    <div style="font-weight: 800; font-size: 14px; color: #0F172A;">{{ o.total_amount | currency }}</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 11px; color: #64748B;">Balance Due:</div>
+                    <div style="font-weight: 700; font-size: 14px; color: {% if o.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
+                        {{ o.balance_due | currency }}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div style="padding: 30px; text-align: center; color: #94A3B8; background: #FFFFFF; border-radius: 8px;">
+            No purchase orders found.
+        </div>
+        {% endfor %}
+    </div>
 
         {% if total_pages > 1 %}
         <div style="padding: 14px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC;">
