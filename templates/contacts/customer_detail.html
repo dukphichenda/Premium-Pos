@@ -368,11 +368,9 @@
             </div>
 
             <!-- Customer Delivery Address (At the Top) -->
-            <div style="margin-bottom: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 8px 10px;">
-                <div style="font-weight: 700; color: #0F172A; font-size: 11.5px; margin-bottom: 2px;">📍 Delivery Address (Top of sticker):</div>
-                <div id="modalCustAddressPreview" style="font-weight: 600; color: #334155; font-size: 12px; line-height: 1.3;">
-                    {{ customer.shipping_address or customer.address1 or customer.billing_address or 'No delivery address recorded' }}
-                </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">📍 Delivery Address / អាសយដ្ឋានដឹកជញ្ជូន (Top of sticker):</label>
+                <textarea id="modalCustAddressInput" style="width: 100%; height: 46px; font-size: 12px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 3px; resize: vertical; font-weight: 600;" placeholder="Enter delivery address...">{{ customer.shipping_address or customer.address1 or customer.billing_address or '' }}</textarea>
             </div>
 
             <!-- Receiver Name & Phone preview -->
@@ -579,11 +577,11 @@ function confirmDeleteCustomer() {
 function openCustomerDeliveryModal() {
     loadCustomerModalDeliveryServices();
     
-    // Update address preview in modal from currently active address
+    // Update address input in modal from currently active address
     const curAddr = (typeof addressData !== 'undefined' && (addressData.shipping || addressData.business || addressData.billing)) ||
                     (document.getElementById('shippingAddressHidden')?.value || document.getElementById('businessAddressHidden')?.value || '');
-    const addrEl = document.getElementById('modalCustAddressPreview');
-    if (addrEl && curAddr) addrEl.innerText = curAddr;
+    const addrInput = document.getElementById('modalCustAddressInput');
+    if (addrInput && curAddr) addrInput.value = curAddr;
 
     const modal = document.getElementById('customerDeliveryModal');
     if (modal) modal.style.display = 'flex';
@@ -619,8 +617,8 @@ function submitCustomerDeliveryLabel() {
     const packages = Math.max(1, parseInt(document.getElementById('modalCustCaseCountInput')?.value) || 1);
     const cost = Math.max(0, parseFloat(document.getElementById('modalCustProductCostInput')?.value) || 0);
     const notes = document.getElementById('modalCustDeliveryNotesInput')?.value || '';
-    const previewEl = document.getElementById('modalCustAddressPreview');
-    const addr = (previewEl ? previewEl.innerText.trim() : '') ||
+    const addrInput = document.getElementById('modalCustAddressInput');
+    const addr = (addrInput ? addrInput.value.trim() : '') ||
                  (typeof addressData !== 'undefined' && (addressData.shipping || addressData.business || addressData.billing)) ||
                  (document.getElementById('shippingAddressHidden')?.value || document.getElementById('businessAddressHidden')?.value || '');
 

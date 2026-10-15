@@ -2802,6 +2802,10 @@ def print_invoice(id):
         package_count = max(1, int(request.args.get('packages') or order.get('package_count') or 1))
         delivery_notes = request.args.get('notes') or order.get('delivery_notes') or ''
 
+        override_address = request.args.get('address')
+        if override_address is not None and override_address.strip():
+            order['customer_address'] = override_address.strip()
+
         raw_cost = request.args.get('cost') or request.args.get('cod')
         if raw_cost is not None:
             try:
@@ -2888,17 +2892,31 @@ def update_sales_shipping(id):
     package_count = max(1, int(data.get('package_count') or 1))
     delivery_notes = (data.get('delivery_notes') or '').strip()
     cod_amount = max(0.0, float(data.get('cod_amount') or 0.0))
+    customer_address = (data.get('customer_address') or '').strip()
 
-    execute("""
-        UPDATE sales_orders
-        SET carrier = %s,
-            destination_province = %s,
-            package_count = %s,
-            delivery_notes = %s,
-            cod_amount = %s,
-            updated_at = CURRENT_TIMESTAMP
-        WHERE id = %s
-    """, (carrier, province, package_count, delivery_notes, cod_amount, id))
+    if customer_address:
+        execute("""
+            UPDATE sales_orders
+            SET carrier = %s,
+                destination_province = %s,
+                package_count = %s,
+                delivery_notes = %s,
+                cod_amount = %s,
+                customer_address = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (carrier, province, package_count, delivery_notes, cod_amount, customer_address, id))
+    else:
+        execute("""
+            UPDATE sales_orders
+            SET carrier = %s,
+                destination_province = %s,
+                package_count = %s,
+                delivery_notes = %s,
+                cod_amount = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        """, (carrier, province, package_count, delivery_notes, cod_amount, id))
 
     return jsonify({'success': True, 'message': 'Shipping details updated'})
 

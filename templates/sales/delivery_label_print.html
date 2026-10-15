@@ -443,7 +443,15 @@
 
             <!-- Sender Phone (First 9 numbers before / or \) -->
             <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Sender Phone:</label>
-            <input type="text" id="senderPhoneInput" class="tb-input" value="{{ sender_phone or (inv_settings.phone or company.phone or '010 264 731').split('/')[0].split('\\')[0].strip() }}" style="width: 140px; font-weight: 700; text-align: center;" oninput="onSenderPhoneChange()">
+            <input type="text" id="senderPhoneInput" class="tb-input" value="{{ sender_phone or (inv_settings.phone or company.phone or '010 264 731').split('/')[0].split('\\')[0].strip() }}" style="width: 125px; font-weight: 700; text-align: center;" oninput="onSenderPhoneChange()">
+
+            <!-- Delivery Address -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Address:</label>
+            <input type="text" id="deliveryAddressInput" class="tb-input" value="{{ order.customer_address or '' }}" placeholder="Delivery address..." style="width: 160px; font-weight: 600;" oninput="onDeliveryAddressChange()">
+
+            <!-- Notes / Taxi Info -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Taxi / Note:</label>
+            <input type="text" id="deliveryNotesInput" class="tb-input" value="{{ delivery_notes or '' }}" placeholder="e.g. ឡានឈ្នួល / 012 345 678..." style="width: 175px; font-weight: 700; color: #FDE047;" oninput="onDeliveryNotesChange()">
         </div>
 
         <div class="toolbar-group">
@@ -472,11 +480,14 @@
                     <span>DATE: <strong>{{ order.order_date | format_inflow_date }}</strong></span>
                 </div>
 
-                <!-- 3. CUSTOMER ADDRESS (MOVED TO THE TOP) -->
+                <!-- 3. CUSTOMER ADDRESS & TAXI / NOTES (MOVED TO THE TOP) -->
                 <div class="address-top-section">
                     <span class="address-top-badge">📍 អាសយដ្ឋានដឹកជញ្ជូន / DELIVERY ADDRESS</span>
-                    <div class="address-top-text">
+                    <div class="address-top-text labelAddressDisplay-{{ c_num }}">
                         {{ order.customer_address or 'រាជធានីភ្នំពេញ / Phnom Penh' }}
+                    </div>
+                    <div class="address-taxi-note labelTaxiDisplay-{{ c_num }}" style="{% if not delivery_notes %}display: none;{% endif %} margin-top: 2px; padding-top: 2px; border-top: 1.5px dashed #000000; font-size: 12.5px; font-weight: 900; line-height: 1.2; color: #000000; word-break: break-word;">
+                        🚕 <span class="taxi-note-label">ចំណាំ / ផ្ញើតាមឡាន:</span> <span class="taxi-note-text">{{ delivery_notes }}</span>
                     </div>
                 </div>
 
@@ -612,12 +623,36 @@
             });
         }
 
+        function onDeliveryAddressChange() {
+            const addr = (document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value.trim() : '') || 'រាជធានីភ្នំពេញ / Phnom Penh';
+            document.querySelectorAll('[class*="labelAddressDisplay-"]').forEach(el => {
+                el.innerText = addr;
+            });
+        }
+
+        function onDeliveryNotesChange() {
+            const notes = (document.getElementById('deliveryNotesInput') ? document.getElementById('deliveryNotesInput').value.trim() : '');
+            document.querySelectorAll('[class*="labelTaxiDisplay-"]').forEach(el => {
+                if (!notes) {
+                    el.style.display = 'none';
+                } else {
+                    el.style.display = 'block';
+                    const txt = el.querySelector('.taxi-note-text');
+                    if (txt) txt.innerText = notes;
+                }
+            });
+            document.querySelectorAll('[id^="labelNotesDisplay-"]').forEach(el => {
+                el.innerText = 'ចំណាំ: ' + notes;
+                el.style.display = notes ? 'block' : 'none';
+            });
+        }
+
         function regenerateStickers(totalCount) {
             const carrier = document.getElementById('carrierSelect').value;
             const cost = Math.max(0, parseFloat(document.getElementById('productCostInput').value) || 0);
             const customerName = `{{ order.customer_name or order.customer_contact or 'អតិថិជន (Customer)' }}`;
             const customerPhone = `{{ order.customer_phone or 'គ្មានលេខទូរស័ព្ទ' }}`;
-            const customerAddress = `{{ order.customer_address or 'រាជធានីភ្នំពេញ / Phnom Penh' }}`;
+            const customerAddress = (document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value.trim() : '') || `{{ order.customer_address or 'រាជធានីភ្នំពេញ / Phnom Penh' }}`;
             let rawSender = (document.getElementById('senderPhoneInput') ? document.getElementById('senderPhoneInput').value.trim() : '');
             if (rawSender) {
                 rawSender = rawSender.split(/[/\\;,|]/)[0].trim();
@@ -625,7 +660,7 @@
             const senderPhone = rawSender || `{{ sender_phone or (inv_settings.phone or company.phone or '010 264 731').split('/')[0].split('\\')[0].strip() }}`;
             const orderNum = `{{ order.order_number }}`;
             const orderDate = `{{ order.order_date | format_inflow_date }}`;
-            const notes = `{{ delivery_notes }}`;
+            const notes = (document.getElementById('deliveryNotesInput') ? document.getElementById('deliveryNotesInput').value.trim() : '') || `{{ delivery_notes }}`;
 
             const workspace = document.getElementById('labelsWorkspace');
             let html = '';
@@ -643,7 +678,10 @@
                         </div>
                         <div class="address-top-section">
                             <span class="address-top-badge">📍 អាសយដ្ឋានដឹកជញ្ជូន / DELIVERY ADDRESS</span>
-                            <div class="address-top-text">${customerAddress}</div>
+                            <div class="address-top-text labelAddressDisplay-${c}">${customerAddress}</div>
+                            <div class="address-taxi-note labelTaxiDisplay-${c}" style="${!notes ? 'display: none;' : ''} margin-top: 2px; padding-top: 2px; border-top: 1.5px dashed #000000; font-size: 12.5px; font-weight: 900; line-height: 1.2; color: #000000; word-break: break-word;">
+                                🚕 <span class="taxi-note-label">ចំណាំ / ផ្ញើតាមឡាន:</span> <span class="taxi-note-text">${notes}</span>
+                            </div>
                         </div>
                         <div class="receiver-row">
                             <div class="receiver-name-col">
@@ -674,7 +712,7 @@
                         </div>
                         <div>
                             <div class="caution-box">⚠ ទំនិញប្រយ័ត្នបែក / FRAGILE - HANDLE WITH CARE ⚠</div>
-                            ${notes ? `<div class="notes-text">ចំណាំ: ${notes}</div>` : ''}
+                            ${notes ? `<div class="notes-text" id="labelNotesDisplay-${c}">ចំណាំ: ${notes}</div>` : ''}
                         </div>
                     </div>
                 </div>`;
@@ -687,6 +725,8 @@
             const carrier = document.getElementById('carrierSelect').value;
             const packages = currentTotalCases;
             const cost = currentProductCost;
+            const address = document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value.trim() : '';
+            const notes = document.getElementById('deliveryNotesInput') ? document.getElementById('deliveryNotesInput').value.trim() : '';
 
             fetch('/sales/' + orderId + '/update-shipping', {
                 method: 'POST',
@@ -694,7 +734,9 @@
                 body: JSON.stringify({
                     carrier: carrier,
                     package_count: packages,
-                    cod_amount: cost
+                    cod_amount: cost,
+                    customer_address: address,
+                    delivery_notes: notes
                 })
             }).catch(e => console.error(e));
 

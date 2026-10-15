@@ -1019,11 +1019,9 @@
             </div>
 
             <!-- Customer Delivery Address (At the Top) -->
-            <div style="margin-bottom: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 8px 10px;">
-                <div style="font-weight: 700; color: #0F172A; font-size: 11.5px; margin-bottom: 2px;">📍 Delivery Address (Top of sticker):</div>
-                <div style="font-weight: 600; color: #334155; font-size: 12px; line-height: 1.3;">
-                    {{ order.get('customer_address') or 'Customer Address from Order' if order else 'Customer Address' }}
-                </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">📍 Delivery Address / អាសយដ្ឋានដឹកជញ្ជូន (Top of sticker):</label>
+                <textarea id="modalDeliveryAddressInput" class="inflow-field-input" rows="2" style="width: 100%; height: 46px; font-size: 12px; padding: 4px 8px; resize: vertical; font-weight: 600;" placeholder="Customer delivery address...">{{ order.get('customer_address') or '' }}</textarea>
             </div>
 
             <!-- Case Count & Product Cost Grid -->
@@ -1040,12 +1038,12 @@
 
             <!-- Remarks / Taxi Info -->
             <div style="margin-bottom: 8px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Notes / Taxi Info (ចំណាំ / ផ្លាកលេខឡាន / សាខា):</label>
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Notes / Taxi Info (ចំណាំ / ផ្ញើតាមឡាន / សាខា):</label>
                 <input type="text" id="modalDeliveryNotesInput" class="inflow-field-input" placeholder="e.g. ឡានឈ្នួលផ្សារដើមគ / 012 345 678..." value="{{ (order.get('delivery_notes') if order else '') or '' }}" style="width: 100%; height: 28px;">
             </div>
 
-            <div style="font-size: 11px; color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 6px 10px; margin-top: 8px;">
-                ℹ️ Optimized for <b>80mm x 100mm</b> thermal sticker printers in crisp monochrome black & white with customer address at top, customer phone, product cost, and shop info.
+            <div style="font-size: 11px; color: #0284C7; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 4px; padding: 6px 10px; margin-top: 8px;">
+                ℹ️ Delivery Address and Notes / Taxi Info will be printed together prominently in the <b>📍 Delivery Address</b> section on the 80x100mm sticker.
             </div>
         </div>
         <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: space-between; border-top: 1px solid #E2E8F0;">
@@ -3372,6 +3370,19 @@ function openDeliveryModal() {
         return;
     }
 
+    // Populate modal address from main form or order
+    const currentAddr = document.getElementById('addressInput')?.value || `{{ (order.customer_address if order else '') or '' }}`;
+    const modalAddrInput = document.getElementById('modalDeliveryAddressInput');
+    if (modalAddrInput && currentAddr) {
+        modalAddrInput.value = currentAddr;
+    }
+
+    const currentNotes = document.querySelector('input[name="delivery_notes"]')?.value || `{{ (order.delivery_notes if order else '') or '' }}`;
+    const modalNotesInput = document.getElementById('modalDeliveryNotesInput');
+    if (modalNotesInput && currentNotes) {
+        modalNotesInput.value = currentNotes;
+    }
+
     // Load available carriers from API
     loadModalDeliveryServices();
 
@@ -3471,18 +3482,26 @@ function getDeliveryModalData() {
     const packages = Math.max(1, parseInt(document.getElementById('modalCaseCountInput')?.value) || 1);
     const cost = Math.max(0, parseFloat(document.getElementById('modalProductCostInput')?.value) || 0);
     const notes = document.getElementById('modalDeliveryNotesInput')?.value || '';
+    const address = document.getElementById('modalDeliveryAddressInput')?.value || '';
 
     return {
         carrier: carrier,
         package_count: packages,
         cod_amount: cost,
-        delivery_notes: notes
+        delivery_notes: notes,
+        customer_address: address
     };
 }
 
 function saveDeliveryInfoOnly() {
     const orderId = {{ order.id if order and order.id else 0 }};
     const data = getDeliveryModalData();
+
+    // Sync back to main form if present
+    const mainAddrInput = document.getElementById('addressInput');
+    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
+    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
+    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
 
     fetch('/sales/' + orderId + '/update-shipping', {
         method: 'POST',
@@ -3505,10 +3524,17 @@ function saveAndOpenDeliveryLabel() {
     const orderId = {{ order.id if order and order.id else 0 }};
     const data = getDeliveryModalData();
 
+    // Sync back to main form if present
+    const mainAddrInput = document.getElementById('addressInput');
+    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
+    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
+    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
+
     const url = '/sales/' + orderId + '/print?type=label' +
         '&carrier=' + encodeURIComponent(data.carrier) +
         '&packages=' + encodeURIComponent(data.package_count) +
         '&cost=' + encodeURIComponent(data.cod_amount) +
+        '&address=' + encodeURIComponent(data.customer_address) +
         '&notes=' + encodeURIComponent(data.delivery_notes);
 
     // Open print window immediately to avoid modern browser popup blocking
