@@ -717,19 +717,35 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     elif date_filter == 'Last 30 Days':
         drawer_where.append("so.order_date >= CURRENT_DATE - INTERVAL '30 days' AND so.order_date <= CURRENT_DATE")
 
-    # Status filter (supports multi-select comma separated statuses)
+    # Delivery man filter
+    delivery_man_filter = (request.args.get('delivery_man') or '').strip()
+    if delivery_man_filter and delivery_man_filter.lower() != 'all':
+        if delivery_man_filter.lower() == 'unassigned':
+            drawer_where.append("(so.delivery_man IS NULL OR TRIM(so.delivery_man) = '')")
+        else:
+            drawer_where.append("so.delivery_man = %s")
+            drawer_params.append(delivery_man_filter)
+
+    # General search query (order #, customer name, delivery man, or total amount)
+    search_query = (request.args.get('search') or request.args.get('q') or '').strip()
+    if search_query:
+        sp = f"%{search_query}%"
+        drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
+        drawer_params.extend([sp, sp, sp, sp])
+
+    # Status filter (supports multi-select comma separated statuses, e.g. Open, Unfulfilled, Fulfilled, Paid, All)
     if status_filter and status_filter.strip() and status_filter.strip().lower() != 'all':
         tokens = [t.strip().lower() for t in status_filter.split(',') if t.strip()]
         status_clauses = []
         for token in tokens:
             if token == 'quote':
                 status_clauses.append("UPPER(so.status) = 'QUOTE'")
-            elif token == 'open':
-                status_clauses.append("UPPER(so.status) = 'OPEN'")
+            elif token in ('open', 'unfulfilled'):
+                status_clauses.append("UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')")
             elif token in ('in progress', 'in_progress'):
                 status_clauses.append("UPPER(so.status) IN ('IN_PROGRESS', 'PICKED', 'PACKED')")
-            elif token in ('fully shipped', 'shipped'):
-                status_clauses.append("UPPER(so.status) = 'SHIPPED'")
+            elif token in ('fully shipped', 'shipped', 'fulfilled'):
+                status_clauses.append("(UPPER(so.status) IN ('SHIPPED', 'INVOICED') OR UPPER(so.payment_status) = 'PAID')")
             elif token == 'invoiced':
                 status_clauses.append("UPPER(so.status) IN ('INVOICED', 'PAID')")
             elif token == 'paid':
@@ -747,11 +763,20 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     # Exclude phantom empty orders with no customer and 0 total
     drawer_where.append("NOT (so.customer_id IS NULL AND so.total_amount = 0)")
 
+    drawer_limit = 500 if (status_filter and status_filter.strip().lower() in ('open', 'unfulfilled')) else (200 if search_query else 300)
+
     drawer_sql = f"""
         SELECT 
             so.id, 
             so.order_number, 
             so.order_date, 
+            CASE 
+                WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
+                WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
+                WHEN UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS') THEN 'Unfulfilled'
+                WHEN UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID' THEN 'Fulfilled'
+                ELSE 'Unfulfilled'
+            END as fulfillment_badge,
             CASE 
                 WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
                 WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
@@ -777,9 +802,39 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         LEFT JOIN locations l ON so.location_id = l.id
         WHERE {' AND '.join(drawer_where)}
         ORDER BY so.id DESC
-        LIMIT 100
+        LIMIT {drawer_limit}
     """
     sidebar_orders = query_all(drawer_sql, tuple(drawer_params))
+
+    # Branch scope where condition for status counts
+    branch_count_where = ["NOT (so.customer_id IS NULL AND so.total_amount = 0)"]
+    branch_count_params = []
+    if not is_main:
+        if user_bid:
+            branch_count_where.append("so.branch_id = %s")
+            branch_count_params.append(user_bid)
+        else:
+            branch_count_where.append("1=0")
+    else:
+        if branch_id and str(branch_id).lower() != 'all':
+            if str(branch_id).lower() == 'main':
+                branch_count_where.append("so.branch_id IS NULL")
+            elif str(branch_id).isdigit():
+                branch_count_where.append("so.branch_id = %s")
+                branch_count_params.append(int(branch_id))
+
+    raw_counts = query_one(f"""
+        SELECT 
+            COUNT(*) as total,
+            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')) as open,
+            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('SHIPPED', 'INVOICED') OR UPPER(so.payment_status) = 'PAID') as fulfilled,
+            COUNT(*) FILTER (WHERE UPPER(so.status) = 'PAID' OR UPPER(so.payment_status) = 'PAID') as paid,
+            COUNT(*) FILTER (WHERE UPPER(so.status) = 'CANCELLED') as cancelled,
+            COUNT(*) FILTER (WHERE UPPER(so.status) = 'QUOTE') as quote
+        FROM sales_orders so
+        WHERE {' AND '.join(branch_count_where)}
+    """, tuple(branch_count_params))
+    status_counts = dict(raw_counts) if raw_counts else {'total': 0, 'open': 0, 'fulfilled': 0, 'paid': 0, 'cancelled': 0, 'quote': 0}
 
     cust_where = ["is_active = TRUE"]
     cust_params = []
@@ -861,6 +916,9 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
 
     return {
         'sidebar_orders': sidebar_orders,
+        'status_counts': status_counts,
+        'active_delivery_man': delivery_man_filter,
+        'search_query': search_query,
         'all_customers': all_customers,
         'all_locations': all_locations,
         'pricing_schemes': pricing_schemes,
@@ -1594,6 +1652,9 @@ def new_order():
                            order=order,
                            lines=lines,
                            sidebar_orders=drawer_data['sidebar_orders'],
+                           status_counts=drawer_data.get('status_counts', {}),
+                           active_delivery_man=drawer_data.get('active_delivery_man', ''),
+                           search_query=drawer_data.get('search_query', ''),
                            date_filter=date_filter,
                            status_filter=status_filter,
                            customer_search=customer_search,
@@ -1833,6 +1894,9 @@ def detail_order(id):
                            order=order,
                            lines=lines,
                            sidebar_orders=drawer_data['sidebar_orders'],
+                           status_counts=drawer_data.get('status_counts', {}),
+                           active_delivery_man=drawer_data.get('active_delivery_man', ''),
+                           search_query=drawer_data.get('search_query', ''),
                            date_filter=date_filter,
                            status_filter=status_filter,
                            customer_search=customer_search,

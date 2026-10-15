@@ -26,9 +26,9 @@ class TestSoStoreScopeAndProductDecimals(unittest.TestCase):
         self.assertNotIn('id="drawerBranchSelect"', html)
         self.assertNotIn('<span class="inflow-filter-label" style="font-weight: 700; color: #334155; white-space: nowrap; font-size: 11px;">Store Scope</span>', html)
         
-        # Verify Order Date and Status filters are still intact
-        self.assertIn('id="drawerDateFilterSelect"', html)
-        self.assertIn('id="drawerStatusFilterInput"', html)
+        # Verify Order Date and Status filters are still intact in modern sidebar
+        self.assertIn('id="soDateFilterSelect"', html)
+        self.assertIn('id="btnSoStatusPill"', html)
 
     def test_product_detail_decimal_settings_ajax(self):
         """
