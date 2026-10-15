@@ -6,6 +6,19 @@ purchase_orders_bp = Blueprint('purchase_orders', __name__)
 
 @purchase_orders_bp.route('/purchases')
 def list_purchases():
+    if request.args.get('view') == 'table':
+        return _render_table_list_purchases()
+
+    selected_id = request.args.get('id', type=int)
+    if not selected_id:
+        latest = query_one("SELECT id FROM purchase_orders ORDER BY order_date DESC, id DESC LIMIT 1")
+        if latest:
+            selected_id = latest['id']
+    if selected_id:
+        return detail_purchase(selected_id)
+    return create_purchase()
+
+def _render_table_list_purchases():
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 25))
     offset = (page - 1) * per_page
@@ -291,18 +304,13 @@ def api_vendor_summary(id):
 
 def _format_po_status_label(o):
     st = o.get('status') or ''
-    pay_st = o.get('payment_status') or ''
-    if st == 'PAID' or pay_st == 'PAID':
-        return 'Paid'
-    if st in ('ISSUED', 'OPEN'):
-        return 'Open'
-    if st in ('PARTIAL_RECEIVED', 'IN_PROGRESS'):
-        return 'In Progress'
     if st in ('RECEIVED', 'FULFILLED'):
-        return 'Received'
+        return 'Fulfilled'
+    if st in ('PARTIAL_RECEIVED', 'IN_PROGRESS', 'PARTIAL'):
+        return 'Partial'
     if st in ('CANCELLED', 'VOID'):
         return 'Cancelled'
-    return st or 'Open'
+    return 'Unfulfilled'
 
 @purchase_orders_bp.route('/api/purchases/drawer')
 def api_purchases_drawer():
@@ -316,19 +324,124 @@ def api_purchases_drawer():
         'orders': [{
             'id': o['id'],
             'order_number': o['order_number'],
-            'order_date': o['order_date'].strftime('%d-%b-%y') if o['order_date'] else '',
+            'order_date': o['order_date'].strftime('%b %d, %Y') if o['order_date'] else '',
             'raw_date': o['order_date'].strftime('%Y-%m-%d') if o['order_date'] else '',
             'status': _format_po_status_label(o),
+            'status_badge': _format_po_status_label(o),
             'raw_status': o['status'],
-            'payment_status': o['payment_status'] or '',
+            'payment_status': o['payment_status'] or 'UNPAID',
             'vendor_name': o['vendor_name'] or '',
             'vendor_invoice_no': o['vendor_invoice_no'] or '',
             'location_name': o['location_name'] or '',
-            'expected_date': o['expected_date'].strftime('%d-%b-%y') if o['expected_date'] else '',
+            'expected_date': o['expected_date'].strftime('%b %d, %Y') if o['expected_date'] else '',
             'total_amount': float(o['total_amount'] or 0),
             'paid_amount': float(o['paid_amount'] or 0),
             'balance_due': float(o['balance_due'] or 0)
         } for o in data['sidebar_orders']]
+    })
+
+@purchase_orders_bp.route('/api/purchases/<int:id>/data')
+def api_purchase_data(id):
+    order = query_one("""
+        SELECT 
+            po.*,
+            v.name as vendor_name,
+            COALESCE(po.contact, v.contact_name, '') as contact,
+            COALESCE(po.phone, v.phone, '') as phone,
+            COALESCE(po.vendor_address, v.address1, '') as vendor_address,
+            v.balance as vendor_balance,
+            v.payment_terms as vendor_payment_terms,
+            l.name as location_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN locations l ON po.location_id = l.id
+        WHERE po.id = %s
+    """, (id,))
+    if not order:
+        return jsonify({'success': False, 'message': 'Purchase order not found'}), 404
+
+    lines = query_all("""
+        SELECT 
+            pol.*,
+            COALESCE(pol.uom, p.purchasing_uom, p.uom, 'pcs.') as line_uom,
+            p.name as product_name,
+            p.sku as product_sku,
+            p.barcode as product_barcode,
+            p.image_url as product_image,
+            COALESCE(p.uom, 'pcs.') as product_uom,
+            COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            p.average_cost as product_avg_cost,
+            p.last_purchase_cost as product_last_cost
+        FROM purchase_order_lines pol
+        JOIN products p ON pol.product_id = p.id
+        WHERE pol.purchase_order_id = %s
+        ORDER BY pol.line_num ASC
+    """, (id,))
+
+    total_qty_ordered = sum(float(l['quantity'] or 0) for l in lines)
+    total_qty_received = sum(float(l['received_qty'] or 0) for l in lines)
+    receiving_percent = int((total_qty_received / total_qty_ordered * 100) if total_qty_ordered > 0 else 0)
+
+    st = order.get('status') or ''
+    if st in ('RECEIVED', 'FULFILLED'):
+        badge = 'Fulfilled'
+    elif st in ('PARTIAL_RECEIVED', 'IN_PROGRESS', 'PARTIAL'):
+        badge = 'Partial'
+    elif st in ('CANCELLED', 'VOID'):
+        badge = 'Cancelled'
+    else:
+        badge = 'Unfulfilled'
+
+    return jsonify({
+        'success': True,
+        'order': {
+            'id': order['id'],
+            'order_number': order['order_number'],
+            'order_date': order['order_date'].strftime('%b %d, %Y') if order['order_date'] else '',
+            'order_date_raw': order['order_date'].strftime('%Y-%m-%d') if order['order_date'] else '',
+            'expected_date': order['expected_date'].strftime('%b %d, %Y') if order['expected_date'] else '',
+            'expected_date_raw': order['expected_date'].strftime('%Y-%m-%d') if order['expected_date'] else '',
+            'status': order['status'],
+            'status_badge': badge,
+            'payment_status': order['payment_status'] or 'UNPAID',
+            'vendor_id': order['vendor_id'],
+            'vendor_name': order['vendor_name'] or 'None',
+            'contact': order['contact'] or '',
+            'phone': order['phone'] or '',
+            'vendor_address': order['vendor_address'] or '',
+            'location_id': order['location_id'],
+            'location_name': order['location_name'] or 'Main Warehouse',
+            'carrier': order['carrier'] or '',
+            'vendor_invoice_no': order['vendor_invoice_no'] or '',
+            'subtotal': float(order['subtotal'] or 0),
+            'shipping_fee': float(order['shipping_fee'] or 0),
+            'discount_amount': float(order['discount_amount'] or 0),
+            'total_amount': float(order['total_amount'] or 0),
+            'paid_amount': float(order['paid_amount'] or 0),
+            'balance_due': float(order['balance_due'] or 0),
+            'currency_code': order['currency_code'] or 'USD',
+            'notes': order['notes'] or '',
+            'sales_rep': order.get('sales_rep') or 'Admin',
+            'payment_terms': order.get('vendor_payment_terms') or 'Net 30'
+        },
+        'lines': [{
+            'id': l['id'],
+            'product_id': l['product_id'],
+            'product_name': l['product_name'],
+            'product_sku': l['product_sku'],
+            'product_barcode': l['product_barcode'],
+            'product_image': l.get('product_image') or '',
+            'vendor_product_code': l.get('vendor_product_code') or '',
+            'quantity': float(l['quantity'] or 0),
+            'unit_cost': float(l['unit_cost'] or 0),
+            'discount_percent': float(l['discount_percent'] or 0),
+            'subtotal': float(l['subtotal'] or 0),
+            'line_uom': l['line_uom'],
+            'received_qty': float(l['received_qty'] or 0)
+        } for l in lines],
+        'total_qty_ordered': total_qty_ordered,
+        'total_qty_received': total_qty_received,
+        'receiving_percent': receiving_percent
     })
 
 @purchase_orders_bp.route('/purchases/new')
@@ -622,6 +735,7 @@ def detail_purchase(id):
             p.name as product_name,
             p.sku as product_sku,
             p.barcode as product_barcode,
+            p.image_url as product_image,
             COALESCE(p.uom, 'pcs.') as product_uom,
             COALESCE(p.uom, 'pcs.') as base_uom,
             COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
