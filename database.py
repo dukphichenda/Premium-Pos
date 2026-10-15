@@ -431,8 +431,10 @@ def init_db():
                     );
                     CREATE INDEX IF NOT EXISTS idx_po_attachments_order_id ON purchase_order_attachments(purchase_order_id);
                 """)
+                cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_signature_url TEXT;")
+                cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_name VARCHAR(150);")
             except Exception as mig_err:
-                logger.warning(f"Customer columns migration notice: {mig_err}")
+                logger.warning(f"Customer/Invoice columns migration notice: {mig_err}")
 
             # Resynchronize custom numbering sequences with current max IDs
             try:

@@ -610,6 +610,8 @@ ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS qr_offset_x INTEGER DEFAUL
 ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS qr_offset_y INTEGER DEFAULT 0;
 ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_offset_x INTEGER DEFAULT 0;
 ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS bank_offset_y INTEGER DEFAULT 0;
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_signature_url TEXT;
+ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_name VARCHAR(150);
 
 -- 23. Delivery Services / Carriers (Cambodia)
 CREATE TABLE IF NOT EXISTS delivery_services (

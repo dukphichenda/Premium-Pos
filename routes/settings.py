@@ -26,7 +26,8 @@ def get_invoice_settings():
                 payment_terms, footer_notes_kh, footer_notes_en,
                 show_signature, show_sku, show_tax,
                 qr_size, qr_position, bank_info_size, bank_info_position,
-                qr_offset_x, qr_offset_y, bank_offset_x, bank_offset_y
+                qr_offset_x, qr_offset_y, bank_offset_x, bank_offset_y,
+                seller_signature_url, seller_name
             ) VALUES (
                 'Kantumruy Pro', '#0284C7', '#0F172A',
                 'ក្រុមហ៊ុន អ៊ិនហ្វ្លូ ត្រេឌីង (ខេមបូឌា)', 'inFlow Premium Trading Co., Ltd.',
@@ -41,7 +42,8 @@ def get_invoice_settings():
                 'Goods sold are not returnable. Thank you for your business!',
                 TRUE, TRUE, TRUE,
                 180, 'left', '8.5', 'below_qr',
-                0, 0, 0, 0
+                0, 0, 0, 0,
+                NULL, NULL
             );
         """)
         inv = query_one("SELECT * FROM invoice_settings LIMIT 1")
@@ -364,6 +366,19 @@ def update_invoice_settings():
                 file.save(save_path)
                 qr_code_url = f"/static/uploads/invoice/{fname}"
 
+        seller_name = request.form.get('seller_name', inv.get('seller_name') or '').strip()
+        seller_signature_url = inv.get('seller_signature_url')
+        if request.form.get('remove_seller_signature') == '1':
+            seller_signature_url = None
+        elif 'seller_signature_file' in request.files:
+            file = request.files['seller_signature_file']
+            if file and file.filename and allowed_file(file.filename):
+                ext = file.filename.rsplit('.', 1)[1].lower()
+                fname = f"seller_sig_{int(time.time())}_{uuid.uuid4().hex[:6]}.{ext}"
+                save_path = os.path.join(upload_dir, fname)
+                file.save(save_path)
+                seller_signature_url = f"/static/uploads/invoice/{fname}"
+
         execute("""
             UPDATE invoice_settings SET
                 font_family = %s,
@@ -400,6 +415,8 @@ def update_invoice_settings():
                 qr_offset_y = %s,
                 bank_offset_x = %s,
                 bank_offset_y = %s,
+                seller_signature_url = %s,
+                seller_name = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (
@@ -413,6 +430,7 @@ def update_invoice_settings():
             show_signature, show_sku, show_tax,
             qr_size, qr_position, bank_info_size, bank_info_position,
             qr_offset_x, qr_offset_y, bank_offset_x, bank_offset_y,
+            seller_signature_url, seller_name,
             inv['id']
         ))
 

@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number, resync_all_sequences
 from datetime import datetime, date, timedelta
-import re, os, time, json, mimetypes, logging
+import re, os, time, json, mimetypes, logging, uuid
 from werkzeug.utils import secure_filename
 from routes.auth import user_can_edit_prices, user_can_view_costs
 
@@ -2983,7 +2983,9 @@ def print_invoice(id):
             'footer_notes_en': 'Goods sold are not returnable. Thank you for your business!',
             'show_signature': True,
             'show_sku': True,
-            'show_tax': True
+            'show_tax': True,
+            'seller_signature_url': None,
+            'seller_name': None
         }
 
     # Branch specific invoice styles & branding override
@@ -3008,7 +3010,8 @@ def print_invoice(id):
                       'show_signature', 'show_sku', 'show_tax', 'enable_khr_total', 'khr_exchange_rate',
                       'primary_color', 'secondary_color', 'font_family', 'paper_size',
                       'qr_size', 'qr_position', 'bank_info_size', 'bank_info_position',
-                      'qr_offset_x', 'qr_offset_y', 'bank_offset_x', 'bank_offset_y']:
+                      'qr_offset_x', 'qr_offset_y', 'bank_offset_x', 'bank_offset_y',
+                      'seller_signature_url', 'seller_name']:
                 if k in b_settings and b_settings[k] not in (None, ''):
                     inv_settings[k] = b_settings[k]
 
@@ -3096,6 +3099,119 @@ def print_invoice(id):
                            total_khr=total_khr,
                            paid_khr=paid_khr,
                            balance_khr=balance_khr)
+
+
+@sales_orders_bp.route('/api/invoice/save-signature-settings', methods=['POST'])
+def save_invoice_signature_settings():
+    try:
+        seller_name = request.form.get('seller_name', '').strip()
+        show_sig_val = request.form.get('show_signature')
+        show_signature = None
+        if show_sig_val is not None:
+            show_signature = (show_sig_val in ('1', 'true', 'True', 'on', True))
+
+        remove_sig = (request.form.get('remove_signature') in ('1', 'true', 'True', 'on', True))
+        
+        # Get current invoice settings
+        current_inv = query_one("SELECT id, seller_signature_url, seller_name, show_signature FROM invoice_settings LIMIT 1")
+        if not current_inv:
+            from routes.settings import get_invoice_settings
+            current_inv = get_invoice_settings()
+
+        signature_url = current_inv.get('seller_signature_url')
+
+        if remove_sig:
+            signature_url = None
+        elif 'signature_file' in request.files:
+            file = request.files['signature_file']
+            if file and file.filename:
+                ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'png'
+                if ext in ('png', 'jpg', 'jpeg', 'webp', 'svg'):
+                    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'invoice', 'signatures')
+                    os.makedirs(upload_dir, exist_ok=True)
+                    fname = f"seller_sig_{int(time.time())}_{uuid.uuid4().hex[:6]}.{ext}"
+                    save_path = os.path.join(upload_dir, fname)
+                    file.save(save_path)
+                    signature_url = f"/static/uploads/invoice/signatures/{fname}"
+
+        # Update DB
+        updates = []
+        params = []
+        if request.form.get('seller_name') is not None:
+            updates.append("seller_name = %s")
+            params.append(seller_name)
+        if show_signature is not None:
+            updates.append("show_signature = %s")
+            params.append(show_signature)
+        if remove_sig or ('signature_file' in request.files and request.files['signature_file'].filename):
+            updates.append("seller_signature_url = %s")
+            params.append(signature_url)
+
+        if updates:
+            updates.append("updated_at = CURRENT_TIMESTAMP")
+            params.append(current_inv['id'])
+            execute(f"UPDATE invoice_settings SET {', '.join(updates)} WHERE id = %s", tuple(params))
+
+        # Also support branch-level override if branch_id is passed
+        branch_id = request.form.get('branch_id')
+        if branch_id:
+            try:
+                b = query_one("SELECT id, settings_json FROM branches WHERE id = %s", (branch_id,))
+                if b:
+                    b_set = b.get('settings_json')
+                    if isinstance(b_set, str):
+                        b_set = json.loads(b_set) if b_set else {}
+                    elif not isinstance(b_set, dict):
+                        b_set = {}
+                    if request.form.get('seller_name') is not None:
+                        b_set['seller_name'] = seller_name
+                    if show_signature is not None:
+                        b_set['show_signature'] = show_signature
+                    if remove_sig:
+                        b_set['seller_signature_url'] = None
+                    elif signature_url:
+                        b_set['seller_signature_url'] = signature_url
+                    execute("UPDATE branches SET settings_json = %s WHERE id = %s", (json.dumps(b_set), branch_id))
+            except Exception as b_err:
+                logger.warning(f"Branch signature settings update error: {b_err}")
+
+        return jsonify({
+            'success': True,
+            'seller_signature_url': signature_url or '',
+            'seller_name': seller_name,
+            'show_signature': show_signature if show_signature is not None else current_inv.get('show_signature', True)
+        })
+    except Exception as e:
+        logger.error(f"Error saving invoice signature settings: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sales_orders_bp.route('/api/invoice/toggle-signature', methods=['POST'])
+def toggle_invoice_signature():
+    try:
+        data = request.get_json(silent=True) or request.form
+        show_sig = data.get('show_signature')
+        is_show = (show_sig in (True, 'true', 'True', '1', 'on', 1))
+        execute("UPDATE invoice_settings SET show_signature = %s, updated_at = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM invoice_settings LIMIT 1);", (is_show,))
+        
+        branch_id = data.get('branch_id')
+        if branch_id:
+            try:
+                b = query_one("SELECT id, settings_json FROM branches WHERE id = %s", (branch_id,))
+                if b:
+                    b_set = b.get('settings_json')
+                    if isinstance(b_set, str):
+                        b_set = json.loads(b_set) if b_set else {}
+                    elif not isinstance(b_set, dict):
+                        b_set = {}
+                    b_set['show_signature'] = is_show
+                    execute("UPDATE branches SET settings_json = %s WHERE id = %s", (json.dumps(b_set), branch_id))
+            except Exception as b_err:
+                logger.warning(f"Branch signature toggle error: {b_err}")
+                
+        return jsonify({'success': True, 'show_signature': is_show})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @sales_orders_bp.route('/api/delivery-services', methods=['GET', 'POST'])
