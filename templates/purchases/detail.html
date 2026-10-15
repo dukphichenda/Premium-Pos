@@ -2018,13 +2018,15 @@ input:checked + .po-toggle-slider:before {
                                 <td style="text-align: right; padding: 10px 12px; font-weight: 600;">{{ l.quantity }} {{ l.line_uom or '' }}</td>
                                 <td style="text-align: right; padding: 10px 12px; color: #059669; font-weight: 600;">{{ l.received_qty }}</td>
                                 <td style="text-align: right; padding: 10px 12px;">
-                                    <input type="number" step="any" min="0" max="{{ remaining }}" 
+                                    <input type="number" step="any" min="0" 
                                            data-line-id="{{ l.id }}" 
                                            data-remaining="{{ remaining }}" 
+                                           data-ordered="{{ l.quantity }}" 
+                                           data-received="{{ l.received_qty }}" 
                                            class="po-cell-input po-receive-input-row" 
                                            value="{{ remaining if remaining > 0 else 0 }}" 
-                                           style="width: 90px; text-align: right; border: 1px solid #CBD5E1; background: #FFFFFF; font-weight: 700;" 
-                                           {% if remaining <= 0 %}disabled{% endif %}>
+                                           onfocus="this.select()" 
+                                           style="width: 100px; text-align: right; border: 1.5px solid #CBD5E1; background: #FFFFFF; font-weight: 700; color: #0F172A; padding: 4px 8px; border-radius: 4px;">
                                 </td>
                             </tr>
                             {% endfor %}
@@ -3050,13 +3052,15 @@ function populateReceiveModal(poId, lines, order) {
             <td style="text-align: right; padding: 10px 12px; font-weight: 600;">${l.quantity} ${l.line_uom || ''}</td>
             <td style="text-align: right; padding: 10px 12px; color: #059669; font-weight: 600;">${l.received_qty || 0}</td>
             <td style="text-align: right; padding: 10px 12px;">
-                <input type="number" step="any" min="0" max="${remaining}" 
+                <input type="number" step="any" min="0" 
                        data-line-id="${l.id}" 
                        data-remaining="${remaining}" 
+                       data-ordered="${l.quantity}" 
+                       data-received="${l.received_qty || 0}" 
                        class="po-cell-input po-receive-input-row" 
                        value="${remaining > 0 ? remaining : 0}" 
-                       style="width: 90px; text-align: right; border: 1px solid #CBD5E1; background: #FFFFFF; font-weight: 700;" 
-                       ${remaining <= 0 ? 'disabled' : ''}>
+                       onfocus="this.select()" 
+                       style="width: 100px; text-align: right; border: 1.5px solid #CBD5E1; background: #FFFFFF; font-weight: 700; color: #0F172A; padding: 4px 8px; border-radius: 4px;">
             </td>
         `;
         tbody.appendChild(tr);
@@ -3065,13 +3069,15 @@ function populateReceiveModal(poId, lines, order) {
 
 function fillAllRemainingReceiveQty() {
     document.querySelectorAll('.po-receive-input-row').forEach(inp => {
-        if (!inp.disabled) inp.value = inp.dataset.remaining;
+        const rem = parseFloat(inp.dataset.remaining || 0);
+        const ord = parseFloat(inp.dataset.ordered || 0);
+        inp.value = rem > 0 ? rem : ord;
     });
 }
 
 function submitReceiveModal(e) {
     if (e) e.preventDefault();
-    const poId = document.getElementById('receiveModalPoId').value || document.getElementById('poIdHidden').value;
+    const poId = document.getElementById('receiveModalPoId')?.value || document.getElementById('poIdHidden')?.value;
     if (!poId || poId == '0') {
         alert('Invalid purchase order ID.');
         return;
@@ -3086,10 +3092,7 @@ function submitReceiveModal(e) {
         }
     });
 
-    if (items.length === 0) {
-        alert('Please specify quantity to receive greater than 0.');
-        return;
-    }
+    const payload = (items.length > 0) ? { items: items } : { receive_all: true };
 
     const btn = document.getElementById('btnConfirmReceive');
     if (btn) {
@@ -3103,7 +3106,7 @@ function submitReceiveModal(e) {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify({ items: items })
+        body: JSON.stringify(payload)
     })
     .then(r => r.json())
     .then(res => {
@@ -3113,8 +3116,12 @@ function submitReceiveModal(e) {
         }
         if (res.success) {
             closeReceiveModal();
-            showPoToast(`✓ Successfully received ${res.total_received || items.length} item(s) into inventory!`);
-            selectPurchaseOrder(poId);
+            showPoToast(res.message || '✓ Goods received successfully into inventory!');
+            if (typeof selectPurchaseOrder === 'function') {
+                selectPurchaseOrder(poId);
+            } else {
+                location.reload();
+            }
         } else {
             alert(res.message || 'Error receiving goods.');
         }
@@ -3130,7 +3137,7 @@ function submitReceiveModal(e) {
 
 // 1-Click Receive All
 function quickReceiveAllAction() {
-    const poId = document.getElementById('poIdHidden').value;
+    const poId = document.getElementById('receiveModalPoId')?.value || document.getElementById('poIdHidden')?.value;
     if (!poId || poId == '0') {
         alert('Please save the purchase order before receiving goods.');
         return;
@@ -3152,8 +3159,12 @@ function quickReceiveAllAction() {
     .then(res => {
         if (res.success) {
             closeReceiveModal();
-            showPoToast('✓ All purchase order goods fulfilled into inventory!');
-            selectPurchaseOrder(poId);
+            showPoToast(res.message || '✓ All purchase order goods fulfilled into inventory!');
+            if (typeof selectPurchaseOrder === 'function') {
+                selectPurchaseOrder(poId);
+            } else {
+                location.reload();
+            }
         } else {
             alert(res.message || 'Error receiving goods.');
         }

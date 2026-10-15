@@ -1132,10 +1132,14 @@ def receive_goods(id):
             line_uom = (l.get('uom') or 'pcs.').strip()
             remaining = max(0.0, ordered_qty - already_rcv)
 
-            if receive_all or not line_receives:
+            if receive_all:
+                qty_to_receive = remaining
+            elif lid in line_receives:
+                qty_to_receive = max(0.0, float(line_receives[lid]))
+            elif not line_receives:
                 qty_to_receive = remaining
             else:
-                qty_to_receive = min(remaining, line_receives.get(lid, 0.0))
+                qty_to_receive = 0.0
 
             if qty_to_receive > 0:
                 any_received = True
@@ -1209,18 +1213,28 @@ def receive_goods(id):
                     all_lines_complete = False
 
         if not any_received:
-            msg = "No remaining quantities to receive for this order."
-            if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': msg}), 400
-            flash(msg, "warning")
-            return redirect(url_for('purchase_orders.detail_purchase', id=id))
-
-        new_status = 'RECEIVED' if all_lines_complete else 'PARTIAL_RECEIVED'
-        cur.execute("""
-            UPDATE purchase_orders 
-            SET status = %s, received_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
-            WHERE id = %s;
-        """, (new_status, id))
+            # If all lines are already complete or receive_all was clicked on an unfulfilled PO, mark as RECEIVED (Fulfilled)!
+            if all_lines_complete or receive_all:
+                new_status = 'RECEIVED'
+                cur.execute("""
+                    UPDATE purchase_orders 
+                    SET status = %s, received_date = COALESCE(received_date, CURRENT_TIMESTAMP), updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s;
+                """, (new_status, id))
+                all_lines_complete = True
+            else:
+                msg = "No remaining quantities to receive for this order."
+                if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                    return jsonify({'success': False, 'message': msg}), 400
+                flash(msg, "warning")
+                return redirect(url_for('purchase_orders.detail_purchase', id=id))
+        else:
+            new_status = 'RECEIVED' if all_lines_complete else 'PARTIAL_RECEIVED'
+            cur.execute("""
+                UPDATE purchase_orders 
+                SET status = %s, received_date = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s;
+            """, (new_status, id))
 
     badge = 'Fulfilled' if new_status == 'RECEIVED' else 'Partial'
     success_msg = f"Purchase Order {order['order_number']} goods successfully received into warehouse! Inventory updated." if all_lines_complete else f"Partial shipment for Purchase Order {order['order_number']} received! Inventory updated."
