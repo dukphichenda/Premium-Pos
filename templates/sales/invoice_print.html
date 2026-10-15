@@ -266,12 +266,17 @@
             width: 100% !important;
             max-width: 110mm !important;
             margin: 0 auto 2mm auto !important;
-            display: grid !important;
+            display: grid;
             grid-template-columns: 1fr 1fr !important;
             gap: 20mm !important;
             align-items: end !important;
             padding-top: 2px !important;
             page-break-inside: avoid !important;
+        }
+        body.exporting-pdf .signature-section.sig-hidden,
+        body.exporting-pdf .signature-section[style*="display: none"],
+        body.exporting-pdf .signature-section[style*="display:none"] {
+            display: none !important;
         }
         body.exporting-pdf .sig-box {
             text-align: center !important;
@@ -1051,11 +1056,17 @@
             width: 100% !important;
             max-width: 440px !important;
             margin: 0 auto 6px auto !important;
-            display: grid !important;
+            display: grid;
             grid-template-columns: 1fr 1fr !important;
             gap: 48px !important;
             align-items: end !important;
             page-break-inside: avoid;
+        }
+
+        .signature-section.sig-hidden,
+        .signature-section[style*="display: none"],
+        .signature-section[style*="display:none"] {
+            display: none !important;
         }
 
         .sig-box {
@@ -1512,12 +1523,17 @@
                 width: 100% !important;
                 max-width: 120mm !important;
                 margin: 0 auto 2mm auto !important;
-                display: grid !important;
+                display: grid;
                 grid-template-columns: 1fr 1fr !important;
                 gap: 20mm !important;
                 align-items: end !important;
                 padding-top: 2px !important;
                 page-break-inside: avoid !important;
+            }
+            .signature-section.sig-hidden,
+            .signature-section[style*="display: none"],
+            .signature-section[style*="display:none"] {
+                display: none !important;
             }
             .sig-box {
                 text-align: center !important;
@@ -2164,7 +2180,7 @@
         <!-- Pinned Bottom Section (Signatures & Thank you footer: sits at bottom even if order items are few) -->
         <div class="invoice-page-footer" id="invoicePageFooter">
             <!-- 6. Signature Section (Cambodia Standard) -->
-            <div class="signature-section" id="signatureSection" style="{% if not inv_settings.show_signature %}display: none;{% endif %}">
+            <div class="signature-section {% if not inv_settings.show_signature %}sig-hidden{% endif %}" id="signatureSection" style="{% if not inv_settings.show_signature %}display: none !important;{% endif %}">
                 <div class="sig-box">
                     <div class="sig-title-kh">ហត្ថលេខា និងឈ្មោះអ្នកទិញ</div>
                     <div class="sig-title-en">Customer's Signature & Name</div>
@@ -2302,24 +2318,46 @@
             const sigSec = document.getElementById('signatureSection');
             const chk = document.getElementById('chkShowSignature');
             const modalChk = document.getElementById('modalShowSignature');
-            if (chk) chk.checked = !!show;
-            if (modalChk) modalChk.checked = !!show;
+            const isVisible = !!show;
+            if (chk) chk.checked = isVisible;
+            if (modalChk) modalChk.checked = isVisible;
             if (sigSec) {
-                sigSec.style.display = show ? 'grid' : 'none';
+                if (isVisible) {
+                    sigSec.classList.remove('sig-hidden');
+                    sigSec.style.setProperty('display', 'grid', 'important');
+                } else {
+                    sigSec.classList.add('sig-hidden');
+                    sigSec.style.setProperty('display', 'none', 'important');
+                }
             }
             try {
-                localStorage.setItem('inflow_invoice_show_signature', show ? '1' : '0');
+                localStorage.setItem('inflow_invoice_show_signature', isVisible ? '1' : '0');
             } catch(e) {}
-            // Persist choice asynchronously
+            // Persist choice asynchronously to DB
             fetch('/api/invoice/toggle-signature', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    show_signature: !!show,
+                    show_signature: isVisible,
                     branch_id: '{{ order.branch_id or "" }}'
                 })
             }).catch(() => {});
         }
+
+        // Initialize signature visibility on page load
+        (function initSignatureDisplay() {
+            try {
+                const saved = localStorage.getItem('inflow_invoice_show_signature');
+                if (saved !== null) {
+                    toggleSignatureDisplay(saved === '1');
+                } else {
+                    const chk = document.getElementById('chkShowSignature');
+                    if (chk) {
+                        toggleSignatureDisplay(chk.checked);
+                    }
+                }
+            } catch(e) {}
+        })();
 
         function openSignatureModal() {
             const modal = document.getElementById('signatureModal');
