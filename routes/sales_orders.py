@@ -3128,11 +3128,27 @@ def save_invoice_signature_settings():
                 ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'png'
                 if ext in ('png', 'jpg', 'jpeg', 'webp', 'svg'):
                     upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'invoice', 'signatures')
-                    os.makedirs(upload_dir, exist_ok=True)
+                    try:
+                        os.makedirs(upload_dir, mode=0o777, exist_ok=True)
+                    except Exception:
+                        pass
                     fname = f"seller_sig_{int(time.time())}_{uuid.uuid4().hex[:6]}.{ext}"
                     save_path = os.path.join(upload_dir, fname)
-                    file.save(save_path)
-                    signature_url = f"/static/uploads/invoice/signatures/{fname}"
+                    try:
+                        file.save(save_path)
+                        try:
+                            os.chmod(save_path, 0o666)
+                        except Exception:
+                            pass
+                        signature_url = f"/static/uploads/invoice/signatures/{fname}"
+                    except Exception as save_err:
+                        logger.warning(f"File save failed ({save_err}), falling back to base64 data-URI for signature")
+                        import base64
+                        file.seek(0)
+                        file_bytes = file.read()
+                        mime_type = f"image/{'svg+xml' if ext == 'svg' else ('jpeg' if ext == 'jpg' else ext)}"
+                        b64_str = base64.b64encode(file_bytes).decode('utf-8')
+                        signature_url = f"data:{mime_type};base64,{b64_str}"
 
         # Update DB
         updates = []

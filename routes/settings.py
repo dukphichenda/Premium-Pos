@@ -376,8 +376,20 @@ def update_invoice_settings():
                 ext = file.filename.rsplit('.', 1)[1].lower()
                 fname = f"seller_sig_{int(time.time())}_{uuid.uuid4().hex[:6]}.{ext}"
                 save_path = os.path.join(upload_dir, fname)
-                file.save(save_path)
-                seller_signature_url = f"/static/uploads/invoice/{fname}"
+                try:
+                    file.save(save_path)
+                    try:
+                        os.chmod(save_path, 0o666)
+                    except Exception:
+                        pass
+                    seller_signature_url = f"/static/uploads/invoice/{fname}"
+                except Exception as save_err:
+                    import base64
+                    file.seek(0)
+                    file_bytes = file.read()
+                    mime_type = f"image/{'svg+xml' if ext == 'svg' else ('jpeg' if ext == 'jpg' else ext)}"
+                    b64_str = base64.b64encode(file_bytes).decode('utf-8')
+                    seller_signature_url = f"data:{mime_type};base64,{b64_str}"
 
         execute("""
             UPDATE invoice_settings SET
