@@ -88,9 +88,14 @@
                     <span>Search</span>
                     <span class="cust-drawer-arrow-icon">▶</span>
                 </div>
-                <button type="button" class="cust-drawer-collapse-btn" onclick="toggleCustDrawerCollapse()" title="Collapse drawer">
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
-                </button>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <button type="button" class="cust-drawer-collapse-btn" onclick="handleNavigate('{{ url_for('contacts.list_customers') }}')" title="Open Full Customer List Grid (បញ្ជីអតិថិជន)" style="background: #68A614; color: #FFFFFF; border-radius: 2px; padding: 2px 7px; font-weight: 700; font-size: 11px; display: inline-flex; align-items: center; gap: 3px; border: 1px solid #558B0E;">
+                        <span>📋 List</span>
+                    </button>
+                    <button type="button" class="cust-drawer-collapse-btn" onclick="toggleCustDrawerCollapse()" title="Collapse drawer">
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    </button>
+                </div>
             </div>
             
             <!-- 4 Filter Fields Matching Image 2: Name, Contact, Phone, Address1 -->
@@ -784,8 +789,9 @@ function saveAddressModal() {
     const state = (document.getElementById('modalState')?.value || '').trim();
     const country = (document.getElementById('modalCountry')?.value || '').trim();
     const postal = (document.getElementById('modalPostalCode')?.value || '').trim();
+    const modalType = document.getElementById('modalAddressType')?.value || 'Business Address';
 
-    // Update hidden inputs
+    // Update hidden granular inputs
     if (document.getElementById('businessAddressHidden')) document.getElementById('businessAddressHidden').value = street;
     if (document.getElementById('cityHidden')) document.getElementById('cityHidden').value = city;
     if (document.getElementById('stateHidden')) document.getElementById('stateHidden').value = state;
@@ -798,12 +804,32 @@ function saveAddressModal() {
     const line2 = [city, state, postal].filter(Boolean).join(', ');
     if (line2) parts.push(line2);
     if (country && country !== 'Cambodia') parts.push(country);
-    const formatted = parts.join('\n');
+    const formatted = parts.join('\n') || street;
+
+    // Map modal type to internal address key
+    let targetType = currentAddressType;
+    if (modalType === 'Shipping Address') targetType = 'shipping';
+    else if (modalType === 'Billing Address') targetType = 'billing';
+    else if (modalType === 'Business Address') targetType = 'business';
+
+    addressData[targetType] = formatted;
+
+    // Update backend persistence hidden inputs
+    if (targetType === 'business') {
+        if (document.getElementById('businessAddressHidden')) document.getElementById('businessAddressHidden').value = street;
+    } else if (targetType === 'shipping') {
+        if (document.getElementById('shippingAddressHidden')) document.getElementById('shippingAddressHidden').value = formatted;
+    } else if (targetType === 'billing') {
+        if (document.getElementById('billingAddressHidden')) document.getElementById('billingAddressHidden').value = formatted;
+    }
+
+    // Update UI elements
+    const typeSelect = document.getElementById('addressTypeSelect');
+    if (typeSelect) typeSelect.value = targetType;
+    currentAddressType = targetType;
 
     const textarea = document.getElementById('addressDisplay');
-    if (textarea) textarea.value = formatted || street;
-
-    addressData[currentAddressType] = formatted || street;
+    if (textarea) textarea.value = formatted;
 
     isDirty = true;
     closeAddressModal();

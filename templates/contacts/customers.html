@@ -5,122 +5,211 @@
 
 {% block content %}
 <!-- Top Accent Line (inFlow Lime Green) -->
-<div style="height: 4px; background: #659E27;"></div>
+<div class="inflow-top-accent-bar" style="height: 4px; background: #659E27;"></div>
 
 <!-- Top inFlow Header Ribbon / Actions -->
-<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #85BD28; color: #FFFFFF; font-weight: 700; font-size: 13px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-            <span>Customer</span>
+<div class="inflow-win-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1; gap: 12px; flex-wrap: wrap;">
+    <!-- Left: Badge & Quick Stats -->
+    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: #85BD28; color: #FFFFFF; font-weight: 700; font-size: 13px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <span>Customers</span>
         </div>
-        <span style="font-size: 12px; color: #64748B; font-weight: 500;">
-            CRM Directory &bull; {{ total_count }} total records
-        </span>
+
+        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #64748B;">
+            <span style="background: #FFFFFF; border: 1px solid #CBD5E1; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #1E293B;">
+                Total: <strong id="ribbonTotalCount">{{ total_count }}</strong>
+            </span>
+            <span style="background: #FEF2F2; border: 1px solid #FECACA; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #DC2626;">
+                Receivables: <strong>{{ (summary_stats.total_receivables or 0) | currency }}</strong>
+            </span>
+            <span style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #16A34A;">
+                Total Sales: <strong>{{ (summary_stats.total_revenue or 0) | currency }}</strong>
+            </span>
+        </div>
     </div>
 
-    <div style="display: flex; align-items: center; gap: 8px;">
+    <!-- Right: Branch Filter (HQ) & Action Buttons -->
+    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
         {% if is_main_admin %}
         <!-- Branch Selector Pills for HQ -->
-        <div style="display: flex; gap: 4px; align-items: center; margin-right: 8px;">
-            <a href="{{ url_for('contacts.list_customers', branch='main', search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address) }}" 
-               class="inflow-tb-btn {% if current_branch_param == 'main' %}active-pill{% endif %}" 
-               style="font-size: 11.5px; padding: 3px 9px; text-decoration: none; border-radius: 3px; border: 1px solid #CBD5E1; background: {% if current_branch_param == 'main' %}#0284C7{% else %}#FFFFFF{% endif %}; color: {% if current_branch_param == 'main' %}#FFFFFF{% else %}#334155{% endif %}; font-weight: 600;">
-                🏢 Main HQ
+        <div style="display: inline-flex; gap: 3px; align-items: center; background: #E2E8F0; padding: 2px; border-radius: 4px;">
+            <a href="{{ url_for('contacts.list_customers', branch='main', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-branch-pill {% if current_branch_param == 'main' %}active{% endif %}" title="HQ Main Store">
+                🏢 HQ Main
             </a>
             {% for b in branches %}
-            <a href="{{ url_for('contacts.list_customers', branch=b.id, search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address) }}" 
-               class="inflow-tb-btn {% if current_branch_param == b.id|string %}active-pill{% endif %}" 
-               style="font-size: 11.5px; padding: 3px 9px; text-decoration: none; border-radius: 3px; border: 1px solid #CBD5E1; background: {% if current_branch_param == b.id|string %}#0284C7{% else %}#FFFFFF{% endif %}; color: {% if current_branch_param == b.id|string %}#FFFFFF{% else %}#334155{% endif %}; font-weight: 600;">
+            <a href="{{ url_for('contacts.list_customers', branch=b.id, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-branch-pill {% if current_branch_param == b.id|string %}active{% endif %}" title="{{ b.name }}">
                 🏪 {{ b.code or b.name }}
             </a>
             {% endfor %}
-            <a href="{{ url_for('contacts.list_customers', branch='all', search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address) }}" 
-               class="inflow-tb-btn {% if current_branch_param == 'all' %}active-pill{% endif %}" 
-               style="font-size: 11.5px; padding: 3px 9px; text-decoration: none; border-radius: 3px; border: 1px solid #CBD5E1; background: {% if current_branch_param == 'all' %}#0284C7{% else %}#FFFFFF{% endif %}; color: {% if current_branch_param == 'all' %}#FFFFFF{% else %}#334155{% endif %}; font-weight: 600;">
+            <a href="{{ url_for('contacts.list_customers', branch='all', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-branch-pill {% if current_branch_param == 'all' %}active{% endif %}" title="All Branches Combined">
                 🌐 All
             </a>
         </div>
         {% endif %}
 
-        <!-- Add Customer Button -->
-        <a href="javascript:void(0);" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('contacts.new_customer') }}', 'New Customer', 'sales'); } else { window.location.href='{{ url_for('contacts.new_customer') }}'; }" 
-           class="inflow-tb-btn" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 3px; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
-            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+        <!-- Quick Add Modal Button -->
+        <button type="button" onclick="openQuickAddModal()" class="inflow-tb-btn" style="background: #FFFFFF; color: #0F766E; border: 1px solid #99F6E4;" title="Quick Add Customer Modal (Alt+N)">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>⚡ Quick Add</span>
+        </button>
+
+        <!-- New Customer Full Form Button -->
+        <a href="javascript:void(0);" onclick="openCustomerUrl('{{ url_for('contacts.new_customer') }}', 'New Customer')" 
+           class="inflow-tb-btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #94A3B8; font-weight: 600;" title="Create Customer (Full Detail)">
+            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
                 <path d="M3 2C3 1.44772 3.44772 1 4 1H9.58579C9.851 1 10.1054 1.10536 10.2929 1.29289L13.7071 4.70711C13.8946 4.89464 14 5.149 14 5.41421V14C14 14.5523 13.5523 15 13 15H4C3.44772 15 3 14.5523 3 14V2Z" fill="#F8FAFC" stroke="#64748B" stroke-width="1.2"/>
                 <path d="M9.5 1V5H13.5" stroke="#64748B" stroke-width="1.2"/>
                 <path d="M8 8V12M6 10H10" stroke="#0284C7" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
             <span>+ New Customer</span>
         </a>
+
+        <!-- Export CSV Button -->
+        <a href="{{ url_for('contacts.export_customers', branch=current_branch_param if is_main_admin else None, search=search, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir) }}" 
+           class="inflow-tb-btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1;" title="Export filtered customers to Excel CSV">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Export CSV</span>
+        </a>
+
+        <!-- Refresh Button -->
+        <button type="button" onclick="window.location.reload()" class="inflow-tb-btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1;" title="Refresh list">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+        </button>
     </div>
 </div>
 
-<!-- Authentic inFlow Search Pane (Matching step_img_38.png & step_img_50.png) -->
-<div class="inflow-list-search-pane" style="background: linear-gradient(180deg, #D6F358 0%, #E2FA7B 100%); border-bottom: 1px solid #BFE637; padding: 8px 14px 10px;">
+<!-- Authentic inFlow Collapsible Search Pane (Matching step_img_38.png & step_img_50.png) -->
+<div class="inflow-list-search-pane" id="inflowSearchPane">
+    <!-- Header with Toggle Button & Actions -->
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <div style="font-size: 12.5px; font-weight: 700; color: #488210; display: flex; align-items: center; gap: 4px;">
-            <span>Search</span>
-            <span style="font-size: 9px;">▼</span>
+        <div onclick="toggleSearchPane()" style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px; user-select: none;">
+            <span id="searchPaneArrow" style="font-size: 10px; color: #488210; font-weight: bold; transition: transform 0.15s ease;">▼</span>
+            <span style="font-size: 12.5px; font-weight: 700; color: #488210;">Search</span>
+            <span style="font-size: 11px; color: #648B1E; font-weight: 500;">(Click to collapse/expand)</span>
         </div>
+
         <div style="display: flex; gap: 8px; align-items: center;">
+            <!-- Quick Filter Pill: With Balance -->
+            <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, with_balance='1' if with_balance != '1' else '', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}"
+               style="font-size: 11px; padding: 2px 8px; border-radius: 3px; text-decoration: none; font-weight: 600; border: 1px solid {% if with_balance == '1' %}#DC2626{% else %}#A8D154{% endif %}; background: {% if with_balance == '1' %}#DC2626{% else %}#FFFFFF{% endif %}; color: {% if with_balance == '1' %}#FFFFFF{% else %}#2F540C{% endif %};">
+                ⚠️ With Balance Only
+            </a>
+
+            <!-- Quick Filter: Pricing Scheme -->
+            <select onchange="filterByScheme(this.value)" style="height: 22px; padding: 0 4px; font-size: 11px; border: 1px solid #A8D154; border-radius: 2px; background: #FFFFFF; color: #2F540C; font-weight: 500;">
+                <option value="">All Pricing Schemes</option>
+                {% for ps in pricing_schemes %}
+                <option value="{{ ps.id }}" {% if scheme_filter == ps.id|string %}selected{% endif %}>{{ ps.name }}</option>
+                {% endfor %}
+            </select>
+
             <button type="button" onclick="submitSearchForm()" class="inflow-search-refresh-btn" style="background: linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%); border: 1px solid #7F9DB9; border-radius: 2px; padding: 2px 14px; font-size: 11px; font-weight: 600; color: #1E293B; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.1);">
                 Refresh
             </button>
-            {% if search_name or search_contact or search_phone or search_address or search %}
-            <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None) }}" style="font-size: 11px; color: #2F540C; text-decoration: underline; font-weight: 500;">
-                Reset
+            
+            {% if search_name or search_contact or search_phone or search_address or search or with_balance or scheme_filter %}
+            <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None) }}" style="font-size: 11px; color: #2F540C; text-decoration: underline; font-weight: 600;">
+                Reset Filters
             </a>
             {% endif %}
         </div>
     </div>
 
-    <form id="customerSearchForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
-        {% if is_main_admin and current_branch_param %}
-        <input type="hidden" name="branch" value="{{ current_branch_param }}">
-        {% endif %}
+    <!-- 4 inFlow Search Rows (with Operator Selectors: Contains -, Exact =, Starts ^) -->
+    <div id="searchPaneBody">
+        <form id="customerSearchForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
+            {% if is_main_admin and current_branch_param %}
+            <input type="hidden" name="branch" value="{{ current_branch_param }}">
+            {% endif %}
+            <input type="hidden" name="with_balance" id="hiddenWithBalance" value="{{ with_balance }}">
+            <input type="hidden" name="scheme_id" id="hiddenSchemeId" value="{{ scheme_filter }}">
+            <input type="hidden" name="sort_by" value="{{ sort_by }}">
+            <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
+            <input type="hidden" name="per_page" value="{{ per_page_raw }}">
 
-        <!-- 4 Authentic inFlow Search Fields arranged in 4 rows / 2x2 grid -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; max-width: 960px;">
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Name</label>
-                <input type="text" name="search_name" id="searchName" value="{{ search_name }}" 
-                       class="inflow-pane-input font-khmer" 
-                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
-            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 14px; max-width: 1040px; margin-top: 4px;">
+                <!-- Row 1: Name -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Name</label>
+                    <select name="op_name" class="inflow-op-select" title="Search Operator: Contains (-), Exact (=), Starts with (^)">
+                        <option value="-" {% if op_name == '-' %}selected{% endif %}>-</option>
+                        <option value="=" {% if op_name == '=' %}selected{% endif %}>=</option>
+                        <option value="^" {% if op_name == '^' %}selected{% endif %}>^</option>
+                    </select>
+                    <input type="text" name="search_name" id="searchName" value="{{ search_name }}" 
+                           class="inflow-pane-input font-khmer" placeholder="Search customer name..." autocomplete="off" oninput="applyLiveFilter()">
+                </div>
 
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Contact</label>
-                <input type="text" name="search_contact" id="searchContact" value="{{ search_contact }}" 
-                       class="inflow-pane-input font-khmer" 
-                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
-            </div>
+                <!-- Row 2: Contact -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Contact</label>
+                    <select name="op_contact" class="inflow-op-select" title="Search Operator">
+                        <option value="-" {% if op_contact == '-' %}selected{% endif %}>-</option>
+                        <option value="=" {% if op_contact == '=' %}selected{% endif %}>=</option>
+                        <option value="^" {% if op_contact == '^' %}selected{% endif %}>^</option>
+                    </select>
+                    <input type="text" name="search_contact" id="searchContact" value="{{ search_contact }}" 
+                           class="inflow-pane-input font-khmer" placeholder="Search contact name..." autocomplete="off" oninput="applyLiveFilter()">
+                </div>
 
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Phone</label>
-                <input type="text" name="search_phone" id="searchPhone" value="{{ search_phone }}" 
-                       class="inflow-pane-input" 
-                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
-            </div>
+                <!-- Row 3: Phone -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Phone</label>
+                    <select name="op_phone" class="inflow-op-select" title="Search Operator">
+                        <option value="-" {% if op_phone == '-' %}selected{% endif %}>-</option>
+                        <option value="=" {% if op_phone == '=' %}selected{% endif %}>=</option>
+                        <option value="^" {% if op_phone == '^' %}selected{% endif %}>^</option>
+                    </select>
+                    <input type="text" name="search_phone" id="searchPhone" value="{{ search_phone }}" 
+                           class="inflow-pane-input" placeholder="Search phone number..." autocomplete="off" oninput="applyLiveFilter()">
+                </div>
 
-            <div style="display: flex; align-items: center; gap: 6px;">
-                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Address1</label>
-                <input type="text" name="search_address" id="searchAddress" value="{{ search_address }}" 
-                       class="inflow-pane-input font-khmer" 
-                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
+                <!-- Row 4: Address1 -->
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Address1</label>
+                    <select name="op_address" class="inflow-op-select" title="Search Operator">
+                        <option value="-" {% if op_address == '-' %}selected{% endif %}>-</option>
+                        <option value="=" {% if op_address == '=' %}selected{% endif %}>=</option>
+                        <option value="^" {% if op_address == '^' %}selected{% endif %}>^</option>
+                    </select>
+                    <input type="text" name="search_address" id="searchAddress" value="{{ search_address }}" 
+                           class="inflow-pane-input font-khmer" placeholder="Search address, city, street..." autocomplete="off" oninput="applyLiveFilter()">
+                </div>
             </div>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
 
-<!-- Data Grid Container (Full-bleed inFlow Table Matching step_img_38.png) -->
-<div style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 200px); background: #FFFFFF; border-bottom: 1px solid #CBD5E1;">
-    <table id="customerGridTable" style="width: 100%; border-collapse: collapse; font-size: 11.5px; white-space: nowrap; user-select: none;">
+<!-- Data Grid Container (Authentic inFlow Table Matching step_img_38.png) -->
+<div class="inflow-grid-viewport" id="inflowGridViewport">
+    <table id="customerGridTable" class="inflow-table">
         <thead>
             <tr style="background: #85BD28; color: #FFFFFF; height: 26px; border-bottom: 1px solid #74A71E;">
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
-                    Name <span style="font-size: 9px;">▲</span>
+                <!-- Multi-select Checkbox Column Header -->
+                <th style="width: 32px; text-align: center; padding: 2px 4px; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 12;">
+                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllRows(this.checked)" title="Select/Deselect All">
                 </th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Contact</th>
+
+                <!-- 13 Desktop Columns -->
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
+                    <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, sort_by='name', sort_dir='desc' if sort_by == 'name' and sort_dir == 'asc' else 'asc', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, per_page=per_page_raw) }}" 
+                       style="color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
+                        <span>Name</span>
+                        <span>{% if sort_by == 'name' %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% else %}▲{% endif %}</span>
+                    </a>
+                </th>
+
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
+                    <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, sort_by='contact', sort_dir='desc' if sort_by == 'contact' and sort_dir == 'asc' else 'asc', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, per_page=per_page_raw) }}" 
+                       style="color: #FFFFFF; text-decoration: none;">
+                        Contact {% if sort_by == 'contact' %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
+                    </a>
+                </th>
+
                 <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Phone</th>
                 <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Email</th>
                 <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Website</th>
@@ -132,11 +221,19 @@
                 <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Country</th>
                 <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Pricing / Currency</th>
                 <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Discount</th>
+                
                 {% if is_main_admin %}
                 <th style="padding: 3px 8px; text-align: center; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Branch</th>
                 {% endif %}
-                <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Open Balance</th>
-                <th style="padding: 3px 8px; text-align: center; font-weight: 700; position: sticky; top: 0; background: #85BD28; z-index: 10;">Actions</th>
+
+                <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
+                    <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, sort_by='balance', sort_dir='desc' if sort_by == 'balance' and sort_dir == 'asc' else 'asc', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, per_page=per_page_raw) }}" 
+                       style="color: #FFFFFF; text-decoration: none;">
+                        Open Balance {% if sort_by == 'balance' %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
+                    </a>
+                </th>
+
+                <th style="width: 75px; padding: 3px 6px; text-align: center; font-weight: 700; position: sticky; top: 0; background: #85BD28; z-index: 10;">Actions</th>
             </tr>
         </thead>
         <tbody id="customerTableBody">
@@ -147,32 +244,64 @@
                 data-contact="{{ (c.contact_name or '')|lower }}"
                 data-phone="{{ (c.phone or '')|lower }}"
                 data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
-                onclick="selectGridRow(this)"
-                ondblclick="openCustomerDetail('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
-                title="Double-click to open customer details">
+                onclick="handleRowClick(event, this)"
+                ondblclick="openCustomerUrl('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
+                tabindex="0"
+                title="Double-click to open customer details &bull; Delete key to remove">
                 
-                <td style="padding: 3px 8px; font-weight: 600; color: inherit;" class="font-khmer">
-                    <a href="javascript:void(0);" onclick="openCustomerDetail('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" style="color: inherit; text-decoration: none;">
+                <!-- Checkbox -->
+                <td style="text-align: center; padding: 2px 4px; border-right: 1px solid #E2E8F0;" onclick="event.stopPropagation()">
+                    <input type="checkbox" class="customer-row-checkbox" value="{{ c.id }}" onchange="updateSelectedCount()">
+                </td>
+
+                <!-- 1. Name -->
+                <td style="padding: 3px 8px; font-weight: 600; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">
+                    <a href="javascript:void(0);" onclick="openCustomerUrl('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" style="color: inherit; text-decoration: none;">
                         {{ c.name }}
                     </a>
                 </td>
-                <td style="padding: 3px 8px; color: inherit;" class="font-khmer">{{ c.contact_name or '' }}</td>
-                <td style="padding: 3px 8px; font-family: monospace; color: inherit;">{{ c.phone or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.email or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.website or '' }}</td>
-                <td style="padding: 3px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: inherit;" class="font-khmer" title="{{ c.address1 or c.billing_address or '' }}">
+
+                <!-- 2. Contact -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">{{ c.contact_name or '' }}</td>
+
+                <!-- 3. Phone -->
+                <td style="padding: 3px 8px; font-family: monospace; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.phone or '' }}</td>
+
+                <!-- 4. Email -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.email or '' }}</td>
+
+                <!-- 5. Website -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.website or '' }}</td>
+
+                <!-- 6. Address1 -->
+                <td style="padding: 3px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer" title="{{ c.address1 or c.billing_address or '' }}">
                     {{ c.address1 or c.billing_address or '' }}
                 </td>
-                <td style="padding: 3px 8px; color: inherit;" class="font-khmer">{{ c.address2 or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.city or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.state or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.postal_code or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.country or '' }}</td>
-                <td style="padding: 3px 8px; color: inherit;">{{ c.pricing_scheme_name or 'Retail 1' }}</td>
-                <td style="padding: 3px 8px; text-align: right; color: inherit;">{{ '%.0f'|format(c.discount_percent or 0) }}%</td>
+
+                <!-- 7. Address2 -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">{{ c.address2 or '' }}</td>
+
+                <!-- 8. City -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.city or '' }}</td>
+
+                <!-- 9. State/Province -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.state or '' }}</td>
+
+                <!-- 10. Zip/Postal Code -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.postal_code or '' }}</td>
+
+                <!-- 11. Country -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.country or 'Cambodia' }}</td>
+
+                <!-- 12. Pricing / Currency -->
+                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.pricing_scheme_name or 'Retail 1' }}</td>
+
+                <!-- 13. Discount -->
+                <td style="padding: 3px 8px; text-align: right; color: inherit; border-right: 1px solid #E2E8F0;">{{ '%.0f'|format(c.discount_percent or 0) }}%</td>
                 
+                <!-- Branch (HQ Admin) -->
                 {% if is_main_admin %}
-                <td style="padding: 3px 8px; text-align: center;">
+                <td style="padding: 3px 8px; text-align: center; border-right: 1px solid #E2E8F0;">
                     {% if c.branch_name %}
                     <span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">
                         🏪 {{ c.branch_code or c.branch_name }}
@@ -185,19 +314,28 @@
                 </td>
                 {% endif %}
 
-                <td style="padding: 3px 8px; text-align: right; font-weight: 600; color: {% if c.open_balance > 0 %}#DC2626{% else %}inherit{% endif %};">
+                <!-- Open Balance -->
+                <td style="padding: 3px 8px; text-align: right; font-weight: 700; color: {% if c.open_balance > 0 %}#DC2626{% else %}inherit{% endif %}; border-right: 1px solid #E2E8F0;">
                     {{ c.open_balance | currency }}
                 </td>
-                <td style="padding: 3px 8px; text-align: center;">
-                    <a href="javascript:void(0);" onclick="openCustomerDetail('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
-                       style="display: inline-block; padding: 1px 6px; font-size: 10.5px; font-weight: 600; color: #0369A1; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 2px; text-decoration: none;">
-                        Detail
-                    </a>
+
+                <!-- Actions: Detail button & 1-click Delete cross button -->
+                <td style="padding: 2px 4px; text-align: center; white-space: nowrap;">
+                    <div style="display: inline-flex; align-items: center; gap: 3px;">
+                        <a href="javascript:void(0);" onclick="openCustomerUrl('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
+                           class="inflow-row-btn" title="Open customer details">
+                            Detail
+                        </a>
+                        <!-- 1-Click Hover Cross Button to Delete/Deactivate -->
+                        <button type="button" class="inflow-row-delete-btn" onclick="event.stopPropagation(); deleteSingleCustomer({{ c.id }}, '{{ c.name|replace("'", "\\'") }}')" title="Delete or Archive Customer (1-click)">
+                            ✕
+                        </button>
+                    </div>
                 </td>
             </tr>
             {% else %}
             <tr id="noCustomersRow">
-                <td colspan="{% if is_main_admin %}16{% else %}15{% endif %}" style="text-align: center; color: #64748B; padding: 36px; font-style: italic;">
+                <td colspan="{% if is_main_admin %}18{% else %}17{% endif %}" style="text-align: center; color: #64748B; padding: 36px; font-style: italic;">
                     No customers found matching the search criteria.
                 </td>
             </tr>
@@ -206,49 +344,244 @@
     </table>
 </div>
 
-<!-- Authentic inFlow Bottom Status Bar (Matching step_img_50.png) -->
-<div class="inflow-status-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 12px; background: #ECECEC; border-top: 1px solid #CBD5E1; font-size: 11.5px; color: #334155;">
+<!-- Floating Multi-select Action Bar (Slides up when rows are selected) -->
+<div id="bulkActionBar" class="inflow-bulk-bar" style="display: none;">
     <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="font-weight: 700; color: #0F172A;" id="bulkSelectedCount">0 customers selected</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" onclick="confirmBulkDelete()" class="btn-bulk-delete" title="Delete or archive selected customers">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            <span>Delete Selected</span>
+        </button>
+        <button type="button" onclick="exportSelectedCustomers()" class="btn-bulk-action" title="Export selected customers to CSV">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            <span>Export Selected</span>
+        </button>
+        <button type="button" onclick="clearSelectedRows()" class="btn-bulk-cancel">
+            ✕ Deselect
+        </button>
+    </div>
+</div>
+
+<!-- Authentic inFlow Bottom Status Bar (Matching step_img_50.png) -->
+<div class="inflow-status-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 14px; background: #ECECEC; border-top: 1px solid #CBD5E1; font-size: 11.5px; color: #334155; user-select: none;">
+    <div style="display: flex; align-items: center; gap: 10px;">
         <span>Total number of Customers displayed: <strong id="displayedCount">{{ customers|length }}</strong></span>
-        {% if total_count > customers|length %}
+        {% if total_count > customers|length or page > 1 %}
         <span style="color: #64748B;">(Page {{ page }} of {{ total_pages }} &bull; {{ total_count }} total)</span>
         {% endif %}
+
+        <!-- Per page selector -->
+        <span style="color: #CBD5E1;">|</span>
+        <div style="display: flex; align-items: center; gap: 4px;">
+            <label for="perPageSelect" style="font-size: 11px; color: #64748B;">Show:</label>
+            <select id="perPageSelect" onchange="changePerPage(this.value)" style="height: 20px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF; color: #1E293B; padding: 0 2px;">
+                <option value="25" {% if per_page_raw == '25' %}selected{% endif %}>25</option>
+                <option value="50" {% if per_page_raw == '50' or not per_page_raw %}selected{% endif %}>50</option>
+                <option value="100" {% if per_page_raw == '100' %}selected{% endif %}>100</option>
+                <option value="250" {% if per_page_raw == '250' %}selected{% endif %}>250</option>
+                <option value="500" {% if per_page_raw == '500' %}selected{% endif %}>500</option>
+                <option value="all" {% if per_page_raw == 'all' %}selected{% endif %}>All</option>
+            </select>
+        </div>
     </div>
 
     <div style="display: flex; align-items: center; gap: 14px;">
-        {% if total_pages > 1 %}
+        {% if total_pages > 1 and per_page_raw != 'all' %}
         <!-- Pagination controls -->
         <div style="display: flex; gap: 4px; align-items: center;">
             {% if page > 1 %}
-            <a href="{{ url_for('contacts.list_customers', page=page-1, search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address, branch=current_branch_param if is_main_admin else None) }}" 
-               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; text-decoration: none; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;">
+            <a href="{{ url_for('contacts.list_customers', page=1, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="First Page">
+                ⏮
+            </a>
+            <a href="{{ url_for('contacts.list_customers', page=page-1, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="Previous Page">
                 ◀ Prev
             </a>
             {% endif %}
+            
             <span style="font-weight: 600; padding: 0 4px;">{{ page }} / {{ total_pages }}</span>
+            
             {% if page < total_pages %}
-            <a href="{{ url_for('contacts.list_customers', page=page+1, search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address, branch=current_branch_param if is_main_admin else None) }}" 
-               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; text-decoration: none; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;">
+            <a href="{{ url_for('contacts.list_customers', page=page+1, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="Next Page">
                 Next ▶
+            </a>
+            <a href="{{ url_for('contacts.list_customers', page=total_pages, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
+               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="Last Page">
+                ⏭
             </a>
             {% endif %}
         </div>
-        <span style="color: #94A3B8;">|</span>
+        <span style="color: #CBD5E1;">|</span>
         {% endif %}
 
         <div style="display: flex; align-items: center; gap: 6px;">
             <span>Current User: <strong>{{ session.get('user_name', 'Default User') }}</strong></span>
-            <span style="color: #94A3B8;">|</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;">
+            <span style="color: #CBD5E1;">|</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;" title="Connected locally to PostgreSQL 16 database">
                 <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22C55E;"></span>
-                <span>Connected (Locally)</span>
+                <span>Connected (Locally - PostgreSQL 16)</span>
             </span>
         </div>
     </div>
 </div>
 
+<!-- Floating Quick Add Customer Modal Dialog -->
+<div id="quickAddModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="background: #FFFFFF; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 500px; max-width: 95%; overflow: hidden; border: 1px solid #74A71E;">
+        <div class="inflow-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: linear-gradient(180deg, #D6F358 0%, #BFE637 100%); border-bottom: 1px solid #A8D154;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #2F540C;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                <span>Quick Add Customer</span>
+            </div>
+            <button type="button" onclick="closeQuickAddModal()" style="border: none; background: transparent; font-size: 15px; font-weight: bold; cursor: pointer; color: #2F540C;">✕</button>
+        </div>
+
+        <form id="quickAddForm" onsubmit="submitQuickAddCustomer(event)" style="padding: 16px 20px;">
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <div>
+                    <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 3px;">
+                        Customer Name <span style="color: #DC2626;">*</span>
+                    </label>
+                    <input type="text" id="quickName" name="name" required class="inflow-pane-input font-khmer" style="width: 100%; height: 28px; font-size: 13px;" placeholder="Company or personal name...">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Contact Person</label>
+                        <input type="text" id="quickContact" name="contact_name" class="inflow-pane-input font-khmer" style="width: 100%; height: 26px;" placeholder="Contact name...">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Phone</label>
+                        <input type="text" id="quickPhone" name="phone" class="inflow-pane-input" style="width: 100%; height: 26px;" placeholder="012 345 678...">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Email</label>
+                        <input type="email" id="quickEmail" name="email" class="inflow-pane-input" style="width: 100%; height: 26px;" placeholder="email@example.com">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Pricing Scheme</label>
+                        <select id="quickScheme" name="pricing_scheme_id" class="inflow-pane-input" style="width: 100%; height: 26px; background: #FFF;">
+                            {% for ps in pricing_schemes %}
+                            <option value="{{ ps.id }}">{{ ps.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Address1</label>
+                    <input type="text" id="quickAddress" name="address1" class="inflow-pane-input font-khmer" style="width: 100%; height: 26px;" placeholder="Street / Building / Khan / Sangkat...">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">City</label>
+                        <input type="text" id="quickCity" name="city" class="inflow-pane-input font-khmer" style="width: 100%; height: 26px;" placeholder="Phnom Penh, Siem Reap..." value="Phnom Penh">
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Discount %</label>
+                        <input type="number" id="quickDiscount" name="discount_percent" min="0" max="100" step="any" value="0" class="inflow-pane-input" style="width: 100%; height: 26px; text-align: right;">
+                    </div>
+                </div>
+
+                {% if is_main_admin %}
+                <div>
+                    <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Branch</label>
+                    <select id="quickBranch" name="branch_id" class="inflow-pane-input" style="width: 100%; height: 26px; background: #FFF;">
+                        <option value="">🏢 HQ Main Store</option>
+                        {% for b in branches %}
+                        <option value="{{ b.id }}">🏪 {{ b.name }} ({{ b.code }})</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
+                <button type="button" onclick="closeQuickAddModal()" style="padding: 5px 14px; font-size: 12px; color: #475569; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="submit" id="btnSubmitQuickAdd" style="padding: 5px 16px; font-size: 12px; font-weight: 700; color: #FFFFFF; background: #68A614; border: 1px solid #558B0E; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                    <span>✓ Save Customer</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
-/* Authentic inFlow Grid Styling */
+/* Authentic inFlow Grid & Desktop Toolbar Styling */
+.inflow-top-accent-bar {
+    height: 4px;
+    background: #659E27;
+}
+
+.inflow-branch-pill {
+    font-size: 11px;
+    padding: 3px 8px;
+    text-decoration: none;
+    border-radius: 3px;
+    color: #475569;
+    font-weight: 600;
+    transition: all 0.1s ease;
+}
+.inflow-branch-pill:hover {
+    background: #CBD5E1;
+    color: #0F172A;
+}
+.inflow-branch-pill.active {
+    background: #0284C7;
+    color: #FFFFFF;
+    box-shadow: 0 1px 2px rgba(2, 132, 199, 0.2);
+}
+
+.inflow-tb-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    border-radius: 3px;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 1px 1px rgba(0,0,0,0.06);
+    transition: all 0.12s ease;
+    white-space: nowrap;
+}
+.inflow-tb-btn:hover {
+    background: #F1F5F9 !important;
+}
+
+/* inFlow Search Pane */
+.inflow-list-search-pane {
+    background: linear-gradient(180deg, #D6F358 0%, #E2FA7B 100%);
+    border-bottom: 1px solid #BFE637;
+    padding: 8px 14px 10px;
+    transition: all 0.2s ease;
+}
+
+.inflow-op-select {
+    width: 32px;
+    height: 20px;
+    font-size: 11px;
+    font-weight: bold;
+    text-align: center;
+    background: #FFFFFF;
+    border: 1px solid #A8D154;
+    border-radius: 2px;
+    color: #2F540C;
+    outline: none;
+    cursor: pointer;
+}
+
 .inflow-pane-input {
     flex: 1;
     min-width: 0;
@@ -265,6 +598,24 @@
 .inflow-pane-input:focus {
     border-color: #558B12;
     box-shadow: 0 0 0 1px #558B12;
+}
+
+/* Table Viewport */
+.inflow-grid-viewport {
+    overflow-x: auto;
+    overflow-y: auto;
+    max-height: calc(100vh - 200px);
+    background: #FFFFFF;
+    border-bottom: 1px solid #CBD5E1;
+    position: relative;
+}
+
+.inflow-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+    white-space: nowrap;
+    user-select: none;
 }
 
 /* Zebra rows matching inFlow Desktop */
@@ -287,11 +638,115 @@
 .inflow-grid-row.selected a {
     color: #FFFFFF !important;
 }
+
+/* Row Action Buttons */
+.inflow-row-btn {
+    display: inline-block;
+    padding: 1px 6px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: #0369A1;
+    background: #F0F9FF;
+    border: 1px solid #BAE6FD;
+    border-radius: 2px;
+    text-decoration: none;
+}
+.inflow-row-btn:hover {
+    background: #E0F2FE;
+}
+
+.inflow-row-delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    font-size: 11px;
+    font-weight: 800;
+    color: #DC2626;
+    background: #FEF2F2;
+    border: 1px solid #FECACA;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    line-height: 1;
+}
+.inflow-row-delete-btn:hover {
+    background: #DC2626;
+    color: #FFFFFF;
+    border-color: #B91C1C;
+    transform: scale(1.1);
+}
+
+/* Floating Bulk Action Bar */
+.inflow-bulk-bar {
+    position: fixed;
+    bottom: 32px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FFFFFF;
+    border: 1.5px solid #0284C7;
+    border-radius: 6px;
+    padding: 8px 18px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    z-index: 9999;
+    animation: slideUp 0.15s ease-out;
+}
+@keyframes slideUp {
+    from { transform: translate(-50%, 20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+}
+.btn-bulk-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: 1px solid #B91C1C;
+    padding: 4px 12px;
+    border-radius: 3px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+.btn-bulk-delete:hover {
+    background: #B91C1C;
+}
+.btn-bulk-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #FFFFFF;
+    color: #1E293B;
+    border: 1px solid #CBD5E1;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-bulk-action:hover {
+    background: #F1F5F9;
+}
+.btn-bulk-cancel {
+    background: transparent;
+    color: #64748B;
+    border: none;
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.btn-bulk-cancel:hover {
+    color: #0F172A;
+}
 </style>
 
 <script>
 // Open customer details in tabbed MDI if available, or navigate directly
-function openCustomerDetail(url, title) {
+function openCustomerUrl(url, title) {
     if (window.top && window.top.inflowMdi) {
         window.top.inflowMdi.openTab(url, title, 'sales');
     } else {
@@ -299,13 +754,48 @@ function openCustomerDetail(url, title) {
     }
 }
 
-// Select a row on click
-function selectGridRow(row) {
+// Single row click highlight
+function handleRowClick(event, row) {
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'BUTTON' || event.target.tagName === 'A') {
+        return;
+    }
     document.querySelectorAll('.inflow-grid-row.selected').forEach(r => r.classList.remove('selected'));
     row.classList.add('selected');
+    row.focus();
 }
 
-// Live client-side instant filter on table rows
+// Search Pane Collapse / Expand Toggle
+function toggleSearchPane() {
+    const body = document.getElementById('searchPaneBody');
+    const arrow = document.getElementById('searchPaneArrow');
+    if (!body) return;
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        if (arrow) arrow.textContent = '▼';
+        localStorage.setItem('inflow_customer_search_collapsed', '0');
+    } else {
+        body.style.display = 'none';
+        if (arrow) arrow.textContent = '▶';
+        localStorage.setItem('inflow_customer_search_collapsed', '1');
+    }
+}
+
+// Filter by pricing scheme
+function filterByScheme(schemeId) {
+    const el = document.getElementById('hiddenSchemeId');
+    if (el) el.value = schemeId;
+    submitSearchForm();
+}
+
+// Change Per Page
+function changePerPage(val) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('per_page', val);
+    url.searchParams.set('page', '1');
+    window.location.href = url.toString();
+}
+
+// Instant Live Client-side Filter
 function applyLiveFilter() {
     const nameVal = (document.getElementById('searchName')?.value || '').toLowerCase().trim();
     const contactVal = (document.getElementById('searchContact')?.value || '').toLowerCase().trim();
@@ -343,13 +833,263 @@ function applyLiveFilter() {
     }
 }
 
-// Submit search to server on enter or refresh click
+// Submit Search Form to backend
 function submitSearchForm() {
     const form = document.getElementById('customerSearchForm');
     if (form) form.submit();
 }
 
+// Multi-select Row Handling
+function toggleSelectAllRows(checked) {
+    const checkboxes = document.querySelectorAll('#customerTableBody .customer-row-checkbox');
+    checkboxes.forEach(cb => {
+        const row = cb.closest('tr');
+        if (row && row.style.display !== 'none') {
+            cb.checked = checked;
+        }
+    });
+    updateSelectedCount();
+}
+
+function updateSelectedCount() {
+    const selected = document.querySelectorAll('#customerTableBody .customer-row-checkbox:checked');
+    const bar = document.getElementById('bulkActionBar');
+    const countEl = document.getElementById('bulkSelectedCount');
+
+    if (selected.length > 0) {
+        if (bar) bar.style.display = 'flex';
+        if (countEl) countEl.textContent = `${selected.length} customer(s) selected`;
+    } else {
+        if (bar) bar.style.display = 'none';
+    }
+}
+
+function clearSelectedRows() {
+    document.querySelectorAll('#customerTableBody .customer-row-checkbox').forEach(cb => cb.checked = false);
+    const selectAll = document.getElementById('selectAllCheckbox');
+    if (selectAll) selectAll.checked = false;
+    updateSelectedCount();
+}
+
+// 1-Click Single Customer Delete / Archive
+function deleteSingleCustomer(id, name) {
+    if (!confirm(`Are you sure you want to remove customer "${name}"?\n(If sales orders exist, customer will be archived to protect order records)`)) {
+        return;
+    }
+
+    fetch(`/customers/${id}/delete`, {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const row = document.querySelector(`.inflow-grid-row[data-id="${id}"]`);
+            if (row) {
+                row.remove();
+            }
+            updateDisplayedCount();
+            alert(data.message);
+        } else {
+            alert('Error: ' + (data.message || 'Could not delete customer'));
+        }
+    })
+    .catch(err => {
+        console.error('Delete error:', err);
+        alert('Server error occurred during deletion.');
+    });
+}
+
+// Bulk Customer Delete
+function confirmBulkDelete() {
+    const selectedCbs = document.querySelectorAll('#customerTableBody .customer-row-checkbox:checked');
+    const ids = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+
+    if (ids.length === 0) return;
+
+    if (!confirm(`Delete or archive ${ids.length} selected customer(s)?`)) {
+        return;
+    }
+
+    fetch('/customers/bulk-delete', {
+        method: 'POST',
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ids: ids })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            ids.forEach(id => {
+                const row = document.querySelector(`.inflow-grid-row[data-id="${id}"]`);
+                if (row) row.remove();
+            });
+            clearSelectedRows();
+            updateDisplayedCount();
+            alert(data.message);
+        } else {
+            alert('Bulk delete error: ' + (data.message || 'Operation failed'));
+        }
+    })
+    .catch(err => {
+        console.error('Bulk delete error:', err);
+        alert('Server error occurred during bulk deletion.');
+    });
+}
+
+// Export selected customers
+function exportSelectedCustomers() {
+    const selectedCbs = document.querySelectorAll('#customerTableBody .customer-row-checkbox:checked');
+    const ids = Array.from(selectedCbs).map(cb => cb.value);
+    if (ids.length === 0) return;
+
+    let baseExportUrl = "{{ url_for('contacts.export_customers') }}";
+    window.location.href = baseExportUrl + '?ids=' + encodeURIComponent(ids.join(','));
+}
+
+function updateDisplayedCount() {
+    const remaining = document.querySelectorAll('#customerTableBody .inflow-grid-row').length;
+    const countEl = document.getElementById('displayedCount');
+    if (countEl) countEl.textContent = remaining;
+    const ribbonTotal = document.getElementById('ribbonTotalCount');
+    if (ribbonTotal) ribbonTotal.textContent = remaining;
+}
+
+// Quick Add Customer Modal
+function openQuickAddModal() {
+    const modal = document.getElementById('quickAddModal');
+    if (modal) modal.style.display = 'flex';
+    const nameInput = document.getElementById('quickName');
+    if (nameInput) {
+        nameInput.value = '';
+        nameInput.focus();
+    }
+}
+
+function closeQuickAddModal() {
+    const modal = document.getElementById('quickAddModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function submitQuickAddCustomer(event) {
+    event.preventDefault();
+    const btn = document.getElementById('btnSubmitQuickAdd');
+    if (btn) btn.disabled = true;
+
+    const payload = {
+        name: document.getElementById('quickName')?.value.trim(),
+        contact_name: document.getElementById('quickContact')?.value.trim(),
+        phone: document.getElementById('quickPhone')?.value.trim(),
+        email: document.getElementById('quickEmail')?.value.trim(),
+        address1: document.getElementById('quickAddress')?.value.trim(),
+        city: document.getElementById('quickCity')?.value.trim(),
+        pricing_scheme_id: document.getElementById('quickScheme')?.value,
+        discount_percent: document.getElementById('quickDiscount')?.value,
+        branch_id: document.getElementById('quickBranch')?.value
+    };
+
+    fetch('/api/customers/quick-add', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (btn) btn.disabled = false;
+        if (data.success && data.customer) {
+            closeQuickAddModal();
+            // Prepend new row to table
+            insertCustomerRowIntoGrid(data.customer);
+            alert(`Customer "${data.customer.name}" created successfully!`);
+        } else {
+            alert('Error creating customer: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        if (btn) btn.disabled = false;
+        console.error('Quick add error:', err);
+        alert('Server error creating customer.');
+    });
+}
+
+function insertCustomerRowIntoGrid(c) {
+    const tbody = document.getElementById('customerTableBody');
+    if (!tbody) return;
+
+    const noRow = document.getElementById('noCustomersRow');
+    if (noRow) noRow.remove();
+
+    const tr = document.createElement('tr');
+    tr.className = 'inflow-grid-row';
+    tr.setAttribute('data-id', c.id);
+    tr.setAttribute('data-name', (c.name || '').toLowerCase());
+    tr.setAttribute('data-contact', (c.contact_name || '').toLowerCase());
+    tr.setAttribute('data-phone', (c.phone || '').toLowerCase());
+    tr.setAttribute('data-address', (c.address1 || '').toLowerCase());
+    tr.onclick = function(e) { handleRowClick(e, tr); };
+    tr.ondblclick = function() { openCustomerUrl(`/customers/${c.id}`, `Customer: ${c.name}`); };
+
+    const detailUrl = `/customers/${c.id}`;
+    const branchBadge = c.branch_name ? 
+        `<span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">🏪 ${c.branch_code || c.branch_name}</span>` :
+        `<span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;">🏢 HQ</span>`;
+
+    tr.innerHTML = `
+        <td style="text-align: center; padding: 2px 4px; border-right: 1px solid #E2E8F0;" onclick="event.stopPropagation()">
+            <input type="checkbox" class="customer-row-checkbox" value="${c.id}" onchange="updateSelectedCount()">
+        </td>
+        <td style="padding: 3px 8px; font-weight: 600; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">
+            <a href="javascript:void(0);" onclick="openCustomerUrl('${detailUrl}', 'Customer: ${c.name}')" style="color: inherit; text-decoration: none;">
+                ${c.name}
+            </a>
+        </td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">${c.contact_name || ''}</td>
+        <td style="padding: 3px 8px; font-family: monospace; color: inherit; border-right: 1px solid #E2E8F0;">${c.phone || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.email || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.website || ''}</td>
+        <td style="padding: 3px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">${c.address1 || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">${c.address2 || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.city || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.state || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.postal_code || ''}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.country || 'Cambodia'}</td>
+        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.pricing_scheme_name || 'Retail 1'}</td>
+        <td style="padding: 3px 8px; text-align: right; color: inherit; border-right: 1px solid #E2E8F0;">${parseFloat(c.discount_percent || 0).toFixed(0)}%</td>
+        {% if is_main_admin %}
+        <td style="padding: 3px 8px; text-align: center; border-right: 1px solid #E2E8F0;">${branchBadge}</td>
+        {% endif %}
+        <td style="padding: 3px 8px; text-align: right; font-weight: 700; color: inherit; border-right: 1px solid #E2E8F0;">$0.00</td>
+        <td style="padding: 2px 4px; text-align: center; white-space: nowrap;">
+            <div style="display: inline-flex; align-items: center; gap: 3px;">
+                <a href="javascript:void(0);" onclick="openCustomerUrl('${detailUrl}', 'Customer: ${c.name}')" class="inflow-row-btn">Detail</a>
+                <button type="button" class="inflow-row-delete-btn" onclick="event.stopPropagation(); deleteSingleCustomer(${c.id}, '${c.name}')" title="Delete customer">✕</button>
+            </div>
+        </td>
+    `;
+
+    tbody.insertBefore(tr, tbody.firstChild);
+    updateDisplayedCount();
+}
+
+// Keyboard Navigation & Shortcuts
 document.addEventListener('DOMContentLoaded', function() {
+    // Restore collapsed search pane preference
+    if (localStorage.getItem('inflow_customer_search_collapsed') === '1') {
+        const body = document.getElementById('searchPaneBody');
+        const arrow = document.getElementById('searchPaneArrow');
+        if (body) body.style.display = 'none';
+        if (arrow) arrow.textContent = '▶';
+    }
+
+    // Submit search on Enter key in search inputs
     const inputs = document.querySelectorAll('.inflow-pane-input');
     inputs.forEach(input => {
         input.addEventListener('keydown', function(e) {
@@ -358,6 +1098,63 @@ document.addEventListener('DOMContentLoaded', function() {
                 submitSearchForm();
             }
         });
+    });
+
+    // Arrow keys & Delete key navigation on grid
+    document.addEventListener('keydown', function(e) {
+        // Quick Add shortcut: Alt + N
+        if (e.altKey && (e.key === 'n' || e.key === 'N')) {
+            e.preventDefault();
+            openQuickAddModal();
+            return;
+        }
+
+        const activeRow = document.querySelector('.inflow-grid-row.selected');
+        if (!activeRow) return;
+
+        // Skip if typing in an input
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
+            return;
+        }
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            let next = activeRow.nextElementSibling;
+            while (next && (next.id === 'noCustomersRow' || next.style.display === 'none')) {
+                next = next.nextElementSibling;
+            }
+            if (next && next.classList.contains('inflow-grid-row')) {
+                activeRow.classList.remove('selected');
+                next.classList.add('selected');
+                next.scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            let prev = activeRow.previousElementSibling;
+            while (prev && (prev.id === 'noCustomersRow' || prev.style.display === 'none')) {
+                prev = prev.previousElementSibling;
+            }
+            if (prev && prev.classList.contains('inflow-grid-row')) {
+                activeRow.classList.remove('selected');
+                prev.classList.add('selected');
+                prev.scrollIntoView({ block: 'nearest' });
+            }
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            const id = activeRow.getAttribute('data-id');
+            const name = activeRow.getAttribute('data-name');
+            if (id) {
+                openCustomerUrl(`/customers/${id}`, `Customer: ${name}`);
+            }
+        } else if (e.key === 'Delete') {
+            e.preventDefault();
+            const id = activeRow.getAttribute('data-id');
+            const nameEl = activeRow.querySelector('td:nth-child(2)');
+            const name = nameEl ? nameEl.textContent.trim() : `Customer #${id}`;
+            if (id) {
+                deleteSingleCustomer(id, name);
+            }
+        }
     });
 });
 </script>
