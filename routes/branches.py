@@ -1276,9 +1276,8 @@ def create_branch_expense(id):
 @branches_bp.route('/branches/<int:id>/customers')
 def branch_customers(id):
     """
-    Branch Customer Directory.
-    Displays customers accessible to this branch, order counts, spending, and outstanding debt.
-    Allows filtering by All vs Branch-registered vs Debtors.
+    Branch customer view: Redirects to the unified master-detail customer interface,
+    strictly scoped and filtered to this branch.
     """
     branch = query_one("SELECT * FROM branches WHERE id = %s", (id,))
     if not branch:
@@ -1291,82 +1290,20 @@ def branch_customers(id):
         return redirect(url_for('branches.branch_workspace', id=id))
 
     search = request.args.get('search', '').strip()
-    tab = request.args.get('tab', 'all').strip().lower()
-    page = max(1, int(request.args.get('page', 1) or 1))
-    per_page = int(request.args.get('per_page', 25) or 25)
-    offset = (page - 1) * per_page
-
-    # Overall KPI Stats strictly scoped to this branch
-    stats = query_one("""
-        SELECT 
-            COUNT(*) as total_all,
-            COUNT(CASE WHEN branch_id = %s THEN 1 END) as branch_registered,
-            COUNT(CASE WHEN balance > 0 THEN 1 END) as with_balance,
-            COALESCE(SUM(CASE WHEN balance > 0 THEN balance ELSE 0 END), 0) as total_debt
-        FROM customers
-        WHERE is_active = TRUE AND branch_id = %s
-    """, (id, id)) or {'total_all': 0, 'branch_registered': 0, 'with_balance': 0, 'total_debt': 0}
-
-    # Branch orders impact on clients
-    branch_orders_stats = query_one("""
-        SELECT 
-            COUNT(DISTINCT customer_id) as branch_active_clients,
-            COALESCE(SUM(total_amount), 0) as branch_total_revenue
-        FROM sales_orders
-        WHERE branch_id = %s AND status != 'CANCELLED'
-    """, (id,)) or {'branch_active_clients': 0, 'branch_total_revenue': 0}
-
-    # Branch can ONLY view their own branch customers - no mix with other branches or HQ!
-    where_clauses = ["c.is_active = TRUE", "c.branch_id = %s"]
-    count_params = [id]
-
-    if tab == 'debt':
-        where_clauses.append("c.balance > 0")
-
+    selected_id = request.args.get('selected_id') or request.args.get('id')
+    with_balance = '1' if request.args.get('tab') == 'debt' else request.args.get('with_balance', '')
+    
+    kwargs = {'branch': id}
     if search:
-        where_clauses.append("(c.name ILIKE %s OR c.phone ILIKE %s OR c.contact_name ILIKE %s OR c.email ILIKE %s OR c.address1 ILIKE %s)")
-        sp = f"%{search}%"
-        count_params.extend([sp, sp, sp, sp, sp])
-
-    where_sql = " AND ".join(where_clauses)
-
-    count_sql = f"SELECT COUNT(*) as cnt FROM customers c WHERE {where_sql}"
-    total_count = query_one(count_sql, tuple(count_params))['cnt']
-    total_pages = max(1, (total_count + per_page - 1) // per_page)
-
-    list_sql = f"""
-        SELECT 
-            c.*,
-            b.name as registered_branch_name,
-            b.code as registered_branch_code,
-            COUNT(DISTINCT CASE WHEN so.branch_id = %s THEN so.id END) as branch_order_count,
-            COALESCE(SUM(CASE WHEN so.branch_id = %s AND so.status != 'CANCELLED' THEN so.total_amount ELSE 0 END), 0) as branch_spent
-        FROM customers c
-        LEFT JOIN branches b ON c.branch_id = b.id
-        LEFT JOIN sales_orders so ON c.id = so.customer_id
-        WHERE {where_sql}
-        GROUP BY c.id, b.name, b.code
-        ORDER BY c.name ASC
-        LIMIT %s OFFSET %s
-    """
-    rows_params = [id, id] + count_params + [per_page, offset]
-    customers = query_all(list_sql, tuple(rows_params))
-
-    pricing_schemes = query_all("SELECT id, name FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
-
-    return render_template('branches/customers.html',
-                           branch=branch,
-                           perms=perms,
-                           customers=customers,
-                           search=search,
-                           tab=tab,
-                           page=page,
-                           per_page=per_page,
-                           total_count=total_count,
-                           total_pages=total_pages,
-                           stats=stats,
-                           branch_orders_stats=branch_orders_stats,
-                           pricing_schemes=pricing_schemes)
+        kwargs['search'] = search
+    if selected_id:
+        kwargs['selected_id'] = selected_id
+    if with_balance:
+        kwargs['with_balance'] = with_balance
+    if request.args.get('action') == 'add':
+        kwargs['action'] = 'add'
+        
+    return redirect(url_for('contacts.list_customers', **kwargs))
 
 @branches_bp.route('/branches/<int:id>/customers/create', methods=['POST'])
 def branch_create_customer(id):
@@ -1407,7 +1344,7 @@ def branch_create_customer(id):
             if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
                 return jsonify({'success': False, 'message': 'Customer Name is required'}), 400
             flash("Customer Name is required.", "error")
-            return redirect(url_for('branches.branch_customers', id=id))
+            return redirect(url_for('contacts.list_customers', branch=id))
 
         new_id = execute_returning_id("""
             INSERT INTO customers (
@@ -1436,13 +1373,13 @@ def branch_create_customer(id):
             })
 
         flash(f"Customer '{name}' (អតិថិជនថ្មី) successfully added for branch {branch['name']}!", "success")
-        return redirect(url_for('branches.branch_customers', id=id))
+        return redirect(url_for('contacts.list_customers', branch=id, selected_id=new_id))
 
     except Exception as e:
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'message': str(e)}), 500
         flash(f"Error creating customer: {e}", "error")
-        return redirect(url_for('branches.branch_customers', id=id))
+        return redirect(url_for('contacts.list_customers', branch=id))
 
 @branches_bp.route('/branches/<int:id>/customers/<int:cust_id>/edit', methods=['POST'])
 def branch_edit_customer(id, cust_id):
@@ -1473,7 +1410,7 @@ def branch_edit_customer(id, cust_id):
 
         if not name:
             flash("Customer Name is required.", "error")
-            return redirect(url_for('branches.branch_customers', id=id))
+            return redirect(url_for('contacts.list_customers', branch=id, selected_id=cust_id))
 
         execute("""
             UPDATE customers
@@ -1497,12 +1434,12 @@ def branch_edit_customer(id, cust_id):
             return jsonify({'success': True, 'message': f"Customer '{name}' updated successfully!"})
 
         flash(f"Customer '{name}' updated successfully!", "success")
-        return redirect(url_for('branches.branch_customers', id=id))
+        return redirect(url_for('contacts.list_customers', branch=id, selected_id=cust_id))
     except Exception as e:
         if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': False, 'message': str(e)}), 500
         flash(f"Error updating customer: {e}", "error")
-        return redirect(url_for('branches.branch_customers', id=id))
+        return redirect(url_for('contacts.list_customers', branch=id, selected_id=cust_id))
 
 @branches_bp.route('/branches/<int:id>/customers/api/search')
 def branch_customers_search_api(id):

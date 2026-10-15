@@ -201,7 +201,10 @@ def list_customers(selected_id_override=None):
         branches = []
     else:
         branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
-        raw_branch = (request.args.get('branch') or '').strip().lower()
+        raw_branch = request.args.get('branch')
+        if raw_branch is None and session.get('active_branch_id'):
+            raw_branch = str(session.get('active_branch_id'))
+        raw_branch = (raw_branch or '').strip().lower()
         if not raw_branch or raw_branch == 'all':
             current_branch_param = 'all'  # HQ sees all customers across all branches by default
         elif raw_branch == 'main':

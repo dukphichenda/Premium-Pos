@@ -161,5 +161,39 @@ class TestCustomerMasterDetailUI(unittest.TestCase):
         self.assertEqual(cust['tax_number'], 'TAX-KH-2026-99')
         self.assertEqual(cust['address1'], 'Building 12, Street 271, Phnom Penh')
 
+    def test_07_branch_customers_redirect_to_unified_ui(self):
+        """Test GET /branches/<id>/customers redirects to /customers?branch=<id> and renders unified UI"""
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['role'] = 'main_admin'
+            sess['branch_id'] = None
+
+        resp = self.client.get('/branches/1/customers')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/customers?branch=1', resp.headers.get('Location'))
+
+        follow_resp = self.client.get(resp.headers.get('Location'))
+        self.assertEqual(follow_resp.status_code, 200)
+        html = follow_resp.data.decode('utf-8')
+        self.assertIn('cust-master-sidebar', html)
+        self.assertIn('cust-detail-canvas', html)
+
+    def test_08_branch_button_pill_and_action_add(self):
+        """Test branch pill label and action=add auto open"""
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['role'] = 'main_admin'
+            sess['branch_id'] = None
+
+        resp = self.client.get('/customers?branch=main')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        self.assertIn('HQ Main Store', html)
+
+        resp_add = self.client.get('/customers?action=add')
+        self.assertEqual(resp_add.status_code, 200)
+        html_add = resp_add.data.decode('utf-8')
+        self.assertIn('startNewCustomer()', html_add)
+
 if __name__ == '__main__':
     unittest.main()
