@@ -145,6 +145,38 @@
     window.getUkFlagSvg = getUkFlagSvg;
     window.getKhmerFlagSvg = getKhmerFlagSvg;
 
+    function getCircularFlagSvg(lang = 'en', size = 26) {
+        if (lang === 'km') {
+            return `<svg width="${size}" height="${size}" viewBox="0 0 60 40" preserveAspectRatio="xMidYMid slice" style="width: 100%; height: 100%; border-radius: 50%; display: block;" aria-label="Khmer Flag">
+                <rect width="60" height="10" fill="#032EA6"/>
+                <rect y="10" width="60" height="20" fill="#ED1B24"/>
+                <rect y="30" width="60" height="10" fill="#032EA6"/>
+                <g fill="#FFFFFF">
+                    <rect x="17" y="26.5" width="26" height="2" rx="0.3"/>
+                    <rect x="19" y="24.5" width="22" height="2"/>
+                    <rect x="21" y="22.5" width="18" height="2"/>
+                    <path d="M28.5 13.5 L31.5 13.5 L32 18 L32.5 22.5 L27.5 22.5 L28 18 Z"/>
+                    <polygon points="30,11 28,13.5 32,13.5"/>
+                    <path d="M23.5 16 L26.5 16 L27 19.5 L27.5 22.5 L22.5 22.5 L23 19.5 Z"/>
+                    <polygon points="25,13.5 23,16 27,16"/>
+                    <path d="M33.5 16 L36.5 16 L37 19.5 L37.5 22.5 L32.5 22.5 L33 19.5 Z"/>
+                    <polygon points="35,13.5 33,16 37,16"/>
+                    <polygon points="20,19.5 19,22.5 21.5,22.5"/>
+                    <polygon points="40,19.5 38.5,22.5 41,22.5"/>
+                </g>
+            </svg>`;
+        } else {
+            return `<svg width="${size}" height="${size}" viewBox="0 0 60 40" preserveAspectRatio="xMidYMid slice" style="width: 100%; height: 100%; border-radius: 50%; display: block;" aria-label="UK Flag">
+                <rect width="60" height="40" fill="#012169"/>
+                <path stroke="#FFFFFF" stroke-width="7" d="M0 0 L60 40 M60 0 L0 40"/>
+                <path stroke="#C8102E" stroke-width="4" d="M0 0 L60 40 M60 0 L0 40"/>
+                <path fill="#FFFFFF" d="M25 0h10v40H25z M0 15h60v10H0z"/>
+                <path fill="#C8102E" d="M27 0h6v40H27z M0 17h60v6H0z"/>
+            </svg>`;
+        }
+    }
+    window.getCircularFlagSvg = getCircularFlagSvg;
+
     /* ==========================================================================
        HOST SHELL MANAGER (Runs in the top browser window)
        ========================================================================== */
@@ -376,9 +408,14 @@
                         ? `${currentBranch.name} (${storeCode}) - Click to Switch Store` 
                         : 'Main Store (HQ Enterprise) - Click to Switch Store';
 
+                    const sStoreCircleBtn = document.getElementById('sidebarStoreCircleBtn');
                     const sStorePill = document.getElementById('sidebarStorePill');
                     const sStoreCode = document.getElementById('sidebarStoreCode');
                     const sStoreIcon = document.getElementById('sidebarStoreIcon');
+                    if (sStoreCircleBtn) {
+                        sStoreCircleBtn.className = `inflow-sidebar-circle-btn ${isBranchMode ? 'circle-btn-branch' : 'circle-btn-store'}`;
+                        sStoreCircleBtn.title = storeTooltip;
+                    }
                     if (sStorePill) {
                         sStorePill.className = `inflow-store-pill ${storeClass}`;
                         sStorePill.title = storeTooltip;
@@ -954,6 +991,7 @@
                 this.currentLang = lang;
                 const badge = document.getElementById('sidebarLangBadgeText') || document.getElementById('inflowLangBadgeText');
                 const btn = document.getElementById('sidebarLangBtn') || document.getElementById('inflowLangBtn');
+                const sCircleBtn = document.getElementById('sidebarLangCircleBtn');
                 const flagIcon = document.getElementById('sidebarLangFlagIcon') || document.getElementById('inflowLangFlagIcon');
                 const optEn = document.getElementById('sidebarFlyoutLangEn') || document.getElementById('langItemEn');
                 const optKm = document.getElementById('sidebarFlyoutLangKm') || document.getElementById('langItemKm');
@@ -963,7 +1001,19 @@
                 const flyoutFlagKm = document.getElementById('sidebarFlyoutFlagKm');
 
                 if (flagIcon) {
-                    flagIcon.innerHTML = (lang === 'km') ? getKhmerFlagSvg(18, 12) : getUkFlagSvg(18, 12);
+                    if (typeof getCircularFlagSvg === 'function') {
+                        flagIcon.innerHTML = getCircularFlagSvg(lang, 26);
+                    } else if (window.getCircularFlagSvg) {
+                        flagIcon.innerHTML = window.getCircularFlagSvg(lang, 26);
+                    } else {
+                        flagIcon.innerHTML = (lang === 'km') ? getKhmerFlagSvg(18, 12) : getUkFlagSvg(18, 12);
+                    }
+                }
+                if (sCircleBtn) {
+                    sCircleBtn.className = `inflow-sidebar-circle-btn circle-btn-lang ${lang === 'km' ? 'lang-km' : 'lang-en'}`;
+                    sCircleBtn.setAttribute('title', lang === 'km' 
+                        ? 'ភាសាខ្មែរ (ចុចដើម្បីជ្រើសរើសភាសា / Click to Select Language)' 
+                        : 'English (Click to Select Language / ជ្រើសរើសភាសា)');
                 }
                 if (badge) {
                     badge.textContent = (lang === 'km') ? 'KH' : 'EN';
