@@ -357,6 +357,40 @@ CREATE TABLE IF NOT EXISTS sales_order_lines (
     combine_option_id INTEGER REFERENCES product_combine_options(id) ON DELETE SET NULL
 );
 
+-- 13b. Sales Order Attachments (Photos, Proof of Delivery, Invoices, Slips)
+CREATE TABLE IF NOT EXISTS sales_order_attachments (
+    id SERIAL PRIMARY KEY,
+    sales_order_id INTEGER NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size BIGINT DEFAULT 0,
+    file_type VARCHAR(100),
+    caption TEXT,
+    uploaded_by VARCHAR(150),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_so_attachments_order_id ON sales_order_attachments(sales_order_id);
+
+-- 13c. Sales Order Version History & Snapshot Audit
+CREATE TABLE IF NOT EXISTS sales_order_versions (
+    id SERIAL PRIMARY KEY,
+    sales_order_id INTEGER NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+    version_number INTEGER NOT NULL DEFAULT 1,
+    order_number VARCHAR(100),
+    status VARCHAR(50),
+    payment_status VARCHAR(50),
+    customer_name VARCHAR(255),
+    total_amount NUMERIC(16, 4) DEFAULT 0,
+    paid_amount NUMERIC(16, 4) DEFAULT 0,
+    balance_due NUMERIC(16, 4) DEFAULT 0,
+    items_count INTEGER DEFAULT 0,
+    user_name VARCHAR(150),
+    change_summary TEXT,
+    snapshot_data JSONB,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_so_versions_order_id ON sales_order_versions(sales_order_id);
+
 -- 14. Purchase Orders
 CREATE TABLE IF NOT EXISTS purchase_orders (
     id SERIAL PRIMARY KEY,

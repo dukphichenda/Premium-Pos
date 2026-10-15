@@ -1,10 +1,119 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number, resync_all_sequences
 from datetime import datetime, date, timedelta
-import re
+import re, os, time, json, mimetypes, logging
+from werkzeug.utils import secure_filename
 from routes.auth import user_can_edit_prices, user_can_view_costs
 
+logger = logging.getLogger(__name__)
+
 sales_orders_bp = Blueprint('sales_orders', __name__)
+
+def _ensure_so_tables_exist():
+    try:
+        execute("""
+            CREATE TABLE IF NOT EXISTS sales_order_attachments (
+                id SERIAL PRIMARY KEY,
+                sales_order_id INTEGER NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+                file_name VARCHAR(255) NOT NULL,
+                file_path TEXT NOT NULL,
+                file_size BIGINT DEFAULT 0,
+                file_type VARCHAR(100),
+                caption TEXT,
+                uploaded_by VARCHAR(150),
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_so_attachments_order_id ON sales_order_attachments(sales_order_id);
+
+            CREATE TABLE IF NOT EXISTS sales_order_versions (
+                id SERIAL PRIMARY KEY,
+                sales_order_id INTEGER NOT NULL REFERENCES sales_orders(id) ON DELETE CASCADE,
+                version_number INTEGER NOT NULL DEFAULT 1,
+                order_number VARCHAR(100),
+                status VARCHAR(50),
+                payment_status VARCHAR(50),
+                customer_name VARCHAR(255),
+                total_amount NUMERIC(16, 4) DEFAULT 0,
+                paid_amount NUMERIC(16, 4) DEFAULT 0,
+                balance_due NUMERIC(16, 4) DEFAULT 0,
+                items_count INTEGER DEFAULT 0,
+                user_name VARCHAR(150),
+                change_summary TEXT,
+                snapshot_data JSONB,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_so_versions_order_id ON sales_order_versions(sales_order_id);
+        """)
+    except Exception as e:
+        logger.warning(f"Error ensuring SO auxiliary tables: {e}")
+
+def _record_order_version(order_id, user_name=None, change_summary=None):
+    _ensure_so_tables_exist()
+    try:
+        order = query_one("""
+            SELECT so.*, c.name as customer_name
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE so.id = %s
+        """, (order_id,))
+        if not order:
+            return
+
+        lines = query_all("""
+            SELECT sol.line_num, sol.description, sol.quantity, sol.unit_price, sol.subtotal,
+                   p.name as product_name, p.sku as product_sku, sol.uom
+            FROM sales_order_lines sol
+            LEFT JOIN products p ON sol.product_id = p.id
+            WHERE sol.sales_order_id = %s
+            ORDER BY sol.line_num ASC
+        """, (order_id,))
+
+        max_v = query_one("SELECT COALESCE(MAX(version_number), 0) as mv FROM sales_order_versions WHERE sales_order_id = %s", (order_id,))
+        next_v = (max_v['mv'] if max_v else 0) + 1
+
+        uname = user_name or session.get('username') or session.get('display_name') or 'Admin'
+        summary = change_summary or (f"Order Created (v1)" if next_v == 1 else f"Order Updated (Total: ${float(order.get('total_amount') or 0):,.2f})")
+
+        snapshot = {
+            'order_number': order.get('order_number'),
+            'order_date': str(order.get('order_date')),
+            'customer_name': order.get('customer_name'),
+            'status': order.get('status'),
+            'payment_status': order.get('payment_status'),
+            'total_amount': float(order.get('total_amount') or 0),
+            'paid_amount': float(order.get('paid_amount') or 0),
+            'balance_due': float(order.get('balance_due') or 0),
+            'notes': order.get('notes'),
+            'carrier': order.get('carrier'),
+            'delivery_notes': order.get('delivery_notes'),
+            'lines': [
+                {
+                    'line_num': l.get('line_num'),
+                    'sku': l.get('product_sku') or '',
+                    'name': l.get('product_name') or l.get('description') or '',
+                    'qty': float(l.get('quantity') or 0),
+                    'uom': l.get('uom') or 'pcs.',
+                    'price': float(l.get('unit_price') or 0),
+                    'subtotal': float(l.get('subtotal') or 0)
+                }
+                for l in lines
+            ]
+        }
+
+        execute("""
+            INSERT INTO sales_order_versions (
+                sales_order_id, version_number, order_number, status, payment_status,
+                customer_name, total_amount, paid_amount, balance_due, items_count,
+                user_name, change_summary, snapshot_data
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
+            order_id, next_v, order.get('order_number'), order.get('status'), order.get('payment_status'),
+            order.get('customer_name'), float(order.get('total_amount') or 0),
+            float(order.get('paid_amount') or 0), float(order.get('balance_due') or 0),
+            len(lines), uname, summary, json.dumps(snapshot)
+        ))
+    except Exception as e:
+        logger.warning(f"Error recording order version: {e}")
 
 def _is_main_admin():
     return session.get('role') == 'main_admin'
@@ -1505,6 +1614,8 @@ def new_order():
                            is_copied_draft=is_copied_draft,
                            current_branch=branch,
                            is_branch_order=bool(branch),
+                           attachments=[],
+                           versions=[],
                            preview_so_number=preview_so_number)
 
 @sales_orders_bp.route('/sales/<int:id>')
@@ -1664,6 +1775,38 @@ def detail_order(id):
     branch_obj = query_one("SELECT * FROM branches WHERE id = %s", (order['branch_id'],)) if order.get('branch_id') else None
     order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or '').strip()
 
+    # Load attachments & versions for this sales order
+    _ensure_so_tables_exist()
+    attachments = query_all("""
+        SELECT id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_attachments
+        WHERE sales_order_id = %s
+        ORDER BY created_at DESC, id DESC
+    """, (id,))
+
+    versions = query_all("""
+        SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+               customer_name, total_amount, paid_amount, balance_due, items_count,
+               user_name, change_summary,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_versions
+        WHERE sales_order_id = %s
+        ORDER BY version_number DESC, created_at DESC
+    """, (id,))
+
+    if not versions:
+        _record_order_version(id, change_summary="Base Version (v1)")
+        versions = query_all("""
+            SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+                   customer_name, total_amount, paid_amount, balance_due, items_count,
+                   user_name, change_summary,
+                   TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+            FROM sales_order_versions
+            WHERE sales_order_id = %s
+            ORDER BY version_number DESC, created_at DESC
+        """, (id,))
+
     return render_template('sales/detail.html',
                            order=order,
                            lines=lines,
@@ -1685,6 +1828,8 @@ def detail_order(id):
                            payments=payments,
                            is_paid=is_paid,
                            is_new=False,
+                           attachments=attachments,
+                           versions=versions,
                            current_branch=branch_obj,
                            is_branch_order=bool(branch_obj))
 
@@ -2046,6 +2191,13 @@ def save_order(id=0):
                         WHERE id = %s
                     """, (balance_due, customer_id))
 
+        # Record version snapshot
+        try:
+            ver_action = "Order Created" if is_new else f"Saved Order (Status: {status}, Total: ${total_amount:,.2f})"
+            _record_order_version(id, change_summary=ver_action)
+        except Exception as ve:
+            logger.warning(f"Failed to record version on save: {ve}")
+
         cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
         date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
         status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
@@ -2194,6 +2346,11 @@ def complete_pay(id):
         redirect_kwargs['customer_search'] = cust_search
     redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
 
+    try:
+        _record_order_version(id, change_summary=f"Marked Completed & Paid ({payment_method})")
+    except Exception as ve:
+        logger.warning(f"Failed to record version on complete: {ve}")
+
     if request.is_json:
         return jsonify({
             'success': True,
@@ -2267,6 +2424,11 @@ def reopen_order(id):
         redirect_kwargs['customer_search'] = cust_search
     redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
 
+    try:
+        _record_order_version(id, change_summary="Order Reopened to Open")
+    except Exception as ve:
+        logger.warning(f"Failed to record version on reopen: {ve}")
+
     if request.is_json:
         return jsonify({'success': True, 'message': 'Order is Re-opened! You can now edit the order.', 'redirect_url': redirect_url})
 
@@ -2295,6 +2457,11 @@ def cancel_order_direct(id):
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (id,))
+
+    try:
+        _record_order_version(id, change_summary="Order Cancelled")
+    except Exception as ve:
+        logger.warning(f"Failed to record version on cancel: {ve}")
 
     date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
     status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
@@ -3432,4 +3599,175 @@ def create_dropship_po_from_sales(id):
         })
     flash(f"Dropship Purchase Order {po_number} created successfully for {cust_name}!", "success")
     return redirect(redirect_url)
+
+
+# ==============================================================================
+# Sales Order Attachments & Photo Upload Endpoints
+# ==============================================================================
+
+@sales_orders_bp.route('/sales/<int:id>/attachments', methods=['GET'])
+def get_order_attachments(id):
+    _ensure_so_tables_exist()
+    order = query_one("SELECT id FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'error': 'Order not found or access denied'}), 404
+
+    attachments = query_all("""
+        SELECT id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_attachments
+        WHERE sales_order_id = %s
+        ORDER BY created_at DESC, id DESC
+    """, (id,))
+    return jsonify({'success': True, 'attachments': attachments})
+
+
+@sales_orders_bp.route('/sales/<int:id>/attachments/upload', methods=['POST'])
+def upload_order_attachment(id):
+    _ensure_so_tables_exist()
+    order = query_one("SELECT id, order_number FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'error': 'Order not found or access denied'}), 404
+
+    files = request.files.getlist('attachment_files')
+    if not files or not files[0].filename:
+        if 'attachment_file' in request.files:
+            files = [request.files['attachment_file']]
+        elif 'file' in request.files:
+            files = [request.files['file']]
+
+    if not files or not files[0].filename:
+        return jsonify({'success': False, 'error': 'No file selected for upload'}), 400
+
+    upload_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads', 'sales_attachments')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    uploaded_items = []
+    uname = session.get('username') or session.get('display_name') or 'Admin'
+    caption = (request.form.get('caption') or '').strip()
+
+    for f in files:
+        if f and f.filename:
+            orig_name = f.filename
+            safe_name = f"so_{id}_{int(time.time())}_{secure_filename(orig_name)}"
+            fpath = os.path.join(upload_dir, safe_name)
+            f.save(fpath)
+            fsize = os.path.getsize(fpath)
+            url_path = f"/static/uploads/sales_attachments/{safe_name}"
+            ftype, _ = mimetypes.guess_type(orig_name)
+            ftype = ftype or ('image/jpeg' if orig_name.lower().endswith(('.jpg', '.jpeg')) else 'application/octet-stream')
+
+            att_id = execute_returning_id("""
+                INSERT INTO sales_order_attachments (sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (id, orig_name, url_path, fsize, ftype, caption, uname))
+
+            uploaded_items.append({
+                'id': att_id,
+                'file_name': orig_name,
+                'file_path': url_path,
+                'file_size': fsize,
+                'file_type': ftype,
+                'caption': caption,
+                'uploaded_by': uname
+            })
+
+    if uploaded_items:
+        _record_order_version(id, user_name=uname, change_summary=f"Added {len(uploaded_items)} attachment(s): {', '.join(x['file_name'] for x in uploaded_items)}")
+
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'ajax' in request.args:
+        total_count = query_one("SELECT COUNT(*) as cnt FROM sales_order_attachments WHERE sales_order_id = %s", (id,))['cnt']
+        return jsonify({'success': True, 'uploaded': uploaded_items, 'total_count': total_count})
+
+    flash(f"Uploaded {len(uploaded_items)} attachment(s) successfully!", "success")
+    return redirect(url_for('sales_orders.detail_order', id=id))
+
+
+@sales_orders_bp.route('/sales/<int:id>/attachments/<int:att_id>/delete', methods=['POST'])
+def delete_order_attachment(id, att_id):
+    _ensure_so_tables_exist()
+    order = query_one("SELECT id FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'error': 'Access denied'}), 403
+
+    att = query_one("SELECT * FROM sales_order_attachments WHERE id = %s AND sales_order_id = %s", (att_id, id))
+    if att:
+        try:
+            rel_path = att['file_path'].lstrip('/')
+            full_path = os.path.join(os.path.dirname(__file__), '..', rel_path)
+            if os.path.exists(full_path):
+                os.remove(full_path)
+        except Exception as e:
+            logger.warning(f"Error removing physical attachment file: {e}")
+
+        execute("DELETE FROM sales_order_attachments WHERE id = %s AND sales_order_id = %s", (att_id, id))
+        uname = session.get('username') or session.get('display_name') or 'Admin'
+        _record_order_version(id, user_name=uname, change_summary=f"Deleted attachment: {att['file_name']}")
+
+    total_count = query_one("SELECT COUNT(*) as cnt FROM sales_order_attachments WHERE sales_order_id = %s", (id,))['cnt']
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'ajax' in request.args:
+        return jsonify({'success': True, 'total_count': total_count})
+
+    flash("Attachment removed.", "success")
+    return redirect(url_for('sales_orders.detail_order', id=id))
+
+
+# ==============================================================================
+# Sales Order Version History Endpoints
+# ==============================================================================
+
+@sales_orders_bp.route('/sales/<int:id>/versions', methods=['GET'])
+def get_order_versions(id):
+    _ensure_so_tables_exist()
+    order = query_one("SELECT id FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'error': 'Order not found or access denied'}), 404
+
+    versions = query_all("""
+        SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+               customer_name, total_amount, paid_amount, balance_due, items_count,
+               user_name, change_summary,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_versions
+        WHERE sales_order_id = %s
+        ORDER BY version_number DESC, created_at DESC
+    """, (id,))
+
+    if not versions:
+        _record_order_version(id, change_summary="Base Version (v1)")
+        versions = query_all("""
+            SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+                   customer_name, total_amount, paid_amount, balance_due, items_count,
+                   user_name, change_summary,
+                   TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+            FROM sales_order_versions
+            WHERE sales_order_id = %s
+            ORDER BY version_number DESC, created_at DESC
+        """, (id,))
+
+    return jsonify({'success': True, 'versions': versions})
+
+
+@sales_orders_bp.route('/sales/<int:id>/versions/<int:ver_id>', methods=['GET'])
+def get_order_version_snapshot(id, ver_id):
+    _ensure_so_tables_exist()
+    order = query_one("SELECT id FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'error': 'Order not found or access denied'}), 404
+
+    ver = query_one("""
+        SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+               customer_name, total_amount, paid_amount, balance_due, items_count,
+               user_name, change_summary, snapshot_data,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_versions
+        WHERE id = %s AND sales_order_id = %s
+    """, (ver_id, id))
+
+    if not ver:
+        return jsonify({'success': False, 'error': 'Version snapshot not found'}), 404
+
+    return jsonify({'success': True, 'version': ver})
+
 
