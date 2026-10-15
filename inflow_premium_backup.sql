@@ -1182,6 +1182,43 @@ ALTER SEQUENCE public.purchase_orders_id_seq OWNED BY public.purchase_orders.id;
 
 
 --
+-- Name: sales_order_attachments; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_order_attachments (
+    id integer NOT NULL,
+    sales_order_id integer NOT NULL,
+    file_name character varying(255) NOT NULL,
+    file_path text NOT NULL,
+    file_size bigint DEFAULT 0,
+    file_type character varying(100),
+    caption text,
+    uploaded_by character varying(150),
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: sales_order_attachments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sales_order_attachments_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sales_order_attachments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.sales_order_attachments_id_seq OWNED BY public.sales_order_attachments.id;
+
+
+--
 -- Name: sales_order_lines; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -1226,6 +1263,49 @@ CREATE SEQUENCE public.sales_order_lines_id_seq
 --
 
 ALTER SEQUENCE public.sales_order_lines_id_seq OWNED BY public.sales_order_lines.id;
+
+
+--
+-- Name: sales_order_versions; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.sales_order_versions (
+    id integer NOT NULL,
+    sales_order_id integer NOT NULL,
+    version_number integer DEFAULT 1 NOT NULL,
+    order_number character varying(100),
+    status character varying(50),
+    payment_status character varying(50),
+    customer_name character varying(255),
+    total_amount numeric(16,4) DEFAULT 0,
+    paid_amount numeric(16,4) DEFAULT 0,
+    balance_due numeric(16,4) DEFAULT 0,
+    items_count integer DEFAULT 0,
+    user_name character varying(150),
+    change_summary text,
+    snapshot_data jsonb,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: sales_order_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.sales_order_versions_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: sales_order_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.sales_order_versions_id_seq OWNED BY public.sales_order_versions.id;
 
 
 --
@@ -1798,10 +1878,24 @@ ALTER TABLE ONLY public.purchase_orders ALTER COLUMN id SET DEFAULT nextval('pub
 
 
 --
+-- Name: sales_order_attachments id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_order_attachments ALTER COLUMN id SET DEFAULT nextval('public.sales_order_attachments_id_seq'::regclass);
+
+
+--
 -- Name: sales_order_lines id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines ALTER COLUMN id SET DEFAULT nextval('public.sales_order_lines_id_seq'::regclass);
+
+
+--
+-- Name: sales_order_versions id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_order_versions ALTER COLUMN id SET DEFAULT nextval('public.sales_order_versions_id_seq'::regclass);
 
 
 --
@@ -1939,7 +2033,6 @@ COPY public.companies (id, name, phone, fax, email, website, address1, address2,
 --
 
 COPY public.customers (id, name, contact_name, phone, email, address1, address2, city, state, country, postal_code, billing_address, shipping_address, payment_terms, discount_percent, default_pricing_scheme_id, balance, is_active, created_at, updated_at, tax_number, fax, website, branch_id) FROM stdin;
-104	Vottey Khoun	Vottey Khoun	095 722 335		ក្បែរវត្តសន្សំកុសល់		Phnom Penh	Phnom Penh	Cambodia		ក្បែរវត្តសន្សំកុសល់	ក្បែរវត្តសន្សំកុសល់	Due on Receipt	0.00	105	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 105	ធីតា ផ្លិតដែក	ធីតា ផ្លិតដែក	092863169		ស្តុបបេនឡានចុងកៅស៊ូ, សៀមរាប				Cambodia		ស្តុបបេនឡានចុងកៅស៊ូ, សៀមរាប	ស្តុបបេនឡានចុងកៅស៊ូ, សៀមរាប	Due on Receipt	0.00	102	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 106	Hea Woo Yong	Hea Woo Yong	069 454 674/ 016233690		ផ្លូវ 360 ផ្ទះលេខ 53 សង្កាត់ បឹងកេងកង3		Phnom Penh	Phnom Penh	Cambodia		ផ្លូវ 360 ផ្ទះលេខ 53 សង្កាត់ បឹងកេងកង3	ផ្លូវ 360 ផ្ទះលេខ 53 សង្កាត់ បឹងកេងកង3	Due on Receipt	0.00	103	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 107	Rina Khan	Rina Khan	076 7777852		PC market no 3A			Phnom Penh	Cambodia		PC market no 3A	PC market no 3A	Due on Receipt	0.00	101	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
@@ -4543,6 +4636,7 @@ COPY public.customers (id, name, contact_name, phone, email, address1, address2,
 103	​​​NITH ROTHANA	​​​NITH ROTHANA	066 567 343		ជិតសាលាបឹងសាឡាង		Phnom Penh	Phnom Penh	Cambodia		ជិតសាលាបឹងសាឡាង	ជិតសាលាបឹងសាឡាង	Due on Receipt	0.00	\N	500.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 02:35:03.467514+08	\N			\N
 102	Bamboo Hut	Royston Chan	+855 717739643		Bamboo Hut				Cambodia		Bamboo Hut	NEAR DERM THKOV MARKET	Due on Receipt	0.00	103	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 02:34:59.32813+08	\N			\N
 2775	MO NI		077888081ទាក់ទងតេលេក្រាម		ឫស្សីកែវ ជិតតារាង បាល់ទាត់ ផ្ការីកគ្រប់រដូវ				Cambodia		ឫស្សីកែវ ជិតតារាង បាល់ទាត់ ផ្ការីកគ្រប់រដូវ	ឫស្សីកែវ ជិតតារាង បាល់ទាត់ ផ្ការីកគ្រប់រដូវ	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	\N			\N
+104	Vottey Khoun	Test Contact Person	012999888		123 Test Blvd		Phnom Penh	Phnom Penh	Cambodia		456 Billing St, Phnom Penh	123 Test Blvd	Net 30	5.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 16:36:15.568666+08	\N			2
 \.
 
 
@@ -46541,6 +46635,14 @@ COPY public.purchase_orders (id, order_number, vendor_id, location_id, order_dat
 879	PO-000461	110	100	2026-09-22	\N	ISSUED	PAID	2102.0000	0.00	0.0000	0.0000	2102.0000	0.0000	0.0000		\N		2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N	0.0000		Queen Pack Phương		Chi nhánh Chương Dương Hà Nội	0.0000	USD
 880	PO-000462	110	100	2026-09-29	\N	ISSUED	PAID	3063.4000	0.00	0.0000	0.0000	3063.4000	0.0000	0.0000		\N		2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N	0.0000		Queen Pack Phương		Chi nhánh Chương Dương Hà Nội	0.0000	USD
 881	PO-000463	110	100	2026-10-13	\N	ISSUED	PAID	3291.0000	0.00	0.0000	0.0000	3291.0000	0.0000	0.0000		\N		2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N	0.0000		Queen Pack Phương		Chi nhánh Chương Dương Hà Nội	0.0000	USD
+\.
+
+
+--
+-- Data for Name: sales_order_attachments; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.sales_order_attachments (id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by, created_at) FROM stdin;
 \.
 
 
@@ -97032,6 +97134,15 @@ COPY public.sales_order_lines (id, sales_order_id, line_num, product_id, descrip
 
 
 --
+-- Data for Name: sales_order_versions; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.sales_order_versions (id, sales_order_id, version_number, order_number, status, payment_status, customer_name, total_amount, paid_amount, balance_due, items_count, user_name, change_summary, snapshot_data, created_at) FROM stdin;
+1	34393	1	SO-022829	OPEN	UNPAID	MO NI	53.0000	0.0000	53.0000	1	admin	Base Version (v1)	{"lines": [{"qty": 100.0, "sku": "N3000R-QP", "uom": "pcs.", "name": "N3000R-QP ចានស៊ុបមូលញ៉ូមពណ៌មាស មានគម្រប 3000 ml 200ចាន/កេស", "price": 0.53, "line_num": 1, "subtotal": 53.0}], "notes": "", "status": "OPEN", "carrier": null, "order_date": "2026-10-15", "balance_due": 53.0, "paid_amount": 0.0, "order_number": "SO-022829", "total_amount": 53.0, "customer_name": "MO NI", "delivery_notes": null, "payment_status": "UNPAID"}	2026-10-15 16:05:21.610382+08
+\.
+
+
+--
 -- Data for Name: sales_orders; Type: TABLE DATA; Schema: public; Owner: -
 --
 
@@ -119860,11 +119971,11 @@ COPY public.sales_orders (id, order_number, customer_id, location_id, order_date
 34386	SO-022822	1591	100	2026-10-15	\N	OPEN	UNPAID	5944.7500	0.00	0.0000	0.0000	0.0000	5944.7500	0.0000	5944.7500			\N	\N	\N	\N	\N	\N	លុយភ្ញៀវ 187	2026-10-15 01:22:33.416754+08	2026-10-15 11:07:06.172044+08	107					1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34387	SO-022823	2310	100	2026-10-15	\N	OPEN	UNPAID	204.0000	0.00	0.0000	0.0000	0.0000	204.0000	0.0000	204.0000			\N	\N	\N	\N	\N	\N	សុំវេនព្រឹក	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	102	ផ្លូវ២០០៤ ជិតបន្ទាយទាហ៊ាន		070 222 673/ 017 222 673		1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34388	SO-022824	2218	100	2026-10-15	\N	OPEN	UNPAID	57.0000	0.00	0.0000	0.0000	0.0000	57.0000	0.0000	57.0000			\N	\N	\N	\N	\N	\N	ដឹកទៅLucky Seven Bright ជិតផ្សារ KC	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	Lucky Seven Bright ជិតផ្សារ KC		069 69 76 76		1	\N	0.00	\N	\N	\N	0.00	\N	\N
-34389	SO-022825	1678	100	2026-10-15	\N	OPEN	UNPAID	46.0000	0.00	0.0000	0.0000	0.0000	46.0000	0.0000	46.0000			\N	\N	\N	\N	\N	\N	ព្រឹក	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ក្រោយផ្សារសេនជូរីបណ្តោះអាសន្ន	Rachana	086685093		1	\N	0.00	\N	\N	\N	0.00	\N	\N
-34390	SO-022826	2771	100	2026-10-15	\N	OPEN	UNPAID	44.0000	0.00	0.0000	0.0000	0.0000	44.0000	0.0000	44.0000			\N	\N	\N	\N	\N	\N	លុយខ្មែរ\r\n178​ 000៛	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ទីរួមខេត្តកំពត		0966103472		1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34391	SO-022827	2329	100	2026-10-15	\N	OPEN	UNPAID	18.0000	0.00	0.0000	0.0000	0.0000	18.0000	0.0000	18.0000			\N	\N	\N	\N	\N	\N	1500 គម្របស្រអាប់	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ជិតក្ដាន់2 ហាងកាហ្វេ Chao doi		0966465800		1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34392	SO-022828	922	100	2026-10-15	\N	OPEN	UNPAID	64.0000	0.00	0.0000	0.0000	0.0000	64.0000	0.0000	64.0000			\N	\N	\N	\N	\N	\N	បេនអូរឫស្សី លេខឡាន 098 300 971 មកដល់ម៉ោង10 កន្លះ ចេញម៉ោង 12	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ព្រែកតាកែវ, កៀនស្វាយ	081503185			1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34393	SO-022829	2775	100	2026-10-15	\N	OPEN	UNPAID	53.0000	0.00	0.0000	0.0000	0.0000	53.0000	0.0000	53.0000			\N	\N	\N	\N	\N	\N		2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ឫស្សីកែវ ជិតតារាង បាល់ទាត់ ផ្ការីកគ្រប់រដូវ		077888081ទាក់ទងតេលេក្រាម		1	\N	0.00	\N	\N	\N	0.00	\N	\N
+34389	SO-022825	1678	100	2026-10-15	\N	OPEN	UNPAID	46.0000	0.00	0.0000	0.0000	0.0000	46.0000	0.0000	46.0000			\N	\N	\N	\N	\N	\N	ព្រឹក	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ក្រោយផ្សារសេនជូរីបណ្តោះអាសន្ន	Rachana	086685093		1	\N	0.00	\N	\N	\N	0.00	\N	\N
+34390	SO-022826	2771	100	2026-10-15	\N	OPEN	UNPAID	44.0000	0.00	0.0000	0.0000	0.0000	44.0000	0.0000	44.0000			\N	\N	\N	\N	\N	\N	លុយខ្មែរ\r\n178​ 000៛	2026-10-15 11:07:06.172044+08	2026-10-15 11:07:06.172044+08	100	ទីរួមខេត្តកំពត		0966103472		1	\N	0.00	\N	\N	\N	0.00	\N	\N
 \.
 
 
@@ -120151,10 +120262,24 @@ SELECT pg_catalog.setval('public.purchase_orders_id_seq', 901, true);
 
 
 --
+-- Name: sales_order_attachments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.sales_order_attachments_id_seq', 5, true);
+
+
+--
 -- Name: sales_order_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.sales_order_lines_id_seq', 63814, true);
+
+
+--
+-- Name: sales_order_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.sales_order_versions_id_seq', 8, true);
 
 
 --
@@ -120168,7 +120293,7 @@ SELECT pg_catalog.setval('public.sales_orders_id_seq', 34393, true);
 -- Name: so_branch_1_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.so_branch_1_seq', 4227, true);
+SELECT pg_catalog.setval('public.so_branch_1_seq', 1, false);
 
 
 --
@@ -120513,11 +120638,27 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
+-- Name: sales_order_attachments sales_order_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_order_attachments
+    ADD CONSTRAINT sales_order_attachments_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: sales_order_lines sales_order_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
     ADD CONSTRAINT sales_order_lines_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: sales_order_versions sales_order_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_order_versions
+    ADD CONSTRAINT sales_order_versions_pkey PRIMARY KEY (id);
 
 
 --
@@ -120894,6 +121035,13 @@ CREATE INDEX idx_products_sku ON public.products USING btree (sku);
 
 
 --
+-- Name: idx_so_attachments_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_so_attachments_order_id ON public.sales_order_attachments USING btree (sales_order_id);
+
+
+--
 -- Name: idx_so_branch; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -120940,6 +121088,13 @@ CREATE INDEX idx_so_number ON public.sales_orders USING btree (order_number);
 --
 
 CREATE INDEX idx_so_status ON public.sales_orders USING btree (status);
+
+
+--
+-- Name: idx_so_versions_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_so_versions_order_id ON public.sales_order_versions USING btree (sales_order_id);
 
 
 --
@@ -121226,6 +121381,14 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
+-- Name: sales_order_attachments sales_order_attachments_sales_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_order_attachments
+    ADD CONSTRAINT sales_order_attachments_sales_order_id_fkey FOREIGN KEY (sales_order_id) REFERENCES public.sales_orders(id) ON DELETE CASCADE;
+
+
+--
 -- Name: sales_order_lines sales_order_lines_addon_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -121263,6 +121426,14 @@ ALTER TABLE ONLY public.sales_order_lines
 
 ALTER TABLE ONLY public.sales_order_lines
     ADD CONSTRAINT sales_order_lines_sales_order_id_fkey FOREIGN KEY (sales_order_id) REFERENCES public.sales_orders(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sales_order_versions sales_order_versions_sales_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.sales_order_versions
+    ADD CONSTRAINT sales_order_versions_sales_order_id_fkey FOREIGN KEY (sales_order_id) REFERENCES public.sales_orders(id) ON DELETE CASCADE;
 
 
 --
