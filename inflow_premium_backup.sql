@@ -17,7 +17,7 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: adj_number_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: adj_number_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.adj_number_seq
@@ -28,14 +28,12 @@ CREATE SEQUENCE public.adj_number_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.adj_number_seq OWNER TO odoo;
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
 
 --
--- Name: app_settings; Type: TABLE; Schema: public; Owner: odoo
+-- Name: app_settings; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.app_settings (
@@ -46,10 +44,92 @@ CREATE TABLE public.app_settings (
 );
 
 
-ALTER TABLE public.app_settings OWNER TO odoo;
+--
+-- Name: backup_logs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.backup_logs (
+    id integer NOT NULL,
+    filename character varying(255) NOT NULL,
+    filepath text NOT NULL,
+    file_size_bytes bigint DEFAULT 0,
+    backup_type character varying(50) DEFAULT 'manual'::character varying,
+    status character varying(50) DEFAULT 'completed'::character varying,
+    error_message text,
+    gdrive_status character varying(50) DEFAULT 'none'::character varying,
+    gdrive_details text,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
 
 --
--- Name: branches; Type: TABLE; Schema: public; Owner: odoo
+-- Name: backup_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.backup_logs_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: backup_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.backup_logs_id_seq OWNED BY public.backup_logs.id;
+
+
+--
+-- Name: backup_settings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.backup_settings (
+    id integer NOT NULL,
+    auto_backup_enabled boolean DEFAULT false,
+    auto_backup_frequency character varying(50) DEFAULT 'daily'::character varying,
+    auto_backup_time character varying(10) DEFAULT '23:00'::character varying,
+    auto_save_gdrive boolean DEFAULT false,
+    gdrive_mode character varying(50) DEFAULT 'local_sync'::character varying,
+    gdrive_local_path text DEFAULT 'G:\My Drive\inFlow_Backups'::text,
+    gdrive_folder_id character varying(255) DEFAULT ''::character varying,
+    gdrive_service_account_json text DEFAULT ''::text,
+    retention_count integer DEFAULT 15,
+    last_backup_at timestamp with time zone,
+    last_backup_status character varying(50),
+    last_backup_file text,
+    last_backup_size bigint DEFAULT 0,
+    last_gdrive_sync_at timestamp with time zone,
+    last_gdrive_sync_status character varying(50),
+    last_gdrive_error text,
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--
+-- Name: backup_settings_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.backup_settings_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: backup_settings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.backup_settings_id_seq OWNED BY public.backup_settings.id;
+
+
+--
+-- Name: branches; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.branches (
@@ -71,10 +151,8 @@ CREATE TABLE public.branches (
 );
 
 
-ALTER TABLE public.branches OWNER TO odoo;
-
 --
--- Name: branches_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: branches_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.branches_id_seq
@@ -86,17 +164,15 @@ CREATE SEQUENCE public.branches_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.branches_id_seq OWNER TO odoo;
-
 --
--- Name: branches_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: branches_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.branches_id_seq OWNED BY public.branches.id;
 
 
 --
--- Name: categories; Type: TABLE; Schema: public; Owner: odoo
+-- Name: categories; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.categories (
@@ -111,10 +187,8 @@ CREATE TABLE public.categories (
 );
 
 
-ALTER TABLE public.categories OWNER TO odoo;
-
 --
--- Name: categories_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: categories_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.categories_id_seq
@@ -126,17 +200,15 @@ CREATE SEQUENCE public.categories_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.categories_id_seq OWNER TO odoo;
-
 --
--- Name: categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: categories_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.categories_id_seq OWNED BY public.categories.id;
 
 
 --
--- Name: companies; Type: TABLE; Schema: public; Owner: odoo
+-- Name: companies; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.companies (
@@ -168,10 +240,8 @@ CREATE TABLE public.companies (
 );
 
 
-ALTER TABLE public.companies OWNER TO odoo;
-
 --
--- Name: companies_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: companies_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.companies_id_seq
@@ -183,17 +253,15 @@ CREATE SEQUENCE public.companies_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.companies_id_seq OWNER TO odoo;
-
 --
--- Name: companies_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: companies_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.companies_id_seq OWNED BY public.companies.id;
 
 
 --
--- Name: customers; Type: TABLE; Schema: public; Owner: odoo
+-- Name: customers; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.customers (
@@ -224,10 +292,8 @@ CREATE TABLE public.customers (
 );
 
 
-ALTER TABLE public.customers OWNER TO odoo;
-
 --
--- Name: customers_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: customers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.customers_id_seq
@@ -239,17 +305,15 @@ CREATE SEQUENCE public.customers_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.customers_id_seq OWNER TO odoo;
-
 --
--- Name: customers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: customers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.customers_id_seq OWNED BY public.customers.id;
 
 
 --
--- Name: delivery_men; Type: TABLE; Schema: public; Owner: odoo
+-- Name: delivery_men; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.delivery_men (
@@ -261,10 +325,8 @@ CREATE TABLE public.delivery_men (
 );
 
 
-ALTER TABLE public.delivery_men OWNER TO odoo;
-
 --
--- Name: delivery_men_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: delivery_men_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.delivery_men_id_seq
@@ -276,17 +338,15 @@ CREATE SEQUENCE public.delivery_men_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.delivery_men_id_seq OWNER TO odoo;
-
 --
--- Name: delivery_men_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: delivery_men_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.delivery_men_id_seq OWNED BY public.delivery_men.id;
 
 
 --
--- Name: delivery_services; Type: TABLE; Schema: public; Owner: odoo
+-- Name: delivery_services; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.delivery_services (
@@ -299,10 +359,8 @@ CREATE TABLE public.delivery_services (
 );
 
 
-ALTER TABLE public.delivery_services OWNER TO odoo;
-
 --
--- Name: delivery_services_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: delivery_services_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.delivery_services_id_seq
@@ -314,17 +372,15 @@ CREATE SEQUENCE public.delivery_services_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.delivery_services_id_seq OWNER TO odoo;
-
 --
--- Name: delivery_services_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: delivery_services_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.delivery_services_id_seq OWNED BY public.delivery_services.id;
 
 
 --
--- Name: expenses; Type: TABLE; Schema: public; Owner: odoo
+-- Name: expenses; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.expenses (
@@ -345,10 +401,8 @@ CREATE TABLE public.expenses (
 );
 
 
-ALTER TABLE public.expenses OWNER TO odoo;
-
 --
--- Name: expenses_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: expenses_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.expenses_id_seq
@@ -360,17 +414,15 @@ CREATE SEQUENCE public.expenses_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.expenses_id_seq OWNER TO odoo;
-
 --
--- Name: expenses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: expenses_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.expenses_id_seq OWNED BY public.expenses.id;
 
 
 --
--- Name: inventory; Type: TABLE; Schema: public; Owner: odoo
+-- Name: inventory; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.inventory (
@@ -385,10 +437,8 @@ CREATE TABLE public.inventory (
 );
 
 
-ALTER TABLE public.inventory OWNER TO odoo;
-
 --
--- Name: inventory_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: inventory_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.inventory_id_seq
@@ -400,17 +450,15 @@ CREATE SEQUENCE public.inventory_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.inventory_id_seq OWNER TO odoo;
-
 --
--- Name: inventory_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: inventory_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.inventory_id_seq OWNED BY public.inventory.id;
 
 
 --
--- Name: inventory_logs; Type: TABLE; Schema: public; Owner: odoo
+-- Name: inventory_logs; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.inventory_logs (
@@ -433,10 +481,8 @@ CREATE TABLE public.inventory_logs (
 );
 
 
-ALTER TABLE public.inventory_logs OWNER TO odoo;
-
 --
--- Name: inventory_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: inventory_logs_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.inventory_logs_id_seq
@@ -448,17 +494,15 @@ CREATE SEQUENCE public.inventory_logs_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.inventory_logs_id_seq OWNER TO odoo;
-
 --
--- Name: inventory_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: inventory_logs_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.inventory_logs_id_seq OWNED BY public.inventory_logs.id;
 
 
 --
--- Name: invoice_settings; Type: TABLE; Schema: public; Owner: odoo
+-- Name: invoice_settings; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.invoice_settings (
@@ -502,10 +546,8 @@ CREATE TABLE public.invoice_settings (
 );
 
 
-ALTER TABLE public.invoice_settings OWNER TO odoo;
-
 --
--- Name: invoice_settings_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: invoice_settings_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.invoice_settings_id_seq
@@ -517,17 +559,15 @@ CREATE SEQUENCE public.invoice_settings_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.invoice_settings_id_seq OWNER TO odoo;
-
 --
--- Name: invoice_settings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: invoice_settings_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.invoice_settings_id_seq OWNED BY public.invoice_settings.id;
 
 
 --
--- Name: locations; Type: TABLE; Schema: public; Owner: odoo
+-- Name: locations; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.locations (
@@ -542,10 +582,8 @@ CREATE TABLE public.locations (
 );
 
 
-ALTER TABLE public.locations OWNER TO odoo;
-
 --
--- Name: locations_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: locations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.locations_id_seq
@@ -557,17 +595,15 @@ CREATE SEQUENCE public.locations_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.locations_id_seq OWNER TO odoo;
-
 --
--- Name: locations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: locations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.locations_id_seq OWNED BY public.locations.id;
 
 
 --
--- Name: media_receipts; Type: TABLE; Schema: public; Owner: odoo
+-- Name: media_receipts; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.media_receipts (
@@ -582,10 +618,8 @@ CREATE TABLE public.media_receipts (
 );
 
 
-ALTER TABLE public.media_receipts OWNER TO odoo;
-
 --
--- Name: media_receipts_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: media_receipts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.media_receipts_id_seq
@@ -597,17 +631,15 @@ CREATE SEQUENCE public.media_receipts_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.media_receipts_id_seq OWNER TO odoo;
-
 --
--- Name: media_receipts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: media_receipts_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.media_receipts_id_seq OWNED BY public.media_receipts.id;
 
 
 --
--- Name: monthly_cash_summaries; Type: TABLE; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.monthly_cash_summaries (
@@ -627,10 +659,8 @@ CREATE TABLE public.monthly_cash_summaries (
 );
 
 
-ALTER TABLE public.monthly_cash_summaries OWNER TO odoo;
-
 --
--- Name: monthly_cash_summaries_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.monthly_cash_summaries_id_seq
@@ -642,17 +672,15 @@ CREATE SEQUENCE public.monthly_cash_summaries_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.monthly_cash_summaries_id_seq OWNER TO odoo;
-
 --
--- Name: monthly_cash_summaries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.monthly_cash_summaries_id_seq OWNED BY public.monthly_cash_summaries.id;
 
 
 --
--- Name: order_payments; Type: TABLE; Schema: public; Owner: odoo
+-- Name: order_payments; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.order_payments (
@@ -669,10 +697,8 @@ CREATE TABLE public.order_payments (
 );
 
 
-ALTER TABLE public.order_payments OWNER TO odoo;
-
 --
--- Name: order_payments_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: order_payments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.order_payments_id_seq
@@ -684,17 +710,15 @@ CREATE SEQUENCE public.order_payments_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.order_payments_id_seq OWNER TO odoo;
-
 --
--- Name: order_payments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: order_payments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.order_payments_id_seq OWNED BY public.order_payments.id;
 
 
 --
--- Name: po_number_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: po_number_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.po_number_seq
@@ -705,10 +729,8 @@ CREATE SEQUENCE public.po_number_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.po_number_seq OWNER TO odoo;
-
 --
--- Name: pricing_schemes; Type: TABLE; Schema: public; Owner: odoo
+-- Name: pricing_schemes; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.pricing_schemes (
@@ -721,10 +743,8 @@ CREATE TABLE public.pricing_schemes (
 );
 
 
-ALTER TABLE public.pricing_schemes OWNER TO odoo;
-
 --
--- Name: pricing_schemes_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: pricing_schemes_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.pricing_schemes_id_seq
@@ -736,17 +756,15 @@ CREATE SEQUENCE public.pricing_schemes_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.pricing_schemes_id_seq OWNER TO odoo;
-
 --
--- Name: pricing_schemes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: pricing_schemes_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.pricing_schemes_id_seq OWNED BY public.pricing_schemes.id;
 
 
 --
--- Name: product_attachments; Type: TABLE; Schema: public; Owner: odoo
+-- Name: product_attachments; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.product_attachments (
@@ -759,10 +777,8 @@ CREATE TABLE public.product_attachments (
 );
 
 
-ALTER TABLE public.product_attachments OWNER TO odoo;
-
 --
--- Name: product_attachments_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: product_attachments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.product_attachments_id_seq
@@ -774,17 +790,15 @@ CREATE SEQUENCE public.product_attachments_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.product_attachments_id_seq OWNER TO odoo;
-
 --
--- Name: product_attachments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: product_attachments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.product_attachments_id_seq OWNED BY public.product_attachments.id;
 
 
 --
--- Name: product_boms; Type: TABLE; Schema: public; Owner: odoo
+-- Name: product_boms; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.product_boms (
@@ -798,10 +812,8 @@ CREATE TABLE public.product_boms (
 );
 
 
-ALTER TABLE public.product_boms OWNER TO odoo;
-
 --
--- Name: product_boms_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: product_boms_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.product_boms_id_seq
@@ -813,17 +825,15 @@ CREATE SEQUENCE public.product_boms_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.product_boms_id_seq OWNER TO odoo;
-
 --
--- Name: product_boms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: product_boms_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.product_boms_id_seq OWNED BY public.product_boms.id;
 
 
 --
--- Name: product_combine_options; Type: TABLE; Schema: public; Owner: odoo
+-- Name: product_combine_options; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.product_combine_options (
@@ -842,10 +852,8 @@ CREATE TABLE public.product_combine_options (
 );
 
 
-ALTER TABLE public.product_combine_options OWNER TO odoo;
-
 --
--- Name: product_combine_options_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: product_combine_options_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.product_combine_options_id_seq
@@ -857,17 +865,15 @@ CREATE SEQUENCE public.product_combine_options_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.product_combine_options_id_seq OWNER TO odoo;
-
 --
--- Name: product_combine_options_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: product_combine_options_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.product_combine_options_id_seq OWNED BY public.product_combine_options.id;
 
 
 --
--- Name: product_prices; Type: TABLE; Schema: public; Owner: odoo
+-- Name: product_prices; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.product_prices (
@@ -878,10 +884,8 @@ CREATE TABLE public.product_prices (
 );
 
 
-ALTER TABLE public.product_prices OWNER TO odoo;
-
 --
--- Name: product_prices_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: product_prices_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.product_prices_id_seq
@@ -893,17 +897,15 @@ CREATE SEQUENCE public.product_prices_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.product_prices_id_seq OWNER TO odoo;
-
 --
--- Name: product_prices_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: product_prices_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.product_prices_id_seq OWNED BY public.product_prices.id;
 
 
 --
--- Name: product_vendors; Type: TABLE; Schema: public; Owner: odoo
+-- Name: product_vendors; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.product_vendors (
@@ -916,10 +918,8 @@ CREATE TABLE public.product_vendors (
 );
 
 
-ALTER TABLE public.product_vendors OWNER TO odoo;
-
 --
--- Name: product_vendors_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: product_vendors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.product_vendors_id_seq
@@ -931,17 +931,15 @@ CREATE SEQUENCE public.product_vendors_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.product_vendors_id_seq OWNER TO odoo;
-
 --
--- Name: product_vendors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: product_vendors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.product_vendors_id_seq OWNED BY public.product_vendors.id;
 
 
 --
--- Name: product_versions; Type: TABLE; Schema: public; Owner: odoo
+-- Name: product_versions; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.product_versions (
@@ -957,10 +955,8 @@ CREATE TABLE public.product_versions (
 );
 
 
-ALTER TABLE public.product_versions OWNER TO odoo;
-
 --
--- Name: product_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: product_versions_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.product_versions_id_seq
@@ -972,17 +968,15 @@ CREATE SEQUENCE public.product_versions_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.product_versions_id_seq OWNER TO odoo;
-
 --
--- Name: product_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: product_versions_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.product_versions_id_seq OWNED BY public.product_versions.id;
 
 
 --
--- Name: products; Type: TABLE; Schema: public; Owner: odoo
+-- Name: products; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.products (
@@ -1071,10 +1065,8 @@ CREATE TABLE public.products (
 );
 
 
-ALTER TABLE public.products OWNER TO odoo;
-
 --
--- Name: products_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: products_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.products_id_seq
@@ -1086,17 +1078,15 @@ CREATE SEQUENCE public.products_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.products_id_seq OWNER TO odoo;
-
 --
--- Name: products_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: products_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.products_id_seq OWNED BY public.products.id;
 
 
 --
--- Name: purchase_order_lines; Type: TABLE; Schema: public; Owner: odoo
+-- Name: purchase_order_lines; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.purchase_order_lines (
@@ -1115,10 +1105,8 @@ CREATE TABLE public.purchase_order_lines (
 );
 
 
-ALTER TABLE public.purchase_order_lines OWNER TO odoo;
-
 --
--- Name: purchase_order_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: purchase_order_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.purchase_order_lines_id_seq
@@ -1130,17 +1118,15 @@ CREATE SEQUENCE public.purchase_order_lines_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.purchase_order_lines_id_seq OWNER TO odoo;
-
 --
--- Name: purchase_order_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: purchase_order_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.purchase_order_lines_id_seq OWNED BY public.purchase_order_lines.id;
 
 
 --
--- Name: purchase_orders; Type: TABLE; Schema: public; Owner: odoo
+-- Name: purchase_orders; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.purchase_orders (
@@ -1175,10 +1161,8 @@ CREATE TABLE public.purchase_orders (
 );
 
 
-ALTER TABLE public.purchase_orders OWNER TO odoo;
-
 --
--- Name: purchase_orders_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: purchase_orders_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.purchase_orders_id_seq
@@ -1190,17 +1174,15 @@ CREATE SEQUENCE public.purchase_orders_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.purchase_orders_id_seq OWNER TO odoo;
-
 --
--- Name: purchase_orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: purchase_orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.purchase_orders_id_seq OWNED BY public.purchase_orders.id;
 
 
 --
--- Name: sales_order_lines; Type: TABLE; Schema: public; Owner: odoo
+-- Name: sales_order_lines; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.sales_order_lines (
@@ -1226,10 +1208,8 @@ CREATE TABLE public.sales_order_lines (
 );
 
 
-ALTER TABLE public.sales_order_lines OWNER TO odoo;
-
 --
--- Name: sales_order_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: sales_order_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.sales_order_lines_id_seq
@@ -1241,17 +1221,15 @@ CREATE SEQUENCE public.sales_order_lines_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.sales_order_lines_id_seq OWNER TO odoo;
-
 --
--- Name: sales_order_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: sales_order_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.sales_order_lines_id_seq OWNED BY public.sales_order_lines.id;
 
 
 --
--- Name: sales_orders; Type: TABLE; Schema: public; Owner: odoo
+-- Name: sales_orders; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.sales_orders (
@@ -1299,10 +1277,8 @@ CREATE TABLE public.sales_orders (
 );
 
 
-ALTER TABLE public.sales_orders OWNER TO odoo;
-
 --
--- Name: sales_orders_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: sales_orders_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.sales_orders_id_seq
@@ -1314,17 +1290,15 @@ CREATE SEQUENCE public.sales_orders_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.sales_orders_id_seq OWNER TO odoo;
-
 --
--- Name: sales_orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: sales_orders_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.sales_orders_id_seq OWNED BY public.sales_orders.id;
 
 
 --
--- Name: so_branch_1_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: so_branch_1_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.so_branch_1_seq
@@ -1335,10 +1309,8 @@ CREATE SEQUENCE public.so_branch_1_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.so_branch_1_seq OWNER TO odoo;
-
 --
--- Name: so_branch_2_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: so_branch_2_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.so_branch_2_seq
@@ -1349,10 +1321,8 @@ CREATE SEQUENCE public.so_branch_2_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.so_branch_2_seq OWNER TO odoo;
-
 --
--- Name: so_branch_3_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: so_branch_3_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.so_branch_3_seq
@@ -1363,10 +1333,8 @@ CREATE SEQUENCE public.so_branch_3_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.so_branch_3_seq OWNER TO odoo;
-
 --
--- Name: so_number_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: so_number_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.so_number_seq
@@ -1377,10 +1345,8 @@ CREATE SEQUENCE public.so_number_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.so_number_seq OWNER TO odoo;
-
 --
--- Name: stock_adjustment_lines; Type: TABLE; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.stock_adjustment_lines (
@@ -1394,10 +1360,8 @@ CREATE TABLE public.stock_adjustment_lines (
 );
 
 
-ALTER TABLE public.stock_adjustment_lines OWNER TO odoo;
-
 --
--- Name: stock_adjustment_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.stock_adjustment_lines_id_seq
@@ -1409,17 +1373,15 @@ CREATE SEQUENCE public.stock_adjustment_lines_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.stock_adjustment_lines_id_seq OWNER TO odoo;
-
 --
--- Name: stock_adjustment_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.stock_adjustment_lines_id_seq OWNED BY public.stock_adjustment_lines.id;
 
 
 --
--- Name: stock_adjustments; Type: TABLE; Schema: public; Owner: odoo
+-- Name: stock_adjustments; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.stock_adjustments (
@@ -1435,10 +1397,8 @@ CREATE TABLE public.stock_adjustments (
 );
 
 
-ALTER TABLE public.stock_adjustments OWNER TO odoo;
-
 --
--- Name: stock_adjustments_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: stock_adjustments_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.stock_adjustments_id_seq
@@ -1450,17 +1410,15 @@ CREATE SEQUENCE public.stock_adjustments_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.stock_adjustments_id_seq OWNER TO odoo;
-
 --
--- Name: stock_adjustments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: stock_adjustments_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.stock_adjustments_id_seq OWNED BY public.stock_adjustments.id;
 
 
 --
--- Name: stock_transfer_lines; Type: TABLE; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.stock_transfer_lines (
@@ -1471,10 +1429,8 @@ CREATE TABLE public.stock_transfer_lines (
 );
 
 
-ALTER TABLE public.stock_transfer_lines OWNER TO odoo;
-
 --
--- Name: stock_transfer_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.stock_transfer_lines_id_seq
@@ -1486,17 +1442,15 @@ CREATE SEQUENCE public.stock_transfer_lines_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.stock_transfer_lines_id_seq OWNER TO odoo;
-
 --
--- Name: stock_transfer_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.stock_transfer_lines_id_seq OWNED BY public.stock_transfer_lines.id;
 
 
 --
--- Name: stock_transfers; Type: TABLE; Schema: public; Owner: odoo
+-- Name: stock_transfers; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.stock_transfers (
@@ -1512,10 +1466,8 @@ CREATE TABLE public.stock_transfers (
 );
 
 
-ALTER TABLE public.stock_transfers OWNER TO odoo;
-
 --
--- Name: stock_transfers_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: stock_transfers_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.stock_transfers_id_seq
@@ -1527,17 +1479,15 @@ CREATE SEQUENCE public.stock_transfers_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.stock_transfers_id_seq OWNER TO odoo;
-
 --
--- Name: stock_transfers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: stock_transfers_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.stock_transfers_id_seq OWNED BY public.stock_transfers.id;
 
 
 --
--- Name: sublocations; Type: TABLE; Schema: public; Owner: odoo
+-- Name: sublocations; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.sublocations (
@@ -1548,10 +1498,8 @@ CREATE TABLE public.sublocations (
 );
 
 
-ALTER TABLE public.sublocations OWNER TO odoo;
-
 --
--- Name: sublocations_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: sublocations_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.sublocations_id_seq
@@ -1563,17 +1511,15 @@ CREATE SEQUENCE public.sublocations_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.sublocations_id_seq OWNER TO odoo;
-
 --
--- Name: sublocations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: sublocations_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.sublocations_id_seq OWNED BY public.sublocations.id;
 
 
 --
--- Name: trf_number_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: trf_number_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.trf_number_seq
@@ -1584,10 +1530,8 @@ CREATE SEQUENCE public.trf_number_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.trf_number_seq OWNER TO odoo;
-
 --
--- Name: users; Type: TABLE; Schema: public; Owner: odoo
+-- Name: users; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.users (
@@ -1607,10 +1551,8 @@ CREATE TABLE public.users (
 );
 
 
-ALTER TABLE public.users OWNER TO odoo;
-
 --
--- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.users_id_seq
@@ -1622,17 +1564,15 @@ CREATE SEQUENCE public.users_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.users_id_seq OWNER TO odoo;
-
 --
--- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 
 --
--- Name: vendors; Type: TABLE; Schema: public; Owner: odoo
+-- Name: vendors; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.vendors (
@@ -1655,10 +1595,8 @@ CREATE TABLE public.vendors (
 );
 
 
-ALTER TABLE public.vendors OWNER TO odoo;
-
 --
--- Name: vendors_id_seq; Type: SEQUENCE; Schema: public; Owner: odoo
+-- Name: vendors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
 
 CREATE SEQUENCE public.vendors_id_seq
@@ -1670,248 +1608,260 @@ CREATE SEQUENCE public.vendors_id_seq
     CACHE 1;
 
 
-ALTER SEQUENCE public.vendors_id_seq OWNER TO odoo;
-
 --
--- Name: vendors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: odoo
+-- Name: vendors_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
 --
 
 ALTER SEQUENCE public.vendors_id_seq OWNED BY public.vendors.id;
 
 
 --
--- Name: branches id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: backup_logs id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.backup_logs ALTER COLUMN id SET DEFAULT nextval('public.backup_logs_id_seq'::regclass);
+
+
+--
+-- Name: backup_settings id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.backup_settings ALTER COLUMN id SET DEFAULT nextval('public.backup_settings_id_seq'::regclass);
+
+
+--
+-- Name: branches id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.branches ALTER COLUMN id SET DEFAULT nextval('public.branches_id_seq'::regclass);
 
 
 --
--- Name: categories id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: categories id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.categories ALTER COLUMN id SET DEFAULT nextval('public.categories_id_seq'::regclass);
 
 
 --
--- Name: companies id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: companies id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.companies ALTER COLUMN id SET DEFAULT nextval('public.companies_id_seq'::regclass);
 
 
 --
--- Name: customers id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: customers id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.customers ALTER COLUMN id SET DEFAULT nextval('public.customers_id_seq'::regclass);
 
 
 --
--- Name: delivery_men id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: delivery_men id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.delivery_men ALTER COLUMN id SET DEFAULT nextval('public.delivery_men_id_seq'::regclass);
 
 
 --
--- Name: delivery_services id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: delivery_services id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.delivery_services ALTER COLUMN id SET DEFAULT nextval('public.delivery_services_id_seq'::regclass);
 
 
 --
--- Name: expenses id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: expenses id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.expenses ALTER COLUMN id SET DEFAULT nextval('public.expenses_id_seq'::regclass);
 
 
 --
--- Name: inventory id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: inventory id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory ALTER COLUMN id SET DEFAULT nextval('public.inventory_id_seq'::regclass);
 
 
 --
--- Name: inventory_logs id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: inventory_logs id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory_logs ALTER COLUMN id SET DEFAULT nextval('public.inventory_logs_id_seq'::regclass);
 
 
 --
--- Name: invoice_settings id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: invoice_settings id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.invoice_settings ALTER COLUMN id SET DEFAULT nextval('public.invoice_settings_id_seq'::regclass);
 
 
 --
--- Name: locations id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: locations id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.locations ALTER COLUMN id SET DEFAULT nextval('public.locations_id_seq'::regclass);
 
 
 --
--- Name: media_receipts id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: media_receipts id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.media_receipts ALTER COLUMN id SET DEFAULT nextval('public.media_receipts_id_seq'::regclass);
 
 
 --
--- Name: monthly_cash_summaries id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.monthly_cash_summaries ALTER COLUMN id SET DEFAULT nextval('public.monthly_cash_summaries_id_seq'::regclass);
 
 
 --
--- Name: order_payments id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: order_payments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.order_payments ALTER COLUMN id SET DEFAULT nextval('public.order_payments_id_seq'::regclass);
 
 
 --
--- Name: pricing_schemes id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: pricing_schemes id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.pricing_schemes ALTER COLUMN id SET DEFAULT nextval('public.pricing_schemes_id_seq'::regclass);
 
 
 --
--- Name: product_attachments id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: product_attachments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_attachments ALTER COLUMN id SET DEFAULT nextval('public.product_attachments_id_seq'::regclass);
 
 
 --
--- Name: product_boms id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: product_boms id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_boms ALTER COLUMN id SET DEFAULT nextval('public.product_boms_id_seq'::regclass);
 
 
 --
--- Name: product_combine_options id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: product_combine_options id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_combine_options ALTER COLUMN id SET DEFAULT nextval('public.product_combine_options_id_seq'::regclass);
 
 
 --
--- Name: product_prices id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: product_prices id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_prices ALTER COLUMN id SET DEFAULT nextval('public.product_prices_id_seq'::regclass);
 
 
 --
--- Name: product_vendors id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: product_vendors id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_vendors ALTER COLUMN id SET DEFAULT nextval('public.product_vendors_id_seq'::regclass);
 
 
 --
--- Name: product_versions id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: product_versions id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_versions ALTER COLUMN id SET DEFAULT nextval('public.product_versions_id_seq'::regclass);
 
 
 --
--- Name: products id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: products id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.products ALTER COLUMN id SET DEFAULT nextval('public.products_id_seq'::regclass);
 
 
 --
--- Name: purchase_order_lines id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: purchase_order_lines id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_order_lines ALTER COLUMN id SET DEFAULT nextval('public.purchase_order_lines_id_seq'::regclass);
 
 
 --
--- Name: purchase_orders id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: purchase_orders id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_orders ALTER COLUMN id SET DEFAULT nextval('public.purchase_orders_id_seq'::regclass);
 
 
 --
--- Name: sales_order_lines id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: sales_order_lines id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines ALTER COLUMN id SET DEFAULT nextval('public.sales_order_lines_id_seq'::regclass);
 
 
 --
--- Name: sales_orders id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: sales_orders id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_orders ALTER COLUMN id SET DEFAULT nextval('public.sales_orders_id_seq'::regclass);
 
 
 --
--- Name: stock_adjustment_lines id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustment_lines ALTER COLUMN id SET DEFAULT nextval('public.stock_adjustment_lines_id_seq'::regclass);
 
 
 --
--- Name: stock_adjustments id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: stock_adjustments id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustments ALTER COLUMN id SET DEFAULT nextval('public.stock_adjustments_id_seq'::regclass);
 
 
 --
--- Name: stock_transfer_lines id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfer_lines ALTER COLUMN id SET DEFAULT nextval('public.stock_transfer_lines_id_seq'::regclass);
 
 
 --
--- Name: stock_transfers id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: stock_transfers id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfers ALTER COLUMN id SET DEFAULT nextval('public.stock_transfers_id_seq'::regclass);
 
 
 --
--- Name: sublocations id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: sublocations id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sublocations ALTER COLUMN id SET DEFAULT nextval('public.sublocations_id_seq'::regclass);
 
 
 --
--- Name: users id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: users id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
 
 
 --
--- Name: vendors id; Type: DEFAULT; Schema: public; Owner: odoo
+-- Name: vendors id; Type: DEFAULT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.vendors ALTER COLUMN id SET DEFAULT nextval('public.vendors_id_seq'::regclass);
 
 
 --
--- Data for Name: app_settings; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: app_settings; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.app_settings (setting_key, setting_value, description, updated_at) FROM stdin;
@@ -1919,7 +1869,25 @@ COPY public.app_settings (setting_key, setting_value, description, updated_at) F
 
 
 --
--- Data for Name: branches; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: backup_logs; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.backup_logs (id, filename, filepath, file_size_bytes, backup_type, status, error_message, gdrive_status, gdrive_details, created_at) FROM stdin;
+1	inflow_premium_backup_2026-10-15_093125.sql	f:\\inflow premium\\backups\\inflow_premium_backup_2026-10-15_093125.sql	18825566	manual	completed	\N	none		2026-10-15 10:31:25.982099+08
+\.
+
+
+--
+-- Data for Name: backup_settings; Type: TABLE DATA; Schema: public; Owner: -
+--
+
+COPY public.backup_settings (id, auto_backup_enabled, auto_backup_frequency, auto_backup_time, auto_save_gdrive, gdrive_mode, gdrive_local_path, gdrive_folder_id, gdrive_service_account_json, retention_count, last_backup_at, last_backup_status, last_backup_file, last_backup_size, last_gdrive_sync_at, last_gdrive_sync_status, last_gdrive_error, updated_at) FROM stdin;
+1	f	daily	23:00	f	local_sync	G:\\My Drive\\inFlow_Backups			15	2026-10-15 10:31:25.986458+08	success	inflow_premium_backup_2026-10-15_093125.sql	18825566	\N	\N	\N	2026-10-15 10:31:25.986458+08
+\.
+
+
+--
+-- Data for Name: branches; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.branches (id, code, name, phone, address, manager_name, so_prefix, is_active, created_at, updated_at, permissions_json, location_id, is_main, color, settings_json) FROM stdin;
@@ -1930,7 +1898,7 @@ COPY public.branches (id, code, name, phone, address, manager_name, so_prefix, i
 
 
 --
--- Data for Name: categories; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: categories; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.categories (id, name, parent_id, description, is_active, created_at, color, updated_at) FROM stdin;
@@ -1958,21 +1926,19 @@ COPY public.categories (id, name, parent_id, description, is_active, created_at,
 
 
 --
--- Data for Name: companies; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: companies; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.companies (id, name, phone, fax, email, website, address1, address2, city, state, country, postal_code, tax_number, currency_code, currency_symbol, logo_url, created_at, updated_at, decimal_places_price, decimal_places_cost, decimal_places_qty, decimal_places_markup, decimal_places_total, decimal_places_measurement, app_logo_url) FROM stdin;
-1	inFlow Premium Business						 ផ្ទះលេខ 194 ផ្លូវលេខ 156 សង្កាត់ទឹកល្អក់3						USD	$	/static/uploads/invoice/logo_1791609254_40baae.png	2026-10-07 21:17:33.636761+08	2026-10-15 02:06:21.193306+08	2	3	0	2	2	2	/static/uploads/branding/app_logo_1791747192_d6596c.png
+1	inFlow Premium Business						 ផ្ទះលេខ 194 ផ្លូវលេខ 156 សង្កាត់ទឹកល្អក់3						USD	$	/static/uploads/invoice/logo_1791609254_40baae.png	2026-10-07 21:17:33.636761+08	2026-10-15 02:34:39.129191+08	2	3	0	2	2	2	/static/uploads/branding/app_logo_1791747192_d6596c.png
 \.
 
 
 --
--- Data for Name: customers; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: customers; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.customers (id, name, contact_name, phone, email, address1, address2, city, state, country, postal_code, billing_address, shipping_address, payment_terms, discount_percent, default_pricing_scheme_id, balance, is_active, created_at, updated_at, tax_number, fax, website, branch_id) FROM stdin;
-102	Bamboo Hut	Royston Chan	+855 717739643		Bamboo Hut				Cambodia		Bamboo Hut	NEAR DERM THKOV MARKET	Due on Receipt	0.00	103	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
-103	​​​NITH ROTHANA	​​​NITH ROTHANA	066 567 343		ជិតសាលាបឹងសាឡាង		Phnom Penh	Phnom Penh	Cambodia		ជិតសាលាបឹងសាឡាង	ជិតសាលាបឹងសាឡាង	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 104	Vottey Khoun	Vottey Khoun	095 722 335		ក្បែរវត្តសន្សំកុសល់		Phnom Penh	Phnom Penh	Cambodia		ក្បែរវត្តសន្សំកុសល់	ក្បែរវត្តសន្សំកុសល់	Due on Receipt	0.00	105	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 105	ធីតា ផ្លិតដែក	ធីតា ផ្លិតដែក	092863169		ស្តុបបេនឡានចុងកៅស៊ូ, សៀមរាប				Cambodia		ស្តុបបេនឡានចុងកៅស៊ូ, សៀមរាប	ស្តុបបេនឡានចុងកៅស៊ូ, សៀមរាប	Due on Receipt	0.00	102	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 106	Hea Woo Yong	Hea Woo Yong	069 454 674/ 016233690		ផ្លូវ 360 ផ្ទះលេខ 53 សង្កាត់ បឹងកេងកង3		Phnom Penh	Phnom Penh	Cambodia		ផ្លូវ 360 ផ្ទះលេខ 53 សង្កាត់ បឹងកេងកង3	ផ្លូវ 360 ផ្ទះលេខ 53 សង្កាត់ បឹងកេងកង3	Due on Receipt	0.00	103	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
@@ -2134,6 +2100,7 @@ COPY public.customers (id, name, contact_name, phone, email, address1, address2,
 277	Bong Psa Derm Tkouv	បងផ្សាដើមថ្កូវ	081 808 382		ផ្សាដើមថ្កូវ				Cambodia		ផ្សាដើមថ្កូវ	ផ្សាដើមថ្កូវ	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 278	Somneang Phay	Somneang Phay	010315551		ផ្ទះលេខ55B ផ្លូវ 199 ជិតផ្សារសុវណ្				Cambodia		ផ្ទះលេខ55B ផ្លូវ 199 ជិតផ្សារសុវណ្	ផ្ទះលេខ55B ផ្លូវ 199 ជិតផ្សារសុវណ្	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 371	Sophorn Nb	Sophorn Nb	087200313		ឈូកវ៉ា២				Cambodia		ឈូកវ៉ា២	ឈូកវ៉ា២	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
+1172	មន្ទីរពេទ្យ KT	ហ៊ាប ភារម្យ	+855 69 998 189		ខេត្តកំពង់ចាម				Cambodia		ខេត្តកំពង់ចាម	ខេត្តកំពង់ចាម	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 279	Kanika	កណ្ណិការ ពៅ	098989849		ម្តុំ Nokia អូរបែកក្អម មុខសលារៀន សឡា២				Cambodia		ម្តុំ Nokia អូរបែកក្អម មុខសលារៀន សឡា២	ម្តុំ Nokia អូរបែកក្អម មុខសលារៀន សឡា២	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 280	SOK SOPANHA PICH	SOK SOPANHA PICH	+855 61662268		Sky Line				Cambodia		Sky Line	Sky Line	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 281	Bro. Lyna	ម្ជូរលីណា	088 946 77 78		ចំការដូង				Cambodia		ចំការដូង	ចំការដូង	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
@@ -2995,7 +2962,6 @@ COPY public.customers (id, name, contact_name, phone, email, address1, address2,
 1170	Wincey Stella	Wincey Stella	061666639						Cambodia				Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 1171	Lee Kafee	Lee Kafee	017 233 244		មុខផ្សាររាត្រី ភ្នំពេញ				Cambodia		មុខផ្សាររាត្រី ភ្នំពេញ	មុខផ្សាររាត្រី ភ្នំពេញ	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 1229	លី មួយ Ly Mouy		069 69 68 86						Cambodia				Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
-1172	មន្ទីរពេទ្យ KT	ហ៊ាប ភារម្យ	+855 69 998 189		ខេត្តកំពង់ចាម				Cambodia		ខេត្តកំពង់ចាម	ខេត្តកំពង់ចាម	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 1173	Mei Li	Mei Li	015799669		ទឹកល្អក់3 ផ្លូវ 257 កែង 210				Cambodia		ទឹកល្អក់3 ផ្លូវ 257 កែង 210	ទឹកល្អក់3 ផ្លូវ 257 កែង 210	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 1174	Kheam Rachny	Kheam Rachny	096 693 6620		ជិតវិទ្យាល័យបុរី ១០០ខ្នង				Cambodia		ជិតវិទ្យាល័យបុរី ១០០ខ្នង	ជិតវិទ្យាល័យបុរី ១០០ខ្នង	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 1175	Diana Srun	Diana Srun	0968681868		ផ្លូវ #261 កែងនឹងផ្លូវ #160				Cambodia		ផ្លូវ #261 កែងនឹងផ្លូវ #160	ផ្លូវ #261 កែងនឹងផ្លូវ #160	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
@@ -4574,11 +4540,13 @@ COPY public.customers (id, name, contact_name, phone, email, address1, address2,
 2773	Vanny Vanny		095466596		ទីរួមខេត្តពោធិសាត់				Cambodia		ទីរួមខេត្តពោធិសាត់	ទីរួមខេត្តពោធិសាត់	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 2774	Somaly Khorn		014464226		កំពតវិរៈប៊ុនថាំសាខាស្ពានថ្មី				Cambodia		កំពតវិរៈប៊ុនថាំសាខាស្ពានថ្មី	កំពតវិរៈប៊ុនថាំសាខាស្ពានថ្មី	Due on Receipt	0.00	\N	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	\N			\N
 101	Kry Lida	Kry Lida	010936369		Car Number: 066 222 670		ស្គន់	កំពង់ចាម	Cambodia		Car Number: 066 222 670	Car Number: 066 222 670	Due on Receipt	0.00	101	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:41.05784+08	\N			\N
+103	​​​NITH ROTHANA	​​​NITH ROTHANA	066 567 343		ជិតសាលាបឹងសាឡាង		Phnom Penh	Phnom Penh	Cambodia		ជិតសាលាបឹងសាឡាង	ជិតសាលាបឹងសាឡាង	Due on Receipt	0.00	\N	500.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 02:35:03.467514+08	\N			\N
+102	Bamboo Hut	Royston Chan	+855 717739643		Bamboo Hut				Cambodia		Bamboo Hut	NEAR DERM THKOV MARKET	Due on Receipt	0.00	103	0.0000	t	2026-10-15 01:22:33.416754+08	2026-10-15 02:34:59.32813+08	\N			\N
 \.
 
 
 --
--- Data for Name: delivery_men; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: delivery_men; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.delivery_men (id, name, phone, is_active, created_at) FROM stdin;
@@ -4588,7 +4556,7 @@ COPY public.delivery_men (id, name, phone, is_active, created_at) FROM stdin;
 
 
 --
--- Data for Name: delivery_services; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: delivery_services; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.delivery_services (id, name, code, phone, is_active, created_at) FROM stdin;
@@ -4603,7 +4571,7 @@ COPY public.delivery_services (id, name, code, phone, is_active, created_at) FRO
 
 
 --
--- Data for Name: expenses; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: expenses; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.expenses (id, expense_date, item, category, unit_price, quantity, total_price, paid_by, payment_account, notes, month_key, created_at, updated_at, branch_id) FROM stdin;
@@ -4636,7 +4604,7 @@ COPY public.expenses (id, expense_date, item, category, unit_price, quantity, to
 
 
 --
--- Data for Name: inventory; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: inventory; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.inventory (id, product_id, location_id, sublocation, quantity, reserved_quantity, created_at, updated_at) FROM stdin;
@@ -4754,7 +4722,7 @@ COPY public.inventory (id, product_id, location_id, sublocation, quantity, reser
 5472	104	100		-11200.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.194529+08
 5573	159	1		0.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.215886+08
 5574	159	100		-1345.8000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.215886+08
-5540	138	100		-41.5000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:48.369616+08
+5540	138	100		-43.5000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:35:06.574109+08
 5583	164	1		0.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08
 5584	164	100		0.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08
 5585	165	1		0.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08
@@ -5362,13 +5330,13 @@ COPY public.inventory (id, product_id, location_id, sublocation, quantity, reser
 5738	253	100		-30464.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:18.819986+08
 6131	458	1		0.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.099971+08
 6132	458	100		-9.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.099971+08
-5593	169	1		0.0000	752.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:45.233248+08
-6232	514	100		-5250.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:48.369616+08
+5593	169	1		0.0000	1504.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:35:03.467514+08
+6232	514	100		-5750.0000	0.0000	2026-10-15 01:22:33.416754+08	2026-10-15 02:35:06.574109+08
 \.
 
 
 --
--- Data for Name: inventory_logs; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: inventory_logs; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.inventory_logs (id, product_id, movement_type, reference_type, reference_id, from_location_id, to_location_id, quantity, qty_before, qty_after, unit_cost, reason, notes, created_by, created_at, branch_id) FROM stdin;
@@ -5376,11 +5344,15 @@ COPY public.inventory_logs (id, product_id, movement_type, reference_type, refer
 797	138	SALE_SHIP	SO	SO-022821	100	\N	1.0000	-39.5000	-40.5000	0.0000	Fulfillment Complete & Pay for Grab Delivery	\N	system	2026-10-15 02:06:48.314252+08	\N
 798	514	SALE_SHIP	SO	SO-022821	100	\N	250.0000	-5000.0000	-5250.0000	0.0000	Fulfillment Complete & Pay for ចានមូលញ៉ូមពណ៌មាស 1400 ml+គម្របជ័រ 500ចាន/កេស	\N	system	2026-10-15 02:06:48.369616+08	\N
 799	138	SALE_SHIP	SO	SO-022821	100	\N	1.0000	-40.5000	-41.5000	0.0000	Fulfillment Complete & Pay for Grab Delivery	\N	system	2026-10-15 02:06:48.369616+08	\N
+814	514	SALE_SHIP	SO	SO-022821	100	\N	250.0000	-5250.0000	-5500.0000	0.0000	Fulfillment Complete & Pay for ចានមូលញ៉ូមពណ៌មាស 1400 ml+គម្របជ័រ 500ចាន/កេស	\N	system	2026-10-15 02:35:06.518508+08	\N
+815	138	SALE_SHIP	SO	SO-022821	100	\N	1.0000	-41.5000	-42.5000	0.0000	Fulfillment Complete & Pay for Grab Delivery	\N	system	2026-10-15 02:35:06.518508+08	\N
+816	514	SALE_SHIP	SO	SO-022821	100	\N	250.0000	-5500.0000	-5750.0000	0.0000	Fulfillment Complete & Pay for ចានមូលញ៉ូមពណ៌មាស 1400 ml+គម្របជ័រ 500ចាន/កេស	\N	system	2026-10-15 02:35:06.574109+08	\N
+817	138	SALE_SHIP	SO	SO-022821	100	\N	1.0000	-42.5000	-43.5000	0.0000	Fulfillment Complete & Pay for Grab Delivery	\N	system	2026-10-15 02:35:06.574109+08	\N
 \.
 
 
 --
--- Data for Name: invoice_settings; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: invoice_settings; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.invoice_settings (id, font_family, primary_color, secondary_color, logo_url, shop_name_kh, shop_name_en, shop_address_kh, shop_address_en, phone, email, website, vat_tin, invoice_title_kh, invoice_title_en, enable_khr_total, khr_exchange_rate, qr_code_url, bank_name, account_name, account_number, payment_terms, footer_notes_kh, footer_notes_en, show_signature, show_sku, show_tax, created_at, updated_at, qr_size, qr_position, bank_info_size, bank_info_position, qr_offset_x, qr_offset_y, bank_offset_x, bank_offset_y) FROM stdin;
@@ -5389,7 +5361,7 @@ COPY public.invoice_settings (id, font_family, primary_color, secondary_color, l
 
 
 --
--- Data for Name: locations; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: locations; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.locations (id, name, code, address, is_active, is_default, created_at, is_central) FROM stdin;
@@ -5401,7 +5373,7 @@ COPY public.locations (id, name, code, address, is_active, is_default, created_a
 
 
 --
--- Data for Name: media_receipts; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: media_receipts; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.media_receipts (id, receipt_date, customer_name, amount, notes, month_key, created_at, updated_at) FROM stdin;
@@ -5412,7 +5384,7 @@ COPY public.media_receipts (id, receipt_date, customer_name, amount, notes, mont
 
 
 --
--- Data for Name: monthly_cash_summaries; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: monthly_cash_summaries; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.monthly_cash_summaries (id, month_key, opening_balance, media_expense, clear_stm, custom_sales_income, accounts_json, notes, created_at, updated_at, manual_opening_balance, manual_media_income, branch_id) FROM stdin;
@@ -5436,14 +5408,14 @@ COPY public.monthly_cash_summaries (id, month_key, opening_balance, media_expens
 5	2026-06	963463.88	0.00	0.00	\N	{"ABA": 0.0, "Tola": 0.0, "WING": 0.0, "Borrow": 0.0, "Office": 0.0, "ACELEDA": 0.0, "Cash KHR": 0.0, "Cash USD": 0.0, "Teamwork": 0.0}	\N	2026-10-09 23:42:28.77497+08	2026-10-09 23:42:28.77497+08	\N	\N	\N
 3	2026-08	1041386.96	0.00	0.00	\N	{"ABA": 0.0, "Tola": 0.0, "WING": 0.0, "Borrow": 0.0, "Office": 0.0, "ACELEDA": 0.0, "Cash KHR": 0.0, "Cash USD": 0.0, "Teamwork": 0.0}	\N	2026-10-09 23:42:28.746906+08	2026-10-09 23:42:28.746906+08	\N	\N	\N
 13	2025-10	882322.69	0.00	0.00	\N	{"ABA": 0.0, "Tola": 0.0, "WING": 0.0, "Borrow": 0.0, "Office": 0.0, "ACELEDA": 0.0, "Cash KHR": 0.0, "Cash USD": 0.0, "Teamwork": 0.0}	\N	2026-10-09 23:42:28.891215+08	2026-10-09 23:42:28.891215+08	\N	\N	\N
-1	2026-10	5618.74	0.00	3093.65	\N	[{"expr": "=5592+3764100/4000", "name": "ABA", "amount": 6533.025}, {"expr": "0.00", "name": "Cash USD", "amount": 0.0}, {"expr": "0.00", "name": "Cash KHR", "amount": 0.0}, {"expr": "0.00", "name": "ACELEDA", "amount": 0.0}, {"expr": "=9.66+100", "name": "Teamwork", "amount": 109.66}]	\N	2026-10-09 23:32:27.289886+08	2026-10-11 05:21:27.241399+08	\N	\N	\N
 2	2026-09	9752.92	90.00	3136.00	\N	[{"expr": "0.00", "name": "ABA", "amount": 0.0}, {"expr": "0.00", "name": "Tola", "amount": 0.0}, {"expr": "0.00", "name": "WING", "amount": 0.0}, {"expr": "0.00", "name": "Borrow", "amount": 0.0}, {"expr": "0.00", "name": "Office", "amount": 0.0}, {"expr": "0.00", "name": "ACELEDA", "amount": 0.0}, {"expr": "0.00", "name": "Cash KHR", "amount": 0.0}, {"expr": "0.00", "name": "Cash USD", "amount": 0.0}, {"expr": "0.00", "name": "Teamwork", "amount": 0.0}]	\N	2026-10-09 23:42:28.731256+08	2026-10-10 18:47:21.293061+08	9752.92	\N	\N
 43	2026-10	0.00	0.00	0.00	\N	[{"expr": "0.00", "name": "ABA", "amount": 0.0}, {"expr": "0.00", "name": "Cash USD", "amount": 0.0}, {"expr": "0.00", "name": "Cash KHR", "amount": 0.0}, {"expr": "0.00", "name": "ACELEDA", "amount": 0.0}, {"expr": "0.00", "name": "WING", "amount": 0.0}, {"expr": "0.00", "name": "Office", "amount": 0.0}, {"expr": "0.00", "name": "Teamwork", "amount": 0.0}, {"expr": "0.00", "name": "Tola", "amount": 0.0}, {"expr": "0.00", "name": "Borrow", "amount": 0.0}]	\N	2026-10-15 00:09:20.66669+08	2026-10-15 00:09:20.66669+08	\N	\N	1
+1	2026-10	5618.74	0.00	3093.65	\N	[{"expr": "=5592+3764100/4000", "name": "ABA", "amount": 6533.025}, {"expr": "0.00", "name": "Cash USD", "amount": 0.0}, {"expr": "0.00", "name": "Cash KHR", "amount": 0.0}, {"expr": "0.00", "name": "ACELEDA", "amount": 0.0}, {"expr": "=9.66+100", "name": "Teamwork", "amount": 109.66}]	\N	2026-10-09 23:32:27.289886+08	2026-10-11 05:21:27.241399+08	\N	\N	\N
 \.
 
 
 --
--- Data for Name: order_payments; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: order_payments; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.order_payments (id, order_type, order_id, amount, payment_method, payment_date, reference, notes, created_at, branch_id) FROM stdin;
@@ -28461,11 +28433,14 @@ COPY public.order_payments (id, order_type, order_id, amount, payment_method, pa
 23546	PO	884	800.0000	Bank Transfer	2026-10-15 02:06:26.383291+08	FT-8899		2026-10-15 02:06:26.383291+08	\N
 23547	SO	34402	190.0000	ABA Pay	2026-10-15 02:06:27.701836+08	ABA-TX-1001		2026-10-15 02:06:27.701836+08	\N
 23548	SO	34422	250.0000	Cash	2026-10-15 02:06:52.430528+08			2026-10-15 02:06:52.430528+08	\N
+23549	PO	894	800.0000	Bank Transfer	2026-10-15 02:34:44.256004+08	FT-8899		2026-10-15 02:34:44.256004+08	\N
+23550	SO	34438	190.0000	ABA Pay	2026-10-15 02:34:45.58489+08	ABA-TX-1001		2026-10-15 02:34:45.58489+08	\N
+23551	SO	34446	250.0000	Cash	2026-10-15 02:35:10.733924+08			2026-10-15 02:35:10.733924+08	\N
 \.
 
 
 --
--- Data for Name: pricing_schemes; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: pricing_schemes; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.pricing_schemes (id, name, is_default, is_active, created_at, currency) FROM stdin;
@@ -28486,7 +28461,7 @@ COPY public.pricing_schemes (id, name, is_default, is_active, created_at, curren
 
 
 --
--- Data for Name: product_attachments; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: product_attachments; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.product_attachments (id, product_id, file_name, file_path, file_size, created_at) FROM stdin;
@@ -28494,7 +28469,7 @@ COPY public.product_attachments (id, product_id, file_name, file_path, file_size
 
 
 --
--- Data for Name: product_boms; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: product_boms; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.product_boms (id, product_id, component_product_id, description, quantity, cost, created_at) FROM stdin;
@@ -28502,7 +28477,7 @@ COPY public.product_boms (id, product_id, component_product_id, description, qua
 
 
 --
--- Data for Name: product_combine_options; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: product_combine_options; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.product_combine_options (id, product_id, option_name, component_product_id, component_quantity, price_modifier, selling_price, is_default, sort_order, notes, created_at, updated_at) FROM stdin;
@@ -28510,7 +28485,7 @@ COPY public.product_combine_options (id, product_id, option_name, component_prod
 
 
 --
--- Data for Name: product_prices; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: product_prices; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.product_prices (id, product_id, pricing_scheme_id, unit_price) FROM stdin;
@@ -28665,8 +28640,8 @@ COPY public.product_prices (id, product_id, pricing_scheme_id, unit_price) FROM 
 10523	135	102	0.1700
 10524	135	101	0.1700
 10525	135	103	0.1500
-10381	102	100	39.0000
 10382	102	102	40.5000
+10381	102	100	39.0000
 10530	137	100	0.1250
 10531	137	102	0.1200
 10532	137	101	0.1250
@@ -30280,7 +30255,7 @@ COPY public.product_prices (id, product_id, pricing_scheme_id, unit_price) FROM 
 
 
 --
--- Data for Name: product_vendors; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: product_vendors; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.product_vendors (id, product_id, vendor_id, vendor_item_code, cost, created_at) FROM stdin;
@@ -31111,7 +31086,7 @@ COPY public.product_vendors (id, product_id, vendor_id, vendor_item_code, cost, 
 
 
 --
--- Data for Name: product_versions; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: product_versions; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.product_versions (id, product_id, version_number, name, sku, standard_cost, default_price, change_summary, created_at) FROM stdin;
@@ -37505,6 +37480,7 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 34410	166	15	កែវជ័រយ៉ាអួរ​ 160ml (Yogurt 160 ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34411	167	1	ប្រអប់ជ្រុងថ្លា 750មល  (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34412	167	2	ប្រអប់ជ្រុងថ្លា 750មល  (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
+38150	266	30	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 34413	167	3	ប្រអប់ជ្រុងថ្លា 750មល  (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34414	167	4	ប្រអប់ជ្រុងថ្លា 750មល  (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34415	167	5	ប្រអប់ជ្រុងថ្លា 750មល  (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
@@ -37592,6 +37568,7 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 34496	167	86	HT ប្រអប់ជ្រុងថ្លា (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34497	167	87	HT ប្រអប់ជ្រុងថ្លា (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34498	167	88	HT ប្រអប់ជ្រុងថ្លា (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
+38151	266	31	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 34499	167	89	HT ប្រអប់ជ្រុងថ្លា (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34500	167	90	HT ប្រអប់ជ្រុងថ្លា (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34501	167	91	HT ប្រអប់ជ្រុងថ្លា (Clear Box 750ml)	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
@@ -37838,6 +37815,7 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 34800	172	42	Straw-KHទុយោកាហ្វេ 6mm (Straw 6mm) 40 Pack/Case	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34801	172	43	Straw-KHទុយោកាហ្វេ 6mm (Straw 6mm) 40 Pack/Case	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34802	172	44	Straw-KHទុយោកាហ្វេ 6mm (Straw 6mm) 40 Pack/Case	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
+38152	266	32	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 34803	172	45	Straw-KHទុយោកាហ្វេ 6mm (Straw 6mm) 40 Pack/Case	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34804	172	46	Straw-KHទុយោកាហ្វេ 6mm (Straw 6mm) 40 Pack/Case	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
 34805	172	47	Straw-KHទុយោកាហ្វេ 6mm (Straw 6mm) 40 Pack/Case	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.240034+08
@@ -39970,6 +39948,7 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 37032	238	55	WRAP01-TE ក្រដាស់បឺហ្គឺ ពណ៌ស 27x36 (White Paper Wrap) 500សន្លឹក/ដុំ 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 37033	238	56	WRAP01-TE ក្រដាស់បឺហ្គឺ ពណ៌ស 27x36 (White Paper Wrap) 500សន្លឹក/ដុំ 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 37034	238	57	WRAP01-TE ក្រដាស់បឺហ្គឺ ពណ៌ស 27x36 (White Paper Wrap) 500សន្លឹក/ដុំ 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
+38153	266	33	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 37035	238	58	WRAP01-TE ក្រដាស់បឺហ្គឺ ពណ៌ស 27x36 (White Paper Wrap) 500សន្លឹក/ដុំ 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 37036	238	59	WRAP01-TE ក្រដាស់បឺហ្គឺ ពណ៌ស 27x36 (White Paper Wrap) 500សន្លឹក/ដុំ 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 37037	238	60	WRAP01-TE ក្រដាស់បឺហ្គឺ ពណ៌ស 27x36 (White Paper Wrap) 500សន្លឹក/ដុំ 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
@@ -41015,10 +40994,6 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 38147	266	27	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 38148	266	28	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 38149	266	29	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
-38150	266	30	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
-38151	266	31	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
-38152	266	32	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
-38153	266	33	HT ចានស៊ុបខ្មៅ ( Black 750ML) 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 38154	266	34	BO750B-HT ចានស៊ុបខ្មៅ ( Black 750ML)300ចាន/កេស  	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 38155	266	35	BO750B-HT ចានស៊ុបខ្មៅ ( Black 750ML)300ចាន/កេស  	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
 38156	266	36	BO750B-HT ចានស៊ុបខ្មៅ ( Black 750ML)300ចាន/កេស  	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.242007+08
@@ -43113,6 +43088,7 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 40394	428	3	N5500-QP ប្រអប់ញ៉ូម AL box 5500 ml 100ចាន/កេស	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
 40395	428	4	N5500-QP ប្រអប់ញ៉ូម AL box 5500 ml 100ចាន/កេស	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
 40396	428	5	N5500-QP ប្រអប់ញ៉ូម AL box 5500 ml 100ចាន/កេស	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
+41088	301	26	N3500G-QP Test Extra Info	SKU-0301	0.6150	0.0000	Product specifications and pricing saved in-place	2026-10-15 02:34:39.660355+08
 40397	429	1	W700-QP C01 ប្រអប់មានថង់ពីលើ Paper Box 900ML 300ចាន/កេស 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
 40398	429	2	W700-QP C01 ប្រអប់មានថង់ពីលើ Paper Box 900ML 300ចាន/កេស 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
 40399	429	3	W700-QP C01 ប្រអប់មានថង់ពីលើ Paper Box 900ML 300ចាន/កេស 	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
@@ -43528,6 +43504,8 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 41067	301	24	N3500G-QP Test Extra Info	SKU-0301	0.4500	0.0000	Product specifications and pricing saved in-place	2026-10-15 02:06:21.754293+08
 41068	301	25	N3500G-QP Test Extra Info	SKU-0301	0.6150	0.0000	Product specifications and pricing saved in-place	2026-10-15 02:06:22.242698+08
 41086	102	132	HT25A-TTK ប្រអប់បាយ4ថត 300 pcs/Case	SKU-0102	0.1070	39.0000	Product specifications and pricing saved in-place	2026-10-15 02:06:35.564583+08
+41089	301	27	N3500G-QP Test Extra Info	SKU-0301	0.6150	0.0000	Product specifications and pricing saved in-place	2026-10-15 02:34:40.120924+08
+41107	102	133	HT25A-TTK ប្រអប់បាយ4ថត 300 pcs/Case	SKU-0102	0.1070	39.0000	Product specifications and pricing saved in-place	2026-10-15 02:34:53.972277+08
 40871	503	1	SANDW1-Paper ប្រអប់សាំងក្រដាស់ (Sandwich Box) 600ប្រអប់/កេស	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
 40872	504	1	lidHT17	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
 40873	505	1	N3500R-QP ចានមូលញ៉ូមពណ៌មាស 3500 ml 200ចាន/កេស	\N	0.0000	0.0000	Migrated legacy revision from inFlow SQL Server	2026-10-15 00:22:35.244164+08
@@ -43716,7 +43694,7 @@ COPY public.product_versions (id, product_id, version_number, name, sku, standar
 
 
 --
--- Data for Name: products; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: products; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.products (id, sku, name, description, barcode, category_id, uom, master_pack_qty, inner_pack_qty, default_location_id, reorder_point, reorder_quantity, min_stock, max_stock, standard_cost, average_cost, last_purchase_cost, default_price, is_sellable, is_purchaseable, is_active, image_url, created_at, updated_at, item_type, tax_code, costing_method, custom1, custom2, custom3, custom4, custom5, default_sublocation, last_vendor_id, sales_uom, sales_uom_ratio, sales_uom_ratio_std, purchasing_uom, purchasing_uom_ratio, purchasing_uom_ratio_std, length, width, height, weight, remarks, price_decimals, cost_decimals, qty_decimals, brand, color, country_of_origin, material, whmis_number, scent, capacity, amps, warranty_expiry, qa_passed, custom_attributes, packs_per_case, pcs_per_pack, tier_qty_1, tier_qty_2, tier_qty_3, tier_price_1, tier_price_2, tier_price_3, price_card_notes, cost_formula, price_card_color, price_card_font, factory_cost, factory_cost_formula, cost_rate, shipping_cost, shipping_cost_formula, costing_sheet_pcs, costing_sheet_cost, costing_sheet_formula, cost_rate_formula, costing_sheet_pcs_formula, combine_type) FROM stdin;
@@ -43726,9 +43704,10 @@ COPY public.products (id, sku, name, description, barcode, category_id, uom, mas
 452	UKP16PET	កែវកញ្ចក់ លេខ 16 oz (500ml) មាត់លេខ 98		\N	108	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0470	0.0000	0.0000	0.0000	t	t	t	/static/uploads/products/prod_452.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.005969+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	1000.0000	cases	1.0000	1000.0000	\N	\N	\N	\N	[Merged with SKUs: UKP16PET-NOLID]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 452}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 281	N14-TE	ថង់ក្រដាស់អត់ដៃ Size L 800ថង់/កេស		\N	114	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0680	0.0622	0.0622	0.0000	t	t	t	/static/uploads/products/prod_281.png	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.237244+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	750.0000	cases	1.0000	750.0000	\N	\N	\N	\N	[Merged with SKUs: N14-TE-2]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 281}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 431	PVC Board with Sticker	ស្ទីកឺបិតលើជ័រ ស្ពោធ 6mm		\N	110	pcs	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	2.0000	0.0000	0.0000	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.306026+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	1.0000	pcs.	1.0000	1.0000	\N	\N	\N	\N	[Merged with SKUs: PVC Board with Sticker-2]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 431}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
+101	HT17-1-TTK	ប្រអប់បាយ1ថត 500ចាន/កេស	ដាក់JB	1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0590	0.0560	0.0560	0.0000	t	t	t	/static/uploads/products/prod_101.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:34:38.122499+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	500.0000	cases	1.0000	500.0000	\N	\N	\N	\N	\N	1	2	0	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 101}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 103	HC03-TTK	ប្រអប់បាយ3ថត 400ចាន/កេស		1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.1240	0.1175	0.1175	0.0000	t	t	t	/static/uploads/products/prod_103.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:18.733167+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	400.0000	cases	1.0000	400.0000	\N	\N	\N	\N	[Merged with SKUs: HT03, CT03-DA] [Merged Barcodes: 1, 1]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 103}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 104	SKU-0104	ដបជ្រុងកធំ 330 (Squre Bottle 330 ml) 200ដប/ដុំ		\N	103	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.1000	0.1000	0.1000	0.0000	t	t	t	/static/uploads/products/prod_104.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:19.194529+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	200.0000	pcs.	1.0000	200.0000	\N	\N	\N	\N	[Merged with SKUs: SKU-0410]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 104}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
-101	HT17-1-TTK	ប្រអប់បាយ1ថត 500ចាន/កេស	ដាក់JB	1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0590	0.0560	0.0560	0.0000	t	t	t	/static/uploads/products/prod_101.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:20.211286+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	500.0000	cases	1.0000	500.0000	\N	\N	\N	\N	\N	1	2	0	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 101}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
+102	SKU-0102	HT25A-TTK ប្រអប់បាយ4ថត 300 pcs/Case		1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.1070	0.1000	0.1000	39.0000	t	t	t	/static/uploads/products/prod_102.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:34:53.97073+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N		\N	cases	1.0000	300.0000	cases	1.0000	300.0000	\N	\N	\N	\N	[Merged with SKUs: HT26-JB, HT04B, HT25-JB, HT05-JB, HT24-JB, HT04C] [Merged Barcodes: 1, 1, 1, 1, 1, 1]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 102}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 105	SKU-0105	ដបមូលកធំ 330 (Round Bottle 330 ml)		\N	103	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.1150	0.1168	0.1200	0.0000	t	t	t	/static/uploads/products/prod_105.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	1.0000	pcs.	1.0000	1.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 105}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 106	SKU-0106	ដបត្រីកោណ​ កតុច 330 (Triangle Bottle 330 ml)		\N	103	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.1200	0.1200	0.1200	0.0000	t	t	t	/static/uploads/products/prod_106.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	1.0000	pcs.	1.0000	1.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 106}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 107	BO1000B-TTK	ចានស៊ុបខ្មៅ ល្ពៅ 1000ML 600ចាន/កេស		1	102	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0732	0.0950	0.0950	0.0000	t	t	t	/static/uploads/products/prod_107.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	600.0000	cases	1.0000	600.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 107}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
@@ -43737,10 +43716,10 @@ COPY public.products (id, sku, name, description, barcode, category_id, uom, mas
 110	SA3.5-TTK	កូនចានគម្របដាច់ ( sauce 3.5 OZ) 2000ចាន/កេស		1	106	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0174	0.0175	0.0175	0.0000	t	t	t	/static/uploads/products/prod_110.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	2000.0000	cases	1.0000	2000.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 110}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 111	CA250G-TTK	ប្រអប់នំ2ខាំ (Cake Box 250g) 600ប្រអប់/កេស		\N	109	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0400	0.0444	0.0444	0.0000	t	t	t	/static/uploads/products/prod_111.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	600.0000	cases	1.0000	600.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 111}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 112	SKU-0112	ដបមូលកធំ (Roud Bottle 500 ml) 200ដប/ដុំ		\N	103	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.1250	0.1200	0.1200	0.0000	t	t	t	/static/uploads/products/prod_112.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	200.0000	pcs.	1.0000	200.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 112}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
+420	SKU-0420	light Box 40cm		\N	110	pcs	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Average	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	1.0000	pcs.	1.0000	1.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 420}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 113	CA450G-TTK	ប្រអប់4ខាំកន្លះ (Cake BOX 450G)		1	109	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0380	0.0400	0.0400	0.0000	t	t	t	/static/uploads/products/prod_113.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	400.0000	cases	1.0000	400.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 113}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 114	REC1000H-TTK	ប្រអប់ជ្រុងរឹងទាប1000ml 200 ចាន/កេស		1	104	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.1390	0.1180	0.1180	0.0000	t	t	t	/static/uploads/products/prod_114.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	200.0000	cases	1.0000	200.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 114}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
-100	HT17-2-TTK	ប្រអប់បាយ២ថតពុះស្មើរ 500ចាន/កេស		1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0520	0.1280	0.1280	0.0000	t	t	t	/static/uploads/products/prod_100.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:48.837806+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	500.0000	cases	1.0000	500.0000	\N	\N	\N	\N	\N	\N	\N	0	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 100}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
-102	SKU-0102	HT25A-TTK ប្រអប់បាយ4ថត 300 pcs/Case		1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.1070	0.1000	0.1000	39.0000	t	t	t	/static/uploads/products/prod_102.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:35.563223+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N		\N	cases	1.0000	300.0000	cases	1.0000	300.0000	\N	\N	\N	\N	[Merged with SKUs: HT26-JB, HT04B, HT25-JB, HT05-JB, HT24-JB, HT04C] [Merged Barcodes: 1, 1, 1, 1, 1, 1]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 102}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
+100	HT17-2-TTK	ប្រអប់បាយ២ថតពុះស្មើរ 500ចាន/កេស		1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0520	0.1280	0.1280	0.0000	t	t	t	/static/uploads/products/prod_100.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:35:07.051791+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	500.0000	cases	1.0000	500.0000	\N	\N	\N	\N	\N	\N	\N	0	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 100}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 116	SA5.5-TTK	កូនចានគម្របដាច់  ( sauce 5.5 OZ) 2000ចាន/កេស		1	106	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0256	0.0167	0.0167	0.0000	t	t	t	/static/uploads/products/prod_116.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	2000.0000	cases	1.0000	2000.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 116}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 117	BO700H-TTK	ចានស៊ុបប្រាំជ្រុង (Hexa 700ML) 400ចាន/កេស		1	102	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0480	0.0500	0.0500	0.0000	t	t	t	/static/uploads/products/prod_117.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	400.0000	cases	1.0000	400.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 117}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 118	BO600R-TTK	ចានស៊ុបខ្មៅ_ក្រហម ( bolw 600ML)400ចាន/កេស		1	102	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0743	0.0746	0.0740	0.0000	t	t	t	/static/uploads/products/prod_118.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	400.0000	cases	1.0000	400.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 118}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
@@ -43910,7 +43889,7 @@ COPY public.products (id, sku, name, description, barcode, category_id, uom, mas
 312	H50-JB	ប្រអប់នំ 4ខាំ 400g 600ប្រអប់/កេស		\N	109	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0420	0.0000	0.0000	0.0000	t	t	t	/static/uploads/products/prod_312.png	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	600.0000	cases	1.0000	600.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 312}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 305	P1000B-JB	ប្រអប់ផ្លែឈើ 1000g 330ប្រអប់/កេស		\N	109	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0992	0.0848	0.0848	0.0000	t	t	t	/static/uploads/products/prod_305.jpg	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:18.91424+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	330.0000	cases	1.0000	330.0000	\N	\N	\N	\N	[Merged with SKUs: P1000A-JB]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 305}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 307	EGG10-JB	ប្រអប់ដាក់ពងទា10គ្រាប់ (Egg Box) 600ប្រអប់/កេស		\N	109	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0472	0.0513	0.0520	0.0000	t	t	t	/static/uploads/products/prod_307.png	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:18.937992+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	600.0000	cases	1.0000	600.0000	\N	\N	\N	\N	[Merged with SKUs: EGG10-JB-2]	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 307}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
-301	SKU-0301	N3500G-QP Test Extra Info	គម្រប 330	8936000001	118	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.6150	0.6150	0.3800	0.0000	t	t	t	/static/uploads/products/prod_301.png	2026-10-15 01:22:33.416754+08	2026-10-15 02:06:22.240329+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N		\N	cases	1.0000	200.0000	cases	1.0000	1.0000	25.5000	18.2000	12.0000	0.7500	Testing authentic inFlow Extra Info replication	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 301}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	multi
+301	SKU-0301	N3500G-QP Test Extra Info	គម្រប 330	8936000001	118	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.6150	0.6150	0.3800	0.0000	t	t	t	/static/uploads/products/prod_301.png	2026-10-15 01:22:33.416754+08	2026-10-15 02:34:40.118563+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N		\N	cases	1.0000	200.0000	cases	1.0000	1.0000	25.5000	18.2000	12.0000	0.7500	Testing authentic inFlow Extra Info replication	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 301}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	multi
 314	HT12-JB	ប្រអប់នំ1ថតតូច 1200ចាន/កេស		1	101	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0330	0.0400	0.0400	0.0000	t	t	t	/static/uploads/products/prod_314.png	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	1200.0000	cases	1.0000	1200.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 314}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 315	SA1.0-HYPP	កូនចានគម្របជាប់ហុងអ៊ីន( sauce 1 OZ) 2000ចាន/កេស		1	106	pcs.	1.0000	1.0000	100	200.0000	1800.0000	0.0000	0.0000	0.0103	0.0106	0.0103	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Non-Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	2000.0000	cases	1.0000	2000.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 315}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 316	N1-TE	ថង់ក្រដាស់ Hot dog Bag 1000ថង់/កេស		\N	114	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0200	0.0195	0.0200	0.0000	t	t	t	/static/uploads/products/prod_316.png	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	1000.0000	cases	1.0000	1000.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 316}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
@@ -44002,7 +43981,6 @@ COPY public.products (id, sku, name, description, barcode, category_id, uom, mas
 415	UKP98-640PET-20oz-2	បោះពុម្ព 2 color		\N	108	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0630	0.0537	0.0630	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	1000.0000	cases	1.0000	1000.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 415}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 416	2cups-CN	ទម្រកែវ 2 Cup Holder (600pcs/កេស)		\N	108	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0520	0.0000	0.0000	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	600.0000	cases	1.0000	600.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 416}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 419	N11-TE	ថង់ក្រដាស់បោះពុម្ព 1 ពណ៍ Bag (20x13x25) 500ថង់/កេស		\N	114	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.1080	0.1215	0.1215	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	500.0000	cases	1.0000	500.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 419}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
-420	SKU-0420	light Box 40cm		\N	110	pcs	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Average	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	1.0000	pcs.	1.0000	1.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 420}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 421	K1000-QP-TCN	ប្រអប់ក្រដាស់គគីជ្រុង Box 1000ML 300ចាន/កេស		\N	111	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.1120	0.1433	0.1430	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	300.0000	cases	1.0000	300.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 421}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 422	SKU-0422	ស្រោមដៃ hand Glow 100 box/Case		\N	108	packs	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.2400	0.2400	0.2400	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	cases	1.0000	100.0000	cases	1.0000	100.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 422}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
 423	SKU-0423	Lid 150G (PP lid 150mm)		\N	108	pcs.	1.0000	1.0000	100	0.0000	0.0000	0.0000	0.0000	0.0200	0.0000	0.0000	0.0000	t	t	t	\N	2026-10-15 01:22:33.416754+08	2026-10-15 01:45:36.413629+08	Stockable	Taxable	Manual	\N	\N	\N	\N	\N	\N	\N	pcs.	1.0000	1.0000	pcs.	1.0000	1.0000	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	f	{"inflow_prod_id": 423}	3.00	50.00	100	300	600	\N	\N	\N		\N	#0F172A	Kantumruy Pro	\N	\N	\N	\N	\N	\N	\N	\N	\N	\N	single
@@ -44094,7 +44072,7 @@ COPY public.products (id, sku, name, description, barcode, category_id, uom, mas
 
 
 --
--- Data for Name: purchase_order_lines; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: purchase_order_lines; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.purchase_order_lines (id, purchase_order_id, line_num, product_id, description, quantity, unit_cost, subtotal, received_qty, discount_percent, vendor_product_code, uom) FROM stdin;
@@ -44307,6 +44285,7 @@ COPY public.purchase_order_lines (id, purchase_order_id, line_num, product_id, d
 322	148	1	103	HC03-TTK ប្រអប់បាយ3ថត 400ចាន/កេស	8000.0000	0.1150	920.0000	8000.0000	0.00		pcs.
 323	148	2	100	HT17-2-TTK ប្រអប់បាយ២ថតពុះស្មើរ 500ចាន/កេស	2500.0000	0.0720	180.0000	2500.0000	0.00		pcs.
 324	148	3	102	HT25A-TTK ប្រអប់បាយ4ថត 300 pcs/Case	2500.0000	0.1200	300.0000	2500.0000	0.00		pcs.
+1212	409	10	209	H26-JB ប្រអប់នំពងទា Egg Cake 300ប្រអប់/ថង់	5000.0000	0.0450	225.0000	5000.0000	0.00		pcs.
 325	148	4	121	CA2KG-TTK ប្រអប់នំ 2kg អត់រន្ធ  (Cake Box 2Kg)​ 400ប្រអប់/កេស	800.0000	0.1001	80.0800	800.0000	0.00		pcs.
 326	148	5	115	SA2.0-TTK កូនចានគម្របដាច់  ( sauce 2 OZ) 2500ចាន/កេស	9600.0000	0.0133	127.6800	9600.0000	0.00		pcs.
 327	148	6	116	SA5.5-TTK កូនចានគម្របដាច់  ( sauce 5.5 OZ) 2000ចាន/កេស	4800.0000	0.0254	121.9200	4800.0000	0.00		pcs.
@@ -45111,7 +45090,6 @@ COPY public.purchase_order_lines (id, purchase_order_id, line_num, product_id, d
 1208	409	6	361	PB850K-QP ចានគគី (Kraft bolw 850ml) 400ចាន/កេស	3000.0000	0.0920	276.0000	3000.0000	0.00		pcs.
 1209	409	7	329	PB850W-Fuli ចានក្រដាស់ស (Paper  bolw 850ml) 500ចាន/កេស	3000.0000	0.0860	258.0000	3000.0000	0.00		pcs.
 1210	409	8	298	HT205-JB ប្រអប់បាយ2ថតធំ 600ចាន/បេ	10000.0000	44.0000	1100.0000	10000.0000	0.00		pcs.
-1212	409	10	209	H26-JB ប្រអប់នំពងទា Egg Cake 300ប្រអប់/ថង់	5000.0000	0.0450	225.0000	5000.0000	0.00		pcs.
 1213	409	11	163	BURGER-JB ប្រអប់បឺហ្គឺ ​(HighBurger Box) 1000ប្រអប់/កេស	5000.0000	0.0350	175.0000	5000.0000	0.00		pcs.
 1214	410	1	211	HT88-JB ប្រអប់បាយ​3ថត 300ចាន/កេស	4500.0000	26.0000	390.0000	4500.0000	0.00		pcs.
 1193	410	2	305	P1000B-JB ប្រអប់ផ្លែឈើ 1000g 330ប្រអប់/កេស	13200.0000	27.0000	1080.0000	13200.0000	0.00		pcs.
@@ -46092,7 +46070,7 @@ COPY public.purchase_order_lines (id, purchase_order_id, line_num, product_id, d
 
 
 --
--- Data for Name: purchase_orders; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: purchase_orders; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.purchase_orders (id, order_number, vendor_id, location_id, order_date, expected_date, status, payment_status, subtotal, tax_rate, tax_amount, shipping_fee, total_amount, paid_amount, balance_due, carrier, received_date, notes, created_at, updated_at, branch_id, discount_amount, vendor_invoice_no, contact, phone, vendor_address, non_vendor_costs, currency_code) FROM stdin;
@@ -46563,7 +46541,7 @@ COPY public.purchase_orders (id, order_number, vendor_id, location_id, order_dat
 
 
 --
--- Data for Name: sales_order_lines; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: sales_order_lines; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.sales_order_lines (id, sales_order_id, line_num, product_id, description, quantity, unit_price, discount_percent, subtotal, cost_price, picked_qty, packed_qty, shipped_qty, uom, quantity_display, pricing_scheme_id, addon_product_id, addon_quantity, combine_option_id) FROM stdin;
@@ -97041,7 +97019,7 @@ COPY public.sales_order_lines (id, sales_order_id, line_num, product_id, descrip
 
 
 --
--- Data for Name: sales_orders; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: sales_orders; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.sales_orders (id, order_number, customer_id, location_id, order_date, due_date, status, payment_status, subtotal, tax_rate, tax_amount, discount_amount, shipping_fee, total_amount, paid_amount, balance_due, sales_rep, po_number, carrier, tracking_number, picked_date, packed_date, shipped_date, invoiced_date, notes, created_at, updated_at, pricing_scheme_id, customer_address, customer_contact, customer_phone, destination_province, package_count, delivery_notes, cod_amount, branch_id, delivery_man, delivery_helper, delivery_fee_khr, payment_method, completed_by) FROM stdin;
@@ -119866,12 +119844,12 @@ COPY public.sales_orders (id, order_number, customer_id, location_id, order_date
 34383	SO-022819	2570	100	2026-10-14	\N	OPEN	PAID	76.0000	0.00	0.0000	0.0000	0.0000	76.0000	0.0000	0.0000			\N	\N	\N	\N	\N	\N	ដឹកម៉ោង3 នៅចាំទុរទាត់	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	100	ក្រោយវត្តសន្សំកុសល		0963322529		1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34384	SO-022820	2571	100	2026-10-14	\N	OPEN	PAID	340.0000	0.00	0.0000	0.0000	0.0000	340.0000	0.0000	0.0000			\N	\N	\N	\N	\N	\N	ដាក់ទៅBKK ថ្មី	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	100		Bong Nary	017343889		1	\N	0.00	\N	\N	\N	0.00	\N	\N
 34386	SO-022822	1591	100	2026-10-15	\N	OPEN	PAID	5697.2000	0.00	0.0000	0.0000	0.0000	5697.2000	0.0000	0.0000			\N	\N	\N	\N	\N	\N	លុយភ្ញៀវ 187	2026-10-15 01:22:33.416754+08	2026-10-15 01:22:33.416754+08	107					1	\N	0.00	\N	\N	\N	0.00	\N	\N
-34385	SO-022821	1263	100	2026-10-14	\N	PAID	PAID	67.5000	0.00	0.0000	0.0000	0.0000	67.5000	67.5000	0.0000			\N	\N	\N	\N	2026-10-15 00:00:00+08	2026-10-15 02:06:48.314252+08		2026-10-15 01:22:33.416754+08	2026-10-15 02:06:48.369616+08	102	TK St.548 Home No 6		086456824		1	\N	0.00	\N	\N	\N	0.00	Cash	admin
+34385	SO-022821	1263	100	2026-10-14	\N	PAID	PAID	67.5000	0.00	0.0000	0.0000	0.0000	67.5000	67.5000	0.0000			\N	\N	\N	\N	2026-10-15 00:00:00+08	2026-10-15 02:06:48.314252+08		2026-10-15 01:22:33.416754+08	2026-10-15 02:35:06.574109+08	102	TK St.548 Home No 6		086456824		1	\N	0.00	\N	\N	\N	0.00	Cash	admin
 \.
 
 
 --
--- Data for Name: stock_adjustment_lines; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: stock_adjustment_lines; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.stock_adjustment_lines (id, adjustment_id, product_id, old_qty, new_qty, diff_qty, unit_cost) FROM stdin;
@@ -119879,7 +119857,7 @@ COPY public.stock_adjustment_lines (id, adjustment_id, product_id, old_qty, new_
 
 
 --
--- Data for Name: stock_adjustments; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: stock_adjustments; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.stock_adjustments (id, adjustment_number, location_id, adjustment_date, reason, status, notes, created_at, branch_id) FROM stdin;
@@ -119887,7 +119865,7 @@ COPY public.stock_adjustments (id, adjustment_number, location_id, adjustment_da
 
 
 --
--- Data for Name: stock_transfer_lines; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: stock_transfer_lines; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.stock_transfer_lines (id, transfer_id, product_id, quantity) FROM stdin;
@@ -119895,7 +119873,7 @@ COPY public.stock_transfer_lines (id, transfer_id, product_id, quantity) FROM st
 
 
 --
--- Data for Name: stock_transfers; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: stock_transfers; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.stock_transfers (id, transfer_number, from_location_id, to_location_id, status, transfer_date, notes, created_at, branch_id) FROM stdin;
@@ -119903,7 +119881,7 @@ COPY public.stock_transfers (id, transfer_number, from_location_id, to_location_
 
 
 --
--- Data for Name: sublocations; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: sublocations; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.sublocations (id, location_id, name, created_at) FROM stdin;
@@ -119911,7 +119889,7 @@ COPY public.sublocations (id, location_id, name, created_at) FROM stdin;
 
 
 --
--- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: users; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.users (id, username, password_hash, display_name, email, phone, role, branch_id, permissions_json, is_active, last_login, created_at, updated_at) FROM stdin;
@@ -119924,7 +119902,7 @@ COPY public.users (id, username, password_hash, display_name, email, phone, role
 
 
 --
--- Data for Name: vendors; Type: TABLE DATA; Schema: public; Owner: odoo
+-- Data for Name: vendors; Type: TABLE DATA; Schema: public; Owner: -
 --
 
 COPY public.vendors (id, name, contact_name, phone, email, address1, address2, city, country, postal_code, payment_terms, currency_code, balance, is_active, created_at, updated_at) FROM stdin;
@@ -119957,287 +119935,301 @@ COPY public.vendors (id, name, contact_name, phone, email, address1, address2, c
 
 
 --
--- Name: adj_number_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: adj_number_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.adj_number_seq', 41, true);
+SELECT pg_catalog.setval('public.adj_number_seq', 42, true);
 
 
 --
--- Name: branches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: backup_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.backup_logs_id_seq', 1, true);
+
+
+--
+-- Name: backup_settings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.backup_settings_id_seq', 1, true);
+
+
+--
+-- Name: branches_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.branches_id_seq', 3, true);
 
 
 --
--- Name: categories_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: categories_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.categories_id_seq', 120, true);
+SELECT pg_catalog.setval('public.categories_id_seq', 121, true);
 
 
 --
--- Name: companies_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: companies_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.companies_id_seq', 1, true);
 
 
 --
--- Name: customers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: customers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.customers_id_seq', 2817, true);
+SELECT pg_catalog.setval('public.customers_id_seq', 2846, true);
 
 
 --
--- Name: delivery_men_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: delivery_men_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.delivery_men_id_seq', 30, true);
 
 
 --
--- Name: delivery_services_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: delivery_services_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.delivery_services_id_seq', 7, true);
 
 
 --
--- Name: expenses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: expenses_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.expenses_id_seq', 33, true);
-
-
---
--- Name: inventory_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.inventory_id_seq', 6315, true);
+SELECT pg_catalog.setval('public.expenses_id_seq', 34, true);
 
 
 --
--- Name: inventory_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: inventory_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.inventory_logs_id_seq', 803, true);
+SELECT pg_catalog.setval('public.inventory_id_seq', 6376, true);
 
 
 --
--- Name: invoice_settings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: inventory_logs_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.inventory_logs_id_seq', 821, true);
+
+
+--
+-- Name: invoice_settings_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.invoice_settings_id_seq', 1, true);
 
 
 --
--- Name: locations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: locations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.locations_id_seq', 101, true);
 
 
 --
--- Name: media_receipts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: media_receipts_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.media_receipts_id_seq', 5, true);
 
 
 --
--- Name: monthly_cash_summaries_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.monthly_cash_summaries_id_seq', 49, true);
-
-
---
--- Name: order_payments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.order_payments_id_seq', 23548, true);
+SELECT pg_catalog.setval('public.monthly_cash_summaries_id_seq', 51, true);
 
 
 --
--- Name: po_number_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: order_payments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.po_number_seq', 464, true);
-
-
---
--- Name: pricing_schemes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.pricing_schemes_id_seq', 121, true);
+SELECT pg_catalog.setval('public.order_payments_id_seq', 23551, true);
 
 
 --
--- Name: product_attachments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: po_number_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.po_number_seq', 463, true);
+
+
+--
+-- Name: pricing_schemes_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.pricing_schemes_id_seq', 122, true);
+
+
+--
+-- Name: product_attachments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.product_attachments_id_seq', 1, false);
 
 
 --
--- Name: product_boms_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: product_boms_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.product_boms_id_seq', 79, true);
+SELECT pg_catalog.setval('public.product_boms_id_seq', 80, true);
 
 
 --
--- Name: product_combine_options_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: product_combine_options_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.product_combine_options_id_seq', 22, true);
 
 
 --
--- Name: product_prices_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: product_prices_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.product_prices_id_seq', 12328, true);
-
-
---
--- Name: product_vendors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.product_vendors_id_seq', 4329, true);
+SELECT pg_catalog.setval('public.product_prices_id_seq', 12340, true);
 
 
 --
--- Name: product_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: product_vendors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.product_versions_id_seq', 41086, true);
-
-
---
--- Name: products_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.products_id_seq', 568, true);
+SELECT pg_catalog.setval('public.product_vendors_id_seq', 4343, true);
 
 
 --
--- Name: purchase_order_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: product_versions_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.purchase_order_lines_id_seq', 2663, true);
-
-
---
--- Name: purchase_orders_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.purchase_orders_id_seq', 891, true);
+SELECT pg_catalog.setval('public.product_versions_id_seq', 41107, true);
 
 
 --
--- Name: sales_order_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: products_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.sales_order_lines_id_seq', 63804, true);
-
-
---
--- Name: sales_orders_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.sales_orders_id_seq', 34422, true);
+SELECT pg_catalog.setval('public.products_id_seq', 611, true);
 
 
 --
--- Name: so_branch_1_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: purchase_order_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.purchase_order_lines_id_seq', 2674, true);
+
+
+--
+-- Name: purchase_orders_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.purchase_orders_id_seq', 901, true);
+
+
+--
+-- Name: sales_order_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.sales_order_lines_id_seq', 63817, true);
+
+
+--
+-- Name: sales_orders_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.sales_orders_id_seq', 34446, true);
+
+
+--
+-- Name: so_branch_1_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.so_branch_1_seq', 4227, true);
 
 
 --
--- Name: so_branch_2_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: so_branch_2_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.so_branch_2_seq', 1, false);
 
 
 --
--- Name: so_branch_3_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: so_branch_3_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.so_branch_3_seq', 1, false);
 
 
 --
--- Name: so_number_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: so_number_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.so_number_seq', 22823, true);
-
-
---
--- Name: stock_adjustment_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.stock_adjustment_lines_id_seq', 62, true);
+SELECT pg_catalog.setval('public.so_number_seq', 22822, true);
 
 
 --
--- Name: stock_adjustments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.stock_adjustments_id_seq', 62, true);
-
-
---
--- Name: stock_transfer_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
---
-
-SELECT pg_catalog.setval('public.stock_transfer_lines_id_seq', 62, true);
+SELECT pg_catalog.setval('public.stock_adjustment_lines_id_seq', 63, true);
 
 
 --
--- Name: stock_transfers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: stock_adjustments_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.stock_transfers_id_seq', 62, true);
+SELECT pg_catalog.setval('public.stock_adjustments_id_seq', 63, true);
 
 
 --
--- Name: sublocations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.stock_transfer_lines_id_seq', 63, true);
+
+
+--
+-- Name: stock_transfers_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
+--
+
+SELECT pg_catalog.setval('public.stock_transfers_id_seq', 63, true);
+
+
+--
+-- Name: sublocations_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.sublocations_id_seq', 1, false);
 
 
 --
--- Name: trf_number_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: trf_number_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.trf_number_seq', 6, true);
+SELECT pg_catalog.setval('public.trf_number_seq', 7, true);
 
 
 --
--- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: users_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
 SELECT pg_catalog.setval('public.users_id_seq', 6, true);
 
 
 --
--- Name: vendors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: odoo
+-- Name: vendors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: -
 --
 
-SELECT pg_catalog.setval('public.vendors_id_seq', 681, true);
+SELECT pg_catalog.setval('public.vendors_id_seq', 706, true);
 
 
 --
--- Name: app_settings app_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: app_settings app_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.app_settings
@@ -120245,7 +120237,23 @@ ALTER TABLE ONLY public.app_settings
 
 
 --
--- Name: branches branches_code_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: backup_logs backup_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.backup_logs
+    ADD CONSTRAINT backup_logs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: backup_settings backup_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.backup_settings
+    ADD CONSTRAINT backup_settings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: branches branches_code_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.branches
@@ -120253,7 +120261,7 @@ ALTER TABLE ONLY public.branches
 
 
 --
--- Name: branches branches_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: branches branches_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.branches
@@ -120261,7 +120269,7 @@ ALTER TABLE ONLY public.branches
 
 
 --
--- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: categories categories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.categories
@@ -120269,7 +120277,7 @@ ALTER TABLE ONLY public.categories
 
 
 --
--- Name: companies companies_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: companies companies_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.companies
@@ -120277,7 +120285,7 @@ ALTER TABLE ONLY public.companies
 
 
 --
--- Name: customers customers_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: customers customers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.customers
@@ -120285,7 +120293,7 @@ ALTER TABLE ONLY public.customers
 
 
 --
--- Name: delivery_men delivery_men_name_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: delivery_men delivery_men_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.delivery_men
@@ -120293,7 +120301,7 @@ ALTER TABLE ONLY public.delivery_men
 
 
 --
--- Name: delivery_men delivery_men_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: delivery_men delivery_men_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.delivery_men
@@ -120301,7 +120309,7 @@ ALTER TABLE ONLY public.delivery_men
 
 
 --
--- Name: delivery_services delivery_services_name_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: delivery_services delivery_services_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.delivery_services
@@ -120309,7 +120317,7 @@ ALTER TABLE ONLY public.delivery_services
 
 
 --
--- Name: delivery_services delivery_services_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: delivery_services delivery_services_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.delivery_services
@@ -120317,7 +120325,7 @@ ALTER TABLE ONLY public.delivery_services
 
 
 --
--- Name: expenses expenses_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: expenses expenses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.expenses
@@ -120325,7 +120333,7 @@ ALTER TABLE ONLY public.expenses
 
 
 --
--- Name: inventory_logs inventory_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory_logs inventory_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory_logs
@@ -120333,7 +120341,7 @@ ALTER TABLE ONLY public.inventory_logs
 
 
 --
--- Name: inventory inventory_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory inventory_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory
@@ -120341,7 +120349,7 @@ ALTER TABLE ONLY public.inventory
 
 
 --
--- Name: invoice_settings invoice_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: invoice_settings invoice_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.invoice_settings
@@ -120349,7 +120357,7 @@ ALTER TABLE ONLY public.invoice_settings
 
 
 --
--- Name: locations locations_name_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: locations locations_name_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.locations
@@ -120357,7 +120365,7 @@ ALTER TABLE ONLY public.locations
 
 
 --
--- Name: locations locations_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: locations locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.locations
@@ -120365,7 +120373,7 @@ ALTER TABLE ONLY public.locations
 
 
 --
--- Name: media_receipts media_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: media_receipts media_receipts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.media_receipts
@@ -120373,7 +120381,7 @@ ALTER TABLE ONLY public.media_receipts
 
 
 --
--- Name: monthly_cash_summaries monthly_cash_summaries_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries monthly_cash_summaries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.monthly_cash_summaries
@@ -120381,7 +120389,7 @@ ALTER TABLE ONLY public.monthly_cash_summaries
 
 
 --
--- Name: order_payments order_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: order_payments order_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.order_payments
@@ -120389,7 +120397,7 @@ ALTER TABLE ONLY public.order_payments
 
 
 --
--- Name: pricing_schemes pricing_schemes_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: pricing_schemes pricing_schemes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.pricing_schemes
@@ -120397,7 +120405,7 @@ ALTER TABLE ONLY public.pricing_schemes
 
 
 --
--- Name: product_attachments product_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_attachments product_attachments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_attachments
@@ -120405,7 +120413,7 @@ ALTER TABLE ONLY public.product_attachments
 
 
 --
--- Name: product_boms product_boms_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_boms product_boms_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_boms
@@ -120413,7 +120421,7 @@ ALTER TABLE ONLY public.product_boms
 
 
 --
--- Name: product_combine_options product_combine_options_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_combine_options product_combine_options_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_combine_options
@@ -120421,7 +120429,7 @@ ALTER TABLE ONLY public.product_combine_options
 
 
 --
--- Name: product_prices product_prices_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_prices product_prices_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_prices
@@ -120429,7 +120437,7 @@ ALTER TABLE ONLY public.product_prices
 
 
 --
--- Name: product_vendors product_vendors_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_vendors product_vendors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_vendors
@@ -120437,7 +120445,7 @@ ALTER TABLE ONLY public.product_vendors
 
 
 --
--- Name: product_versions product_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_versions product_versions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_versions
@@ -120445,7 +120453,7 @@ ALTER TABLE ONLY public.product_versions
 
 
 --
--- Name: products products_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: products products_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.products
@@ -120453,7 +120461,7 @@ ALTER TABLE ONLY public.products
 
 
 --
--- Name: products products_sku_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: products products_sku_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.products
@@ -120461,7 +120469,7 @@ ALTER TABLE ONLY public.products
 
 
 --
--- Name: purchase_order_lines purchase_order_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_order_lines purchase_order_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_order_lines
@@ -120469,7 +120477,7 @@ ALTER TABLE ONLY public.purchase_order_lines
 
 
 --
--- Name: purchase_orders purchase_orders_order_number_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_orders purchase_orders_order_number_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_orders
@@ -120477,7 +120485,7 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
--- Name: purchase_orders purchase_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_orders purchase_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_orders
@@ -120485,7 +120493,7 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
--- Name: sales_order_lines sales_order_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_order_lines sales_order_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
@@ -120493,7 +120501,7 @@ ALTER TABLE ONLY public.sales_order_lines
 
 
 --
--- Name: sales_orders sales_orders_order_number_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_orders sales_orders_order_number_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_orders
@@ -120501,7 +120509,7 @@ ALTER TABLE ONLY public.sales_orders
 
 
 --
--- Name: sales_orders sales_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_orders sales_orders_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_orders
@@ -120509,7 +120517,7 @@ ALTER TABLE ONLY public.sales_orders
 
 
 --
--- Name: stock_adjustment_lines stock_adjustment_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines stock_adjustment_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustment_lines
@@ -120517,7 +120525,7 @@ ALTER TABLE ONLY public.stock_adjustment_lines
 
 
 --
--- Name: stock_adjustments stock_adjustments_adjustment_number_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustments stock_adjustments_adjustment_number_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustments
@@ -120525,7 +120533,7 @@ ALTER TABLE ONLY public.stock_adjustments
 
 
 --
--- Name: stock_adjustments stock_adjustments_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustments stock_adjustments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustments
@@ -120533,7 +120541,7 @@ ALTER TABLE ONLY public.stock_adjustments
 
 
 --
--- Name: stock_transfer_lines stock_transfer_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines stock_transfer_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfer_lines
@@ -120541,7 +120549,7 @@ ALTER TABLE ONLY public.stock_transfer_lines
 
 
 --
--- Name: stock_transfers stock_transfers_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfers stock_transfers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfers
@@ -120549,7 +120557,7 @@ ALTER TABLE ONLY public.stock_transfers
 
 
 --
--- Name: stock_transfers stock_transfers_transfer_number_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfers stock_transfers_transfer_number_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfers
@@ -120557,7 +120565,7 @@ ALTER TABLE ONLY public.stock_transfers
 
 
 --
--- Name: sublocations sublocations_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sublocations sublocations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sublocations
@@ -120565,7 +120573,7 @@ ALTER TABLE ONLY public.sublocations
 
 
 --
--- Name: inventory uq_inventory_loc; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory uq_inventory_loc; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory
@@ -120573,7 +120581,7 @@ ALTER TABLE ONLY public.inventory
 
 
 --
--- Name: sublocations uq_loc_subloc; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sublocations uq_loc_subloc; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sublocations
@@ -120581,7 +120589,7 @@ ALTER TABLE ONLY public.sublocations
 
 
 --
--- Name: product_prices uq_prod_scheme; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_prices uq_prod_scheme; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_prices
@@ -120589,7 +120597,7 @@ ALTER TABLE ONLY public.product_prices
 
 
 --
--- Name: product_vendors uq_product_vendor; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_vendors uq_product_vendor; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_vendors
@@ -120597,7 +120605,7 @@ ALTER TABLE ONLY public.product_vendors
 
 
 --
--- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: users users_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users
@@ -120605,7 +120613,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users
@@ -120613,7 +120621,7 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: vendors vendors_pkey; Type: CONSTRAINT; Schema: public; Owner: odoo
+-- Name: vendors vendors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.vendors
@@ -120621,336 +120629,336 @@ ALTER TABLE ONLY public.vendors
 
 
 --
--- Name: idx_customers_branch_id; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_customers_branch_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_customers_branch_id ON public.customers USING btree (branch_id);
 
 
 --
--- Name: idx_customers_name; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_customers_name; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_customers_name ON public.customers USING btree (name);
 
 
 --
--- Name: idx_customers_phone; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_customers_phone; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_customers_phone ON public.customers USING btree (phone);
 
 
 --
--- Name: idx_delivery_men_name; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_delivery_men_name; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_delivery_men_name ON public.delivery_men USING btree (name);
 
 
 --
--- Name: idx_expenses_branch; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_expenses_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_expenses_branch ON public.expenses USING btree (branch_id);
 
 
 --
--- Name: idx_expenses_date; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_expenses_date; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_expenses_date ON public.expenses USING btree (expense_date);
 
 
 --
--- Name: idx_expenses_month; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_expenses_month; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_expenses_month ON public.expenses USING btree (month_key);
 
 
 --
--- Name: idx_inv_logs_branch; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_inv_logs_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_inv_logs_branch ON public.inventory_logs USING btree (branch_id);
 
 
 --
--- Name: idx_inv_logs_created; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_inv_logs_created; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_inv_logs_created ON public.inventory_logs USING btree (created_at DESC);
 
 
 --
--- Name: idx_inv_logs_prod; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_inv_logs_prod; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_inv_logs_prod ON public.inventory_logs USING btree (product_id);
 
 
 --
--- Name: idx_inv_logs_type; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_inv_logs_type; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_inv_logs_type ON public.inventory_logs USING btree (movement_type);
 
 
 --
--- Name: idx_inventory_prod_loc; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_inventory_prod_loc; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_inventory_prod_loc ON public.inventory USING btree (product_id, location_id);
 
 
 --
--- Name: idx_inventory_qty; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_inventory_qty; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_inventory_qty ON public.inventory USING btree (quantity);
 
 
 --
--- Name: idx_media_receipts_date; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_media_receipts_date; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_media_receipts_date ON public.media_receipts USING btree (receipt_date);
 
 
 --
--- Name: idx_media_receipts_month; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_media_receipts_month; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_media_receipts_month ON public.media_receipts USING btree (month_key);
 
 
 --
--- Name: idx_monthly_cash_summaries_branch; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_monthly_cash_summaries_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_monthly_cash_summaries_branch ON public.monthly_cash_summaries USING btree (branch_id);
 
 
 --
--- Name: idx_payments_branch; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_payments_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_payments_branch ON public.order_payments USING btree (branch_id);
 
 
 --
--- Name: idx_payments_date; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_payments_date; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_payments_date ON public.order_payments USING btree (payment_date DESC);
 
 
 --
--- Name: idx_payments_order; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_payments_order; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_payments_order ON public.order_payments USING btree (order_type, order_id);
 
 
 --
--- Name: idx_po_date; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_po_date; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_po_date ON public.purchase_orders USING btree (order_date DESC);
 
 
 --
--- Name: idx_po_lines_po; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_po_lines_po; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_po_lines_po ON public.purchase_order_lines USING btree (purchase_order_id);
 
 
 --
--- Name: idx_po_lines_prod; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_po_lines_prod; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_po_lines_prod ON public.purchase_order_lines USING btree (product_id);
 
 
 --
--- Name: idx_po_number; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_po_number; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_po_number ON public.purchase_orders USING btree (order_number);
 
 
 --
--- Name: idx_po_status; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_po_status; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_po_status ON public.purchase_orders USING btree (status);
 
 
 --
--- Name: idx_po_vendor; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_po_vendor; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_po_vendor ON public.purchase_orders USING btree (vendor_id);
 
 
 --
--- Name: idx_prod_combine_pid; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_prod_combine_pid; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_prod_combine_pid ON public.product_combine_options USING btree (product_id);
 
 
 --
--- Name: idx_prod_vendors_pid; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_prod_vendors_pid; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_prod_vendors_pid ON public.product_vendors USING btree (product_id);
 
 
 --
--- Name: idx_prod_versions_pid; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_prod_versions_pid; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_prod_versions_pid ON public.product_versions USING btree (product_id);
 
 
 --
--- Name: idx_product_boms_component_id; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_product_boms_component_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_product_boms_component_id ON public.product_boms USING btree (component_product_id);
 
 
 --
--- Name: idx_product_boms_product_id; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_product_boms_product_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_product_boms_product_id ON public.product_boms USING btree (product_id);
 
 
 --
--- Name: idx_products_active; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_products_active; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_products_active ON public.products USING btree (is_active);
 
 
 --
--- Name: idx_products_barcode; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_products_barcode; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_products_barcode ON public.products USING btree (barcode);
 
 
 --
--- Name: idx_products_category; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_products_category; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_products_category ON public.products USING btree (category_id);
 
 
 --
--- Name: idx_products_name; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_products_name; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_products_name ON public.products USING gin (to_tsvector('simple'::regconfig, (name)::text));
 
 
 --
--- Name: idx_products_sku; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_products_sku; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_products_sku ON public.products USING btree (sku);
 
 
 --
--- Name: idx_so_branch; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_branch ON public.sales_orders USING btree (branch_id);
 
 
 --
--- Name: idx_so_customer; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_customer; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_customer ON public.sales_orders USING btree (customer_id);
 
 
 --
--- Name: idx_so_date; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_date; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_date ON public.sales_orders USING btree (order_date DESC);
 
 
 --
--- Name: idx_so_lines_prod; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_lines_prod; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_lines_prod ON public.sales_order_lines USING btree (product_id);
 
 
 --
--- Name: idx_so_lines_so; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_lines_so; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_lines_so ON public.sales_order_lines USING btree (sales_order_id);
 
 
 --
--- Name: idx_so_number; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_number; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_number ON public.sales_orders USING btree (order_number);
 
 
 --
--- Name: idx_so_status; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_so_status; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_so_status ON public.sales_orders USING btree (status);
 
 
 --
--- Name: idx_sol_order_line; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_sol_order_line; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_sol_order_line ON public.sales_order_lines USING btree (sales_order_id, line_num);
 
 
 --
--- Name: idx_users_branch_id; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_users_branch_id; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_users_branch_id ON public.users USING btree (branch_id);
 
 
 --
--- Name: idx_users_username; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_users_username; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_users_username ON public.users USING btree (username);
 
 
 --
--- Name: idx_vendors_name; Type: INDEX; Schema: public; Owner: odoo
+-- Name: idx_vendors_name; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX idx_vendors_name ON public.vendors USING btree (name);
 
 
 --
--- Name: uq_monthly_cash_summaries_month_branch; Type: INDEX; Schema: public; Owner: odoo
+-- Name: uq_monthly_cash_summaries_month_branch; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX uq_monthly_cash_summaries_month_branch ON public.monthly_cash_summaries USING btree (month_key, COALESCE(branch_id, 0));
 
 
 --
--- Name: branches branches_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: branches branches_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.branches
@@ -120958,7 +120966,7 @@ ALTER TABLE ONLY public.branches
 
 
 --
--- Name: categories categories_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: categories categories_parent_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.categories
@@ -120966,7 +120974,7 @@ ALTER TABLE ONLY public.categories
 
 
 --
--- Name: customers customers_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: customers customers_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.customers
@@ -120974,7 +120982,7 @@ ALTER TABLE ONLY public.customers
 
 
 --
--- Name: customers customers_default_pricing_scheme_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: customers customers_default_pricing_scheme_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.customers
@@ -120982,7 +120990,7 @@ ALTER TABLE ONLY public.customers
 
 
 --
--- Name: expenses expenses_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: expenses expenses_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.expenses
@@ -120990,7 +120998,7 @@ ALTER TABLE ONLY public.expenses
 
 
 --
--- Name: inventory inventory_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory inventory_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory
@@ -120998,7 +121006,7 @@ ALTER TABLE ONLY public.inventory
 
 
 --
--- Name: inventory_logs inventory_logs_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory_logs inventory_logs_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory_logs
@@ -121006,7 +121014,7 @@ ALTER TABLE ONLY public.inventory_logs
 
 
 --
--- Name: inventory_logs inventory_logs_from_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory_logs inventory_logs_from_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory_logs
@@ -121014,7 +121022,7 @@ ALTER TABLE ONLY public.inventory_logs
 
 
 --
--- Name: inventory_logs inventory_logs_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory_logs inventory_logs_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory_logs
@@ -121022,7 +121030,7 @@ ALTER TABLE ONLY public.inventory_logs
 
 
 --
--- Name: inventory_logs inventory_logs_to_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory_logs inventory_logs_to_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory_logs
@@ -121030,7 +121038,7 @@ ALTER TABLE ONLY public.inventory_logs
 
 
 --
--- Name: inventory inventory_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: inventory inventory_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.inventory
@@ -121038,7 +121046,7 @@ ALTER TABLE ONLY public.inventory
 
 
 --
--- Name: monthly_cash_summaries monthly_cash_summaries_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: monthly_cash_summaries monthly_cash_summaries_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.monthly_cash_summaries
@@ -121046,7 +121054,7 @@ ALTER TABLE ONLY public.monthly_cash_summaries
 
 
 --
--- Name: order_payments order_payments_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: order_payments order_payments_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.order_payments
@@ -121054,7 +121062,7 @@ ALTER TABLE ONLY public.order_payments
 
 
 --
--- Name: product_attachments product_attachments_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_attachments product_attachments_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_attachments
@@ -121062,7 +121070,7 @@ ALTER TABLE ONLY public.product_attachments
 
 
 --
--- Name: product_boms product_boms_component_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_boms product_boms_component_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_boms
@@ -121070,7 +121078,7 @@ ALTER TABLE ONLY public.product_boms
 
 
 --
--- Name: product_boms product_boms_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_boms product_boms_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_boms
@@ -121078,7 +121086,7 @@ ALTER TABLE ONLY public.product_boms
 
 
 --
--- Name: product_combine_options product_combine_options_component_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_combine_options product_combine_options_component_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_combine_options
@@ -121086,7 +121094,7 @@ ALTER TABLE ONLY public.product_combine_options
 
 
 --
--- Name: product_combine_options product_combine_options_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_combine_options product_combine_options_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_combine_options
@@ -121094,7 +121102,7 @@ ALTER TABLE ONLY public.product_combine_options
 
 
 --
--- Name: product_prices product_prices_pricing_scheme_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_prices product_prices_pricing_scheme_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_prices
@@ -121102,7 +121110,7 @@ ALTER TABLE ONLY public.product_prices
 
 
 --
--- Name: product_prices product_prices_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_prices product_prices_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_prices
@@ -121110,7 +121118,7 @@ ALTER TABLE ONLY public.product_prices
 
 
 --
--- Name: product_vendors product_vendors_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_vendors product_vendors_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_vendors
@@ -121118,7 +121126,7 @@ ALTER TABLE ONLY public.product_vendors
 
 
 --
--- Name: product_vendors product_vendors_vendor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_vendors product_vendors_vendor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_vendors
@@ -121126,7 +121134,7 @@ ALTER TABLE ONLY public.product_vendors
 
 
 --
--- Name: product_versions product_versions_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: product_versions product_versions_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.product_versions
@@ -121134,7 +121142,7 @@ ALTER TABLE ONLY public.product_versions
 
 
 --
--- Name: products products_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: products products_category_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.products
@@ -121142,7 +121150,7 @@ ALTER TABLE ONLY public.products
 
 
 --
--- Name: products products_default_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: products products_default_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.products
@@ -121150,7 +121158,7 @@ ALTER TABLE ONLY public.products
 
 
 --
--- Name: products products_last_vendor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: products products_last_vendor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.products
@@ -121158,7 +121166,7 @@ ALTER TABLE ONLY public.products
 
 
 --
--- Name: purchase_order_lines purchase_order_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_order_lines purchase_order_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_order_lines
@@ -121166,7 +121174,7 @@ ALTER TABLE ONLY public.purchase_order_lines
 
 
 --
--- Name: purchase_order_lines purchase_order_lines_purchase_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_order_lines purchase_order_lines_purchase_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_order_lines
@@ -121174,7 +121182,7 @@ ALTER TABLE ONLY public.purchase_order_lines
 
 
 --
--- Name: purchase_orders purchase_orders_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_orders purchase_orders_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_orders
@@ -121182,7 +121190,7 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
--- Name: purchase_orders purchase_orders_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_orders purchase_orders_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_orders
@@ -121190,7 +121198,7 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
--- Name: purchase_orders purchase_orders_vendor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: purchase_orders purchase_orders_vendor_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.purchase_orders
@@ -121198,7 +121206,7 @@ ALTER TABLE ONLY public.purchase_orders
 
 
 --
--- Name: sales_order_lines sales_order_lines_addon_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_order_lines sales_order_lines_addon_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
@@ -121206,7 +121214,7 @@ ALTER TABLE ONLY public.sales_order_lines
 
 
 --
--- Name: sales_order_lines sales_order_lines_combine_option_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_order_lines sales_order_lines_combine_option_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
@@ -121214,7 +121222,7 @@ ALTER TABLE ONLY public.sales_order_lines
 
 
 --
--- Name: sales_order_lines sales_order_lines_pricing_scheme_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_order_lines sales_order_lines_pricing_scheme_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
@@ -121222,7 +121230,7 @@ ALTER TABLE ONLY public.sales_order_lines
 
 
 --
--- Name: sales_order_lines sales_order_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_order_lines sales_order_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
@@ -121230,7 +121238,7 @@ ALTER TABLE ONLY public.sales_order_lines
 
 
 --
--- Name: sales_order_lines sales_order_lines_sales_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_order_lines sales_order_lines_sales_order_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_order_lines
@@ -121238,7 +121246,7 @@ ALTER TABLE ONLY public.sales_order_lines
 
 
 --
--- Name: sales_orders sales_orders_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_orders sales_orders_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_orders
@@ -121246,7 +121254,7 @@ ALTER TABLE ONLY public.sales_orders
 
 
 --
--- Name: sales_orders sales_orders_customer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_orders sales_orders_customer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_orders
@@ -121254,7 +121262,7 @@ ALTER TABLE ONLY public.sales_orders
 
 
 --
--- Name: sales_orders sales_orders_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sales_orders sales_orders_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sales_orders
@@ -121262,7 +121270,7 @@ ALTER TABLE ONLY public.sales_orders
 
 
 --
--- Name: stock_adjustment_lines stock_adjustment_lines_adjustment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines stock_adjustment_lines_adjustment_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustment_lines
@@ -121270,7 +121278,7 @@ ALTER TABLE ONLY public.stock_adjustment_lines
 
 
 --
--- Name: stock_adjustment_lines stock_adjustment_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustment_lines stock_adjustment_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustment_lines
@@ -121278,7 +121286,7 @@ ALTER TABLE ONLY public.stock_adjustment_lines
 
 
 --
--- Name: stock_adjustments stock_adjustments_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustments stock_adjustments_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustments
@@ -121286,7 +121294,7 @@ ALTER TABLE ONLY public.stock_adjustments
 
 
 --
--- Name: stock_adjustments stock_adjustments_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_adjustments stock_adjustments_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_adjustments
@@ -121294,7 +121302,7 @@ ALTER TABLE ONLY public.stock_adjustments
 
 
 --
--- Name: stock_transfer_lines stock_transfer_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines stock_transfer_lines_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfer_lines
@@ -121302,7 +121310,7 @@ ALTER TABLE ONLY public.stock_transfer_lines
 
 
 --
--- Name: stock_transfer_lines stock_transfer_lines_transfer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfer_lines stock_transfer_lines_transfer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfer_lines
@@ -121310,7 +121318,7 @@ ALTER TABLE ONLY public.stock_transfer_lines
 
 
 --
--- Name: stock_transfers stock_transfers_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfers stock_transfers_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfers
@@ -121318,7 +121326,7 @@ ALTER TABLE ONLY public.stock_transfers
 
 
 --
--- Name: stock_transfers stock_transfers_from_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfers stock_transfers_from_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfers
@@ -121326,7 +121334,7 @@ ALTER TABLE ONLY public.stock_transfers
 
 
 --
--- Name: stock_transfers stock_transfers_to_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: stock_transfers stock_transfers_to_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.stock_transfers
@@ -121334,7 +121342,7 @@ ALTER TABLE ONLY public.stock_transfers
 
 
 --
--- Name: sublocations sublocations_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: sublocations sublocations_location_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.sublocations
@@ -121342,7 +121350,7 @@ ALTER TABLE ONLY public.sublocations
 
 
 --
--- Name: users users_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: odoo
+-- Name: users users_branch_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users

@@ -20,7 +20,7 @@
         </div>
         <nav class="settings-tabs-list">
             <!-- Tab 1: Company Profile -->
-            <button type="button" class="settings-nav-tab {% if active_tab not in ['tabDecimals', 'tabInvoice', 'tabUsers'] %}active{% endif %}" id="btnTabCompany" onclick="switchSettingsTab('tabCompany', this)">
+            <button type="button" class="settings-nav-tab {% if active_tab not in ['tabDecimals', 'tabInvoice', 'tabUsers', 'tabBackup'] %}active{% endif %}" id="btnTabCompany" onclick="switchSettingsTab('tabCompany', this)">
                 <div class="tab-icon-wrap">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
                 </div>
@@ -62,6 +62,17 @@
                     <span class="tab-desc">User accounts & access roles</span>
                 </div>
             </button>
+
+            <!-- Tab 5: Backup & Restore -->
+            <button type="button" class="settings-nav-tab {% if active_tab == 'tabBackup' %}active{% endif %}" id="btnTabBackup" onclick="switchSettingsTab('tabBackup', this)">
+                <div class="tab-icon-wrap" style="background: rgba(14, 165, 233, 0.12); color: #0284C7;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <div class="tab-text-wrap">
+                    <span class="tab-title">Backup & Restore</span>
+                    <span class="tab-desc">.SQL dump, restore & Google Drive</span>
+                </div>
+            </button>
         </nav>
     </aside>
 
@@ -71,7 +82,7 @@
 <!-- ========================================== -->
 <!-- TAB 1: Company Profile                     -->
 <!-- ========================================== -->
-<div id="tabCompany" class="settings-tab-pane" {% if active_tab in ['tabDecimals', 'tabInvoice', 'tabUsers'] %}style="display: none;"{% endif %}>
+<div id="tabCompany" class="settings-tab-pane" {% if active_tab in ['tabDecimals', 'tabInvoice', 'tabUsers', 'tabBackup'] %}style="display: none;"{% endif %}>
     <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px;">
         <!-- Profile Form -->
         <div class="card">
@@ -237,6 +248,28 @@
                 <a href="{{ url_for('migration.migration_page') }}" class="btn btn-primary btn-sm" style="width: 100%;">
                     Open inFlow SQL Sync Hub →
                 </a>
+            </div>
+
+            <div class="card" style="background: #F0F9FF; border-color: #BAE6FD;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <h3 style="font-size: 1rem; font-weight: 700; color: #0369A1; margin: 0; display: flex; align-items: center; gap: 6px;">
+                        <span>💾</span> Database Backup (.sql)
+                    </h3>
+                    <span style="font-size: 11px; background: #E0F2FE; color: #0369A1; padding: 2px 8px; border-radius: 12px; font-weight: 700;">
+                        {{ backups_count }} backups
+                    </span>
+                </div>
+                <p style="font-size: 0.82rem; color: #075985; margin-bottom: 12px;">
+                    Export full PostgreSQL database as dated <code>.sql</code> files, restore data, and automatically save to Google Drive.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" onclick="switchSettingsTab('tabBackup', document.getElementById('btnTabBackup'))" class="btn btn-primary btn-sm" style="width: 100%; background: #0284C7; border-color: #0284C7;">
+                        Open Backup & Restore Center →
+                    </button>
+                    <button type="button" onclick="triggerQuickBackup(event)" class="btn btn-outline btn-sm" style="width: 100%; background: #FFFFFF; color: #0284C7; border-color: #BAE6FD;">
+                        ⚡ Quick Backup (.sql) Now
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -1251,6 +1284,433 @@
         </div>
     </div>
 </div>
+
+<!-- ======================================================= -->
+<!-- TAB 5: Database Backup, Restore & Google Drive Sync     -->
+<!-- ======================================================= -->
+<div id="tabBackup" class="settings-tab-pane" {% if active_tab != 'tabBackup' %}style="display: none;"{% endif %}>
+    <!-- Top Hero Banner -->
+    <div class="card" style="margin-bottom: 24px; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); color: #FFFFFF; border: none; padding: 24px 28px; position: relative; overflow: hidden;">
+        <div style="position: absolute; right: -20px; top: -20px; width: 180px; height: 180px; background: radial-gradient(circle, rgba(14, 165, 233, 0.15) 0%, rgba(14, 165, 233, 0) 70%); border-radius: 50%; pointer-events: none;"></div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; position: relative; z-index: 1;">
+            <div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+                    <div style="width: 42px; height: 42px; border-radius: 10px; background: rgba(14, 165, 233, 0.2); display: flex; align-items: center; justify-content: center; color: #38BDF8;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    </div>
+                    <div>
+                        <h2 style="font-size: 1.35rem; font-weight: 800; color: #FFFFFF; margin: 0; letter-spacing: -0.02em;">
+                            Database Backup & Disaster Recovery
+                        </h2>
+                        <span style="font-size: 0.84rem; color: #94A3B8;">
+                            PostgreSQL 16 full <code>.sql</code> dumps with timestamp • 1-Click Restore • Automated Google Drive Sync
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                <button type="button" onclick="openCreateBackupModal()" class="btn btn-primary" style="background: #0284C7; border-color: #0284C7; font-weight: 700; padding: 9px 18px; border-radius: 8px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    Create Backup (.sql)
+                </button>
+                <button type="button" onclick="openRestoreModal()" class="btn btn-outline" style="background: rgba(255, 255, 255, 0.1); color: #FFFFFF; border-color: rgba(255, 255, 255, 0.25); font-weight: 600; padding: 9px 16px; border-radius: 8px; display: flex; align-items: center; gap: 8px;">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2.5 2v6h6M21.5 22v-6h-6"/><path d="M22 11.5A10 10 0 0 0 3.2 7.2M2 12.5a10 10 0 0 0 18.8 4.2"/></svg>
+                    Restore Database
+                </button>
+                <button type="button" onclick="window.location.href='{{ url_for('settings.general_settings', tab='tabBackup') }}'" class="btn btn-outline" style="background: rgba(255, 255, 255, 0.05); color: #CBD5E1; border-color: rgba(255, 255, 255, 0.15); padding: 9px 12px; border-radius: 8px;" title="Refresh list">
+                    🔄
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4 Key Metrics Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">
+        <div class="card" style="padding: 16px 20px; display: flex; align-items: center; gap: 16px; border-left: 4px solid #0284C7;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                🗄️
+            </div>
+            <div>
+                <div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B;">Total Backups</div>
+                <div style="font-size: 1.45rem; font-weight: 800; color: #0F172A;">{{ backups_count }} <span style="font-size: 0.85rem; font-weight: 500; color: #64748B;">files</span></div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 16px 20px; display: flex; align-items: center; gap: 16px; border-left: 4px solid #10B981;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: #DCFCE7; color: #10B981; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                💾
+            </div>
+            <div>
+                <div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B;">Disk Space Used</div>
+                <div style="font-size: 1.45rem; font-weight: 800; color: #0F172A;">{{ backups_formatted_total_size }}</div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 16px 20px; display: flex; align-items: center; gap: 16px; border-left: 4px solid #F59E0B;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: #FEF3C7; color: #F59E0B; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                ⏱️
+            </div>
+            <div>
+                <div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B;">Latest Backup</div>
+                <div style="font-size: 0.95rem; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px;">
+                    {{ latest_backup.date_display if latest_backup else 'No backup yet' }}
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="padding: 16px 20px; display: flex; align-items: center; gap: 16px; border-left: 4px solid #3B82F6;">
+            <div style="width: 44px; height: 44px; border-radius: 10px; background: #DBEAFE; color: #2563EB; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                ☁️
+            </div>
+            <div>
+                <div style="font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748B;">Google Drive Sync</div>
+                <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                    {% if backup_settings.auto_save_gdrive %}
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #10B981; box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);"></span>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: #059669;">Auto-Sync ON</span>
+                    {% else %}
+                    <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94A3B8;"></span>
+                    <span style="font-size: 0.95rem; font-weight: 700; color: #64748B;">Manual / Standby</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Google Drive & Auto-Backup Settings Card -->
+    <div class="card" style="margin-bottom: 24px; border-color: #BAE6FD; background: #FBFCFE;">
+        <div style="padding-bottom: 16px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <!-- Google Drive Tri-color Icon -->
+                <svg width="32" height="32" viewBox="0 0 87.3 78" style="flex-shrink: 0;">
+                    <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/>
+                    <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/>
+                    <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/>
+                    <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/>
+                    <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/>
+                    <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/>
+                </svg>
+                <div>
+                    <h3 style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 8px;">
+                        Google Drive Integration & Automated Backup
+                    </h3>
+                    <p style="font-size: 0.83rem; color: #64748B; margin: 2px 0 0 0;">
+                        Automatically save every <code>.sql</code> backup with current date to Google Drive for secure offsite backup.
+                    </p>
+                </div>
+            </div>
+            
+            <div id="gdriveStatusBadge">
+                {% if backup_settings.auto_save_gdrive %}
+                <span style="background: #DCFCE7; color: #166534; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #BBF7D0;">
+                    ✓ Auto-Save Enabled
+                </span>
+                {% else %}
+                <span style="background: #F1F5F9; color: #475569; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #E2E8F0;">
+                    Auto-Save Disabled
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <form id="gdriveConfigForm" onsubmit="saveBackupConfig(event)" style="padding-top: 20px;">
+            <!-- Auto-save switch -->
+            <div style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 14px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="font-size: 24px;">☁️</div>
+                    <div>
+                        <label for="autoSaveGdriveToggle" style="font-weight: 800; font-size: 0.95rem; color: #0F172A; cursor: pointer; margin-bottom: 2px; display: block;">
+                            Automatically Save Every Backup to Google Drive
+                        </label>
+                        <span style="font-size: 0.82rem; color: #64748B;">
+                            Whenever a backup is created (manual or scheduled), the dated <code>.sql</code> file is instantly saved to your configured Google Drive.
+                        </span>
+                    </div>
+                </div>
+                <div>
+                    <label class="switch" style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                        <input type="checkbox" name="auto_save_gdrive" id="autoSaveGdriveToggle" value="true" {% if backup_settings.auto_save_gdrive %}checked{% endif %} style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: {% if backup_settings.auto_save_gdrive %}#0284C7{% else %}#CBD5E1{% endif %}; transition: .3s; border-radius: 34px;"></span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Google Drive Mode Selection (2 Options) -->
+            <div style="margin-bottom: 20px;">
+                <label style="font-size: 0.86rem; font-weight: 700; color: #334155; margin-bottom: 10px; display: block;">
+                    Google Drive Sync Method (ជ្រើសរើសវិធីសាស្ត្រតភ្ជាប់ Google Drive):
+                </label>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <!-- Option 1: Google Drive for Desktop -->
+                    <div onclick="selectGDriveMode('local_sync')" id="cardModeLocal" class="gdrive-mode-card {% if backup_settings.gdrive_mode != 'cloud_api' %}active{% endif %}" style="border: 2px solid {% if backup_settings.gdrive_mode != 'cloud_api' %}#0284C7{% else %}#E2E8F0{% endif %}; background: {% if backup_settings.gdrive_mode != 'cloud_api' %}#F0F9FF{% else %}#FFFFFF{% endif %}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 20px;">💻</span>
+                                <strong style="font-size: 0.95rem; color: #0F172A;">Google Drive for Desktop</strong>
+                            </div>
+                            <input type="radio" name="gdrive_mode" value="local_sync" {% if backup_settings.gdrive_mode != 'cloud_api' %}checked{% endif %} id="radioModeLocal">
+                        </div>
+                        <p style="font-size: 0.81rem; color: #64748B; margin: 0 0 8px 0; line-height: 1.4;">
+                            <strong>Recommended for Office PC:</strong> Uses your installed "Google Drive for Desktop" app. Backups are copied to your Google Drive folder and synced to cloud in real time.
+                        </p>
+                        <span style="font-size: 11px; background: #E0F2FE; color: #0369A1; padding: 2px 7px; border-radius: 6px; font-weight: 700;">Zero setup needed</span>
+                    </div>
+
+                    <!-- Option 2: Cloud API Service Account -->
+                    <div onclick="selectGDriveMode('cloud_api')" id="cardModeCloud" class="gdrive-mode-card {% if backup_settings.gdrive_mode == 'cloud_api' %}active{% endif %}" style="border: 2px solid {% if backup_settings.gdrive_mode == 'cloud_api' %}#0284C7{% else %}#E2E8F0{% endif %}; background: {% if backup_settings.gdrive_mode == 'cloud_api' %}#F0F9FF{% else %}#FFFFFF{% endif %}; border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 20px;">☁️</span>
+                                <strong style="font-size: 0.95rem; color: #0F172A;">Google Drive Direct Cloud API</strong>
+                            </div>
+                            <input type="radio" name="gdrive_mode" value="cloud_api" {% if backup_settings.gdrive_mode == 'cloud_api' %}checked{% endif %} id="radioModeCloud">
+                        </div>
+                        <p style="font-size: 0.81rem; color: #64748B; margin: 0 0 8px 0; line-height: 1.4;">
+                            <strong>Direct Cloud Upload:</strong> Uses a Google Cloud Service Account JSON key to upload directly to a specific Google Drive Folder ID without requiring desktop sync.
+                        </p>
+                        <span style="font-size: 11px; background: #FEF3C7; color: #B45309; padding: 2px 7px; border-radius: 6px; font-weight: 700;">Ideal for VPS/Cloud</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mode 1 Parameters: Local Sync Folder -->
+            <div id="sectionLocalSync" style="{% if backup_settings.gdrive_mode == 'cloud_api' %}display: none;{% endif %} background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+                <label class="form-label" style="font-weight: 700; font-size: 0.86rem; color: #334155; margin-bottom: 6px;">
+                    Google Drive Sync Folder Path on PC (ផ្លូវថត Google Drive លើម៉ាស៊ីន) *
+                </label>
+                <div style="display: flex; gap: 10px;">
+                    <input type="text" name="gdrive_local_path" id="inputLocalPath" value="{{ backup_settings.gdrive_local_path or 'G:\\My Drive\\inFlow_Backups' }}" class="form-input" placeholder="e.g. G:\My Drive\inFlow_Backups or C:\Users\ADMIN\Google Drive\Backups" style="font-family: monospace; font-size: 0.88rem; flex: 1;">
+                    <button type="button" onclick="testGDrive('local_sync')" class="btn btn-outline" style="white-space: nowrap; font-weight: 600; padding: 0 16px;">
+                        🔍 Test Folder Access
+                    </button>
+                </div>
+                <div style="font-size: 0.78rem; color: #64748B; margin-top: 6px; display: flex; gap: 12px; flex-wrap: wrap;">
+                    <span>💡 Standard paths: <code>G:\My Drive\inFlow_Backups</code> or <code>C:\Users\&lt;YourName&gt;\Google Drive\Backups</code></span>
+                </div>
+            </div>
+
+            <!-- Mode 2 Parameters: Cloud API -->
+            <div id="sectionCloudApi" style="{% if backup_settings.gdrive_mode != 'cloud_api' %}display: none;{% endif %} background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
+                    <div>
+                        <label class="form-label" style="font-weight: 700; font-size: 0.86rem; color: #334155;">
+                            Target Google Drive Folder ID (លេខសម្គាល់ Folder)
+                        </label>
+                        <input type="text" name="gdrive_folder_id" id="inputFolderId" value="{{ backup_settings.gdrive_folder_id or '' }}" class="form-input" placeholder="e.g. 1aBcDeFgHiJkLmNoPqRsTuVwXyZ" style="font-family: monospace;">
+                        <span style="font-size: 0.76rem; color: #94A3B8;">Copied from folder URL: drive.google.com/drive/folders/<strong>[FOLDER_ID]</strong></span>
+                    </div>
+
+                    <div>
+                        <label class="form-label" style="font-weight: 700; font-size: 0.86rem; color: #334155;">
+                            Upload Service Account JSON File (.json)
+                        </label>
+                        <input type="file" name="sa_file" id="inputSaFile" accept=".json" class="form-input" style="padding: 6px 12px; font-size: 0.82rem;" onchange="readSaJsonFile(this)">
+                        <span style="font-size: 0.76rem; color: #94A3B8;">From Google Cloud Console &gt; Service Accounts &gt; Keys</span>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-weight: 700; font-size: 0.86rem; color: #334155;">
+                        Service Account JSON Credentials Key (or paste below)
+                    </label>
+                    <textarea name="gdrive_service_account_json" id="inputSaJson" rows="3" class="form-textarea" placeholder='{"type": "service_account", "project_id": "...", "private_key": "...", "client_email": "..."}' style="font-family: monospace; font-size: 0.78rem;">{{ backup_settings.gdrive_service_account_json or '' }}</textarea>
+                </div>
+
+                <button type="button" onclick="testGDrive('cloud_api')" class="btn btn-outline" style="font-weight: 600; padding: 7px 16px;">
+                    🔍 Test Google Drive API Connection
+                </button>
+            </div>
+
+            <!-- Automated Backup Schedule Settings -->
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span style="font-size: 20px;">⏰</span>
+                        <div>
+                            <label for="autoBackupToggle" style="font-weight: 800; font-size: 0.92rem; color: #0F172A; cursor: pointer; margin-bottom: 2px; display: block;">
+                                Enable Automated Scheduled Backups
+                            </label>
+                            <span style="font-size: 0.80rem; color: #64748B;">
+                                System automatically takes .sql snapshots in the background and uploads them to Google Drive.
+                            </span>
+                        </div>
+                    </div>
+                    <div>
+                        <input type="checkbox" name="auto_backup_enabled" id="autoBackupToggle" value="true" {% if backup_settings.auto_backup_enabled %}checked{% endif %} style="transform: scale(1.3); cursor: pointer;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label class="form-label" style="font-weight: 700; font-size: 0.82rem; color: #334155;">Backup Frequency</label>
+                        <select name="auto_backup_frequency" class="form-input">
+                            <option value="daily" {% if backup_settings.auto_backup_frequency == 'daily' %}selected{% endif %}>Daily (រៀងរាល់ថ្ងៃ)</option>
+                            <option value="every_12h" {% if backup_settings.auto_backup_frequency == 'every_12h' %}selected{% endif %}>Every 12 Hours (រៀងរាល់ ១២ ម៉ោង)</option>
+                            <option value="every_6h" {% if backup_settings.auto_backup_frequency == 'every_6h' %}selected{% endif %}>Every 6 Hours (រៀងរាល់ ៦ ម៉ោង)</option>
+                            <option value="weekly" {% if backup_settings.auto_backup_frequency == 'weekly' %}selected{% endif %}>Weekly (រៀងរាល់សប្តាហ៍)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="form-label" style="font-weight: 700; font-size: 0.82rem; color: #334155;">Scheduled Time</label>
+                        <input type="time" name="auto_backup_time" value="{{ backup_settings.auto_backup_time or '23:00' }}" class="form-input">
+                    </div>
+
+                    <div>
+                        <label class="form-label" style="font-weight: 700; font-size: 0.82rem; color: #334155;">Retention Limit (Files)</label>
+                        <input type="number" name="retention_count" value="{{ backup_settings.retention_count or 15 }}" min="3" max="100" class="form-input" title="Keep latest N backups and clean older files to save disk space">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Save settings action bar -->
+            <div style="display: flex; justify-content: flex-end; align-items: center; gap: 12px;">
+                <span id="configSaveMsg" style="font-size: 0.85rem; font-weight: 600; display: none;"></span>
+                <button type="submit" id="btnSaveBackupConfig" class="btn btn-primary" style="background: #0284C7; border-color: #0284C7; font-weight: 700; padding: 10px 24px; border-radius: 8px;">
+                    💾 Save Backup & Google Drive Settings
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Backup Files History Table -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 18px 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; background: #F8FAFC;">
+            <div>
+                <h3 style="font-size: 1.1rem; font-weight: 800; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <span>📂</span> Available .SQL Database Backups
+                </h3>
+                <span style="font-size: 0.80rem; color: #64748B;">
+                    All backups created on this system with file sizes, timestamps, and Google Drive sync status.
+                </span>
+            </div>
+
+            <div style="display: flex; gap: 10px; align-items: center;">
+                <input type="text" id="backupSearchInput" onkeyup="filterBackupTable()" placeholder="Filter backups by date or name..." class="form-input" style="padding: 6px 12px; font-size: 0.82rem; width: 220px;">
+                <select id="backupTypeFilter" onchange="filterBackupTable()" class="form-input" style="padding: 6px 10px; font-size: 0.82rem; width: 140px;">
+                    <option value="">All Types</option>
+                    <option value="manual">Manual</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="safety">Safety Snapshot</option>
+                </select>
+            </div>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="table" id="backupsTable" style="width: 100%; border-collapse: collapse; margin-bottom: 0;">
+                <thead>
+                    <tr style="background: #F1F5F9; border-bottom: 2px solid #E2E8F0;">
+                        <th style="padding: 12px 18px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Backup File (.sql)</th>
+                        <th style="padding: 12px 18px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Created Date & Time</th>
+                        <th style="padding: 12px 18px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Size</th>
+                        <th style="padding: 12px 18px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Type</th>
+                        <th style="padding: 12px 18px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Google Drive</th>
+                        <th style="padding: 12px 18px; text-align: right; font-size: 11px; font-weight: 700; text-transform: uppercase; color: #475569;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if backups %}
+                    {% for b in backups %}
+                    <tr class="backup-row" data-filename="{{ b.filename|lower }}" data-date="{{ b.date_display|lower }}" data-type="{{ b.backup_type }}" style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s;">
+                        <td style="padding: 14px 18px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="width: 32px; height: 32px; border-radius: 6px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0;">
+                                    SQL
+                                </div>
+                                <div>
+                                    <strong style="font-family: monospace; font-size: 0.88rem; color: #0F172A; display: block;">
+                                        {{ b.filename }}
+                                    </strong>
+                                    {% if b.is_safety %}
+                                    <span style="font-size: 10.5px; color: #B45309; background: #FEF3C7; padding: 1px 6px; border-radius: 4px; font-weight: 600;">
+                                        Pre-Restore Safety Snapshot
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </td>
+                        <td style="padding: 14px 18px; font-size: 0.85rem; color: #334155; white-space: nowrap;">
+                            <span style="font-weight: 600;">{{ b.date_display }}</span>
+                        </td>
+                        <td style="padding: 14px 18px; font-size: 0.85rem; color: #0F172A; font-weight: 700; white-space: nowrap;">
+                            {{ b.formatted_size }}
+                        </td>
+                        <td style="padding: 14px 18px; white-space: nowrap;">
+                            {% if b.backup_type == 'scheduled' %}
+                            <span style="font-size: 11px; font-weight: 700; background: #F3E8FF; color: #7E22CE; padding: 2px 8px; border-radius: 10px;">
+                                ⏰ Scheduled
+                            </span>
+                            {% elif b.is_safety or b.backup_type == 'safety' %}
+                            <span style="font-size: 11px; font-weight: 700; background: #FEF3C7; color: #B45309; padding: 2px 8px; border-radius: 10px;">
+                                🛡️ Safety
+                            </span>
+                            {% else %}
+                            <span style="font-size: 11px; font-weight: 700; background: #E0F2FE; color: #0369A1; padding: 2px 8px; border-radius: 10px;">
+                                👤 Manual
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 14px 18px; white-space: nowrap;">
+                            {% if b.gdrive_status == 'synced' %}
+                            <span style="font-size: 11.5px; font-weight: 700; background: #DCFCE7; color: #166534; padding: 3px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                                ✓ Synced
+                            </span>
+                            {% elif b.gdrive_status == 'failed' %}
+                            <span style="font-size: 11.5px; font-weight: 700; background: #FEE2E2; color: #991B1B; padding: 3px 8px; border-radius: 12px;" title="{{ b.gdrive_details }}">
+                                ⚠️ Sync Failed
+                            </span>
+                            {% else %}
+                            <span style="font-size: 11px; color: #94A3B8;">
+                                Local Only
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td style="padding: 14px 18px; text-align: right; white-space: nowrap;">
+                            <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
+                                <!-- Download -->
+                                <a href="{{ url_for('settings.download_backup_action', filename=b.filename) }}" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #F8FAFC; color: #0284C7; border: 1px solid #CBD5E1; border-radius: 6px; text-decoration: none; font-weight: 600;" title="Download .sql file to your computer">
+                                    ⬇️ Download
+                                </a>
+
+                                <!-- Sync to Google Drive -->
+                                <button type="button" onclick="syncSingleBackupToGDrive('{{ b.filename }}', this)" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 6px; font-weight: 600;" title="Save / Re-upload to Google Drive">
+                                    ☁️ Drive
+                                </button>
+
+                                <!-- Restore -->
+                                <button type="button" onclick="openRestoreModal('{{ b.filename }}')" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A; border-radius: 6px; font-weight: 700;" title="Restore this backup into database">
+                                    🔄 Restore
+                                </button>
+
+                                <!-- Delete -->
+                                <button type="button" onclick="deleteBackupFile('{{ b.filename }}', this)" class="btn btn-sm" style="padding: 4px 8px; font-size: 11.5px; background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA; border-radius: 6px; cursor: pointer;" title="Delete backup file">
+                                    🗑️
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="padding: 40px 20px; text-align: center; color: #64748B;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">📭</div>
+                            <div style="font-weight: 700; color: #334155; margin-bottom: 4px;">No Database Backups Found</div>
+                            <div style="font-size: 0.84rem; margin-bottom: 16px;">Click the button below to generate your first full PostgreSQL database backup.</div>
+                            <button type="button" onclick="openCreateBackupModal()" class="btn btn-primary btn-sm" style="background: #0284C7; border-color: #0284C7;">
+                                Create First Backup (.sql)
+                            </button>
+                        </td>
+                    </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
     </main>
 </div><!-- /.settings-page-layout -->
 
@@ -1406,8 +1866,531 @@
     </div>
 </div>
 
+<!-- ========================================== -->
+<!-- MODAL: CREATE DATABASE BACKUP (.sql)       -->
+<!-- ========================================== -->
+<div id="createBackupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.65); z-index: 100000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #FFFFFF; border-radius: 14px; max-width: 540px; width: 92%; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 45px rgba(0,0,0,0.3); border: 1px solid #E2E8F0;">
+        <div style="padding: 18px 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #F8FAFC; border-radius: 14px 14px 0 0;">
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0F172A; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>💾</span> Create PostgreSQL Database Backup
+            </h3>
+            <button type="button" onclick="closeCreateBackupModal()" style="background: none; border: none; font-size: 18px; color: #64748B; cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
+        </div>
+
+        <form id="createBackupForm" onsubmit="submitCreateBackup(event)" style="padding: 24px;">
+            <div style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 10px; padding: 14px 16px; margin-bottom: 18px;">
+                <div style="font-size: 0.82rem; color: #0369A1; font-weight: 700; margin-bottom: 4px;">
+                    OUTPUT FILE FORMAT
+                </div>
+                <div style="font-family: monospace; font-size: 0.92rem; font-weight: 700; color: #0C4A6E; word-break: break-all;">
+                    inflow_premium_backup_<span style="color: #0284C7;">YYYY-MM-DD_HHMMSS</span>.sql
+                </div>
+                <div style="font-size: 0.76rem; color: #0284C7; margin-top: 4px;">
+                    Timestamped with the current date & time. Contains complete database tables, sequences, constraints, and data.
+                </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="font-weight: 700; font-size: 12px; color: #334155;">Backup Note / Label (Optional)</label>
+                <input type="text" name="note" id="backupNoteInput" class="form-input" placeholder="e.g. Before month-end close or price update">
+            </div>
+
+            <div style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 16px; margin-bottom: 22px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 22px;">☁️</span>
+                    <div>
+                        <label for="modalSaveToGDrive" style="font-weight: 700; font-size: 0.88rem; color: #0F172A; cursor: pointer; display: block; margin-bottom: 1px;">
+                            Save automatically to Google Drive
+                        </label>
+                        <span style="font-size: 0.78rem; color: #64748B;">
+                            Copies/uploads this dated .sql file to Google Drive after generation.
+                        </span>
+                    </div>
+                </div>
+                <input type="checkbox" name="save_to_gdrive" id="modalSaveToGDrive" value="true" {% if backup_settings.auto_save_gdrive %}checked{% endif %} style="transform: scale(1.25); cursor: pointer;">
+            </div>
+
+            <div id="backupProgressBox" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-bottom: 16px; text-align: center;">
+                <div class="spinner" style="display: inline-block; width: 24px; height: 24px; border: 3px solid #E2E8F0; border-top-color: #0284C7; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;" id="backupProgressText">Generating PostgreSQL SQL Dump...</div>
+                <div style="font-size: 0.78rem; color: #64748B;">Please wait while the database dump is written to disk.</div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0; padding-top: 18px;">
+                <button type="button" class="btn btn-outline" onclick="closeCreateBackupModal()" id="btnCancelCreateBackup">Cancel</button>
+                <button type="submit" id="btnSubmitCreateBackup" class="btn btn-primary" style="background: #0284C7; border-color: #0284C7; font-weight: 700; padding: 9px 22px;">
+                    🚀 Create Backup Now
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: RESTORE DATABASE FROM .SQL          -->
+<!-- ========================================== -->
+<div id="restoreBackupModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(15, 23, 42, 0.7); z-index: 100000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: #FFFFFF; border-radius: 14px; max-width: 620px; width: 92%; max-height: 90vh; overflow-y: auto; box-shadow: 0 25px 50px rgba(0,0,0,0.35); border: 1px solid #E2E8F0;">
+        <div style="padding: 18px 24px; border-bottom: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; background: #FFFBEB; border-radius: 14px 14px 0 0;">
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #92400E; margin: 0; display: flex; align-items: center; gap: 8px;">
+                <span>⚠️</span> Restore Database from .SQL Backup
+            </h3>
+            <button type="button" onclick="closeRestoreModal()" style="background: none; border: none; font-size: 18px; color: #92400E; cursor: pointer; padding: 4px 8px; border-radius: 6px;">✕</button>
+        </div>
+
+        <form id="restoreBackupForm" onsubmit="submitRestoreBackup(event)" enctype="multipart/form-data" style="padding: 24px;">
+            <!-- Critical Warning Box -->
+            <div style="background: #FEF2F2; border: 1.5px solid #FECACA; border-radius: 10px; padding: 14px 16px; margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                    <span style="font-size: 20px; line-height: 1;">🚨</span>
+                    <div>
+                        <strong style="color: #991B1B; font-size: 0.90rem; display: block; margin-bottom: 2px;">
+                            Important Notice: Active Data Overwrite
+                        </strong>
+                        <span style="font-size: 0.81rem; color: #B91C1C; line-height: 1.4; display: block;">
+                            Restoring will replace the live PostgreSQL database with the contents of the chosen <code>.sql</code> backup. Any orders or records created after that backup will be overwritten.
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Restore Source Tabs: Existing vs Upload -->
+            <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
+                <button type="button" id="tabBtnRestoreExisting" onclick="switchRestoreSource('existing')" class="btn btn-sm btn-primary" style="font-weight: 700; border-radius: 6px; padding: 6px 14px; background: #0284C7; border-color: #0284C7;">
+                    1. Choose from Existing Backups
+                </button>
+                <button type="button" id="tabBtnRestoreUpload" onclick="switchRestoreSource('upload')" class="btn btn-sm btn-outline" style="font-weight: 600; border-radius: 6px; padding: 6px 14px;">
+                    2. Upload .SQL File from Computer
+                </button>
+                <input type="hidden" name="source" id="restoreSourceInput" value="existing">
+            </div>
+
+            <!-- Source A: Existing Backup Dropdown -->
+            <div id="restoreSourceExistingBox" style="margin-bottom: 18px;">
+                <label class="form-label" style="font-weight: 700; font-size: 12px; color: #334155;">
+                    Select Existing Database Backup (.sql) *
+                </label>
+                <select name="filename" id="restoreFilenameSelect" class="form-input" style="font-family: monospace; font-size: 0.85rem; font-weight: 600;">
+                    {% if backups %}
+                    {% for b in backups %}
+                    <option value="{{ b.filename }}">
+                        {{ b.filename }} ({{ b.formatted_size }} - {{ b.date_display }})
+                    </option>
+                    {% endfor %}
+                    {% else %}
+                    <option value="">No backups available on disk</option>
+                    {% endif %}
+                </select>
+            </div>
+
+            <!-- Source B: Upload File Input -->
+            <div id="restoreSourceUploadBox" style="display: none; margin-bottom: 18px;">
+                <label class="form-label" style="font-weight: 700; font-size: 12px; color: #334155;">
+                    Select .sql Backup File from your computer *
+                </label>
+                <input type="file" name="backup_file" id="restoreFileInput" accept=".sql,.sgl" class="form-input" style="padding: 8px 12px; font-size: 0.85rem;">
+                <span style="font-size: 0.76rem; color: #64748B; margin-top: 4px; display: block;">
+                    Accepts PostgreSQL SQL dump files (<code>.sql</code>).
+                </span>
+            </div>
+
+            <!-- Safety Snapshot Checkbox -->
+            <div style="background: #F0FDF4; border: 1.5px solid #BBF7D0; border-radius: 10px; padding: 12px 16px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">🛡️</span>
+                    <div>
+                        <label for="createSafetyBackupCheck" style="font-weight: 700; font-size: 0.88rem; color: #166534; cursor: pointer; display: block; margin-bottom: 1px;">
+                            Create safety backup before restoring (Recommended)
+                        </label>
+                        <span style="font-size: 0.77rem; color: #15803D;">
+                            Creates a snapshot (<code>pre_restore_safety_backup_...sql</code>) so you can rollback if needed.
+                        </span>
+                    </div>
+                </div>
+                <input type="checkbox" name="create_safety_backup" id="createSafetyBackupCheck" value="true" checked style="transform: scale(1.25); cursor: pointer;">
+            </div>
+
+            <!-- Confirmation Typed Input -->
+            <div style="margin-bottom: 20px;">
+                <label class="form-label" style="font-weight: 700; font-size: 12px; color: #334155;">
+                    Type <strong style="color: #DC2626;">RESTORE</strong> to confirm database overwrite:
+                </label>
+                <input type="text" id="restoreConfirmText" class="form-input" placeholder="RESTORE" oninput="checkRestoreConfirmText(this)" style="font-family: monospace; font-weight: 800; letter-spacing: 0.1em; color: #DC2626;">
+            </div>
+
+            <!-- Restoration Progress Indicator -->
+            <div id="restoreProgressBox" style="display: none; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 16px; margin-bottom: 16px; text-align: center;">
+                <div class="spinner" style="display: inline-block; width: 26px; height: 26px; border: 3px solid #FEF3C7; border-top-color: #D97706; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
+                <div style="font-size: 0.90rem; font-weight: 800; color: #92400E;" id="restoreProgressText">Restoring PostgreSQL Database...</div>
+                <div style="font-size: 0.78rem; color: #B45309;">Executing SQL commands and resynchronizing numbering sequences. Do not close browser.</div>
+            </div>
+
+            <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0; padding-top: 18px;">
+                <button type="button" class="btn btn-outline" onclick="closeRestoreModal()" id="btnCancelRestore">Cancel</button>
+                <button type="submit" id="btnSubmitRestore" class="btn btn-primary" disabled style="background: #DC2626; border-color: #DC2626; font-weight: 700; padding: 9px 24px; opacity: 0.5; cursor: not-allowed;">
+                    ⚠️ Confirm & Restore Database
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 
 <script>
+// =========================================================================
+// Backup & Restore & Google Drive Client-Side Interactions
+// =========================================================================
+
+function openCreateBackupModal() {
+    const modal = document.getElementById('createBackupModal');
+    if (modal) {
+        document.getElementById('backupNoteInput').value = '';
+        document.getElementById('backupProgressBox').style.display = 'none';
+        document.getElementById('btnSubmitCreateBackup').disabled = false;
+        document.getElementById('btnSubmitCreateBackup').style.opacity = '1';
+        document.getElementById('btnCancelCreateBackup').disabled = false;
+        modal.style.display = 'flex';
+    }
+}
+
+function closeCreateBackupModal() {
+    const modal = document.getElementById('createBackupModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function triggerQuickBackup(e) {
+    if (e) e.preventDefault();
+    openCreateBackupModal();
+}
+
+async function submitCreateBackup(e) {
+    e.preventDefault();
+    const btnSubmit = document.getElementById('btnSubmitCreateBackup');
+    const btnCancel = document.getElementById('btnCancelCreateBackup');
+    const progressBox = document.getElementById('backupProgressBox');
+    
+    btnSubmit.disabled = true;
+    btnSubmit.style.opacity = '0.5';
+    btnCancel.disabled = true;
+    progressBox.style.display = 'block';
+    
+    const formData = new FormData(document.getElementById('createBackupForm'));
+    
+    try {
+        const resp = await fetch('{{ url_for("settings.create_backup_action") }}?format=json', {
+            method: 'POST',
+            body: formData,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+        const res = await resp.json();
+        
+        if (res.success) {
+            closeCreateBackupModal();
+            alert(res.message || 'Database backup created successfully!');
+            window.location.href = '{{ url_for("settings.general_settings", tab="tabBackup") }}';
+        } else {
+            alert('Error creating backup: ' + (res.message || 'Unknown error'));
+            btnSubmit.disabled = false;
+            btnSubmit.style.opacity = '1';
+            btnCancel.disabled = false;
+            progressBox.style.display = 'none';
+        }
+    } catch (err) {
+        alert('Server connection error during backup: ' + err);
+        btnSubmit.disabled = false;
+        btnSubmit.style.opacity = '1';
+        btnCancel.disabled = false;
+        progressBox.style.display = 'none';
+    }
+}
+
+function openRestoreModal(presetFilename) {
+    const modal = document.getElementById('restoreBackupModal');
+    if (modal) {
+        switchRestoreSource('existing');
+        if (presetFilename) {
+            const select = document.getElementById('restoreFilenameSelect');
+            if (select) select.value = presetFilename;
+        }
+        document.getElementById('restoreConfirmText').value = '';
+        checkRestoreConfirmText(document.getElementById('restoreConfirmText'));
+        document.getElementById('restoreProgressBox').style.display = 'none';
+        modal.style.display = 'flex';
+    }
+}
+
+function closeRestoreModal() {
+    const modal = document.getElementById('restoreBackupModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function switchRestoreSource(source) {
+    document.getElementById('restoreSourceInput').value = source;
+    const btnExisting = document.getElementById('tabBtnRestoreExisting');
+    const btnUpload = document.getElementById('tabBtnRestoreUpload');
+    const boxExisting = document.getElementById('restoreSourceExistingBox');
+    const boxUpload = document.getElementById('restoreSourceUploadBox');
+    
+    if (source === 'existing') {
+        btnExisting.className = 'btn btn-sm btn-primary';
+        btnExisting.style.background = '#0284C7';
+        btnExisting.style.borderColor = '#0284C7';
+        btnUpload.className = 'btn btn-sm btn-outline';
+        btnUpload.style.background = '#FFFFFF';
+        btnUpload.style.borderColor = '#CBD5E1';
+        boxExisting.style.display = 'block';
+        boxUpload.style.display = 'none';
+    } else {
+        btnUpload.className = 'btn btn-sm btn-primary';
+        btnUpload.style.background = '#0284C7';
+        btnUpload.style.borderColor = '#0284C7';
+        btnExisting.className = 'btn btn-sm btn-outline';
+        btnExisting.style.background = '#FFFFFF';
+        btnExisting.style.borderColor = '#CBD5E1';
+        boxExisting.style.display = 'none';
+        boxUpload.style.display = 'block';
+    }
+}
+
+function checkRestoreConfirmText(input) {
+    const btn = document.getElementById('btnSubmitRestore');
+    if (input && input.value.trim().toUpperCase() === 'RESTORE') {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.style.cursor = 'pointer';
+    } else {
+        btn.disabled = true;
+        btn.style.opacity = '0.5';
+        btn.style.cursor = 'not-allowed';
+    }
+}
+
+async function submitRestoreBackup(e) {
+    e.preventDefault();
+    const confirmInput = document.getElementById('restoreConfirmText');
+    if (confirmInput.value.trim().toUpperCase() !== 'RESTORE') {
+        alert('Please type RESTORE in capital letters to confirm restoration.');
+        return;
+    }
+    
+    if (!confirm('FINAL CONFIRMATION: Are you absolutely certain you want to overwrite the database now?')) {
+        return;
+    }
+    
+    const btnSubmit = document.getElementById('btnSubmitRestore');
+    const btnCancel = document.getElementById('btnCancelRestore');
+    const progressBox = document.getElementById('restoreProgressBox');
+    
+    btnSubmit.disabled = true;
+    btnSubmit.style.opacity = '0.5';
+    btnCancel.disabled = true;
+    progressBox.style.display = 'block';
+    
+    const formData = new FormData(document.getElementById('restoreBackupForm'));
+    
+    try {
+        const resp = await fetch('{{ url_for("settings.restore_backup_action") }}?format=json', {
+            method: 'POST',
+            body: formData,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+        const res = await resp.json();
+        
+        if (res.success) {
+            closeRestoreModal();
+            alert(res.message || 'Database restored successfully!');
+            window.location.href = '{{ url_for("settings.general_settings", tab="tabBackup") }}';
+        } else {
+            alert('Restore failed: ' + (res.message || 'Unknown error'));
+            btnSubmit.disabled = false;
+            btnSubmit.style.opacity = '1';
+            btnCancel.disabled = false;
+            progressBox.style.display = 'none';
+        }
+    } catch (err) {
+        alert('Server communication error during restoration: ' + err);
+        btnSubmit.disabled = false;
+        btnSubmit.style.opacity = '1';
+        btnCancel.disabled = false;
+        progressBox.style.display = 'none';
+    }
+}
+
+async function syncSingleBackupToGDrive(filename, btn) {
+    if (!confirm(`Upload backup '${filename}' to Google Drive now?`)) return;
+    
+    const origText = btn.innerHTML;
+    btn.innerHTML = '⏳ Uploading...';
+    btn.disabled = true;
+    
+    try {
+        const resp = await fetch(`{{ url_for("settings.sync_gdrive_action", filename="REPLACE_ME") }}`.replace('REPLACE_ME', encodeURIComponent(filename)), {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'}
+        });
+        const res = await resp.json();
+        
+        if (res.success) {
+            alert(res.message || `Backup '${filename}' successfully saved to Google Drive!`);
+            window.location.reload();
+        } else {
+            alert('Google Drive upload failed: ' + (res.message || 'Unknown error'));
+            btn.innerHTML = origText;
+            btn.disabled = false;
+        }
+    } catch (err) {
+        alert('Network error connecting to Google Drive: ' + err);
+        btn.innerHTML = origText;
+        btn.disabled = false;
+    }
+}
+
+async function deleteBackupFile(filename, btn) {
+    if (!confirm(`Are you sure you want to permanently delete backup file '${filename}'?`)) return;
+    
+    try {
+        const resp = await fetch(`{{ url_for("settings.delete_backup_action", filename="REPLACE_ME") }}`.replace('REPLACE_ME', encodeURIComponent(filename)), {
+            method: 'POST',
+            headers: {'X-Requested-With': 'XMLHttpRequest', 'Content-Type': 'application/json'}
+        });
+        const res = await resp.json();
+        
+        if (res.success) {
+            const row = btn.closest('.backup-row');
+            if (row) {
+                row.style.transition = 'opacity 0.3s';
+                row.style.opacity = '0';
+                setTimeout(() => row.remove(), 300);
+            }
+        } else {
+            alert('Could not delete backup: ' + (res.message || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Delete request error: ' + err);
+    }
+}
+
+function selectGDriveMode(mode) {
+    document.getElementById('radioModeLocal').checked = (mode === 'local_sync');
+    document.getElementById('radioModeCloud').checked = (mode === 'cloud_api');
+    
+    const cardLocal = document.getElementById('cardModeLocal');
+    const cardCloud = document.getElementById('cardModeCloud');
+    const secLocal = document.getElementById('sectionLocalSync');
+    const secCloud = document.getElementById('sectionCloudApi');
+    
+    if (mode === 'local_sync') {
+        cardLocal.style.borderColor = '#0284C7';
+        cardLocal.style.background = '#F0F9FF';
+        cardCloud.style.borderColor = '#E2E8F0';
+        cardCloud.style.background = '#FFFFFF';
+        secLocal.style.display = 'block';
+        secCloud.style.display = 'none';
+    } else {
+        cardCloud.style.borderColor = '#0284C7';
+        cardCloud.style.background = '#F0F9FF';
+        cardLocal.style.borderColor = '#E2E8F0';
+        cardLocal.style.background = '#FFFFFF';
+        secLocal.style.display = 'none';
+        secCloud.style.display = 'block';
+    }
+}
+
+function readSaJsonFile(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            document.getElementById('inputSaJson').value = e.target.result;
+        };
+        reader.readAsText(input.files[0]);
+    }
+}
+
+async function saveBackupConfig(e) {
+    e.preventDefault();
+    const form = document.getElementById('gdriveConfigForm');
+    const formData = new FormData(form);
+    const btn = document.getElementById('btnSaveBackupConfig');
+    const msgSpan = document.getElementById('configSaveMsg');
+    
+    btn.disabled = true;
+    btn.innerHTML = '💾 Saving...';
+    
+    try {
+        const resp = await fetch('{{ url_for("settings.save_backup_config_action") }}?format=json', {
+            method: 'POST',
+            body: formData,
+            headers: {'X-Requested-With': 'XMLHttpRequest'}
+        });
+        const res = await resp.json();
+        
+        if (res.success) {
+            msgSpan.style.display = 'inline';
+            msgSpan.style.color = '#166534';
+            msgSpan.textContent = '✓ Settings Saved!';
+            setTimeout(() => { msgSpan.style.display = 'none'; }, 3000);
+            
+            // Update toggle background and status badge
+            const autoGdrive = document.getElementById('autoSaveGdriveToggle').checked;
+            const badge = document.getElementById('gdriveStatusBadge');
+            if (badge) {
+                badge.innerHTML = autoGdrive
+                    ? '<span style="background: #DCFCE7; color: #166534; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #BBF7D0;">✓ Auto-Save Enabled</span>'
+                    : '<span style="background: #F1F5F9; color: #475569; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #E2E8F0;">Auto-Save Disabled</span>';
+            }
+        } else {
+            alert('Failed to save settings: ' + (res.message || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error saving settings: ' + err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '💾 Save Backup & Google Drive Settings';
+    }
+}
+
+async function testGDrive(mode) {
+    const localPath = document.getElementById('inputLocalPath') ? document.getElementById('inputLocalPath').value : '';
+    const folderId = document.getElementById('inputFolderId') ? document.getElementById('inputFolderId').value : '';
+    const saJson = document.getElementById('inputSaJson') ? document.getElementById('inputSaJson').value : '';
+    
+    try {
+        const resp = await fetch('{{ url_for("settings.test_gdrive_config_action") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                gdrive_mode: mode,
+                gdrive_local_path: localPath,
+                gdrive_folder_id: folderId,
+                gdrive_service_account_json: saJson
+            })
+        });
+        const res = await resp.json();
+        if (res.success) {
+            alert('✅ GOOGLE DRIVE TEST SUCCESSFUL:\n\n' + res.message);
+        } else {
+            alert('❌ GOOGLE DRIVE TEST FAILED:\n\n' + (res.error || res.message || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Connection test error: ' + err);
+    }
+}
+
+function filterBackupTable() {
+    const q = (document.getElementById('backupSearchInput').value || '').toLowerCase();
+    const type = (document.getElementById('backupTypeFilter').value || '').toLowerCase();
+    
+    document.querySelectorAll('.backup-row').forEach(row => {
+        const fname = row.getAttribute('data-filename') || '';
+        const dt = row.getAttribute('data-date') || '';
+        const rowType = (row.getAttribute('data-type') || '').toLowerCase();
+        
+        const matchesQuery = !q || fname.includes(q) || dt.includes(q);
+        const matchesType = !type || (type === 'safety' && (rowType === 'safety' || fname.startsWith('pre_restore_'))) || rowType === type;
+        
+        row.style.display = (matchesQuery && matchesType) ? '' : 'none';
+    });
+}
 // Tab Switching
 function switchSettingsTab(tabId, btn) {
     document.querySelectorAll('.settings-nav-tab').forEach(b => {

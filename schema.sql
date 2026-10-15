@@ -681,3 +681,38 @@ ALTER TABLE purchase_orders ADD COLUMN IF NOT EXISTS vendor_invoice_no VARCHAR(1
 
 ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(6, 2) DEFAULT 0;
 ALTER TABLE purchase_order_lines ADD COLUMN IF NOT EXISTS vendor_product_code VARCHAR(100);
+
+-- 31. Database Backup & Google Drive Integration
+CREATE TABLE IF NOT EXISTS backup_settings (
+    id SERIAL PRIMARY KEY,
+    auto_backup_enabled BOOLEAN DEFAULT FALSE,
+    auto_backup_frequency VARCHAR(50) DEFAULT 'daily',
+    auto_backup_time VARCHAR(10) DEFAULT '23:00',
+    auto_save_gdrive BOOLEAN DEFAULT FALSE,
+    gdrive_mode VARCHAR(50) DEFAULT 'local_sync',
+    gdrive_local_path TEXT DEFAULT 'G:\My Drive\inFlow_Backups',
+    gdrive_folder_id VARCHAR(255) DEFAULT '',
+    gdrive_service_account_json TEXT DEFAULT '',
+    retention_count INTEGER DEFAULT 15,
+    last_backup_at TIMESTAMP WITH TIME ZONE,
+    last_backup_status VARCHAR(50),
+    last_backup_file TEXT,
+    last_backup_size BIGINT DEFAULT 0,
+    last_gdrive_sync_at TIMESTAMP WITH TIME ZONE,
+    last_gdrive_sync_status VARCHAR(50),
+    last_gdrive_error TEXT,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS backup_logs (
+    id SERIAL PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    filepath TEXT NOT NULL,
+    file_size_bytes BIGINT DEFAULT 0,
+    backup_type VARCHAR(50) DEFAULT 'manual',
+    status VARCHAR(50) DEFAULT 'completed',
+    error_message TEXT,
+    gdrive_status VARCHAR(50) DEFAULT 'none',
+    gdrive_details TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

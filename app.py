@@ -84,6 +84,13 @@ def create_app():
     app.register_blueprint(data_exchange_bp)
     app.register_blueprint(auth_bp)
 
+    # Initialize Automated Database Backup Scheduler
+    try:
+        from services.backup_service import start_backup_scheduler
+        start_backup_scheduler()
+    except Exception as sched_err:
+        logger.warning(f"Could not start automated backup scheduler: {sched_err}")
+
     # Global Template Filters
     @app.template_filter('currency')
     def format_currency(value):

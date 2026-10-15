@@ -1,9 +1,14 @@
 import os
 import time
 import uuid
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, send_file
 from werkzeug.utils import secure_filename
 from database import query_one, query_all, execute
+from services.backup_service import (
+    get_backup_settings, save_backup_settings, list_backups,
+    create_backup, restore_backup, test_gdrive_config,
+    save_backup_to_gdrive, get_backup_dir, format_file_size
+)
 
 settings_bp = Blueprint('settings', __name__)
 
@@ -75,6 +80,14 @@ def general_settings():
     """)
     all_branches_list = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
 
+    # Fetch database backups and backup settings for Backup & Restore tab
+    backups = list_backups()
+    backup_settings = get_backup_settings()
+    backups_count = len(backups)
+    backups_total_size = sum(b.get('size_bytes', 0) for b in backups)
+    backups_formatted_total_size = format_file_size(backups_total_size)
+    latest_backup = backups[0] if backups else None
+
     active_tab = request.args.get('tab', 'tabCompany')
 
     return render_template('settings/general.html',
@@ -85,6 +98,11 @@ def general_settings():
                            products_count=products_count,
                            users=users,
                            all_branches_list=all_branches_list,
+                           backups=backups,
+                           backup_settings=backup_settings,
+                           backups_count=backups_count,
+                           backups_formatted_total_size=backups_formatted_total_size,
+                           latest_backup=latest_backup,
                            active_tab=active_tab)
 
 @settings_bp.route('/settings/update', methods=['POST'])
@@ -584,4 +602,267 @@ def set_app_language(lang):
     resp = jsonify({'success': True, 'lang': lang})
     resp.set_cookie('inflow_lang', lang, max_age=31536000, path='/')
     return resp
+
+# =========================================================================
+# Database Backup, Restore & Google Drive Management Endpoints
+# =========================================================================
+
+@settings_bp.route('/settings/backup/create', methods=['POST'])
+def create_backup_action():
+    try:
+        is_ajax = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json'
+        data = request.get_json(silent=True) if request.is_json else request.form
+        
+        save_gdrive_val = data.get('save_to_gdrive') if data else None
+        save_to_gdrive = None
+        if save_gdrive_val is not None:
+            save_to_gdrive = str(save_gdrive_val).lower() in ('1', 'true', 'on', 'yes')
+            
+        note = (data.get('note') or '').strip() if data else ''
+        
+        res = create_backup(backup_type='manual', note=note, save_to_gdrive=save_to_gdrive)
+        
+        if res.get('success'):
+            msg = f"✅ Database backup created: {res['filename']} ({res['formatted_size']})"
+            if res.get('gdrive_saved'):
+                gdrive_res = res.get('gdrive_result', {})
+                if gdrive_res.get('success'):
+                    msg += " & automatically saved to Google Drive!"
+                else:
+                    msg += f" (Google Drive note: {gdrive_res.get('error', 'Sync pending')})"
+            if is_ajax:
+                return jsonify({'success': True, 'message': msg, 'backup': res})
+            flash(msg, 'success')
+        else:
+            err_msg = res.get('error', 'Failed to generate database backup.')
+            if is_ajax:
+                return jsonify({'success': False, 'message': err_msg}), 400
+            flash(f"❌ Backup failed: {err_msg}", 'error')
+            
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+    except Exception as e:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"Error creating backup: {e}", 'error')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+
+@settings_bp.route('/settings/backup/restore', methods=['POST'])
+def restore_backup_action():
+    try:
+        is_ajax = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json'
+        b_dir = get_backup_dir()
+        
+        source = request.form.get('source', 'existing')
+        safety_val = request.form.get('create_safety_backup', 'true')
+        create_safety = str(safety_val).lower() in ('1', 'true', 'on', 'yes')
+        
+        target_filepath = None
+        
+        if source == 'upload':
+            if 'backup_file' not in request.files:
+                err_msg = "Please select a .sql database backup file to upload."
+                if is_ajax: return jsonify({'success': False, 'message': err_msg}), 400
+                flash(err_msg, 'error')
+                return redirect(url_for('settings.general_settings', tab='tabBackup'))
+                
+            file = request.files['backup_file']
+            if not file or not file.filename:
+                err_msg = "No file selected."
+                if is_ajax: return jsonify({'success': False, 'message': err_msg}), 400
+                flash(err_msg, 'error')
+                return redirect(url_for('settings.general_settings', tab='tabBackup'))
+                
+            fname_clean = secure_filename(file.filename)
+            ext = fname_clean.rsplit('.', 1)[-1].lower() if '.' in fname_clean else ''
+            if ext not in ('sql', 'sgl'):
+                err_msg = "Invalid file type. Only PostgreSQL .sql backup files are accepted."
+                if is_ajax: return jsonify({'success': False, 'message': err_msg}), 400
+                flash(err_msg, 'error')
+                return redirect(url_for('settings.general_settings', tab='tabBackup'))
+                
+            now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
+            saved_name = f"uploaded_restore_{now_str}_{fname_clean}"
+            if not saved_name.endswith('.sql'):
+                saved_name = saved_name.rsplit('.', 1)[0] + '.sql'
+            target_filepath = os.path.join(b_dir, saved_name)
+            file.save(target_filepath)
+        else:
+            filename = secure_filename(request.form.get('filename', '').strip())
+            if not filename:
+                err_msg = "Please select a backup file to restore."
+                if is_ajax: return jsonify({'success': False, 'message': err_msg}), 400
+                flash(err_msg, 'error')
+                return redirect(url_for('settings.general_settings', tab='tabBackup'))
+                
+            target_filepath = os.path.join(b_dir, filename)
+            if not os.path.exists(target_filepath):
+                err_msg = f"Backup file {filename} does not exist on disk."
+                if is_ajax: return jsonify({'success': False, 'message': err_msg}), 404
+                flash(err_msg, 'error')
+                return redirect(url_for('settings.general_settings', tab='tabBackup'))
+                
+        res = restore_backup(target_filepath, create_safety_backup=create_safety)
+        
+        if res.get('success'):
+            msg = "🎉 Database restored successfully!"
+            if res.get('safety_backup'):
+                msg += f" (Safety snapshot created: {res['safety_backup']})"
+            if is_ajax:
+                return jsonify({'success': True, 'message': msg, 'result': res})
+            flash(msg, 'success')
+        else:
+            err = res.get('error', 'Restoration failed.')
+            if is_ajax:
+                return jsonify({'success': False, 'message': err}), 500
+            flash(f"❌ Restore failed: {err}", 'error')
+            
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+    except Exception as e:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"Error restoring backup: {e}", 'error')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+
+@settings_bp.route('/settings/backup/download/<path:filename>', methods=['GET'])
+def download_backup_action(filename):
+    try:
+        fname = secure_filename(filename)
+        b_dir = get_backup_dir()
+        fpath = os.path.abspath(os.path.join(b_dir, fname))
+        
+        # Security check: must reside inside backup directory
+        if not fpath.startswith(os.path.abspath(b_dir)) or not os.path.exists(fpath):
+            flash(f"Backup file '{fname}' not found.", 'error')
+            return redirect(url_for('settings.general_settings', tab='tabBackup'))
+            
+        return send_file(
+            fpath,
+            as_attachment=True,
+            download_name=fname,
+            mimetype='application/sql'
+        )
+    except Exception as e:
+        flash(f"Error downloading backup: {e}", 'error')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+
+@settings_bp.route('/settings/backup/delete/<path:filename>', methods=['POST'])
+def delete_backup_action(filename):
+    try:
+        is_ajax = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json'
+        fname = secure_filename(filename)
+        b_dir = get_backup_dir()
+        fpath = os.path.abspath(os.path.join(b_dir, fname))
+        
+        if not fpath.startswith(os.path.abspath(b_dir)) or not os.path.exists(fpath):
+            msg = f"File '{fname}' not found."
+            if is_ajax: return jsonify({'success': False, 'message': msg}), 404
+            flash(msg, 'warning')
+            return redirect(url_for('settings.general_settings', tab='tabBackup'))
+            
+        os.remove(fpath)
+        try:
+            execute("DELETE FROM backup_logs WHERE filename = %s", (fname,))
+        except Exception:
+            pass
+            
+        msg = f"🗑️ Backup '{fname}' deleted successfully."
+        if is_ajax:
+            return jsonify({'success': True, 'message': msg})
+        flash(msg, 'success')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+    except Exception as e:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"Error deleting backup: {e}", 'error')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+
+@settings_bp.route('/settings/backup/sync-gdrive/<path:filename>', methods=['POST'])
+def sync_gdrive_action(filename):
+    try:
+        is_ajax = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json'
+        fname = secure_filename(filename)
+        b_dir = get_backup_dir()
+        fpath = os.path.abspath(os.path.join(b_dir, fname))
+        
+        if not fpath.startswith(os.path.abspath(b_dir)) or not os.path.exists(fpath):
+            msg = f"Backup file '{fname}' not found."
+            if is_ajax: return jsonify({'success': False, 'message': msg}), 404
+            flash(msg, 'error')
+            return redirect(url_for('settings.general_settings', tab='tabBackup'))
+            
+        res = save_backup_to_gdrive(fpath, fname)
+        if res.get('success'):
+            msg = f"☁️ Backup '{fname}' saved to Google Drive successfully! {res.get('message', '')}"
+            if is_ajax: return jsonify({'success': True, 'message': msg, 'result': res})
+            flash(msg, 'success')
+        else:
+            err = res.get('error', 'Google Drive sync failed.')
+            if is_ajax: return jsonify({'success': False, 'message': err}), 500
+            flash(f"❌ Google Drive sync failed: {err}", 'error')
+            
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+    except Exception as e:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"Error saving to Google Drive: {e}", 'error')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+
+@settings_bp.route('/settings/backup/config', methods=['POST'])
+def save_backup_config_action():
+    try:
+        is_ajax = request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('format') == 'json'
+        data = request.get_json(silent=True) if request.is_json else request.form
+        
+        auto_backup_enabled = str(data.get('auto_backup_enabled', '')).lower() in ('1', 'true', 'on', 'yes')
+        auto_save_gdrive = str(data.get('auto_save_gdrive', '')).lower() in ('1', 'true', 'on', 'yes')
+        auto_backup_frequency = data.get('auto_backup_frequency', 'daily')
+        auto_backup_time = data.get('auto_backup_time', '23:00')
+        gdrive_mode = data.get('gdrive_mode', 'local_sync')
+        gdrive_local_path = data.get('gdrive_local_path', r'G:\My Drive\inFlow_Backups')
+        gdrive_folder_id = data.get('gdrive_folder_id', '')
+        retention_count = int(data.get('retention_count', 15) or 15)
+        
+        # Check if service account JSON file was uploaded
+        gdrive_service_account_json = data.get('gdrive_service_account_json', '')
+        if 'sa_file' in request.files:
+            sa_f = request.files['sa_file']
+            if sa_f and sa_f.filename:
+                gdrive_service_account_json = sa_f.read().decode('utf-8', errors='ignore')
+                
+        save_backup_settings({
+            'auto_backup_enabled': auto_backup_enabled,
+            'auto_backup_frequency': auto_backup_frequency,
+            'auto_backup_time': auto_backup_time,
+            'auto_save_gdrive': auto_save_gdrive,
+            'gdrive_mode': gdrive_mode,
+            'gdrive_local_path': gdrive_local_path,
+            'gdrive_folder_id': gdrive_folder_id,
+            'gdrive_service_account_json': gdrive_service_account_json,
+            'retention_count': retention_count
+        })
+        
+        msg = "✅ Backup & Google Drive settings saved successfully!"
+        if is_ajax:
+            return jsonify({'success': True, 'message': msg})
+        flash(msg, 'success')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+    except Exception as e:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': str(e)}), 500
+        flash(f"Error saving backup settings: {e}", 'error')
+        return redirect(url_for('settings.general_settings', tab='tabBackup'))
+
+@settings_bp.route('/settings/backup/test-gdrive', methods=['POST'])
+def test_gdrive_config_action():
+    try:
+        data = request.get_json(silent=True) or request.form
+        mode = data.get('gdrive_mode')
+        local_path = data.get('gdrive_local_path')
+        sa_json = data.get('gdrive_service_account_json')
+        folder_id = data.get('gdrive_folder_id')
+        
+        res = test_gdrive_config(mode=mode, local_path=local_path, sa_json=sa_json, folder_id=folder_id)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
