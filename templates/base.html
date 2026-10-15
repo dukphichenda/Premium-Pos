@@ -21,12 +21,24 @@
         document.documentElement.setAttribute('data-lang', savedLang);
         document.documentElement.setAttribute('lang', savedLang);
 
-        // Early View Mode initialization to prevent layout flash
-        var savedViewMode = localStorage.getItem('inflow_view_mode');
-        if (!savedViewMode) {
-            savedViewMode = (window.innerWidth <= 768) ? 'mobile' : 'desktop';
+        // Comprehensive Device View Mode detection (Phones/Tablets in portrait or landscape default to mobile)
+        function inflowDetectDeviceViewMode() {
+            try {
+                var manual = localStorage.getItem('inflow_view_mode_manual');
+                var saved = localStorage.getItem('inflow_view_mode');
+                if (manual === 'true' && (saved === 'mobile' || saved === 'desktop')) {
+                    return saved;
+                }
+            } catch(e) {}
+            var isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Silk/i.test(navigator.userAgent)
+                || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1 && window.screen.width <= 1024)
+                || (window.innerWidth <= 992);
+            return isMob ? 'mobile' : 'desktop';
         }
+
+        var savedViewMode = inflowDetectDeviceViewMode();
         document.documentElement.setAttribute('data-view-mode', savedViewMode);
+        document.documentElement.classList.remove('is-desktop-view', 'is-mobile-view');
         document.documentElement.classList.add(savedViewMode === 'mobile' ? 'is-mobile-view' : 'is-desktop-view');
 
         if (window.self !== window.top || window.location.search.indexOf('embed=1') !== -1) {
@@ -848,11 +860,9 @@
            View Mode Switcher (Desktop View ↔ Mobile View)
            ========================================================================== */
         function getCurrentViewMode() {
-            let mode = localStorage.getItem('inflow_view_mode');
-            if (!mode) {
-                mode = (window.innerWidth <= 768) ? 'mobile' : 'desktop';
-            }
-            return mode;
+            return (typeof inflowDetectDeviceViewMode === 'function') 
+                ? inflowDetectDeviceViewMode() 
+                : (localStorage.getItem('inflow_view_mode') || 'desktop');
         }
 
         function handleViewModeItemClick(e, el) {
@@ -870,6 +880,7 @@
             // 1. Persist in localStorage and cookie
             try {
                 localStorage.setItem('inflow_view_mode', mode);
+                localStorage.setItem('inflow_view_mode_manual', 'true');
                 document.cookie = "inflow_view_mode=" + mode + "; path=/; max-age=31536000; SameSite=Lax";
             } catch(e) {}
 

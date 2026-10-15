@@ -571,7 +571,9 @@
                             } catch (e) {}
 
                             // Ensure newly loaded iframe receives current view mode (desktop/mobile) immediately
-                            const curViewMode = localStorage.getItem('inflow_view_mode') || (window.innerWidth <= 768 ? 'mobile' : 'desktop');
+                            const curViewMode = (typeof window.getCurrentViewMode === 'function')
+                                ? window.getCurrentViewMode()
+                                : (localStorage.getItem('inflow_view_mode') || ((/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 992) ? 'mobile' : 'desktop'));
                             try {
                                 iframe.contentWindow.localStorage.setItem('inflow_view_mode', curViewMode);
                                 if (typeof iframe.contentWindow.applyViewMode === 'function') {
