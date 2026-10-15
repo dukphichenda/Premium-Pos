@@ -765,8 +765,12 @@
                             <td></td>
                         </tr>
 
-                        <!-- Empty Desktop Grid Rows -->
-                        {% for i in range(6) %}
+                        <!-- Empty Desktop Grid Rows (Padded only if table has fewer than 5 rows to prevent grid overflow) -->
+                        {% set existing_lines_count = lines|length %}
+                        {% set min_grid_rows = 5 %}
+                        {% set empty_rows_needed = min_grid_rows - existing_lines_count %}
+                        {% if empty_rows_needed > 0 %}
+                        {% for i in range(empty_rows_needed) %}
                         <tr>
                             <td class="inflow-grid-selector-col"></td>
                             <td></td>
@@ -778,6 +782,7 @@
                             <td></td>
                         </tr>
                         {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
 
@@ -844,10 +849,10 @@
 
             <!-- Grid Action Buttons (+, —, ↑, ↓ matching screenshot0046.JPEG) -->
             <div class="inflow-grid-actions-bar">
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}addNewBlankLine(){% endif %}" title="Add row" {% if is_paid %}disabled style="opacity:0.4; cursor:not-allowed;"{% endif %}>+</button>
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}deleteSelectedLine(){% endif %}" title="Delete selected row" {% if is_paid %}disabled style="opacity:0.4; cursor:not-allowed;"{% endif %}>—</button>
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}moveSelectedLineUp(){% endif %}" title="Move row up" {% if is_paid %}disabled style="opacity:0.4; cursor:not-allowed;"{% endif %}>↑</button>
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}moveSelectedLineDown(){% endif %}" title="Move row down" {% if is_paid %}disabled style="opacity:0.4; cursor:not-allowed;"{% endif %}>↓</button>
+                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}addNewBlankLine(){% endif %}" title="Add new item row (+)" {% if is_paid %}disabled{% endif %}>+</button>
+                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}deleteSelectedLine(){% endif %}" title="Delete selected row (&minus;)" {% if is_paid %}disabled{% endif %}>&minus;</button>
+                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}moveSelectedLineUp(){% endif %}" title="Move selected row up (&uarr;)" {% if is_paid %}disabled{% endif %}>&uarr;</button>
+                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}moveSelectedLineDown(){% endif %}" title="Move selected row down (&darr;)" {% if is_paid %}disabled{% endif %}>&darr;</button>
             </div>
 
             <!-- Footer: Pricing Scheme, Remarks, Financial Totals -->
@@ -2727,12 +2732,40 @@ function selectGridRow(rowEl) {
     rowEl.classList.add('is-active-row');
 }
 
+// Track input focus inside line items so clicking any field marks the row active
+document.addEventListener('focusin', function(e) {
+    const row = e.target.closest('#lineItemsBody tr');
+    if (row) {
+        selectGridRow(row);
+    }
+});
+
 function addNewBlankLine() {
+    {% if is_paid %}
+    return;
+    {% endif %}
+    const newRow = document.getElementById('newRowEntry');
     const input = document.getElementById('newItemTextInput');
+    if (newRow) {
+        selectGridRow(newRow);
+        newRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
     if (input) {
         input.focus();
         openItemDropdown(input);
     }
+}
+
+function resequenceSoLineIndices() {
+    const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
+    rows.forEach((r, idx) => {
+        r.setAttribute('data-line-index', idx);
+        r.querySelectorAll('input, select').forEach(el => {
+            if (el.name && el.name.startsWith('lines[')) {
+                el.name = el.name.replace(/lines\[\d+\]/, `lines[${idx}]`);
+            }
+        });
+    });
 }
 
 function deleteSpecificSoLine(btn, event) {
@@ -2750,6 +2783,7 @@ function deleteSpecificSoLine(btn, event) {
         activeGridRowEl = null;
     }
     row.remove();
+    resequenceSoLineIndices();
     recalculateTotals();
     markDirty();
     syncSoSelectAllCheckbox();
@@ -2759,6 +2793,7 @@ function deleteSelectedLine() {
     {% if is_paid %}
     return;
     {% endif %}
+    // 1. If any row checkboxes are checked, delete all checked rows
     const checkedBoxes = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked');
     if (checkedBoxes.length > 0) {
         checkedBoxes.forEach(chk => {
@@ -2768,15 +2803,36 @@ function deleteSelectedLine() {
                 row.remove();
             }
         });
+        resequenceSoLineIndices();
         recalculateTotals();
         markDirty();
         syncSoSelectAllCheckbox();
-    } else if (activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index')) {
-        activeGridRowEl.remove();
-        activeGridRowEl = null;
+        return;
+    }
+
+    // 2. Otherwise find the active or highlighted row
+    let targetRow = activeGridRowEl;
+    if (!targetRow || !targetRow.hasAttribute('data-line-index')) {
+        targetRow = document.querySelector('#lineItemsBody tr.is-active-row[data-line-index]') ||
+                    document.querySelector('#lineItemsBody tr.is-selected-row[data-line-index]');
+    }
+
+    if (targetRow && targetRow.hasAttribute('data-line-index')) {
+        const nextTarget = (targetRow.nextElementSibling && targetRow.nextElementSibling.hasAttribute('data-line-index')) 
+                           ? targetRow.nextElementSibling 
+                           : (targetRow.previousElementSibling && targetRow.previousElementSibling.hasAttribute('data-line-index') ? targetRow.previousElementSibling : null);
+        targetRow.remove();
+        activeGridRowEl = nextTarget;
+        if (activeGridRowEl) selectGridRow(activeGridRowEl);
+        resequenceSoLineIndices();
         recalculateTotals();
         markDirty();
         syncSoSelectAllCheckbox();
+    } else if (activeGridRowEl && activeGridRowEl.id === 'newRowEntry') {
+        const itemInput = document.getElementById('newItemTextInput');
+        if (itemInput) itemInput.value = '';
+        const descInput = document.getElementById('newItemDescInput');
+        if (descInput) descInput.value = '';
     }
 }
 
@@ -2799,6 +2855,9 @@ function onSoLineCheckboxChange(chk, event) {
     const row = chk.closest('tr');
     if (row) {
         row.classList.toggle('is-selected-row', chk.checked);
+        if (chk.checked) {
+            selectGridRow(row);
+        }
     }
     syncSoSelectAllCheckbox();
 }
@@ -2817,15 +2876,41 @@ function syncSoSelectAllCheckbox() {
     masterChk.indeterminate = (checkedCount > 0 && checkedCount < allRowChks.length);
 }
 
+function getTargetRowForShift() {
+    if (activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index')) {
+        return activeGridRowEl;
+    }
+    const checked = document.querySelector('#lineItemsBody tr[data-line-index] .line-select-chk:checked');
+    if (checked) return checked.closest('tr');
+    return document.querySelector('#lineItemsBody tr.is-active-row[data-line-index]') ||
+           document.querySelector('#lineItemsBody tr.is-selected-row[data-line-index]');
+}
+
 function moveSelectedLineUp() {
-    if (activeGridRowEl && activeGridRowEl.previousElementSibling && activeGridRowEl.previousElementSibling.hasAttribute('data-line-index')) {
-        activeGridRowEl.parentNode.insertBefore(activeGridRowEl, activeGridRowEl.previousElementSibling);
+    {% if is_paid %}
+    return;
+    {% endif %}
+    const row = getTargetRowForShift();
+    if (row && row.previousElementSibling && row.previousElementSibling.hasAttribute('data-line-index')) {
+        row.parentNode.insertBefore(row, row.previousElementSibling);
+        selectGridRow(row);
+        resequenceSoLineIndices();
+        markDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
 function moveSelectedLineDown() {
-    if (activeGridRowEl && activeGridRowEl.nextElementSibling && activeGridRowEl.nextElementSibling.hasAttribute('data-line-index')) {
-        activeGridRowEl.parentNode.insertBefore(activeGridRowEl.nextElementSibling, activeGridRowEl);
+    {% if is_paid %}
+    return;
+    {% endif %}
+    const row = getTargetRowForShift();
+    if (row && row.nextElementSibling && row.nextElementSibling.hasAttribute('data-line-index')) {
+        row.parentNode.insertBefore(row.nextElementSibling, row);
+        selectGridRow(row);
+        resequenceSoLineIndices();
+        markDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 

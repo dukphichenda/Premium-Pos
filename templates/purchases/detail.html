@@ -651,8 +651,11 @@
                             <td></td>
                         </tr>
 
-                        <!-- Empty Desktop Grid Rows for visual authentic inFlow look -->
-                        {% for i in range(5) %}
+                        <!-- Empty Desktop Grid Rows for visual authentic inFlow look (padded only if fewer than 5 rows) -->
+                        {% set po_lines_count = lines|length %}
+                        {% set po_empty_needed = 5 - po_lines_count %}
+                        {% if po_empty_needed > 0 %}
+                        {% for i in range(po_empty_needed) %}
                         <tr>
                             <td class="inflow-grid-selector-col"></td>
                             <td></td>
@@ -663,6 +666,7 @@
                             <td></td>
                         </tr>
                         {% endfor %}
+                        {% endif %}
                     </tbody>
                 </table>
 
@@ -732,10 +736,10 @@
 
             <!-- Grid Action Buttons (+, —, ↑, ↓ matching inFlow standard) -->
             <div class="inflow-grid-actions-bar">
-                <button type="button" class="inflow-grid-btn" onclick="addNewBlankPoLine()" title="Add row">+</button>
-                <button type="button" class="inflow-grid-btn" onclick="deleteSelectedPoLine()" title="Delete selected row">—</button>
-                <button type="button" class="inflow-grid-btn" onclick="moveSelectedPoLineUp()" title="Move row up">↑</button>
-                <button type="button" class="inflow-grid-btn" onclick="moveSelectedPoLineDown()" title="Move row down">↓</button>
+                <button type="button" class="inflow-grid-btn" onclick="addNewBlankPoLine()" title="Add row (+)">+</button>
+                <button type="button" class="inflow-grid-btn" onclick="deleteSelectedPoLine()" title="Delete selected row (&minus;)">&minus;</button>
+                <button type="button" class="inflow-grid-btn" onclick="moveSelectedPoLineUp()" title="Move row up (&uarr;)">&uarr;</button>
+                <button type="button" class="inflow-grid-btn" onclick="moveSelectedPoLineDown()" title="Move row down (&darr;)">&darr;</button>
                 <button type="button" class="inflow-grid-btn" onclick="openReorderModal()" style="margin-left: 10px; width: auto; padding: 0 8px; font-weight: 600; color: #0F766E;" title="Check low stock items">⚡ Low Stock Restock</button>
             </div>
 
@@ -1943,17 +1947,33 @@ function syncPoSelectAllCheckbox() {
     masterChk.indeterminate = (checkedCount > 0 && checkedCount < allRowChks.length);
 }
 
+function getTargetPoRowForShift() {
+    if (activePoRow && activePoRow.dataset.lineIndex !== undefined) {
+        return activePoRow;
+    }
+    const checked = document.querySelector('#poLineItemsBody tr[data-line-index] .line-select-chk:checked');
+    if (checked) return checked.closest('tr');
+    return document.querySelector('#poLineItemsBody tr.is-active-row[data-line-index]') ||
+           document.querySelector('#poLineItemsBody tr.is-selected-row[data-line-index]');
+}
+
 function moveSelectedPoLineUp() {
-    if (activePoRow && activePoRow.previousElementSibling && activePoRow.previousElementSibling.dataset.lineIndex !== undefined) {
-        activePoRow.parentNode.insertBefore(activePoRow, activePoRow.previousElementSibling);
+    const row = getTargetPoRowForShift();
+    if (row && row.previousElementSibling && row.previousElementSibling.dataset.lineIndex !== undefined) {
+        row.parentNode.insertBefore(row, row.previousElementSibling);
+        activePoRow = row;
         markPoDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
 function moveSelectedPoLineDown() {
-    if (activePoRow && activePoRow.nextElementSibling && activePoRow.nextElementSibling.id !== 'poNewRowEntry') {
-        activePoRow.parentNode.insertBefore(activePoRow.nextElementSibling, activePoRow);
+    const row = getTargetPoRowForShift();
+    if (row && row.nextElementSibling && row.nextElementSibling.id !== 'poNewRowEntry' && row.nextElementSibling.dataset.lineIndex !== undefined) {
+        row.parentNode.insertBefore(row.nextElementSibling, row);
+        activePoRow = row;
         markPoDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
