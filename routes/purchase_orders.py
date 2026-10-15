@@ -1,6 +1,25 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number
 from datetime import datetime, date
+import os
+import time
+from werkzeug.utils import secure_filename
+
+def _match_uom(uom1, uom2):
+    """Checks whether two UOM strings refer to the same unit (case vs cases, pack vs packs, pcs vs pcs.)."""
+    if not uom1 or not uom2:
+        return False
+    u1 = str(uom1).strip().lower().rstrip('.')
+    u2 = str(uom2).strip().lower().rstrip('.')
+    if u1 == u2:
+        return True
+    if u1 in ('case', 'cases', 'box', 'boxes', 'carton', 'cartons', 'កេស', 'កាតុង') and u2 in ('case', 'cases', 'box', 'boxes', 'carton', 'cartons', 'កេស', 'កាតុង'):
+        return True
+    if u1 in ('pack', 'packs', 'packet', 'packets', 'ដុំ', 'កញ្ចប់') and u2 in ('pack', 'packs', 'packet', 'packets', 'ដុំ', 'កញ្ចប់'):
+        return True
+    if u1 in ('pc', 'pcs', 'piece', 'pieces', 'each', 'ea', 'ចាន', 'កែវ', 'ដប', 'កំប៉ុង', 'គ្រាប់', 'សន្លឹក') and u2 in ('pc', 'pcs', 'piece', 'pieces', 'each', 'ea', 'ចាន', 'កែវ', 'ដប', 'កំប៉ុង', 'គ្រាប់', 'សន្លឹក'):
+        return True
+    return False
 
 purchase_orders_bp = Blueprint('purchase_orders', __name__)
 
@@ -221,13 +240,15 @@ def _get_po_drawer_data(date_filter='All', status_filter='All', vendor_search=''
 
     products_sql = """
         SELECT 
-            p.id, p.sku, p.name, p.barcode, 
+            p.id, p.sku, p.name, p.barcode, p.image_url,
             COALESCE(p.uom, 'pcs.') as uom,
             COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
             COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
             COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
             COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
-            COALESCE(p.last_purchase_cost, p.average_cost, p.standard_cost, 0) as cost_price,
+            COALESCE(p.costing_sheet_cost, p.standard_cost, p.last_purchase_cost, p.average_cost, 0) as cost_price,
+            COALESCE(p.standard_cost, 0) as standard_cost,
+            COALESCE(p.costing_sheet_cost, 0) as costing_sheet_cost,
             COALESCE(p.default_price, 0) as unit_price,
             COALESCE(inv.total_qty, 0) as on_hand,
             COALESCE(inv.reserved_qty, 0) as reserved_qty,
@@ -316,7 +337,7 @@ def _format_po_status_label(o):
 def api_purchases_drawer():
     date_filter = request.args.get('date_filter', 'All')
     status_filter = request.args.get('status_filter', 'All')
-    vendor_search = request.args.get('vendor_search', '')
+    vendor_search = request.args.get('vendor_search', '') or request.args.get('vendor_id', '')
     order_search = request.args.get('order_search', '')
     data = _get_po_drawer_data(date_filter, status_filter, vendor_search, order_search)
     return jsonify({
@@ -330,6 +351,7 @@ def api_purchases_drawer():
             'status_badge': _format_po_status_label(o),
             'raw_status': o['status'],
             'payment_status': o['payment_status'] or 'UNPAID',
+            'vendor_id': o['vendor_id'],
             'vendor_name': o['vendor_name'] or '',
             'vendor_invoice_no': o['vendor_invoice_no'] or '',
             'location_name': o['location_name'] or '',
@@ -370,6 +392,10 @@ def api_purchase_data(id):
             p.image_url as product_image,
             COALESCE(p.uom, 'pcs.') as product_uom,
             COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
+            COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
+            COALESCE(p.costing_sheet_cost, p.standard_cost, p.last_purchase_cost, p.average_cost, 0) as cost_price,
             p.average_cost as product_avg_cost,
             p.last_purchase_cost as product_last_cost
         FROM purchase_order_lines pol
@@ -381,6 +407,9 @@ def api_purchase_data(id):
     total_qty_ordered = sum(float(l['quantity'] or 0) for l in lines)
     total_qty_received = sum(float(l['received_qty'] or 0) for l in lines)
     receiving_percent = int((total_qty_received / total_qty_ordered * 100) if total_qty_ordered > 0 else 0)
+
+    att_row = query_one("SELECT COUNT(*) as cnt FROM purchase_order_attachments WHERE purchase_order_id = %s", (id,))
+    attachment_count = att_row['cnt'] if att_row else 0
 
     st = order.get('status') or ''
     if st in ('RECEIVED', 'FULFILLED'):
@@ -422,7 +451,8 @@ def api_purchase_data(id):
             'currency_code': order['currency_code'] or 'USD',
             'notes': order['notes'] or '',
             'sales_rep': order.get('sales_rep') or 'Admin',
-            'payment_terms': order.get('vendor_payment_terms') or 'Net 30'
+            'payment_terms': order.get('vendor_payment_terms') or 'Net 30',
+            'attachment_count': attachment_count
         },
         'lines': [{
             'id': l['id'],
@@ -437,11 +467,18 @@ def api_purchase_data(id):
             'discount_percent': float(l['discount_percent'] or 0),
             'subtotal': float(l['subtotal'] or 0),
             'line_uom': l['line_uom'],
-            'received_qty': float(l['received_qty'] or 0)
+            'received_qty': float(l['received_qty'] or 0),
+            'product_uom': l['product_uom'],
+            'purchasing_uom': l['purchasing_uom'],
+            'purchasing_ratio': float(l['purchasing_ratio'] or 1.0),
+            'sales_uom': l['sales_uom'],
+            'sales_ratio': float(l['sales_ratio'] or 1.0),
+            'cost_price': float(l['cost_price'] or 0.0)
         } for l in lines],
         'total_qty_ordered': total_qty_ordered,
         'total_qty_received': total_qty_received,
-        'receiving_percent': receiving_percent
+        'receiving_percent': receiving_percent,
+        'attachment_count': attachment_count
     })
 
 @purchase_orders_bp.route('/purchases/new')
@@ -551,6 +588,8 @@ def create_purchase():
                                total_qty_ordered=sum(l['quantity'] for l in lines),
                                total_qty_received=0,
                                receiving_percent=0,
+                               attachments=[],
+                               attachment_count=0,
                                company=company,
                                date_filter=date_filter,
                                status_filter=status_filter,
@@ -788,12 +827,21 @@ def detail_purchase(id):
     total_qty_received = sum(float(l['received_qty'] or 0) for l in lines)
     receiving_percent = int((total_qty_received / total_qty_ordered * 100) if total_qty_ordered > 0 else 0)
 
+    # Attachments
+    attachments = query_all("""
+        SELECT * FROM purchase_order_attachments
+        WHERE purchase_order_id = %s
+        ORDER BY id DESC
+    """, (id,))
+
     return render_template('purchases/detail.html', 
                            is_new=False,
                            order=order, 
                            lines=lines, 
                            payments=payments,
                            inventory_logs=inventory_logs,
+                           attachments=attachments,
+                           attachment_count=len(attachments),
                            company=company,
                            total_qty_ordered=total_qty_ordered,
                            total_qty_received=total_qty_received,
@@ -1027,19 +1075,27 @@ def copy_purchase(id):
 def receive_goods(id):
     order = query_one("SELECT * FROM purchase_orders WHERE id = %s", (id,))
     if not order:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Order not found.'}), 404
         flash("Order not found.", "error")
         return redirect(url_for('purchase_orders.list_purchases'))
 
     if order['status'] in ('RECEIVED', 'PAID'):
-        flash("Purchase order has already been received. Duplicate inventory increment was prevented.", "warning")
+        msg = "Purchase order has already been fully received. Duplicate inventory increment was prevented."
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, "warning")
         return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
     if order['status'] == 'CANCELLED':
-        flash("Cannot receive goods for a cancelled purchase order.", "error")
+        msg = "Cannot receive goods for a cancelled purchase order."
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, "error")
         return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
-    # Check if partial receiving quantities were provided
     data = request.get_json(silent=True) or request.form
+    receive_all = (str(data.get('receive_all', '')).lower() in ('1', 'true', 'yes'))
     line_receives = {}
     
     if request.is_json and 'items' in data:
@@ -1048,7 +1104,7 @@ def receive_goods(id):
             rq = float(it.get('received_qty') or 0)
             if rq > 0:
                 line_receives[lid] = rq
-    else:
+    elif not receive_all:
         for key in request.form:
             if key.startswith('receive_qty_'):
                 try:
@@ -1060,11 +1116,12 @@ def receive_goods(id):
                     pass
 
     with get_db_cursor(commit=True) as cur:
-        cur.execute("SELECT id, product_id, quantity, unit_cost, received_qty FROM purchase_order_lines WHERE purchase_order_id = %s FOR UPDATE", (id,))
+        cur.execute("SELECT id, product_id, quantity, unit_cost, received_qty, uom FROM purchase_order_lines WHERE purchase_order_id = %s FOR UPDATE", (id,))
         lines = cur.fetchall()
 
         any_received = False
         all_lines_complete = True
+        total_items_received_now = 0
 
         for l in lines:
             lid = l['id']
@@ -1072,40 +1129,58 @@ def receive_goods(id):
             ordered_qty = float(l['quantity'])
             already_rcv = float(l['received_qty'] or 0)
             cost = float(l['unit_cost'])
+            line_uom = (l.get('uom') or 'pcs.').strip()
             remaining = max(0.0, ordered_qty - already_rcv)
 
-            if line_receives:
-                qty_to_receive = min(remaining, line_receives.get(lid, 0.0))
-            else:
+            if receive_all or not line_receives:
                 qty_to_receive = remaining
+            else:
+                qty_to_receive = min(remaining, line_receives.get(lid, 0.0))
 
             if qty_to_receive > 0:
                 any_received = True
+                total_items_received_now += qty_to_receive
                 new_rcv_total = already_rcv + qty_to_receive
 
-                # Lock product and inventory using SAME cursor
-                cur.execute("SELECT average_cost, standard_cost FROM products WHERE id = %s FOR UPDATE", (pid,))
+                # Check product for packaging UOM ratio
+                cur.execute("""
+                    SELECT uom, purchasing_uom, purchasing_uom_ratio_std, sales_uom, sales_uom_ratio_std,
+                           standard_cost, average_cost, last_purchase_cost, costing_sheet_cost
+                    FROM products WHERE id = %s FOR UPDATE
+                """, (pid,))
                 cur_p = cur.fetchone()
+
+                ratio = 1.0
+                if cur_p:
+                    if line_uom and cur_p.get('purchasing_uom') and _match_uom(line_uom, cur_p.get('purchasing_uom')):
+                        ratio = float(cur_p.get('purchasing_uom_ratio_std') or 1.0)
+                    elif line_uom and cur_p.get('sales_uom') and _match_uom(line_uom, cur_p.get('sales_uom')):
+                        ratio = float(cur_p.get('sales_uom_ratio_std') or 1.0)
+                    elif _match_uom(line_uom, 'case'):
+                        ratio = float(cur_p.get('purchasing_uom_ratio_std') or cur_p.get('sales_uom_ratio_std') or 1.0)
+
+                base_qty_to_receive = qty_to_receive * ratio
 
                 cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s FOR UPDATE", (pid, order['location_id']))
                 cur_inv = cur.fetchone()
                 old_qty = float(cur_inv['qty']) if cur_inv else 0.0
 
-                # Increment stock in warehouse
+                # Increment stock in warehouse (standard base units)
                 cur.execute("""
                     INSERT INTO inventory (product_id, location_id, sublocation, quantity)
                     VALUES (%s, %s, '', %s)
                     ON CONFLICT (product_id, location_id, sublocation)
                     DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
-                """, (pid, order['location_id'], qty_to_receive))
+                """, (pid, order['location_id'], base_qty_to_receive))
 
-                # Recalculate moving average cost
-                cur_avg = float(cur_p['average_cost'] or cost) if cur_p else cost
-                new_total_qty = old_qty + qty_to_receive
+                # Recalculate moving average cost (cost per base unit = cost / ratio)
+                base_unit_cost = (cost / ratio) if ratio > 0 else cost
+                cur_avg = float(cur_p['average_cost'] or base_unit_cost) if cur_p else base_unit_cost
+                new_total_qty = old_qty + base_qty_to_receive
                 if new_total_qty > 0:
-                    new_avg = ((old_qty * cur_avg) + (qty_to_receive * cost)) / new_total_qty
+                    new_avg = ((old_qty * cur_avg) + (base_qty_to_receive * base_unit_cost)) / new_total_qty
                 else:
-                    new_avg = cost
+                    new_avg = base_unit_cost
 
                 cur.execute("""
                     UPDATE products 
@@ -1113,15 +1188,16 @@ def receive_goods(id):
                         average_cost = %s,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s;
-                """, (cost, new_avg, pid))
+                """, (base_unit_cost, new_avg, pid))
 
                 # Audit ledger
+                log_reason = f"Purchase Order Received ({qty_to_receive} {line_uom}" + (f" = {base_qty_to_receive} {cur_p.get('uom','pcs.')})" if ratio > 1 else ")")
                 cur.execute("""
                     INSERT INTO inventory_logs (
                         product_id, movement_type, reference_type, reference_id,
                         to_location_id, quantity, qty_before, qty_after, unit_cost, reason
-                    ) VALUES (%s, 'PO_RECEIVE', 'PO', %s, %s, %s, %s, %s, %s, 'Purchase Order Receiving');
-                """, (pid, order['order_number'], order['location_id'], qty_to_receive, old_qty, old_qty + qty_to_receive, cost))
+                    ) VALUES (%s, 'PO_RECEIVE', 'PO', %s, %s, %s, %s, %s, %s, %s);
+                """, (pid, order['order_number'], order['location_id'], base_qty_to_receive, old_qty, old_qty + base_qty_to_receive, base_unit_cost, log_reason))
 
                 # Update line received_qty
                 cur.execute("UPDATE purchase_order_lines SET received_qty = %s WHERE id = %s", (new_rcv_total, lid))
@@ -1133,7 +1209,10 @@ def receive_goods(id):
                     all_lines_complete = False
 
         if not any_received:
-            flash("No quantities were specified to receive.", "warning")
+            msg = "No remaining quantities to receive for this order."
+            if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': msg}), 400
+            flash(msg, "warning")
             return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
         new_status = 'RECEIVED' if all_lines_complete else 'PARTIAL_RECEIVED'
@@ -1143,12 +1222,175 @@ def receive_goods(id):
             WHERE id = %s;
         """, (new_status, id))
 
-    if all_lines_complete:
-        flash(f"Purchase Order {order['order_number']} goods fully received into warehouse! Inventory updated.", "success")
-    else:
-        flash(f"Partial shipment for Purchase Order {order['order_number']} received! Inventory updated.", "success")
+    badge = 'Fulfilled' if new_status == 'RECEIVED' else 'Partial'
+    success_msg = f"Purchase Order {order['order_number']} goods successfully received into warehouse! Inventory updated." if all_lines_complete else f"Partial shipment for Purchase Order {order['order_number']} received! Inventory updated."
 
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'message': success_msg,
+            'new_status': new_status,
+            'status_badge': badge,
+            'all_lines_complete': all_lines_complete
+        })
+
+    flash(success_msg, "success")
     return redirect(url_for('purchase_orders.detail_purchase', id=id))
+
+@purchase_orders_bp.route('/purchases/<int:id>/unfulfill', methods=['POST'])
+def unfulfill_purchase(id):
+    order = query_one("SELECT * FROM purchase_orders WHERE id = %s", (id,))
+    if not order:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Order not found.'}), 404
+        flash("Order not found.", "error")
+        return redirect(url_for('purchase_orders.list_purchases'))
+
+    with get_db_cursor(commit=True) as cur:
+        cur.execute("SELECT id, product_id, quantity, unit_cost, received_qty, uom FROM purchase_order_lines WHERE purchase_order_id = %s FOR UPDATE", (id,))
+        lines = cur.fetchall()
+
+        for l in lines:
+            rcv = float(l['received_qty'] or 0)
+            if rcv > 0:
+                pid = l['product_id']
+                line_uom = (l.get('uom') or 'pcs.').strip()
+                cur.execute("SELECT uom, purchasing_uom, purchasing_uom_ratio_std, sales_uom, sales_uom_ratio_std FROM products WHERE id = %s", (pid,))
+                cur_p = cur.fetchone()
+                ratio = 1.0
+                if cur_p:
+                    if line_uom and cur_p.get('purchasing_uom') and _match_uom(line_uom, cur_p.get('purchasing_uom')):
+                        ratio = float(cur_p.get('purchasing_uom_ratio_std') or 1.0)
+                    elif line_uom and cur_p.get('sales_uom') and _match_uom(line_uom, cur_p.get('sales_uom')):
+                        ratio = float(cur_p.get('sales_uom_ratio_std') or 1.0)
+                    elif _match_uom(line_uom, 'case'):
+                        ratio = float(cur_p.get('purchasing_uom_ratio_std') or cur_p.get('sales_uom_ratio_std') or 1.0)
+
+                base_qty = rcv * ratio
+                cur.execute("UPDATE inventory SET quantity = GREATEST(0, quantity - %s), updated_at = CURRENT_TIMESTAMP WHERE product_id = %s AND location_id = %s", (base_qty, pid, order['location_id']))
+                cur.execute("""
+                    INSERT INTO inventory_logs (
+                        product_id, movement_type, reference_type, reference_id,
+                        from_location_id, quantity, unit_cost, reason
+                    ) VALUES (%s, 'PO_UNRECEIVE', 'PO', %s, %s, %s, %s, 'PO Receiving Reversal (Unfulfilled)');
+                """, (pid, order['order_number'], order['location_id'], base_qty, l['unit_cost']))
+
+                cur.execute("UPDATE purchase_order_lines SET received_qty = 0 WHERE id = %s", (l['id'],))
+
+        cur.execute("UPDATE purchase_orders SET status = 'ISSUED', received_date = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (id,))
+
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'message': f"Purchase Order {order['order_number']} unfulfilled. Received stock reversed from inventory.",
+            'new_status': 'ISSUED',
+            'status_badge': 'Unfulfilled'
+        })
+
+    flash(f"Purchase Order {order['order_number']} unfulfilled. Received stock reversed from inventory.", "info")
+    return redirect(url_for('purchase_orders.detail_purchase', id=id))
+
+@purchase_orders_bp.route('/purchases/<int:id>/attachments', methods=['GET'])
+def get_po_attachments(id):
+    order = query_one("SELECT id FROM purchase_orders WHERE id = %s", (id,))
+    if not order:
+        return jsonify({'success': False, 'message': 'Order not found'}), 404
+    atts = query_all("""
+        SELECT id, purchase_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by, created_at
+        FROM purchase_order_attachments
+        WHERE purchase_order_id = %s
+        ORDER BY id DESC
+    """, (id,))
+    res = []
+    for a in atts:
+        d = dict(a)
+        if d.get('created_at'):
+            d['created_at_fmt'] = d['created_at'].strftime('%Y-%m-%d %H:%M')
+        else:
+            d['created_at_fmt'] = ''
+        res.append(d)
+    return jsonify({'success': True, 'attachments': res, 'count': len(res)})
+
+@purchase_orders_bp.route('/purchases/<int:id>/attachments/upload', methods=['POST'])
+def upload_po_attachments(id):
+    order = query_one("SELECT id, order_number FROM purchase_orders WHERE id = %s", (id,))
+    if not order:
+        return jsonify({'success': False, 'message': 'Order not found'}), 404
+
+    files = request.files.getlist('files') or request.files.getlist('attachment_files')
+    if not files and 'file' in request.files:
+        files = [request.files['file']]
+    if not files and 'attachment_file' in request.files:
+        files = [request.files['attachment_file']]
+
+    if not files:
+        return jsonify({'success': False, 'message': 'No files provided for upload.'}), 400
+
+    upload_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads', 'purchase_attachments')
+    os.makedirs(upload_dir, exist_ok=True)
+
+    saved_items = []
+    current_username = 'Admin'
+    try:
+        if session.get('username'):
+            current_username = session.get('username')
+    except Exception:
+        pass
+
+    with get_db_cursor(commit=True) as cur:
+        for f in files:
+            if not f or not f.filename:
+                continue
+            orig_name = f.filename
+            clean_name = secure_filename(orig_name) or 'po_attachment'
+            ext = os.path.splitext(orig_name)[1].lower()
+            unique_name = f"po_{id}_{int(time.time())}_{clean_name}"
+            save_path = os.path.join(upload_dir, unique_name)
+            f.save(save_path)
+
+            file_size = os.path.getsize(save_path) if os.path.exists(save_path) else 0
+            file_url = f"/static/uploads/purchase_attachments/{unique_name}"
+            file_type = f.content_type or ('image' if ext in ('.jpg', '.jpeg', '.png', '.webp', '.gif') else 'document')
+
+            cur.execute("""
+                INSERT INTO purchase_order_attachments (
+                    purchase_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (id, orig_name, file_url, file_size, file_type, request.form.get('caption', ''), current_username))
+            new_id = cur.fetchone()['id']
+            saved_items.append({
+                'id': new_id,
+                'file_name': orig_name,
+                'file_path': file_url,
+                'file_size': file_size,
+                'file_type': file_type
+            })
+
+    total_count = query_one("SELECT COUNT(*) as cnt FROM purchase_order_attachments WHERE purchase_order_id = %s", (id,))['cnt']
+    return jsonify({
+        'success': True,
+        'message': f"Uploaded {len(saved_items)} file(s) successfully!",
+        'uploaded': saved_items,
+        'total_count': total_count
+    })
+
+@purchase_orders_bp.route('/purchases/<int:id>/attachments/<int:att_id>/delete', methods=['POST'])
+def delete_po_attachment(id, att_id):
+    att = query_one("SELECT * FROM purchase_order_attachments WHERE id = %s AND purchase_order_id = %s", (att_id, id))
+    if not att:
+        return jsonify({'success': False, 'message': 'Attachment not found'}), 404
+
+    try:
+        full_path = os.path.join(os.path.dirname(__file__), '..', att['file_path'].lstrip('/'))
+        if os.path.exists(full_path):
+            os.remove(full_path)
+    except Exception:
+        pass
+
+    execute("DELETE FROM purchase_order_attachments WHERE id = %s AND purchase_order_id = %s", (att_id, id))
+    total_count = query_one("SELECT COUNT(*) as cnt FROM purchase_order_attachments WHERE purchase_order_id = %s", (id,))['cnt']
+    return jsonify({'success': True, 'message': 'Attachment deleted.', 'total_count': total_count})
 
 @purchase_orders_bp.route('/purchases/<int:id>/pay', methods=['POST'])
 def record_payment(id):

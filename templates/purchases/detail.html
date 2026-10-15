@@ -1053,6 +1053,151 @@ input:checked + .po-toggle-slider {
 input:checked + .po-toggle-slider:before {
     transform: translateX(14px);
 }
+
+/* UOM Cell Select & Auto Count Hint */
+.po-cell-select {
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 11px;
+    background: #FFFFFF;
+    color: #334155;
+    font-weight: 600;
+    cursor: pointer;
+    outline: none;
+    max-width: 85px;
+    transition: border-color 0.12s ease;
+}
+.po-cell-select:hover {
+    border-color: #94A3B8;
+}
+.po-cell-select:focus {
+    border-color: #7A5531;
+}
+.po-qty-count-hint {
+    font-size: 10.5px;
+    color: #7A5531;
+    font-weight: 700;
+    text-align: right;
+    margin-top: 2px;
+    white-space: nowrap;
+}
+
+/* Attachments Dropzone & Grid */
+.po-dropzone {
+    border: 2px dashed #CBD5E1;
+    border-radius: 8px;
+    padding: 20px 16px;
+    text-align: center;
+    background: #F8FAFC;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.po-dropzone:hover, .po-dropzone.dragover {
+    border-color: #7A5531;
+    background: #FDFBF7;
+}
+.po-attachments-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+    max-height: 280px;
+    overflow-y: auto;
+    padding: 4px 2px;
+}
+.po-attachment-card {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    display: flex;
+    flex-direction: column;
+}
+.po-attachment-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+}
+.po-attachment-thumb-wrap {
+    height: 110px;
+    background: #F1F5F9;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+}
+.po-attachment-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+}
+.po-attachment-info {
+    padding: 8px 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+.po-attachment-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: #1E293B;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.po-attachment-meta {
+    font-size: 10.5px;
+    color: #64748B;
+    margin-top: 2px;
+}
+.po-attachment-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 8px;
+    padding-top: 6px;
+    border-top: 1px solid #F1F5F9;
+}
+.po-attachment-act-btn {
+    font-size: 11.5px;
+    font-weight: 600;
+    text-decoration: none;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    padding: 2px 4px;
+}
+.po-attachment-act-btn:hover {
+    text-decoration: underline;
+}
+
+/* Floating Toast Banner */
+.po-toast-banner {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1E293B;
+    color: #FFFFFF;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: poToastFadeIn 0.2s ease;
+}
+@keyframes poToastFadeIn {
+    from { opacity: 0; transform: translate(-50%, 10px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
+}
 </style>
 {% endblock %}
 
@@ -1187,6 +1332,15 @@ input:checked + .po-toggle-slider:before {
                     {% endfor %}
                 </select>
             </div>
+            <div class="po-adv-filter-group" style="margin-top: 6px;">
+                <label>Vendor / Supplier:</label>
+                <select id="poVendorFilterSelect" onchange="applyPoVendorFilter(this.value)">
+                    <option value="All" {% if not vendor_search or vendor_search == 'All' %}selected{% endif %}>All Vendors</option>
+                    {% for v in all_vendors %}
+                    <option value="{{ v.id }}" {% if vendor_search and (vendor_search == v.id|string or vendor_search == v.name) %}selected{% endif %}>{{ v.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
         </div>
 
         <!-- Column Label: Order number -->
@@ -1211,6 +1365,8 @@ input:checked + .po-toggle-slider:before {
                  data-id="{{ o.id }}"
                  data-order-number="{{ o.order_number|lower }}"
                  data-vendor="{{ (o.vendor_name or '')|lower }}"
+                 data-vendor-id="{{ o.vendor_id or '' }}"
+                 data-location-id="{{ o.location_id or '' }}"
                  data-status="{{ o_badge }}"
                  onclick="selectPurchaseOrder({{ o.id }})">
                 <div class="po-card-top-row">
@@ -1259,7 +1415,7 @@ input:checked + .po-toggle-slider:before {
                         <span style="color: #DC2626;">🚫</span> Cancel order
                     </button>
                     <button type="button" class="po-top-action-btn" onclick="openAttachmentsModal()" title="View and upload attachments">
-                        📎 Attachments
+                        📎 Attachments (<span id="poTopAttachmentCount">{{ attachment_count or 0 }}</span>)
                     </button>
                     {% if not is_new %}
                     <button type="button" class="po-top-action-btn" onclick="executePoCopyAction()" title="Duplicate this purchase order">
@@ -1553,7 +1709,7 @@ input:checked + .po-toggle-slider:before {
                     </div>
                 </div>
 
-                <div class="po-pipeline-right">
+                <div class="po-pipeline-right" id="poPipelineActionButtons">
                     <!-- Quick Pay / Unpay Action -->
                     {% if order.payment_status == 'PAID' or order.status == 'PAID' %}
                     <button type="button" class="po-pipeline-action-link" onclick="openPaymentModal()" title="View and modify payments">
@@ -1567,10 +1723,13 @@ input:checked + .po-toggle-slider:before {
 
                     <!-- Quick Receive / Unfulfill Action -->
                     {% if order.status in ('RECEIVED', 'FULFILLED') %}
-                    <button type="button" class="po-pipeline-action-link" onclick="openReceiveModal()" title="View receiving vouchers">
+                    <button type="button" class="po-pipeline-action-link danger" onclick="unfulfillOrderAction()" title="Reverse goods receipt and return to Issued">
                         ↩ Unfulfill
                     </button>
                     {% else %}
+                    <button type="button" class="po-pipeline-action-link" onclick="quickReceiveAllAction()" title="1-Click Receive All Remaining Items">
+                        ✓ Receive All
+                    </button>
                     <button type="button" class="po-pipeline-action-link primary" onclick="openReceiveModal()" title="Receive goods into inventory">
                         📦 Receive
                     </button>
@@ -1599,7 +1758,16 @@ input:checked + .po-toggle-slider:before {
                     </thead>
                     <tbody id="poLineItemsBody">
                         {% for l in lines %}
-                        <tr data-line-index="{{ loop.index0 }}" data-product-id="{{ l.product_id }}" class="po-line-row">
+                        <tr data-line-index="{{ loop.index0 }}" 
+                            data-line-id="{{ l.id }}"
+                            data-product-id="{{ l.product_id }}"
+                            data-base-uom="{{ l.product_uom or l.base_uom or 'pcs.' }}"
+                            data-purchasing-uom="{{ l.purchasing_uom or '' }}"
+                            data-purchasing-ratio="{{ l.purchasing_ratio or 1.0 }}"
+                            data-sales-uom="{{ l.sales_uom or '' }}"
+                            data-sales-ratio="{{ l.sales_ratio or 1.0 }}"
+                            data-base-cost="{{ l.cost_price or (l.unit_cost / (l.purchasing_ratio if l.purchasing_ratio and l.purchasing_ratio > 0 else 1.0)) }}"
+                            class="po-line-row">
                             <!-- Product Column: Thumbnail + Bold Name + SKU -->
                             <td>
                                 <div class="po-line-product-cell">
@@ -1633,25 +1801,43 @@ input:checked + .po-toggle-slider:before {
                                        onchange="markPoDirty()">
                             </td>
 
-                            <!-- Quantity Column with UOM tag -->
+                            <!-- Quantity Column with UOM Selector & Count Hint -->
                             <td style="text-align: right;">
                                 <div class="po-qty-cell-wrap">
                                     <input type="number" step="any" min="0" name="lines[{{ loop.index0 }}][quantity]" 
                                            value="{{ l.quantity }}" 
                                            class="po-cell-input po-qty-input line-qty" 
-                                           oninput="recalculatePoTotals(); markPoDirty();">
-                                    <span class="po-qty-uom-tag">{{ l.line_uom or 'pcs.' }}</span>
-                                    <input type="hidden" name="lines[{{ loop.index0 }}][uom]" class="line-uom" value="{{ l.line_uom or 'pcs.' }}">
+                                           oninput="handleLineQtyInput(this)">
+                                    {% set base_u = l.product_uom or l.base_uom or 'pcs.' %}
+                                    {% set purch_u = l.purchasing_uom or base_u %}
+                                    {% set sales_u = l.sales_uom or base_u %}
+                                    {% set curr_u = l.line_uom or purch_u or 'pcs.' %}
+                                    <select class="po-cell-select line-uom" onchange="handleLineUomChange(this)">
+                                        <option value="{{ purch_u }}" {% if curr_u|lower == purch_u|lower %}selected{% endif %}>{{ purch_u }}</option>
+                                        {% if base_u|lower != purch_u|lower %}
+                                        <option value="{{ base_u }}" {% if curr_u|lower == base_u|lower %}selected{% endif %}>{{ base_u }}</option>
+                                        {% endif %}
+                                        {% if sales_u|lower != base_u|lower and sales_u|lower != purch_u|lower %}
+                                        <option value="{{ sales_u }}" {% if curr_u|lower == sales_u|lower %}selected{% endif %}>{{ sales_u }}</option>
+                                        {% endif %}
+                                        {% for std_u in ['case', 'pcs.', 'box', 'pack', 'carton', 'kg', 'bottle', 'can'] %}
+                                            {% if std_u|lower not in [purch_u|lower, base_u|lower, sales_u|lower] %}
+                                            <option value="{{ std_u }}" {% if curr_u|lower == std_u|lower %}selected{% endif %}>{{ std_u }}</option>
+                                            {% endif %}
+                                        {% endfor %}
+                                    </select>
+                                    <input type="hidden" name="lines[{{ loop.index0 }}][uom]" class="line-uom-hidden" value="{{ curr_u }}">
                                 </div>
+                                <div class="po-qty-count-hint line-count-hint"></div>
                             </td>
 
-                            <!-- Vendor Price Column -->
+                            <!-- Vendor Price Column (Auto-calculated from costing, editable) -->
                             <td style="text-align: right;">
                                 <input type="number" step="0.0001" min="0" name="lines[{{ loop.index0 }}][unit_cost]" 
                                        value="{{ l.unit_cost }}" 
                                        class="po-cell-input line-cost" 
                                        style="text-align: right; width: 90px;" 
-                                       oninput="recalculatePoTotals(); markPoDirty();">
+                                       oninput="handleLineCostInput(this)">
                             </td>
 
                             <!-- Subtotal Column in Bold -->
@@ -1765,15 +1951,23 @@ input:checked + .po-toggle-slider:before {
                  data-sku="{{ p.sku }}" 
                  data-name="{{ p.name }}" 
                  data-cost="{{ p.cost_price or 0 }}" 
-                 data-uom="{{ p.purchasing_uom or p.uom or 'pcs.' }}"
+                 data-base-uom="{{ p.uom or 'pcs.' }}"
+                 data-purchasing-uom="{{ p.purchasing_uom or '' }}"
+                 data-purchasing-ratio="{{ p.purchasing_ratio or p.purchasing_uom_ratio_std or p.master_pack_qty or 1.0 }}"
+                 data-sales-uom="{{ p.sales_uom or '' }}"
+                 data-sales-ratio="{{ p.sales_ratio or p.sales_uom_ratio_std or 1.0 }}"
+                 data-image="{{ p.image_url or '' }}"
                  onclick="addPoProductFromPicker(this)">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <div>
                         <span style="font-family: var(--font-mono); font-weight: 700; color: #7A5531; font-size: 12px;">{{ p.sku }}</span>
                         <div style="font-weight: 600; font-size: 13.5px; color: #1E293B;">{{ p.name }}</div>
+                        {% if p.purchasing_uom and p.purchasing_uom != p.uom %}
+                        <div style="font-size: 11px; color: #7A5531;">Purchasing: 1 {{ p.purchasing_uom }} = {{ p.purchasing_ratio or p.purchasing_uom_ratio_std or p.master_pack_qty or 1 }} {{ p.uom or 'pcs.' }}</div>
+                        {% endif %}
                     </div>
                     <div style="text-align: right;">
-                        <div style="font-weight: 700; color: #0F172A;">{{ (p.cost_price or 0) | currency }}</div>
+                        <div style="font-weight: 700; color: #0F172A;">{{ (p.cost_price or 0) | currency }} <span style="font-size: 11px; font-weight: normal; color: #64748B;">/ {{ p.uom or 'pcs.' }}</span></div>
                         <div style="font-size: 11px; color: #64748B;">Stock: {{ p.on_hand or 0 }} {{ p.uom or 'pcs.' }}</div>
                     </div>
                 </div>
@@ -1783,48 +1977,53 @@ input:checked + .po-toggle-slider:before {
     </div>
 </div>
 
-<!-- 2. Receive Goods Modal -->
+<!-- 2. Receive Goods Modal (Dynamic) -->
 <div class="modal-overlay" id="poReceiveGoodsModal" style="display: none;">
-    <div class="modal-dialog" style="max-width: 680px;">
+    <div class="modal-dialog" style="max-width: 720px;">
         <div class="modal-header">
-            <h2 class="modal-title">Receive Goods into Inventory</h2>
+            <h2 class="modal-title" id="poReceiveModalTitle">Receive Goods into Inventory</h2>
             <button class="modal-close" onclick="closeReceiveModal()">✕</button>
         </div>
-        <form method="POST" action="{% if not is_new %}{{ url_for('purchase_orders.receive_goods', id=order.id) }}{% endif %}">
+        <form id="poReceiveGoodsForm" onsubmit="submitReceiveModal(event)">
+            <input type="hidden" id="receiveModalPoId" value="{{ order.id if not is_new else 0 }}">
             <div style="padding: 16px 20px;">
-                <p style="font-size: 13px; color: #64748B; margin-bottom: 12px;">
-                    Enter received quantity for each item to increment warehouse inventory.
-                </p>
-                <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="fillAllRemainingReceiveQty()">Fill All Remaining</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <p style="font-size: 13px; color: #64748B; margin: 0;">
+                        Enter quantity to receive for each line item. Warehouse inventory will be credited immediately.
+                    </p>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="fillAllRemainingReceiveQty()">Fill All Remaining</button>
+                        <button type="button" class="btn btn-primary btn-sm" style="background: #059669; border-color: #059669;" onclick="quickReceiveAllAction()">✓ 1-Click Receive All</button>
+                    </div>
                 </div>
-                <div style="max-height: 320px; overflow-y: auto;">
-                    <table class="data-table" style="width: 100%;">
+                <div style="max-height: 360px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 6px;">
+                    <table class="data-table" style="width: 100%; margin-bottom: 0;">
                         <thead>
-                            <tr>
-                                <th>Item</th>
-                                <th style="text-align: right;">Ordered</th>
-                                <th style="text-align: right;">Received</th>
-                                <th style="text-align: right;">Receiving Now</th>
+                            <tr style="background: #F8FAFC;">
+                                <th style="padding: 8px 12px;">Item & Packaging</th>
+                                <th style="text-align: right; padding: 8px 12px;">Ordered</th>
+                                <th style="text-align: right; padding: 8px 12px;">Already Received</th>
+                                <th style="text-align: right; padding: 8px 12px; width: 140px;">Receive Now</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="poReceiveModalTbody">
                             {% for l in lines %}
                             {% set remaining = l.quantity - l.received_qty %}
                             <tr>
-                                <td>
-                                    <strong>{{ l.product_sku }}</strong>
+                                <td style="padding: 10px 12px;">
+                                    <div style="font-weight: 700; color: #1E293B;">{{ l.product_sku }}</div>
                                     <div style="font-size: 12px; color: #64748B;">{{ l.product_name }}</div>
+                                    <div style="font-size: 11px; color: #7A5531; font-weight: 600;">Unit: {{ l.line_uom or 'pcs.' }}</div>
                                 </td>
-                                <td style="text-align: right;">{{ l.quantity }}</td>
-                                <td style="text-align: right;">{{ l.received_qty }}</td>
-                                <td style="text-align: right;">
+                                <td style="text-align: right; padding: 10px 12px; font-weight: 600;">{{ l.quantity }} {{ l.line_uom or '' }}</td>
+                                <td style="text-align: right; padding: 10px 12px; color: #059669; font-weight: 600;">{{ l.received_qty }}</td>
+                                <td style="text-align: right; padding: 10px 12px;">
                                     <input type="number" step="any" min="0" max="{{ remaining }}" 
-                                           name="receive_qty_{{ l.id }}" 
-                                           class="inflow-field-input po-receive-input-row" 
-                                           data-remaining="{{ remaining }}"
+                                           data-line-id="{{ l.id }}" 
+                                           data-remaining="{{ remaining }}" 
+                                           class="po-cell-input po-receive-input-row" 
                                            value="{{ remaining if remaining > 0 else 0 }}" 
-                                           style="width: 80px; text-align: right;" 
+                                           style="width: 90px; text-align: right; border: 1px solid #CBD5E1; background: #FFFFFF; font-weight: 700;" 
                                            {% if remaining <= 0 %}disabled{% endif %}>
                                 </td>
                             </tr>
@@ -1833,11 +2032,91 @@ input:checked + .po-toggle-slider:before {
                     </table>
                 </div>
             </div>
-            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 8px;">
-                <button type="button" class="btn btn-secondary" onclick="closeReceiveModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary" style="background: #7A5531; border-color: #7A5531;">Confirm Receipt</button>
+            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 12px; color: #64748B;" id="poReceiveModalFooterNote">
+                    Inventory count will scale automatically according to product packaging units.
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeReceiveModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnConfirmReceive" style="background: #7A5531; border-color: #7A5531;">Confirm Receipt</button>
+                </div>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- 4. Attachments Modal -->
+<div class="modal-overlay" id="poAttachmentsModal" style="display: none;">
+    <div class="modal-dialog" style="max-width: 680px;">
+        <div class="modal-header">
+            <h2 class="modal-title">📎 Attachments - <span id="poAttachOrderNumDisplay">{% if order %}{{ order.order_number }}{% endif %}</span></h2>
+            <button class="modal-close" onclick="closeAttachmentsModal()">✕</button>
+        </div>
+        <div style="padding: 18px 20px;">
+            <!-- Dropzone / File input -->
+            <div class="po-dropzone" id="poDropzone" onclick="document.getElementById('poFileInput').click()">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#7A5531" stroke-width="1.8">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                <div style="margin-top: 8px; font-weight: 700; color: #2D241E; font-size: 14px;">
+                    Drop pictures, invoices, receipts, or click to upload
+                </div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 2px;">
+                    Supports PNG, JPG, JPEG, WEBP, GIF, PDF (Max 15MB)
+                </div>
+                <input type="file" id="poFileInput" multiple accept="image/*,.pdf" style="display: none;" onchange="handlePoFileSelect(this.files)">
+            </div>
+
+            <!-- Upload progress indicator -->
+            <div id="poUploadProgress" style="display: none; padding: 10px; background: #FEF3C7; border-radius: 6px; font-size: 12.5px; color: #92400E; margin-top: 12px; font-weight: 600;">
+                ⏳ Uploading attachment...
+            </div>
+
+            <!-- Attachments Grid -->
+            <div style="margin-top: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 12.5px; font-weight: 700; color: #334155;">Attached Files (<span id="poAttachModalCount">{{ attachment_count or 0 }}</span>)</span>
+                </div>
+                <div class="po-attachments-grid" id="poAttachmentsGrid">
+                    {% for a in attachments %}
+                    {% set is_img = a.file_type == 'image' or (a.file_path and (a.file_path.endswith('.png') or a.file_path.endswith('.jpg') or a.file_path.endswith('.jpeg') or a.file_path.endswith('.webp'))) %}
+                    <div class="po-attachment-card">
+                        <div class="po-attachment-thumb-wrap">
+                            {% if is_img %}
+                            <img src="{{ a.file_path }}" alt="" class="po-attachment-thumb-img" onclick="window.open('{{ a.file_path }}', '_blank')">
+                            {% else %}
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div class="po-attachment-info">
+                            <div>
+                                <div class="po-attachment-name" title="{{ a.file_name }}">{{ a.file_name }}</div>
+                                <div class="po-attachment-meta">{{ a.created_at.strftime('%b %d, %H:%M') if a.created_at else '' }}</div>
+                            </div>
+                            <div class="po-attachment-actions">
+                                <a href="{{ a.file_path }}" target="_blank" class="po-attachment-act-btn" style="color: #2563EB;">View</a>
+                                <button type="button" class="po-attachment-act-btn" style="color: #DC2626;" onclick="deletePoAttachment({{ order.id }}, {{ a.id }})">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div style="grid-column: 1 / -1; text-align: center; color: #94A3B8; font-size: 12.5px; padding: 24px;">
+                        No files attached yet. Drop images or click above to upload.
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-secondary" onclick="closeAttachmentsModal()">Close</button>
+        </div>
     </div>
 </div>
 
@@ -2001,15 +2280,109 @@ function togglePoMasterSearch() {
     }
 }
 
+// UOM Matcher & Ratio Helpers
+function matchUom(u1, u2) {
+    if (!u1 || !u2) return false;
+    const a = String(u1).trim().toLowerCase().replace(/\.$/, '');
+    const b = String(u2).trim().toLowerCase().replace(/\.$/, '');
+    if (a === b) return true;
+    const caseGroup = ['case', 'cases', 'box', 'boxes', 'carton', 'cartons', 'កេស', 'កាតុង'];
+    if (caseGroup.includes(a) && caseGroup.includes(b)) return true;
+    const packGroup = ['pack', 'packs', 'packet', 'packets', 'ដុំ', 'កញ្ចប់'];
+    if (packGroup.includes(a) && packGroup.includes(b)) return true;
+    const pcsGroup = ['pc', 'pcs', 'piece', 'pieces', 'each', 'ea', 'ចាន', 'កែវ', 'ដប', 'កំប៉ុង', 'គ្រាប់', 'សន្លឹក'];
+    if (pcsGroup.includes(a) && pcsGroup.includes(b)) return true;
+    return false;
+}
+
+function getLineUomRatio(row, uom) {
+    const purchUom = row.dataset.purchasingUom || '';
+    const purchRatio = parseFloat(row.dataset.purchasingRatio || 1.0);
+    const salesUom = row.dataset.salesUom || '';
+    const salesRatio = parseFloat(row.dataset.salesRatio || 1.0);
+
+    if (purchUom && matchUom(uom, purchUom)) return (purchRatio > 0 ? purchRatio : 1.0);
+    if (matchUom(uom, 'case')) return (purchRatio > 1.0 ? purchRatio : (salesRatio > 1.0 ? salesRatio : 1.0));
+    if (salesUom && matchUom(uom, salesUom)) return (salesRatio > 0 ? salesRatio : 1.0);
+    return 1.0;
+}
+
+function handleLineQtyInput(inp) {
+    const row = inp.closest('.po-line-row');
+    if (!row) return;
+    updateLineAutoCountAndSubtotal(row);
+    recalculatePoTotals();
+    markPoDirty();
+}
+
+function handleLineCostInput(inp) {
+    const row = inp.closest('.po-line-row');
+    if (!row) return;
+    updateLineAutoCountAndSubtotal(row);
+    recalculatePoTotals();
+    markPoDirty();
+}
+
+function handleLineUomChange(sel) {
+    const row = sel.closest('.po-line-row');
+    if (!row) return;
+    const uom = sel.value;
+    const hiddenUom = row.querySelector('.line-uom-hidden');
+    if (hiddenUom) hiddenUom.value = uom;
+
+    // Auto-update vendor price based on base cost * ratio
+    const baseCost = parseFloat(row.dataset.baseCost || 0);
+    const ratio = getLineUomRatio(row, uom);
+    if (baseCost > 0) {
+        const costInput = row.querySelector('.line-cost');
+        if (costInput) {
+            costInput.value = (Math.round(baseCost * ratio * 10000) / 10000).toFixed(2);
+        }
+    }
+
+    updateLineAutoCountAndSubtotal(row);
+    recalculatePoTotals();
+    markPoDirty();
+}
+
+function updateLineAutoCountAndSubtotal(row) {
+    const qtyInput = row.querySelector('.line-qty');
+    const costInput = row.querySelector('.line-cost');
+    const uomSelect = row.querySelector('.line-uom');
+    const hintEl = row.querySelector('.line-count-hint');
+    const subtotalEl = row.querySelector('.line-subtotal');
+
+    const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+    const cost = parseFloat(costInput ? costInput.value : 0) || 0;
+    const uom = uomSelect ? uomSelect.value : (row.dataset.baseUom || 'pcs.');
+    const ratio = getLineUomRatio(row, uom);
+    const baseUom = row.dataset.baseUom || 'pcs.';
+
+    // Hint: if ratio > 1, show unit count e.g. "(= 400 pcs.)"
+    if (hintEl) {
+        if (ratio > 1 && qty > 0) {
+            const totalUnits = Math.round(qty * ratio * 100) / 100;
+            hintEl.innerText = `(= ${totalUnits} ${baseUom})`;
+            hintEl.style.display = 'block';
+        } else {
+            hintEl.innerText = '';
+            hintEl.style.display = 'none';
+        }
+    }
+
+    // Subtotal
+    const sub = qty * cost;
+    if (subtotalEl) {
+        subtotalEl.innerText = formatCurrency(sub);
+    }
+}
+
+// Master Sidebar Search & Multi-Filter (Status, Search, Location, Vendor)
+let currentPoVendorFilter = 'All';
+
 function handlePoLiveSearch(val) {
-    val = (val || '').toLowerCase().trim();
-    document.getElementById('btnClearPoSearch').style.display = val ? 'block' : 'none';
-    document.querySelectorAll('#poMasterList .po-list-card').forEach(card => {
-        const num = card.dataset.orderNumber || '';
-        const vendor = card.dataset.vendor || '';
-        const match = !val || num.includes(val) || vendor.includes(val);
-        card.style.display = match ? 'block' : 'none';
-    });
+    document.getElementById('btnClearPoSearch').style.display = (val || '').trim() ? 'block' : 'none';
+    filterPoSidebarOrders();
 }
 
 function clearPoLiveSearch() {
@@ -2027,11 +2400,7 @@ function togglePoStatusDropdown(e) {
 function selectPoStatusFilter(statusVal) {
     document.getElementById('poStatusFilterLabel').innerText = statusVal;
     document.getElementById('poStatusDropdownMenu').style.display = 'none';
-    document.querySelectorAll('#poMasterList .po-list-card').forEach(card => {
-        const st = card.dataset.status;
-        const match = (statusVal === 'All') || (st === statusVal);
-        card.style.display = match ? 'block' : 'none';
-    });
+    filterPoSidebarOrders();
 }
 
 function togglePoAdvancedFilters() {
@@ -2044,16 +2413,54 @@ function applyPoDateFilter(val) {
 }
 
 function applyPoLocationFilter(val) {
-    if (val === 'All') {
-        document.querySelectorAll('#poMasterList .po-list-card').forEach(c => c.style.display = 'block');
-    } else {
-        // filter
-    }
+    filterPoSidebarOrders();
 }
+
+function applyPoVendorFilter(val) {
+    currentPoVendorFilter = val;
+    filterPoSidebarOrders();
+}
+
+function filterPoSidebarOrders() {
+    const liveVal = (document.getElementById('poLiveSearchInput')?.value || '').toLowerCase().trim();
+    const statusVal = document.getElementById('poStatusFilterLabel')?.innerText.trim() || 'All';
+    const locVal = document.getElementById('poLocationFilterSelect')?.value || 'All';
+    const vendorVal = currentPoVendorFilter || 'All';
+
+    document.querySelectorAll('#poMasterList .po-list-card').forEach(card => {
+        const num = card.dataset.orderNumber || '';
+        const vendor = card.dataset.vendor || '';
+        const vendorId = card.dataset.vendorId || '';
+        const locId = card.dataset.locationId || '';
+        const st = card.dataset.status || '';
+
+        let match = true;
+        if (liveVal && !num.includes(liveVal) && !vendor.includes(liveVal)) {
+            match = false;
+        }
+        if (statusVal !== 'All' && st !== statusVal) {
+            match = false;
+        }
+        if (locVal !== 'All' && String(locId) !== String(locVal)) {
+            match = false;
+        }
+        if (vendorVal !== 'All' && String(vendorId) !== String(vendorVal)) {
+            match = false;
+        }
+
+        card.style.display = match ? 'block' : 'none';
+    });
+}
+
+// Active State Cache
+let currentActivePoId = document.getElementById('poIdHidden')?.value || 0;
+let currentActiveOrder = null;
+let currentActiveLines = [];
 
 // Select Purchase Order from Left Master Sidebar
 function selectPurchaseOrder(id) {
     if (!id) return;
+    currentActivePoId = id;
     
     // 1. Highlight card
     document.querySelectorAll('#poMasterList .po-list-card').forEach(c => c.classList.remove('active'));
@@ -2073,6 +2480,8 @@ function selectPurchaseOrder(id) {
         .then(r => r.json())
         .then(res => {
             if (res.success && res.order) {
+                currentActiveOrder = res.order;
+                currentActiveLines = res.lines;
                 renderPoDetailsInCanvas(res.order, res.lines, res.receiving_percent);
                 clearPoDirty();
             } else {
@@ -2086,10 +2495,18 @@ function selectPurchaseOrder(id) {
 
 // Render dynamic data into canvas
 function renderPoDetailsInCanvas(order, lines, receivePct) {
+    currentActivePoId = order.id;
+    currentActiveOrder = order;
+    currentActiveLines = lines;
+
     document.getElementById('poIdHidden').value = order.id;
     document.getElementById('poMainForm').action = `/purchases/${order.id}/save`;
     document.getElementById('poOrderNumberInput').value = order.order_number;
     document.getElementById('poOrderTitleDisplay').innerText = order.order_number;
+
+    // Attachments count
+    const topAttCnt = document.getElementById('poTopAttachmentCount');
+    if (topAttCnt) topAttCnt.innerText = order.attachment_count || 0;
 
     // Badge
     const badgeWrap = document.getElementById('poDetailStatusBadgeWrap');
@@ -2098,6 +2515,19 @@ function renderPoDetailsInCanvas(order, lines, receivePct) {
     else if (order.status_badge === 'Partial') bClass = 'badge-partial';
     else if (order.status_badge === 'Cancelled') bClass = 'badge-cancelled';
     badgeWrap.innerHTML = `<span class="po-header-badge ${bClass}">${order.status_badge}</span>`;
+
+    // Update active card badge and amount in sidebar
+    const activeCard = document.getElementById('poCard_' + order.id);
+    if (activeCard) {
+        activeCard.dataset.status = order.status_badge;
+        const cardBadge = activeCard.querySelector('.po-card-badge');
+        if (cardBadge) {
+            cardBadge.className = `po-card-badge ${bClass}`;
+            cardBadge.innerText = order.status_badge;
+        }
+        const cardAmt = activeCard.querySelector('.po-card-amount');
+        if (cardAmt) cardAmt.innerText = formatCurrency(order.total_amount);
+    }
 
     // Dates
     document.getElementById('poOrderDateInput').value = order.order_date_raw || '';
@@ -2135,13 +2565,38 @@ function renderPoDetailsInCanvas(order, lines, receivePct) {
     const lineBadge = document.getElementById('poStepReceiveBadge');
     if (order.status_badge === 'Fulfilled') {
         lineBadge.className = 'po-step-badge completed';
+        lineBadge.querySelector('.po-step-check').innerText = '✓';
         document.getElementById('poStepLine').className = 'po-step-connecting-line completed';
     } else if (order.status_badge === 'Partial') {
         lineBadge.className = 'po-step-badge partial';
+        lineBadge.querySelector('.po-step-check').innerText = '📦';
         document.getElementById('poStepLine').className = 'po-step-connecting-line';
     } else {
         lineBadge.className = 'po-step-badge';
+        lineBadge.querySelector('.po-step-check').innerText = '📦';
         document.getElementById('poStepLine').className = 'po-step-connecting-line';
+    }
+
+    // Dynamic Pipeline Action Buttons (Pay / Unfulfill / Receive All / Receive)
+    const pipelineBtns = document.getElementById('poPipelineActionButtons');
+    if (pipelineBtns) {
+        let payBtnHtml = '';
+        if (order.payment_status === 'PAID') {
+            payBtnHtml = `<button type="button" class="po-pipeline-action-link" onclick="openPaymentModal()" title="View payments">↩ Unpay</button>`;
+        } else {
+            payBtnHtml = `<button type="button" class="po-pipeline-action-link" onclick="openPaymentModal()" title="Record payment">💳 Pay</button>`;
+        }
+
+        let receiveBtnHtml = '';
+        if (order.status_badge === 'Fulfilled') {
+            receiveBtnHtml = `<button type="button" class="po-pipeline-action-link danger" onclick="unfulfillOrderAction()" title="Reverse goods receipt">↩ Unfulfill</button>`;
+        } else {
+            receiveBtnHtml = `
+                <button type="button" class="po-pipeline-action-link" onclick="quickReceiveAllAction()" title="1-Click Receive All Remaining Items">✓ Receive All</button>
+                <button type="button" class="po-pipeline-action-link primary" onclick="openReceiveModal()" title="Receive goods into inventory">📦 Receive</button>
+            `;
+        }
+        pipelineBtns.innerHTML = payBtnHtml + receiveBtnHtml;
     }
 
     // Remarks
@@ -2156,10 +2611,41 @@ function renderPoLinesTable(lines) {
     const tbody = document.getElementById('poLineItemsBody');
     tbody.innerHTML = '';
     lines.forEach((l, index) => {
+        const baseUom = l.product_uom || l.base_uom || 'pcs.';
+        const purchUom = l.purchasing_uom || baseUom;
+        const purchRatio = parseFloat(l.purchasing_ratio || 1.0);
+        const salesUom = l.sales_uom || baseUom;
+        const salesRatio = parseFloat(l.sales_ratio || 1.0);
+        const currUom = l.line_uom || purchUom || 'pcs.';
+        const baseCost = parseFloat(l.cost_price || (l.unit_cost / (purchRatio > 0 ? purchRatio : 1.0)) || 0);
+
+        // Build distinct UOM options
+        const optionsMap = new Map();
+        optionsMap.set(purchUom.toLowerCase(), purchUom);
+        optionsMap.set(baseUom.toLowerCase(), baseUom);
+        if (salesUom) optionsMap.set(salesUom.toLowerCase(), salesUom);
+        ['case', 'pcs.', 'box', 'pack', 'carton', 'kg', 'bottle', 'can'].forEach(u => {
+            if (!optionsMap.has(u.toLowerCase())) optionsMap.set(u.toLowerCase(), u);
+        });
+
+        let uomOptionsHtml = '';
+        optionsMap.forEach((label, val) => {
+            const sel = (val === currUom.toLowerCase()) ? 'selected' : '';
+            uomOptionsHtml += `<option value="${label}" ${sel}>${label}</option>`;
+        });
+
         const tr = document.createElement('tr');
         tr.className = 'po-line-row';
         tr.dataset.lineIndex = index;
+        tr.dataset.lineId = l.id || 0;
         tr.dataset.productId = l.product_id;
+        tr.dataset.baseUom = baseUom;
+        tr.dataset.purchasingUom = purchUom;
+        tr.dataset.purchasingRatio = purchRatio;
+        tr.dataset.salesUom = salesUom;
+        tr.dataset.salesRatio = salesRatio;
+        tr.dataset.baseCost = baseCost;
+
         tr.innerHTML = `
             <td>
                 <div class="po-line-product-cell">
@@ -2185,19 +2671,23 @@ function renderPoLinesTable(lines) {
             </td>
             <td style="text-align: right;">
                 <div class="po-qty-cell-wrap">
-                    <input type="number" step="any" min="0" name="lines[${index}][quantity]" value="${l.quantity}" class="po-cell-input po-qty-input line-qty" oninput="recalculatePoTotals(); markPoDirty();">
-                    <span class="po-qty-uom-tag">${l.line_uom || 'pcs.'}</span>
-                    <input type="hidden" name="lines[${index}][uom]" class="line-uom" value="${l.line_uom || 'pcs.'}">
+                    <input type="number" step="any" min="0" name="lines[${index}][quantity]" value="${l.quantity}" class="po-cell-input po-qty-input line-qty" oninput="handleLineQtyInput(this)">
+                    <select class="po-cell-select line-uom" onchange="handleLineUomChange(this)">
+                        ${uomOptionsHtml}
+                    </select>
+                    <input type="hidden" name="lines[${index}][uom]" class="line-uom-hidden" value="${currUom}">
                 </div>
+                <div class="po-qty-count-hint line-count-hint"></div>
             </td>
             <td style="text-align: right;">
-                <input type="number" step="0.0001" min="0" name="lines[${index}][unit_cost]" value="${l.unit_cost}" class="po-cell-input line-cost" style="text-align: right; width: 90px;" oninput="recalculatePoTotals(); markPoDirty();">
+                <input type="number" step="0.0001" min="0" name="lines[${index}][unit_cost]" value="${l.unit_cost}" class="po-cell-input line-cost" style="text-align: right; width: 90px;" oninput="handleLineCostInput(this)">
             </td>
             <td style="text-align: right; font-weight: 700; color: #1E293B;" class="line-subtotal">
                 ${formatCurrency(l.subtotal)}
             </td>
         `;
         tbody.appendChild(tr);
+        updateLineAutoCountAndSubtotal(tr);
     });
 }
 
@@ -2300,60 +2790,119 @@ function addPoProductFromPicker(el) {
     const pid = el.dataset.id;
     const sku = el.dataset.sku;
     const name = el.dataset.name;
-    const cost = parseFloat(el.dataset.cost || 0);
-    const uom = el.dataset.uom || 'pcs.';
+    const baseCost = parseFloat(el.dataset.cost || 0);
+    const baseUom = el.dataset.baseUom || 'pcs.';
+    const purchUom = el.dataset.purchasingUom || '';
+    const purchRatio = parseFloat(el.dataset.purchasingRatio || 1.0);
+    const salesUom = el.dataset.salesUom || '';
+    const salesRatio = parseFloat(el.dataset.salesRatio || 1.0);
+    const img = el.dataset.image || '';
 
-    appendPoLineRow(pid, sku, name, '', 1, cost, uom);
+    // Default to purchasing UOM (e.g. Case) if set, otherwise base UOM
+    const defaultUom = purchUom || baseUom;
+    const ratio = (defaultUom === purchUom && purchRatio > 0) ? purchRatio : 1.0;
+    const initialPrice = (Math.round(baseCost * ratio * 10000) / 10000);
+
+    appendPoLineRow({
+        productId: pid,
+        sku: sku,
+        name: name,
+        image: img,
+        vpc: '',
+        qty: 1,
+        cost: initialPrice,
+        baseCost: baseCost,
+        baseUom: baseUom,
+        selectedUom: defaultUom,
+        purchasingUom: purchUom,
+        purchasingRatio: purchRatio,
+        salesUom: salesUom,
+        salesRatio: salesRatio
+    });
+
     closePoProductPickerModal();
     markPoDirty();
 }
 
-function appendPoLineRow(productId, sku, name, vpc, qty, cost, uom) {
+function appendPoLineRow(params) {
     const tbody = document.getElementById('poLineItemsBody');
     const index = tbody.querySelectorAll('tr').length;
-    const subtotal = qty * cost;
+    const subtotal = params.qty * params.cost;
+
+    const baseUom = params.baseUom || 'pcs.';
+    const purchUom = params.purchasingUom || baseUom;
+    const salesUom = params.salesUom || baseUom;
+    const currUom = params.selectedUom || purchUom || 'pcs.';
+
+    // Build distinct UOM options
+    const optionsMap = new Map();
+    optionsMap.set(purchUom.toLowerCase(), purchUom);
+    optionsMap.set(baseUom.toLowerCase(), baseUom);
+    if (salesUom) optionsMap.set(salesUom.toLowerCase(), salesUom);
+    ['case', 'pcs.', 'box', 'pack', 'carton', 'kg', 'bottle', 'can'].forEach(u => {
+        if (!optionsMap.has(u.toLowerCase())) optionsMap.set(u.toLowerCase(), u);
+    });
+
+    let uomOptionsHtml = '';
+    optionsMap.forEach((label, val) => {
+        const sel = (val === currUom.toLowerCase()) ? 'selected' : '';
+        uomOptionsHtml += `<option value="${label}" ${sel}>${label}</option>`;
+    });
 
     const tr = document.createElement('tr');
     tr.className = 'po-line-row';
     tr.dataset.lineIndex = index;
-    tr.dataset.productId = productId;
+    tr.dataset.lineId = 0;
+    tr.dataset.productId = params.productId;
+    tr.dataset.baseUom = baseUom;
+    tr.dataset.purchasingUom = purchUom;
+    tr.dataset.purchasingRatio = params.purchasingRatio || 1.0;
+    tr.dataset.salesUom = salesUom;
+    tr.dataset.salesRatio = params.salesRatio || 1.0;
+    tr.dataset.baseCost = params.baseCost || (params.cost / (params.purchasingRatio || 1.0));
+
     tr.innerHTML = `
         <td>
             <div class="po-line-product-cell">
                 <div class="po-line-thumb">
+                    ${params.image ? `<img src="${params.image}" class="po-thumb-img">` : `
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7A5531" stroke-width="1.8">
                         <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
                         <circle cx="8.5" cy="8.5" r="1.5"></circle>
                         <polyline points="21 15 16 10 5 21"></polyline>
-                    </svg>
+                    </svg>`}
                 </div>
                 <div class="po-line-details">
-                    <input type="hidden" name="lines[${index}][product_id]" value="${productId}" class="line-product-id">
-                    <input type="hidden" name="lines[${index}][description]" value="${name}" class="line-desc">
-                    <div class="po-line-name">${name}</div>
-                    <div class="po-line-sku">${sku}</div>
+                    <input type="hidden" name="lines[${index}][product_id]" value="${params.productId}" class="line-product-id">
+                    <input type="hidden" name="lines[${index}][description]" value="${params.name}" class="line-desc">
+                    <div class="po-line-name">${params.name}</div>
+                    <div class="po-line-sku">${params.sku}</div>
                 </div>
                 <button type="button" class="po-line-delete-btn" onclick="deletePoLine(this, event)" title="Remove item">✕</button>
             </div>
         </td>
         <td>
-            <input type="text" name="lines[${index}][vendor_product_code]" value="${vpc || ''}" class="po-cell-input line-vpc" onchange="markPoDirty()">
+            <input type="text" name="lines[${index}][vendor_product_code]" value="${params.vpc || ''}" class="po-cell-input line-vpc" onchange="markPoDirty()">
         </td>
         <td style="text-align: right;">
             <div class="po-qty-cell-wrap">
-                <input type="number" step="any" min="0" name="lines[${index}][quantity]" value="${qty}" class="po-cell-input po-qty-input line-qty" oninput="recalculatePoTotals(); markPoDirty();">
-                <span class="po-qty-uom-tag">${uom}</span>
-                <input type="hidden" name="lines[${index}][uom]" class="line-uom" value="${uom}">
+                <input type="number" step="any" min="0" name="lines[${index}][quantity]" value="${params.qty}" class="po-cell-input po-qty-input line-qty" oninput="handleLineQtyInput(this)">
+                <select class="po-cell-select line-uom" onchange="handleLineUomChange(this)">
+                    ${uomOptionsHtml}
+                </select>
+                <input type="hidden" name="lines[${index}][uom]" class="line-uom-hidden" value="${currUom}">
             </div>
+            <div class="po-qty-count-hint line-count-hint"></div>
         </td>
         <td style="text-align: right;">
-            <input type="number" step="0.0001" min="0" name="lines[${index}][unit_cost]" value="${cost}" class="po-cell-input line-cost" style="text-align: right; width: 90px;" oninput="recalculatePoTotals(); markPoDirty();">
+            <input type="number" step="0.0001" min="0" name="lines[${index}][unit_cost]" value="${params.cost}" class="po-cell-input line-cost" style="text-align: right; width: 90px;" oninput="handleLineCostInput(this)">
         </td>
         <td style="text-align: right; font-weight: 700; color: #1E293B;" class="line-subtotal">
             ${formatCurrency(subtotal)}
         </td>
     `;
     tbody.appendChild(tr);
+    updateLineAutoCountAndSubtotal(tr);
     recalculatePoTotals();
     document.getElementById('poStepProductCount').innerText = tbody.querySelectorAll('tr').length;
 }
@@ -2423,7 +2972,7 @@ function handlePoFormSubmit(e) {
                 quantity: parseFloat(row.querySelector('.line-qty')?.value || 1),
                 unit_cost: parseFloat(row.querySelector('.line-cost')?.value || 0),
                 discount_percent: 0,
-                uom: row.querySelector('.line-uom')?.value || 'pcs.'
+                uom: row.querySelector('.line-uom')?.value || row.querySelector('.line-uom-hidden')?.value || 'pcs.'
             });
         }
     });
@@ -2446,12 +2995,377 @@ function executePoPreviewAction() {
     }
 }
 
-// Modals Open/Close
-function openReceiveModal() { document.getElementById('poReceiveGoodsModal').style.display = 'flex'; }
-function closeReceiveModal() { document.getElementById('poReceiveGoodsModal').style.display = 'none'; }
-function fillAllRemainingReceiveQty() {
-    document.querySelectorAll('.po-receive-input-row').forEach(inp => { if (!inp.disabled) inp.value = inp.dataset.remaining; });
+// Receive Goods Modal & Actions
+function openReceiveModal() {
+    const poId = document.getElementById('poIdHidden').value;
+    if (!poId || poId == '0') {
+        alert('Please save the purchase order before receiving goods.');
+        return;
+    }
+
+    // Populate modal lines dynamically
+    if (currentActiveLines && currentActiveLines.length > 0 && String(currentActivePoId) === String(poId)) {
+        populateReceiveModal(poId, currentActiveLines, currentActiveOrder);
+        document.getElementById('poReceiveGoodsModal').style.display = 'flex';
+    } else {
+        fetch(`/api/purchases/${poId}/data`)
+            .then(r => r.json())
+            .then(res => {
+                if (res.success) {
+                    currentActiveOrder = res.order;
+                    currentActiveLines = res.lines;
+                    populateReceiveModal(poId, res.lines, res.order);
+                    document.getElementById('poReceiveGoodsModal').style.display = 'flex';
+                }
+            });
+    }
 }
+
+function closeReceiveModal() {
+    document.getElementById('poReceiveGoodsModal').style.display = 'none';
+}
+
+function populateReceiveModal(poId, lines, order) {
+    document.getElementById('receiveModalPoId').value = poId;
+    if (order && order.order_number) {
+        document.getElementById('poReceiveModalTitle').innerText = `Receive Goods - ${order.order_number}`;
+    }
+    const tbody = document.getElementById('poReceiveModalTbody');
+    tbody.innerHTML = '';
+
+    if (!lines || lines.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 24px; color: #94A3B8;">No line items found in this order.</td></tr>';
+        return;
+    }
+
+    lines.forEach(l => {
+        const remaining = Math.max(0, (parseFloat(l.quantity) || 0) - (parseFloat(l.received_qty) || 0));
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td style="padding: 10px 12px;">
+                <div style="font-weight: 700; color: #1E293B;">${l.product_sku || ''}</div>
+                <div style="font-size: 12px; color: #64748B;">${l.product_name || ''}</div>
+                <div style="font-size: 11px; color: #7A5531; font-weight: 600;">Unit: ${l.line_uom || 'pcs.'}</div>
+            </td>
+            <td style="text-align: right; padding: 10px 12px; font-weight: 600;">${l.quantity} ${l.line_uom || ''}</td>
+            <td style="text-align: right; padding: 10px 12px; color: #059669; font-weight: 600;">${l.received_qty || 0}</td>
+            <td style="text-align: right; padding: 10px 12px;">
+                <input type="number" step="any" min="0" max="${remaining}" 
+                       data-line-id="${l.id}" 
+                       data-remaining="${remaining}" 
+                       class="po-cell-input po-receive-input-row" 
+                       value="${remaining > 0 ? remaining : 0}" 
+                       style="width: 90px; text-align: right; border: 1px solid #CBD5E1; background: #FFFFFF; font-weight: 700;" 
+                       ${remaining <= 0 ? 'disabled' : ''}>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function fillAllRemainingReceiveQty() {
+    document.querySelectorAll('.po-receive-input-row').forEach(inp => {
+        if (!inp.disabled) inp.value = inp.dataset.remaining;
+    });
+}
+
+function submitReceiveModal(e) {
+    if (e) e.preventDefault();
+    const poId = document.getElementById('receiveModalPoId').value || document.getElementById('poIdHidden').value;
+    if (!poId || poId == '0') {
+        alert('Invalid purchase order ID.');
+        return;
+    }
+
+    const items = [];
+    document.querySelectorAll('.po-receive-input-row').forEach(inp => {
+        const lid = inp.dataset.lineId;
+        const rq = parseFloat(inp.value || 0);
+        if (lid && rq > 0) {
+            items.push({ line_id: parseInt(lid), received_qty: rq });
+        }
+    });
+
+    if (items.length === 0) {
+        alert('Please specify quantity to receive greater than 0.');
+        return;
+    }
+
+    const btn = document.getElementById('btnConfirmReceive');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerText = 'Receiving...';
+    }
+
+    fetch(`/purchases/${poId}/receive`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ items: items })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Confirm Receipt';
+        }
+        if (res.success) {
+            closeReceiveModal();
+            showPoToast(`✓ Successfully received ${res.total_received || items.length} item(s) into inventory!`);
+            selectPurchaseOrder(poId);
+        } else {
+            alert(res.message || 'Error receiving goods.');
+        }
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerText = 'Confirm Receipt';
+        }
+        alert('Network error occurred while receiving goods.');
+    });
+}
+
+// 1-Click Receive All
+function quickReceiveAllAction() {
+    const poId = document.getElementById('poIdHidden').value;
+    if (!poId || poId == '0') {
+        alert('Please save the purchase order before receiving goods.');
+        return;
+    }
+
+    if (!confirm('Receive all remaining items for this purchase order into warehouse stock?')) {
+        return;
+    }
+
+    fetch(`/purchases/${poId}/receive`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ receive_all: true })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            closeReceiveModal();
+            showPoToast('✓ All purchase order goods fulfilled into inventory!');
+            selectPurchaseOrder(poId);
+        } else {
+            alert(res.message || 'Error receiving goods.');
+        }
+    })
+    .catch(err => {
+        alert('Network error while fulfilling purchase order.');
+    });
+}
+
+// Unfulfill Order Action
+function unfulfillOrderAction() {
+    const poId = document.getElementById('poIdHidden').value;
+    if (!poId || poId == '0') return;
+
+    if (!confirm('Are you sure you want to unfulfill this purchase order?\n\nReceived goods will be removed from warehouse inventory and status will return to Unfulfilled.')) {
+        return;
+    }
+
+    fetch(`/purchases/${poId}/unfulfill`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            showPoToast('↩ Purchase order unfulfilled. Inventory reversed.');
+            selectPurchaseOrder(poId);
+        } else {
+            alert(res.message || 'Error unfulfilling order.');
+        }
+    })
+    .catch(err => {
+        alert('Network error while unfulfilling order.');
+    });
+}
+
+// Attachments Modal & Actions
+function openAttachmentsModal() {
+    const poId = document.getElementById('poIdHidden').value;
+    if (!poId || poId == '0') {
+        alert('Please save the purchase order before adding attachments.');
+        return;
+    }
+    const orderNum = document.getElementById('poOrderTitleDisplay').innerText;
+    document.getElementById('poAttachOrderNumDisplay').innerText = orderNum;
+    loadPoAttachments(poId);
+    document.getElementById('poAttachmentsModal').style.display = 'flex';
+}
+
+function closeAttachmentsModal() {
+    document.getElementById('poAttachmentsModal').style.display = 'none';
+}
+
+function loadPoAttachments(poId) {
+    const grid = document.getElementById('poAttachmentsGrid');
+    grid.innerHTML = '<div style="color: #94A3B8; font-size: 12px; padding: 12px; grid-column: 1 / -1; text-align: center;">Loading attachments...</div>';
+
+    fetch(`/purchases/${poId}/attachments`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                renderAttachmentsList(res.attachments, poId);
+                const cnt = res.attachments.length;
+                const mCnt = document.getElementById('poAttachModalCount');
+                if (mCnt) mCnt.innerText = cnt;
+                const topCnt = document.getElementById('poTopAttachmentCount');
+                if (topCnt) topCnt.innerText = cnt;
+            }
+        })
+        .catch(() => {
+            grid.innerHTML = '<div style="color: #DC2626; font-size: 12px; padding: 12px; grid-column: 1 / -1; text-align: center;">Failed to load attachments.</div>';
+        });
+}
+
+function renderAttachmentsList(atts, poId) {
+    const grid = document.getElementById('poAttachmentsGrid');
+    grid.innerHTML = '';
+    if (!atts || atts.length === 0) {
+        grid.innerHTML = '<div style="grid-column: 1 / -1; text-align: center; color: #94A3B8; font-size: 12.5px; padding: 24px;">No files attached yet. Drop images or click above to upload.</div>';
+        return;
+    }
+
+    atts.forEach(a => {
+        const isImg = a.file_type === 'image' || (/\.(png|jpe?g|webp|gif)$/i).test(a.file_path);
+        const card = document.createElement('div');
+        card.className = 'po-attachment-card';
+        card.innerHTML = `
+            <div class="po-attachment-thumb-wrap">
+                ${isImg ? `<img src="${a.file_path}" alt="" class="po-attachment-thumb-img" onclick="window.open('${a.file_path}', '_blank')">` : `
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                        <polyline points="14 2 14 8 20 8"></polyline>
+                        <line x1="16" y1="13" x2="8" y2="13"></line>
+                        <line x1="16" y1="17" x2="8" y2="17"></line>
+                    </svg>
+                `}
+            </div>
+            <div class="po-attachment-info">
+                <div>
+                    <div class="po-attachment-name" title="${a.file_name}">${a.file_name}</div>
+                    <div class="po-attachment-meta">${a.file_size_formatted || ''} • ${a.created_at || ''}</div>
+                </div>
+                <div class="po-attachment-actions">
+                    <a href="${a.file_path}" target="_blank" class="po-attachment-act-btn" style="color: #2563EB;">View</a>
+                    <button type="button" class="po-attachment-act-btn" style="color: #DC2626;" onclick="deletePoAttachment(${poId}, ${a.id})">Delete</button>
+                </div>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function handlePoFileSelect(files) {
+    const poId = document.getElementById('poIdHidden').value;
+    if (!poId || poId == '0') {
+        alert('Please save the purchase order first.');
+        return;
+    }
+    if (!files || files.length === 0) return;
+
+    const prog = document.getElementById('poUploadProgress');
+    prog.style.display = 'block';
+
+    let uploaded = 0;
+    Array.from(files).forEach(file => {
+        const formData = new FormData();
+        formData.append('file', file);
+
+        fetch(`/purchases/${poId}/attachments/upload`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(r => r.json())
+        .then(res => {
+            uploaded++;
+            if (uploaded === files.length) {
+                prog.style.display = 'none';
+                loadPoAttachments(poId);
+                showPoToast('✓ Attachment uploaded successfully!');
+                document.getElementById('poFileInput').value = '';
+            }
+        })
+        .catch(err => {
+            uploaded++;
+            if (uploaded === files.length) {
+                prog.style.display = 'none';
+                loadPoAttachments(poId);
+            }
+        });
+    });
+}
+
+function deletePoAttachment(poId, attId) {
+    if (!confirm('Are you sure you want to delete this attachment?')) return;
+
+    fetch(`/purchases/${poId}/attachments/${attId}/delete`, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            loadPoAttachments(poId);
+            showPoToast('✓ Attachment deleted.');
+        } else {
+            alert(res.message || 'Error deleting attachment.');
+        }
+    });
+}
+
+// Drag & drop dropzone listeners
+const poDropzoneEl = document.getElementById('poDropzone');
+if (poDropzoneEl) {
+    ['dragenter', 'dragover'].forEach(evt => {
+        poDropzoneEl.addEventListener(evt, (e) => {
+            e.preventDefault();
+            poDropzoneEl.classList.add('dragover');
+        });
+    });
+    ['dragleave', 'drop'].forEach(evt => {
+        poDropzoneEl.addEventListener(evt, (e) => {
+            e.preventDefault();
+            poDropzoneEl.classList.remove('dragover');
+        });
+    });
+    poDropzoneEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (e.dataTransfer && e.dataTransfer.files) {
+            handlePoFileSelect(e.dataTransfer.files);
+        }
+    });
+}
+
+// Toast notification helper
+function showPoToast(msg) {
+    const existing = document.querySelector('.po-toast-banner');
+    if (existing) existing.remove();
+    const t = document.createElement('div');
+    t.className = 'po-toast-banner';
+    t.innerHTML = `<span>${msg}</span>`;
+    document.body.appendChild(t);
+    setTimeout(() => {
+        t.style.opacity = '0';
+        t.style.transition = 'opacity 0.3s ease';
+        setTimeout(() => t.remove(), 300);
+    }, 3500);
+}
+
+// Modals: Payment, Quick Vendor, Reorder
 function openPaymentModal() { document.getElementById('poRecordPaymentModal').style.display = 'flex'; }
 function closePaymentModal() { document.getElementById('poRecordPaymentModal').style.display = 'none'; }
 function openQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'flex'; }
@@ -2496,7 +3410,17 @@ function addSelectedReorderItems() {
         const cost = parseFloat(chk.dataset.cost || 0);
         const row = chk.closest('tr');
         const qty = parseFloat(row.querySelector('.reorder-suggest-qty')?.value || 10);
-        appendPoLineRow(id, sku, name, '', qty, cost, 'pcs.');
+        appendPoLineRow({
+            productId: id,
+            sku: sku,
+            name: name,
+            vpc: '',
+            qty: qty,
+            cost: cost,
+            baseCost: cost,
+            baseUom: 'pcs.',
+            selectedUom: 'pcs.'
+        });
     });
     closeReorderModal();
     markPoDirty();
@@ -2522,7 +3446,6 @@ function executePoCopyAction() {
     }
 }
 
-function openAttachmentsModal() { alert('Attachments: No files attached to this purchase order.'); }
 function openEmailModal() { alert('Email Order: Document PDF ready to send to supplier.'); }
 function togglePoMoreMenu(e) {
     e.stopPropagation();
@@ -2541,7 +3464,6 @@ function handleBarcodeScan(e) {
         e.preventDefault();
         const code = e.target.value.trim().toLowerCase();
         if (!code) return;
-        // Search in all_products
         let found = null;
         document.querySelectorAll('#poProductPickerList .po-prod-picker-item').forEach(it => {
             if ((it.dataset.sku || '').toLowerCase() === code || (it.dataset.name || '').toLowerCase().includes(code)) {
@@ -2587,6 +3509,13 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         document.getElementById('poMainForm').submit();
     }
+});
+
+// Initialize line auto counts on DOM ready
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('#poLineItemsBody tr.po-line-row').forEach(row => {
+        updateLineAutoCountAndSubtotal(row);
+    });
 });
 </script>
 {% endblock %}

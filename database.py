@@ -417,6 +417,20 @@ def init_db():
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS website VARCHAR(255);")
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS tax_number VARCHAR(100);")
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id INTEGER;")
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS purchase_order_attachments (
+                        id SERIAL PRIMARY KEY,
+                        purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+                        file_name VARCHAR(255) NOT NULL,
+                        file_path TEXT NOT NULL,
+                        file_size BIGINT DEFAULT 0,
+                        file_type VARCHAR(100),
+                        caption TEXT,
+                        uploaded_by VARCHAR(150),
+                        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE INDEX IF NOT EXISTS idx_po_attachments_order_id ON purchase_order_attachments(purchase_order_id);
+                """)
             except Exception as mig_err:
                 logger.warning(f"Customer columns migration notice: {mig_err}")
 

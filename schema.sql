@@ -438,6 +438,20 @@ CREATE TABLE IF NOT EXISTS purchase_order_lines (
     received_qty NUMERIC(14, 4) DEFAULT 0
 );
 
+-- 15b. Purchase Order Attachments (Photos, Invoices, Delivery Slips)
+CREATE TABLE IF NOT EXISTS purchase_order_attachments (
+    id SERIAL PRIMARY KEY,
+    purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+    file_name VARCHAR(255) NOT NULL,
+    file_path TEXT NOT NULL,
+    file_size BIGINT DEFAULT 0,
+    file_type VARCHAR(100),
+    caption TEXT,
+    uploaded_by VARCHAR(150),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_po_attachments_order_id ON purchase_order_attachments(purchase_order_id);
+
 -- 16. Stock Transfers (Inter-warehouse)
 CREATE TABLE IF NOT EXISTS stock_transfers (
     id SERIAL PRIMARY KEY,
