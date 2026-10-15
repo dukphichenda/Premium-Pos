@@ -3,71 +3,9 @@
 {% block title %}Sales Order {{ order.order_number }} - inFlow Premium{% endblock %}
 {% block body_class %}sales-order-body-fullscreen{% endblock %}
 
-{% block mobile_appbar_center %}
-<div class="mobile-appbar-title-text" style="font-weight: 800; font-size: 16px; color: #FFFFFF; letter-spacing: -0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: flex; align-items: center; gap: 6px;">
-    <span>Sales Oder {% if order.order_number %}{{ order.order_number }}{% else %}New{% endif %}</span>
-</div>
-{% endblock %}
-
-{% block mobile_appbar_actions %}
-<button type="button" class="mobile-action-icon-btn" onclick="openGlobalSearch()" title="Quick Search">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-</button>
-<a href="{% if is_branch_mode and current_branch %}{{ url_for('sales_orders.new_order', branch=current_branch.id) }}{% else %}{{ url_for('sales_orders.new_order') }}{% endif %}" class="mobile-action-icon-btn" title="Create New Order">
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-</a>
-<div style="position: relative;">
-    <button type="button" class="mobile-action-icon-btn" onclick="toggleMobileMoreMenu(event)" title="More Options">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
-    </button>
-    <div id="mobileMoreMenuDropdown" class="inflow-win-menu" style="display: none; position: absolute; right: 0; top: 38px; min-width: 175px; z-index: 100010; box-shadow: 0 8px 24px rgba(0,0,0,0.25); border-radius: 8px;">
-        <div class="win-menu-item" onclick="openOrderAttachmentModal()">
-            <span>📎 Attachments</span>
-        </div>
-        <div class="win-menu-item" onclick="openOrderVersionsModal()">
-            <span>🕒 Version History</span>
-        </div>
-        <div class="win-menu-item" onclick="directExportOrderPdf()">
-            <span>📄 Export PDF</span>
-        </div>
-        <div class="win-menu-item" onclick="executeCopyAction('copy-so')">
-            <span>📋 Copy Sales Order</span>
-        </div>
-        <div class="win-menu-separator"></div>
-        <div class="win-menu-item" onclick="toggleDesktopMobileView()">
-            <span>🖥️ Switch to PC View</span>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
 {% block content %}
 <!-- Top Accent Color Bar (Lime Green for Sales Order) -->
 <div class="inflow-top-accent-bar sales"></div>
-
-<!-- Mobile Action Pills Toolbar Matching Reference Image2 -->
-<div class="inflow-mobile-action-pills-row no-print">
-    <a href="{% if is_branch_mode and current_branch %}{{ url_for('sales_orders.new_order', branch=current_branch.id) }}{% else %}{{ url_for('sales_orders.new_order') }}{% endif %}" class="mobile-pill-btn active-teal">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        <span>New</span>
-    </a>
-    <button type="button" class="mobile-pill-btn" onclick="saveSalesOrder()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span>Save</span>
-    </button>
-    <a href="{{ url_for('branches.branch_orders', id=current_branch.id) if (is_branch_mode and current_branch) else url_for('sales_orders.list_orders', view='table') }}" class="mobile-pill-btn">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-        <span>Orders List</span>
-    </a>
-    <button type="button" class="mobile-pill-btn" onclick="executePreviewAction()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-        <span>Preview</span>
-    </button>
-    <div class="mobile-pills-separator"></div>
-    <button type="button" class="mobile-pill-btn icon-only" onclick="toggleMobileMoreMenu(event)" title="More Options">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
-    </button>
-</div>
 
 <!-- inFlow Desktop Ribbon Toolbar -->
 <div class="inflow-desktop-toolbar">
@@ -442,8 +380,8 @@
             <div class="inflow-so-top-grid">
                 <!-- Customer Column with Combobox Search matching screenshot0042.JPEG -->
                 <div class="inflow-so-col inflow-so-col-customer">
-                    <div class="inflow-field-row field-row-customer" style="position: relative;">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>Customer</span>
+                    <div class="inflow-field-row" style="position: relative;">
+                        <span class="inflow-field-label">Customer</span>
                         <div style="display: flex; gap: 4px; align-items: center; flex: 1; position: relative;">
                             <div class="inflow-combobox-wrapper" style="flex: 1;">
                                 <input type="text" id="customerSearchInput" name="customer_name" 
@@ -502,16 +440,16 @@
                             </button>
                         </div>
                     </div>
-                    <div class="inflow-field-row field-row-contact">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>Contact</span>
-                        <input type="text" name="contact" id="contactInput" class="inflow-field-input" value="{{ order.customer_contact or order.customer_phone or '' }}" {% if is_paid %}readonly{% endif %}>
+                    <div class="inflow-field-row">
+                        <span class="inflow-field-label">Contact</span>
+                        <input type="text" name="contact" id="contactInput" class="inflow-field-input" value="{{ order.customer_contact or '' }}" {% if is_paid %}readonly{% endif %}>
                     </div>
-                    <div class="inflow-field-row field-row-phone">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>Phone</span>
+                    <div class="inflow-field-row">
+                        <span class="inflow-field-label">Phone</span>
                         <input type="text" name="phone" id="phoneInput" class="inflow-field-input" value="{{ order.customer_phone or '' }}" {% if is_paid %}readonly{% endif %}>
                     </div>
-                    <div class="inflow-field-row field-row-address" style="align-items: flex-start;">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>Address</span>
+                    <div class="inflow-field-row" style="align-items: flex-start;">
+                        <span class="inflow-field-label" style="padding-top: 4px;">Address</span>
                         <textarea name="address" id="addressInput" class="inflow-field-textarea" rows="3" {% if is_paid %}readonly{% endif %}>{{ order.customer_address or '' }}</textarea>
                     </div>
                 </div>
@@ -520,8 +458,8 @@
                 <div class="inflow-so-col inflow-so-col-delivery">
                     <input type="hidden" name="sales_rep" id="salesRepInput" value="{{ order.sales_rep or '' }}">
                     {% if session.get('role') == 'main_admin' %}
-                    <div class="inflow-field-row field-row-branch" style="margin-bottom: 4px;">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>Store/Branch</span>
+                    <div class="inflow-field-row" style="margin-bottom: 4px;">
+                        <span class="inflow-field-label">Store/Branch</span>
                         <select name="branch_id" id="soBranchSelect" class="inflow-field-select" onchange="handleSoBranchChange(this.value);" {% if is_paid %}disabled{% endif %}>
                             <option value="" {% if not order.branch_id and (not branch_scope or branch_scope in ('main', 'all')) %}selected{% endif %}>🏢 Main Store (HQ)</option>
                             {% for br in all_branches %}
@@ -530,8 +468,8 @@
                         </select>
                     </div>
                     {% endif %}
-                    <div class="inflow-field-row field-row-location">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 7V3h12v4M10 11v6M14 11v6"></path></svg>Location</span>
+                    <div class="inflow-field-row">
+                        <span class="inflow-field-label">Location</span>
                         <select name="location_id" class="inflow-field-select" {% if is_paid %}disabled{% endif %}>
                             {% for loc in all_locations %}
                             <option value="{{ loc.id }}" {% if order.location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
@@ -540,8 +478,8 @@
                     </div>
 
                     <!-- Delivery By (Choose any 1 person, ALL, or multiple persons with equal split) -->
-                    <div class="inflow-field-row field-row-delivery-man" style="align-items: center; margin-top: 4px; position: relative;">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>Delivery By</span>
+                    <div class="inflow-field-row" style="align-items: center; margin-top: 4px; position: relative;">
+                        <span class="inflow-field-label">Delivery By</span>
                         <div style="display: flex; gap: 4px; align-items: center; flex: 1; position: relative;">
                             <!-- Hidden input storing value to submit: '' or 'ALL' or 'Dara Delivery' or 'Dara Delivery, Chan Thary' -->
                             <input type="hidden" name="delivery_man" id="deliveryManInput" value="{{ order.delivery_man or '' }}">
@@ -615,8 +553,8 @@
                     </div>
 
                     <!-- Delivery Fee in KHR (with quick buttons: 1000, 1500, 2000, 3000, 4000 KHR + add more custom) -->
-                    <div class="inflow-field-row field-row-delivery-fee" style="align-items: flex-start; margin-top: 4px;">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>Delivery Fee</span>
+                    <div class="inflow-field-row" style="align-items: flex-start; margin-top: 4px;">
+                        <span class="inflow-field-label" style="padding-top: 3px;">Delivery Fee</span>
                         <div style="flex: 1;">
                             <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
                                 <input type="number" step="100" min="0" name="delivery_fee_khr" id="deliveryFeeKhrInput" 
@@ -646,16 +584,16 @@
                     </div>
 
                     <!-- Delivery Notes / Instructions -->
-                    <div class="inflow-field-row field-row-delivery-notes" style="align-items: center; margin-top: 4px;">
-                        <span class="inflow-field-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>Delivery Note</span>
+                    <div class="inflow-field-row" style="align-items: center; margin-top: 4px;">
+                        <span class="inflow-field-label">Delivery Note</span>
                         <input type="text" name="delivery_notes" class="inflow-field-input" placeholder="Delivery fee note or instructions..." value="{{ (order.delivery_notes if 'delivery_notes' in order else '') or '' }}" onchange="markDirty(); persistDeliveryLogisticsIfCompleted();">
                     </div>
                 </div>
 
                 <!-- Right Column: Order #, Date, Status -->
                 <div class="inflow-so-col inflow-so-col-orderinfo" style="text-align: right;">
-                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-number field-row-order-number" style="justify-content: flex-end;">
-                        <span class="inflow-orderinfo-label">Order #</span>
+                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-number" style="justify-content: flex-end;">
+                        <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Order #</span>
                         <span class="inflow-orderinfo-value inflow-order-number-val" style="font-weight: 700; font-size: 12px; color: #111827; width: 110px; text-align: left;">
                             {% if is_new %}
                             <input type="text" id="orderNumberInput" name="order_number" value="" readonly 
@@ -668,8 +606,8 @@
                         </span>
                     </div>
 
-                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-date field-row-order-date" style="justify-content: flex-end;">
-                        <span class="inflow-orderinfo-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>Order Date</span>
+                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-date" style="justify-content: flex-end;">
+                        <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Date</span>
                         <div class="gs-datepicker-wrapper inflow-orderinfo-datepicker" style="width: 110px;">
                             <input type="text" name="order_date" id="orderDateInput" class="inflow-field-input gs-datepicker-input" style="width: 100%; padding-right: 22px; cursor: pointer;" value="{{ order.order_date | format_inflow_date }}" data-original-date="{{ order.order_date | format_inflow_date }}" onchange="handleBillDateChange(this)">
                             <span class="gs-datepicker-icon" title="Select date">
@@ -682,10 +620,9 @@
                             </span>
                         </div>
                     </div>
-                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-status field-row-status" style="justify-content: flex-end; align-items: flex-start;">
-                        <span class="inflow-orderinfo-label"><svg class="field-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg>Status</span>
-                        <div style="display: flex; gap: 6px; align-items: center; width: 100%;">
-                            <div class="inflow-orderinfo-status-val" style="font-size: 11.5px; flex: 1; text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;">
+                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-status" style="justify-content: flex-end; align-items: flex-start;">
+                        <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px; padding-top: 2px;">Status</span>
+                        <div class="inflow-orderinfo-status-val" style="font-size: 11.5px; width: 140px; text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;">
                             <span class="inflow-order-status-badge" style="{% if is_paid %}color: #16A34A; font-weight: 700;{% elif (order.status or '')|upper == 'CANCELLED' %}color: #DC2626; font-weight: 700;{% elif (order.status or '')|upper == 'OPEN' %}color: #D97706; font-weight: 700;{% else %}color: #111827; font-weight: 600;{% endif %}">
                                 {% if is_paid %}✓ Paid{% elif (order.status or '')|upper == 'CANCELLED' %}Cancelled{% elif (order.status or '')|upper == 'OPEN' %}Open{% else %}{{ order.status | capitalize }}{% endif %}
                             </span>
@@ -705,10 +642,8 @@
                             {% endif %}
                             {% endif %}
                         </div>
-                            <button type="button" class="mobile-status-refresh-btn" onclick="location.reload()" title="Refresh order status"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg><span>Refresh</span></button>
-                        </div>
                     </div>
-                    <div class="inflow-orderinfo-delivery field-row-delivery-label" style="margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                    <div class="inflow-orderinfo-delivery" style="margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
                         <a href="javascript:void(0)" class="inflow-blue-link inflow-delivery-label-btn" onclick="openDeliveryModal()" title="Delivery Service & Label (80x100mm)">
                             🚚 Delivery & Label (80x100mm)
                         </a>
@@ -919,15 +854,6 @@
             <!-- Footer: Pricing Scheme, Remarks, Financial Totals -->
             <div class="inflow-so-footer-grid">
                 <div>
-                    <!-- Mobile steppers row matching image2 -->
-                    <div class="mobile-grid-steppers-bar">
-                        <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}addNewBlankLine(){% endif %}" title="Add row (+)" {% if is_paid %}disabled{% endif %}>+</button>
-                        <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}deleteSelectedLine(){% endif %}" title="Decrement / Remove" {% if is_paid %}disabled{% endif %}>&minus;</button>
-                        <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}deleteSelectedLine(){% endif %}" title="Delete selected row" {% if is_paid %}disabled{% endif %}>
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                        </button>
-                    </div>
-
                     <div class="inflow-field-row" style="margin-bottom: 12px;">
                         <span class="inflow-field-label">Pricing / Currency</span>
                         <select name="pricing_scheme_id" id="masterPricingSchemeSelect" class="inflow-field-select" style="max-width: 180px;" onchange="onMasterPricingSchemeChange(this.value)" {% if is_paid %}disabled{% endif %}>
@@ -945,25 +871,11 @@
                         </div>
                         <textarea name="notes" id="orderNotesInput" class="inflow-field-textarea" style="width: 100%; min-height: 72px; border: 1px solid #CBD5E1; border-radius: 4px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45; font-family: inherit; color: #1E293B; background: #FFFFFF;" placeholder="Enter remarks or notes here..." oninput="markDirty()">{{ order.notes or '' }}</textarea>
                     </div>
-
-                    <!-- Mobile Left Action Buttons (Delete & Cancel Order) matching image2 -->
-                    <div class="mobile-footer-left-btns">
-                        {% if not is_new and not is_paid %}
-                        <button type="button" class="inflow-btn-delete-order" onclick="deleteOrderAction()" title="Delete Order">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                            <span>Delete</span>
-                        </button>
-                        {% endif %}
-                        {% if not is_paid %}
-                        <button type="button" class="inflow-btn-cancel-order" onclick="cancelOrderAction()">Cancel Order</button>
-                        {% endif %}
-                    </div>
                 </div>
 
                 <!-- Right Totals Block -->
                 <div>
-                    <div class="inflow-totals-card-wrap">
-                        <table class="inflow-totals-table">
+                    <table class="inflow-totals-table">
                         <tr>
                             <td style="color: #4B5563;">Sub-Total</td>
                             <td class="val" id="dispSubtotal">${{ "%.2f"|format(order.subtotal or 0) }}</td>
@@ -1005,17 +917,7 @@
                         </tr>
                         {% endif %}
                         {% endif %}
-                        </table>
-
-                        <!-- Mobile Right Action Button (Complete & Pay) matching image2 -->
-                        <div class="mobile-footer-right-btn">
-                            {% if is_paid %}
-                            <button type="button" class="inflow-btn-complete-pay" onclick="openReopenPromptModal()" style="background: #F8FAFC !important; color: #16A34A !important; border: 1.5px solid #86EFAC !important;">Re-open Order</button>
-                            {% else %}
-                            <button type="button" class="inflow-btn-complete-pay" onclick="completePayAction()">Complete & Pay ▾</button>
-                            {% endif %}
-                        </div>
-                    </div>
+                    </table>
 
                     <div class="inflow-btn-group">
                         {% if is_paid %}
@@ -1621,22 +1523,6 @@ let activeItemInputEl = null;
 function markDirty() {
     isDirty = true;
 }
-
-function toggleMobileMoreMenu(event) {
-    if (event) {
-        event.stopPropagation();
-        event.preventDefault();
-    }
-    const m = document.getElementById('mobileMoreMenuDropdown');
-    if (!m) return;
-    m.style.display = (m.style.display === 'none' || !m.style.display) ? 'block' : 'none';
-}
-document.addEventListener('click', function(e) {
-    const m = document.getElementById('mobileMoreMenuDropdown');
-    if (m && !e.target.closest('#mobileMoreMenuDropdown') && !e.target.closest('.mobile-action-icon-btn') && !e.target.closest('.mobile-pill-btn')) {
-        m.style.display = 'none';
-    }
-});
 
 // Injected product catalog with UOM conversion ratios and live stock data
 window.productsCatalog = {
