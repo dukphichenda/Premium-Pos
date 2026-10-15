@@ -1036,20 +1036,23 @@
                 </div>
             </div>
 
-            <!-- Remarks / Taxi Info -->
+            <!-- Note / ចំណាំ -->
             <div style="margin-bottom: 8px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Notes / Taxi Info (ចំណាំ / ផ្ញើតាមឡាន / សាខា):</label>
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Note / ចំណាំ:</label>
                 <input type="text" id="modalDeliveryNotesInput" class="inflow-field-input" placeholder="e.g. ឡានឈ្នួលផ្សារដើមគ / 012 345 678..." value="{{ (order.get('delivery_notes') if order else '') or '' }}" style="width: 100%; height: 28px;">
             </div>
 
             <div style="font-size: 11px; color: #0284C7; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 4px; padding: 6px 10px; margin-top: 8px;">
-                ℹ️ Delivery Address and Notes / Taxi Info will be printed together prominently in the <b>📍 Delivery Address</b> section on the 80x100mm sticker.
+                ℹ️ Delivery Address and Note / ចំណាំ will be printed together prominently in the <b>📍 Delivery Address</b> section on the 80x100mm sticker.
             </div>
         </div>
         <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: space-between; border-top: 1px solid #E2E8F0;">
             <button type="button" class="inflow-dlg-btn" onclick="saveDeliveryInfoOnly()" style="color: #334155;">Save Info Only</button>
             <div style="display: flex; gap: 8px;">
                 <button type="button" class="inflow-dlg-btn" onclick="closeDeliveryModal()">Cancel</button>
+                <button type="button" class="inflow-dlg-btn" onclick="saveAndExportDeliveryLabelPdf()" style="background: #2563EB; color: #FFFFFF; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                    <span>📄 Export PDF</span>
+                </button>
                 <button type="button" class="inflow-dlg-btn btn-save" onclick="saveAndOpenDeliveryLabel()" style="background: #059669; color: #FFFFFF; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
                     <span>🖨️ Print Label (80x100mm)</span>
                 </button>
@@ -3538,6 +3541,36 @@ function saveAndOpenDeliveryLabel() {
         '&notes=' + encodeURIComponent(data.delivery_notes);
 
     // Open print window immediately to avoid modern browser popup blocking
+    window.open(url, '_blank');
+    closeDeliveryModal();
+
+    // Persist shipping info in background
+    fetch('/sales/' + orderId + '/update-shipping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).catch(err => console.error('Error saving shipping data:', err));
+}
+
+function saveAndExportDeliveryLabelPdf() {
+    const orderId = {{ order.id if order and order.id else 0 }};
+    const data = getDeliveryModalData();
+
+    // Sync back to main form if present
+    const mainAddrInput = document.getElementById('addressInput');
+    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
+    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
+    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
+
+    const url = '/sales/' + orderId + '/print?type=label' +
+        '&carrier=' + encodeURIComponent(data.carrier) +
+        '&packages=' + encodeURIComponent(data.package_count) +
+        '&cost=' + encodeURIComponent(data.cod_amount) +
+        '&address=' + encodeURIComponent(data.customer_address) +
+        '&notes=' + encodeURIComponent(data.delivery_notes) +
+        '&autopdf=1';
+
+    // Open print window with autopdf=1
     window.open(url, '_blank');
     closeDeliveryModal();
 

@@ -397,9 +397,9 @@
                 </div>
             </div>
 
-            <!-- Remarks / Taxi Info -->
+            <!-- Note / ចំណាំ -->
             <div style="margin-bottom: 8px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Notes / Taxi Info (ចំណាំ / ផ្លាកលេខឡាន / សាខា):</label>
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Note / ចំណាំ:</label>
                 <input type="text" id="modalCustDeliveryNotesInput" placeholder="e.g. ឡានឈ្នួលផ្សារដើមគ / 012 345 678..." style="width: 100%; height: 28px; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 8px;">
             </div>
 
@@ -409,6 +409,9 @@
         </div>
         <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
             <button type="button" onclick="closeCustomerDeliveryModal()" style="padding: 5px 14px; font-size: 12px; color: #475569; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px; cursor: pointer;">Cancel</button>
+            <button type="button" onclick="submitCustomerDeliveryLabelPdf()" style="padding: 5px 14px; font-size: 12px; font-weight: 700; color: #FFFFFF; background: #2563EB; border: 1px solid #1D4ED8; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                <span>📄 Export PDF</span>
+            </button>
             <button type="button" onclick="submitCustomerDeliveryLabel()" style="padding: 5px 14px; font-size: 12px; font-weight: 700; color: #FFFFFF; background: #059669; border: 1px solid #047857; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                 <span>🖨️ Print Label (80x100mm)</span>
             </button>
@@ -629,6 +632,35 @@ function submitCustomerDeliveryLabel() {
         '&packages=' + encodeURIComponent(packages) +
         '&cost=' + encodeURIComponent(cost) +
         '&notes=' + encodeURIComponent(notes);
+
+    if (addr && addr !== 'No delivery address recorded') {
+        url += '&address=' + encodeURIComponent(addr);
+    }
+
+    window.open(url, '_blank');
+}
+
+function submitCustomerDeliveryLabelPdf() {
+    const customerId = {{ customer.id if customer and customer.id else 0 }};
+    if (!customerId) return;
+    
+    const carrier = document.getElementById('modalCustCarrierSelect')?.value || 'Virak Buntham';
+    const packages = Math.max(1, parseInt(document.getElementById('modalCustCaseCountInput')?.value) || 1);
+    const cost = Math.max(0, parseFloat(document.getElementById('modalCustProductCostInput')?.value) || 0);
+    const notes = document.getElementById('modalCustDeliveryNotesInput')?.value || '';
+    const addrInput = document.getElementById('modalCustAddressInput');
+    const addr = (addrInput ? addrInput.value.trim() : '') ||
+                 (typeof addressData !== 'undefined' && (addressData.shipping || addressData.business || addressData.billing)) ||
+                 (document.getElementById('shippingAddressHidden')?.value || document.getElementById('businessAddressHidden')?.value || '');
+
+    closeCustomerDeliveryModal();
+
+    let url = '/customers/' + customerId + '/print-label' +
+        '?carrier=' + encodeURIComponent(carrier) +
+        '&packages=' + encodeURIComponent(packages) +
+        '&cost=' + encodeURIComponent(cost) +
+        '&notes=' + encodeURIComponent(notes) +
+        '&autopdf=1';
 
     if (addr && addr !== 'No delivery address recorded') {
         url += '&address=' + encodeURIComponent(addr);

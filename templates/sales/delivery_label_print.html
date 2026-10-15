@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Kantumruy+Pro:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700;800&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
     
     <style>
         /* ==========================================================================
@@ -33,6 +34,36 @@
             font-family: 'Kantumruy Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
             color: #000000;
             -webkit-font-smoothing: antialiased;
+        }
+
+        /* Exporting PDF Clean Mode */
+        body.exporting-pdf {
+            background: #FFFFFF !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        body.exporting-pdf .no-print-toolbar {
+            display: none !important;
+        }
+        body.exporting-pdf .preview-workspace {
+            padding: 0 !important;
+            margin: 0 !important;
+            gap: 0 !important;
+            background: #FFFFFF !important;
+            display: block !important;
+            width: 80mm !important;
+        }
+        body.exporting-pdf .label-page {
+            box-shadow: none !important;
+            margin: 0 !important;
+            width: 80mm !important;
+            height: 100mm !important;
+            page-break-after: always !important;
+            break-after: page !important;
+        }
+        body.exporting-pdf .label-page:last-child {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
         }
 
         /* Screen Toolbar */
@@ -449,12 +480,16 @@
             <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Address:</label>
             <input type="text" id="deliveryAddressInput" class="tb-input" value="{{ order.customer_address or '' }}" placeholder="Delivery address..." style="width: 160px; font-weight: 600;" oninput="onDeliveryAddressChange()">
 
-            <!-- Notes / Taxi Info -->
-            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Taxi / Note:</label>
+            <!-- Note / ចំណាំ -->
+            <label style="font-size: 11.5px; color: #94A3B8; margin-left: 8px;">Note/ចំណាំ:</label>
             <input type="text" id="deliveryNotesInput" class="tb-input" value="{{ delivery_notes or '' }}" placeholder="e.g. ឡានឈ្នួល / 012 345 678..." style="width: 175px; font-weight: 700; color: #FDE047;" oninput="onDeliveryNotesChange()">
         </div>
 
         <div class="toolbar-group">
+            <button type="button" class="tb-btn tb-btn-primary" id="exportPdfBtn" onclick="exportToPdf()" title="Direct export to 80x100mm PDF file">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Export PDF</span>
+            </button>
             <button type="button" class="tb-btn tb-btn-success" onclick="saveShippingAndPrint()" title="Print sticker label on 80mm x 100mm">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 <span>Print Sticker</span>
@@ -487,7 +522,7 @@
                         {{ order.customer_address or 'រាជធានីភ្នំពេញ / Phnom Penh' }}
                     </div>
                     <div class="address-taxi-note labelTaxiDisplay-{{ c_num }}" style="{% if not delivery_notes %}display: none;{% endif %} margin-top: 2px; padding-top: 2px; border-top: 1.5px dashed #000000; font-size: 12.5px; font-weight: 900; line-height: 1.2; color: #000000; word-break: break-word;">
-                        🚕 <span class="taxi-note-label">ចំណាំ / ផ្ញើតាមឡាន:</span> <span class="taxi-note-text">{{ delivery_notes }}</span>
+                        🚕 <span class="taxi-note-label">Note/ចំណាំ:</span> <span class="taxi-note-text">{{ delivery_notes }}</span>
                     </div>
                 </div>
 
@@ -541,7 +576,7 @@
                     </div>
                     {% if delivery_notes %}
                     <div class="notes-text" id="labelNotesDisplay-{{ c_num }}">
-                        ចំណាំ: {{ delivery_notes }}
+                        Note/ចំណាំ: {{ delivery_notes }}
                     </div>
                     {% endif %}
                 </div>
@@ -642,7 +677,7 @@
                 }
             });
             document.querySelectorAll('[id^="labelNotesDisplay-"]').forEach(el => {
-                el.innerText = 'ចំណាំ: ' + notes;
+                el.innerText = 'Note/ចំណាំ: ' + notes;
                 el.style.display = notes ? 'block' : 'none';
             });
         }
@@ -680,7 +715,7 @@
                             <span class="address-top-badge">📍 អាសយដ្ឋានដឹកជញ្ជូន / DELIVERY ADDRESS</span>
                             <div class="address-top-text labelAddressDisplay-${c}">${customerAddress}</div>
                             <div class="address-taxi-note labelTaxiDisplay-${c}" style="${!notes ? 'display: none;' : ''} margin-top: 2px; padding-top: 2px; border-top: 1.5px dashed #000000; font-size: 12.5px; font-weight: 900; line-height: 1.2; color: #000000; word-break: break-word;">
-                                🚕 <span class="taxi-note-label">ចំណាំ / ផ្ញើតាមឡាន:</span> <span class="taxi-note-text">${notes}</span>
+                                🚕 <span class="taxi-note-label">Note/ចំណាំ:</span> <span class="taxi-note-text">${notes}</span>
                             </div>
                         </div>
                         <div class="receiver-row">
@@ -712,7 +747,7 @@
                         </div>
                         <div>
                             <div class="caution-box">⚠ ទំនិញប្រយ័ត្នបែក / FRAGILE - HANDLE WITH CARE ⚠</div>
-                            ${notes ? `<div class="notes-text" id="labelNotesDisplay-${c}">ចំណាំ: ${notes}</div>` : ''}
+                            ${notes ? `<div class="notes-text" id="labelNotesDisplay-${c}">Note/ចំណាំ: ${notes}</div>` : ''}
                         </div>
                     </div>
                 </div>`;
@@ -817,12 +852,96 @@
             .catch(e => alert('Error deleting service'));
         }
 
+        async function exportToPdf() {
+            const btn = document.getElementById('exportPdfBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">⏳ Generating PDF...</span>';
+            }
+
+            // Sync shipping data in background
+            try {
+                const carrier = document.getElementById('carrierSelect').value;
+                const packages = currentTotalCases;
+                const cost = currentProductCost;
+                const address = document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value.trim() : '';
+                const notes = document.getElementById('deliveryNotesInput') ? document.getElementById('deliveryNotesInput').value.trim() : '';
+                if (typeof orderId !== 'undefined' && orderId) {
+                    fetch('/sales/' + orderId + '/update-shipping', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            carrier: carrier,
+                            package_count: packages,
+                            cod_amount: cost,
+                            customer_address: address,
+                            delivery_notes: notes
+                        })
+                    }).catch(e => console.error(e));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            if (typeof html2pdf === 'undefined') {
+                alert('PDF library not loaded. Falling back to system print.');
+                window.print();
+                if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+                return;
+            }
+
+            document.body.classList.add('exporting-pdf');
+
+            const orderNum = `{{ order.order_number }}` || 'Export';
+            const filename = `Delivery_Label_${orderNum}.pdf`;
+
+            try {
+                const element = document.getElementById('labelsWorkspace');
+                const opt = {
+                    margin: 0,
+                    filename: filename,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 3,
+                        useCORS: true,
+                        logging: false,
+                        scrollX: 0,
+                        scrollY: 0
+                    },
+                    jsPDF: {
+                        unit: 'mm',
+                        format: [80, 100],
+                        orientation: 'portrait'
+                    },
+                    pagebreak: {
+                        mode: ['css', 'legacy']
+                    }
+                };
+
+                await html2pdf().set(opt).from(element).save();
+            } catch (err) {
+                console.error('Error generating PDF:', err);
+                alert('Failed to generate PDF directly: ' + (err.message || err));
+            } finally {
+                document.body.classList.remove('exporting-pdf');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('autoprint') === '1') {
                 setTimeout(function() {
                     window.print();
                 }, 500);
+            } else if (urlParams.get('autopdf') === '1') {
+                setTimeout(function() {
+                    exportToPdf();
+                }, 600);
             }
         });
     </script>
