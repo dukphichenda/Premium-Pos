@@ -478,13 +478,6 @@ def create_order():
 
             line_sub = (qty * price) * (1.0 - (disc / 100.0))
 
-            if not user_can_edit_prices():
-                p_info = query_one("SELECT default_price FROM products WHERE id = %s", (pid,))
-                if p_info:
-                    price = float(p_info['default_price'] or 0.0)
-                disc = 0.0
-                line_sub = qty * price
-
             subtotal += line_sub
 
             # Get product cost
@@ -1960,21 +1953,6 @@ def save_order(id=0):
                             ratio = float(prow.get('purchasing_uom_ratio_std') or 1.0)
 
                     line_scheme_id = int(item.get('pricing_scheme_id') or pricing_scheme_id or 100)
-
-                    # Enforce official catalog/tier price if user is not authorized to edit prices
-                    if not user_can_edit_prices():
-                        cur.execute("""
-                            SELECT COALESCE(pp.unit_price, p.default_price, 0) as official_price
-                            FROM products p
-                            LEFT JOIN product_prices pp ON p.id = pp.product_id AND pp.pricing_scheme_id = %s
-                            WHERE p.id = %s
-                        """, (line_scheme_id, pid))
-                        pr_row = cur.fetchone()
-                        official_case_price = float(pr_row['official_price'] or 0.0) if pr_row else 0.0
-                        pcs_per_case = float(prow.get('sales_uom_ratio_std') or 1.0) if (prow and prow.get('sales_uom') and float(prow.get('sales_uom_ratio_std') or 1.0) > 1) else 1.0
-                        price_per_base = official_case_price / pcs_per_case if pcs_per_case > 0 else official_case_price
-                        unit_price = price_per_base * ratio
-                        disc = 0.0
 
                     std_qty = display_qty * ratio
                     line_sub = (display_qty * unit_price) * (1.0 - (disc / 100.0))
