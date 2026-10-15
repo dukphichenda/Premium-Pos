@@ -1647,7 +1647,7 @@
 
         <div class="tb-right">
             <button type="button" class="tb-btn" onclick="openSignatureModal()" title="Upload Seller Signature Stamp and Edit Seller Name" style="display: inline-flex; align-items: center; gap: 4px; background: #FFFFFF; border-color: #CBD5E1; color: #1E293B;">
-                <span>🖋️ Seller Signature</span>
+                <span>🖋️ Seller Signature {% if is_branch and branch %}({{ branch.name }}){% else %}(HQ){% endif %}</span>
             </button>
             <a href="{{ url_for('settings.general_settings', tab='tabInvoice') }}" class="tb-btn" title="Customize invoice fonts, color, logo, and address in Settings">
                 ⚙️ Invoice Settings
@@ -2217,7 +2217,7 @@
     <div class="sig-modal-backdrop no-print" id="signatureModal" onclick="if(event.target === this) closeSignatureModal()">
         <div class="sig-modal-card">
             <div class="sig-modal-header">
-                <h3><span>🖋️</span> ហត្ថលេខា និងឈ្មោះអ្នកលក់ / Seller Signature & Name</h3>
+                <h3><span>🖋️</span> ហត្ថលេខា និងឈ្មោះអ្នកលក់ {% if is_branch and branch %}({{ branch.name }}){% else %}(HQ / ទីស្នាក់ការកណ្តាល){% endif %}</h3>
                 <button type="button" class="sig-modal-close" onclick="closeSignatureModal()">&times;</button>
             </div>
             <form id="signatureSettingsForm" onsubmit="saveSignatureSettings(event)">
@@ -2225,6 +2225,15 @@
                 <input type="hidden" name="order_id" value="{{ order.id or '' }}">
                 <input type="hidden" id="removeSignatureFlag" name="remove_signature" value="0">
                 <div class="sig-modal-body">
+                    {% if is_branch and branch %}
+                    <div style="font-size: 11.5px; color: #0284C7; background: #F0F9FF; border: 1px solid #BAE6FD; padding: 7px 11px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                        <span>🏪</span> <span>កំណត់ហត្ថលេខាសម្រាប់សាខា៖ <b>{{ branch.name }}</b> (ឯករាជ្យពី HQ / Independent for this branch only)</span>
+                    </div>
+                    {% else %}
+                    <div style="font-size: 11.5px; color: #0284C7; background: #F0F9FF; border: 1px solid #BAE6FD; padding: 7px 11px; border-radius: 6px; margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+                        <span>🏢</span> <span>កំណត់ហត្ថលេខាសម្រាប់ទីស្នាក់ការកណ្តាល៖ <b>HQ (Main Store)</b> (ឯករាជ្យពីសាខា / Independent for HQ only)</span>
+                    </div>
+                    {% endif %}
                     <!-- Seller Name -->
                     <div class="sig-form-group">
                         <label class="sig-form-label" for="sellerNameInput">ឈ្មោះអ្នកលក់ / Seller Name:</label>
@@ -2314,6 +2323,8 @@
         /* ==========================================================================
            Signature Visibility Toggle & Seller Signature / Name Management
            ========================================================================== */
+        const branchStorageKey = 'inflow_invoice_show_sig_{{ order.branch_id or "hq" }}';
+
         function toggleSignatureDisplay(show) {
             const sigSec = document.getElementById('signatureSection');
             const chk = document.getElementById('chkShowSignature');
@@ -2331,7 +2342,7 @@
                 }
             }
             try {
-                localStorage.setItem('inflow_invoice_show_signature', isVisible ? '1' : '0');
+                localStorage.setItem(branchStorageKey, isVisible ? '1' : '0');
             } catch(e) {}
             // Persist choice asynchronously to DB
             fetch('/api/invoice/toggle-signature', {
@@ -2347,7 +2358,7 @@
         // Initialize signature visibility on page load
         (function initSignatureDisplay() {
             try {
-                const saved = localStorage.getItem('inflow_invoice_show_signature');
+                const saved = localStorage.getItem(branchStorageKey);
                 if (saved !== null) {
                     toggleSignatureDisplay(saved === '1');
                 } else {

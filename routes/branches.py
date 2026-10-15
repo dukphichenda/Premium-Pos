@@ -59,6 +59,8 @@ DEFAULT_BRANCH_SETTINGS = {
     'footer_notes_kh': 'ទំនិញដែលបានទិញរួចមិនអាចប្តូរវិញបានទេ! សូមអរគុណចំពោះការគាំទ្ររបស់លោកអ្នក!',
     'footer_notes_en': 'Goods sold are not returnable. Thank you for your business!',
     'show_signature': True,
+    'seller_signature_url': None,
+    'seller_name': None,
     'show_sku': True,
     'show_tax': True,
     'paper_size': 'A5',

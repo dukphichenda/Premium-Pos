@@ -2989,9 +2989,12 @@ def print_invoice(id):
         }
 
     # Branch specific invoice styles & branding override
+    branch = None
+    is_branch = False
     if order.get('branch_id'):
         branch = query_one("SELECT * FROM branches WHERE id = %s", (order['branch_id'],))
-        if branch:
+        if branch and not branch.get('is_main'):
+            is_branch = True
             if branch.get('color'):
                 inv_settings['primary_color'] = branch['color']
             b_settings = branch.get('settings_json')
@@ -3007,13 +3010,21 @@ def print_invoice(id):
                       'shop_name_en', 'shop_address_kh', 'shop_address_en', 'phone', 'email', 'website',
                       'vat_tin', 'logo_url', 'qr_code_url', 'bank_name', 'account_name',
                       'account_number', 'payment_terms', 'footer_notes_kh', 'footer_notes_en',
-                      'show_signature', 'show_sku', 'show_tax', 'enable_khr_total', 'khr_exchange_rate',
+                      'show_sku', 'show_tax', 'enable_khr_total', 'khr_exchange_rate',
                       'primary_color', 'secondary_color', 'font_family', 'paper_size',
                       'qr_size', 'qr_position', 'bank_info_size', 'bank_info_position',
-                      'qr_offset_x', 'qr_offset_y', 'bank_offset_x', 'bank_offset_y',
-                      'seller_signature_url', 'seller_name']:
+                      'qr_offset_x', 'qr_offset_y', 'bank_offset_x', 'bank_offset_y']:
                 if k in b_settings and b_settings[k] not in (None, ''):
                     inv_settings[k] = b_settings[k]
+
+            # INDEPENDENT SIGNATURE FOR BRANCHES (HQ signature is for HQ only):
+            # A branch ONLY uses its own signature and seller name if configured in its own b_settings!
+            inv_settings['seller_signature_url'] = b_settings.get('seller_signature_url') or None
+            inv_settings['seller_name'] = b_settings.get('seller_name') or None
+            if 'show_signature' in b_settings:
+                inv_settings['show_signature'] = bool(b_settings['show_signature'])
+            else:
+                inv_settings['show_signature'] = True
 
             if not b_settings.get('shop_name_en') and branch.get('name'):
                 inv_settings['shop_name_en'] = branch['name']
@@ -3093,6 +3104,8 @@ def print_invoice(id):
                            order=order,
                            lines=lines,
                            company=company,
+                           branch=branch,
+                           is_branch=is_branch,
                            inv_settings=inv_settings,
                            doc_type=doc_type,
                            khr_rate=rate,
@@ -3112,91 +3125,122 @@ def save_invoice_signature_settings():
 
         remove_sig = (request.form.get('remove_signature') in ('1', 'true', 'True', 'on', True))
         
-        # Get current invoice settings
-        current_inv = query_one("SELECT id, seller_signature_url, seller_name, show_signature FROM invoice_settings LIMIT 1")
-        if not current_inv:
-            from routes.settings import get_invoice_settings
-            current_inv = get_invoice_settings()
+        branch_id = request.form.get('branch_id')
+        branch = None
+        if branch_id and str(branch_id).strip() not in ('', 'null', 'None', 'main', 'hq'):
+            branch = query_one("SELECT id, name, is_main, settings_json FROM branches WHERE id = %s", (branch_id,))
 
-        signature_url = current_inv.get('seller_signature_url')
+        is_branch = bool(branch and not branch.get('is_main'))
 
-        if remove_sig:
-            signature_url = None
-        elif 'signature_file' in request.files:
+        # Handle uploaded signature image file (or base64 fallback)
+        signature_url = None
+        has_new_file = ('signature_file' in request.files and request.files['signature_file'].filename)
+        if has_new_file:
             file = request.files['signature_file']
-            if file and file.filename:
-                ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'png'
-                if ext in ('png', 'jpg', 'jpeg', 'webp', 'svg'):
-                    upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'invoice', 'signatures')
+            ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else 'png'
+            if ext in ('png', 'jpg', 'jpeg', 'webp', 'svg'):
+                upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'invoice', 'signatures')
+                try:
+                    os.makedirs(upload_dir, mode=0o777, exist_ok=True)
+                except Exception:
+                    pass
+                prefix = f"branch_{branch['id']}" if is_branch else "hq"
+                fname = f"seller_sig_{prefix}_{int(time.time())}_{uuid.uuid4().hex[:6]}.{ext}"
+                save_path = os.path.join(upload_dir, fname)
+                try:
+                    file.save(save_path)
                     try:
-                        os.makedirs(upload_dir, mode=0o777, exist_ok=True)
+                        os.chmod(save_path, 0o666)
                     except Exception:
                         pass
-                    fname = f"seller_sig_{int(time.time())}_{uuid.uuid4().hex[:6]}.{ext}"
-                    save_path = os.path.join(upload_dir, fname)
-                    try:
-                        file.save(save_path)
-                        try:
-                            os.chmod(save_path, 0o666)
-                        except Exception:
-                            pass
-                        signature_url = f"/static/uploads/invoice/signatures/{fname}"
-                    except Exception as save_err:
-                        logger.warning(f"File save failed ({save_err}), falling back to base64 data-URI for signature")
-                        import base64
-                        file.seek(0)
-                        file_bytes = file.read()
-                        mime_type = f"image/{'svg+xml' if ext == 'svg' else ('jpeg' if ext == 'jpg' else ext)}"
-                        b64_str = base64.b64encode(file_bytes).decode('utf-8')
-                        signature_url = f"data:{mime_type};base64,{b64_str}"
+                    signature_url = f"/static/uploads/invoice/signatures/{fname}"
+                except Exception as save_err:
+                    logger.warning(f"File save failed ({save_err}), falling back to base64 data-URI for signature")
+                    import base64
+                    file.seek(0)
+                    file_bytes = file.read()
+                    mime_type = f"image/{'svg+xml' if ext == 'svg' else ('jpeg' if ext == 'jpg' else ext)}"
+                    b64_str = base64.b64encode(file_bytes).decode('utf-8')
+                    signature_url = f"data:{mime_type};base64,{b64_str}"
 
-        # Update DB
-        updates = []
-        params = []
-        if request.form.get('seller_name') is not None:
-            updates.append("seller_name = %s")
-            params.append(seller_name)
-        if show_signature is not None:
-            updates.append("show_signature = %s")
-            params.append(show_signature)
-        if remove_sig or ('signature_file' in request.files and request.files['signature_file'].filename):
-            updates.append("seller_signature_url = %s")
-            params.append(signature_url)
+        if is_branch:
+            # =========================================================
+            # BRANCH INDEPENDENT SIGNATURE (Does NOT touch HQ!)
+            # =========================================================
+            b_set = branch.get('settings_json')
+            if isinstance(b_set, str):
+                try:
+                    b_set = json.loads(b_set) if b_set else {}
+                except Exception:
+                    b_set = {}
+            elif not isinstance(b_set, dict):
+                b_set = {}
 
-        if updates:
-            updates.append("updated_at = CURRENT_TIMESTAMP")
-            params.append(current_inv['id'])
-            execute(f"UPDATE invoice_settings SET {', '.join(updates)} WHERE id = %s", tuple(params))
+            if remove_sig:
+                b_set['seller_signature_url'] = None
+                signature_url = None
+            elif has_new_file:
+                b_set['seller_signature_url'] = signature_url
+            else:
+                signature_url = b_set.get('seller_signature_url')
 
-        # Also support branch-level override if branch_id is passed
-        branch_id = request.form.get('branch_id')
-        if branch_id:
-            try:
-                b = query_one("SELECT id, settings_json FROM branches WHERE id = %s", (branch_id,))
-                if b:
-                    b_set = b.get('settings_json')
-                    if isinstance(b_set, str):
-                        b_set = json.loads(b_set) if b_set else {}
-                    elif not isinstance(b_set, dict):
-                        b_set = {}
-                    if request.form.get('seller_name') is not None:
-                        b_set['seller_name'] = seller_name
-                    if show_signature is not None:
-                        b_set['show_signature'] = show_signature
-                    if remove_sig:
-                        b_set['seller_signature_url'] = None
-                    elif signature_url:
-                        b_set['seller_signature_url'] = signature_url
-                    execute("UPDATE branches SET settings_json = %s WHERE id = %s", (json.dumps(b_set), branch_id))
-            except Exception as b_err:
-                logger.warning(f"Branch signature settings update error: {b_err}")
+            if request.form.get('seller_name') is not None:
+                b_set['seller_name'] = seller_name
+            if show_signature is not None:
+                b_set['show_signature'] = show_signature
 
-        return jsonify({
-            'success': True,
-            'seller_signature_url': signature_url or '',
-            'seller_name': seller_name,
-            'show_signature': show_signature if show_signature is not None else current_inv.get('show_signature', True)
-        })
+            execute("UPDATE branches SET settings_json = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (json.dumps(b_set), branch['id']))
+
+            return jsonify({
+                'success': True,
+                'is_branch': True,
+                'branch_id': branch['id'],
+                'branch_name': branch.get('name', ''),
+                'seller_signature_url': signature_url or '',
+                'seller_name': seller_name,
+                'show_signature': show_signature if show_signature is not None else b_set.get('show_signature', True)
+            })
+
+        else:
+            # =========================================================
+            # HQ INDEPENDENT SIGNATURE (Does NOT touch any branch!)
+            # =========================================================
+            current_inv = query_one("SELECT id, seller_signature_url, seller_name, show_signature FROM invoice_settings LIMIT 1")
+            if not current_inv:
+                from routes.settings import get_invoice_settings
+                current_inv = get_invoice_settings()
+
+            if remove_sig:
+                signature_url = None
+            elif not has_new_file:
+                signature_url = current_inv.get('seller_signature_url')
+
+            updates = []
+            params = []
+            if request.form.get('seller_name') is not None:
+                updates.append("seller_name = %s")
+                params.append(seller_name)
+            if show_signature is not None:
+                updates.append("show_signature = %s")
+                params.append(show_signature)
+            if remove_sig or has_new_file:
+                updates.append("seller_signature_url = %s")
+                params.append(signature_url)
+
+            if updates:
+                updates.append("updated_at = CURRENT_TIMESTAMP")
+                params.append(current_inv['id'])
+                execute(f"UPDATE invoice_settings SET {', '.join(updates)} WHERE id = %s", tuple(params))
+
+            return jsonify({
+                'success': True,
+                'is_branch': False,
+                'branch_id': None,
+                'seller_signature_url': signature_url or '',
+                'seller_name': seller_name,
+                'show_signature': show_signature if show_signature is not None else (current_inv.get('show_signature', True) if current_inv else True)
+            })
+
     except Exception as e:
         logger.error(f"Error saving invoice signature settings: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -3208,24 +3252,27 @@ def toggle_invoice_signature():
         data = request.get_json(silent=True) or request.form
         show_sig = data.get('show_signature')
         is_show = (show_sig in (True, 'true', 'True', '1', 'on', 1))
-        execute("UPDATE invoice_settings SET show_signature = %s, updated_at = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM invoice_settings LIMIT 1);", (is_show,))
         
         branch_id = data.get('branch_id')
-        if branch_id:
-            try:
-                b = query_one("SELECT id, settings_json FROM branches WHERE id = %s", (branch_id,))
-                if b:
-                    b_set = b.get('settings_json')
-                    if isinstance(b_set, str):
-                        b_set = json.loads(b_set) if b_set else {}
-                    elif not isinstance(b_set, dict):
-                        b_set = {}
-                    b_set['show_signature'] = is_show
-                    execute("UPDATE branches SET settings_json = %s WHERE id = %s", (json.dumps(b_set), branch_id))
-            except Exception as b_err:
-                logger.warning(f"Branch signature toggle error: {b_err}")
-                
-        return jsonify({'success': True, 'show_signature': is_show})
+        branch = None
+        if branch_id and str(branch_id).strip() not in ('', 'null', 'None', 'main', 'hq'):
+            branch = query_one("SELECT id, is_main, settings_json FROM branches WHERE id = %s", (branch_id,))
+
+        if branch and not branch.get('is_main'):
+            b_set = branch.get('settings_json')
+            if isinstance(b_set, str):
+                try:
+                    b_set = json.loads(b_set) if b_set else {}
+                except Exception:
+                    b_set = {}
+            elif not isinstance(b_set, dict):
+                b_set = {}
+            b_set['show_signature'] = is_show
+            execute("UPDATE branches SET settings_json = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (json.dumps(b_set), branch['id']))
+            return jsonify({'success': True, 'is_branch': True, 'branch_id': branch['id'], 'show_signature': is_show})
+        else:
+            execute("UPDATE invoice_settings SET show_signature = %s, updated_at = CURRENT_TIMESTAMP WHERE id = (SELECT id FROM invoice_settings LIMIT 1);", (is_show,))
+            return jsonify({'success': True, 'is_branch': False, 'branch_id': None, 'show_signature': is_show})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
