@@ -30,13 +30,21 @@
                     <span id="statusFilterLabel">
                         {% if with_balance == '1' %}With Balance
                         {% elif scheme_filter %}Pricing Scheme
-                        {% elif current_branch_param and current_branch_param != 'all' and current_branch_param != 'main' %}Branch {{ current_branch_param }}
+                        {% elif current_branch_param == 'main' %}🏢 HQ Main Store
+                        {% elif current_branch_param and current_branch_param != 'all' %}
+                            {% set matched_name = namespace(val=none) %}
+                            {% for b in branches %}
+                                {% if current_branch_param == b.id|string %}
+                                    {% set matched_name.val = b.code or b.name %}
+                                {% endif %}
+                            {% endfor %}
+                            🏪 {{ matched_name.val or ('Branch ' ~ current_branch_param) }}
                         {% else %}All{% endif %}
                     </span>
                     <span style="font-size: 10px; margin-left: 2px;">▾</span>
                 </button>
                 <div class="cust-menu-dropdown" id="statusDropdownMenu" style="display: none;">
-                    <div class="cust-menu-item {% if not with_balance and not scheme_filter and (not current_branch_param or current_branch_param == 'all' or current_branch_param == 'main') %}active{% endif %}" onclick="selectFilterPreset('all')">
+                    <div class="cust-menu-item {% if not with_balance and not scheme_filter and (not current_branch_param or current_branch_param == 'all') %}active{% endif %}" onclick="selectFilterPreset('all')">
                         <span>All Customers</span>
                     </div>
                     <div class="cust-menu-item {% if with_balance == '1' %}active{% endif %}" onclick="selectFilterPreset('with_balance')">
@@ -315,7 +323,9 @@
         <!-- Scrollable Detail Body Container -->
         <div class="cust-detail-scroll-content" id="custDetailScrollContent">
             
-            <!-- VIEW MODE: Sho                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout with Full Contact Details) -->
+            <!-- VIEW MODE: Shown by default -->
+            <div id="custViewContainer">
+                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout with Full Contact Details) -->
                 <div class="cust-meta-header-grid">
                     
                     <!-- COLUMN 1: Customer Identity & Key Contact Details (Name, Contact, Phone, Email) -->
@@ -1992,6 +2002,7 @@
 <script>
 // Global customer state
 let currentCustomerId = {{ selected_customer.id if selected_customer else 0 }};
+let currentBranchParam = "{{ current_branch_param or 'all' }}";
 let dirtyFields = new Set();
 let cachedCustomerData = {};
 
@@ -2007,7 +2018,7 @@ cachedCustomerData[{{ selected_customer.id }}] = {
         website: "{{ (selected_customer.website or '')|replace('"', '\\"') }}",
         address1: "{{ (selected_customer.address1 or '')|replace('"', '\\"') }}",
         city: "{{ (selected_customer.city or '')|replace('"', '\\"') }}",
-        country: "{{ (selected_customer.country or 'Cambodia')|replace('"', '\\"') }}",
+        country: "{{ (selected_country or selected_customer.country or 'Cambodia')|replace('"', '\\"') }}",
         postal_code: "{{ (selected_customer.postal_code or '')|replace('"', '\\"') }}",
         display_address: "{{ (selected_customer.display_address or '')|replace('"', '\\"') }}",
         balance: {{ selected_customer.balance or 0 }},
@@ -2029,8 +2040,9 @@ function selectCustomer(id) {
     if (!id) return;
     currentCustomerId = id;
 
-    // 1. Highlight active card in left list
-    document.querySelectorAll('.cust-list-card').forEach(c => c.classList.remove('active'));
+    // 1. Highlight active card in left list (fast single query without looping 3,000 cards)
+    const prevActive = document.querySelector('.cust-list-card.active');
+    if (prevActive) prevActive.classList.remove('active');
     const activeCard = document.getElementById('custCard_' + id);
     if (activeCard) {
         activeCard.classList.add('active');
@@ -2038,8 +2050,10 @@ function selectCustomer(id) {
     }
 
     // 2. Switch right canvas from "New Customer" mode back to "View Customer" mode
-    document.getElementById('custNewContainer').style.display = 'none';
-    document.getElementById('custViewContainer').style.display = 'block';
+    const newCont = document.getElementById('custNewContainer');
+    if (newCont) newCont.style.display = 'none';
+    const viewCont = document.getElementById('custViewContainer');
+    if (viewCont) viewCont.style.display = 'block';
 
     // 3. Update URL smoothly without full-page reload
     if (window.history && window.history.pushState) {
@@ -2054,7 +2068,8 @@ function selectCustomer(id) {
 function fetchCustomerDetails(id) {
     // Show loading state in orders table
     const tableBody = document.getElementById('custOrdersTableBody');
-    tableBody.innerHTML = `
+    if (tableBody) {
+        tableBody.innerHTML = `
         <tr>
             <td colspan="10" style="padding: 28px; text-align: center; color: #64748B;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8C6541" stroke-width="2.5" style="animation: spin 1s linear infinite; vertical-align: middle; margin-right: 6px;">
@@ -2066,6 +2081,7 @@ function fetchCustomerDetails(id) {
             </td>
         </tr>
     `;
+    }
 
     fetch('/api/customers/' + id + '/details')
         .then(res => {
@@ -2465,15 +2481,21 @@ function saveCustomerData() {
 
 // Start New Customer Mode
 function startNewCustomer() {
-    document.getElementById('custViewContainer').style.display = 'none';
-    document.getElementById('custNewContainer').style.display = 'block';
-    document.querySelectorAll('.cust-list-card').forEach(c => c.classList.remove('active'));
-    document.getElementById('newCustName').focus();
+    const viewCont = document.getElementById('custViewContainer');
+    if (viewCont) viewCont.style.display = 'none';
+    const newCont = document.getElementById('custNewContainer');
+    if (newCont) newCont.style.display = 'block';
+    const prevActive = document.querySelector('.cust-list-card.active');
+    if (prevActive) prevActive.classList.remove('active');
+    const nameInp = document.getElementById('newCustName');
+    if (nameInp) nameInp.focus();
 }
 
 function cancelNewCustomer() {
-    document.getElementById('custNewContainer').style.display = 'none';
-    document.getElementById('custViewContainer').style.display = 'block';
+    const newCont = document.getElementById('custNewContainer');
+    if (newCont) newCont.style.display = 'none';
+    const viewCont = document.getElementById('custViewContainer');
+    if (viewCont) viewCont.style.display = 'block';
     if (currentCustomerId) {
         const c = document.getElementById('custCard_' + currentCustomerId);
         if (c) c.classList.add('active');
