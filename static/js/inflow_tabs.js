@@ -141,6 +141,10 @@
         </svg>`;
     }
 
+    // Expose flag SVGs globally for sidebar widgets
+    window.getUkFlagSvg = getUkFlagSvg;
+    window.getKhmerFlagSvg = getKhmerFlagSvg;
+
     /* ==========================================================================
        HOST SHELL MANAGER (Runs in the top browser window)
        ========================================================================== */
@@ -360,14 +364,11 @@
                     </div>
                 `;
 
-                // Top Store Context Switcher Pill & Dropdown
+                // Sync Sidebar Store, Language, and User Widgets (Moved from Top Right)
                 try {
                     const storeCtx = window.INFLOW_STORE_CONTEXT || {};
                     const isBranchMode = !!storeCtx.is_branch_mode;
                     const currentBranch = storeCtx.current_branch || null;
-                    const allBranches = Array.isArray(storeCtx.all_branches) ? storeCtx.all_branches : [];
-
-                    // Show ONLY CODE as required by user
                     const storeCode = (isBranchMode && currentBranch) ? (currentBranch.code || 'STM') : 'HQ';
                     const storeIcon = isBranchMode ? '🏪' : '🏢';
                     const storeClass = isBranchMode ? 'store-pill-branch' : 'store-pill-main';
@@ -375,119 +376,20 @@
                         ? `${currentBranch.name} (${storeCode}) - Click to Switch Store` 
                         : 'Main Store (HQ Enterprise) - Click to Switch Store';
 
-                    let branchOptionsHtml = `
-                        <a href="/branches/switch/0" onclick="window.inflowMdi.switchStoreContext(0, event)" class="inflow-store-dropdown-item ${!isBranchMode ? 'active' : ''}">
-                            <span>🏢 Main Store (HQ Enterprise)</span>
-                            ${!isBranchMode ? '<span class="check">✓</span>' : ''}
-                        </a>
-                        <div class="inflow-store-dropdown-divider"></div>
-                    `;
+                    const sStorePill = document.getElementById('sidebarStorePill');
+                    const sStoreCode = document.getElementById('sidebarStoreCode');
+                    const sStoreIcon = document.getElementById('sidebarStoreIcon');
+                    if (sStorePill) {
+                        sStorePill.className = `inflow-store-pill ${storeClass}`;
+                        sStorePill.title = storeTooltip;
+                    }
+                    if (sStoreCode) sStoreCode.textContent = storeCode;
+                    if (sStoreIcon) sStoreIcon.textContent = storeIcon;
 
-                    allBranches.forEach(b => {
-                        const isThisActive = isBranchMode && currentBranch && currentBranch.id === b.id;
-                        branchOptionsHtml += `
-                            <a href="/branches/switch/${b.id}" onclick="window.inflowMdi.switchStoreContext(${b.id}, event)" class="inflow-store-dropdown-item ${isThisActive ? 'active' : ''}">
-                                <span>🏪 ${b.name} (${b.code})</span>
-                                ${isThisActive ? '<span class="check">✓</span>' : ''}
-                            </a>
-                        `;
-                    });
-
-                    branchOptionsHtml += `
-                        <div class="inflow-store-dropdown-divider"></div>
-                        <a href="/branches/launch" onclick="window.inflowMdi.openTabOrNavigateTop('/branches/launch', 'Branch Launcher', event)" class="inflow-store-dropdown-item launch-btn-highlight" style="color: #0284C7; font-weight: 700; background: #F0F9FF; display: flex; align-items: center; justify-content: space-between;">
-                            <span>🚀 Launch Branch System (បើកប្រព័ន្ធ)</span>
-                            <span style="font-size: 10px; background: #0284C7; color: #fff; padding: 2px 6px; border-radius: 4px; font-weight: 700;">PORTAL</span>
-                        </a>
-                        <a href="/branches" onclick="window.inflowMdi.openTabOrNavigateTop('/branches', 'Branches', event)" class="inflow-store-dropdown-item manage" style="color: #475569; font-weight: 500;">
-                            <span>⚙️ Manage Branches & Perms...</span>
-                        </a>
-                    `;
-
-                    // Top User Account Pill & Dropdown
-                    const currentUser = storeCtx.current_user || null;
-                    const userName = currentUser ? (currentUser.display_name || currentUser.username) : 'Administrator';
-                    const userRole = currentUser ? currentUser.role : 'main_admin';
-                    const isMainAdmin = (userRole === 'main_admin');
-                    const userRoleBadge = isMainAdmin ? '👑 HQ Admin' : '🏪 Branch';
-                    const userPillClass = isMainAdmin ? 'user-pill-admin' : 'user-pill-branch';
-
-                    const currentLang = this.getLanguage ? this.getLanguage() : (localStorage.getItem('inflow_app_lang') || 'en');
-
-                    html += `
-                        <div class="inflow-bar-right-store" id="inflowStoreContextWrapper">
-                            <div class="inflow-store-pill ${storeClass}" id="inflowStorePill" onclick="window.inflowMdi.toggleStoreDropdown(event)" title="${storeTooltip}">
-                                <span class="store-icon">${storeIcon}</span>
-                                <span class="store-code">${storeCode}</span>
-                                <span class="store-chevron" style="font-size: 9px; opacity: 0.8; margin-left: 2px;">▼</span>
-                            </div>
-                            <div class="inflow-store-dropdown" id="inflowStoreDropdown">
-                                <div class="inflow-store-dropdown-header">Store Context (ជ្រើសរើសទីតាំងហាង)</div>
-                                ${branchOptionsHtml}
-                            </div>
-                        </div>
-
-                        <!-- Language Switcher Pill Button (near user login) -->
-                        <div class="inflow-bar-right-lang" id="inflowLangContextWrapper" style="position: relative; display: flex; align-items: center; margin-left: 6px; flex-shrink: 0;">
-                            <div class="inflow-lang-pill-btn ${currentLang === 'km' ? 'lang-km' : 'lang-en'}" id="inflowLangBtn" onclick="window.inflowMdi.toggleLanguageDirect(event)" title="${currentLang === 'km' ? 'ភាសាខ្មែរ (ចុចដើម្បីប្តូរទៅ English / Click for English)' : 'English (Click to Switch to ភាសាខ្មែរ)'}">
-                                <span id="inflowLangFlagIcon" style="display: inline-flex; align-items: center; line-height: 1;">${currentLang === 'km' ? getKhmerFlagSvg(19, 13) : getUkFlagSvg(19, 13)}</span>
-                                <span id="inflowLangBadgeText" style="font-weight: 800; font-size: 11px; margin-left: 2px; line-height: 1;">${currentLang === 'km' ? 'KH' : 'EN'}</span>
-                                <span class="lang-chevron-arrow" onclick="window.inflowMdi.toggleLangDropdown(event)" title="Select Language / ជ្រើសរើសភាសា">▼</span>
-                            </div>
-                            <div class="inflow-lang-dropdown" id="inflowLangDropdown">
-                                <div class="inflow-lang-dropdown-header">Select Language / ជ្រើសរើសភាសា</div>
-                                <a href="javascript:void(0)" onclick="window.inflowMdi.switchLanguage('en', event)" class="inflow-store-dropdown-item ${currentLang === 'en' ? 'active' : ''}" id="langItemEn" style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer;">
-                                    <span style="display: flex; align-items: center; gap: 10px;">
-                                        ${getUkFlagSvg(22, 15)}
-                                        <span style="font-weight: 700; color: #0F172A; font-size: 13px;">English</span>
-                                        <span style="font-size: 9.5px; background: #E2E8F0; color: #475569; padding: 1px 6px; border-radius: 4px; font-weight: 700;">Default</span>
-                                    </span>
-                                    <span class="check" id="langCheckEn" style="color: #0284C7; font-weight: 800; font-size: 14px; ${currentLang === 'en' ? '' : 'display: none;'}">✓</span>
-                                </a>
-                                <a href="javascript:void(0)" onclick="window.inflowMdi.switchLanguage('km', event)" class="inflow-store-dropdown-item ${currentLang === 'km' ? 'active' : ''}" id="langItemKm" style="display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; cursor: pointer;">
-                                    <span style="display: flex; align-items: center; gap: 10px;">
-                                        ${getKhmerFlagSvg(22, 15)}
-                                        <span style="font-weight: 700; color: #0F172A; font-size: 13px;">ភាសាខ្មែរ (Khmer)</span>
-                                    </span>
-                                    <span class="check" id="langCheckKm" style="color: #0284C7; font-weight: 800; font-size: 14px; ${currentLang === 'km' ? '' : 'display: none;'}">✓</span>
-                                </a>
-                                <div class="inflow-store-dropdown-divider"></div>
-                                <div style="padding: 6px 10px; background: #F8FAFC; text-align: center;">
-                                    <button type="button" onclick="window.inflowMdi.toggleLanguageDirect(event)" style="background: none; border: none; color: #0284C7; font-size: 11px; font-weight: 700; cursor: pointer; padding: 3px 6px; display: inline-flex; align-items: center; gap: 5px;">
-                                        <span>⇄ Quick Switch (ប្តូរភាសា)</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="inflow-bar-right-user" id="inflowUserContextWrapper" style="position: relative; display: flex; align-items: center; margin-left: 6px; flex-shrink: 0;">
-                            <div class="inflow-user-circle-btn ${isMainAdmin ? 'user-circle-admin' : 'user-circle-branch'}" id="inflowUserPill" onclick="window.inflowMdi.toggleUserDropdown(event)" title="Logged in as: ${userName} (${userRole})">
-                                <span style="font-size: 13px; line-height: 1;">${isMainAdmin ? '👑' : '👤'}</span>
-                            </div>
-                            <div class="inflow-user-dropdown" id="inflowUserDropdown">
-                                <div style="padding: 10px 14px; border-bottom: 1px solid #E2E8F0; background: #F8FAFC;">
-                                    <div style="font-weight: 800; font-size: 12.5px; color: #0F172A;">${userName}</div>
-                                    <div style="font-size: 11px; color: #64748B;">@${currentUser ? currentUser.username : 'admin'} • ${isMainAdmin ? 'Main Store HQ (Full Control)' : 'Branch Admin (Restricted)'}</div>
-                                </div>
-                                ${isMainAdmin ? `
-                                <a href="/settings?tab=tabUsers" onclick="window.inflowMdi.openTabOrNavigateTop('/settings?tab=tabUsers', 'Settings', event)" class="inflow-store-dropdown-item" style="color: #334155; font-weight: 600; padding: 8px 14px;">
-                                    <span>👥 Users & Permissions</span>
-                                </a>` : `
-                                <a href="/branches/${currentBranch ? currentBranch.id : 1}/settings?tab=users" onclick="window.inflowMdi.openTabOrNavigateTop('/branches/${currentBranch ? currentBranch.id : 1}/settings?tab=users', 'Branch Settings', event)" class="inflow-store-dropdown-item" style="color: #334155; font-weight: 600; padding: 8px 14px;">
-                                    <span>👥 Branch Users</span>
-                                </a>`}
-                                <a href="/login?switch=1" target="_top" class="inflow-store-dropdown-item" style="color: #0284C7; font-weight: 600; padding: 8px 14px;">
-                                    <span>🔄 Switch Account / Login</span>
-                                </a>
-                                <div class="inflow-store-dropdown-divider"></div>
-                                <a href="/logout" target="_top" class="inflow-store-dropdown-item" style="color: #EF4444; font-weight: 700; padding: 8px 14px;">
-                                    <span>🚪 Sign Out</span>
-                                </a>
-                            </div>
-                        </div>
-                    `;
+                    const curLang = this.getLanguage ? this.getLanguage() : (localStorage.getItem('inflow_app_lang') || 'en');
+                    this.updateLangUi(curLang);
                 } catch (e) {
-                    console.warn('Error rendering store switcher:', e);
+                    console.warn('Error syncing sidebar widgets:', e);
                 }
 
                 container.innerHTML = html;
@@ -1050,16 +952,18 @@
 
             updateLangUi: function (lang) {
                 this.currentLang = lang;
-                const badge = document.getElementById('inflowLangBadgeText');
-                const btn = document.getElementById('inflowLangBtn');
-                const flagIcon = document.getElementById('inflowLangFlagIcon');
-                const optEn = document.getElementById('langItemEn');
-                const optKm = document.getElementById('langItemKm');
-                const checkEn = document.getElementById('langCheckEn');
-                const checkKm = document.getElementById('langCheckKm');
+                const badge = document.getElementById('sidebarLangBadgeText') || document.getElementById('inflowLangBadgeText');
+                const btn = document.getElementById('sidebarLangBtn') || document.getElementById('inflowLangBtn');
+                const flagIcon = document.getElementById('sidebarLangFlagIcon') || document.getElementById('inflowLangFlagIcon');
+                const optEn = document.getElementById('sidebarFlyoutLangEn') || document.getElementById('langItemEn');
+                const optKm = document.getElementById('sidebarFlyoutLangKm') || document.getElementById('langItemKm');
+                const checkEn = document.getElementById('sidebarFlyoutCheckEn') || document.getElementById('langCheckEn');
+                const checkKm = document.getElementById('sidebarFlyoutCheckKm') || document.getElementById('langCheckKm');
+                const flyoutFlagEn = document.getElementById('sidebarFlyoutFlagEn');
+                const flyoutFlagKm = document.getElementById('sidebarFlyoutFlagKm');
 
                 if (flagIcon) {
-                    flagIcon.innerHTML = (lang === 'km') ? getKhmerFlagSvg(19, 13) : getUkFlagSvg(19, 13);
+                    flagIcon.innerHTML = (lang === 'km') ? getKhmerFlagSvg(18, 12) : getUkFlagSvg(18, 12);
                 }
                 if (badge) {
                     badge.textContent = (lang === 'km') ? 'KH' : 'EN';
@@ -1070,6 +974,8 @@
                         ? 'ភាសាខ្មែរ (ចុចដើម្បីប្តូរទៅ English / Click for English)' 
                         : 'English (Click to Switch to ភាសាខ្មែរ)');
                 }
+                if (flyoutFlagEn && !flyoutFlagEn.innerHTML) flyoutFlagEn.innerHTML = getUkFlagSvg(20, 14);
+                if (flyoutFlagKm && !flyoutFlagKm.innerHTML) flyoutFlagKm.innerHTML = getKhmerFlagSvg(20, 14);
                 if (optEn) optEn.classList.toggle('active', lang === 'en');
                 if (optKm) optKm.classList.toggle('active', lang === 'km');
                 if (checkEn) checkEn.style.display = (lang === 'en') ? 'inline' : 'none';
