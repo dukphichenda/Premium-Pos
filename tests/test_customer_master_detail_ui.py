@@ -96,5 +96,63 @@ class TestCustomerMasterDetailUI(unittest.TestCase):
         self.assertIn('cust-detail-canvas', html)
         self.assertIn(f'custCard_{self.test_cust_id}', html)
 
+    def test_05_search_customers_json_api(self):
+        """Test GET /customers?format=json&ajax=1&search=... searches across all customers"""
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['role'] = 'main_admin'
+            sess['branch_id'] = None
+
+        # Search using test customer name
+        search_term = self.test_cust_name[:4]
+        resp = self.client.get(f'/customers?format=json&ajax=1&search={search_term}')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data.get('success'))
+        self.assertIn('customers', data)
+        self.assertGreaterEqual(len(data['customers']), 1)
+        found_ids = [c['id'] for c in data['customers']]
+        self.assertIn(self.test_cust_id, found_ids)
+
+    def test_06_customer_contact_fields_and_persistence(self):
+        """Test that customer details include phone, contact_name, remarks, and saving persists them"""
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['role'] = 'main_admin'
+            sess['branch_id'] = None
+
+        # 1. Update contact person, phone, and remarks
+        update_payload = {
+            'name': self.test_cust_name,
+            'contact_name': 'Sokha Chan (Director)',
+            'phone': '+855 12 999 888',
+            'email': 'sokha.chan@example.com',
+            'remarks': 'VIP Customer - Priority Delivery',
+            'tax_number': 'TAX-KH-2026-99',
+            'address1': 'Building 12, Street 271, Phnom Penh',
+            'city': 'Phnom Penh',
+            'country': 'Cambodia'
+        }
+        save_resp = self.client.post(f'/customers/{self.test_cust_id}/save',
+                                     json=update_payload,
+                                     headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(save_resp.status_code, 200)
+        save_data = save_resp.get_json()
+        self.assertTrue(save_data.get('success'))
+        self.assertEqual(save_data['customer']['contact_name'], 'Sokha Chan (Director)')
+        self.assertEqual(save_data['customer']['phone'], '+855 12 999 888')
+
+        # 2. Fetch details via /api/customers/<id>/details and verify all fields are returned
+        detail_resp = self.client.get(f'/api/customers/{self.test_cust_id}/details')
+        self.assertEqual(detail_resp.status_code, 200)
+        detail_data = detail_resp.get_json()
+        self.assertTrue(detail_data.get('success'))
+        cust = detail_data['customer']
+        self.assertEqual(cust['contact_name'], 'Sokha Chan (Director)')
+        self.assertEqual(cust['phone'], '+855 12 999 888')
+        self.assertEqual(cust['remarks'], 'VIP Customer - Priority Delivery')
+        self.assertEqual(cust['tax_number'], 'TAX-KH-2026-99')
+        self.assertEqual(cust['address1'], 'Building 12, Street 271, Phnom Penh')
+
 if __name__ == '__main__':
     unittest.main()

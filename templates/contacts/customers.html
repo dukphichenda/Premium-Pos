@@ -87,8 +87,9 @@
                        placeholder="Search name, phone, city, address..." 
                        value="{{ search_name or search }}" 
                        autocomplete="off" 
-                       oninput="handleLiveSearch(this.value)">
-                <button type="button" class="cust-clear-search-btn" id="btnClearSearch" onclick="clearLiveSearch()" style="display: none;">✕</button>
+                       oninput="handleLiveSearch(this.value)"
+                       onkeydown="if(event.key === 'Enter') { event.preventDefault(); triggerServerSearch(this.value); }">
+                <button type="button" class="cust-clear-search-btn" id="btnClearSearch" onclick="clearLiveSearch()" style="display: {% if search_name or search %}block{% else %}none{% endif %};">✕</button>
             </div>
         </div>
 
@@ -314,108 +315,152 @@
         <!-- Scrollable Detail Body Container -->
         <div class="cust-detail-scroll-content" id="custDetailScrollContent">
             
-            <!-- VIEW MODE: Showing Customer Details & Order History -->
-            <div id="custViewContainer">
-                
-                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout) -->
+            <!-- VIEW MODE: Sho                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout with Full Contact Details) -->
                 <div class="cust-meta-header-grid">
                     
-                    <!-- COLUMN 1: Identity & Assignment -->
+                    <!-- COLUMN 1: Customer Identity & Key Contact Details (Name, Contact, Phone, Email) -->
                     <div class="cust-meta-col-1">
                         <!-- Top status pill: [ Fulfilled / Active ] -->
-                        <div style="margin-bottom: 8px;">
+                        <div style="margin-bottom: 6px;">
                             <span class="cust-status-badge fulfilled" id="detailHeaderStatusPill">
                                 {% if selected_customer and selected_customer.balance and selected_customer.balance > 0 %}Unpaid Balance{% else %}Active Customer{% endif %}
                             </span>
                         </div>
 
-                        <!-- Big Title: Customer Name -->
-                        <h1 class="cust-primary-title font-khmer" id="detailCustomerName">
-                            {{ selected_customer.name if selected_customer else 'Select a customer' }}
-                        </h1>
-
-                        <!-- Meta row 1: Created Date -->
-                        <div class="cust-meta-line">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            <span>Customer since <strong id="detailCreatedAt">{{ (selected_customer.created_at|string)[:10] if selected_customer and selected_customer.created_at else 'Active' }}</strong></span>
+                        <!-- Customer Title / Business Name (Directly Editable) -->
+                        <div style="margin-bottom: 8px;">
+                            <input type="text" id="detailCustomerNameInput" class="cust-primary-title-input font-khmer" 
+                                   value="{{ selected_customer.name if selected_customer else '' }}" 
+                                   placeholder="Customer / Business Name..." 
+                                   oninput="markFieldDirty('name'); updateSidebarCardName(this.value);" />
+                            <!-- Hidden compat element for query selectors -->
+                            <span id="detailCustomerName" style="display: none;">{{ selected_customer.name if selected_customer else '' }}</span>
                         </div>
 
-                        <!-- Meta row 2: Assigned Branch / Rep -->
-                        <div class="cust-meta-line">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                            <span>Assigned to <strong id="detailBranchText">{{ selected_customer.branch_name if selected_customer and selected_customer.branch_name else 'Main Store (HQ)' }}</strong></span>
+                        <!-- Contact Person Name (Prominent & Clear) -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">👤 Contact:</span>
+                            <input type="text" id="detailContactPersonInput" class="cust-meta-input font-khmer" 
+                                   value="{{ selected_customer.contact_name or '' if selected_customer else '' }}" 
+                                   placeholder="Contact Person Name (e.g. John Doe, Heng Somnang)" 
+                                   oninput="markFieldDirty('contact_name'); updateSidebarCardContact(this.value);" />
                         </div>
 
-                        <!-- Meta row 3: Quick Contact Link (e.g. Rolling Rolling 123 > ↗) -->
-                        <div class="cust-meta-line" style="margin-top: 6px;">
-                            <a href="javascript:void(0);" onclick="openContactModal()" class="cust-contact-link font-khmer" id="detailContactLink">
-                                <span id="detailContactPersonText">{{ selected_customer.contact_name or selected_customer.name if selected_customer else 'Customer Contact' }}</span>
-                                <span style="font-size: 11px;">&gt;</span>
-                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                            </a>
+                        <!-- Phone Number (Prominent & Clear with Quick Dial / Copy) -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">📞 Phone:</span>
+                            <div style="display: flex; gap: 4px; width: 100%;">
+                                <input type="text" id="detailPhoneInput" class="cust-meta-input" 
+                                       value="{{ selected_customer.phone or '' if selected_customer else '' }}" 
+                                       placeholder="e.g. 012 345 678 / 098 765 432" 
+                                       oninput="markFieldDirty('phone'); updateSidebarCardPhone(this.value);" />
+                                <a href="tel:{{ selected_customer.phone or '' if selected_customer else '' }}" id="detailPhoneCallBtn" class="cust-quick-action-btn" title="Call this phone number">
+                                    📞
+                                </a>
+                                <button type="button" class="cust-quick-action-btn" onclick="copyCustomerPhone()" title="Copy phone number">
+                                    📋
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Email Address -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">✉️ Email:</span>
+                            <div style="display: flex; gap: 4px; width: 100%;">
+                                <input type="email" id="detailEmailInput" class="cust-meta-input" 
+                                       value="{{ selected_customer.email or '' if selected_customer else '' }}" 
+                                       placeholder="customer@email.com" 
+                                       oninput="markFieldDirty('email')" />
+                                <a href="mailto:{{ selected_customer.email or '' if selected_customer else '' }}" id="detailEmailMailtoBtn" class="cust-quick-action-btn" title="Send email">
+                                    ✉️
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Metadata row: Created Date & Branch -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 11.5px; color: #64748B;">
+                            <span>📅 Since <strong id="detailCreatedAt" style="color: #334155;">{{ (selected_customer.created_at|string)[:10] if selected_customer and selected_customer.created_at else 'Active' }}</strong></span>
+                            <span>🏪 Branch: <strong id="detailBranchText" style="color: #334155;">{{ selected_customer.branch_name if selected_customer and selected_customer.branch_name else 'Main Store (HQ)' }}</strong></span>
                         </div>
                     </div>
 
-                    <!-- COLUMN 2: Pricing Scheme, Warehouse & Address -->
+                    <!-- COLUMN 2: Pricing Scheme, Warehouse, Address & Tax -->
                     <div class="cust-meta-col-2">
-                        <!-- Pricing Scheme / Terms -->
-                        <div class="cust-meta-line">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                            <span>Pricing Scheme:</span>
-                            <select id="detailPricingSchemeSelect" class="cust-meta-select" onchange="markFieldDirty('pricing_scheme_id')">
+                        <!-- Pricing Scheme -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">🏷️ Scheme:</span>
+                            <select id="detailPricingSchemeSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('pricing_scheme_id')">
                                 {% for ps in pricing_schemes %}
                                 <option value="{{ ps.id }}" {% if selected_customer and selected_customer.default_pricing_scheme_id == ps.id %}selected{% endif %}>{{ ps.name }}</option>
                                 {% endfor %}
                             </select>
                         </div>
 
-                        <!-- Location / Branch Selector -->
-                        <div class="cust-meta-line">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                            {% if is_main_admin %}
-                            <select id="detailBranchSelect" class="cust-meta-select" onchange="markFieldDirty('branch_id')">
+                        <!-- Payment Terms -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">⏳ Terms:</span>
+                            <select id="detailPaymentTermsSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('payment_terms')">
+                                <option value="Due on Receipt" {% if selected_customer and selected_customer.payment_terms == 'Due on Receipt' %}selected{% endif %}>Due on Receipt</option>
+                                <option value="Net 15" {% if selected_customer and selected_customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
+                                <option value="Net 30" {% if selected_customer and selected_customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
+                                <option value="Net 60" {% if selected_customer and selected_customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
+                                <option value="COD" {% if selected_customer and selected_customer.payment_terms == 'COD' %}selected{% endif %}>COD (Cash on Delivery)</option>
+                                <option value="Prepaid" {% if selected_customer and selected_customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
+                            </select>
+                        </div>
+
+                        <!-- Address Fields: Street & City / Country -->
+                        <div class="cust-meta-field-row" style="align-items: flex-start;">
+                            <span class="cust-field-label" style="margin-top: 5px;">📍 Address:</span>
+                            <div style="flex: 1;">
+                                <input type="text" id="detailAddress1Input" class="cust-meta-input font-khmer" 
+                                       value="{{ selected_customer.address1 or selected_customer.shipping_address or selected_customer.billing_address or '' if selected_customer else '' }}" 
+                                       placeholder="Street address / House # / Sangkat..." 
+                                       oninput="markFieldDirty('address1')" style="margin-bottom: 4px;" />
+                                <div style="display: flex; gap: 4px;">
+                                    <input type="text" id="detailCityInput" class="cust-meta-input font-khmer" 
+                                           value="{{ selected_customer.city or '' if selected_customer else '' }}" 
+                                           placeholder="City / Khan" 
+                                           oninput="markFieldDirty('city')" />
+                                    <input type="text" id="detailCountryInput" class="cust-meta-input" 
+                                           value="{{ selected_customer.country or 'Cambodia' if selected_customer else 'Cambodia' }}" 
+                                           placeholder="Country" 
+                                           oninput="markFieldDirty('country')" style="max-width: 90px;" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Discount & Tax / VAT # -->
+                        <div style="display: flex; gap: 8px; margin-top: 4px;">
+                            <div style="flex: 1;">
+                                <span style="font-size: 11px; color: #64748B; font-weight: 600;">Discount (%):</span>
+                                <input type="number" id="detailDiscountInput" step="any" min="0" max="100" class="cust-meta-input" 
+                                       value="{{ selected_customer.discount_percent or 0 if selected_customer else 0 }}" 
+                                       oninput="markFieldDirty('discount_percent')" style="text-align: right;" />
+                            </div>
+                            <div style="flex: 1.4;">
+                                <span style="font-size: 11px; color: #64748B; font-weight: 600;">VAT / Tax #:</span>
+                                <input type="text" id="detailTaxNumberInput" class="cust-meta-input" 
+                                       value="{{ selected_customer.tax_number or '' if selected_customer else '' }}" 
+                                       placeholder="Enter Tax ID" 
+                                       oninput="markFieldDirty('tax_number')" />
+                            </div>
+                        </div>
+
+                        {% if is_main_admin %}
+                        <div class="cust-meta-field-row" style="margin-top: 6px;">
+                            <span class="cust-field-label">🏪 Store:</span>
+                            <select id="detailBranchSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('branch_id')">
                                 <option value="">Main Warehouse (HQ)</option>
                                 {% for b in branches %}
                                 <option value="{{ b.id }}" {% if selected_customer and selected_customer.branch_id|string == b.id|string %}selected{% endif %}>{{ b.name }} ({{ b.code }})</option>
                                 {% endfor %}
                             </select>
-                            {% else %}
-                            <strong style="color: #1E293B;" id="detailBranchStatic">{{ selected_customer.branch_name or 'Main Warehouse' if selected_customer else 'Main Warehouse' }}</strong>
-                            {% endif %}
                         </div>
-
-                        <!-- Address Block (with Street, City, State, Country) -->
-                        <div class="cust-address-card" onclick="openAddressModal()" title="Click to edit customer address">
-                            <div class="cust-address-lines font-khmer" id="detailAddressText">
-                                {% if selected_customer and (selected_customer.address1 or selected_customer.billing_address or selected_customer.shipping_address) %}
-                                    {{ selected_customer.address1 or selected_customer.shipping_address or selected_customer.billing_address }}<br>
-                                    {% if selected_customer.city %}{{ selected_customer.city }}, {% endif %}{{ selected_customer.state or '' }} {{ selected_customer.postal_code or '' }}<br>
-                                    {{ selected_customer.country or 'Cambodia' }}
-                                {% else %}
-                                    <span style="color: #94A3B8; font-style: italic;">+ Set business & delivery address</span>
-                                {% endif %}
-                            </div>
-                            <span class="cust-address-edit-hint">✏️ Edit</span>
-                        </div>
-
-                        <!-- Custom Fields / Extras Matching Screenshot -->
-                        <div class="cust-custom-fields-row">
-                            <div class="cust-cf-item">
-                                <span class="cust-cf-label">Discount:</span>
-                                <input type="number" id="detailDiscountInput" step="any" min="0" max="100" class="cust-cf-input" value="{{ selected_customer.discount_percent or 0 if selected_customer else 0 }}" onchange="markFieldDirty('discount_percent')" style="width: 50px; text-align: right;">
-                                <span style="font-size: 11px; color: #64748B;">%</span>
-                            </div>
-                            <div class="cust-cf-item">
-                                <span class="cust-cf-label">VAT / Tax #:</span>
-                                <input type="text" id="detailTaxNumberInput" class="cust-cf-input" value="{{ selected_customer.tax_number or '' if selected_customer else '' }}" placeholder="Enter data" onchange="markFieldDirty('tax_number')" style="width: 130px;">
-                            </div>
-                            <div class="cust-cf-item">
-                                <a href="javascript:void(0);" onclick="openFullEditModal()" style="font-size: 11.5px; color: #8C6541; text-decoration: none; font-weight: 600;">⚙ Manage all fields</a>
-                            </div>
-                        </div>
+                        {% endif %}
                     </div>
 
-                    <!-- COLUMN 3: Financial Summary Box (Matching Screenshot Top Right) -->
+                    <!-- COLUMN 3: Financial Summary Box & Remarks / Notes -->
                     <div class="cust-meta-col-3">
                         <!-- Top: Paid / Balance Header & Badge -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
@@ -425,34 +470,25 @@
                             </span>
                         </div>
 
-                        <!-- Payment history ℹ️ -->
+                        <!-- Lifetime Spent -->
                         <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
                             <span style="font-size: 11px; color: #64748B;">Total Spent: <strong id="detailTotalSpentText" style="color: #0F172A;">{{ (selected_stats.total_spent or selected_customer.total_spent or 0) | currency if selected_customer else '$0.00' }}</strong></span>
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
                         </div>
 
                         <!-- Currency Selector -->
-                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 4px;">
+                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
                             <span style="font-size: 11.5px; color: #64748B;">💵 Currency:</span>
                             <strong style="font-size: 12px; color: #1E293B;">US Dollar ($) ▾</strong>
                         </div>
 
-                        <!-- Tax / Pricing Scheme Summary -->
-                        <div class="cust-meta-line" style="justify-content: flex-end;">
-                            <span style="font-size: 11px; color: #64748B;">🔗 <span id="detailSchemeSummaryText">{{ selected_customer.pricing_scheme_name if selected_customer and selected_customer.pricing_scheme_name else 'Retail 1' }}</span></span>
-                        </div>
-
-                        <!-- Payment Terms -->
-                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 6px;">
-                            <span style="font-size: 11.5px; color: #64748B;">Terms:</span>
-                            <select id="detailPaymentTermsSelect" class="cust-meta-select" onchange="markFieldDirty('payment_terms')">
-                                <option value="Due on Receipt" {% if selected_customer and selected_customer.payment_terms == 'Due on Receipt' %}selected{% endif %}>Due on Receipt</option>
-                                <option value="Net 15" {% if selected_customer and selected_customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
-                                <option value="Net 30" {% if selected_customer and selected_customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
-                                <option value="Net 60" {% if selected_customer and selected_customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
-                                <option value="COD" {% if selected_customer and selected_customer.payment_terms == 'COD' %}selected{% endif %}>COD</option>
-                                <option value="Prepaid" {% if selected_customer and selected_customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
-                            </select>
+                        <!-- Directly Visible Customer Remarks / Notes Box -->
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                <span style="font-size: 11px; font-weight: 700; color: #475569;">📝 Remarks & Notes:</span>
+                            </div>
+                            <textarea id="detailRemarksTextarea" class="cust-remarks-box font-khmer" rows="3" 
+                                      placeholder="Add customer remarks, delivery preferences, guidelines..." 
+                                      oninput="markFieldDirty('remarks')">{{ selected_customer.remarks or '' if selected_customer else '' }}</textarea>
                         </div>
                     </div>
 
@@ -1382,6 +1418,98 @@
     line-height: 1.2;
 }
 
+.cust-primary-title-input {
+    font-size: 22px;
+    font-weight: 800;
+    color: #0F172A;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 2px 6px;
+    width: 100%;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+.cust-primary-title-input:hover {
+    border-color: #CBD5E1;
+    background: #FFFFFF;
+}
+.cust-primary-title-input:focus {
+    border-color: #8C6541;
+    background: #FFFFFF;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(140, 101, 65, 0.15);
+}
+
+.cust-meta-field-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 7px;
+}
+.cust-field-label {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #64748B;
+    min-width: 85px;
+    flex-shrink: 0;
+}
+.cust-meta-input {
+    height: 30px;
+    padding: 4px 8px;
+    font-size: 12.5px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    background: #FFFFFF;
+    color: #1E293B;
+    width: 100%;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+.cust-meta-input:focus {
+    border-color: #8C6541;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(140, 101, 65, 0.15);
+}
+
+.cust-quick-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    background: #FFFFFF;
+    cursor: pointer;
+    text-decoration: none;
+    font-size: 13px;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+.cust-quick-action-btn:hover {
+    background: #F1F5F9;
+    border-color: #8C6541;
+}
+
+.cust-remarks-box {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    background: #FFFFFF;
+    color: #1E293B;
+    resize: vertical;
+    box-sizing: border-box;
+    transition: all 0.15s ease;
+}
+.cust-remarks-box:focus {
+    border-color: #8C6541;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(140, 101, 65, 0.15);
+}
+
 .cust-meta-line {
     display: flex;
     align-items: center;
@@ -1938,7 +2066,16 @@ function fetchCustomerDetails(id) {
     `;
 
     fetch('/api/customers/' + id + '/details')
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                return res.json().then(data => {
+                    throw new Error(data.message || ('Server error ' + res.status));
+                }).catch(e => {
+                    throw new Error(e.message || ('Server error ' + res.status));
+                });
+            }
+            return res.json();
+        })
         .then(data => {
             if (!data.success) {
                 showToast('Failed to load customer: ' + (data.message || 'Unknown error'), true);
@@ -1948,51 +2085,69 @@ function fetchCustomerDetails(id) {
         })
         .catch(err => {
             console.error('Error fetching customer:', err);
-            showToast('Network error loading customer details', true);
+            showToast('Error loading customer: ' + (err.message || 'Network error'), true);
         });
 }
 
 // Render the fetched data into the right detail panel
 function renderCustomerDetails(data) {
-    const c = data.customer;
+    const c = data.customer || {};
     const orders = data.orders || [];
     const stats = data.stats || {};
 
     cachedCustomerData[c.id] = data;
 
     // Update hidden inputs
-    document.getElementById('currentCustomerId').value = c.id;
-    document.getElementById('currentCustomerName').value = c.name;
-    document.getElementById('currentCustomerBalance').value = c.balance || 0;
-    document.getElementById('currentCustomerPhone').value = c.phone || '';
-    document.getElementById('currentCustomerAddress').value = c.display_address || c.address1 || '';
+    if (document.getElementById('currentCustomerId')) document.getElementById('currentCustomerId').value = c.id;
+    if (document.getElementById('currentCustomerName')) document.getElementById('currentCustomerName').value = c.name || '';
+    if (document.getElementById('currentCustomerBalance')) document.getElementById('currentCustomerBalance').value = c.balance || 0;
+    if (document.getElementById('currentCustomerPhone')) document.getElementById('currentCustomerPhone').value = c.phone || '';
+    if (document.getElementById('currentCustomerAddress')) document.getElementById('currentCustomerAddress').value = c.display_address || c.address1 || '';
 
-    // Identity & Contact
-    document.getElementById('detailCustomerName').textContent = c.name;
-    document.getElementById('detailCreatedAt').textContent = c.created_at || 'Active';
-    document.getElementById('detailBranchText').textContent = c.branch_name || 'Main Store (HQ)';
-    document.getElementById('detailContactPersonText').textContent = c.contact_name || c.name;
+    // Customer Name, Contact Person, Phone, Email
+    const nameEl = document.getElementById('detailCustomerName');
+    if (nameEl) nameEl.textContent = c.name || '';
+
+    const nameInp = document.getElementById('detailCustomerNameInput');
+    if (nameInp) nameInp.value = c.name || '';
+
+    const contactInp = document.getElementById('detailContactPersonInput');
+    if (contactInp) contactInp.value = c.contact_name || '';
+
+    const phoneInp = document.getElementById('detailPhoneInput');
+    if (phoneInp) phoneInp.value = c.phone || '';
+
+    const phoneCallBtn = document.getElementById('detailPhoneCallBtn');
+    if (phoneCallBtn) phoneCallBtn.href = c.phone ? ('tel:' + c.phone) : 'javascript:void(0);';
+
+    const emailInp = document.getElementById('detailEmailInput');
+    if (emailInp) emailInp.value = c.email || '';
+
+    const emailMailtoBtn = document.getElementById('detailEmailMailtoBtn');
+    if (emailMailtoBtn) emailMailtoBtn.href = c.email ? ('mailto:' + c.email) : 'javascript:void(0);';
+
+    const addr1Inp = document.getElementById('detailAddress1Input');
+    if (addr1Inp) addr1Inp.value = c.address1 || c.shipping_address || c.display_address || '';
+
+    const cityInp = document.getElementById('detailCityInput');
+    if (cityInp) cityInp.value = c.city || '';
+
+    const countryInp = document.getElementById('detailCountryInput');
+    if (countryInp) countryInp.value = c.country || 'Cambodia';
+
+    if (document.getElementById('detailCreatedAt')) document.getElementById('detailCreatedAt').textContent = c.created_at || 'Active';
+    if (document.getElementById('detailBranchText')) document.getElementById('detailBranchText').textContent = c.branch_name || 'Main Store (HQ)';
 
     // Status Pill
     const statusPill = document.getElementById('detailHeaderStatusPill');
-    if (c.balance && c.balance > 0) {
-        statusPill.textContent = 'Unpaid Balance';
-        statusPill.className = 'cust-status-badge unfulfilled';
-    } else {
-        statusPill.textContent = 'Active Customer';
-        statusPill.className = 'cust-status-badge fulfilled';
-    }
-
-    // Address
-    const addressBox = document.getElementById('detailAddressText');
-    if (c.address1 || c.city || c.display_address) {
-        addressBox.innerHTML = `
-            ${escapeHtml(c.address1 || c.display_address)}<br>
-            ${escapeHtml(c.city || '')}${c.city && c.state ? ', ' : ''}${escapeHtml(c.state || '')} ${escapeHtml(c.postal_code || '')}<br>
-            ${escapeHtml(c.country || 'Cambodia')}
-        `;
-    } else {
-        addressBox.innerHTML = '<span style="color: #94A3B8; font-style: italic;">+ Set business & delivery address</span>';
+    if (statusPill) {
+        if (c.balance && c.balance > 0) {
+            statusPill.textContent = 'Unpaid Balance';
+            statusPill.className = 'cust-status-badge unfulfilled';
+        } else {
+            statusPill.textContent = 'Active Customer';
+            statusPill.className = 'cust-status-badge fulfilled';
+        }
     }
 
     // Fields
@@ -2018,18 +2173,18 @@ function renderCustomerDetails(data) {
     const formattedBal = formatCurrency(c.balance || 0);
     const formattedSpent = formatCurrency(stats.total_spent || c.total_spent || 0);
 
-    document.getElementById('detailBalanceLargeBadge').textContent = formattedBal;
-    document.getElementById('detailTotalSpentText').textContent = formattedSpent;
-    document.getElementById('detailSchemeSummaryText').textContent = c.pricing_scheme_name || 'Retail 1';
+    if (document.getElementById('detailBalanceLargeBadge')) document.getElementById('detailBalanceLargeBadge').textContent = formattedBal;
+    if (document.getElementById('detailTotalSpentText')) document.getElementById('detailTotalSpentText').textContent = formattedSpent;
+    if (document.getElementById('detailSchemeSummaryText')) document.getElementById('detailSchemeSummaryText').textContent = c.pricing_scheme_name || 'Retail 1';
 
     // Tracker pills
-    document.getElementById('trackerTotalOrders').textContent = stats.total_orders || orders.length;
-    document.getElementById('trackerPaidOrders').textContent = stats.paid_orders || 0;
-    document.getElementById('trackerUnpaidOrders').textContent = stats.unpaid_orders || 0;
+    if (document.getElementById('trackerTotalOrders')) document.getElementById('trackerTotalOrders').textContent = stats.total_orders || orders.length;
+    if (document.getElementById('trackerPaidOrders')) document.getElementById('trackerPaidOrders').textContent = stats.paid_orders || 0;
+    if (document.getElementById('trackerUnpaidOrders')) document.getElementById('trackerUnpaidOrders').textContent = stats.unpaid_orders || 0;
 
     // Bottom Summary Box
-    document.getElementById('bottomSummaryBalance').textContent = formattedBal;
-    document.getElementById('bottomSummaryTotalSpent').textContent = formattedSpent;
+    if (document.getElementById('bottomSummaryBalance')) document.getElementById('bottomSummaryBalance').textContent = formattedBal;
+    if (document.getElementById('bottomSummaryTotalSpent')) document.getElementById('bottomSummaryTotalSpent').textContent = formattedSpent;
 
     // Render Order History Table
     renderOrderHistoryRows(orders);
@@ -2170,6 +2325,62 @@ function markFieldDirty(fieldName) {
     dirtyFields.add(fieldName);
 }
 
+// Copy phone number to clipboard
+function copyCustomerPhone() {
+    const inp = document.getElementById('detailPhoneInput');
+    const val = (inp ? inp.value : '').trim();
+    if (!val) {
+        showToast('No phone number to copy.', true);
+        return;
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(val).then(() => {
+            showToast('✓ Phone copied: ' + val);
+        }).catch(() => {
+            inp.select();
+            document.execCommand('copy');
+            showToast('✓ Phone copied: ' + val);
+        });
+    } else {
+        inp.select();
+        document.execCommand('copy');
+        showToast('✓ Phone copied: ' + val);
+    }
+}
+
+// Inline live updates to the active card in the left list
+function updateSidebarCardName(val) {
+    if (!currentCustomerId) return;
+    const activeCard = document.getElementById('custCard_' + currentCustomerId);
+    if (activeCard) {
+        const nameEl = activeCard.querySelector('.cust-card-name');
+        if (nameEl && val.trim()) nameEl.textContent = val.trim();
+        activeCard.dataset.name = val.toLowerCase();
+    }
+    const hiddenName = document.getElementById('detailCustomerName');
+    if (hiddenName) hiddenName.textContent = val;
+}
+
+function updateSidebarCardPhone(val) {
+    if (!currentCustomerId) return;
+    const activeCard = document.getElementById('custCard_' + currentCustomerId);
+    if (activeCard) {
+        activeCard.dataset.phone = val.toLowerCase();
+        const metaSpan = activeCard.querySelector('.cust-card-meta-text span');
+        if (metaSpan && val.trim()) metaSpan.textContent = val.trim();
+    }
+    const callBtn = document.getElementById('detailPhoneCallBtn');
+    if (callBtn) callBtn.href = val.trim() ? ('tel:' + val.trim()) : 'javascript:void(0);';
+}
+
+function updateSidebarCardContact(val) {
+    if (!currentCustomerId) return;
+    const activeCard = document.getElementById('custCard_' + currentCustomerId);
+    if (activeCard) {
+        activeCard.dataset.contact = val.toLowerCase();
+    }
+}
+
 // Save Customer Data via AJAX
 function saveCustomerData() {
     if (!currentCustomerId) {
@@ -2177,13 +2388,27 @@ function saveCustomerData() {
         return;
     }
 
+    const nameInp = document.getElementById('detailCustomerNameInput');
+    const nameVal = (nameInp ? nameInp.value : (document.getElementById('detailCustomerName') ? document.getElementById('detailCustomerName').textContent : '')).trim();
+    if (!nameVal) {
+        showToast('Customer name cannot be empty.', true);
+        if (nameInp) nameInp.focus();
+        return;
+    }
+
     const payload = {
-        name: document.getElementById('detailCustomerName').textContent.trim(),
+        name: nameVal,
+        contact_name: (document.getElementById('detailContactPersonInput') ? document.getElementById('detailContactPersonInput').value : '').trim(),
+        phone: (document.getElementById('detailPhoneInput') ? document.getElementById('detailPhoneInput').value : '').trim(),
+        email: (document.getElementById('detailEmailInput') ? document.getElementById('detailEmailInput').value : '').trim(),
+        address1: (document.getElementById('detailAddress1Input') ? document.getElementById('detailAddress1Input').value : '').trim(),
+        city: (document.getElementById('detailCityInput') ? document.getElementById('detailCityInput').value : '').trim(),
+        country: (document.getElementById('detailCountryInput') ? document.getElementById('detailCountryInput').value : 'Cambodia').trim(),
         default_pricing_scheme_id: document.getElementById('detailPricingSchemeSelect') ? document.getElementById('detailPricingSchemeSelect').value : null,
         payment_terms: document.getElementById('detailPaymentTermsSelect') ? document.getElementById('detailPaymentTermsSelect').value : 'Due on Receipt',
-        discount_percent: document.getElementById('detailDiscountInput') ? document.getElementById('detailDiscountInput').value : 0,
-        tax_number: document.getElementById('detailTaxNumberInput') ? document.getElementById('detailTaxNumberInput').value : '',
-        remarks: document.getElementById('detailRemarksTextarea') ? document.getElementById('detailRemarksTextarea').value : ''
+        discount_percent: document.getElementById('detailDiscountInput') ? (parseFloat(document.getElementById('detailDiscountInput').value) || 0) : 0,
+        tax_number: (document.getElementById('detailTaxNumberInput') ? document.getElementById('detailTaxNumberInput').value : '').trim(),
+        remarks: (document.getElementById('detailRemarksTextarea') ? document.getElementById('detailRemarksTextarea').value : '').trim()
     };
 
     const branchSelect = document.getElementById('detailBranchSelect');
@@ -2211,11 +2436,18 @@ function saveCustomerData() {
         if (data.success) {
             showToast('✓ ' + (data.message || 'Customer saved successfully!'));
             dirtyFields.clear();
-            // Update left sidebar card if name or balance changed
+            // Update left sidebar card if name, phone or contact changed
             const activeCard = document.getElementById('custCard_' + currentCustomerId);
             if (activeCard && data.customer) {
                 const nameEl = activeCard.querySelector('.cust-card-name');
                 if (nameEl) nameEl.textContent = data.customer.name;
+                activeCard.dataset.name = (data.customer.name || '').toLowerCase();
+                activeCard.dataset.phone = (data.customer.phone || '').toLowerCase();
+                activeCard.dataset.contact = (data.customer.contact_name || '').toLowerCase();
+                const metaSpan = activeCard.querySelector('.cust-card-meta-text span');
+                if (metaSpan) {
+                    metaSpan.textContent = data.customer.phone || data.customer.city || data.customer.contact_name || '';
+                }
             }
         } else {
             showToast(data.message || 'Failed to save customer', true);
@@ -2315,13 +2547,24 @@ function submitNewCustomer() {
     });
 }
 
-// Live Search Filter for Left Sidebar Cards
+// Live Search Filter for Left Sidebar Cards (Local + Global Server Search)
+let searchDebounceTimer = null;
+let originalCardListHtml = null;
+
 function handleLiveSearch(query) {
-    const q = query.trim().toLowerCase();
+    const q = (query || '').trim();
     const clearBtn = document.getElementById('btnClearSearch');
     if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
 
-    let matchCount = 0;
+    // Store original cards list HTML on first search so we can restore instantly on clear
+    const cardListEl = document.getElementById('custCardList');
+    if (originalCardListHtml === null && cardListEl) {
+        originalCardListHtml = cardListEl.innerHTML;
+    }
+
+    // 1. Instant local DOM filtering for immediate keystroke response
+    let localMatches = 0;
+    const lowerQ = q.toLowerCase();
     document.querySelectorAll('.cust-list-card').forEach(card => {
         const name = card.dataset.name || '';
         const phone = card.dataset.phone || '';
@@ -2329,24 +2572,126 @@ function handleLiveSearch(query) {
         const contact = card.dataset.contact || '';
         const address = card.dataset.address || '';
 
-        const isMatch = !q || name.includes(q) || phone.includes(q) || city.includes(q) || contact.includes(q) || address.includes(q);
+        const isMatch = !lowerQ || name.includes(lowerQ) || phone.includes(lowerQ) || city.includes(lowerQ) || contact.includes(lowerQ) || address.includes(lowerQ);
         if (isMatch) {
             card.style.display = 'block';
-            matchCount++;
+            localMatches++;
         } else {
             card.style.display = 'none';
         }
     });
 
     const noMatch = document.getElementById('custNoMatchFilterMsg');
-    if (noMatch) noMatch.style.display = matchCount === 0 ? 'block' : 'none';
+    if (noMatch) noMatch.style.display = (localMatches === 0 && !q) ? 'block' : 'none';
+
+    // 2. Clear previous debounce timer
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+
+    // 3. If query cleared, restore original list
+    if (!q) {
+        if (originalCardListHtml !== null && cardListEl) {
+            cardListEl.innerHTML = originalCardListHtml;
+            document.querySelectorAll('.cust-list-card').forEach(c => c.style.display = 'block');
+            const total = document.querySelectorAll('.cust-list-card').length;
+            const counter = document.getElementById('custCounterLabel');
+            if (counter) counter.textContent = total + ' Customers';
+            if (noMatch) noMatch.style.display = 'none';
+        }
+        return;
+    }
+
+    // 4. Debounced Server Search across the ENTIRE database (280ms)
+    searchDebounceTimer = setTimeout(() => {
+        triggerServerSearch(q);
+    }, 280);
+}
+
+function triggerServerSearch(q) {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    q = (q || '').trim();
+    if (!q) {
+        clearLiveSearch();
+        return;
+    }
+
+    const counter = document.getElementById('custCounterLabel');
+    if (counter) counter.textContent = 'Searching...';
+
+    const branchParam = currentBranchParam && currentBranchParam !== 'all' ? '&branch=' + encodeURIComponent(currentBranchParam) : '';
+    fetch('/customers?format=json&ajax=1&search=' + encodeURIComponent(q) + branchParam)
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success || !data.customers) return;
+
+            const cardListEl = document.getElementById('custCardList');
+            const noMatchEl = document.getElementById('custNoMatchFilterMsg');
+
+            if (data.customers.length === 0) {
+                if (cardListEl) cardListEl.innerHTML = '';
+                if (noMatchEl) {
+                    noMatchEl.textContent = 'No customers found matching "' + q + '".';
+                    noMatchEl.style.display = 'block';
+                }
+                if (counter) counter.textContent = '0 Customers found';
+                return;
+            }
+
+            if (noMatchEl) noMatchEl.style.display = 'none';
+            if (counter) counter.textContent = data.customers.length + ' Customers found';
+
+            let html = '';
+            data.customers.forEach((c, idx) => {
+                const isActive = (currentCustomerId && c.id === currentCustomerId) || (!currentCustomerId && idx === 0);
+                const hasBalance = c.open_balance && c.open_balance > 0;
+                html += `
+                    <div class="cust-list-card ${isActive ? 'active' : ''}"
+                         id="custCard_${c.id}"
+                         data-id="${c.id}"
+                         data-name="${escapeHtml((c.name || '').toLowerCase())}"
+                         data-phone="${escapeHtml((c.phone || '').toLowerCase())}"
+                         data-city="${escapeHtml((c.city || '').toLowerCase())}"
+                         data-contact="${escapeHtml((c.contact_name || '').toLowerCase())}"
+                         data-address="${escapeHtml((c.address1 || '').toLowerCase())}"
+                         data-balance="${c.open_balance || 0}"
+                         onclick="selectCustomer(${c.id})">
+                        <div class="cust-card-row-top">
+                            <span class="cust-card-name font-khmer" title="${escapeHtml(c.name)}">${escapeHtml(c.name)}</span>
+                            <span class="cust-status-badge ${hasBalance ? 'unfulfilled' : 'fulfilled'}">
+                                ${hasBalance ? 'Unpaid' : 'Active'}
+                            </span>
+                        </div>
+                        <div class="cust-card-row-bottom">
+                            <span class="cust-balance-pill ${hasBalance ? 'has-balance' : 'zero-balance'}">
+                                ${formatCurrency(c.open_balance || 0)}
+                            </span>
+                            <div class="cust-card-meta-text">
+                                <span>${escapeHtml(c.phone || c.city || c.contact_name || '')}</span>
+                                ${c.branch_code ? `<span class="cust-branch-tag">🏪 ${escapeHtml(c.branch_code)}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+
+            if (cardListEl) cardListEl.innerHTML = html;
+
+            // Auto-select first result if current selected customer is not in results
+            const foundCurrent = data.customers.some(c => c.id === currentCustomerId);
+            if (!foundCurrent && data.customers.length > 0) {
+                selectCustomer(data.customers[0].id);
+            }
+        })
+        .catch(err => {
+            console.error('Search error:', err);
+            if (counter) counter.textContent = 'Search error';
+        });
 }
 
 function clearLiveSearch() {
     const inp = document.getElementById('custLiveSearchInput');
-    inp.value = '';
+    if (inp) inp.value = '';
     handleLiveSearch('');
-    inp.focus();
+    if (inp) inp.focus();
 }
 
 function toggleMasterSearch() {

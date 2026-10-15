@@ -410,6 +410,16 @@ def init_db():
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(schema_sql)
             
+            # Ensure essential columns exist in customers
+            try:
+                cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS remarks TEXT;")
+                cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS fax VARCHAR(100);")
+                cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS website VARCHAR(255);")
+                cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS tax_number VARCHAR(100);")
+                cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id INTEGER;")
+            except Exception as mig_err:
+                logger.warning(f"Customer columns migration notice: {mig_err}")
+
             # Resynchronize custom numbering sequences with current max IDs
             try:
                 resync_all_sequences(cur=cur)

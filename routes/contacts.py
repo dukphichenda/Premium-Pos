@@ -201,19 +201,18 @@ def list_customers(selected_id_override=None):
         branches = []
     else:
         branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
-        raw_branch = request.args.get('branch', 'main').strip().lower()
-        if raw_branch == 'main':
+        raw_branch = (request.args.get('branch') or '').strip().lower()
+        if not raw_branch or raw_branch == 'all':
+            current_branch_param = 'all'  # HQ sees all customers across all branches by default
+        elif raw_branch == 'main':
             where_clauses.append("c.branch_id IS NULL")
             current_branch_param = 'main'
-        elif raw_branch == 'all':
-            current_branch_param = 'all'  # HQ sees all combined
         elif raw_branch.isdigit():
             where_clauses.append("c.branch_id = %s")
             params.append(int(raw_branch))
             current_branch_param = raw_branch
         else:
-            where_clauses.append("c.branch_id IS NULL")
-            current_branch_param = 'main'
+            current_branch_param = 'all'
 
     def _apply_op(field, val, op):
         if op in ('=', 'exact'):
@@ -224,9 +223,9 @@ def list_customers(selected_id_override=None):
             return f"{field} ILIKE %s", f"%{val}%"
 
     if search:
-        where_clauses.append("(c.name ILIKE %s OR c.phone ILIKE %s OR c.contact_name ILIKE %s OR c.billing_address ILIKE %s OR c.address1 ILIKE %s)")
+        where_clauses.append("(c.name ILIKE %s OR c.phone ILIKE %s OR c.contact_name ILIKE %s OR c.email ILIKE %s OR c.city ILIKE %s OR c.billing_address ILIKE %s OR c.address1 ILIKE %s)")
         sp = f"%{search}%"
-        params.extend([sp, sp, sp, sp, sp])
+        params.extend([sp, sp, sp, sp, sp, sp, sp])
 
     if search_name:
         clause, p = _apply_op("c.name", search_name, op_name)
@@ -493,6 +492,69 @@ def new_customer():
                            sidebar_customers=sidebar_customers,
                            is_new=True)
 
+def _format_customer_api_payload(cust_data):
+    if not cust_data:
+        return {'success': False, 'message': 'Customer not found.'}
+    c = cust_data.get('customer') or {}
+    orders = cust_data.get('orders') or []
+    stats = cust_data.get('stats') or {}
+    return {
+        'success': True,
+        'customer': {
+            'id': c.get('id'),
+            'name': c.get('name') or '',
+            'contact_name': c.get('contact_name') or '',
+            'phone': c.get('phone') or '',
+            'fax': c.get('fax') or '',
+            'email': c.get('email') or '',
+            'website': c.get('website') or '',
+            'address1': c.get('address1') or '',
+            'address2': c.get('address2') or '',
+            'city': c.get('city') or '',
+            'state': c.get('state') or '',
+            'country': c.get('country') or 'Cambodia',
+            'postal_code': c.get('postal_code') or '',
+            'shipping_address': c.get('shipping_address') or c.get('address1') or '',
+            'billing_address': c.get('billing_address') or c.get('address1') or '',
+            'display_address': c.get('display_address') or '',
+            'default_pricing_scheme_id': c.get('default_pricing_scheme_id') or 100,
+            'pricing_scheme_name': c.get('pricing_scheme_name') or 'Retail 1',
+            'discount_percent': float(c.get('discount_percent') or 0),
+            'payment_terms': c.get('payment_terms') or 'Due on Receipt',
+            'remarks': c.get('remarks') or '',
+            'tax_number': c.get('tax_number') or '',
+            'branch_id': c.get('branch_id'),
+            'branch_name': c.get('branch_name') or '',
+            'branch_code': c.get('branch_code') or '',
+            'balance': float(c.get('balance') or 0),
+            'total_spent': float(c.get('total_spent') or 0),
+            'order_count': int(c.get('order_count') or 0),
+            'created_at': str(c.get('created_at') or '')[:10],
+            'updated_at': str(c.get('updated_at') or '')[:10]
+        },
+        'orders': [{
+            'id': o.get('id'),
+            'order_number': o.get('order_number') or '',
+            'order_date': str(o.get('order_date') or '')[:10],
+            'status': o.get('status') or '',
+            'payment_status': o.get('payment_status') or '',
+            'location_name': o.get('location_name') or 'Main Warehouse',
+            'total_amount': float(o.get('total_amount') or 0),
+            'paid_amount': float(o.get('paid_amount') or 0),
+            'balance_due': float(o.get('balance_due') or 0),
+            'items_summary': o.get('items_summary') or 'Products',
+            'total_qty': float(o.get('total_qty') or 0),
+            'notes': o.get('notes') or ''
+        } for o in orders],
+        'stats': {
+            'total_orders': int(stats.get('total_orders') or 0),
+            'total_spent': float(stats.get('total_spent') or 0),
+            'open_balance': float(stats.get('open_balance') or 0),
+            'paid_orders': int(stats.get('paid_orders') or 0),
+            'unpaid_orders': int(stats.get('unpaid_orders') or 0)
+        }
+    }
+
 @contacts_bp.route('/customers/<int:id>')
 def detail_customer(id):
     is_main_admin = _is_main_admin()
@@ -516,64 +578,7 @@ def detail_customer(id):
         cust_data = _get_customer_full_data(id, user_bid, is_main_admin)
         if not cust_data:
             return jsonify({'success': False, 'message': 'Customer not found or access denied.'}), 404
-        
-        c = cust_data['customer']
-        return jsonify({
-            'success': True,
-            'customer': {
-                'id': c['id'],
-                'name': c['name'] or '',
-                'contact_name': c['contact_name'] or '',
-                'phone': c['phone'] or '',
-                'fax': c['fax'] or '',
-                'email': c['email'] or '',
-                'website': c['website'] or '',
-                'address1': c['address1'] or '',
-                'address2': c['address2'] or '',
-                'city': c['city'] or '',
-                'state': c['state'] or '',
-                'country': c['country'] or 'Cambodia',
-                'postal_code': c['postal_code'] or '',
-                'shipping_address': c['shipping_address'] or c['address1'] or '',
-                'billing_address': c['billing_address'] or c['address1'] or '',
-                'display_address': c['display_address'] or '',
-                'default_pricing_scheme_id': c['default_pricing_scheme_id'] or 100,
-                'pricing_scheme_name': c['pricing_scheme_name'] or 'Retail 1',
-                'discount_percent': float(c['discount_percent'] or 0),
-                'payment_terms': c['payment_terms'] or 'Due on Receipt',
-                'remarks': c['remarks'] or '',
-                'tax_number': c.get('tax_number') or '',
-                'branch_id': c.get('branch_id'),
-                'branch_name': c.get('branch_name') or '',
-                'branch_code': c.get('branch_code') or '',
-                'balance': float(c.get('balance') or 0),
-                'total_spent': float(c.get('total_spent') or 0),
-                'order_count': int(c.get('order_count') or 0),
-                'created_at': str(c.get('created_at') or '')[:10],
-                'updated_at': str(c.get('updated_at') or '')[:10]
-            },
-            'orders': [{
-                'id': o['id'],
-                'order_number': o['order_number'],
-                'order_date': str(o['order_date'] or '')[:10],
-                'status': o['status'],
-                'payment_status': o['payment_status'],
-                'location_name': o['location_name'] or 'Main Warehouse',
-                'total_amount': float(o['total_amount'] or 0),
-                'paid_amount': float(o['paid_amount'] or 0),
-                'balance_due': float(o['balance_due'] or 0),
-                'items_summary': o['items_summary'] or 'Products',
-                'total_qty': float(o['total_qty'] or 0),
-                'notes': o['notes'] or ''
-            } for o in cust_data['orders']],
-            'stats': {
-                'total_orders': int(cust_data['stats']['total_orders']),
-                'total_spent': float(cust_data['stats']['total_spent']),
-                'open_balance': float(cust_data['stats']['open_balance']),
-                'paid_orders': int(cust_data['stats']['paid_orders']),
-                'unpaid_orders': int(cust_data['stats']['unpaid_orders'])
-            }
-        })
+        return jsonify(_format_customer_api_payload(cust_data))
 
     # Direct browser GET navigation: render list_customers with selected_id=id
     # so user gets full split-view interface with customer selected!
@@ -581,69 +586,15 @@ def detail_customer(id):
 
 @contacts_bp.route('/api/customers/<int:id>/details')
 def api_customer_details(id):
-    is_main_admin = _is_main_admin()
-    user_bid = _get_user_branch_id()
-    cust_data = _get_customer_full_data(id, user_bid, is_main_admin)
-    if not cust_data:
-        return jsonify({'success': False, 'message': 'Customer not found or access denied.'}), 404
-
-    c = cust_data['customer']
-    return jsonify({
-        'success': True,
-        'customer': {
-            'id': c['id'],
-            'name': c['name'] or '',
-            'contact_name': c['contact_name'] or '',
-            'phone': c['phone'] or '',
-            'fax': c['fax'] or '',
-            'email': c['email'] or '',
-            'website': c['website'] or '',
-            'address1': c['address1'] or '',
-            'address2': c['address2'] or '',
-            'city': c['city'] or '',
-            'state': c['state'] or '',
-            'country': c['country'] or 'Cambodia',
-            'postal_code': c['postal_code'] or '',
-            'shipping_address': c['shipping_address'] or c['address1'] or '',
-            'billing_address': c['billing_address'] or c['address1'] or '',
-            'display_address': c['display_address'] or '',
-            'default_pricing_scheme_id': c['default_pricing_scheme_id'] or 100,
-            'pricing_scheme_name': c['pricing_scheme_name'] or 'Retail 1',
-            'discount_percent': float(c['discount_percent'] or 0),
-            'payment_terms': c['payment_terms'] or 'Due on Receipt',
-            'remarks': c['remarks'] or '',
-            'tax_number': c.get('tax_number') or '',
-            'branch_id': c.get('branch_id'),
-            'branch_name': c.get('branch_name') or '',
-            'branch_code': c.get('branch_code') or '',
-            'balance': float(c.get('balance') or 0),
-            'total_spent': float(c.get('total_spent') or 0),
-            'order_count': int(c.get('order_count') or 0),
-            'created_at': str(c.get('created_at') or '')[:10],
-            'updated_at': str(c.get('updated_at') or '')[:10]
-        },
-        'orders': [{
-            'id': o['id'],
-            'order_number': o['order_number'],
-            'order_date': str(o['order_date'] or '')[:10],
-            'status': o['status'],
-            'payment_status': o['payment_status'],
-            'location_name': o['location_name'] or 'Main Warehouse',
-            'total_amount': float(o['total_amount'] or 0),
-            'paid_amount': float(o['paid_amount'] or 0),
-            'balance_due': float(o['balance_due'] or 0),
-            'items_summary': o['items_summary'] or 'Products',
-            'total_qty': float(o['total_qty'] or 0),
-            'notes': o['notes'] or ''
-        } for o in cust_data['orders']],
-        'stats': {
-            'total_orders': int(cust_data['stats']['total_orders']),
-            'total_spent': float(cust_data['stats']['total_spent']),
-            'open_balance': float(cust_data['stats']['open_balance']),
-            'paid_orders': int(cust_data['stats']['paid_orders']),
-            'unpaid_orders': int(cust_data['stats']['unpaid_orders'])
-        }
-    })
+    try:
+        is_main_admin = _is_main_admin()
+        user_bid = _get_user_branch_id()
+        cust_data = _get_customer_full_data(id, user_bid, is_main_admin)
+        if not cust_data:
+            return jsonify({'success': False, 'message': 'Customer not found or access denied.'}), 404
+        return jsonify(_format_customer_api_payload(cust_data))
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Error loading customer: {str(e)}"}), 500
 
 @contacts_bp.route('/api/sales-orders/<int:id>/lines')
 def api_sales_order_lines(id):
@@ -728,6 +679,8 @@ def save_customer(id):
             flash("Customer Name is required.", "error")
             return redirect(url_for('contacts.detail_customer', id=id))
 
+        tax_number = (data.get('tax_number') or '').strip()
+
         execute("""
             UPDATE customers
             SET name = %s,
@@ -748,10 +701,11 @@ def save_customer(id):
                 discount_percent = %s,
                 payment_terms = %s,
                 remarks = %s,
+                tax_number = %s,
                 branch_id = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (name, contact_name, phone, fax, email, website, address1, address2, city, state, country, postal_code, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, remarks, target_branch_id, id))
+        """, (name, contact_name, phone, fax, email, website, address1, address2, city, state, country, postal_code, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, remarks, tax_number, target_branch_id, id))
 
         if is_ajax:
             cust_full = _get_customer_full_data(id, user_bid, is_main_admin)
@@ -778,9 +732,10 @@ def save_customer(id):
                     'discount_percent': discount_percent,
                     'payment_terms': payment_terms,
                     'remarks': remarks,
+                    'tax_number': tax_number,
                     'branch_id': target_branch_id,
-                    'balance': float(cust_full['customer']['balance'] if cust_full else 0),
-                    'open_balance': float(cust_full['customer']['balance'] if cust_full else 0)
+                    'balance': float(((cust_full or {}).get('customer') or {}).get('balance') or 0),
+                    'open_balance': float(((cust_full or {}).get('customer') or {}).get('balance') or 0)
                 }
             })
 
