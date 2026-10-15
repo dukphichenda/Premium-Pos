@@ -1,207 +1,364 @@
 {% extends 'base.html' %}
 
-{% block title %}Customers CRM - inFlow Premium{% endblock %}
+{% block title %}Customers - inFlow Inventory - Premium Edition{% endblock %}
+{% block body_class %}customer-body-fullscreen{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-    <div>
-        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Customers CRM Directory</h1>
-        <p style="color: #64748B; font-size: 0.88rem;">Customer relationships, outstanding credit balances, and order histories ({{ total_count }} clients)</p>
+<!-- Top Accent Line (inFlow Lime Green) -->
+<div style="height: 4px; background: #659E27;"></div>
+
+<!-- Top inFlow Header Ribbon / Actions -->
+<div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 16px; background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1;">
+    <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; background: #85BD28; color: #FFFFFF; font-weight: 700; font-size: 13px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
+            <span>Customer</span>
+        </div>
+        <span style="font-size: 12px; color: #64748B; font-weight: 500;">
+            CRM Directory &bull; {{ total_count }} total records
+        </span>
     </div>
-    <div style="display: flex; gap: 10px;">
-        <button onclick="openModal('newCustomerModal')" class="btn btn-primary">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            <span>+ Add Customer</span>
-        </button>
+
+    <div style="display: flex; align-items: center; gap: 8px;">
+        {% if is_main_admin %}
+        <!-- Branch Selector Pills for HQ -->
+        <div style="display: flex; gap: 4px; align-items: center; margin-right: 8px;">
+            <a href="{{ url_for('contacts.list_customers', branch='main', search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address) }}" 
+               class="inflow-tb-btn {% if current_branch_param == 'main' %}active-pill{% endif %}" 
+               style="font-size: 11.5px; padding: 3px 9px; text-decoration: none; border-radius: 3px; border: 1px solid #CBD5E1; background: {% if current_branch_param == 'main' %}#0284C7{% else %}#FFFFFF{% endif %}; color: {% if current_branch_param == 'main' %}#FFFFFF{% else %}#334155{% endif %}; font-weight: 600;">
+                🏢 Main HQ
+            </a>
+            {% for b in branches %}
+            <a href="{{ url_for('contacts.list_customers', branch=b.id, search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address) }}" 
+               class="inflow-tb-btn {% if current_branch_param == b.id|string %}active-pill{% endif %}" 
+               style="font-size: 11.5px; padding: 3px 9px; text-decoration: none; border-radius: 3px; border: 1px solid #CBD5E1; background: {% if current_branch_param == b.id|string %}#0284C7{% else %}#FFFFFF{% endif %}; color: {% if current_branch_param == b.id|string %}#FFFFFF{% else %}#334155{% endif %}; font-weight: 600;">
+                🏪 {{ b.code or b.name }}
+            </a>
+            {% endfor %}
+            <a href="{{ url_for('contacts.list_customers', branch='all', search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address) }}" 
+               class="inflow-tb-btn {% if current_branch_param == 'all' %}active-pill{% endif %}" 
+               style="font-size: 11.5px; padding: 3px 9px; text-decoration: none; border-radius: 3px; border: 1px solid #CBD5E1; background: {% if current_branch_param == 'all' %}#0284C7{% else %}#FFFFFF{% endif %}; color: {% if current_branch_param == 'all' %}#FFFFFF{% else %}#334155{% endif %}; font-weight: 600;">
+                🌐 All
+            </a>
+        </div>
+        {% endif %}
+
+        <!-- Add Customer Button -->
+        <a href="javascript:void(0);" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('contacts.new_customer') }}', 'New Customer', 'sales'); } else { window.location.href='{{ url_for('contacts.new_customer') }}'; }" 
+           class="inflow-tb-btn" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 3px; text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,0.06);">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3 2C3 1.44772 3.44772 1 4 1H9.58579C9.851 1 10.1054 1.10536 10.2929 1.29289L13.7071 4.70711C13.8946 4.89464 14 5.149 14 5.41421V14C14 14.5523 13.5523 15 13 15H4C3.44772 15 3 14.5523 3 14V2Z" fill="#F8FAFC" stroke="#64748B" stroke-width="1.2"/>
+                <path d="M9.5 1V5H13.5" stroke="#64748B" stroke-width="1.2"/>
+                <path d="M8 8V12M6 10H10" stroke="#0284C7" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>+ New Customer</span>
+        </a>
     </div>
 </div>
 
-<!-- Search Bar & Branch Filter -->
-{% if is_main_admin %}
-<div style="display: flex; gap: 8px; margin-bottom: 16px; overflow-x: auto; padding-bottom: 4px;">
-    <a href="{{ url_for('contacts.list_customers', branch='main', search=search) }}" class="btn btn-sm {% if current_branch_param == 'main' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 20px; font-weight: 700;">
-        🏢 Main Store (HQ)
-    </a>
-    {% for b in branches %}
-    <a href="{{ url_for('contacts.list_customers', branch=b.id, search=search) }}" class="btn btn-sm {% if current_branch_param == b.id|string %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 20px; font-weight: 700;">
-        🏪 {{ b.name }} ({{ b.code }})
-    </a>
-    {% endfor %}
-    <a href="{{ url_for('contacts.list_customers', branch='all', search=search) }}" class="btn btn-sm {% if current_branch_param == 'all' %}btn-primary{% else %}btn-secondary{% endif %}" style="border-radius: 20px; font-weight: 700;">
-        🌐 All Customers (Consolidated)
-    </a>
-</div>
-{% endif %}
+<!-- Authentic inFlow Search Pane (Matching step_img_38.png & step_img_50.png) -->
+<div class="inflow-list-search-pane" style="background: linear-gradient(180deg, #D6F358 0%, #E2FA7B 100%); border-bottom: 1px solid #BFE637; padding: 8px 14px 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <div style="font-size: 12.5px; font-weight: 700; color: #488210; display: flex; align-items: center; gap: 4px;">
+            <span>Search</span>
+            <span style="font-size: 9px;">▼</span>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button type="button" onclick="submitSearchForm()" class="inflow-search-refresh-btn" style="background: linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%); border: 1px solid #7F9DB9; border-radius: 2px; padding: 2px 14px; font-size: 11px; font-weight: 600; color: #1E293B; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.1);">
+                Refresh
+            </button>
+            {% if search_name or search_contact or search_phone or search_address or search %}
+            <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None) }}" style="font-size: 11px; color: #2F540C; text-decoration: underline; font-weight: 500;">
+                Reset
+            </a>
+            {% endif %}
+        </div>
+    </div>
 
-<div class="card" style="margin-bottom: 20px; padding: 14px 20px;">
-    <form method="GET" action="{{ url_for('contacts.list_customers') }}" style="display: flex; gap: 14px;">
+    <form id="customerSearchForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
         {% if is_main_admin and current_branch_param %}
         <input type="hidden" name="branch" value="{{ current_branch_param }}">
         {% endif %}
-        <input type="text" name="search" value="{{ search }}" placeholder="Search customer name, phone number, or contact person..." class="form-input" style="flex: 1;">
-        <button type="submit" class="btn btn-secondary">Search</button>
-        {% if search %}
-        <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None) }}" class="btn btn-secondary" style="color: #64748B;">Reset</a>
-        {% endif %}
+
+        <!-- 4 Authentic inFlow Search Fields arranged in 4 rows / 2x2 grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 6px 16px; max-width: 960px;">
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Name</label>
+                <input type="text" name="search_name" id="searchName" value="{{ search_name }}" 
+                       class="inflow-pane-input font-khmer" 
+                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Contact</label>
+                <input type="text" name="search_contact" id="searchContact" value="{{ search_contact }}" 
+                       class="inflow-pane-input font-khmer" 
+                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Phone</label>
+                <input type="text" name="search_phone" id="searchPhone" value="{{ search_phone }}" 
+                       class="inflow-pane-input" 
+                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <label style="width: 65px; font-size: 11.5px; color: #2F540C; font-weight: 500; white-space: nowrap;">Address1</label>
+                <input type="text" name="search_address" id="searchAddress" value="{{ search_address }}" 
+                       class="inflow-pane-input font-khmer" 
+                       placeholder="" autocomplete="off" oninput="applyLiveFilter()">
+            </div>
+        </div>
     </form>
 </div>
 
-<!-- Customers Table -->
-<div class="card" style="padding: 0; overflow: hidden;">
-    <div class="table-container" style="border: none;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Customer Name</th>
-                    {% if is_main_admin %}
-                    <th>Branch / Store</th>
+<!-- Data Grid Container (Full-bleed inFlow Table Matching step_img_38.png) -->
+<div style="overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 200px); background: #FFFFFF; border-bottom: 1px solid #CBD5E1;">
+    <table id="customerGridTable" style="width: 100%; border-collapse: collapse; font-size: 11.5px; white-space: nowrap; user-select: none;">
+        <thead>
+            <tr style="background: #85BD28; color: #FFFFFF; height: 26px; border-bottom: 1px solid #74A71E;">
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
+                    Name <span style="font-size: 9px;">▲</span>
+                </th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Contact</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Phone</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Email</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Website</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Address1</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Address2</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">City</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">State/Province</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Zip/Postal Code</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Country</th>
+                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Pricing / Currency</th>
+                <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Discount</th>
+                {% if is_main_admin %}
+                <th style="padding: 3px 8px; text-align: center; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Branch</th>
+                {% endif %}
+                <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Open Balance</th>
+                <th style="padding: 3px 8px; text-align: center; font-weight: 700; position: sticky; top: 0; background: #85BD28; z-index: 10;">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="customerTableBody">
+            {% for c in customers %}
+            <tr class="inflow-grid-row" 
+                data-id="{{ c.id }}"
+                data-name="{{ (c.name or '')|lower }}"
+                data-contact="{{ (c.contact_name or '')|lower }}"
+                data-phone="{{ (c.phone or '')|lower }}"
+                data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
+                onclick="selectGridRow(this)"
+                ondblclick="openCustomerDetail('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
+                title="Double-click to open customer details">
+                
+                <td style="padding: 3px 8px; font-weight: 600; color: inherit;" class="font-khmer">
+                    <a href="javascript:void(0);" onclick="openCustomerDetail('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" style="color: inherit; text-decoration: none;">
+                        {{ c.name }}
+                    </a>
+                </td>
+                <td style="padding: 3px 8px; color: inherit;" class="font-khmer">{{ c.contact_name or '' }}</td>
+                <td style="padding: 3px 8px; font-family: monospace; color: inherit;">{{ c.phone or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.email or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.website or '' }}</td>
+                <td style="padding: 3px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: inherit;" class="font-khmer" title="{{ c.address1 or c.billing_address or '' }}">
+                    {{ c.address1 or c.billing_address or '' }}
+                </td>
+                <td style="padding: 3px 8px; color: inherit;" class="font-khmer">{{ c.address2 or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.city or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.state or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.postal_code or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.country or '' }}</td>
+                <td style="padding: 3px 8px; color: inherit;">{{ c.pricing_scheme_name or 'Retail 1' }}</td>
+                <td style="padding: 3px 8px; text-align: right; color: inherit;">{{ '%.0f'|format(c.discount_percent or 0) }}%</td>
+                
+                {% if is_main_admin %}
+                <td style="padding: 3px 8px; text-align: center;">
+                    {% if c.branch_name %}
+                    <span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">
+                        🏪 {{ c.branch_code or c.branch_name }}
+                    </span>
+                    {% else %}
+                    <span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;">
+                        🏢 HQ
+                    </span>
                     {% endif %}
-                    <th>Phone</th>
-                    <th>Contact Person</th>
-                    <th>Billing Address</th>
-                    <th style="text-align: right;">Total Orders</th>
-                    <th style="text-align: right;">Total Spent</th>
-                    <th style="text-align: right;">Open Balance</th>
-                    <th style="text-align: center;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for c in customers %}
-                <tr style="cursor: pointer;" ondblclick="if(window.top.inflowMdi){ window.top.inflowMdi.openTab('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name }}', 'sales'); } else { window.location.href='{{ url_for('contacts.detail_customer', id=c.id) }}'; }" title="Double-click to open customer in new tab">
-                    <td>
-                        <a href="{{ url_for('contacts.detail_customer', id=c.id) }}" onclick="if(window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name }}', 'sales'); }" style="font-weight: 700; color: #0F172A; text-decoration: none;">
-                            {{ c.name }}
-                        </a>
-                        {% if c.email %}
-                        <div style="font-size: 0.72rem; color: #64748B;">{{ c.email }}</div>
-                        {% endif %}
-                    </td>
-                    {% if is_main_admin %}
-                    <td>
-                        {% if c.branch_name %}
-                        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">
-                            🏪 {{ c.branch_code or c.branch_name }}
-                        </span>
-                        {% else %}
-                        <span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 700; background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;">
-                            🏢 Main Store
-                        </span>
-                        {% endif %}
-                    </td>
-                    {% endif %}
-                    <td style="font-family: monospace; font-size: 0.85rem;">{{ c.phone or '-' }}</td>
-                    <td style="color: #475569;">{{ c.contact_name or '-' }}</td>
-                    <td style="color: #475569; max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="{{ c.billing_address or c.address1 or c.shipping_address or '' }}">{{ c.billing_address or c.address1 or c.shipping_address or '-' }}</td>
-                    <td style="text-align: right; font-weight: 600;">{{ c.order_count }}</td>
-                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
-                        {{ c.total_spent | currency }}
-                    </td>
-                    <td style="text-align: right; font-weight: 700; color: {% if c.open_balance > 0 %}#DC2626{% else %}#059669{% endif %};">
-                        {{ c.open_balance | currency }}
-                    </td>
-                    <td style="text-align: center;">
-                        <a href="{{ url_for('contacts.detail_customer', id=c.id) }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">
-                            Detail
-                        </a>
-                    </td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="{% if is_main_admin %}9{% else %}8{% endif %}" style="text-align: center; color: #94A3B8; padding: 32px;">No customers found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                </td>
+                {% endif %}
+
+                <td style="padding: 3px 8px; text-align: right; font-weight: 600; color: {% if c.open_balance > 0 %}#DC2626{% else %}inherit{% endif %};">
+                    {{ c.open_balance | currency }}
+                </td>
+                <td style="padding: 3px 8px; text-align: center;">
+                    <a href="javascript:void(0);" onclick="openCustomerDetail('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
+                       style="display: inline-block; padding: 1px 6px; font-size: 10.5px; font-weight: 600; color: #0369A1; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 2px; text-decoration: none;">
+                        Detail
+                    </a>
+                </td>
+            </tr>
+            {% else %}
+            <tr id="noCustomersRow">
+                <td colspan="{% if is_main_admin %}16{% else %}15{% endif %}" style="text-align: center; color: #64748B; padding: 36px; font-style: italic;">
+                    No customers found matching the search criteria.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Authentic inFlow Bottom Status Bar (Matching step_img_50.png) -->
+<div class="inflow-status-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 12px; background: #ECECEC; border-top: 1px solid #CBD5E1; font-size: 11.5px; color: #334155;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span>Total number of Customers displayed: <strong id="displayedCount">{{ customers|length }}</strong></span>
+        {% if total_count > customers|length %}
+        <span style="color: #64748B;">(Page {{ page }} of {{ total_pages }} &bull; {{ total_count }} total)</span>
+        {% endif %}
     </div>
 
-    {% if total_pages > 1 %}
-    <div style="padding: 16px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 0.82rem; color: #64748B;">Page {{ page }} of {{ total_pages }} ({{ total_count }} customers)</span>
-        <div style="display: flex; gap: 8px;">
+    <div style="display: flex; align-items: center; gap: 14px;">
+        {% if total_pages > 1 %}
+        <!-- Pagination controls -->
+        <div style="display: flex; gap: 4px; align-items: center;">
             {% if page > 1 %}
-            <a href="{{ url_for('contacts.list_customers', page=page-1, search=search, branch=current_branch_param if is_main_admin else None) }}" class="btn btn-secondary btn-sm">← Previous</a>
+            <a href="{{ url_for('contacts.list_customers', page=page-1, search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address, branch=current_branch_param if is_main_admin else None) }}" 
+               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; text-decoration: none; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;">
+                ◀ Prev
+            </a>
             {% endif %}
+            <span style="font-weight: 600; padding: 0 4px;">{{ page }} / {{ total_pages }}</span>
             {% if page < total_pages %}
-            <a href="{{ url_for('contacts.list_customers', page=page+1, search=search, branch=current_branch_param if is_main_admin else None) }}" class="btn btn-secondary btn-sm">Next →</a>
+            <a href="{{ url_for('contacts.list_customers', page=page+1, search_name=search_name, search_contact=search_contact, search_phone=search_phone, search_address=search_address, branch=current_branch_param if is_main_admin else None) }}" 
+               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; text-decoration: none; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;">
+                Next ▶
+            </a>
             {% endif %}
         </div>
-    </div>
-    {% endif %}
-</div>
+        <span style="color: #94A3B8;">|</span>
+        {% endif %}
 
-<!-- New Customer Modal -->
-<div class="modal-overlay" id="newCustomerModal">
-    <div class="modal-dialog">
-        <div class="modal-header">
-            <h2 class="modal-title">+ Add New Customer</h2>
-            <button class="modal-close" onclick="closeModal('newCustomerModal')">×</button>
+        <div style="display: flex; align-items: center; gap: 6px;">
+            <span>Current User: <strong>{{ session.get('user_name', 'Default User') }}</strong></span>
+            <span style="color: #94A3B8;">|</span>
+            <span style="display: inline-flex; align-items: center; gap: 4px;">
+                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22C55E;"></span>
+                <span>Connected (Locally)</span>
+            </span>
         </div>
-        <form action="{{ url_for('contacts.create_customer') }}" method="POST">
-            <div class="form-group">
-                <label class="form-label">Customer / Business Name *</label>
-                <input type="text" name="name" required placeholder="Full business or personal name" class="form-input">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                <div class="form-group">
-                    <label class="form-label">Contact Person</label>
-                    <input type="text" name="contact_name" placeholder="Manager / Contact" class="form-input">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Phone Number *</label>
-                    <input type="text" name="phone" placeholder="e.g. 012 345 678" class="form-input">
-                </div>
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                <div class="form-group">
-                    <label class="form-label">Email Address</label>
-                    <input type="email" name="email" placeholder="client@example.com" class="form-input">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">City</label>
-                    <input type="text" name="city" value="Phnom Penh" class="form-input">
-                </div>
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Billing / Street Address</label>
-                <input type="text" name="address1" placeholder="Street, Building, Khan/Sangkat" class="form-input">
-            </div>
-
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                <div class="form-group">
-                    <label class="form-label">Default Discount %</label>
-                    <input type="number" step="0.1" name="discount_percent" value="0" class="form-input">
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Pricing Scheme</label>
-                    <select name="default_pricing_scheme_id" class="form-select">
-                        <option value="">Default Wholesale</option>
-                        {% for ps in pricing_schemes %}
-                        <option value="{{ ps.id }}">{{ ps.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
-
-            {% if is_main_admin %}
-            <div class="form-group">
-                <label class="form-label">Store / Branch Location</label>
-                <select name="branch_id" class="form-select">
-                    <option value="">🏢 Main Store (HQ)</option>
-                    {% for b in branches %}
-                    <option value="{{ b.id }}" {% if current_branch_param == b.id|string %}selected{% endif %}>🏪 {{ b.name }} ({{ b.code }})</option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
-
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('newCustomerModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Save Customer</button>
-            </div>
-        </form>
     </div>
 </div>
+
+<style>
+/* Authentic inFlow Grid Styling */
+.inflow-pane-input {
+    flex: 1;
+    min-width: 0;
+    height: 20px;
+    padding: 1px 6px;
+    font-size: 11.5px;
+    background: #FFFFFF;
+    border: 1px solid #A8D154;
+    border-radius: 2px;
+    color: #0F172A;
+    outline: none;
+    box-sizing: border-box;
+}
+.inflow-pane-input:focus {
+    border-color: #558B12;
+    box-shadow: 0 0 0 1px #558B12;
+}
+
+/* Zebra rows matching inFlow Desktop */
+.inflow-grid-row:nth-child(odd) {
+    background: #F4FDCF;
+    color: #1E293B;
+}
+.inflow-grid-row:nth-child(even) {
+    background: #FFFFFF;
+    color: #1E293B;
+}
+.inflow-grid-row:hover {
+    background: #D7F377 !important;
+    cursor: pointer;
+}
+.inflow-grid-row.selected {
+    background: #68A614 !important;
+    color: #FFFFFF !important;
+}
+.inflow-grid-row.selected a {
+    color: #FFFFFF !important;
+}
+</style>
+
+<script>
+// Open customer details in tabbed MDI if available, or navigate directly
+function openCustomerDetail(url, title) {
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.openTab(url, title, 'sales');
+    } else {
+        window.location.href = url;
+    }
+}
+
+// Select a row on click
+function selectGridRow(row) {
+    document.querySelectorAll('.inflow-grid-row.selected').forEach(r => r.classList.remove('selected'));
+    row.classList.add('selected');
+}
+
+// Live client-side instant filter on table rows
+function applyLiveFilter() {
+    const nameVal = (document.getElementById('searchName')?.value || '').toLowerCase().trim();
+    const contactVal = (document.getElementById('searchContact')?.value || '').toLowerCase().trim();
+    const phoneVal = (document.getElementById('searchPhone')?.value || '').toLowerCase().trim();
+    const addrVal = (document.getElementById('searchAddress')?.value || '').toLowerCase().trim();
+
+    const rows = document.querySelectorAll('#customerTableBody .inflow-grid-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const rName = row.getAttribute('data-name') || '';
+        const rContact = row.getAttribute('data-contact') || '';
+        const rPhone = row.getAttribute('data-phone') || '';
+        const rAddr = row.getAttribute('data-address') || '';
+
+        const match = (!nameVal || rName.includes(nameVal)) &&
+                      (!contactVal || rContact.includes(contactVal)) &&
+                      (!phoneVal || rPhone.includes(phoneVal)) &&
+                      (!addrVal || rAddr.includes(addrVal));
+
+        if (match) {
+            row.style.display = '';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const countEl = document.getElementById('displayedCount');
+    if (countEl) countEl.textContent = visibleCount;
+
+    const noMatchRow = document.getElementById('noCustomersRow');
+    if (noMatchRow) {
+        noMatchRow.style.display = (visibleCount === 0) ? '' : 'none';
+    }
+}
+
+// Submit search to server on enter or refresh click
+function submitSearchForm() {
+    const form = document.getElementById('customerSearchForm');
+    if (form) form.submit();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = document.querySelectorAll('.inflow-pane-input');
+    inputs.forEach(input => {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitSearchForm();
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

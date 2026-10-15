@@ -66,9 +66,13 @@ def list_customers():
     user_bid = _get_user_branch_id()
 
     page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 25))
+    per_page = int(request.args.get('per_page', 50))
     offset = (page - 1) * per_page
     search = request.args.get('search', '').strip()
+    search_name = request.args.get('search_name', '').strip()
+    search_contact = request.args.get('search_contact', '').strip()
+    search_phone = request.args.get('search_phone', '').strip()
+    search_address = request.args.get('search_address', '').strip()
 
     where_clauses = ["c.is_active = TRUE"]
     params = []
@@ -104,6 +108,23 @@ def list_customers():
         sp = f"%{search}%"
         params.extend([sp, sp, sp, sp, sp])
 
+    if search_name:
+        where_clauses.append("c.name ILIKE %s")
+        params.append(f"%{search_name}%")
+
+    if search_contact:
+        where_clauses.append("c.contact_name ILIKE %s")
+        params.append(f"%{search_contact}%")
+
+    if search_phone:
+        where_clauses.append("c.phone ILIKE %s")
+        params.append(f"%{search_phone}%")
+
+    if search_address:
+        where_clauses.append("(c.address1 ILIKE %s OR c.address2 ILIKE %s OR c.city ILIKE %s OR c.state ILIKE %s OR c.billing_address ILIKE %s OR c.shipping_address ILIKE %s)")
+        ap = f"%{search_address}%"
+        params.extend([ap, ap, ap, ap, ap, ap])
+
     where_sql = " AND ".join(where_clauses)
 
     count_sql = f"SELECT COUNT(*) as cnt FROM customers c WHERE {where_sql}"
@@ -115,14 +136,16 @@ def list_customers():
             c.*,
             b.name as branch_name,
             b.code as branch_code,
+            ps.name as pricing_scheme_name,
             COUNT(so.id) as order_count,
             COALESCE(SUM(so.total_amount), 0) as total_spent,
             COALESCE(SUM(so.balance_due), 0) as open_balance
         FROM customers c
         LEFT JOIN branches b ON c.branch_id = b.id
+        LEFT JOIN pricing_schemes ps ON c.default_pricing_scheme_id = ps.id
         LEFT JOIN sales_orders so ON c.id = so.customer_id AND so.status != 'CANCELLED'
         WHERE {where_sql}
-        GROUP BY c.id, b.name, b.code
+        GROUP BY c.id, b.name, b.code, ps.name
         ORDER BY c.name ASC
         LIMIT %s OFFSET %s
     """
@@ -135,6 +158,10 @@ def list_customers():
     return render_template('contacts/customers.html',
                            customers=customers,
                            search=search,
+                           search_name=search_name,
+                           search_contact=search_contact,
+                           search_phone=search_phone,
+                           search_address=search_address,
                            page=page,
                            per_page=per_page,
                            total_count=total_count,
@@ -256,11 +283,17 @@ def save_customer(id):
         email = request.form.get('email', '').strip()
         website = request.form.get('website', '').strip()
         address1 = request.form.get('address1', '').strip()
+        address2 = request.form.get('address2', '').strip()
+        city = request.form.get('city', '').strip()
+        state = request.form.get('state', '').strip()
+        country = request.form.get('country', '').strip()
+        postal_code = request.form.get('postal_code', '').strip()
         shipping_address = request.form.get('shipping_address', '').strip() or address1
         billing_address = request.form.get('billing_address', '').strip() or address1
         discount_percent = float(request.form.get('discount_percent', 0) or 0)
         pricing_scheme_id = int(request.form.get('default_pricing_scheme_id') or 0) or None
         payment_terms = request.form.get('payment_terms', 'Due on Receipt').strip()
+        remarks = request.form.get('remarks', '').strip()
 
         if is_main_admin:
             raw_b = request.form.get('branch_id')
@@ -281,15 +314,21 @@ def save_customer(id):
                 email = %s,
                 website = %s,
                 address1 = %s,
+                address2 = %s,
+                city = %s,
+                state = %s,
+                country = %s,
+                postal_code = %s,
                 shipping_address = %s,
                 billing_address = %s,
                 default_pricing_scheme_id = %s,
                 discount_percent = %s,
                 payment_terms = %s,
+                remarks = %s,
                 branch_id = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
-        """, (name, contact_name, phone, fax, email, website, address1, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, target_branch_id, id))
+        """, (name, contact_name, phone, fax, email, website, address1, address2, city, state, country, postal_code, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, remarks, target_branch_id, id))
 
         flash(f"Customer '{name}' saved successfully!", "success")
         return redirect(url_for('contacts.detail_customer', id=id))
@@ -311,11 +350,17 @@ def create_customer():
         email = request.form.get('email', '').strip()
         website = request.form.get('website', '').strip()
         address1 = request.form.get('address1', '').strip()
+        address2 = request.form.get('address2', '').strip()
+        city = request.form.get('city', '').strip()
+        state = request.form.get('state', '').strip()
+        country = request.form.get('country', '').strip()
+        postal_code = request.form.get('postal_code', '').strip()
         shipping_address = request.form.get('shipping_address', '').strip() or address1
         billing_address = request.form.get('billing_address', '').strip() or address1
         discount_percent = float(request.form.get('discount_percent', 0) or 0)
         pricing_scheme_id = int(request.form.get('default_pricing_scheme_id') or 0) or None
         payment_terms = request.form.get('payment_terms', 'Due on Receipt').strip()
+        remarks = request.form.get('remarks', '').strip()
 
         if not name:
             flash("Customer Name is required.", "error")
@@ -330,12 +375,13 @@ def create_customer():
         new_id = execute_returning_id("""
             INSERT INTO customers (
                 name, contact_name, phone, fax, email, website,
-                address1, shipping_address, billing_address,
+                address1, address2, city, state, country, postal_code,
+                shipping_address, billing_address,
                 discount_percent, default_pricing_scheme_id, payment_terms,
-                branch_id
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                remarks, branch_id
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
-        """, (name, contact_name, phone, fax, email, website, address1, shipping_address, billing_address, discount_percent, pricing_scheme_id, payment_terms, branch_id))
+        """, (name, contact_name, phone, fax, email, website, address1, address2, city, state, country, postal_code, shipping_address, billing_address, discount_percent, pricing_scheme_id, payment_terms, remarks, branch_id))
 
         flash(f"Customer '{name}' created successfully!", "success")
         return redirect(url_for('contacts.detail_customer', id=new_id))
