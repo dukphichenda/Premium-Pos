@@ -723,7 +723,8 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         drawer_params.extend([sp, sp, sp, sp])
 
     # Status filter (supports multi-select comma separated statuses, e.g. Open, Unfulfilled, Fulfilled, Paid, All)
-    if status_filter and status_filter.strip() and status_filter.strip().lower() != 'all':
+    # When user enters a specific search_query, search across all statuses so matching orders are found
+    if not search_query and status_filter and status_filter.strip() and status_filter.strip().lower() != 'all':
         tokens = [t.strip().lower() for t in status_filter.split(',') if t.strip()]
         status_clauses = []
         for token in tokens:
@@ -752,7 +753,14 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     # Exclude phantom empty orders with no customer and 0 total
     drawer_where.append("NOT (so.customer_id IS NULL AND so.total_amount = 0)")
 
-    drawer_limit = 500 if (status_filter and status_filter.strip().lower() in ('open', 'unfulfilled')) else (200 if search_query else 300)
+    if status_filter and status_filter.strip().lower() in ('all', 'all orders'):
+        drawer_limit = 1000
+    elif status_filter and status_filter.strip().lower() in ('open', 'unfulfilled'):
+        drawer_limit = 500
+    elif search_query:
+        drawer_limit = 300
+    else:
+        drawer_limit = 500
 
     drawer_sql = f"""
         SELECT 
@@ -826,28 +834,9 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
 
     cust_where = ["is_active = TRUE"]
     cust_params = []
-    if not is_main:
-        if user_bid:
-            cust_where.append("branch_id = %s")
-            cust_params.append(user_bid)
-        else:
-            cust_where.append("1=0")
-    else:
-        if branch_id:
-            b_str = str(branch_id).strip().lower()
-            if b_str == 'main':
-                cust_where.append("branch_id IS NULL")
-            elif b_str == 'all':
-                pass
-            elif b_str not in ('none', ''):
-                try:
-                    bid = int(b_str)
-                    cust_where.append("branch_id = %s")
-                    cust_params.append(bid)
-                except (ValueError, TypeError):
-                    cust_where.append("branch_id IS NULL")
-        else:
-            cust_where.append("branch_id IS NULL")
+    if not is_main and user_bid:
+        cust_where.append("(branch_id = %s OR branch_id IS NULL)")
+        cust_params.append(user_bid)
 
     all_customers = query_all(f"""
         SELECT 
@@ -876,6 +865,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     all_products = query_all("""
         SELECT 
             p.id, p.sku, p.name, p.description, 
+            COALESCE(p.image_url, '') as image_url,
             COALESCE(p.uom, 'pcs.') as uom,
             COALESCE(p.sales_uom, '') as sales_uom,
             COALESCE(p.sales_uom_ratio_std, 1.0) as sales_uom_ratio_std,
@@ -891,7 +881,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         LEFT JOIN product_prices pp ON p.id = pp.product_id AND pp.pricing_scheme_id = %s
         LEFT JOIN inventory inv ON p.id = inv.product_id
         WHERE p.is_active = TRUE
-        GROUP BY p.id, c.name, pp.unit_price, p.default_price, p.price_decimals
+        GROUP BY p.id, p.image_url, c.name, pp.unit_price, p.default_price, p.price_decimals
         ORDER BY p.sku ASC
     """, (scheme_id,))
 
@@ -1451,6 +1441,7 @@ def new_order():
                     COALESCE(sol.pricing_scheme_id, so.pricing_scheme_id, 100) as pricing_scheme_id,
                     p.name as product_name,
                     p.sku as product_sku,
+                    COALESCE(p.image_url, '') as product_image_url,
                     COALESCE(p.combine_type, 'single') as product_combine_type,
                     COALESCE(p.uom, 'pcs.') as base_uom,
                     COALESCE(p.sales_uom, '') as sales_uom,
@@ -1707,6 +1698,7 @@ def detail_order(id):
             COALESCE(sol.pricing_scheme_id, so.pricing_scheme_id, 100) as pricing_scheme_id,
             p.name as product_name,
             p.sku as product_sku,
+            COALESCE(p.image_url, '') as product_image_url,
             COALESCE(p.combine_type, 'single') as product_combine_type,
             COALESCE(p.uom, 'pcs.') as base_uom,
             COALESCE(p.sales_uom, '') as sales_uom,

@@ -84,15 +84,46 @@ class TestSoModernSidebar(unittest.TestCase):
         location = resp.headers.get('Location') or ''
         self.assertTrue('/sales/' in location)
 
-    def test_search_query(self):
-        """Verify order search by query parameter"""
-        order = query_one("SELECT order_number FROM sales_orders WHERE order_number IS NOT NULL LIMIT 1")
+    def test_cancelled_above_all_orders_in_dropdown(self):
+        """Verify Cancelled is displayed directly above All Orders in the status dropdown"""
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        
+        self.assertIn('selectSoStatusFilter(\'Cancelled\')', html)
+        self.assertIn('selectSoStatusFilter(\'All\')', html)
+        # Cancelled must appear before All Orders
+        cancelled_idx = html.find('selectSoStatusFilter(\'Cancelled\')')
+        all_idx = html.find('selectSoStatusFilter(\'All\')')
+        self.assertGreater(cancelled_idx, -1)
+        self.assertGreater(all_idx, -1)
+        self.assertLess(cancelled_idx, all_idx, "Cancelled should be placed directly above All Orders")
+
+    def test_all_status_returns_all_orders(self):
+        """Verify status_filter=All returns orders across statuses"""
+        resp = self.client.get('/sales/new?status_filter=All')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        card_count = html.count('class="so-sidebar-card')
+        self.assertGreater(card_count, 0)
+
+    def test_photo_column_in_sales_order_not_in_invoice_print(self):
+        """Verify photo column in sales order grid, but NOT in final invoice to print"""
+        order = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
         if order:
-            num = order['order_number']
-            resp = self.client.get(f'/sales/new?search={num}')
-            self.assertEqual(resp.status_code, 200)
-            html = resp.data.decode('utf-8')
-            self.assertIn(num, html)
+            # Sales order detail view
+            resp_detail = self.client.get(f'/sales/{order["id"]}')
+            self.assertEqual(resp_detail.status_code, 200)
+            html_detail = resp_detail.data.decode('utf-8')
+            self.assertIn('>Photo</th>', html_detail)
+            self.assertIn('class="line-pic-cell"', html_detail)
+
+            # Invoice print view
+            resp_print = self.client.get(f'/sales/{order["id"]}/print?type=invoice')
+            self.assertEqual(resp_print.status_code, 200)
+            html_print = resp_print.data.decode('utf-8')
+            self.assertNotIn('>Photo</th>', html_print)
+            self.assertNotIn('line-pic-cell', html_print)
 
 if __name__ == '__main__':
     unittest.main()

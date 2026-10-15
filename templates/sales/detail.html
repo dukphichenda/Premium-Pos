@@ -550,6 +550,8 @@
                             {{ status_counts.open if status_counts else sidebar_orders|length }}
                         {% elif st_key in ('paid', 'fulfilled', 'invoiced') %}
                             {{ status_counts.paid if status_counts else sidebar_orders|length }}
+                        {% elif st_key in ('cancelled', 'canceled') %}
+                            {{ status_counts.cancelled if status_counts else sidebar_orders|length }}
                         {% elif st_key in ('all', 'all orders') %}
                             {{ status_counts.total if status_counts else sidebar_orders|length }}
                         {% else %}
@@ -561,7 +563,7 @@
                     </svg>
                 </button>
 
-                <!-- Status Filter Dropdown Menu (Open, Paid, All Orders) -->
+                <!-- Status Filter Dropdown Menu (Open, Paid, Cancelled, All Orders) -->
                 <div class="so-menu-dropdown" id="soStatusDropdownMenu" style="display: none; left: 50%; transform: translateX(-50%); min-width: 160px;">
                     <div class="so-menu-item {% if (status_filter or 'Open')|lower in ('open', 'unfulfilled') %}active{% endif %}" onclick="selectSoStatusFilter('Open')">
                         <span style="font-weight: 700;">Open</span>
@@ -570,6 +572,10 @@
                     <div class="so-menu-item {% if (status_filter or '')|lower in ('paid', 'fulfilled', 'invoiced') %}active{% endif %}" onclick="selectSoStatusFilter('Paid')">
                         <span style="font-weight: 700;">Paid</span>
                         <span class="so-menu-badge">{{ status_counts.paid if status_counts else 0 }}</span>
+                    </div>
+                    <div class="so-menu-item {% if (status_filter or '')|lower in ('cancelled', 'canceled') %}active{% endif %}" onclick="selectSoStatusFilter('Cancelled')">
+                        <span style="font-weight: 700;">Cancelled</span>
+                        <span class="so-menu-badge">{{ status_counts.cancelled if status_counts else 0 }}</span>
                     </div>
                     <div class="so-menu-separator"></div>
                     <div class="so-menu-item {% if (status_filter or '')|lower in ('all', 'all orders') %}active{% endif %}" onclick="selectSoStatusFilter('All')">
@@ -580,12 +586,6 @@
                     <div class="so-menu-item {% if (status_filter or '')|lower == 'quote' %}active{% endif %}" onclick="selectSoStatusFilter('Quote')">
                         <span>Quote</span>
                         <span class="so-menu-badge">{{ status_counts.quote }}</span>
-                    </div>
-                    {% endif %}
-                    {% if status_counts.cancelled and status_counts.cancelled > 0 %}
-                    <div class="so-menu-item {% if (status_filter or '')|lower == 'cancelled' %}active{% endif %}" onclick="selectSoStatusFilter('Cancelled')">
-                        <span>Cancelled</span>
-                        <span class="so-menu-badge">{{ status_counts.cancelled }}</span>
                     </div>
                     {% endif %}
                 </div>
@@ -693,6 +693,7 @@
                 No orders match criteria
             </div>
             {% endfor %}
+            <div id="soSidebarCustomerMatches" style="display: none; padding: 4px 6px 10px;"></div>
             <div id="soSidebarNoSearchMatch" style="display: none; padding: 32px 16px; font-size: 12px; color: #94A3B8; text-align: center;">
                 No orders match your search
             </div>
@@ -997,10 +998,11 @@
                                     <input type="checkbox" id="masterSelectAllSoLines" class="inflow-master-chk" title="Select all items" onchange="toggleSelectAllSoLines(this.checked)" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
                                 </div>
                             </th>
-                            <th style="width: 28%;">Item</th>
-                            <th style="width: 20%;">Description</th>
-                            <th style="width: 13%;">Quantity</th>
-                            <th style="width: 13%;">Price Tier</th>
+                            <th style="width: 36px; text-align: center; vertical-align: middle;">Photo</th>
+                            <th style="width: 26%;">Item</th>
+                            <th style="width: 19%;">Description</th>
+                            <th style="width: 12%;">Quantity</th>
+                            <th style="width: 12%;">Price Tier</th>
                             <th style="width: 10%;">Unit Price</th>
                             <th style="width: 5%;">Discount</th>
                             <th style="width: 11%;">Sub-Total</th>
@@ -1016,6 +1018,13 @@
                                     <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
                                     {% endif %}
                                 </div>
+                            </td>
+                            <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
+                                {% if l.product_image_url or l.image_url %}
+                                <img src="{{ l.product_image_url or l.image_url }}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">
+                                {% else %}
+                                <div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;" title="No image">🖼️</div>
+                                {% endif %}
                             </td>
                             <td style="position: relative;">
                                 <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}">
@@ -1072,6 +1081,9 @@
                         <!-- Asterisk Row for Typing / Adding New Items (*) matching screenshot0046.JPEG -->
                         <tr id="newRowEntry" onclick="selectGridRow(this)" {% if is_paid %}style="display:none;"{% endif %}>
                             <td class="inflow-grid-selector-col" style="font-weight: bold;">*</td>
+                            <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
+                                <div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>
+                            </td>
                             <td style="position: relative;">
                                 <input type="text" id="newItemTextInput" class="inflow-field-input grid-item-input" 
                                        placeholder="Type to add item..." style="width: 100%; border: 1px solid #7F9DB9;"
@@ -1105,6 +1117,7 @@
                         {% for i in range(empty_rows_needed) %}
                         <tr>
                             <td class="inflow-grid-selector-col"></td>
+                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
@@ -1875,6 +1888,7 @@ window.productsCatalog = {
         purchasing_ratio: {{ (p.purchasing_uom_ratio_std or 1.0)|float }},
         price: {{ (p.price or 0.0)|float }},
         price_decimals: {{ p.price_decimals if p.price_decimals is not none else 'null' }},
+        image_url: {{ (p.image_url or '')|tojson }},
         stock_on_hand: {{ (p.stock_on_hand or 0.0)|float }},
         stock_reserved: {{ (p.stock_reserved or 0.0)|float }},
         combine_type: {{ (p.combine_type or 'single')|tojson }}
@@ -1887,6 +1901,12 @@ window.productPricesMap = {{ product_prices_map | tojson }};
 window.pricingSchemes = [
     {% for ps in pricing_schemes %}
     { id: {{ ps.id }}, name: {{ ps.name | tojson }} },
+    {% endfor %}
+];
+
+window.allCustomersList = [
+    {% for c in all_customers %}
+    { id: {{ c.id }}, name: {{ c.name | tojson }}, contact: {{ (c.contact_name or '') | tojson }}, phone: {{ (c.phone or '') | tojson }} },
     {% endfor %}
 ];
 
@@ -2544,7 +2564,11 @@ function attachFiltersToForm(form) {
 function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
     if (!targetUrl) return;
     
-    // Save drawer scroll position
+    // Save drawer / sidebar scroll position
+    const soSidebarList = document.getElementById('soSidebarListBody');
+    if (soSidebarList) {
+        sessionStorage.setItem('soSidebarList_scrollTop', soSidebarList.scrollTop);
+    }
     const drawerList = document.getElementById('drawerOrdersListBody');
     if (drawerList) {
         sessionStorage.setItem('drawerOrdersList_scrollTop', drawerList.scrollTop);
@@ -2552,12 +2576,28 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
 
     // Immediate active state highlight
     if (clickedEl) {
-        document.querySelectorAll('.inflow-drawer-row, .inflow-expanded-row').forEach(r => r.classList.remove('active'));
+        document.querySelectorAll('.so-sidebar-card, .inflow-drawer-row, .inflow-expanded-row').forEach(r => r.classList.remove('active'));
         clickedEl.classList.add('active');
     }
 
-    syncDrawerFiltersToStorage();
-    const finalUrl = buildUrlWithFilters(targetUrl);
+    // Clear stale customer search in storage so it never wipes out the orders list
+    sessionStorage.removeItem('inflow_so_drawer_customer_search');
+
+    let url;
+    try {
+        url = new URL(targetUrl, window.location.origin);
+    } catch (e) {
+        url = new URL(window.location.origin + targetUrl);
+    }
+
+    // Retain any active search query from the current view
+    const currentParams = new URLSearchParams(window.location.search);
+    if (currentParams.has('search') && !url.searchParams.has('search')) {
+        const sVal = currentParams.get('search');
+        if (sVal) url.searchParams.set('search', sVal);
+    }
+
+    const finalUrl = url.pathname + url.search;
 
     // Navigate immediately (0ms delay)
     if (window.top && window.top.inflowMdi) {
@@ -2707,9 +2747,6 @@ document.addEventListener('DOMContentLoaded', function () {
             drawerCustInput.value = savedCust.trim();
             if (typeof onDrawerCustomerType === 'function') {
                 onDrawerCustomerType(savedCust.trim());
-            }
-            if (!urlParams.has('customer_search') || urlParams.get('customer_search') !== savedCust.trim()) {
-                if (drawerForm) drawerForm.submit();
             }
         }
 
@@ -2985,20 +3022,48 @@ function toggleCustomerDropdown() {
 function filterCustomerDropdown(val) {
     openCustomerDropdown();
     const query = (val || '').toLowerCase().trim();
-    const rows = document.querySelectorAll('#customerDropdownBody tr');
+    const rows = document.querySelectorAll('#customerDropdownBody tr.main-cust-row');
     let firstVisible = null;
+    let matchCount = 0;
     rows.forEach(r => {
         const name = r.getAttribute('data-name') || '';
         const contact = r.getAttribute('data-contact') || '';
         const phone = r.getAttribute('data-phone') || '';
         if (!query || name.includes(query) || contact.includes(query) || phone.includes(query)) {
             r.style.display = '';
+            matchCount++;
             if (!firstVisible) firstVisible = r;
         } else {
             r.style.display = 'none';
             r.classList.remove('highlighted');
         }
     });
+
+    let addRow = document.getElementById('customerDropdownAddNewRow');
+    if (!addRow) {
+        addRow = document.createElement('tr');
+        addRow.id = 'customerDropdownAddNewRow';
+        addRow.className = 'add-cust-row';
+        addRow.style.cursor = 'pointer';
+        addRow.style.background = '#F0FDF4';
+        addRow.innerHTML = `<td colspan="3" style="padding: 8px 12px; color: #16A34A; font-weight: 600;">
+            ➕ Use customer "<span id="addNewCustNameDisplay"></span>"
+        </td>`;
+        addRow.onclick = function() {
+            const rawVal = document.getElementById('customerSearchInput').value.trim();
+            selectCustomer('', rawVal, '', '', '');
+        };
+        const tbody = document.getElementById('customerDropdownBody');
+        if (tbody) tbody.appendChild(addRow);
+    }
+    if (query && matchCount === 0) {
+        const span = document.getElementById('addNewCustNameDisplay');
+        if (span) span.innerText = val.trim();
+        addRow.style.display = '';
+        firstVisible = addRow;
+    } else {
+        addRow.style.display = 'none';
+    }
 
     highlightCustomerRow(firstVisible);
 }
@@ -3018,6 +3083,11 @@ function highlightFirstVisibleCustomer() {
 
 function selectCustomerFromRow(row) {
     if (!row) return;
+    if (row.id === 'customerDropdownAddNewRow') {
+        const rawVal = document.getElementById('customerSearchInput').value.trim();
+        selectCustomer('', rawVal, '', '', '');
+        return;
+    }
     const id = row.getAttribute('data-id');
     const name = row.getAttribute('data-cname');
     const contact = row.getAttribute('data-ccontact') || '';
@@ -3230,6 +3300,9 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                     <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
                 </div>
             </td>
+            <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
+                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`}
+            </td>
             <td style="position: relative;">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
@@ -3294,6 +3367,10 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         activeGridRowEl.setAttribute('data-combine-option-id', '');
         activeGridRowEl.querySelector('input[name*="[product_id]"]').value = pid;
         activeGridRowEl.querySelector('.grid-item-input').value = `${sku} ${name}`;
+        const picCell = activeGridRowEl.querySelector('.line-pic-cell');
+        if (picCell) {
+            picCell.innerHTML = prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`;
+        }
         const descInput = activeGridRowEl.querySelector('input[name*="[description]"]');
         if (descInput) descInput.value = desc;
         const aPid = activeGridRowEl.querySelector('.line-addon-product-id');
@@ -5174,6 +5251,10 @@ function closeImageLightbox() {
     if (modal) modal.style.display = 'none';
 }
 
+function previewImageModal(url, name) {
+    openImageLightbox(url, name || 'Product Photo');
+}
+
 // --- Direct PDF Export ---
 function directExportOrderPdf() {
     if (isNewOrder) {
@@ -5213,25 +5294,96 @@ function handleSoLiveSearch(val) {
         clearBtn.style.display = q ? 'block' : 'none';
     }
 
-    const cards = document.querySelectorAll('.so-sidebar-card');
-    let visible = 0;
+    const cards = document.querySelectorAll('.so-sidebar-card:not(.so-customer-match-card)');
+    let visibleOrders = 0;
     cards.forEach(card => {
         const searchTxt = card.dataset.search || '';
         if (!q || searchTxt.includes(q)) {
             card.style.display = 'block';
-            visible++;
+            visibleOrders++;
         } else {
             card.style.display = 'none';
         }
     });
 
+    // Customer matches: "when searching name even no any order availble it should allow to show"
+    const custMatchesWrap = document.getElementById('soSidebarCustomerMatches');
+    let custMatchesCount = 0;
+    if (custMatchesWrap) {
+        if (q && q.length >= 1 && window.allCustomersList && window.allCustomersList.length > 0) {
+            const matchedCustomers = window.allCustomersList.filter(c => {
+                const cName = (c.name || '').toLowerCase();
+                const cContact = (c.contact || '').toLowerCase();
+                const cPhone = (c.phone || '').toLowerCase();
+                return cName.includes(q) || cContact.includes(q) || cPhone.includes(q);
+            }).slice(0, 15);
+
+            if (matchedCustomers.length > 0) {
+                let html = `<div style="font-size: 11px; font-weight: 700; color: #475569; padding: 6px 4px 4px; text-transform: uppercase; letter-spacing: 0.04em;">Customers (${matchedCustomers.length})</div>`;
+                matchedCustomers.forEach(c => {
+                    const escName = (c.name || '').replace(/"/g, '&quot;');
+                    html += `
+                        <div class="so-sidebar-card so-customer-match-card" 
+                             style="cursor: pointer; background: #F8FAFC; border: 1px dashed #93C5FD; margin-bottom: 6px; padding: 7px 10px; border-radius: 6px; display: block;"
+                             onclick="startNewOrderForCustomer(${c.id}, '${escName}')"
+                             title="Click to start new sales order for ${escName}">
+                            <div class="so-card-row-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                <span class="so-card-order-num" style="color: #1D4ED8; font-weight: 700; font-size: 12px;">👤 ${c.name}</span>
+                                <span class="so-status-pill badge-open" style="font-size: 10px; padding: 1px 6px; background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD;">+ New SO</span>
+                            </div>
+                            <div class="so-card-row-bottom" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748B;">
+                                <span>${c.phone || c.contact || 'Customer'}</span>
+                                <span style="color: #2563EB; font-weight: 600;">Create order ➔</span>
+                            </div>
+                        </div>
+                    `;
+                });
+                custMatchesWrap.innerHTML = html;
+                custMatchesWrap.style.display = 'block';
+                custMatchesCount = matchedCustomers.length;
+            } else {
+                custMatchesWrap.innerHTML = '';
+                custMatchesWrap.style.display = 'none';
+            }
+        } else {
+            custMatchesWrap.innerHTML = '';
+            custMatchesWrap.style.display = 'none';
+        }
+    }
+
+    const totalVisible = visibleOrders + custMatchesCount;
     const noMatch = document.getElementById('soSidebarNoSearchMatch');
     if (noMatch) {
-        noMatch.style.display = (visible === 0 && q) ? 'block' : 'none';
+        noMatch.style.display = (totalVisible === 0 && q) ? 'block' : 'none';
     }
     const countDisplay = document.getElementById('soVisibleCountDisplay');
     if (countDisplay) {
-        countDisplay.innerText = visible;
+        countDisplay.innerText = visibleOrders;
+    }
+}
+
+function startNewOrderForCustomer(customerId, customerName) {
+    const branchScope = '{{ branch_scope or "" }}';
+    const targetUrl = '/sales/new?customer_id=' + encodeURIComponent(customerId) + (branchScope ? '&branch=' + encodeURIComponent(branchScope) : '');
+    if (isDirty) {
+        openSavePromptModal(
+            function() { saveSalesOrder(); },
+            function() {
+                isDirty = false;
+                if (window.top && window.top.inflowMdi) {
+                    window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales');
+                } else {
+                    window.location.href = targetUrl;
+                }
+            },
+            function() { /* cancel */ }
+        );
+    } else {
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales');
+        } else {
+            window.location.href = targetUrl;
+        }
     }
 }
 
