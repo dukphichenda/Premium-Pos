@@ -1777,15 +1777,30 @@ def detail_order(id):
 
     # Load attachments & versions for this sales order
     _ensure_so_tables_exist()
-    attachments = query_all("""
+    raw_attachments = query_all("""
         SELECT id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by,
                TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
         FROM sales_order_attachments
         WHERE sales_order_id = %s
         ORDER BY created_at DESC, id DESC
     """, (id,))
+    attachments = []
+    for a in raw_attachments:
+        d = dict(a)
+        d['original_name'] = d.get('file_name')
+        d['file_url'] = d.get('file_path')
+        d['mime_type'] = d.get('file_type')
+        ftype = (d.get('file_type') or '').lower()
+        fname = (d.get('file_name') or '').lower()
+        if ftype.startswith('image/') or fname.endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
+            d['file_category'] = 'image'
+        elif 'pdf' in ftype or fname.endswith('.pdf'):
+            d['file_category'] = 'pdf'
+        else:
+            d['file_category'] = 'file'
+        attachments.append(d)
 
-    versions = query_all("""
+    raw_versions = query_all("""
         SELECT id, sales_order_id, version_number, order_number, status, payment_status,
                customer_name, total_amount, paid_amount, balance_due, items_count,
                user_name, change_summary,
@@ -1795,9 +1810,9 @@ def detail_order(id):
         ORDER BY version_number DESC, created_at DESC
     """, (id,))
 
-    if not versions:
+    if not raw_versions:
         _record_order_version(id, change_summary="Base Version (v1)")
-        versions = query_all("""
+        raw_versions = query_all("""
             SELECT id, sales_order_id, version_number, order_number, status, payment_status,
                    customer_name, total_amount, paid_amount, balance_due, items_count,
                    user_name, change_summary,
@@ -1806,6 +1821,13 @@ def detail_order(id):
             WHERE sales_order_id = %s
             ORDER BY version_number DESC, created_at DESC
         """, (id,))
+
+    versions = []
+    for v in raw_versions:
+        vd = dict(v)
+        vd['created_by'] = vd.get('user_name') or 'admin'
+        vd['order_status'] = vd.get('status') or 'UNFULFILLED'
+        versions.append(vd)
 
     return render_template('sales/detail.html',
                            order=order,
@@ -3612,14 +3634,29 @@ def get_order_attachments(id):
     if not order or not _check_order_branch_access(order):
         return jsonify({'success': False, 'error': 'Order not found or access denied'}), 404
 
-    attachments = query_all("""
+    raw_attachments = query_all("""
         SELECT id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by,
                TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
         FROM sales_order_attachments
         WHERE sales_order_id = %s
         ORDER BY created_at DESC, id DESC
     """, (id,))
-    return jsonify({'success': True, 'attachments': attachments})
+    attachments = []
+    for a in raw_attachments:
+        d = dict(a)
+        d['original_name'] = d.get('file_name')
+        d['file_url'] = d.get('file_path')
+        d['mime_type'] = d.get('file_type')
+        ftype = (d.get('file_type') or '').lower()
+        fname = (d.get('file_name') or '').lower()
+        if ftype.startswith('image/') or fname.endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
+            d['file_category'] = 'image'
+        elif 'pdf' in ftype or fname.endswith('.pdf'):
+            d['file_category'] = 'pdf'
+        else:
+            d['file_category'] = 'file'
+        attachments.append(d)
+    return jsonify(attachments)
 
 
 @sales_orders_bp.route('/sales/<int:id>/attachments/upload', methods=['POST'])
@@ -3629,12 +3666,12 @@ def upload_order_attachment(id):
     if not order or not _check_order_branch_access(order):
         return jsonify({'success': False, 'error': 'Order not found or access denied'}), 404
 
-    files = request.files.getlist('attachment_files')
+    files = request.files.getlist('files') or request.files.getlist('attachment_files')
     if not files or not files[0].filename:
-        if 'attachment_file' in request.files:
-            files = [request.files['attachment_file']]
-        elif 'file' in request.files:
+        if 'file' in request.files:
             files = [request.files['file']]
+        elif 'attachment_file' in request.files:
+            files = [request.files['attachment_file']]
 
     if not files or not files[0].filename:
         return jsonify({'success': False, 'error': 'No file selected for upload'}), 400
@@ -3666,9 +3703,12 @@ def upload_order_attachment(id):
             uploaded_items.append({
                 'id': att_id,
                 'file_name': orig_name,
+                'original_name': orig_name,
                 'file_path': url_path,
+                'file_url': url_path,
                 'file_size': fsize,
                 'file_type': ftype,
+                'mime_type': ftype,
                 'caption': caption,
                 'uploaded_by': uname
             })
@@ -3676,12 +3716,8 @@ def upload_order_attachment(id):
     if uploaded_items:
         _record_order_version(id, user_name=uname, change_summary=f"Added {len(uploaded_items)} attachment(s): {', '.join(x['file_name'] for x in uploaded_items)}")
 
-    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'ajax' in request.args:
-        total_count = query_one("SELECT COUNT(*) as cnt FROM sales_order_attachments WHERE sales_order_id = %s", (id,))['cnt']
-        return jsonify({'success': True, 'uploaded': uploaded_items, 'total_count': total_count})
-
-    flash(f"Uploaded {len(uploaded_items)} attachment(s) successfully!", "success")
-    return redirect(url_for('sales_orders.detail_order', id=id))
+    total_count = query_one("SELECT COUNT(*) as cnt FROM sales_order_attachments WHERE sales_order_id = %s", (id,))['cnt']
+    return jsonify({'success': True, 'uploaded': uploaded_items, 'total_count': total_count})
 
 
 @sales_orders_bp.route('/sales/<int:id>/attachments/<int:att_id>/delete', methods=['POST'])
@@ -3706,11 +3742,7 @@ def delete_order_attachment(id, att_id):
         _record_order_version(id, user_name=uname, change_summary=f"Deleted attachment: {att['file_name']}")
 
     total_count = query_one("SELECT COUNT(*) as cnt FROM sales_order_attachments WHERE sales_order_id = %s", (id,))['cnt']
-    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or 'ajax' in request.args:
-        return jsonify({'success': True, 'total_count': total_count})
-
-    flash("Attachment removed.", "success")
-    return redirect(url_for('sales_orders.detail_order', id=id))
+    return jsonify({'success': True, 'total_count': total_count})
 
 
 # ==============================================================================
@@ -3768,6 +3800,15 @@ def get_order_version_snapshot(id, ver_id):
     if not ver:
         return jsonify({'success': False, 'error': 'Version snapshot not found'}), 404
 
-    return jsonify({'success': True, 'version': ver})
+    v_dict = dict(ver)
+    v_dict['created_by'] = v_dict.get('user_name') or 'admin'
+    v_dict['order_status'] = v_dict.get('status') or 'UNFULFILLED'
+    snapshot = v_dict.get('snapshot_data') or {}
+
+    return jsonify({
+        'success': True,
+        'version': v_dict,
+        'snapshot': snapshot
+    })
 
 

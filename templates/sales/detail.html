@@ -1294,7 +1294,7 @@
                                     v{{ v.version_number }}
                                 </td>
                                 <td style="padding: 9px 12px; color: #334155; white-space: nowrap;">
-                                    {{ v.created_at.strftime('%Y-%m-%d %H:%M') if v.created_at else '' }}
+                                    {{ v.created_at.strftime('%Y-%m-%d %H:%M') if (v.created_at and v.created_at.strftime is defined) else ((v.created_at|string)[:16] if v.created_at else '') }}
                                 </td>
                                 <td style="padding: 9px 12px; color: #0F172A; font-weight: 600;">
                                     👤 {{ v.created_by or 'system' }}
@@ -1471,7 +1471,7 @@
                                 </div>
                                 {% endif %}
                                 <div style="font-size: 10px; color: #64748B; margin-top: 3px;">
-                                    {{ (att.file_size / 1024)|round(1) }} KB • {{ att.created_at.strftime('%m-%d %H:%M') if att.created_at else '' }}
+                                    {{ (att.file_size / 1024)|round(1) }} KB • {{ att.created_at.strftime('%m-%d %H:%M') if (att.created_at and att.created_at.strftime is defined) else ((att.created_at|string)[5:16] if att.created_at else '') }}
                                 </div>
                             </div>
 
@@ -4458,9 +4458,9 @@ function viewOrderVersionSnapshot(orderId, verId) {
                 return;
             }
             const v = data.version || {};
-            const snap = data.snapshot || {};
-            const o = snap.order || {};
-            const items = snap.items || [];
+            const snap = data.snapshot || v.snapshot_data || {};
+            const o = snap.order || snap;
+            const items = snap.items || snap.lines || [];
             
             if (sTitle) {
                 sTitle.innerText = 'Revision v' + v.version_number + ' Snapshot (' + (v.created_at ? v.created_at.substring(0, 16) : '') + ')';
@@ -4469,14 +4469,15 @@ function viewOrderVersionSnapshot(orderId, verId) {
             let itemsHtml = '';
             if (items.length > 0) {
                 items.forEach((it, idx) => {
-                    const priceVal = parseFloat(it.unit_price || 0);
-                    const qtyVal = parseFloat(it.quantity || 0);
+                    const priceVal = parseFloat(it.unit_price || it.price || 0);
+                    const qtyVal = parseFloat(it.quantity || it.qty || 0);
                     const subtotalVal = parseFloat(it.subtotal || (qtyVal * priceVal) || 0);
+                    const nameVal = it.description || it.name || it.product_name || '-';
                     itemsHtml += `
                         <tr style="border-bottom: 1px solid #E2E8F0;">
                             <td style="padding: 7px 10px; text-align: center; color: #64748B;">${idx + 1}</td>
                             <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${it.sku || '-'}</td>
-                            <td style="padding: 7px 10px; color: #334155;">${it.description || it.name || '-'}</td>
+                            <td style="padding: 7px 10px; color: #334155;">${nameVal}</td>
                             <td style="padding: 7px 10px; text-align: center; font-weight: 700;">${qtyVal} ${it.uom || ''}</td>
                             <td style="padding: 7px 10px; text-align: right; color: #334155;">$${priceVal.toFixed(2)}</td>
                             <td style="padding: 7px 10px; text-align: right; font-weight: 700; color: #059669;">$${subtotalVal.toFixed(2)}</td>
@@ -4668,7 +4669,8 @@ function submitSoAttachmentsUpload(orderId) {
 function reloadOrderAttachmentsGrid(orderId) {
     fetch('/sales/' + orderId + '/attachments')
         .then(res => res.json())
-        .then(attachments => {
+        .then(data => {
+            const attachments = Array.isArray(data) ? data : (data.attachments || []);
             const grid = document.getElementById('soAttachmentsGrid');
             const badge = document.getElementById('soAttachmentBadge');
             const modalBadge = document.getElementById('soAttListCountBadge');
@@ -4695,14 +4697,16 @@ function reloadOrderAttachmentsGrid(orderId) {
 
             let cardsHtml = '';
             attachments.forEach(att => {
-                const isImg = att.file_category === 'image' || (att.mime_type && att.mime_type.startsWith('image/'));
-                const isPdf = att.file_category === 'pdf' || (att.mime_type && att.mime_type.includes('pdf'));
+                const fname = att.original_name || att.file_name || '';
+                const fpath = att.file_url || att.file_path || '';
+                const isImg = att.file_category === 'image' || (att.mime_type && att.mime_type.startsWith('image/')) || (att.file_type && att.file_type.startsWith('image/')) || /\.(jpg|jpeg|png|webp|gif)$/i.test(fname);
+                const isPdf = att.file_category === 'pdf' || (att.mime_type && att.mime_type.includes('pdf')) || (att.file_type && att.file_type.includes('pdf')) || /\.pdf$/i.test(fname);
                 const sizeKb = (att.file_size / 1024).toFixed(1);
 
                 let mediaPreview = '';
                 if (isImg) {
                     mediaPreview = `
-                        <img src="${att.file_url}" alt="${att.original_name}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="openImageLightbox('${att.file_url}', '${att.original_name.replace(/'/g, "\\'")}')">
+                        <img src="${fpath}" alt="${fname}" style="width: 100%; height: 100%; object-fit: cover; cursor: pointer;" onclick="openImageLightbox('${fpath}', '${fname.replace(/'/g, "\\'")}')">
                         <div style="position: absolute; bottom: 4px; right: 4px; background: rgba(0,0,0,0.6); color: #FFFFFF; font-size: 10px; padding: 1px 5px; border-radius: 3px; pointer-events: none;">🔍 Click to view</div>
                     `;
                 } else if (isPdf) {
@@ -4724,8 +4728,8 @@ function reloadOrderAttachmentsGrid(orderId) {
                         </div>
                         <div style="padding: 8px 10px; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
                             <div>
-                                <div style="font-weight: 600; font-size: 11.5px; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${att.original_name}">
-                                    ${att.original_name}
+                                <div style="font-weight: 600; font-size: 11.5px; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${fname}">
+                                    ${fname}
                                 </div>
                                 ${att.caption ? `<div style="font-size: 11px; color: #059669; font-weight: 600; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${att.caption}">💬 ${att.caption}</div>` : ''}
                                 <div style="font-size: 10px; color: #64748B; margin-top: 3px;">
@@ -4733,7 +4737,7 @@ function reloadOrderAttachmentsGrid(orderId) {
                                 </div>
                             </div>
                             <div style="display: flex; gap: 4px; justify-content: flex-end; margin-top: 8px; border-top: 1px dashed #E2E8F0; padding-top: 6px;">
-                                <a href="${att.file_url}" target="_blank" download="${att.original_name}" class="inflow-dlg-btn" style="padding: 2px 7px; font-size: 10.5px; color: #2563EB; border: 1px solid #BFDBFE; background: #EFF6FF; border-radius: 4px; text-decoration: none;" title="Download file">
+                                <a href="${fpath}" target="_blank" download="${fname}" class="inflow-dlg-btn" style="padding: 2px 7px; font-size: 10.5px; color: #2563EB; border: 1px solid #BFDBFE; background: #EFF6FF; border-radius: 4px; text-decoration: none;" title="Download file">
                                     ⬇️ Save
                                 </a>
                                 <button type="button" class="inflow-dlg-btn" onclick="deleteSoAttachmentAjax(${orderId}, ${att.id})" style="padding: 2px 6px; font-size: 10.5px; color: #DC2626; border: 1px solid #FECACA; background: #FEF2F2; border-radius: 4px; cursor: pointer;" title="Delete attachment">
@@ -4776,7 +4780,8 @@ function deleteSoAttachmentAjax(orderId, attId) {
 function reloadOrderVersionsList(orderId) {
     fetch('/sales/' + orderId + '/versions')
         .then(res => res.json())
-        .then(versions => {
+        .then(data => {
+            const versions = Array.isArray(data) ? data : (data.versions || []);
             const tbody = document.getElementById('versionsTableBody');
             const badge = document.getElementById('soVersionBadge');
             const count = (versions && versions.length) ? versions.length : 0;
@@ -4791,18 +4796,20 @@ function reloadOrderVersionsList(orderId) {
             }
             let html = '';
             versions.forEach(v => {
+                const statusStr = v.order_status || v.status || 'UNFULFILLED';
+                const userStr = v.created_by || v.user_name || 'system';
                 let badgeBg = '#FEF3C7', badgeColor = '#92400E';
-                if (v.order_status === 'PAID' || v.order_status === 'FULFILLED') {
+                if (statusStr === 'PAID' || statusStr === 'FULFILLED') {
                     badgeBg = '#DCFCE7'; badgeColor = '#166534';
-                } else if (v.order_status === 'CANCELLED') {
+                } else if (statusStr === 'CANCELLED') {
                     badgeBg = '#FEE2E2'; badgeColor = '#991B1B';
                 }
                 html += `
                     <tr style="border-bottom: 1px solid #E2E8F0; transition: background 0.15s ease;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='#FFFFFF'">
                         <td style="padding: 9px 12px; text-align: center; font-weight: 700; color: #1E40AF;">v${v.version_number}</td>
                         <td style="padding: 9px 12px; color: #334155; white-space: nowrap;">${v.created_at ? v.created_at.substring(0, 16) : ''}</td>
-                        <td style="padding: 9px 12px; color: #0F172A; font-weight: 600;">👤 ${v.created_by || 'system'}</td>
-                        <td style="padding: 9px 12px;"><span style="display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; background: ${badgeBg}; color: ${badgeColor};">${v.order_status}</span></td>
+                        <td style="padding: 9px 12px; color: #0F172A; font-weight: 600;">👤 ${userStr}</td>
+                        <td style="padding: 9px 12px;"><span style="display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10.5px; font-weight: 700; background: ${badgeBg}; color: ${badgeColor};">${statusStr}</span></td>
                         <td style="padding: 9px 12px; text-align: right; font-weight: 700; color: #059669;">$${parseFloat(v.total_amount || 0).toFixed(2)}</td>
                         <td style="padding: 9px 12px; text-align: center; color: #64748B;">${v.items_count || 0}</td>
                         <td style="padding: 9px 12px; color: #334155; font-size: 11.5px;">${v.change_summary || 'Order updated'}</td>
