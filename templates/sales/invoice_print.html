@@ -280,17 +280,29 @@
             align-items: center !important;
             width: 100% !important;
         }
-        body.exporting-pdf .sig-space {
-            width: 100% !important;
-            height: 18px !important;
-            margin-bottom: 2px !important;
-        }
         body.exporting-pdf .sig-title-kh {
             font-size: 8.5px !important;
-            margin-bottom: 0px !important;
+            margin-bottom: 1px !important;
         }
         body.exporting-pdf .sig-title-en {
             font-size: 7px !important;
+            margin-bottom: 2.5mm !important;
+        }
+        body.exporting-pdf .sig-space {
+            width: 100% !important;
+            height: 14mm !important;
+            min-height: 14mm !important;
+            margin-bottom: 1.5mm !important;
+            display: flex !important;
+            align-items: flex-end !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+        }
+        body.exporting-pdf .seller-sig-img {
+            max-height: 13.5mm !important;
+            max-width: 44mm !important;
+            object-fit: contain !important;
+            vertical-align: bottom !important;
         }
         body.exporting-pdf .sig-meta {
             width: 100% !important;
@@ -1058,7 +1070,7 @@
             font-size: 10px;
             font-weight: 700;
             color: #0F172A;
-            margin-bottom: 1px;
+            margin-bottom: 2px;
         }
 
         .sig-title-en {
@@ -1066,18 +1078,21 @@
             font-weight: 500;
             color: #64748B;
             text-transform: uppercase;
+            margin-bottom: 8px; /* Clean separation so signature never overlaps text */
         }
 
         .sig-space {
             width: 100%;
-            height: 38px;
+            height: 60px; /* Ample height so signature is clear, large, and crisp */
+            min-height: 60px;
             border-bottom: 1px dashed #94A3B8;
-            margin-bottom: 4px;
+            margin-bottom: 6px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
             position: relative;
             padding-bottom: 2px;
+            box-sizing: border-box;
         }
 
         .seller-sig-space {
@@ -1091,6 +1106,17 @@
             border-bottom-color: #0284C7;
         }
 
+        .seller-sig-img {
+            max-height: 56px !important;
+            max-width: 160px !important;
+            width: auto !important;
+            height: auto !important;
+            object-fit: contain !important;
+            vertical-align: bottom !important;
+            display: block !important;
+            margin: 0 auto !important;
+        }
+
         .seller-sig-hint {
             font-size: 8.5px;
             color: #0284C7;
@@ -1099,15 +1125,13 @@
             user-select: none;
         }
 
-        .seller-edit-btn {
-            background: none;
-            border: none;
-            color: #0284C7;
-            font-size: 8.5px;
+        .seller-name-clickable {
             cursor: pointer;
-            padding: 0 4px;
-            font-weight: 600;
-            text-decoration: underline;
+            transition: color 0.15s ease;
+        }
+
+        .seller-name-clickable:hover {
+            color: #0284C7;
         }
 
         .sig-meta {
@@ -1502,17 +1526,29 @@
                 align-items: center !important;
                 width: 100% !important;
             }
-            .sig-space {
-                width: 100% !important;
-                height: 18px !important;
-                margin-bottom: 2px !important;
-            }
             .sig-title-kh {
                 font-size: 8.5px !important;
-                margin-bottom: 0px !important;
+                margin-bottom: 1px !important;
             }
             .sig-title-en {
                 font-size: 7px !important;
+                margin-bottom: 2.5mm !important;
+            }
+            .sig-space {
+                width: 100% !important;
+                height: 14mm !important;
+                min-height: 14mm !important;
+                margin-bottom: 1.5mm !important;
+                display: flex !important;
+                align-items: flex-end !important;
+                justify-content: center !important;
+                box-sizing: border-box !important;
+            }
+            .seller-sig-img {
+                max-height: 13.5mm !important;
+                max-width: 44mm !important;
+                object-fit: contain !important;
+                vertical-align: bottom !important;
             }
             .sig-meta {
                 width: 100% !important;
@@ -2142,14 +2178,13 @@
                     <div class="sig-title-kh">ហត្ថលេខា និងឈ្មោះអ្នកលក់</div>
                     <div class="sig-title-en">Seller's Authorized Signature</div>
                     <div class="sig-space seller-sig-space" id="sellerSigSpace" onclick="openSignatureModal()" title="Click to upload or change seller signature (ចុចដើម្បីដាក់ ឬប្តូរហត្ថលេខាអ្នកលក់)">
-                        <img id="sellerSigImg" src="{{ inv_settings.seller_signature_url or '' }}" alt="Seller Signature" style="max-height: 44px; max-width: 140px; object-fit: contain; vertical-align: middle; {% if not inv_settings.seller_signature_url %}display: none;{% endif %}">
+                        <img id="sellerSigImg" class="seller-sig-img" src="{{ inv_settings.seller_signature_url or '' }}" alt="Seller Signature" style="{% if not inv_settings.seller_signature_url %}display: none;{% endif %}">
                         <span id="sellerSigPlaceholder" class="no-print seller-sig-hint" style="{% if inv_settings.seller_signature_url %}display: none;{% endif %}">
                             ✍️ + Upload Signature (ដាក់ហត្ថលេខា)
                         </span>
                     </div>
                     <div class="sig-meta">
-                        <span>ឈ្មោះ / Name: <b id="sellerNameDisplay">{{ inv_settings.seller_name or order.completed_by or order.salesperson or '....................................................' }}</b></span>
-                        <button type="button" class="no-print seller-edit-btn" onclick="openSignatureModal()" title="Edit Seller Name & Signature">✏️ Edit</button>
+                        <span class="seller-name-clickable" onclick="openSignatureModal()" title="Click to edit seller signature or name">ឈ្មោះ / Name: <b id="sellerNameDisplay">{{ inv_settings.seller_name or order.completed_by or order.salesperson or '....................................................' }}</b></span>
                     </div>
                 </div>
             </div>
@@ -2355,7 +2390,7 @@
                     if (data.seller_signature_url) {
                         if (sigImg) {
                             sigImg.src = data.seller_signature_url;
-                            sigImg.style.display = 'inline-block';
+                            sigImg.style.display = 'block';
                         }
                         if (sigPlaceholder) sigPlaceholder.style.display = 'none';
                         if (sigModalPreviewImg) sigModalPreviewImg.src = data.seller_signature_url;
