@@ -415,9 +415,7 @@
                         <div class="recon-title">ផ្ទៀងផ្ទាត់សាច់ប្រាក់ក្នុងដៃ</div>
                         <div class="recon-subtitle">Cash & Bank Accounts Count (Google Sheet Style)</div>
                     </div>
-                    <button type="button" class="btn btn-sm btn-primary" onclick="saveAccountBalances()" id="saveBalancesBtn" style="padding: 3px 10px; font-size: 11px;">
-                        💾 Save
-                    </button>
+                    <div id="reconAutosaveStatus" style="font-size: 11px; font-weight: 600; min-height: 20px; display: inline-flex; align-items: center;"></div>
                 </div>
 
                 <div class="recon-table-wrap">
@@ -434,7 +432,7 @@
                             <tr class="recon-acc-row">
                                 <td class="acc-name-cell">
                                     <span class="acc-icon-indicator"></span>
-                                    <input type="text" class="acc-name-input" value="{{ acc.name }}" placeholder="Account name">
+                                    <input type="text" class="acc-name-input" value="{{ acc.name }}" placeholder="Account name" oninput="scheduleAutoSaveAccountBalances(1000)" onchange="scheduleAutoSaveAccountBalances(50)" onblur="scheduleAutoSaveAccountBalances(50)">
                                 </td>
                                 <td>
                                     <input type="text" 
@@ -1147,6 +1145,7 @@
         }
 
         calcCountedCashTotal();
+        scheduleAutoSaveAccountBalances(1000);
     }
 
     function formatAccountBlur(input) {
@@ -1170,6 +1169,7 @@
             }
         }
         calcCountedCashTotal();
+        scheduleAutoSaveAccountBalances(50);
     }
 
     function formatAccountFocus(input) {
@@ -1193,7 +1193,7 @@
         tr.innerHTML = `
             <td class="acc-name-cell">
                 <span class="acc-icon-indicator"></span>
-                <input type="text" class="acc-name-input" value="New Account" placeholder="Account name">
+                <input type="text" class="acc-name-input" value="New Account" placeholder="Account name" oninput="scheduleAutoSaveAccountBalances(1000)" onchange="scheduleAutoSaveAccountBalances(50)" onblur="scheduleAutoSaveAccountBalances(50)">
             </td>
             <td>
                 <input type="text" 
@@ -1223,6 +1223,7 @@
         if (row) {
             row.remove();
             calcCountedCashTotal();
+            scheduleAutoSaveAccountBalances(50);
         }
     }
 
@@ -1271,12 +1272,28 @@
         }
     }
 
-    // Save Bank & Cash Account Balances
+    let autoSaveAccountBalancesTimer = null;
+    let isSavingAccountBalances = false;
+
+    function scheduleAutoSaveAccountBalances(delay = 600) {
+        if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
+        const statusEl = document.getElementById('reconAutosaveStatus');
+        if (statusEl && !isSavingAccountBalances) {
+            statusEl.innerHTML = '<span style="color: #64748B; font-weight: 500;">● Editing...</span>';
+        }
+        autoSaveAccountBalancesTimer = setTimeout(() => {
+            saveAccountBalances();
+        }, delay);
+    }
+
+    // Auto-Save Bank & Cash Account Balances
     async function saveAccountBalances() {
-        const btn = document.getElementById('saveBalancesBtn');
-        const originalText = btn.innerHTML;
-        btn.innerHTML = 'Saving...';
-        btn.disabled = true;
+        if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
+        const statusEl = document.getElementById('reconAutosaveStatus');
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color: #0284C7; font-weight: 600;">🔄 Saving...</span>';
+        }
+        isSavingAccountBalances = true;
 
         const accountsList = [];
         document.querySelectorAll('#reconAccountsBody tr.recon-acc-row').forEach(row => {
@@ -1325,20 +1342,25 @@
                     }
                 });
                 calcCountedCashTotal();
-                btn.innerHTML = '✓ Saved!';
-                setTimeout(() => {
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                }, 1500);
+                if (statusEl) {
+                    statusEl.innerHTML = '<span style="color: #059669; font-weight: 600;">✓ Saved</span>';
+                    setTimeout(() => {
+                        if (statusEl && statusEl.innerHTML.includes('✓ Saved')) {
+                            statusEl.innerHTML = '';
+                        }
+                    }, 2500);
+                }
             } else {
-                alert("Error saving: " + res.error);
-                btn.innerHTML = originalText;
-                btn.disabled = false;
+                if (statusEl) {
+                    statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600;" title="' + (res.error || 'Save error') + '">⚠️ Save failed</span>';
+                }
             }
         } catch (e) {
-            alert("Error: " + e.message);
-            btn.innerHTML = originalText;
-            btn.disabled = false;
+            if (statusEl) {
+                statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600;" title="' + e.message + '">⚠️ Network error</span>';
+            }
+        } finally {
+            isSavingAccountBalances = false;
         }
     }
 
