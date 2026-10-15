@@ -30,16 +30,19 @@ def list_customers():
         branches = []
     else:
         branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
-        raw_branch = request.args.get('branch', 'all').strip().lower()
+        raw_branch = request.args.get('branch', 'main').strip().lower()
         if raw_branch == 'main':
             where_clauses.append("c.branch_id IS NULL")
             current_branch_param = 'main'
+        elif raw_branch == 'all':
+            current_branch_param = 'all'  # HQ sees all combined
         elif raw_branch.isdigit():
             where_clauses.append("c.branch_id = %s")
             params.append(int(raw_branch))
             current_branch_param = raw_branch
         else:
-            current_branch_param = 'all'  # HQ sees all!
+            where_clauses.append("c.branch_id IS NULL")
+            current_branch_param = 'main'
 
     if search:
         where_clauses.append("(c.name ILIKE %s OR c.phone ILIKE %s OR c.contact_name ILIKE %s)")
@@ -265,8 +268,8 @@ def create_customer():
             return redirect(url_for('contacts.list_customers'))
 
         if is_main_admin:
-            raw_b = request.form.get('branch_id') or session.get('active_branch_id')
-            branch_id = int(raw_b) if raw_b and str(raw_b).isdigit() else None
+            raw_b = request.form.get('branch_id')
+            branch_id = int(raw_b) if raw_b and str(raw_b).strip().isdigit() else None
         else:
             branch_id = user_bid
 
@@ -383,13 +386,14 @@ def search_customers_json():
         else:
             where_clauses.append("branch_id IS NULL")
     else:
-        req_b = request.args.get('branch_id') or session.get('active_branch_id')
+        req_b = request.args.get('branch_id') or request.args.get('branch') or 'main'
         if req_b and str(req_b).strip().lower() == 'main':
             where_clauses.append("branch_id IS NULL")
         elif req_b and str(req_b).strip().isdigit():
             where_clauses.append("branch_id = %s")
             params.append(int(req_b))
-        # If 'all' or empty, HQ sees all!
+        elif req_b and str(req_b).strip().lower() == 'all':
+            pass
 
     where_sql = " AND ".join(where_clauses)
     results = query_all(f"""
@@ -423,12 +427,9 @@ def quick_add_customer_ajax():
         if not is_main_admin:
             branch_id = user_bid
         else:
-            raw_b = data.get('branch_id') or session.get('active_branch_id')
-            if raw_b and str(raw_b).lower() not in ('main', 'none', '', 'all'):
-                try:
-                    branch_id = int(raw_b)
-                except (ValueError, TypeError):
-                    branch_id = None
+            raw_b = data.get('branch_id')
+            if raw_b and str(raw_b).lower() not in ('main', 'none', '', 'all', '0', 'null') and str(raw_b).isdigit():
+                branch_id = int(raw_b)
             else:
                 branch_id = None
 

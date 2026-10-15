@@ -461,6 +461,17 @@
                 <!-- Middle Column: Location & Delivery -->
                 <div>
                     <input type="hidden" name="sales_rep" id="salesRepInput" value="{{ order.sales_rep or '' }}">
+                    {% if session.get('role') == 'main_admin' %}
+                    <div class="inflow-field-row" style="margin-bottom: 4px;">
+                        <span class="inflow-field-label">Store/Branch</span>
+                        <select name="branch_id" id="soBranchSelect" class="inflow-field-select" onchange="handleSoBranchChange(this.value);" {% if is_paid %}disabled{% endif %}>
+                            <option value="" {% if not order.branch_id and (not branch_scope or branch_scope in ('main', 'all')) %}selected{% endif %}>🏢 Main Store (HQ)</option>
+                            {% for br in all_branches %}
+                            <option value="{{ br.id }}" {% if (order.branch_id|string == br.id|string) or (not order.branch_id and branch_scope == br.id|string) %}selected{% endif %}>🏬 {{ br.name }} ({{ br.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
                     <div class="inflow-field-row">
                         <span class="inflow-field-label">Location</span>
                         <select name="location_id" class="inflow-field-select" {% if is_paid %}disabled{% endif %}>
@@ -1803,8 +1814,7 @@ function getDrawerFilterParams() {
                   sessionStorage.getItem('inflow_so_drawer_customer_search') || '{{ customer_search or "" }}';
 
     const branchInput = document.getElementById('drawerBranchFilterInput');
-    let branchVal = (branchInput ? branchInput.value : '') ||
-                    sessionStorage.getItem('inflow_so_branch_filter') || '{{ branch_scope or "" }}';
+    let branchVal = (branchInput ? branchInput.value : '') || '{{ branch_scope or "" }}';
 
     return {
         date_filter: dateVal,
@@ -1824,12 +1834,26 @@ function syncDrawerFiltersToStorage() {
         } else {
             sessionStorage.removeItem('inflow_so_drawer_customer_search');
         }
-        if (params.branch) {
-            sessionStorage.setItem('inflow_so_branch_filter', params.branch);
-        } else {
-            sessionStorage.removeItem('inflow_so_branch_filter');
-        }
+        sessionStorage.removeItem('inflow_so_branch_filter');
     } catch(e) {}
+}
+
+function handleSoBranchChange(val) {
+    const hidden = document.getElementById('orderBranchIdInput');
+    if (hidden) hidden.value = val || '';
+    {% if is_new %}
+    fetch('/api/sales/preview-order-number?branch_id=' + encodeURIComponent(val || ''))
+        .then(r => r.json())
+        .then(data => {
+            if (data && data.order_number) {
+                const numInput = document.getElementById('orderNumberInput');
+                if (numInput) {
+                    numInput.placeholder = '<Auto: ' + data.order_number + '>';
+                    numInput.title = 'Order number auto generated from last SO (Next: ' + data.order_number + ')';
+                }
+            }
+        }).catch(err => console.error(err));
+    {% endif %}
 }
 
 function buildUrlWithFilters(baseUrl, extraParams = {}) {

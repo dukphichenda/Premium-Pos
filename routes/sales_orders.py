@@ -10,7 +10,9 @@ def _is_main_admin():
     return session.get('role') == 'main_admin'
 
 def _get_user_branch_id():
-    bid = session.get('branch_id') or session.get('active_branch_id')
+    if _is_main_admin():
+        return None
+    bid = session.get('branch_id')
     if bid and str(bid).isdigit():
         return int(bid)
     return None
@@ -228,13 +230,11 @@ def list_orders():
         # Branch users are strictly locked to their assigned branch: cannot view HQ or other branches!
         branch_filter = str(user_bid) if user_bid else '-1'
     else:
-        # HQ (main_admin) can see all, main, or any specific branch
+        # HQ (main_admin) can see main (default), specific branch, or all
         if raw_branch is not None:
             branch_filter = raw_branch.strip().lower()
-        elif session.get('active_branch_id'):
-            branch_filter = str(session.get('active_branch_id'))
         else:
-            branch_filter = 'all'  # HQ default overview: sees all orders
+            branch_filter = 'main'  # HQ default overview: Main Store (HQ)
 
     if view_mode != 'table' and not request.args.get('search') and not request.args.get('status') and not request.args.get('page') and raw_branch is None:
         if not is_main:
@@ -565,13 +565,17 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             b_str = str(branch_id).strip().lower()
             if b_str == 'main':
                 drawer_where.append("so.branch_id IS NULL")
-            elif b_str not in ('all', 'none', ''):
+            elif b_str == 'all':
+                pass
+            elif b_str not in ('none', ''):
                 try:
                     bid = int(b_str)
                     drawer_where.append("so.branch_id = %s")
                     drawer_params.append(bid)
                 except (ValueError, TypeError):
-                    pass
+                    drawer_where.append("so.branch_id IS NULL")
+        else:
+            drawer_where.append("so.branch_id IS NULL")
 
     # Filter drawer orders
     if customer_search:
@@ -688,13 +692,17 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             b_str = str(branch_id).strip().lower()
             if b_str == 'main':
                 cust_where.append("branch_id IS NULL")
-            elif b_str not in ('all', 'none', ''):
+            elif b_str == 'all':
+                pass
+            elif b_str not in ('none', ''):
                 try:
                     bid = int(b_str)
                     cust_where.append("branch_id = %s")
                     cust_params.append(bid)
                 except (ValueError, TypeError):
-                    pass
+                    cust_where.append("branch_id IS NULL")
+        else:
+            cust_where.append("branch_id IS NULL")
 
     all_customers = query_all(f"""
         SELECT 
@@ -1210,6 +1218,15 @@ def delete_delivery_man(id):
         flash(msg, 'success')
         return redirect(url_for('sales_orders.list_delivery_men'))
 
+@sales_orders_bp.route('/api/sales/preview-order-number')
+def api_preview_order_number():
+    raw_b = request.args.get('branch_id')
+    bid = None
+    if raw_b and str(raw_b).strip().isdigit():
+        bid = int(raw_b)
+    order_num = preview_order_number('SO', branch_id=bid)
+    return jsonify({'order_number': order_num})
+
 @sales_orders_bp.route('/sales/new')
 def new_order():
     is_main = _is_main_admin()
@@ -1220,16 +1237,10 @@ def new_order():
         branch_id = user_bid
     else:
         branch_param = request.args.get('branch')
-        session_branch_id = session.get('active_branch_id')
         branch_id = None
         if branch_param:
-            if str(branch_param).lower() not in ('main', 'all', 'none', '') and str(branch_param).isdigit():
+            if str(branch_param).lower() not in ('main', 'all', 'none', '', 'hq', '0') and str(branch_param).isdigit():
                 branch_id = int(branch_param)
-        elif session_branch_id:
-            try:
-                branch_id = int(session_branch_id)
-            except (ValueError, TypeError):
-                branch_id = None
 
     branch = query_one("SELECT * FROM branches WHERE id = %s", (branch_id,)) if branch_id else None
 
@@ -1464,8 +1475,6 @@ def new_order():
             req_branch = b_arg
         else:
             req_branch = 'main'
-    elif session.get('active_branch_id'):
-        req_branch = str(session['active_branch_id'])
     else:
         req_branch = 'main'
     scheme_id = order.get('pricing_scheme_id') or 100
@@ -1614,8 +1623,6 @@ def detail_order(id):
         elif order.get('branch_id'):
             # When viewing a branch order, strictly scope drawer to that branch!
             branch_scope = str(order['branch_id'])
-        elif session.get('active_branch_id'):
-            branch_scope = str(session['active_branch_id'])
         else:
             # HQ order (branch_id IS NULL)
             branch_scope = 'main'
@@ -1822,25 +1829,32 @@ def save_order(id=0):
         user_bid = _get_user_branch_id()
 
         if not is_new:
-            # Existing sales orders maintain immutable branch ownership
-            branch_id = order['branch_id']
-            if not _check_order_branch_access(order):
-                if request.is_json:
-                    return jsonify({'success': False, 'message': 'Access denied: Cannot edit order belonging to another branch.'}), 403
-                flash("Access denied: Cannot edit order belonging to another branch.", "error")
-                return redirect(url_for('sales_orders.list_orders'))
+            if not is_main:
+                branch_id = order['branch_id']
+                if not _check_order_branch_access(order):
+                    if request.is_json:
+                        return jsonify({'success': False, 'message': 'Access denied: Cannot edit order belonging to another branch.'}), 403
+                    flash("Access denied: Cannot edit order belonging to another branch.", "error")
+                    return redirect(url_for('sales_orders.list_orders'))
+            else:
+                raw_b = data.get('branch_id') if data.get('branch_id') is not None else request.form.get('branch_id')
+                if raw_b is not None:
+                    raw_str = str(raw_b).strip().lower()
+                    if raw_str in ('main', 'none', '', 'hq', '0', 'null'):
+                        branch_id = None
+                    elif raw_str.isdigit():
+                        branch_id = int(raw_str)
+                    else:
+                        branch_id = order.get('branch_id')
+                else:
+                    branch_id = order.get('branch_id')
         else:
             if not is_main:
                 branch_id = user_bid
             else:
                 raw_b = data.get('branch_id') or request.form.get('branch_id') or data.get('branch') or request.form.get('branch')
-                if raw_b and str(raw_b).lower() not in ('main', 'all', 'none', '') and str(raw_b).isdigit():
+                if raw_b and str(raw_b).lower() not in ('main', 'all', 'none', '', 'hq', '0', 'null') and str(raw_b).isdigit():
                     branch_id = int(raw_b)
-                elif session.get('active_branch_id'):
-                    try:
-                        branch_id = int(session['active_branch_id'])
-                    except (ValueError, TypeError):
-                        branch_id = None
                 else:
                     branch_id = None
 
@@ -1903,9 +1917,10 @@ def save_order(id=0):
                         delivery_fee_khr = %s,
                         delivery_notes = %s,
                         payment_method = COALESCE(NULLIF(%s, ''), payment_method),
+                        branch_id = %s,
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s
-                """, (customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, id))
+                """, (customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, branch_id, id))
 
             if customer_id:
                 cur.execute("""

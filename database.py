@@ -207,20 +207,31 @@ def get_next_order_number(order_type='SO', branch_id=None, cur=None):
         row = c.fetchone()
         max_existing = _row_val(row, 'max_val', 0) or 0
 
-        # 3. Synchronize the PostgreSQL sequence if it is behind the existing orders
-        c.execute(f"SELECT last_value, is_called FROM {seq_name};")
-        srow = c.fetchone()
-        current_seq_val = _row_val(srow, 'last_value', 0) or 0
-        if max_existing > 0 and current_seq_val < max_existing:
-            c.execute(f"SELECT setval('{seq_name}', %s, true);", (max_existing,))
+        # 3. Synchronize the PostgreSQL sequence
+        if max_existing > 0:
+            c.execute(f"SELECT last_value, is_called FROM {seq_name};")
+            srow = c.fetchone()
+            current_seq_val = _row_val(srow, 'last_value', 0) or 0
+            if current_seq_val < max_existing:
+                c.execute(f"SELECT setval('{seq_name}', %s, true);", (max_existing,))
 
-        # 4. Advance sequence atomically
-        c.execute(f"SELECT nextval('{seq_name}') as val;")
-        next_val = _row_val(c.fetchone(), 'val', 0)
+            # 4. Advance sequence atomically
+            c.execute(f"SELECT nextval('{seq_name}') as val;")
+            next_val = _row_val(c.fetchone(), 'val', 0)
 
-        if next_val <= max_existing:
-            next_val = max_existing + 1
-            c.execute(f"SELECT setval('{seq_name}', %s, true);", (next_val,))
+            if next_val <= max_existing:
+                next_val = max_existing + 1
+                c.execute(f"SELECT setval('{seq_name}', %s, true);", (next_val,))
+        else:
+            # When a branch or scope has NO bills/orders yet, start strictly from 1
+            c.execute(f"SELECT last_value, is_called FROM {seq_name};")
+            srow = c.fetchone()
+            current_seq_val = _row_val(srow, 'last_value', 0) or 0
+            is_called = _row_val(srow, 'is_called', 1)
+            if current_seq_val > 1 or is_called:
+                c.execute(f"SELECT setval('{seq_name}', 1, false);")
+            c.execute(f"SELECT nextval('{seq_name}') as val;")
+            next_val = _row_val(c.fetchone(), 'val', 0)
 
         # 5. Ensure uniqueness against historical or manual entries
         while True:
@@ -288,18 +299,22 @@ def preview_order_number(order_type='SO', branch_id=None, cur=None):
         except Exception:
             max_existing = 0
 
-        seq_next = 1
-        try:
-            c.execute(f"SELECT last_value, is_called FROM {seq_name};")
-            srow = c.fetchone()
-            if srow:
-                s_last = _row_val(srow, 'last_value', 0) or 0
-                s_called = _row_val(srow, 'is_called', 1)
-                seq_next = s_last + (1 if s_called else 0)
-        except Exception:
-            pass
+        if max_existing == 0:
+            next_val = 1
+        else:
+            seq_next = max_existing + 1
+            try:
+                c.execute(f"SELECT last_value, is_called FROM {seq_name};")
+                srow = c.fetchone()
+                if srow:
+                    s_last = _row_val(srow, 'last_value', 0) or 0
+                    s_called = _row_val(srow, 'is_called', 1)
+                    c_next = s_last + (1 if s_called else 0)
+                    seq_next = max(max_existing + 1, c_next)
+            except Exception:
+                pass
+            next_val = seq_next
 
-        next_val = max(max_existing + 1, seq_next)
         return f"{prefix}{next_val:0{pad_len}d}"
 
     if cur is not None:
@@ -349,12 +364,14 @@ def resync_all_sequences(cur=None):
                 c.execute(f"""
                     SELECT MAX(SUBSTRING(order_number FROM %s)::bigint) as m
                     FROM sales_orders
-                    WHERE order_number ~ %s OR branch_id = %s;
-                """, (pattern, pattern, b_id))
+                    WHERE order_number ~ %s;
+                """, (pattern, pattern))
                 b_row = c.fetchone()
                 m_b = _row_val(b_row, 'm', 0) or 0
                 if m_b > 0:
                     c.execute(f"SELECT setval('{seq_name}', %s, true);", (m_b,))
+                else:
+                    c.execute(f"SELECT setval('{seq_name}', 1, false);")
         except Exception as b_err:
             logger.warning(f"Branch sequence resync warning: {b_err}")
 
