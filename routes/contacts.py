@@ -68,18 +68,101 @@ def _get_sidebar_customers(search_name='', search_contact='', search_phone='', s
 
     sql = f"""
         SELECT 
-            c.id, c.name, c.contact_name, c.phone, c.address1, c.billing_address, c.shipping_address, c.branch_id,
-            c.city, c.discount_percent, ps.name as pricing_scheme_name
+            c.id, c.name, c.contact_name, c.phone, c.email, c.address1, c.billing_address, c.shipping_address, c.branch_id,
+            c.city, c.discount_percent, ps.name as pricing_scheme_name,
+            b.name as branch_name, b.code as branch_code,
+            COALESCE(SUM(so.balance_due), 0) as open_balance,
+            COALESCE(SUM(so.total_amount), 0) as total_spent,
+            COUNT(so.id) as order_count
         FROM customers c
+        LEFT JOIN branches b ON c.branch_id = b.id
         LEFT JOIN pricing_schemes ps ON c.default_pricing_scheme_id = ps.id
+        LEFT JOIN sales_orders so ON c.id = so.customer_id AND so.status != 'CANCELLED'
         WHERE {' AND '.join(where)}
+        GROUP BY c.id, ps.name, b.name, b.code
         ORDER BY c.name ASC
         LIMIT 500
     """
     return query_all(sql, tuple(params))
 
+def _get_customer_full_data(customer_id, user_bid=None, is_main_admin=False):
+    customer = query_one("""
+        SELECT c.*, 
+               b.name as branch_name, b.code as branch_code,
+               ps.name as pricing_scheme_name,
+               COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), '') as display_address,
+               COALESCE((SELECT SUM(balance_due) FROM sales_orders WHERE customer_id = c.id AND status != 'CANCELLED'), 0) as balance,
+               COALESCE((SELECT SUM(total_amount) FROM sales_orders WHERE customer_id = c.id AND status != 'CANCELLED'), 0) as total_spent,
+               COALESCE((SELECT COUNT(*) FROM sales_orders WHERE customer_id = c.id AND status != 'CANCELLED'), 0) as order_count
+        FROM customers c
+        LEFT JOIN branches b ON c.branch_id = b.id
+        LEFT JOIN pricing_schemes ps ON c.default_pricing_scheme_id = ps.id
+        WHERE c.id = %s
+    """, (customer_id,))
+    
+    if not customer:
+        return None
+        
+    if not is_main_admin:
+        cust_bid = customer.get('branch_id')
+        if user_bid is None and cust_bid is not None:
+            return None
+        if user_bid is not None and (cust_bid is None or int(cust_bid) != user_bid):
+            return None
+
+    branch_cond = ""
+    order_params = [customer_id]
+    if not is_main_admin and user_bid:
+        branch_cond = " AND so.branch_id = %s"
+        order_params.append(user_bid)
+
+    orders = query_all(f"""
+        SELECT so.id, so.order_number, so.order_date, so.status, so.payment_status,
+               so.total_amount, so.paid_amount, so.balance_due, so.notes,
+               l.name as location_name,
+               (
+                   SELECT STRING_AGG(COALESCE(sub.p_name, sub.description, 'Item') || ' (' || sub.quantity || ')', ', ')
+                   FROM (
+                       SELECT sol.description, sol.quantity, p.name as p_name
+                       FROM sales_order_lines sol
+                       LEFT JOIN products p ON sol.product_id = p.id
+                       WHERE sol.sales_order_id = so.id
+                       LIMIT 4
+                   ) sub
+               ) as items_summary,
+               (SELECT SUM(quantity) FROM sales_order_lines WHERE sales_order_id = so.id) as total_qty
+        FROM sales_orders so
+        LEFT JOIN locations l ON so.location_id = l.id
+        WHERE so.customer_id = %s {branch_cond}
+        ORDER BY so.order_date DESC, so.id DESC
+        LIMIT 100
+    """, tuple(order_params))
+
+    stats_row = query_one(f"""
+        SELECT 
+            COUNT(*) as total_orders,
+            COALESCE(SUM(total_amount), 0) as total_spent,
+            COALESCE(SUM(balance_due), 0) as open_balance,
+            COUNT(CASE WHEN balance_due <= 0.0001 AND status != 'CANCELLED' THEN 1 END) as paid_orders,
+            COUNT(CASE WHEN balance_due > 0.0001 AND status != 'CANCELLED' THEN 1 END) as unpaid_orders
+        FROM sales_orders so
+        WHERE so.customer_id = %s AND so.status != 'CANCELLED' {branch_cond}
+    """, tuple(order_params)) or {
+        'total_orders': 0,
+        'total_spent': 0,
+        'open_balance': 0,
+        'paid_orders': 0,
+        'unpaid_orders': 0
+    }
+
+    return {
+        'customer': customer,
+        'orders': orders,
+        'stats': stats_row
+    }
+
 @contacts_bp.route('/customers')
-def list_customers():
+def list_customers(selected_id_override=None):
     is_main_admin = _is_main_admin()
     user_bid = _get_user_branch_id()
 
@@ -296,8 +379,57 @@ def list_customers():
             } for c in customers]
         })
 
+    # Determine which customer is selected for the modern split-view panel
+    selected_id_param = selected_id_override or request.args.get('selected_id') or request.args.get('id')
+    selected_id = None
+    if selected_id_param and str(selected_id_param).isdigit():
+        selected_id = int(selected_id_param)
+    elif customers:
+        selected_id = customers[0]['id']
+
+    selected_customer = None
+    selected_orders = []
+    selected_stats = {'total_orders': 0, 'total_spent': 0, 'open_balance': 0, 'paid_orders': 0, 'unpaid_orders': 0}
+
+    if selected_id:
+        cust_full = _get_customer_full_data(selected_id, user_bid, is_main_admin)
+        if cust_full:
+            selected_customer = cust_full['customer']
+            selected_orders = cust_full['orders']
+            selected_stats = cust_full['stats']
+            # If the selected customer is not in the currently paged/filtered list, prepend it so the card is present
+            if not any(c['id'] == selected_id for c in customers):
+                customers.insert(0, {
+                    'id': selected_customer['id'],
+                    'name': selected_customer['name'],
+                    'contact_name': selected_customer['contact_name'] or '',
+                    'phone': selected_customer['phone'] or '',
+                    'email': selected_customer['email'] or '',
+                    'city': selected_customer['city'] or '',
+                    'address1': selected_customer['address1'] or '',
+                    'billing_address': selected_customer['billing_address'] or '',
+                    'shipping_address': selected_customer['shipping_address'] or '',
+                    'open_balance': float(selected_customer['balance'] or 0),
+                    'total_spent': float(selected_customer['total_spent'] or 0),
+                    'order_count': int(selected_customer['order_count'] or 0),
+                    'branch_id': selected_customer.get('branch_id'),
+                    'branch_name': selected_customer.get('branch_name') or '',
+                    'branch_code': selected_customer.get('branch_code') or ''
+                })
+        elif customers:
+            fallback_full = _get_customer_full_data(customers[0]['id'], user_bid, is_main_admin)
+            if fallback_full:
+                selected_id = customers[0]['id']
+                selected_customer = fallback_full['customer']
+                selected_orders = fallback_full['orders']
+                selected_stats = fallback_full['stats']
+
     return render_template('contacts/customers.html',
                            customers=customers,
+                           selected_id=selected_id,
+                           selected_customer=selected_customer,
+                           selected_orders=selected_orders,
+                           selected_stats=selected_stats,
                            search=search,
                            search_name=search_name,
                            op_name=op_name,
@@ -366,102 +498,233 @@ def detail_customer(id):
     is_main_admin = _is_main_admin()
     user_bid = _get_user_branch_id()
 
-    customer = query_one("""
-        SELECT c.*, 
-               b.name as branch_name, b.code as branch_code,
-               COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), '') as display_address 
-        FROM customers c
-        LEFT JOIN branches b ON c.branch_id = b.id
-        WHERE c.id = %s
-    """, (id,))
+    customer = query_one("SELECT * FROM customers WHERE id = %s", (id,))
     if not customer:
+        if request.args.get('format') == 'json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('ajax') == '1':
+            return jsonify({'success': False, 'message': 'Customer not found.'}), 404
         flash("Customer not found.", "error")
         return redirect(url_for('contacts.list_customers'))
 
-    # Security rule: Branch user can ONLY view their own branch's customers
     if not _check_customer_branch_access(customer):
-        flash("🔒 Access Denied: You do not have permission to view customers outside your branch. / សិទ្ធិត្រូវបានកំណត់៖ អ្នកអាចមើលបានតែអតិថិជនក្នុងសាខារបស់អ្នកប៉ុណ្ណោះ", "error")
+        if request.args.get('format') == 'json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('ajax') == '1':
+            return jsonify({'success': False, 'message': 'Access Denied: You do not have permission to view customers outside your branch'}), 403
+        flash("🔒 Access Denied: You do not have permission to view customers outside your branch", "error")
         return redirect(url_for('contacts.list_customers'))
 
-    if not is_main_admin and user_bid:
-        orders = query_all("""
-            SELECT so.*, l.name as location_name
-            FROM sales_orders so
-            LEFT JOIN locations l ON so.location_id = l.id
-            WHERE so.customer_id = %s AND so.branch_id = %s
-            ORDER BY so.order_date DESC, so.id DESC
-            LIMIT 50
-        """, (id, user_bid))
-    else:
-        orders = query_all("""
-            SELECT so.*, l.name as location_name
-            FROM sales_orders so
-            LEFT JOIN locations l ON so.location_id = l.id
-            WHERE so.customer_id = %s
-            ORDER BY so.order_date DESC, so.id DESC
-            LIMIT 50
-        """, (id,))
+    # JSON response support for live AJAX selection without page reloads
+    if request.args.get('format') == 'json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.args.get('ajax') == '1':
+        cust_data = _get_customer_full_data(id, user_bid, is_main_admin)
+        if not cust_data:
+            return jsonify({'success': False, 'message': 'Customer not found or access denied.'}), 404
+        
+        c = cust_data['customer']
+        return jsonify({
+            'success': True,
+            'customer': {
+                'id': c['id'],
+                'name': c['name'] or '',
+                'contact_name': c['contact_name'] or '',
+                'phone': c['phone'] or '',
+                'fax': c['fax'] or '',
+                'email': c['email'] or '',
+                'website': c['website'] or '',
+                'address1': c['address1'] or '',
+                'address2': c['address2'] or '',
+                'city': c['city'] or '',
+                'state': c['state'] or '',
+                'country': c['country'] or 'Cambodia',
+                'postal_code': c['postal_code'] or '',
+                'shipping_address': c['shipping_address'] or c['address1'] or '',
+                'billing_address': c['billing_address'] or c['address1'] or '',
+                'display_address': c['display_address'] or '',
+                'default_pricing_scheme_id': c['default_pricing_scheme_id'] or 100,
+                'pricing_scheme_name': c['pricing_scheme_name'] or 'Retail 1',
+                'discount_percent': float(c['discount_percent'] or 0),
+                'payment_terms': c['payment_terms'] or 'Due on Receipt',
+                'remarks': c['remarks'] or '',
+                'tax_number': c.get('tax_number') or '',
+                'branch_id': c.get('branch_id'),
+                'branch_name': c.get('branch_name') or '',
+                'branch_code': c.get('branch_code') or '',
+                'balance': float(c.get('balance') or 0),
+                'total_spent': float(c.get('total_spent') or 0),
+                'order_count': int(c.get('order_count') or 0),
+                'created_at': str(c.get('created_at') or '')[:10],
+                'updated_at': str(c.get('updated_at') or '')[:10]
+            },
+            'orders': [{
+                'id': o['id'],
+                'order_number': o['order_number'],
+                'order_date': str(o['order_date'] or '')[:10],
+                'status': o['status'],
+                'payment_status': o['payment_status'],
+                'location_name': o['location_name'] or 'Main Warehouse',
+                'total_amount': float(o['total_amount'] or 0),
+                'paid_amount': float(o['paid_amount'] or 0),
+                'balance_due': float(o['balance_due'] or 0),
+                'items_summary': o['items_summary'] or 'Products',
+                'total_qty': float(o['total_qty'] or 0),
+                'notes': o['notes'] or ''
+            } for o in cust_data['orders']],
+            'stats': {
+                'total_orders': int(cust_data['stats']['total_orders']),
+                'total_spent': float(cust_data['stats']['total_spent']),
+                'open_balance': float(cust_data['stats']['open_balance']),
+                'paid_orders': int(cust_data['stats']['paid_orders']),
+                'unpaid_orders': int(cust_data['stats']['unpaid_orders'])
+            }
+        })
 
-    pricing_schemes = query_all("SELECT id, name FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
-    branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC") if is_main_admin else []
-    
-    search_name = request.args.get('search_name', '').strip()
-    search_contact = request.args.get('search_contact', '').strip()
-    search_phone = request.args.get('search_phone', '').strip()
-    search_address = request.args.get('search_address', '').strip()
-    sidebar_customers = _get_sidebar_customers(search_name, search_contact, search_phone, search_address)
+    # Direct browser GET navigation: render list_customers with selected_id=id
+    # so user gets full split-view interface with customer selected!
+    return list_customers(selected_id_override=id)
 
-    return render_template('contacts/customer_detail.html',
-                           customer=customer,
-                           orders=orders,
-                           pricing_schemes=pricing_schemes,
-                           branches=branches,
-                           is_main_admin=is_main_admin,
-                           sidebar_customers=sidebar_customers,
-                           is_new=False)
+@contacts_bp.route('/api/customers/<int:id>/details')
+def api_customer_details(id):
+    is_main_admin = _is_main_admin()
+    user_bid = _get_user_branch_id()
+    cust_data = _get_customer_full_data(id, user_bid, is_main_admin)
+    if not cust_data:
+        return jsonify({'success': False, 'message': 'Customer not found or access denied.'}), 404
+
+    c = cust_data['customer']
+    return jsonify({
+        'success': True,
+        'customer': {
+            'id': c['id'],
+            'name': c['name'] or '',
+            'contact_name': c['contact_name'] or '',
+            'phone': c['phone'] or '',
+            'fax': c['fax'] or '',
+            'email': c['email'] or '',
+            'website': c['website'] or '',
+            'address1': c['address1'] or '',
+            'address2': c['address2'] or '',
+            'city': c['city'] or '',
+            'state': c['state'] or '',
+            'country': c['country'] or 'Cambodia',
+            'postal_code': c['postal_code'] or '',
+            'shipping_address': c['shipping_address'] or c['address1'] or '',
+            'billing_address': c['billing_address'] or c['address1'] or '',
+            'display_address': c['display_address'] or '',
+            'default_pricing_scheme_id': c['default_pricing_scheme_id'] or 100,
+            'pricing_scheme_name': c['pricing_scheme_name'] or 'Retail 1',
+            'discount_percent': float(c['discount_percent'] or 0),
+            'payment_terms': c['payment_terms'] or 'Due on Receipt',
+            'remarks': c['remarks'] or '',
+            'tax_number': c.get('tax_number') or '',
+            'branch_id': c.get('branch_id'),
+            'branch_name': c.get('branch_name') or '',
+            'branch_code': c.get('branch_code') or '',
+            'balance': float(c.get('balance') or 0),
+            'total_spent': float(c.get('total_spent') or 0),
+            'order_count': int(c.get('order_count') or 0),
+            'created_at': str(c.get('created_at') or '')[:10],
+            'updated_at': str(c.get('updated_at') or '')[:10]
+        },
+        'orders': [{
+            'id': o['id'],
+            'order_number': o['order_number'],
+            'order_date': str(o['order_date'] or '')[:10],
+            'status': o['status'],
+            'payment_status': o['payment_status'],
+            'location_name': o['location_name'] or 'Main Warehouse',
+            'total_amount': float(o['total_amount'] or 0),
+            'paid_amount': float(o['paid_amount'] or 0),
+            'balance_due': float(o['balance_due'] or 0),
+            'items_summary': o['items_summary'] or 'Products',
+            'total_qty': float(o['total_qty'] or 0),
+            'notes': o['notes'] or ''
+        } for o in cust_data['orders']],
+        'stats': {
+            'total_orders': int(cust_data['stats']['total_orders']),
+            'total_spent': float(cust_data['stats']['total_spent']),
+            'open_balance': float(cust_data['stats']['open_balance']),
+            'paid_orders': int(cust_data['stats']['paid_orders']),
+            'unpaid_orders': int(cust_data['stats']['unpaid_orders'])
+        }
+    })
+
+@contacts_bp.route('/api/sales-orders/<int:id>/lines')
+def api_sales_order_lines(id):
+    lines = query_all("""
+        SELECT sol.id, sol.line_num, sol.quantity, sol.unit_price, sol.discount_percent, sol.subtotal,
+               COALESCE(p.name, sol.description, 'Item') as product_name,
+               COALESCE(p.sku, '') as product_sku,
+               COALESCE(p.image_url, '') as image_url
+        FROM sales_order_lines sol
+        LEFT JOIN products p ON sol.product_id = p.id
+        WHERE sol.sales_order_id = %s
+        ORDER BY sol.id ASC
+    """, (id,))
+    return jsonify({
+        'success': True,
+        'lines': [{
+            'id': l['id'],
+            'product_name': l['product_name'],
+            'product_sku': l['product_sku'],
+            'quantity': float(l['quantity'] or 0),
+            'unit_price': float(l['unit_price'] or 0),
+            'discount_percent': float(l['discount_percent'] or 0),
+            'subtotal': float(l['subtotal'] or 0),
+            'image_url': l['image_url'] or ''
+        } for l in lines]
+    })
 
 @contacts_bp.route('/customers/<int:id>/save', methods=['POST'])
 def save_customer(id):
+    is_ajax = (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+        request.is_json or
+        request.args.get('format') == 'json'
+    )
     try:
         is_main_admin = _is_main_admin()
         user_bid = _get_user_branch_id()
 
         existing = query_one("SELECT id, branch_id FROM customers WHERE id = %s", (id,))
         if not existing:
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Customer not found.'}), 404
             flash("Customer not found.", "error")
             return redirect(url_for('contacts.list_customers'))
 
         # Security check: Branch user can edit their own branch customer
         if not _check_customer_branch_access(existing):
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Permission denied: Cannot edit customers of other branches or HQ.'}), 403
             flash("🔒 Permission denied: Cannot edit customers of other branches or HQ.", "error")
             return redirect(url_for('contacts.list_customers'))
 
-        name = request.form.get('name', '').strip()
-        contact_name = request.form.get('contact_name', '').strip()
-        phone = request.form.get('phone', '').strip()
-        fax = request.form.get('fax', '').strip()
-        email = request.form.get('email', '').strip()
-        website = request.form.get('website', '').strip()
-        address1 = request.form.get('address1', '').strip()
-        address2 = request.form.get('address2', '').strip()
-        city = request.form.get('city', '').strip()
-        state = request.form.get('state', '').strip()
-        country = request.form.get('country', '').strip()
-        postal_code = request.form.get('postal_code', '').strip()
-        shipping_address = request.form.get('shipping_address', '').strip() or address1
-        billing_address = request.form.get('billing_address', '').strip() or address1
-        discount_percent = float(request.form.get('discount_percent', 0) or 0)
-        pricing_scheme_id = int(request.form.get('default_pricing_scheme_id') or 0) or None
-        payment_terms = request.form.get('payment_terms', 'Due on Receipt').strip()
-        remarks = request.form.get('remarks', '').strip()
+        data = request.get_json(silent=True) or request.form
+        name = (data.get('name') or '').strip()
+        contact_name = (data.get('contact_name') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        fax = (data.get('fax') or '').strip()
+        email = (data.get('email') or '').strip()
+        website = (data.get('website') or '').strip()
+        address1 = (data.get('address1') or data.get('address') or '').strip()
+        address2 = (data.get('address2') or '').strip()
+        city = (data.get('city') or '').strip()
+        state = (data.get('state') or '').strip()
+        country = (data.get('country') or '').strip()
+        postal_code = (data.get('postal_code') or '').strip()
+        shipping_address = (data.get('shipping_address') or '').strip() or address1
+        billing_address = (data.get('billing_address') or '').strip() or address1
+        discount_percent = float(data.get('discount_percent') or 0)
+        pricing_scheme_id = int(data.get('default_pricing_scheme_id') or data.get('pricing_scheme_id') or 0) or None
+        payment_terms = (data.get('payment_terms') or 'Due on Receipt').strip()
+        remarks = (data.get('remarks') or '').strip()
 
         if is_main_admin:
-            raw_b = request.form.get('branch_id')
+            raw_b = data.get('branch_id')
             target_branch_id = int(raw_b) if raw_b and str(raw_b).strip().isdigit() else None
         else:
             target_branch_id = existing.get('branch_id') if existing.get('branch_id') is not None else user_bid
 
         if not name:
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Customer Name is required.'}), 400
             flash("Customer Name is required.", "error")
             return redirect(url_for('contacts.detail_customer', id=id))
 
@@ -490,44 +753,85 @@ def save_customer(id):
             WHERE id = %s
         """, (name, contact_name, phone, fax, email, website, address1, address2, city, state, country, postal_code, shipping_address, billing_address, pricing_scheme_id, discount_percent, payment_terms, remarks, target_branch_id, id))
 
+        if is_ajax:
+            cust_full = _get_customer_full_data(id, user_bid, is_main_admin)
+            return jsonify({
+                'success': True,
+                'message': f"Customer '{name}' saved successfully!",
+                'customer': {
+                    'id': id,
+                    'name': name,
+                    'contact_name': contact_name,
+                    'phone': phone,
+                    'email': email,
+                    'website': website,
+                    'address1': address1,
+                    'address2': address2,
+                    'city': city,
+                    'state': state,
+                    'country': country,
+                    'postal_code': postal_code,
+                    'shipping_address': shipping_address,
+                    'billing_address': billing_address,
+                    'display_address': address1 or shipping_address or '',
+                    'pricing_scheme_id': pricing_scheme_id,
+                    'discount_percent': discount_percent,
+                    'payment_terms': payment_terms,
+                    'remarks': remarks,
+                    'branch_id': target_branch_id,
+                    'balance': float(cust_full['customer']['balance'] if cust_full else 0),
+                    'open_balance': float(cust_full['customer']['balance'] if cust_full else 0)
+                }
+            })
+
         flash(f"Customer '{name}' saved successfully!", "success")
-        return redirect(url_for('contacts.detail_customer', id=id))
+        return redirect(url_for('contacts.list_customers', selected_id=id))
 
     except Exception as e:
+        if is_ajax:
+            return jsonify({'success': False, 'message': str(e)}), 500
         flash(f"Error saving customer: {e}", "error")
         return redirect(url_for('contacts.detail_customer', id=id))
 
 @contacts_bp.route('/customers/create', methods=['POST'])
 def create_customer():
+    is_ajax = (
+        request.headers.get('X-Requested-With') == 'XMLHttpRequest' or
+        request.is_json or
+        request.args.get('format') == 'json'
+    )
     try:
         is_main_admin = _is_main_admin()
         user_bid = _get_user_branch_id()
 
-        name = request.form.get('name', '').strip()
-        contact_name = request.form.get('contact_name', '').strip()
-        phone = request.form.get('phone', '').strip()
-        fax = request.form.get('fax', '').strip()
-        email = request.form.get('email', '').strip()
-        website = request.form.get('website', '').strip()
-        address1 = request.form.get('address1', '').strip()
-        address2 = request.form.get('address2', '').strip()
-        city = request.form.get('city', '').strip()
-        state = request.form.get('state', '').strip()
-        country = request.form.get('country', '').strip()
-        postal_code = request.form.get('postal_code', '').strip()
-        shipping_address = request.form.get('shipping_address', '').strip() or address1
-        billing_address = request.form.get('billing_address', '').strip() or address1
-        discount_percent = float(request.form.get('discount_percent', 0) or 0)
-        pricing_scheme_id = int(request.form.get('default_pricing_scheme_id') or 0) or None
-        payment_terms = request.form.get('payment_terms', 'Due on Receipt').strip()
-        remarks = request.form.get('remarks', '').strip()
+        data = request.get_json(silent=True) or request.form
+        name = (data.get('name') or '').strip()
+        contact_name = (data.get('contact_name') or '').strip()
+        phone = (data.get('phone') or '').strip()
+        fax = (data.get('fax') or '').strip()
+        email = (data.get('email') or '').strip()
+        website = (data.get('website') or '').strip()
+        address1 = (data.get('address1') or data.get('address') or '').strip()
+        address2 = (data.get('address2') or '').strip()
+        city = (data.get('city') or '').strip()
+        state = (data.get('state') or '').strip()
+        country = (data.get('country') or '').strip()
+        postal_code = (data.get('postal_code') or '').strip()
+        shipping_address = (data.get('shipping_address') or '').strip() or address1
+        billing_address = (data.get('billing_address') or '').strip() or address1
+        discount_percent = float(data.get('discount_percent') or 0)
+        pricing_scheme_id = int(data.get('default_pricing_scheme_id') or data.get('pricing_scheme_id') or 0) or None
+        payment_terms = (data.get('payment_terms') or 'Due on Receipt').strip()
+        remarks = (data.get('remarks') or '').strip()
 
         if not name:
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Customer Name is required.'}), 400
             flash("Customer Name is required.", "error")
             return redirect(url_for('contacts.list_customers'))
 
         if is_main_admin:
-            raw_b = request.form.get('branch_id')
+            raw_b = data.get('branch_id')
             branch_id = int(raw_b) if raw_b and str(raw_b).strip().isdigit() else None
         else:
             branch_id = user_bid
@@ -543,10 +847,37 @@ def create_customer():
             RETURNING id;
         """, (name, contact_name, phone, fax, email, website, address1, address2, city, state, country, postal_code, shipping_address, billing_address, discount_percent, pricing_scheme_id, payment_terms, remarks, branch_id))
 
+        if is_ajax:
+            return jsonify({
+                'success': True,
+                'message': f"Customer '{name}' created successfully!",
+                'customer': {
+                    'id': new_id,
+                    'name': name,
+                    'contact_name': contact_name,
+                    'phone': phone,
+                    'email': email,
+                    'website': website,
+                    'address1': address1,
+                    'city': city,
+                    'display_address': address1 or shipping_address or '',
+                    'pricing_scheme_id': pricing_scheme_id,
+                    'discount_percent': discount_percent,
+                    'payment_terms': payment_terms,
+                    'remarks': remarks,
+                    'branch_id': branch_id,
+                    'balance': 0.0,
+                    'open_balance': 0.0,
+                    'order_count': 0
+                }
+            })
+
         flash(f"Customer '{name}' created successfully!", "success")
-        return redirect(url_for('contacts.detail_customer', id=new_id))
+        return redirect(url_for('contacts.list_customers', selected_id=new_id))
 
     except Exception as e:
+        if is_ajax:
+            return jsonify({'success': False, 'message': str(e)}), 500
         flash(f"Error creating customer: {e}", "error")
         return redirect(url_for('contacts.list_customers'))
 

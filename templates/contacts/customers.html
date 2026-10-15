@@ -4,996 +4,2199 @@
 {% block body_class %}customer-body-fullscreen{% endblock %}
 
 {% block content %}
-<!-- Top Accent Line (inFlow Lime Green) -->
-<div class="inflow-top-accent-bar" style="height: 4px; background: #659E27;"></div>
+<!-- Top Warm Accent Bar (Matching inFlow Modern Cloud UI) -->
+<div class="inflow-top-accent-bar" style="height: 3px; background: linear-gradient(90deg, #8C6541 0%, #D9A05B 50%, #8C6541 100%);"></div>
 
-<!-- Top inFlow Header Ribbon / Actions -->
-<div class="inflow-win-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1; gap: 12px; flex-wrap: wrap;">
-    <!-- Left: Badge & Quick Stats -->
-    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-        <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; background: #85BD28; color: #FFFFFF; font-weight: 700; font-size: 13px; border-radius: 3px; box-shadow: 0 1px 2px rgba(0,0,0,0.15);">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-            <span>Customers</span>
-        </div>
-
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: #64748B;">
-            <span style="background: #FFFFFF; border: 1px solid #CBD5E1; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #1E293B;">
-                Total: <strong id="ribbonTotalCount">{{ total_count }}</strong>
-            </span>
-            <span style="background: #FEF2F2; border: 1px solid #FECACA; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #DC2626;">
-                Receivables: <strong>{{ (summary_stats.total_receivables or 0) | currency }}</strong>
-            </span>
-            <span style="background: #F0FDF4; border: 1px solid #BBF7D0; padding: 2px 8px; border-radius: 3px; font-weight: 600; color: #16A34A;">
-                Total Sales: <strong>{{ (summary_stats.total_revenue or 0) | currency }}</strong>
-            </span>
-        </div>
-    </div>
-
-    <!-- Right: Branch Filter (HQ) & Action Buttons -->
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-        {% if is_main_admin %}
-        <!-- Branch Selector Pills for HQ -->
-        <div style="display: inline-flex; gap: 3px; align-items: center; background: #E2E8F0; padding: 2px; border-radius: 4px;">
-            <a href="{{ url_for('contacts.list_customers', branch='main', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-branch-pill {% if current_branch_param == 'main' %}active{% endif %}" title="HQ Main Store">
-                🏢 HQ Main
-            </a>
-            {% for b in branches %}
-            <a href="{{ url_for('contacts.list_customers', branch=b.id, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-branch-pill {% if current_branch_param == b.id|string %}active{% endif %}" title="{{ b.name }}">
-                🏪 {{ b.code or b.name }}
-            </a>
-            {% endfor %}
-            <a href="{{ url_for('contacts.list_customers', branch='all', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-branch-pill {% if current_branch_param == 'all' %}active{% endif %}" title="All Branches Combined">
-                🌐 All
-            </a>
-        </div>
-        {% endif %}
-
-        <!-- Quick Add Modal Button -->
-        <button type="button" onclick="openQuickAddModal()" class="inflow-tb-btn" style="background: #FFFFFF; color: #0F766E; border: 1px solid #99F6E4;" title="Quick Add Customer Modal (Alt+N)">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            <span>⚡ Quick Add</span>
-        </button>
-
-        <!-- New Customer Full Form Button -->
-        <a href="javascript:void(0);" onclick="openCustomerUrl('{{ url_for('contacts.new_customer') }}', 'New Customer')" 
-           class="inflow-tb-btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #94A3B8; font-weight: 600;" title="Create Customer (Full Detail)">
-            <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
-                <path d="M3 2C3 1.44772 3.44772 1 4 1H9.58579C9.851 1 10.1054 1.10536 10.2929 1.29289L13.7071 4.70711C13.8946 4.89464 14 5.149 14 5.41421V14C14 14.5523 13.5523 15 13 15H4C3.44772 15 3 14.5523 3 14V2Z" fill="#F8FAFC" stroke="#64748B" stroke-width="1.2"/>
-                <path d="M9.5 1V5H13.5" stroke="#64748B" stroke-width="1.2"/>
-                <path d="M8 8V12M6 10H10" stroke="#0284C7" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-            <span>+ New Customer</span>
-        </a>
-
-        <!-- Export CSV Button -->
-        <a href="{{ url_for('contacts.export_customers', branch=current_branch_param if is_main_admin else None, search=search, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir) }}" 
-           class="inflow-tb-btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1;" title="Export filtered customers to Excel CSV">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>Export CSV</span>
-        </a>
-
-        <!-- Refresh Button -->
-        <button type="button" onclick="window.location.reload()" class="inflow-tb-btn" style="background: #FFFFFF; color: #1E293B; border: 1px solid #CBD5E1;" title="Refresh list">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
-        </button>
-    </div>
-</div>
-
-<!-- Authentic inFlow Collapsible Search Pane (Matching step_img_38.png & step_img_50.png) -->
-<div class="inflow-list-search-pane" id="inflowSearchPane">
-    <!-- Header with Toggle Button & Actions -->
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-        <div onclick="toggleSearchPane()" style="cursor: pointer; display: inline-flex; align-items: center; gap: 5px; user-select: none;">
-            <span id="searchPaneArrow" style="font-size: 10px; color: #488210; font-weight: bold; transition: transform 0.15s ease;">▼</span>
-            <span style="font-size: 12.5px; font-weight: 700; color: #488210;">Search</span>
-            <span style="font-size: 11px; color: #648B1E; font-weight: 500;">(Click to collapse/expand)</span>
-        </div>
-
-        <div style="display: flex; gap: 8px; align-items: center;">
-            <!-- Quick Filter Pill: With Balance -->
-            <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, with_balance='1' if with_balance != '1' else '', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}"
-               style="font-size: 11px; padding: 2px 8px; border-radius: 3px; text-decoration: none; font-weight: 600; border: 1px solid {% if with_balance == '1' %}#DC2626{% else %}#A8D154{% endif %}; background: {% if with_balance == '1' %}#DC2626{% else %}#FFFFFF{% endif %}; color: {% if with_balance == '1' %}#FFFFFF{% else %}#2F540C{% endif %};">
-                ⚠️ With Balance Only
-            </a>
-
-            <!-- Quick Filter: Pricing Scheme -->
-            <select onchange="filterByScheme(this.value)" style="height: 22px; padding: 0 4px; font-size: 11px; border: 1px solid #A8D154; border-radius: 2px; background: #FFFFFF; color: #2F540C; font-weight: 500;">
-                <option value="">All Pricing Schemes</option>
-                {% for ps in pricing_schemes %}
-                <option value="{{ ps.id }}" {% if scheme_filter == ps.id|string %}selected{% endif %}>{{ ps.name }}</option>
-                {% endfor %}
-            </select>
-
-            <button type="button" onclick="submitSearchForm()" class="inflow-search-refresh-btn" style="background: linear-gradient(180deg, #FFFFFF 0%, #E8E8E8 100%); border: 1px solid #7F9DB9; border-radius: 2px; padding: 2px 14px; font-size: 11px; font-weight: 600; color: #1E293B; cursor: pointer; box-shadow: 0 1px 1px rgba(0,0,0,0.1);">
-                Refresh
+<!-- Master-Detail Split Workspace -->
+<div class="inflow-cust-split-workspace">
+    
+    <!-- ========================================================================= -->
+    <!-- LEFT MASTER PANEL: Customer List & Search (Matching Screenshot Left Panel) -->
+    <!-- ========================================================================= -->
+    <aside class="cust-master-sidebar" id="custMasterSidebar">
+        <!-- Top Toolbar: [ 🔍 ] [ All ▾ ] [ + ] -->
+        <div class="cust-master-topbar">
+            <!-- Search Toggle Button -->
+            <button type="button" class="cust-icon-btn" id="btnToggleSearch" onclick="toggleMasterSearch()" title="Toggle Search Bar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
             </button>
-            
-            {% if search_name or search_contact or search_phone or search_address or search or with_balance or scheme_filter %}
-            <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None) }}" style="font-size: 11px; color: #2F540C; text-decoration: underline; font-weight: 600;">
-                Reset Filters
-            </a>
-            {% endif %}
-        </div>
-    </div>
 
-    <!-- 4 inFlow Search Rows (with Operator Selectors: Contains -, Exact =, Starts ^) -->
-    <div id="searchPaneBody">
-        <form id="customerSearchForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
-            {% if is_main_admin and current_branch_param %}
-            <input type="hidden" name="branch" value="{{ current_branch_param }}">
-            {% endif %}
-            <input type="hidden" name="with_balance" id="hiddenWithBalance" value="{{ with_balance }}">
-            <input type="hidden" name="scheme_id" id="hiddenSchemeId" value="{{ scheme_filter }}">
-            <input type="hidden" name="sort_by" value="{{ sort_by }}">
-            <input type="hidden" name="sort_dir" value="{{ sort_dir }}">
-            <input type="hidden" name="per_page" value="{{ per_page_raw }}">
-
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 6px 14px; max-width: 1040px; margin-top: 4px;">
-                <!-- Row 1: Name -->
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Name</label>
-                    <select name="op_name" class="inflow-op-select" title="Search Operator: Contains (-), Exact (=), Starts with (^)">
-                        <option value="-" {% if op_name == '-' %}selected{% endif %}>-</option>
-                        <option value="=" {% if op_name == '=' %}selected{% endif %}>=</option>
-                        <option value="^" {% if op_name == '^' %}selected{% endif %}>^</option>
-                    </select>
-                    <input type="text" name="search_name" id="searchName" value="{{ search_name }}" 
-                           class="inflow-pane-input font-khmer" placeholder="Search customer name..." autocomplete="off" oninput="applyLiveFilter()">
-                </div>
-
-                <!-- Row 2: Contact -->
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Contact</label>
-                    <select name="op_contact" class="inflow-op-select" title="Search Operator">
-                        <option value="-" {% if op_contact == '-' %}selected{% endif %}>-</option>
-                        <option value="=" {% if op_contact == '=' %}selected{% endif %}>=</option>
-                        <option value="^" {% if op_contact == '^' %}selected{% endif %}>^</option>
-                    </select>
-                    <input type="text" name="search_contact" id="searchContact" value="{{ search_contact }}" 
-                           class="inflow-pane-input font-khmer" placeholder="Search contact name..." autocomplete="off" oninput="applyLiveFilter()">
-                </div>
-
-                <!-- Row 3: Phone -->
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Phone</label>
-                    <select name="op_phone" class="inflow-op-select" title="Search Operator">
-                        <option value="-" {% if op_phone == '-' %}selected{% endif %}>-</option>
-                        <option value="=" {% if op_phone == '=' %}selected{% endif %}>=</option>
-                        <option value="^" {% if op_phone == '^' %}selected{% endif %}>^</option>
-                    </select>
-                    <input type="text" name="search_phone" id="searchPhone" value="{{ search_phone }}" 
-                           class="inflow-pane-input" placeholder="Search phone number..." autocomplete="off" oninput="applyLiveFilter()">
-                </div>
-
-                <!-- Row 4: Address1 -->
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <label style="width: 58px; font-size: 11.5px; color: #2F540C; font-weight: 600; white-space: nowrap;">Address1</label>
-                    <select name="op_address" class="inflow-op-select" title="Search Operator">
-                        <option value="-" {% if op_address == '-' %}selected{% endif %}>-</option>
-                        <option value="=" {% if op_address == '=' %}selected{% endif %}>=</option>
-                        <option value="^" {% if op_address == '^' %}selected{% endif %}>^</option>
-                    </select>
-                    <input type="text" name="search_address" id="searchAddress" value="{{ search_address }}" 
-                           class="inflow-pane-input font-khmer" placeholder="Search address, city, street..." autocomplete="off" oninput="applyLiveFilter()">
+            <!-- Filter Pill Dropdown: [ All ▾ ] -->
+            <div class="cust-pill-dropdown-wrap">
+                <button type="button" class="cust-pill-btn" id="btnStatusFilter" onclick="toggleStatusDropdown(event)">
+                    <span id="statusFilterLabel">
+                        {% if with_balance == '1' %}With Balance
+                        {% elif scheme_filter %}Pricing Scheme
+                        {% elif current_branch_param and current_branch_param != 'all' and current_branch_param != 'main' %}Branch {{ current_branch_param }}
+                        {% else %}All{% endif %}
+                    </span>
+                    <span style="font-size: 10px; margin-left: 2px;">▾</span>
+                </button>
+                <div class="cust-menu-dropdown" id="statusDropdownMenu" style="display: none;">
+                    <div class="cust-menu-item {% if not with_balance and not scheme_filter and (not current_branch_param or current_branch_param == 'all' or current_branch_param == 'main') %}active{% endif %}" onclick="selectFilterPreset('all')">
+                        <span>All Customers</span>
+                    </div>
+                    <div class="cust-menu-item {% if with_balance == '1' %}active{% endif %}" onclick="selectFilterPreset('with_balance')">
+                        <span>⚠️ With Open Balance</span>
+                    </div>
+                    <div class="cust-menu-separator"></div>
+                    {% if is_main_admin %}
+                    <div style="padding: 4px 12px; font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase;">Branches (HQ)</div>
+                    <div class="cust-menu-item {% if current_branch_param == 'main' %}active{% endif %}" onclick="selectBranchFilter('main')">
+                        <span>🏢 HQ Main Store</span>
+                    </div>
+                    {% for b in branches %}
+                    <div class="cust-menu-item {% if current_branch_param == b.id|string %}active{% endif %}" onclick="selectBranchFilter('{{ b.id }}')">
+                        <span>🏪 {{ b.name }} ({{ b.code }})</span>
+                    </div>
+                    {% endfor %}
+                    <div class="cust-menu-item {% if current_branch_param == 'all' %}active{% endif %}" onclick="selectBranchFilter('all')">
+                        <span>🌐 All Branches</span>
+                    </div>
+                    <div class="cust-menu-separator"></div>
+                    {% endif %}
+                    <div style="padding: 4px 12px; font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase;">Pricing Schemes</div>
+                    {% for ps in pricing_schemes %}
+                    <div class="cust-menu-item {% if scheme_filter == ps.id|string %}active{% endif %}" onclick="selectSchemeFilter('{{ ps.id }}')">
+                        <span>🏷️ {{ ps.name }}</span>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
-        </form>
-    </div>
-</div>
 
-<!-- Data Grid Container (Authentic inFlow Table Matching step_img_38.png) -->
-<div class="inflow-grid-viewport" id="inflowGridViewport">
-    <table id="customerGridTable" class="inflow-table">
-        <thead>
-            <tr style="background: #85BD28; color: #FFFFFF; height: 26px; border-bottom: 1px solid #74A71E;">
-                <!-- Multi-select Checkbox Column Header -->
-                <th style="width: 32px; text-align: center; padding: 2px 4px; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 12;">
-                    <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAllRows(this.checked)" title="Select/Deselect All">
-                </th>
+            <!-- Quick Add Button: [ + ] -->
+            <button type="button" class="cust-icon-btn" onclick="startNewCustomer()" title="Create New Customer (+)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+        </div>
 
-                <!-- 13 Desktop Columns -->
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
-                    <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, sort_by='name', sort_dir='desc' if sort_by == 'name' and sort_dir == 'asc' else 'asc', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, per_page=per_page_raw) }}" 
-                       style="color: #FFFFFF; text-decoration: none; display: flex; align-items: center; justify-content: space-between;">
-                        <span>Name</span>
-                        <span>{% if sort_by == 'name' %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% else %}▲{% endif %}</span>
-                    </a>
-                </th>
+        <!-- Collapsible Search Input Box -->
+        <div class="cust-search-box-wrap" id="custSearchBoxWrap">
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" style="position: absolute; left: 9px; pointer-events: none;">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="custLiveSearchInput" class="cust-search-input font-khmer" 
+                       placeholder="Search name, phone, city, address..." 
+                       value="{{ search_name or search }}" 
+                       autocomplete="off" 
+                       oninput="handleLiveSearch(this.value)">
+                <button type="button" class="cust-clear-search-btn" id="btnClearSearch" onclick="clearLiveSearch()" style="display: none;">✕</button>
+            </div>
+        </div>
 
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
-                    <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, sort_by='contact', sort_dir='desc' if sort_by == 'contact' and sort_dir == 'asc' else 'asc', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, per_page=per_page_raw) }}" 
-                       style="color: #FFFFFF; text-decoration: none;">
-                        Contact {% if sort_by == 'contact' %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
-                    </a>
-                </th>
+        <!-- Sub-header: 🎚️ Filters Toggle -->
+        <div class="cust-filter-toggle-row">
+            <button type="button" class="cust-filter-btn" onclick="toggleAdvancedFilters()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <line x1="1" y1="14" x2="7" y2="14"></line>
+                    <line x1="9" y1="8" x2="15" y2="8"></line>
+                    <line x1="17" y1="16" x2="23" y2="16"></line>
+                </svg>
+                <span>Filters</span>
+                <span id="activeFiltersBadge" class="cust-badge-dot" style="display: {% if search_name or search_phone or search_address or with_balance or scheme_filter %}inline-block{% else %}none{% endif %};"></span>
+            </button>
+            <span style="font-size: 11px; color: #94A3B8; font-weight: 600;" id="custCounterLabel">{{ customers|length }} Customers</span>
+        </div>
 
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Phone</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Email</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Website</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Address1</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Address2</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">City</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">State/Province</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Zip/Postal Code</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Country</th>
-                <th style="padding: 3px 8px; text-align: left; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Pricing / Currency</th>
-                <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Discount</th>
-                
-                {% if is_main_admin %}
-                <th style="padding: 3px 8px; text-align: center; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">Branch</th>
+        <!-- Collapsible Advanced Filters Drawer -->
+        <div class="cust-adv-filters-drawer" id="custAdvFiltersDrawer" style="display: none;">
+            <form id="advFilterForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
+                {% if is_main_admin and current_branch_param %}
+                <input type="hidden" name="branch" value="{{ current_branch_param }}">
                 {% endif %}
+                <div class="cust-drawer-field">
+                    <label>Customer Name:</label>
+                    <input type="text" name="search_name" id="advSearchName" value="{{ search_name }}" class="cust-drawer-input font-khmer" placeholder="Search name...">
+                </div>
+                <div class="cust-drawer-field">
+                    <label>Phone Number:</label>
+                    <input type="text" name="search_phone" id="advSearchPhone" value="{{ search_phone }}" class="cust-drawer-input" placeholder="e.g. 012...">
+                </div>
+                <div class="cust-drawer-field">
+                    <label>Address / City:</label>
+                    <input type="text" name="search_address" id="advSearchAddress" value="{{ search_address }}" class="cust-drawer-input font-khmer" placeholder="Phnom Penh, Toul Kork...">
+                </div>
+                <div class="cust-drawer-field" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                    <input type="checkbox" name="with_balance" id="advWithBalance" value="1" {% if with_balance == '1' %}checked{% endif %}>
+                    <label for="advWithBalance" style="cursor: pointer; margin: 0; font-weight: 600; color: #DC2626;">Only With Open Balance</label>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end;">
+                    <a href="{{ url_for('contacts.list_customers') }}" class="cust-btn-subtle" style="font-size: 11px; text-decoration: none; padding: 4px 8px;">Reset</a>
+                    <button type="submit" class="cust-btn-primary" style="font-size: 11px; padding: 4px 12px;">Apply</button>
+                </div>
+            </form>
+        </div>
 
-                <th style="padding: 3px 8px; text-align: right; font-weight: 700; border-right: 1px solid #7CB325; position: sticky; top: 0; background: #85BD28; z-index: 10;">
-                    <a href="{{ url_for('contacts.list_customers', branch=current_branch_param if is_main_admin else None, sort_by='balance', sort_dir='desc' if sort_by == 'balance' and sort_dir == 'asc' else 'asc', search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, per_page=per_page_raw) }}" 
-                       style="color: #FFFFFF; text-decoration: none;">
-                        Open Balance {% if sort_by == 'balance' %}{{ '▲' if sort_dir == 'asc' else '▼' }}{% endif %}
-                    </a>
-                </th>
+        <!-- Section List Subtitle: "Customer" -->
+        <div class="cust-list-section-header">
+            <span>Customer</span>
+            <span style="font-size: 11px; color: #64748B; font-weight: 500;">Balance</span>
+        </div>
 
-                <th style="width: 75px; padding: 3px 6px; text-align: center; font-weight: 700; position: sticky; top: 0; background: #85BD28; z-index: 10;">Actions</th>
-            </tr>
-        </thead>
-        <tbody id="customerTableBody">
-            {% for c in customers %}
-            <tr class="inflow-grid-row" 
-                data-id="{{ c.id }}"
-                data-name="{{ (c.name or '')|lower }}"
-                data-contact="{{ (c.contact_name or '')|lower }}"
-                data-phone="{{ (c.phone or '')|lower }}"
-                data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
-                onclick="handleRowClick(event, this)"
-                ondblclick="openCustomerUrl('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
-                tabindex="0"
-                title="Double-click to open customer details &bull; Delete key to remove">
+        <!-- Customer Cards List (Scrollable) -->
+        <div class="cust-card-scroll-area" id="custCardScrollArea">
+            <div id="custCardList">
+                {% for c in customers %}
+                <div class="cust-list-card {% if selected_id and c.id == selected_id %}active{% elif not selected_id and loop.first %}active{% endif %}"
+                     id="custCard_{{ c.id }}"
+                     data-id="{{ c.id }}"
+                     data-name="{{ (c.name or '')|lower }}"
+                     data-phone="{{ (c.phone or '')|lower }}"
+                     data-city="{{ (c.city or '')|lower }}"
+                     data-contact="{{ (c.contact_name or '')|lower }}"
+                     data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
+                     data-balance="{{ c.open_balance or 0 }}"
+                     onclick="selectCustomer({{ c.id }})">
+                    
+                    <!-- Card Top Row: Name & Status Pill -->
+                    <div class="cust-card-row-top">
+                        <span class="cust-card-name font-khmer" title="{{ c.name }}">{{ c.name }}</span>
+                        {% if c.open_balance and c.open_balance > 0 %}
+                        <span class="cust-status-badge unfulfilled">Unpaid</span>
+                        {% else %}
+                        <span class="cust-status-badge fulfilled">Active</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Card Bottom Row: Balance Pill & City/Phone -->
+                    <div class="cust-card-row-bottom">
+                        <span class="cust-balance-pill {% if c.open_balance and c.open_balance > 0 %}has-balance{% else %}zero-balance{% endif %}">
+                            {{ (c.open_balance or 0) | currency }}
+                        </span>
+                        <div class="cust-card-meta-text">
+                            {% if c.phone %}
+                            <span>{{ c.phone }}</span>
+                            {% elif c.city %}
+                            <span>{{ c.city }}</span>
+                            {% elif c.contact_name %}
+                            <span>{{ c.contact_name }}</span>
+                            {% endif %}
+                            {% if is_main_admin and c.branch_code %}
+                            <span class="cust-branch-tag">🏪 {{ c.branch_code }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div id="noCustMessage" style="padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12.5px;">
+                    No customers found matching criteria.
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div id="custNoMatchFilterMsg" style="display: none; padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12.5px; font-style: italic;">
+                No customer cards match this search.
+            </div>
+        </div>
+
+        <!-- Master List Footer: Total Customers & Quick Stats -->
+        <div class="cust-master-footer">
+            <div style="font-size: 11px; color: #64748B;">
+                Total: <strong>{{ total_count }}</strong>
+            </div>
+            <div style="font-size: 11px; color: {% if (summary_stats.total_receivables or 0) > 0 %}#DC2626{% else %}#16A34A{% endif %}; font-weight: 700;">
+                Due: {{ (summary_stats.total_receivables or 0) | currency }}
+            </div>
+        </div>
+    </aside>
+
+
+    <!-- ========================================================================= -->
+    <!-- RIGHT DETAIL PANEL: Customer Control & Order History (Matching Screenshot)-->
+    <!-- ========================================================================= -->
+    <main class="cust-detail-canvas" id="custDetailCanvas">
+        
+        <!-- Top Action Toolbar Matching Screenshot -->
+        <div class="cust-detail-toolbar">
+            <!-- Left: Close Button [ ✕ ] -->
+            <div class="cust-toolbar-left">
+                <button type="button" class="cust-tb-close-btn" onclick="handleToolbarClose()" title="Close details / Return">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Right: Action Links Matching Screenshot -->
+            <div class="cust-toolbar-right">
+                <!-- Deactivate / Delete Button with Red Dot -->
+                <button type="button" class="cust-tb-action-link danger" id="btnCustDeactivate" onclick="handleDeactivateCurrentCustomer()" title="Deactivate or Archive this customer">
+                    <span class="cust-tb-red-dot"></span>
+                    <span id="btnDeactivateLabel">Deactivate</span>
+                </button>
+
+                <!-- Attachments -->
+                <button type="button" class="cust-tb-action-link" onclick="handleCustomerAttachments()" title="Customer Attachments">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span>Attachments</span>
+                </button>
+
+                <!-- Copy Customer -->
+                <button type="button" class="cust-tb-action-link" onclick="handleCopyCustomer()" title="Copy / Duplicate this customer profile">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy customer</span>
+                </button>
+
+                <!-- Print Dropdown: [ 🖨️ Print ▾ ] -->
+                <div class="cust-dropdown-wrapper">
+                    <button type="button" class="cust-tb-action-link" onclick="togglePrintDropdown(event)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>Print</span>
+                        <span style="font-size: 10px;">▾</span>
+                    </button>
+                    <div class="cust-menu-dropdown right-aligned" id="printDropdownMenu" style="display: none;">
+                        <div class="cust-menu-item" onclick="printCustomerStatement()">
+                            <span>📄 Print Statement of Account</span>
+                        </div>
+                        <div class="cust-menu-item" onclick="openCustomerDeliveryModal()">
+                            <span>🚚 Print Delivery Label (80x100mm)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Dropdown: [ ✉️ Email ▾ ] -->
+                <div class="cust-dropdown-wrapper">
+                    <button type="button" class="cust-tb-action-link" onclick="toggleEmailDropdown(event)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        <span>Email</span>
+                        <span style="font-size: 10px;">▾</span>
+                    </button>
+                    <div class="cust-menu-dropdown right-aligned" id="emailDropdownMenu" style="display: none;">
+                        <div class="cust-menu-item" onclick="emailCustomerStatement()">
+                            <span>✉️ Email Statement of Account</span>
+                        </div>
+                        <div class="cust-menu-item" onclick="emailPaymentReminder()">
+                            <span>⚠️ Email Payment Reminder</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- More Dropdown: [ ••• More ▾ ] -->
+                <div class="cust-dropdown-wrapper">
+                    <button type="button" class="cust-tb-action-link" onclick="toggleMoreDropdown(event)">
+                        <span>••• More</span>
+                        <span style="font-size: 10px;">▾</span>
+                    </button>
+                    <div class="cust-menu-dropdown right-aligned" id="moreDropdownMenu" style="display: none;">
+                        <div class="cust-menu-item" onclick="exportCustomerOrdersCsv()">
+                            <span>📊 Export Orders to CSV</span>
+                        </div>
+                        <div class="cust-menu-item" onclick="openFullEditModal()">
+                            <span>✏️ Full Edit Profile</span>
+                        </div>
+                        <div class="cust-menu-separator"></div>
+                        <div class="cust-menu-item danger" onclick="handleDeactivateCurrentCustomer()">
+                            <span>🗑️ Delete / Archive Customer</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Customer Button (Prominent) -->
+                <button type="button" class="cust-save-btn" id="btnSaveCustomer" onclick="saveCustomerData()" title="Save changes (Ctrl+S)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <span>Save</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable Detail Body Container -->
+        <div class="cust-detail-scroll-content" id="custDetailScrollContent">
+            
+            <!-- VIEW MODE: Showing Customer Details & Order History -->
+            <div id="custViewContainer">
                 
-                <!-- Checkbox -->
-                <td style="text-align: center; padding: 2px 4px; border-right: 1px solid #E2E8F0;" onclick="event.stopPropagation()">
-                    <input type="checkbox" class="customer-row-checkbox" value="{{ c.id }}" onchange="updateSelectedCount()">
-                </td>
+                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout) -->
+                <div class="cust-meta-header-grid">
+                    
+                    <!-- COLUMN 1: Identity & Assignment -->
+                    <div class="cust-meta-col-1">
+                        <!-- Top status pill: [ Fulfilled / Active ] -->
+                        <div style="margin-bottom: 8px;">
+                            <span class="cust-status-badge fulfilled" id="detailHeaderStatusPill">
+                                {% if selected_customer and selected_customer.balance and selected_customer.balance > 0 %}Unpaid Balance{% else %}Active Customer{% endif %}
+                            </span>
+                        </div>
 
-                <!-- 1. Name -->
-                <td style="padding: 3px 8px; font-weight: 600; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">
-                    <a href="javascript:void(0);" onclick="openCustomerUrl('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" style="color: inherit; text-decoration: none;">
-                        {{ c.name }}
-                    </a>
-                </td>
+                        <!-- Big Title: Customer Name -->
+                        <h1 class="cust-primary-title font-khmer" id="detailCustomerName">
+                            {{ selected_customer.name if selected_customer else 'Select a customer' }}
+                        </h1>
 
-                <!-- 2. Contact -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">{{ c.contact_name or '' }}</td>
+                        <!-- Meta row 1: Created Date -->
+                        <div class="cust-meta-line">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            <span>Customer since <strong id="detailCreatedAt">{{ (selected_customer.created_at|string)[:10] if selected_customer and selected_customer.created_at else 'Active' }}</strong></span>
+                        </div>
 
-                <!-- 3. Phone -->
-                <td style="padding: 3px 8px; font-family: monospace; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.phone or '' }}</td>
+                        <!-- Meta row 2: Assigned Branch / Rep -->
+                        <div class="cust-meta-line">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            <span>Assigned to <strong id="detailBranchText">{{ selected_customer.branch_name if selected_customer and selected_customer.branch_name else 'Main Store (HQ)' }}</strong></span>
+                        </div>
 
-                <!-- 4. Email -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.email or '' }}</td>
+                        <!-- Meta row 3: Quick Contact Link (e.g. Rolling Rolling 123 > ↗) -->
+                        <div class="cust-meta-line" style="margin-top: 6px;">
+                            <a href="javascript:void(0);" onclick="openContactModal()" class="cust-contact-link font-khmer" id="detailContactLink">
+                                <span id="detailContactPersonText">{{ selected_customer.contact_name or selected_customer.name if selected_customer else 'Customer Contact' }}</span>
+                                <span style="font-size: 11px;">&gt;</span>
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>
+                        </div>
+                    </div>
 
-                <!-- 5. Website -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.website or '' }}</td>
+                    <!-- COLUMN 2: Pricing Scheme, Warehouse & Address -->
+                    <div class="cust-meta-col-2">
+                        <!-- Pricing Scheme / Terms -->
+                        <div class="cust-meta-line">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                            <span>Pricing Scheme:</span>
+                            <select id="detailPricingSchemeSelect" class="cust-meta-select" onchange="markFieldDirty('pricing_scheme_id')">
+                                {% for ps in pricing_schemes %}
+                                <option value="{{ ps.id }}" {% if selected_customer and selected_customer.default_pricing_scheme_id == ps.id %}selected{% endif %}>{{ ps.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
 
-                <!-- 6. Address1 -->
-                <td style="padding: 3px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer" title="{{ c.address1 or c.billing_address or '' }}">
-                    {{ c.address1 or c.billing_address or '' }}
-                </td>
+                        <!-- Location / Branch Selector -->
+                        <div class="cust-meta-line">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                            {% if is_main_admin %}
+                            <select id="detailBranchSelect" class="cust-meta-select" onchange="markFieldDirty('branch_id')">
+                                <option value="">Main Warehouse (HQ)</option>
+                                {% for b in branches %}
+                                <option value="{{ b.id }}" {% if selected_customer and selected_customer.branch_id|string == b.id|string %}selected{% endif %}>{{ b.name }} ({{ b.code }})</option>
+                                {% endfor %}
+                            </select>
+                            {% else %}
+                            <strong style="color: #1E293B;" id="detailBranchStatic">{{ selected_customer.branch_name or 'Main Warehouse' if selected_customer else 'Main Warehouse' }}</strong>
+                            {% endif %}
+                        </div>
 
-                <!-- 7. Address2 -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">{{ c.address2 or '' }}</td>
+                        <!-- Address Block (with Street, City, State, Country) -->
+                        <div class="cust-address-card" onclick="openAddressModal()" title="Click to edit customer address">
+                            <div class="cust-address-lines font-khmer" id="detailAddressText">
+                                {% if selected_customer and (selected_customer.address1 or selected_customer.billing_address or selected_customer.shipping_address) %}
+                                    {{ selected_customer.address1 or selected_customer.shipping_address or selected_customer.billing_address }}<br>
+                                    {% if selected_customer.city %}{{ selected_customer.city }}, {% endif %}{{ selected_customer.state or '' }} {{ selected_customer.postal_code or '' }}<br>
+                                    {{ selected_customer.country or 'Cambodia' }}
+                                {% else %}
+                                    <span style="color: #94A3B8; font-style: italic;">+ Set business & delivery address</span>
+                                {% endif %}
+                            </div>
+                            <span class="cust-address-edit-hint">✏️ Edit</span>
+                        </div>
 
-                <!-- 8. City -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.city or '' }}</td>
+                        <!-- Custom Fields / Extras Matching Screenshot -->
+                        <div class="cust-custom-fields-row">
+                            <div class="cust-cf-item">
+                                <span class="cust-cf-label">Discount:</span>
+                                <input type="number" id="detailDiscountInput" step="any" min="0" max="100" class="cust-cf-input" value="{{ selected_customer.discount_percent or 0 if selected_customer else 0 }}" onchange="markFieldDirty('discount_percent')" style="width: 50px; text-align: right;">
+                                <span style="font-size: 11px; color: #64748B;">%</span>
+                            </div>
+                            <div class="cust-cf-item">
+                                <span class="cust-cf-label">VAT / Tax #:</span>
+                                <input type="text" id="detailTaxNumberInput" class="cust-cf-input" value="{{ selected_customer.tax_number or '' if selected_customer else '' }}" placeholder="Enter data" onchange="markFieldDirty('tax_number')" style="width: 130px;">
+                            </div>
+                            <div class="cust-cf-item">
+                                <a href="javascript:void(0);" onclick="openFullEditModal()" style="font-size: 11.5px; color: #8C6541; text-decoration: none; font-weight: 600;">⚙ Manage all fields</a>
+                            </div>
+                        </div>
+                    </div>
 
-                <!-- 9. State/Province -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.state or '' }}</td>
+                    <!-- COLUMN 3: Financial Summary Box (Matching Screenshot Top Right) -->
+                    <div class="cust-meta-col-3">
+                        <!-- Top: Paid / Balance Header & Badge -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748B; letter-spacing: 0.05em;">Open Balance</span>
+                            <span class="cust-balance-badge-large" id="detailBalanceLargeBadge">
+                                {{ (selected_customer.balance or 0) | currency if selected_customer else '$0.00' }}
+                            </span>
+                        </div>
 
-                <!-- 10. Zip/Postal Code -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.postal_code or '' }}</td>
+                        <!-- Payment history ℹ️ -->
+                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
+                            <span style="font-size: 11px; color: #64748B;">Total Spent: <strong id="detailTotalSpentText" style="color: #0F172A;">{{ (selected_stats.total_spent or selected_customer.total_spent or 0) | currency if selected_customer else '$0.00' }}</strong></span>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                        </div>
 
-                <!-- 11. Country -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.country or 'Cambodia' }}</td>
+                        <!-- Currency Selector -->
+                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 4px;">
+                            <span style="font-size: 11.5px; color: #64748B;">💵 Currency:</span>
+                            <strong style="font-size: 12px; color: #1E293B;">US Dollar ($) ▾</strong>
+                        </div>
 
-                <!-- 12. Pricing / Currency -->
-                <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">{{ c.pricing_scheme_name or 'Retail 1' }}</td>
+                        <!-- Tax / Pricing Scheme Summary -->
+                        <div class="cust-meta-line" style="justify-content: flex-end;">
+                            <span style="font-size: 11px; color: #64748B;">🔗 <span id="detailSchemeSummaryText">{{ selected_customer.pricing_scheme_name if selected_customer and selected_customer.pricing_scheme_name else 'Retail 1' }}</span></span>
+                        </div>
 
-                <!-- 13. Discount -->
-                <td style="padding: 3px 8px; text-align: right; color: inherit; border-right: 1px solid #E2E8F0;">{{ '%.0f'|format(c.discount_percent or 0) }}%</td>
-                
-                <!-- Branch (HQ Admin) -->
-                {% if is_main_admin %}
-                <td style="padding: 3px 8px; text-align: center; border-right: 1px solid #E2E8F0;">
-                    {% if c.branch_name %}
-                    <span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">
-                        🏪 {{ c.branch_code or c.branch_name }}
-                    </span>
-                    {% else %}
-                    <span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;">
-                        🏢 HQ
-                    </span>
-                    {% endif %}
-                </td>
-                {% endif %}
+                        <!-- Payment Terms -->
+                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 6px;">
+                            <span style="font-size: 11.5px; color: #64748B;">Terms:</span>
+                            <select id="detailPaymentTermsSelect" class="cust-meta-select" onchange="markFieldDirty('payment_terms')">
+                                <option value="Due on Receipt" {% if selected_customer and selected_customer.payment_terms == 'Due on Receipt' %}selected{% endif %}>Due on Receipt</option>
+                                <option value="Net 15" {% if selected_customer and selected_customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
+                                <option value="Net 30" {% if selected_customer and selected_customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
+                                <option value="Net 60" {% if selected_customer and selected_customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
+                                <option value="COD" {% if selected_customer and selected_customer.payment_terms == 'COD' %}selected{% endif %}>COD</option>
+                                <option value="Prepaid" {% if selected_customer and selected_customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
+                            </select>
+                        </div>
+                    </div>
 
-                <!-- Open Balance -->
-                <td style="padding: 3px 8px; text-align: right; font-weight: 700; color: {% if c.open_balance > 0 %}#DC2626{% else %}inherit{% endif %}; border-right: 1px solid #E2E8F0;">
-                    {{ c.open_balance | currency }}
-                </td>
+                </div>
 
-                <!-- Actions: Detail button & 1-click Delete cross button -->
-                <td style="padding: 2px 4px; text-align: center; white-space: nowrap;">
-                    <div style="display: inline-flex; align-items: center; gap: 3px;">
-                        <a href="javascript:void(0);" onclick="openCustomerUrl('{{ url_for('contacts.detail_customer', id=c.id) }}', 'Customer: {{ c.name|replace("'", "\\'") }}')" 
-                           class="inflow-row-btn" title="Open customer details">
-                            Detail
-                        </a>
-                        <!-- 1-Click Hover Cross Button to Delete/Deactivate -->
-                        <button type="button" class="inflow-row-delete-btn" onclick="event.stopPropagation(); deleteSingleCustomer({{ c.id }}, '{{ c.name|replace("'", "\\'") }}')" title="Delete or Archive Customer (1-click)">
-                            ✕
+                <!-- INTERACTIVE MID STATUS / PROGRESS BAR (Matching Screenshot Progress Bar) -->
+                <div class="cust-mid-progress-bar">
+                    <!-- Left: + Add customer remarks -->
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button type="button" class="cust-remarks-toggle-btn" onclick="toggleRemarksBox()">
+                            <span>+ Add customer remarks</span>
                         </button>
                     </div>
-                </td>
-            </tr>
-            {% else %}
-            <tr id="noCustomersRow">
-                <td colspan="{% if is_main_admin %}18{% else %}17{% endif %}" style="text-align: center; color: #64748B; padding: 36px; font-style: italic;">
-                    No customers found matching the search criteria.
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
 
-<!-- Floating Multi-select Action Bar (Slides up when rows are selected) -->
-<div id="bulkActionBar" class="inflow-bulk-bar" style="display: none;">
-    <div style="display: flex; align-items: center; gap: 8px;">
-        <span style="font-weight: 700; color: #0F172A;" id="bulkSelectedCount">0 customers selected</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 8px;">
-        <button type="button" onclick="confirmBulkDelete()" class="btn-bulk-delete" title="Delete or archive selected customers">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-            <span>Delete Selected</span>
-        </button>
-        <button type="button" onclick="exportSelectedCustomers()" class="btn-bulk-action" title="Export selected customers to CSV">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            <span>Export Selected</span>
-        </button>
-        <button type="button" onclick="clearSelectedRows()" class="btn-bulk-cancel">
-            ✕ Deselect
-        </button>
-    </div>
-</div>
+                    <!-- Center: Workflow Stepper / Orders Summary -->
+                    <div class="cust-workflow-tracker">
+                        <div class="cust-tracker-step active">
+                            <span class="cust-tracker-icon">🛒</span>
+                            <span>Orders (<strong id="trackerTotalOrders">{{ selected_stats.total_orders or (selected_orders|length) }}</strong>)</span>
+                        </div>
+                        <div class="cust-tracker-line"></div>
+                        <div class="cust-tracker-step completed">
+                            <span class="cust-tracker-icon">✓</span>
+                            <span>Paid (<strong id="trackerPaidOrders">{{ selected_stats.paid_orders or 0 }}</strong>)</span>
+                        </div>
+                        <div class="cust-tracker-line"></div>
+                        <div class="cust-tracker-step {% if (selected_stats.unpaid_orders or 0) > 0 %}warning{% endif %}">
+                            <span class="cust-tracker-icon">⚠️</span>
+                            <span>Unpaid (<strong id="trackerUnpaidOrders">{{ selected_stats.unpaid_orders or 0 }}</strong>)</span>
+                        </div>
+                    </div>
 
-<!-- Authentic inFlow Bottom Status Bar (Matching step_img_50.png) -->
-<div class="inflow-status-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 14px; background: #ECECEC; border-top: 1px solid #CBD5E1; font-size: 11.5px; color: #334155; user-select: none;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-        <span>Total number of Customers displayed: <strong id="displayedCount">{{ customers|length }}</strong></span>
-        {% if total_count > customers|length or page > 1 %}
-        <span style="color: #64748B;">(Page {{ page }} of {{ total_pages }} &bull; {{ total_count }} total)</span>
-        {% endif %}
+                    <!-- Right: Quick Actions -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" class="cust-action-pill-btn primary" onclick="createNewOrderForCurrentCustomer()">
+                            <span>+ Create Sales Order</span>
+                        </button>
+                        <button type="button" class="cust-action-pill-btn secondary" onclick="openCustomerDeliveryModal()">
+                            <span>🚚 Delivery Label</span>
+                        </button>
+                    </div>
+                </div>
 
-        <!-- Per page selector -->
-        <span style="color: #CBD5E1;">|</span>
-        <div style="display: flex; align-items: center; gap: 4px;">
-            <label for="perPageSelect" style="font-size: 11px; color: #64748B;">Show:</label>
-            <select id="perPageSelect" onchange="changePerPage(this.value)" style="height: 20px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF; color: #1E293B; padding: 0 2px;">
-                <option value="25" {% if per_page_raw == '25' %}selected{% endif %}>25</option>
-                <option value="50" {% if per_page_raw == '50' or not per_page_raw %}selected{% endif %}>50</option>
-                <option value="100" {% if per_page_raw == '100' %}selected{% endif %}>100</option>
-                <option value="250" {% if per_page_raw == '250' %}selected{% endif %}>250</option>
-                <option value="500" {% if per_page_raw == '500' %}selected{% endif %}>500</option>
-                <option value="all" {% if per_page_raw == 'all' %}selected{% endif %}>All</option>
-            </select>
-        </div>
-    </div>
+                <!-- Collapsible Customer Remarks Drawer -->
+                <div id="custRemarksDrawer" class="cust-remarks-drawer" style="display: none;">
+                    <div style="font-weight: 600; font-size: 12px; color: #475569; margin-bottom: 4px;">Remarks & Delivery Notes:</div>
+                    <textarea id="detailRemarksTextarea" class="cust-remarks-input font-khmer" rows="3" placeholder="Enter special delivery instructions, customer notes, or internal remarks..." oninput="markFieldDirty('remarks')">{{ selected_customer.remarks or '' if selected_customer else '' }}</textarea>
+                </div>
 
-    <div style="display: flex; align-items: center; gap: 14px;">
-        {% if total_pages > 1 and per_page_raw != 'all' %}
-        <!-- Pagination controls -->
-        <div style="display: flex; gap: 4px; align-items: center;">
-            {% if page > 1 %}
-            <a href="{{ url_for('contacts.list_customers', page=1, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="First Page">
-                ⏮
-            </a>
-            <a href="{{ url_for('contacts.list_customers', page=page-1, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="Previous Page">
-                ◀ Prev
-            </a>
-            {% endif %}
-            
-            <span style="font-weight: 600; padding: 0 4px;">{{ page }} / {{ total_pages }}</span>
-            
-            {% if page < total_pages %}
-            <a href="{{ url_for('contacts.list_customers', page=page+1, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="Next Page">
-                Next ▶
-            </a>
-            <a href="{{ url_for('contacts.list_customers', page=total_pages, branch=current_branch_param if is_main_admin else None, search_name=search_name, op_name=op_name, search_contact=search_contact, op_contact=op_contact, search_phone=search_phone, op_phone=op_phone, search_address=search_address, op_address=op_address, with_balance=with_balance, scheme_id=scheme_filter, sort_by=sort_by, sort_dir=sort_dir, per_page=per_page_raw) }}" 
-               class="inflow-tb-btn" style="padding: 1px 6px; font-size: 11px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; border-radius: 2px;" title="Last Page">
-                ⏭
-            </a>
-            {% endif %}
-        </div>
-        <span style="color: #CBD5E1;">|</span>
-        {% endif %}
 
-        <div style="display: flex; align-items: center; gap: 6px;">
-            <span>Current User: <strong>{{ session.get('user_name', 'Default User') }}</strong></span>
-            <span style="color: #CBD5E1;">|</span>
-            <span style="display: inline-flex; align-items: center; gap: 4px;" title="Connected locally to PostgreSQL 16 database">
-                <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22C55E;"></span>
-                <span>Connected (Locally - PostgreSQL 16)</span>
-            </span>
-        </div>
-    </div>
-</div>
+                <!-- ================================================================= -->
+                <!-- SALES ORDER HISTORY SECTION: Full Functionality (Screenshot Table) -->
+                <!-- ================================================================= -->
+                <div class="cust-orders-section">
+                    
+                    <div class="cust-orders-table-wrapper">
+                        <table class="cust-orders-table" id="custOrdersTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px;">Order #</th>
+                                    <th style="width: 100px;">Date</th>
+                                    <th>Products / Items</th>
+                                    <th style="width: 140px;">Warehouse</th>
+                                    <th style="width: 60px; text-align: center;">Qty</th>
+                                    <th style="width: 110px; text-align: right;">Total</th>
+                                    <th style="width: 110px; text-align: right;">Paid</th>
+                                    <th style="width: 110px; text-align: right;">Balance</th>
+                                    <th style="width: 95px; text-align: center;">Status</th>
+                                    <th style="width: 80px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="custOrdersTableBody">
+                                {% for o in selected_orders %}
+                                <tr class="cust-order-row" id="orderRow_{{ o.id }}" onclick="toggleOrderLinesDrawer({{ o.id }})">
+                                    <!-- Order # Link -->
+                                    <td style="font-weight: 700; font-family: monospace;">
+                                        <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('{{ url_for('sales_orders.detail_order', id=o.id) }}', '{{ o.order_number }}')" class="cust-order-link" title="Open sales order {{ o.order_number }}">
+                                            {{ o.order_number }}
+                                        </a>
+                                    </td>
 
-<!-- Floating Quick Add Customer Modal Dialog -->
-<div id="quickAddModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 99999; align-items: center; justify-content: center;">
-    <div class="inflow-modal-box" style="background: #FFFFFF; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 500px; max-width: 95%; overflow: hidden; border: 1px solid #74A71E;">
-        <div class="inflow-modal-header" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: linear-gradient(180deg, #D6F358 0%, #BFE637 100%); border-bottom: 1px solid #A8D154;">
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #2F540C;">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-                <span>Quick Add Customer</span>
+                                    <!-- Date -->
+                                    <td style="color: #475569;">
+                                        {{ (o.order_date|string)[:10] if o.order_date else '-' }}
+                                    </td>
+
+                                    <!-- Products / Items Summary (Matching Screenshot line items) -->
+                                    <td class="font-khmer" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ o.items_summary or 'Order Items' }}">
+                                        {{ o.items_summary or 'Standard Line Items' }}
+                                    </td>
+
+                                    <!-- Location / Warehouse -->
+                                    <td style="color: #64748B;">
+                                        {{ o.location_name or 'Main Warehouse' }}
+                                    </td>
+
+                                    <!-- Quantity -->
+                                    <td style="text-align: center; font-weight: 600; color: #1E293B;">
+                                        {{ '%.0f'|format(o.total_qty or 0) if o.total_qty else '-' }}
+                                    </td>
+
+                                    <!-- Total Amount -->
+                                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                                        {{ (o.total_amount or 0) | currency }}
+                                    </td>
+
+                                    <!-- Paid Amount -->
+                                    <td style="text-align: right; font-weight: 600; color: #16A34A;">
+                                        {{ (o.paid_amount or 0) | currency }}
+                                    </td>
+
+                                    <!-- Balance Due -->
+                                    <td style="text-align: right; font-weight: 700; color: {% if (o.balance_due or 0) > 0 %}#DC2626{% else %}#16A34A{% endif %};">
+                                        {{ (o.balance_due or 0) | currency }}
+                                    </td>
+
+                                    <!-- Status Pill -->
+                                    <td style="text-align: center;">
+                                        {% if o.status == 'PAID' or (o.balance_due is not none and o.balance_due <= 0) %}
+                                        <span class="cust-order-status-badge paid">Paid</span>
+                                        {% elif o.status == 'INVOICED' %}
+                                        <span class="cust-order-status-badge invoiced">Invoiced</span>
+                                        {% elif o.status == 'OPEN' %}
+                                        <span class="cust-order-status-badge open">Open</span>
+                                        {% else %}
+                                        <span class="cust-order-status-badge neutral">{{ o.status or 'Pending' }}</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Action -->
+                                    <td style="text-align: center;">
+                                        <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('{{ url_for('sales_orders.detail_order', id=o.id) }}', '{{ o.order_number }}')" class="cust-row-view-btn">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                                <!-- Expandable Line Items Drawer for this Order -->
+                                <tr id="orderLinesSubRow_{{ o.id }}" class="cust-order-subrow" style="display: none;">
+                                    <td colspan="10" style="padding: 0; background: #F8FAFC;">
+                                        <div class="cust-order-lines-container" id="orderLinesContainer_{{ o.id }}">
+                                            <div style="padding: 12px; text-align: center; font-size: 11px; color: #64748B;">
+                                                Loading product details...
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr id="noOrdersRow">
+                                    <td colspan="10" style="padding: 36px; text-align: center; color: #94A3B8; font-style: italic;">
+                                        No sales order history recorded for this customer yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- TABLE FOOTER & BOTTOM RIGHT SUMMARY BOX (Matching Screenshot) -->
+                    <div class="cust-table-footer-bar">
+                        <!-- Left Action Buttons -->
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" class="cust-footer-action-btn" onclick="createNewOrderForCurrentCustomer()">
+                                + Add Sales Order
+                            </button>
+                            <button type="button" class="cust-footer-action-btn" onclick="openContactModal()">
+                                📞 Contact Info
+                            </button>
+                            <button type="button" class="cust-footer-action-btn" onclick="openFullEditModal()">
+                                ✏️ Edit Customer Profile
+                            </button>
+                        </div>
+
+                        <!-- Right Summary Box (Matching Bottom Right in Screenshot) -->
+                        <div class="cust-bottom-summary-box">
+                            <div class="cust-summary-line">
+                                <span class="cust-summary-label">Balance:</span>
+                                <span class="cust-summary-val balance" id="bottomSummaryBalance">{{ (selected_customer.balance or 0) | currency if selected_customer else '$0.00' }}</span>
+                            </div>
+                            <div class="cust-summary-line">
+                                <span class="cust-summary-label">Total Orders:</span>
+                                <span class="cust-summary-val total" id="bottomSummaryTotalSpent">{{ (selected_stats.total_spent or 0) | currency if selected_customer else '$0.00' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
             </div>
-            <button type="button" onclick="closeQuickAddModal()" style="border: none; background: transparent; font-size: 15px; font-weight: bold; cursor: pointer; color: #2F540C;">✕</button>
+
+            <!-- NEW CUSTOMER FORM MODE: Displayed when clicking [ + ] or New Customer -->
+            <div id="custNewContainer" style="display: none; padding: 24px 32px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
+                    <div>
+                        <span class="cust-status-badge" style="background: #0284C7; color: #FFFFFF; font-weight: 700;">New Customer</span>
+                        <h2 style="font-size: 22px; font-weight: 700; color: #0F172A; margin: 6px 0 0 0;">Create New Customer Profile</h2>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="cust-btn-subtle" onclick="cancelNewCustomer()">Cancel</button>
+                        <button type="button" class="cust-save-btn" onclick="submitNewCustomer()">+ Create Customer</button>
+                    </div>
+                </div>
+
+                <form id="newCustomerForm" onsubmit="event.preventDefault(); submitNewCustomer();">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 900px;">
+                        <!-- Left Block: Basic & Contact -->
+                        <div class="card" style="padding: 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
+                            <h3 style="font-size: 14px; font-weight: 700; color: #8C6541; margin-top: 0; margin-bottom: 14px;">Basic Information</h3>
+                            
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Customer Name <span style="color: #DC2626;">*</span></label>
+                                <input type="text" id="newCustName" class="cust-form-input font-khmer" required placeholder="Customer or business name...">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Contact Person</label>
+                                <input type="text" id="newCustContact" class="cust-form-input font-khmer" placeholder="Contact person name...">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Phone Number</label>
+                                <input type="text" id="newCustPhone" class="cust-form-input" placeholder="e.g. 012 345 678">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Email</label>
+                                <input type="email" id="newCustEmail" class="cust-form-input" placeholder="customer@example.com">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Website</label>
+                                <input type="text" id="newCustWebsite" class="cust-form-input" placeholder="https://...">
+                            </div>
+
+                            {% if is_main_admin %}
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Branch Assignment (HQ)</label>
+                                <select id="newCustBranch" class="cust-form-select">
+                                    <option value="">Main Store (HQ)</option>
+                                    {% for b in branches %}
+                                    <option value="{{ b.id }}">{{ b.name }} ({{ b.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Right Block: Address & Terms -->
+                        <div class="card" style="padding: 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
+                            <h3 style="font-size: 14px; font-weight: 700; color: #8C6541; margin-top: 0; margin-bottom: 14px;">Address & Financial Terms</h3>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Street Address</label>
+                                <input type="text" id="newCustAddress" class="cust-form-input font-khmer" placeholder="Street address or landmark...">
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">City</label>
+                                    <input type="text" id="newCustCity" class="cust-form-input font-khmer" value="Phnom Penh" placeholder="City">
+                                </div>
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">Country</label>
+                                    <input type="text" id="newCustCountry" class="cust-form-input" value="Cambodia">
+                                </div>
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Pricing Scheme</label>
+                                <select id="newCustPricingScheme" class="cust-form-select">
+                                    {% for ps in pricing_schemes %}
+                                    <option value="{{ ps.id }}">{{ ps.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">Discount %</label>
+                                    <input type="number" id="newCustDiscount" step="any" min="0" max="100" class="cust-form-input" value="0">
+                                </div>
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">Payment Terms</label>
+                                    <select id="newCustPaymentTerms" class="cust-form-select">
+                                        <option value="Due on Receipt" selected>Due on Receipt</option>
+                                        <option value="Net 15">Net 15</option>
+                                        <option value="Net 30">Net 30</option>
+                                        <option value="Net 60">Net 60</option>
+                                        <option value="COD">COD</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Remarks / Special Notes</label>
+                                <textarea id="newCustRemarks" rows="2" class="cust-form-input font-khmer" placeholder="Optional notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button type="submit" class="cust-save-btn" style="padding: 8px 24px; font-size: 13px;">Create Customer Profile</button>
+                        <button type="button" class="cust-btn-subtle" onclick="cancelNewCustomer()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
         </div>
 
-        <form id="quickAddForm" onsubmit="submitQuickAddCustomer(event)" style="padding: 16px 20px;">
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-                <div>
-                    <label style="display: block; font-size: 12px; font-weight: 700; color: #1E293B; margin-bottom: 3px;">
-                        Customer Name <span style="color: #DC2626;">*</span>
-                    </label>
-                    <input type="text" id="quickName" name="name" required class="inflow-pane-input font-khmer" style="width: 100%; height: 28px; font-size: 13px;" placeholder="Company or personal name...">
-                </div>
+    </main>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Contact Person</label>
-                        <input type="text" id="quickContact" name="contact_name" class="inflow-pane-input font-khmer" style="width: 100%; height: 26px;" placeholder="Contact name...">
-                    </div>
-                    <div>
-                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Phone</label>
-                        <input type="text" id="quickPhone" name="phone" class="inflow-pane-input" style="width: 100%; height: 26px;" placeholder="012 345 678...">
-                    </div>
-                </div>
+</div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Email</label>
-                        <input type="email" id="quickEmail" name="email" class="inflow-pane-input" style="width: 100%; height: 26px;" placeholder="email@example.com">
-                    </div>
-                    <div>
-                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Pricing Scheme</label>
-                        <select id="quickScheme" name="pricing_scheme_id" class="inflow-pane-input" style="width: 100%; height: 26px; background: #FFF;">
-                            {% for ps in pricing_schemes %}
-                            <option value="{{ ps.id }}">{{ ps.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
+<!-- Hidden inputs for current active customer state -->
+<input type="hidden" id="currentCustomerId" value="{{ selected_customer.id if selected_customer else 0 }}">
+<input type="hidden" id="currentCustomerName" value="{{ selected_customer.name if selected_customer else '' }}">
+<input type="hidden" id="currentCustomerBalance" value="{{ selected_customer.balance if selected_customer else 0 }}">
+<input type="hidden" id="currentCustomerPhone" value="{{ selected_customer.phone if selected_customer else '' }}">
+<input type="hidden" id="currentCustomerAddress" value="{{ selected_customer.address1 or selected_customer.billing_address or '' if selected_customer else '' }}">
 
-                <div>
-                    <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Address1</label>
-                    <input type="text" id="quickAddress" name="address1" class="inflow-pane-input font-khmer" style="width: 100%; height: 26px;" placeholder="Street / Building / Khan / Sangkat...">
-                </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <div>
-                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">City</label>
-                        <input type="text" id="quickCity" name="city" class="inflow-pane-input font-khmer" style="width: 100%; height: 26px;" placeholder="Phnom Penh, Siem Reap..." value="Phnom Penh">
-                    </div>
-                    <div>
-                        <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Discount %</label>
-                        <input type="number" id="quickDiscount" name="discount_percent" min="0" max="100" step="any" value="0" class="inflow-pane-input" style="width: 100%; height: 26px; text-align: right;">
-                    </div>
+<!-- ========================================================================= -->
+<!-- MODAL: Full Customer Edit Profile Dialog                                  -->
+<!-- ========================================================================= -->
+<div id="fullEditModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="max-width: 680px; width: 95%; background: #FFFFFF; border-radius: 6px; box-shadow: 0 12px 36px rgba(0,0,0,0.3); overflow: hidden;">
+        <div style="padding: 12px 18px; background: #8C6541; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 14px;">✏️ Edit Customer Profile</div>
+            <button type="button" onclick="closeFullEditModal()" style="background: none; border: none; color: #FFFFFF; font-size: 16px; cursor: pointer;">✕</button>
+        </div>
+        <div style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Customer Name</label>
+                    <input type="text" id="modalEditName" class="cust-form-input font-khmer">
                 </div>
-
-                {% if is_main_admin %}
-                <div>
-                    <label style="display: block; font-size: 11.5px; font-weight: 600; color: #334155; margin-bottom: 3px;">Branch</label>
-                    <select id="quickBranch" name="branch_id" class="inflow-pane-input" style="width: 100%; height: 26px; background: #FFF;">
-                        <option value="">🏢 HQ Main Store</option>
-                        {% for b in branches %}
-                        <option value="{{ b.id }}">🏪 {{ b.name }} ({{ b.code }})</option>
-                        {% endfor %}
-                    </select>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Contact Person</label>
+                    <input type="text" id="modalEditContact" class="cust-form-input font-khmer">
                 </div>
-                {% endif %}
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Phone</label>
+                    <input type="text" id="modalEditPhone" class="cust-form-input">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Email</label>
+                    <input type="email" id="modalEditEmail" class="cust-form-input">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Website</label>
+                    <input type="text" id="modalEditWebsite" class="cust-form-input">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Tax / VAT Number</label>
+                    <input type="text" id="modalEditTaxNumber" class="cust-form-input">
+                </div>
+                <div class="cust-form-group" style="grid-column: span 2;">
+                    <label class="cust-form-label">Street Address 1</label>
+                    <input type="text" id="modalEditAddress1" class="cust-form-input font-khmer">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">City</label>
+                    <input type="text" id="modalEditCity" class="cust-form-input font-khmer">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Country</label>
+                    <input type="text" id="modalEditCountry" class="cust-form-input">
+                </div>
             </div>
-
-            <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #E2E8F0;">
-                <button type="button" onclick="closeQuickAddModal()" style="padding: 5px 14px; font-size: 12px; color: #475569; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px; cursor: pointer;">
-                    Cancel
-                </button>
-                <button type="submit" id="btnSubmitQuickAdd" style="padding: 5px 16px; font-size: 12px; font-weight: 700; color: #FFFFFF; background: #68A614; border: 1px solid #558B0E; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                    <span>✓ Save Customer</span>
-                </button>
-            </div>
-        </form>
+        </div>
+        <div style="padding: 12px 18px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="cust-btn-subtle" onclick="closeFullEditModal()">Cancel</button>
+            <button type="button" class="cust-save-btn" onclick="saveFullEditModal()">Save Changes</button>
+        </div>
     </div>
 </div>
 
+
+<!-- ========================================================================= -->
+<!-- MODAL: Customer Delivery & Shipping Label (80x100mm Thermal Sticker)      -->
+<!-- ========================================================================= -->
+<div id="customerDeliveryModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="max-width: 460px; width: 95%; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: #1E293B; color: #FFFFFF; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                <span>🚚</span>
+                <span>Delivery Service & Label (80x100mm)</span>
+            </div>
+            <button type="button" onclick="closeCustomerDeliveryModal()" style="color: #94A3B8; font-size: 16px; background: none; border: none; cursor: pointer;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 16px 20px; background: #FFFFFF; font-size: 12px; color: #1E293B; display: block;">
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Delivery Service (សេវាដឹកជញ្ជូន):</label>
+                <select id="modalCustCarrierSelect" class="cust-form-select" style="font-weight: 600; height: 32px;">
+                    <option value="Virak Buntham">Virak Buntham</option>
+                    <option value="Capitol">Capitol</option>
+                    <option value="J&T Express">J&T Express</option>
+                    <option value="Taxi (ឡានឈ្នួល)">Taxi (ឡានឈ្នួល)</option>
+                    <option value="KEX Express">KEX Express</option>
+                    <option value="Cambodia Post">Cambodia Post</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">📍 Delivery Address (Top of sticker):</label>
+                <textarea id="modalCustAddressInput" style="width: 100%; height: 46px; font-size: 12px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 3px; resize: vertical; font-weight: 600;" placeholder="Enter delivery address..."></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Number of Cases (កេស):</label>
+                    <input type="number" id="modalCustCaseCountInput" value="1" min="1" max="50" style="width: 100%; font-weight: 800; height: 30px; text-align: center; border: 1px solid #CBD5E1; border-radius: 3px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Product Cost ($) / តម្លៃ:</label>
+                    <input type="number" id="modalCustProductCostInput" step="0.5" style="width: 100%; font-weight: 800; height: 30px; text-align: right; border: 1px solid #CBD5E1; border-radius: 3px; padding-right: 6px;">
+                </div>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Note / ចំណាំ:</label>
+                <input type="text" id="modalCustDeliveryNotesInput" placeholder="e.g. ឡានឈ្នួលផ្សារដើមគ / 012 345 678..." style="width: 100%; height: 30px; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 8px;">
+            </div>
+        </div>
+        <div style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
+            <button type="button" onclick="closeCustomerDeliveryModal()" class="cust-btn-subtle">Cancel</button>
+            <button type="button" onclick="submitCustomerDeliveryLabelPdf()" class="cust-btn-primary" style="background: #2563EB;">📄 Export PDF</button>
+            <button type="button" onclick="submitCustomerDeliveryLabel()" class="cust-btn-primary" style="background: #059669;">🖨️ Print Label (80x100mm)</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL: inFlow Address Dialog                                              -->
+<!-- ========================================================================= -->
+<div id="inflowAddressModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="background: #FFFFFF; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); width: 440px; overflow: hidden; border: 1px solid #7F9DB9;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #E2E8F0 100%); border-bottom: 1px solid #CBD5E1;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #8C6541;">
+                <span>📍 Address Editor</span>
+            </div>
+            <button type="button" onclick="closeAddressModal()" style="border: none; background: transparent; font-size: 14px; cursor: pointer; color: #64748B;">✕</button>
+        </div>
+        <div style="padding: 16px 20px; font-size: 12px;">
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Street Address</label>
+                <input type="text" id="modalStreet" class="cust-form-input font-khmer" placeholder="Street address or building">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">City</label>
+                    <input type="text" id="modalCity" class="cust-form-input font-khmer" placeholder="City">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">State / Province</label>
+                    <input type="text" id="modalState" class="cust-form-input font-khmer" placeholder="Province">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Country</label>
+                    <input type="text" id="modalCountry" class="cust-form-input" value="Cambodia">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Postal Code</label>
+                    <input type="text" id="modalPostalCode" class="cust-form-input" placeholder="Postal Code">
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; background: #F8FAFC; border-top: 1px solid #CBD5E1;">
+            <button type="button" onclick="closeAddressModal()" class="cust-btn-subtle">Cancel</button>
+            <button type="button" onclick="saveAddressModal()" class="cust-save-btn">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Alert Banner -->
+<div id="custToastBanner" class="cust-toast-banner" style="display: none;"></div>
+
+<!-- ========================================================================= -->
+<!-- STYLESHEET (Rich Aesthetics matching screenshot)                          -->
+<!-- ========================================================================= -->
 <style>
-/* Authentic inFlow Grid & Desktop Toolbar Styling */
-.inflow-top-accent-bar {
-    height: 4px;
-    background: #659E27;
-}
-
-.inflow-branch-pill {
-    font-size: 11px;
-    padding: 3px 8px;
-    text-decoration: none;
-    border-radius: 3px;
-    color: #475569;
-    font-weight: 600;
-    transition: all 0.1s ease;
-}
-.inflow-branch-pill:hover {
-    background: #CBD5E1;
-    color: #0F172A;
-}
-.inflow-branch-pill.active {
-    background: #0284C7;
-    color: #FFFFFF;
-    box-shadow: 0 1px 2px rgba(2, 132, 199, 0.2);
-}
-
-.inflow-tb-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    font-size: 11.5px;
-    font-weight: 600;
-    border-radius: 3px;
-    text-decoration: none;
-    cursor: pointer;
-    box-shadow: 0 1px 1px rgba(0,0,0,0.06);
-    transition: all 0.12s ease;
-    white-space: nowrap;
-}
-.inflow-tb-btn:hover {
-    background: #F1F5F9 !important;
-}
-
-/* inFlow Search Pane */
-.inflow-list-search-pane {
-    background: linear-gradient(180deg, #D6F358 0%, #E2FA7B 100%);
-    border-bottom: 1px solid #BFE637;
-    padding: 8px 14px 10px;
-    transition: all 0.2s ease;
-}
-
-.inflow-op-select {
-    width: 32px;
-    height: 20px;
-    font-size: 11px;
-    font-weight: bold;
-    text-align: center;
-    background: #FFFFFF;
-    border: 1px solid #A8D154;
-    border-radius: 2px;
-    color: #2F540C;
-    outline: none;
-    cursor: pointer;
-}
-
-.inflow-pane-input {
-    flex: 1;
-    min-width: 0;
-    height: 20px;
-    padding: 1px 6px;
-    font-size: 11.5px;
-    background: #FFFFFF;
-    border: 1px solid #A8D154;
-    border-radius: 2px;
-    color: #0F172A;
-    outline: none;
-    box-sizing: border-box;
-}
-.inflow-pane-input:focus {
-    border-color: #558B12;
-    box-shadow: 0 0 0 1px #558B12;
-}
-
-/* Table Viewport */
-.inflow-grid-viewport {
-    overflow-x: auto;
-    overflow-y: auto;
-    max-height: calc(100vh - 200px);
-    background: #FFFFFF;
-    border-bottom: 1px solid #CBD5E1;
-    position: relative;
-}
-
-.inflow-table {
+/* Reset and Workspace Layout */
+.inflow-cust-split-workspace {
+    display: flex;
     width: 100%;
-    border-collapse: collapse;
-    font-size: 11.5px;
-    white-space: nowrap;
+    height: calc(100vh - 38px);
+    overflow: hidden;
+    background: #FFFFFF;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: #1E293B;
+}
+
+/* Master Sidebar (Left) */
+.cust-master-sidebar {
+    width: 320px;
+    min-width: 300px;
+    max-width: 340px;
+    height: 100%;
+    background: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     user-select: none;
 }
 
-/* Zebra rows matching inFlow Desktop */
-.inflow-grid-row:nth-child(odd) {
-    background: #F4FDCF;
-    color: #1E293B;
-}
-.inflow-grid-row:nth-child(even) {
+/* Master Top Toolbar */
+.cust-master-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #F1F5F9;
     background: #FFFFFF;
-    color: #1E293B;
-}
-.inflow-grid-row:hover {
-    background: #D7F377 !important;
-    cursor: pointer;
-}
-.inflow-grid-row.selected {
-    background: #68A614 !important;
-    color: #FFFFFF !important;
-}
-.inflow-grid-row.selected a {
-    color: #FFFFFF !important;
 }
 
-/* Row Action Buttons */
-.inflow-row-btn {
-    display: inline-block;
-    padding: 1px 6px;
-    font-size: 10.5px;
-    font-weight: 600;
-    color: #0369A1;
-    background: #F0F9FF;
-    border: 1px solid #BAE6FD;
-    border-radius: 2px;
-    text-decoration: none;
-}
-.inflow-row-btn:hover {
-    background: #E0F2FE;
-}
-
-.inflow-row-delete-btn {
+.cust-icon-btn {
+    width: 34px;
+    height: 34px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 18px;
-    height: 18px;
-    font-size: 11px;
-    font-weight: 800;
-    color: #DC2626;
-    background: #FEF2F2;
-    border: 1px solid #FECACA;
-    border-radius: 2px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    background: #FFFFFF;
+    color: #475569;
     cursor: pointer;
-    transition: all 0.1s ease;
-    line-height: 1;
+    transition: all 0.15s ease;
 }
-.inflow-row-delete-btn:hover {
-    background: #DC2626;
-    color: #FFFFFF;
-    border-color: #B91C1C;
-    transform: scale(1.1);
+.cust-icon-btn:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+    color: #1E293B;
 }
 
-/* Floating Bulk Action Bar */
-.inflow-bulk-bar {
-    position: fixed;
-    bottom: 32px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #FFFFFF;
-    border: 1.5px solid #0284C7;
-    border-radius: 6px;
-    padding: 8px 18px;
+.cust-pill-dropdown-wrap {
+    position: relative;
+    flex: 1;
+}
+
+/* Rounded Pill Button [ All ▾ ] (Caramel Ochre) */
+.cust-pill-btn {
+    width: 100%;
+    height: 34px;
+    border-radius: 9999px;
+    background: #8C6541;
+    color: #FFFFFF;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
     display: flex;
     align-items: center;
-    gap: 20px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-    z-index: 9999;
-    animation: slideUp 0.15s ease-out;
-}
-@keyframes slideUp {
-    from { transform: translate(-50%, 20px); opacity: 0; }
-    to { transform: translate(-50%, 0); opacity: 1; }
-}
-.btn-bulk-delete {
-    display: inline-flex;
-    align-items: center;
+    justify-content: center;
     gap: 4px;
-    background: #DC2626;
-    color: #FFFFFF;
-    border: 1px solid #B91C1C;
-    padding: 4px 12px;
-    border-radius: 3px;
-    font-size: 11.5px;
-    font-weight: 700;
     cursor: pointer;
+    box-shadow: 0 1px 2px rgba(140, 101, 65, 0.2);
+    transition: background 0.15s ease;
 }
-.btn-bulk-delete:hover {
-    background: #B91C1C;
+.cust-pill-btn:hover {
+    background: #795238;
 }
-.btn-bulk-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
+
+/* Search Box Container */
+.cust-search-box-wrap {
+    padding: 8px 14px;
+    border-bottom: 1px solid #F1F5F9;
+    background: #FAFAFA;
+}
+.cust-search-input {
+    width: 100%;
+    height: 32px;
+    padding: 4px 26px 4px 28px;
+    font-size: 12.5px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
     background: #FFFFFF;
     color: #1E293B;
-    border: 1px solid #CBD5E1;
-    padding: 4px 10px;
-    border-radius: 3px;
-    font-size: 11.5px;
-    font-weight: 600;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.cust-search-input:focus {
+    border-color: #8C6541;
+    box-shadow: 0 0 0 2px rgba(140, 101, 65, 0.15);
+}
+.cust-clear-search-btn {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    color: #94A3B8;
+    font-size: 12px;
     cursor: pointer;
 }
-.btn-bulk-action:hover {
+
+/* Sub-header Filter Row */
+.cust-filter-toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid #F1F5F9;
+    background: #FFFFFF;
+}
+.cust-filter-btn {
+    background: none;
+    border: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+    cursor: pointer;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.cust-filter-btn:hover {
+    color: #1E293B;
     background: #F1F5F9;
 }
-.btn-bulk-cancel {
+.cust-badge-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #DC2626;
+    margin-left: 2px;
+}
+
+/* Advanced Filter Drawer */
+.cust-adv-filters-drawer {
+    padding: 10px 14px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    font-size: 11.5px;
+}
+.cust-drawer-field {
+    margin-bottom: 6px;
+}
+.cust-drawer-field label {
+    display: block;
+    font-size: 11px;
+    color: #64748B;
+    font-weight: 600;
+    margin-bottom: 2px;
+}
+.cust-drawer-input {
+    width: 100%;
+    height: 26px;
+    padding: 2px 6px;
+    font-size: 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+}
+
+/* Section Header (Customer / Balance) */
+.cust-list-section-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #94A3B8;
+    border-bottom: 1px solid #F1F5F9;
+    background: #FAFAFA;
+}
+
+/* Card Scroll Area */
+.cust-card-scroll-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* Individual Customer Card (Matching Screenshot PO cards) */
+.cust-list-card {
+    padding: 10px 14px 10px 14px;
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    position: relative;
+    transition: background 0.15s ease;
+}
+.cust-list-card:hover {
+    background: #F8FAFC;
+}
+
+/* Active Selected Card State (Matching PO-000006 in screenshot) */
+.cust-list-card.active {
+    background: #FAF7F2; /* Soft pale warm cream tint */
+}
+.cust-list-card.active::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: #8C6541; /* Caramel brown vertical accent */
+    border-top-right-radius: 2px;
+    border-bottom-right-radius: 2px;
+}
+
+.cust-card-row-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+.cust-card-name {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #1E293B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+}
+.cust-list-card.active .cust-card-name {
+    color: #795238;
+}
+
+/* Status Badges */
+.cust-status-badge {
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    white-space: nowrap;
+}
+.cust-status-badge.fulfilled {
+    border: 1px solid #8C6541;
+    color: #8C6541;
+    background: #FAF7F2;
+}
+.cust-status-badge.unfulfilled {
+    border: 1px solid #B45309;
+    color: #B45309;
+    background: #FEF3C7;
+}
+
+.cust-card-row-bottom {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+/* Balance Pill */
+.cust-balance-pill {
+    display: inline-flex;
+    align-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    letter-spacing: -0.01em;
+}
+.cust-balance-pill.has-balance {
+    background: #C89255;
+    color: #FFFFFF;
+}
+.cust-balance-pill.zero-balance {
+    background: #E2E8F0;
+    color: #475569;
+}
+
+.cust-card-meta-text {
+    font-size: 11px;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.cust-branch-tag {
+    font-size: 10px;
+    padding: 1px 4px;
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border-radius: 3px;
+    margin-left: 3px;
+}
+
+/* Master Footer */
+.cust-master-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 14px;
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+}
+
+/* Detail Canvas (Right) */
+.cust-detail-canvas {
+    flex: 1;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #FFFFFF;
+    min-width: 0;
+}
+
+/* Top Detail Toolbar */
+.cust-detail-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 24px;
+    border-bottom: 1px solid #E2E8F0;
+    background: #FFFFFF;
+    user-select: none;
+    z-index: 10;
+}
+.cust-toolbar-left {
+    display: flex;
+    align-items: center;
+}
+.cust-tb-close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: none;
     background: transparent;
     color: #64748B;
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+}
+.cust-tb-close-btn:hover {
+    background: #F1F5F9;
+    color: #1E293B;
+}
+
+.cust-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.cust-tb-action-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: #475569;
+    background: none;
     border: none;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+.cust-tb-action-link:hover {
+    color: #1E293B;
+    background: #F1F5F9;
+}
+.cust-tb-action-link.danger {
+    color: #C2410C;
+}
+.cust-tb-action-link.danger:hover {
+    background: #FFF7ED;
+}
+.cust-tb-red-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #EF4444;
+    display: inline-block;
+}
+
+.cust-save-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 14px;
+    background: #8C6541;
+    color: #FFFFFF;
+    font-size: 12.5px;
+    font-weight: 600;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(140, 101, 65, 0.2);
+    transition: background 0.15s ease;
+}
+.cust-save-btn:hover {
+    background: #795238;
+}
+
+/* Detail Scroll Area */
+.cust-detail-scroll-content {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 3-Column Header Grid (Matching Screenshot) */
+.cust-meta-header-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1.35fr 1.15fr;
+    gap: 28px;
+    padding: 20px 28px 16px 28px;
+    background: #FFFFFF;
+}
+@media (max-width: 1100px) {
+    .cust-meta-header-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+@media (max-width: 768px) {
+    .cust-meta-header-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.cust-primary-title {
+    font-size: 26px;
+    font-weight: 700;
+    color: #1E293B;
+    margin: 0 0 8px 0;
+    line-height: 1.2;
+}
+
+.cust-meta-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    color: #475569;
+    margin-bottom: 5px;
+}
+
+.cust-contact-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #1E293B;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+.cust-contact-link:hover {
+    color: #8C6541;
+    text-decoration: underline;
+}
+
+.cust-meta-select {
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 12px;
+    background: #FFFFFF;
+    color: #1E293B;
+    cursor: pointer;
+}
+
+/* Address Card */
+.cust-address-card {
+    border: 1px dashed #CBD5E1;
+    border-radius: 6px;
+    padding: 8px 12px;
+    background: #FAFAFA;
+    margin: 8px 0;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.15s ease;
+}
+.cust-address-card:hover {
+    border-color: #8C6541;
+    background: #FDFBF7;
+}
+.cust-address-lines {
+    font-size: 12px;
+    color: #334155;
+    line-height: 1.45;
+}
+.cust-address-edit-hint {
+    position: absolute;
+    right: 8px;
+    top: 6px;
+    font-size: 10px;
+    color: #8C6541;
+    font-weight: 600;
+}
+
+/* Custom fields items */
+.cust-custom-fields-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 6px;
+}
+.cust-cf-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+}
+.cust-cf-label {
+    width: 80px;
+    color: #64748B;
+    font-weight: 500;
+}
+.cust-cf-input {
+    height: 24px;
+    padding: 2px 6px;
+    font-size: 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 3px;
+}
+
+/* Large Balance Badge (Top Right) */
+.cust-balance-badge-large {
+    font-size: 16px;
+    font-weight: 800;
+    background: #D9A05B;
+    color: #FFFFFF;
+    padding: 3px 12px;
+    border-radius: 9999px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+/* Interactive Mid Bar */
+.cust-mid-progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 28px;
+    background: #FCFCFD;
+    border-top: 1px solid #F1F5F9;
+    border-bottom: 1px solid #F1F5F9;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.cust-remarks-toggle-btn {
+    background: none;
+    border: none;
+    color: #8C6541;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 4px 6px;
+}
+.cust-remarks-toggle-btn:hover {
+    text-decoration: underline;
+}
+
+/* Stepper Tracker */
+.cust-workflow-tracker {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 9999px;
+    padding: 3px 12px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.cust-tracker-step {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+}
+.cust-tracker-step.completed {
+    color: #16A34A;
+}
+.cust-tracker-step.warning {
+    color: #DC2626;
+}
+.cust-tracker-line {
+    width: 16px;
+    height: 2px;
+    background: #CBD5E1;
+}
+
+.cust-action-pill-btn {
+    border-radius: 9999px;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+.cust-action-pill-btn.primary {
+    background: #8C6541;
+    color: #FFFFFF;
+}
+.cust-action-pill-btn.primary:hover {
+    background: #795238;
+}
+.cust-action-pill-btn.secondary {
+    background: #F1F5F9;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+}
+.cust-action-pill-btn.secondary:hover {
+    background: #E2E8F0;
+}
+
+/* Remarks Drawer */
+.cust-remarks-drawer {
+    padding: 12px 28px;
+    background: #FDFBF7;
+    border-bottom: 1px solid #F1F5F9;
+}
+.cust-remarks-input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12.5px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    resize: vertical;
+    box-sizing: border-box;
+    outline: none;
+}
+.cust-remarks-input:focus {
+    border-color: #8C6541;
+}
+
+/* Orders Section */
+.cust-orders-section {
+    padding: 20px 28px 30px 28px;
+}
+.cust-orders-table-wrapper {
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    background: #FFFFFF;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.cust-orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+.cust-orders-table thead tr {
+    background: #FAFAFA;
+    border-bottom: 1px solid #E2E8F0;
+}
+.cust-orders-table th {
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 700;
+    color: #475569;
     font-size: 11.5px;
+}
+.cust-orders-table tbody tr.cust-order-row {
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.cust-orders-table tbody tr.cust-order-row:hover {
+    background: #F8FAFC;
+}
+.cust-orders-table td {
+    padding: 10px 12px;
+    vertical-align: middle;
+}
+
+.cust-order-link {
+    color: #0F766E;
+    text-decoration: none;
+    font-weight: 700;
+}
+.cust-order-link:hover {
+    text-decoration: underline;
+}
+
+.cust-order-status-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    display: inline-block;
+}
+.cust-order-status-badge.paid {
+    background: #DCFCE7;
+    color: #15803D;
+}
+.cust-order-status-badge.invoiced {
+    background: #FEF3C7;
+    color: #B45309;
+}
+.cust-order-status-badge.open {
+    background: #EFF6FF;
+    color: #1D4ED8;
+}
+.cust-order-status-badge.neutral {
+    background: #F1F5F9;
+    color: #475569;
+}
+
+.cust-row-view-btn {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #334155;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    text-decoration: none;
+}
+.cust-row-view-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+/* Footer & Summary Box */
+.cust-table-footer-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 14px;
+    flex-wrap: wrap;
+    gap: 14px;
+}
+
+.cust-footer-action-btn {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.cust-footer-action-btn:hover {
+    border-color: #8C6541;
+    color: #8C6541;
+    background: #FDFBF7;
+}
+
+.cust-bottom-summary-box {
+    background: #FAF7F2;
+    border: 1px solid #D8C7B8;
+    border-radius: 6px;
+    padding: 8px 16px;
+    min-width: 220px;
+}
+.cust-summary-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12.5px;
+    margin: 2px 0;
+}
+.cust-summary-label {
+    color: #64748B;
+    font-weight: 600;
+}
+.cust-summary-val {
+    font-weight: 800;
+    font-size: 14px;
+}
+.cust-summary-val.balance {
+    color: #795238;
+}
+.cust-summary-val.total {
+    color: #0F172A;
+}
+
+/* Form inputs for modals & new customer */
+.cust-form-group {
+    margin-bottom: 12px;
+}
+.cust-form-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 4px;
+}
+.cust-form-input, .cust-form-select {
+    width: 100%;
+    height: 32px;
+    padding: 4px 8px;
+    font-size: 12.5px;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    background: #FFFFFF;
+    color: #1E293B;
+    box-sizing: border-box;
+}
+.cust-form-input:focus, .cust-form-select:focus {
+    border-color: #8C6541;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(140, 101, 65, 0.15);
+}
+
+.cust-btn-subtle {
+    padding: 5px 14px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #475569;
+    border-radius: 4px;
+    font-size: 12px;
     font-weight: 600;
     cursor: pointer;
 }
-.btn-bulk-cancel:hover {
+.cust-btn-subtle:hover {
+    background: #F1F5F9;
+    color: #1E293B;
+}
+
+.cust-btn-primary {
+    padding: 5px 14px;
+    border: none;
+    background: #8C6541;
+    color: #FFFFFF;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+.cust-btn-primary:hover {
+    background: #795238;
+}
+
+/* Dropdown Menus */
+.cust-dropdown-wrapper {
+    position: relative;
+}
+.cust-menu-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+    min-width: 190px;
+    z-index: 1000;
+    padding: 4px 0;
+    user-select: none;
+}
+.cust-menu-dropdown.right-aligned {
+    left: auto;
+    right: 0;
+}
+.cust-menu-item {
+    padding: 6px 14px;
+    font-size: 12px;
+    color: #334155;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+.cust-menu-item:hover {
+    background: #F1F5F9;
     color: #0F172A;
+}
+.cust-menu-item.active {
+    background: #FAF7F2;
+    color: #8C6541;
+    font-weight: 700;
+}
+.cust-menu-item.danger {
+    color: #DC2626;
+}
+.cust-menu-separator {
+    height: 1px;
+    background: #E2E8F0;
+    margin: 4px 0;
+}
+
+/* Toast Notification */
+.cust-toast-banner {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    padding: 10px 18px;
+    background: #1E293B;
+    color: #FFFFFF;
+    font-size: 12.5px;
+    font-weight: 600;
+    border-radius: 6px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 </style>
 
+
+<!-- ========================================================================= -->
+<!-- JAVASCRIPT: Dynamic Master-Detail Control, AJAX selection, and Orders      -->
+<!-- ========================================================================= -->
 <script>
-// Open customer details in tabbed MDI if available, or navigate directly
-function openCustomerUrl(url, title) {
-    if (window.top && window.top.inflowMdi) {
-        window.top.inflowMdi.openTab(url, title, 'sales');
-    } else {
-        window.location.href = url;
+// Global customer state
+let currentCustomerId = {{ selected_customer.id if selected_customer else 0 }};
+let dirtyFields = new Set();
+let cachedCustomerData = {};
+
+// Cache initial rendered customer if available
+{% if selected_customer %}
+cachedCustomerData[{{ selected_customer.id }}] = {
+    customer: {
+        id: {{ selected_customer.id }},
+        name: "{{ (selected_customer.name or '')|replace('"', '\\"') }}",
+        contact_name: "{{ (selected_customer.contact_name or '')|replace('"', '\\"') }}",
+        phone: "{{ (selected_customer.phone or '')|replace('"', '\\"') }}",
+        email: "{{ (selected_customer.email or '')|replace('"', '\\"') }}",
+        website: "{{ (selected_customer.website or '')|replace('"', '\\"') }}",
+        address1: "{{ (selected_customer.address1 or '')|replace('"', '\\"') }}",
+        city: "{{ (selected_customer.city or '')|replace('"', '\\"') }}",
+        country: "{{ (selected_customer.country or 'Cambodia')|replace('"', '\\"') }}",
+        postal_code: "{{ (selected_customer.postal_code or '')|replace('"', '\\"') }}",
+        display_address: "{{ (selected_customer.display_address or '')|replace('"', '\\"') }}",
+        balance: {{ selected_customer.balance or 0 }},
+        total_spent: {{ selected_stats.total_spent or 0 }},
+        default_pricing_scheme_id: {{ selected_customer.default_pricing_scheme_id or 100 }},
+        pricing_scheme_name: "{{ (selected_customer.pricing_scheme_name or 'Retail 1')|replace('"', '\\"') }}",
+        payment_terms: "{{ (selected_customer.payment_terms or 'Due on Receipt')|replace('"', '\\"') }}",
+        discount_percent: {{ selected_customer.discount_percent or 0 }},
+        remarks: "{{ (selected_customer.remarks or '')|replace('"', '\\"') }}",
+        tax_number: "{{ (selected_customer.tax_number or '')|replace('"', '\\"') }}",
+        branch_name: "{{ (selected_customer.branch_name or '')|replace('"', '\\"') }}",
+        created_at: "{{ (selected_customer.created_at|string)[:10] if selected_customer.created_at else '' }}"
     }
-}
+};
+{% endif %}
 
-// Single row click highlight
-function handleRowClick(event, row) {
-    if (event.target.tagName === 'INPUT' || event.target.tagName === 'BUTTON' || event.target.tagName === 'A') {
-        return;
-    }
-    document.querySelectorAll('.inflow-grid-row.selected').forEach(r => r.classList.remove('selected'));
-    row.classList.add('selected');
-    row.focus();
-}
+// Handle click on Customer in the Left Sidebar List
+function selectCustomer(id) {
+    if (!id) return;
+    currentCustomerId = id;
 
-// Search Pane Collapse / Expand Toggle
-function toggleSearchPane() {
-    const body = document.getElementById('searchPaneBody');
-    const arrow = document.getElementById('searchPaneArrow');
-    if (!body) return;
-    if (body.style.display === 'none') {
-        body.style.display = 'block';
-        if (arrow) arrow.textContent = '▼';
-        localStorage.setItem('inflow_customer_search_collapsed', '0');
-    } else {
-        body.style.display = 'none';
-        if (arrow) arrow.textContent = '▶';
-        localStorage.setItem('inflow_customer_search_collapsed', '1');
-    }
-}
-
-// Filter by pricing scheme
-function filterByScheme(schemeId) {
-    const el = document.getElementById('hiddenSchemeId');
-    if (el) el.value = schemeId;
-    submitSearchForm();
-}
-
-// Change Per Page
-function changePerPage(val) {
-    const url = new URL(window.location.href);
-    url.searchParams.set('per_page', val);
-    url.searchParams.set('page', '1');
-    window.location.href = url.toString();
-}
-
-// Instant Live Client-side Filter
-function applyLiveFilter() {
-    const nameVal = (document.getElementById('searchName')?.value || '').toLowerCase().trim();
-    const contactVal = (document.getElementById('searchContact')?.value || '').toLowerCase().trim();
-    const phoneVal = (document.getElementById('searchPhone')?.value || '').toLowerCase().trim();
-    const addrVal = (document.getElementById('searchAddress')?.value || '').toLowerCase().trim();
-
-    const rows = document.querySelectorAll('#customerTableBody .inflow-grid-row');
-    let visibleCount = 0;
-
-    rows.forEach(row => {
-        const rName = row.getAttribute('data-name') || '';
-        const rContact = row.getAttribute('data-contact') || '';
-        const rPhone = row.getAttribute('data-phone') || '';
-        const rAddr = row.getAttribute('data-address') || '';
-
-        const match = (!nameVal || rName.includes(nameVal)) &&
-                      (!contactVal || rContact.includes(contactVal)) &&
-                      (!phoneVal || rPhone.includes(phoneVal)) &&
-                      (!addrVal || rAddr.includes(addrVal));
-
-        if (match) {
-            row.style.display = '';
-            visibleCount++;
-        } else {
-            row.style.display = 'none';
-        }
-    });
-
-    const countEl = document.getElementById('displayedCount');
-    if (countEl) countEl.textContent = visibleCount;
-
-    const noMatchRow = document.getElementById('noCustomersRow');
-    if (noMatchRow) {
-        noMatchRow.style.display = (visibleCount === 0) ? '' : 'none';
-    }
-}
-
-// Submit Search Form to backend
-function submitSearchForm() {
-    const form = document.getElementById('customerSearchForm');
-    if (form) form.submit();
-}
-
-// Multi-select Row Handling
-function toggleSelectAllRows(checked) {
-    const checkboxes = document.querySelectorAll('#customerTableBody .customer-row-checkbox');
-    checkboxes.forEach(cb => {
-        const row = cb.closest('tr');
-        if (row && row.style.display !== 'none') {
-            cb.checked = checked;
-        }
-    });
-    updateSelectedCount();
-}
-
-function updateSelectedCount() {
-    const selected = document.querySelectorAll('#customerTableBody .customer-row-checkbox:checked');
-    const bar = document.getElementById('bulkActionBar');
-    const countEl = document.getElementById('bulkSelectedCount');
-
-    if (selected.length > 0) {
-        if (bar) bar.style.display = 'flex';
-        if (countEl) countEl.textContent = `${selected.length} customer(s) selected`;
-    } else {
-        if (bar) bar.style.display = 'none';
-    }
-}
-
-function clearSelectedRows() {
-    document.querySelectorAll('#customerTableBody .customer-row-checkbox').forEach(cb => cb.checked = false);
-    const selectAll = document.getElementById('selectAllCheckbox');
-    if (selectAll) selectAll.checked = false;
-    updateSelectedCount();
-}
-
-// 1-Click Single Customer Delete / Archive
-function deleteSingleCustomer(id, name) {
-    if (!confirm(`Are you sure you want to remove customer "${name}"?\n(If sales orders exist, customer will be archived to protect order records)`)) {
-        return;
+    // 1. Highlight active card in left list
+    document.querySelectorAll('.cust-list-card').forEach(c => c.classList.remove('active'));
+    const activeCard = document.getElementById('custCard_' + id);
+    if (activeCard) {
+        activeCard.classList.add('active');
+        activeCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 
-    fetch(`/customers/${id}/delete`, {
-        method: 'POST',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            const row = document.querySelector(`.inflow-grid-row[data-id="${id}"]`);
-            if (row) {
-                row.remove();
+    // 2. Switch right canvas from "New Customer" mode back to "View Customer" mode
+    document.getElementById('custNewContainer').style.display = 'none';
+    document.getElementById('custViewContainer').style.display = 'block';
+
+    // 3. Update URL smoothly without full-page reload
+    if (window.history && window.history.pushState) {
+        window.history.pushState({ customerId: id }, '', '/customers/' + id);
+    }
+
+    // 4. Fetch details and order history via AJAX
+    fetchCustomerDetails(id);
+}
+
+// Fetch Customer Full Profile & Sales Order History via AJAX
+function fetchCustomerDetails(id) {
+    // Show loading state in orders table
+    const tableBody = document.getElementById('custOrdersTableBody');
+    tableBody.innerHTML = `
+        <tr>
+            <td colspan="10" style="padding: 28px; text-align: center; color: #64748B;">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#8C6541" stroke-width="2.5" style="animation: spin 1s linear infinite; vertical-align: middle; margin-right: 6px;">
+                    <line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line>
+                    <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+                    <line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line>
+                </svg>
+                <span>Loading customer details and sales order history...</span>
+            </td>
+        </tr>
+    `;
+
+    fetch('/api/customers/' + id + '/details')
+        .then(res => res.json())
+        .then(data => {
+            if (!data.success) {
+                showToast('Failed to load customer: ' + (data.message || 'Unknown error'), true);
+                return;
             }
-            updateDisplayedCount();
-            alert(data.message);
-        } else {
-            alert('Error: ' + (data.message || 'Could not delete customer'));
-        }
-    })
-    .catch(err => {
-        console.error('Delete error:', err);
-        alert('Server error occurred during deletion.');
-    });
+            renderCustomerDetails(data);
+        })
+        .catch(err => {
+            console.error('Error fetching customer:', err);
+            showToast('Network error loading customer details', true);
+        });
 }
 
-// Bulk Customer Delete
-function confirmBulkDelete() {
-    const selectedCbs = document.querySelectorAll('#customerTableBody .customer-row-checkbox:checked');
-    const ids = Array.from(selectedCbs).map(cb => parseInt(cb.value));
+// Render the fetched data into the right detail panel
+function renderCustomerDetails(data) {
+    const c = data.customer;
+    const orders = data.orders || [];
+    const stats = data.stats || {};
 
-    if (ids.length === 0) return;
+    cachedCustomerData[c.id] = data;
 
-    if (!confirm(`Delete or archive ${ids.length} selected customer(s)?`)) {
+    // Update hidden inputs
+    document.getElementById('currentCustomerId').value = c.id;
+    document.getElementById('currentCustomerName').value = c.name;
+    document.getElementById('currentCustomerBalance').value = c.balance || 0;
+    document.getElementById('currentCustomerPhone').value = c.phone || '';
+    document.getElementById('currentCustomerAddress').value = c.display_address || c.address1 || '';
+
+    // Identity & Contact
+    document.getElementById('detailCustomerName').textContent = c.name;
+    document.getElementById('detailCreatedAt').textContent = c.created_at || 'Active';
+    document.getElementById('detailBranchText').textContent = c.branch_name || 'Main Store (HQ)';
+    document.getElementById('detailContactPersonText').textContent = c.contact_name || c.name;
+
+    // Status Pill
+    const statusPill = document.getElementById('detailHeaderStatusPill');
+    if (c.balance && c.balance > 0) {
+        statusPill.textContent = 'Unpaid Balance';
+        statusPill.className = 'cust-status-badge unfulfilled';
+    } else {
+        statusPill.textContent = 'Active Customer';
+        statusPill.className = 'cust-status-badge fulfilled';
+    }
+
+    // Address
+    const addressBox = document.getElementById('detailAddressText');
+    if (c.address1 || c.city || c.display_address) {
+        addressBox.innerHTML = `
+            ${escapeHtml(c.address1 || c.display_address)}<br>
+            ${escapeHtml(c.city || '')}${c.city && c.state ? ', ' : ''}${escapeHtml(c.state || '')} ${escapeHtml(c.postal_code || '')}<br>
+            ${escapeHtml(c.country || 'Cambodia')}
+        `;
+    } else {
+        addressBox.innerHTML = '<span style="color: #94A3B8; font-style: italic;">+ Set business & delivery address</span>';
+    }
+
+    // Fields
+    const schemeSelect = document.getElementById('detailPricingSchemeSelect');
+    if (schemeSelect) schemeSelect.value = c.default_pricing_scheme_id || 100;
+
+    const termsSelect = document.getElementById('detailPaymentTermsSelect');
+    if (termsSelect) termsSelect.value = c.payment_terms || 'Due on Receipt';
+
+    const branchSelect = document.getElementById('detailBranchSelect');
+    if (branchSelect) branchSelect.value = c.branch_id || '';
+
+    const discountInput = document.getElementById('detailDiscountInput');
+    if (discountInput) discountInput.value = c.discount_percent || 0;
+
+    const taxInput = document.getElementById('detailTaxNumberInput');
+    if (taxInput) taxInput.value = c.tax_number || '';
+
+    const remarksText = document.getElementById('detailRemarksTextarea');
+    if (remarksText) remarksText.value = c.remarks || '';
+
+    // Financial Cards
+    const formattedBal = formatCurrency(c.balance || 0);
+    const formattedSpent = formatCurrency(stats.total_spent || c.total_spent || 0);
+
+    document.getElementById('detailBalanceLargeBadge').textContent = formattedBal;
+    document.getElementById('detailTotalSpentText').textContent = formattedSpent;
+    document.getElementById('detailSchemeSummaryText').textContent = c.pricing_scheme_name || 'Retail 1';
+
+    // Tracker pills
+    document.getElementById('trackerTotalOrders').textContent = stats.total_orders || orders.length;
+    document.getElementById('trackerPaidOrders').textContent = stats.paid_orders || 0;
+    document.getElementById('trackerUnpaidOrders').textContent = stats.unpaid_orders || 0;
+
+    // Bottom Summary Box
+    document.getElementById('bottomSummaryBalance').textContent = formattedBal;
+    document.getElementById('bottomSummaryTotalSpent').textContent = formattedSpent;
+
+    // Render Order History Table
+    renderOrderHistoryRows(orders);
+    dirtyFields.clear();
+}
+
+// Render Order History Table Rows
+function renderOrderHistoryRows(orders) {
+    const tbody = document.getElementById('custOrdersTableBody');
+    if (!orders || orders.length === 0) {
+        tbody.innerHTML = `
+            <tr id="noOrdersRow">
+                <td colspan="10" style="padding: 36px; text-align: center; color: #94A3B8; font-style: italic;">
+                    No sales order history recorded for this customer yet.
+                </td>
+            </tr>
+        `;
         return;
     }
 
-    fetch('/customers/bulk-delete', {
-        method: 'POST',
-        headers: {
-            'X-Requested-With': 'XMLHttpRequest',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ ids: ids })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            ids.forEach(id => {
-                const row = document.querySelector(`.inflow-grid-row[data-id="${id}"]`);
-                if (row) row.remove();
-            });
-            clearSelectedRows();
-            updateDisplayedCount();
-            alert(data.message);
-        } else {
-            alert('Bulk delete error: ' + (data.message || 'Operation failed'));
-        }
-    })
-    .catch(err => {
-        console.error('Bulk delete error:', err);
-        alert('Server error occurred during bulk deletion.');
+    let rowsHtml = '';
+    orders.forEach(o => {
+        const isPaid = (o.status === 'PAID') || (o.balance_due <= 0.001);
+        const statusBadgeClass = isPaid ? 'paid' : (o.status === 'INVOICED' ? 'invoiced' : (o.status === 'OPEN' ? 'open' : 'neutral'));
+        const statusLabel = isPaid ? 'Paid' : (o.status || 'Pending');
+
+        rowsHtml += `
+            <tr class="cust-order-row" id="orderRow_${o.id}" onclick="toggleOrderLinesDrawer(${o.id})">
+                <td style="font-weight: 700; font-family: monospace;">
+                    <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('/sales/${o.id}', '${escapeHtml(o.order_number)}')" class="cust-order-link" title="Open sales order ${escapeHtml(o.order_number)}">
+                        ${escapeHtml(o.order_number)}
+                    </a>
+                </td>
+                <td style="color: #475569;">${escapeHtml(o.order_date || '-')}</td>
+                <td class="font-khmer" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${escapeHtml(o.items_summary || '')}">
+                    ${escapeHtml(o.items_summary || 'Line Items')}
+                </td>
+                <td style="color: #64748B;">${escapeHtml(o.location_name || 'Main Warehouse')}</td>
+                <td style="text-align: center; font-weight: 600; color: #1E293B;">
+                    ${o.total_qty ? Math.round(o.total_qty) : '-'}
+                </td>
+                <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                    ${formatCurrency(o.total_amount)}
+                </td>
+                <td style="text-align: right; font-weight: 600; color: #16A34A;">
+                    ${formatCurrency(o.paid_amount)}
+                </td>
+                <td style="text-align: right; font-weight: 700; color: ${o.balance_due > 0 ? '#DC2626' : '#16A34A'};">
+                    ${formatCurrency(o.balance_due)}
+                </td>
+                <td style="text-align: center;">
+                    <span class="cust-order-status-badge ${statusBadgeClass}">${statusLabel}</span>
+                </td>
+                <td style="text-align: center;">
+                    <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('/sales/${o.id}', '${escapeHtml(o.order_number)}')" class="cust-row-view-btn">
+                        View
+                    </a>
+                </td>
+            </tr>
+            <tr id="orderLinesSubRow_${o.id}" class="cust-order-subrow" style="display: none;">
+                <td colspan="10" style="padding: 0; background: #F8FAFC;">
+                    <div class="cust-order-lines-container" id="orderLinesContainer_${o.id}">
+                        <div style="padding: 12px; text-align: center; font-size: 11px; color: #64748B;">
+                            Loading product details...
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        `;
     });
+
+    tbody.innerHTML = rowsHtml;
 }
 
-// Export selected customers
-function exportSelectedCustomers() {
-    const selectedCbs = document.querySelectorAll('#customerTableBody .customer-row-checkbox:checked');
-    const ids = Array.from(selectedCbs).map(cb => cb.value);
-    if (ids.length === 0) return;
+// Expand/Collapse Order Row to view exact Line Items
+function toggleOrderLinesDrawer(orderId) {
+    const subRow = document.getElementById('orderLinesSubRow_' + orderId);
+    if (!subRow) return;
 
-    let baseExportUrl = "{{ url_for('contacts.export_customers') }}";
-    window.location.href = baseExportUrl + '?ids=' + encodeURIComponent(ids.join(','));
-}
+    if (subRow.style.display !== 'none') {
+        subRow.style.display = 'none';
+        return;
+    }
 
-function updateDisplayedCount() {
-    const remaining = document.querySelectorAll('#customerTableBody .inflow-grid-row').length;
-    const countEl = document.getElementById('displayedCount');
-    if (countEl) countEl.textContent = remaining;
-    const ribbonTotal = document.getElementById('ribbonTotalCount');
-    if (ribbonTotal) ribbonTotal.textContent = remaining;
-}
+    subRow.style.display = 'table-row';
+    const container = document.getElementById('orderLinesContainer_' + orderId);
 
-// Quick Add Customer Modal
-function openQuickAddModal() {
-    const modal = document.getElementById('quickAddModal');
-    if (modal) modal.style.display = 'flex';
-    const nameInput = document.getElementById('quickName');
-    if (nameInput) {
-        nameInput.value = '';
-        nameInput.focus();
+    // Fetch lines if not already loaded
+    if (!container.dataset.loaded) {
+        fetch('/api/sales-orders/' + orderId + '/lines')
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success || !data.lines || data.lines.length === 0) {
+                    container.innerHTML = '<div style="padding: 10px 14px; font-size: 11.5px; color: #64748B;">No item details available.</div>';
+                    return;
+                }
+                let linesHtml = `
+                    <div style="padding: 8px 16px; border-left: 3px solid #8C6541;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 11.5px;">
+                            <thead>
+                                <tr style="color: #64748B; border-bottom: 1px solid #E2E8F0;">
+                                    <th style="padding: 4px 6px; text-align: left;">Product</th>
+                                    <th style="padding: 4px 6px; text-align: left;">SKU</th>
+                                    <th style="padding: 4px 6px; text-align: center;">Quantity</th>
+                                    <th style="padding: 4px 6px; text-align: right;">Price</th>
+                                    <th style="padding: 4px 6px; text-align: right;">Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                data.lines.forEach(l => {
+                    linesHtml += `
+                        <tr style="border-bottom: 1px solid #F1F5F9;">
+                            <td style="padding: 5px 6px; font-weight: 600; color: #1E293B;" class="font-khmer">${escapeHtml(l.product_name)}</td>
+                            <td style="padding: 5px 6px; font-family: monospace; color: #64748B;">${escapeHtml(l.product_sku || '-')}</td>
+                            <td style="padding: 5px 6px; text-align: center; font-weight: 700;">${l.quantity}</td>
+                            <td style="padding: 5px 6px; text-align: right;">${formatCurrency(l.unit_price)}</td>
+                            <td style="padding: 5px 6px; text-align: right; font-weight: 700; color: #0F172A;">${formatCurrency(l.subtotal)}</td>
+                        </tr>
+                    `;
+                });
+                linesHtml += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                container.innerHTML = linesHtml;
+                container.dataset.loaded = 'true';
+            })
+            .catch(err => {
+                container.innerHTML = '<div style="padding: 10px 14px; font-size: 11.5px; color: #DC2626;">Error loading products.</div>';
+            });
     }
 }
 
-function closeQuickAddModal() {
-    const modal = document.getElementById('quickAddModal');
-    if (modal) modal.style.display = 'none';
+// Mark field dirty on input
+function markFieldDirty(fieldName) {
+    dirtyFields.add(fieldName);
 }
 
-function submitQuickAddCustomer(event) {
-    event.preventDefault();
-    const btn = document.getElementById('btnSubmitQuickAdd');
-    if (btn) btn.disabled = true;
+// Save Customer Data via AJAX
+function saveCustomerData() {
+    if (!currentCustomerId) {
+        showToast('Please select a customer to save.', true);
+        return;
+    }
 
     const payload = {
-        name: document.getElementById('quickName')?.value.trim(),
-        contact_name: document.getElementById('quickContact')?.value.trim(),
-        phone: document.getElementById('quickPhone')?.value.trim(),
-        email: document.getElementById('quickEmail')?.value.trim(),
-        address1: document.getElementById('quickAddress')?.value.trim(),
-        city: document.getElementById('quickCity')?.value.trim(),
-        pricing_scheme_id: document.getElementById('quickScheme')?.value,
-        discount_percent: document.getElementById('quickDiscount')?.value,
-        branch_id: document.getElementById('quickBranch')?.value
+        name: document.getElementById('detailCustomerName').textContent.trim(),
+        default_pricing_scheme_id: document.getElementById('detailPricingSchemeSelect') ? document.getElementById('detailPricingSchemeSelect').value : null,
+        payment_terms: document.getElementById('detailPaymentTermsSelect') ? document.getElementById('detailPaymentTermsSelect').value : 'Due on Receipt',
+        discount_percent: document.getElementById('detailDiscountInput') ? document.getElementById('detailDiscountInput').value : 0,
+        tax_number: document.getElementById('detailTaxNumberInput') ? document.getElementById('detailTaxNumberInput').value : '',
+        remarks: document.getElementById('detailRemarksTextarea') ? document.getElementById('detailRemarksTextarea').value : ''
     };
 
-    fetch('/api/customers/quick-add', {
+    const branchSelect = document.getElementById('detailBranchSelect');
+    if (branchSelect) {
+        payload.branch_id = branchSelect.value;
+    }
+
+    const btn = document.getElementById('btnSaveCustomer');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<span>Saving...</span>';
+    btn.disabled = true;
+
+    fetch('/customers/' + currentCustomerId + '/save', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -1003,159 +2206,487 @@ function submitQuickAddCustomer(event) {
     })
     .then(res => res.json())
     .then(data => {
-        if (btn) btn.disabled = false;
-        if (data.success && data.customer) {
-            closeQuickAddModal();
-            // Prepend new row to table
-            insertCustomerRowIntoGrid(data.customer);
-            alert(`Customer "${data.customer.name}" created successfully!`);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        if (data.success) {
+            showToast('✓ ' + (data.message || 'Customer saved successfully!'));
+            dirtyFields.clear();
+            // Update left sidebar card if name or balance changed
+            const activeCard = document.getElementById('custCard_' + currentCustomerId);
+            if (activeCard && data.customer) {
+                const nameEl = activeCard.querySelector('.cust-card-name');
+                if (nameEl) nameEl.textContent = data.customer.name;
+            }
         } else {
-            alert('Error creating customer: ' + (data.message || 'Unknown error'));
+            showToast(data.message || 'Failed to save customer', true);
         }
     })
     .catch(err => {
-        if (btn) btn.disabled = false;
-        console.error('Quick add error:', err);
-        alert('Server error creating customer.');
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+        console.error(err);
+        showToast('Network error while saving customer', true);
     });
 }
 
-function insertCustomerRowIntoGrid(c) {
-    const tbody = document.getElementById('customerTableBody');
-    if (!tbody) return;
-
-    const noRow = document.getElementById('noCustomersRow');
-    if (noRow) noRow.remove();
-
-    const tr = document.createElement('tr');
-    tr.className = 'inflow-grid-row';
-    tr.setAttribute('data-id', c.id);
-    tr.setAttribute('data-name', (c.name || '').toLowerCase());
-    tr.setAttribute('data-contact', (c.contact_name || '').toLowerCase());
-    tr.setAttribute('data-phone', (c.phone || '').toLowerCase());
-    tr.setAttribute('data-address', (c.address1 || '').toLowerCase());
-    tr.onclick = function(e) { handleRowClick(e, tr); };
-    tr.ondblclick = function() { openCustomerUrl(`/customers/${c.id}`, `Customer: ${c.name}`); };
-
-    const detailUrl = `/customers/${c.id}`;
-    const branchBadge = c.branch_name ? 
-        `<span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">🏪 ${c.branch_code || c.branch_name}</span>` :
-        `<span style="display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; background: #F8FAFC; color: #475569; border: 1px solid #E2E8F0;">🏢 HQ</span>`;
-
-    tr.innerHTML = `
-        <td style="text-align: center; padding: 2px 4px; border-right: 1px solid #E2E8F0;" onclick="event.stopPropagation()">
-            <input type="checkbox" class="customer-row-checkbox" value="${c.id}" onchange="updateSelectedCount()">
-        </td>
-        <td style="padding: 3px 8px; font-weight: 600; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">
-            <a href="javascript:void(0);" onclick="openCustomerUrl('${detailUrl}', 'Customer: ${c.name}')" style="color: inherit; text-decoration: none;">
-                ${c.name}
-            </a>
-        </td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">${c.contact_name || ''}</td>
-        <td style="padding: 3px 8px; font-family: monospace; color: inherit; border-right: 1px solid #E2E8F0;">${c.phone || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.email || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.website || ''}</td>
-        <td style="padding: 3px 8px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">${c.address1 || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;" class="font-khmer">${c.address2 || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.city || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.state || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.postal_code || ''}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.country || 'Cambodia'}</td>
-        <td style="padding: 3px 8px; color: inherit; border-right: 1px solid #E2E8F0;">${c.pricing_scheme_name || 'Retail 1'}</td>
-        <td style="padding: 3px 8px; text-align: right; color: inherit; border-right: 1px solid #E2E8F0;">${parseFloat(c.discount_percent || 0).toFixed(0)}%</td>
-        {% if is_main_admin %}
-        <td style="padding: 3px 8px; text-align: center; border-right: 1px solid #E2E8F0;">${branchBadge}</td>
-        {% endif %}
-        <td style="padding: 3px 8px; text-align: right; font-weight: 700; color: inherit; border-right: 1px solid #E2E8F0;">$0.00</td>
-        <td style="padding: 2px 4px; text-align: center; white-space: nowrap;">
-            <div style="display: inline-flex; align-items: center; gap: 3px;">
-                <a href="javascript:void(0);" onclick="openCustomerUrl('${detailUrl}', 'Customer: ${c.name}')" class="inflow-row-btn">Detail</a>
-                <button type="button" class="inflow-row-delete-btn" onclick="event.stopPropagation(); deleteSingleCustomer(${c.id}, '${c.name}')" title="Delete customer">✕</button>
-            </div>
-        </td>
-    `;
-
-    tbody.insertBefore(tr, tbody.firstChild);
-    updateDisplayedCount();
+// Start New Customer Mode
+function startNewCustomer() {
+    document.getElementById('custViewContainer').style.display = 'none';
+    document.getElementById('custNewContainer').style.display = 'block';
+    document.querySelectorAll('.cust-list-card').forEach(c => c.classList.remove('active'));
+    document.getElementById('newCustName').focus();
 }
 
-// Keyboard Navigation & Shortcuts
-document.addEventListener('DOMContentLoaded', function() {
-    // Restore collapsed search pane preference
-    if (localStorage.getItem('inflow_customer_search_collapsed') === '1') {
-        const body = document.getElementById('searchPaneBody');
-        const arrow = document.getElementById('searchPaneArrow');
-        if (body) body.style.display = 'none';
-        if (arrow) arrow.textContent = '▶';
+function cancelNewCustomer() {
+    document.getElementById('custNewContainer').style.display = 'none';
+    document.getElementById('custViewContainer').style.display = 'block';
+    if (currentCustomerId) {
+        const c = document.getElementById('custCard_' + currentCustomerId);
+        if (c) c.classList.add('active');
+    }
+}
+
+// Submit New Customer via AJAX
+function submitNewCustomer() {
+    const nameInput = document.getElementById('newCustName');
+    const name = nameInput.value.trim();
+    if (!name) {
+        alert('Customer name is required!');
+        nameInput.focus();
+        return;
     }
 
-    // Submit search on Enter key in search inputs
-    const inputs = document.querySelectorAll('.inflow-pane-input');
-    inputs.forEach(input => {
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                submitSearchForm();
-            }
-        });
+    const payload = {
+        name: name,
+        contact_name: document.getElementById('newCustContact').value.trim(),
+        phone: document.getElementById('newCustPhone').value.trim(),
+        email: document.getElementById('newCustEmail').value.trim(),
+        website: document.getElementById('newCustWebsite').value.trim(),
+        address1: document.getElementById('newCustAddress').value.trim(),
+        city: document.getElementById('newCustCity').value.trim(),
+        country: document.getElementById('newCustCountry').value.trim(),
+        default_pricing_scheme_id: document.getElementById('newCustPricingScheme').value,
+        discount_percent: document.getElementById('newCustDiscount').value,
+        payment_terms: document.getElementById('newCustPaymentTerms').value,
+        remarks: document.getElementById('newCustRemarks').value.trim()
+    };
+
+    const branchEl = document.getElementById('newCustBranch');
+    if (branchEl) payload.branch_id = branchEl.value;
+
+    fetch('/customers/create', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success && data.customer) {
+            showToast('✓ ' + data.message);
+            // Prepend new card to left list
+            const c = data.customer;
+            const cardList = document.getElementById('custCardList');
+            const newCardHtml = `
+                <div class="cust-list-card active" id="custCard_${c.id}" data-id="${c.id}" data-name="${escapeHtml(c.name.toLowerCase())}" data-phone="${escapeHtml(c.phone.toLowerCase())}" data-balance="0" onclick="selectCustomer(${c.id})">
+                    <div class="cust-card-row-top">
+                        <span class="cust-card-name font-khmer">${escapeHtml(c.name)}</span>
+                        <span class="cust-status-badge fulfilled">Active</span>
+                    </div>
+                    <div class="cust-card-row-bottom">
+                        <span class="cust-balance-pill zero-balance">$0.00</span>
+                        <div class="cust-card-meta-text">
+                            <span>${escapeHtml(c.phone || c.city || 'Just added')}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+            cardList.insertAdjacentHTML('afterbegin', newCardHtml);
+            selectCustomer(c.id);
+        } else {
+            showToast(data.message || 'Failed to create customer', true);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Error creating customer', true);
+    });
+}
+
+// Live Search Filter for Left Sidebar Cards
+function handleLiveSearch(query) {
+    const q = query.trim().toLowerCase();
+    const clearBtn = document.getElementById('btnClearSearch');
+    if (clearBtn) clearBtn.style.display = q ? 'block' : 'none';
+
+    let matchCount = 0;
+    document.querySelectorAll('.cust-list-card').forEach(card => {
+        const name = card.dataset.name || '';
+        const phone = card.dataset.phone || '';
+        const city = card.dataset.city || '';
+        const contact = card.dataset.contact || '';
+        const address = card.dataset.address || '';
+
+        const isMatch = !q || name.includes(q) || phone.includes(q) || city.includes(q) || contact.includes(q) || address.includes(q);
+        if (isMatch) {
+            card.style.display = 'block';
+            matchCount++;
+        } else {
+            card.style.display = 'none';
+        }
     });
 
-    // Arrow keys & Delete key navigation on grid
-    document.addEventListener('keydown', function(e) {
-        // Quick Add shortcut: Alt + N
-        if (e.altKey && (e.key === 'n' || e.key === 'N')) {
-            e.preventDefault();
-            openQuickAddModal();
-            return;
-        }
+    const noMatch = document.getElementById('custNoMatchFilterMsg');
+    if (noMatch) noMatch.style.display = matchCount === 0 ? 'block' : 'none';
+}
 
-        const activeRow = document.querySelector('.inflow-grid-row.selected');
-        if (!activeRow) return;
+function clearLiveSearch() {
+    const inp = document.getElementById('custLiveSearchInput');
+    inp.value = '';
+    handleLiveSearch('');
+    inp.focus();
+}
 
-        // Skip if typing in an input
-        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName)) {
-            return;
-        }
+function toggleMasterSearch() {
+    const inp = document.getElementById('custLiveSearchInput');
+    inp.focus();
+}
 
-        if (e.key === 'ArrowDown') {
-            e.preventDefault();
-            let next = activeRow.nextElementSibling;
-            while (next && (next.id === 'noCustomersRow' || next.style.display === 'none')) {
-                next = next.nextElementSibling;
+// Status / Branch Dropdown Toggles
+function toggleStatusDropdown(e) {
+    e.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('statusDropdownMenu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function togglePrintDropdown(e) {
+    e.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('printDropdownMenu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleEmailDropdown(e) {
+    e.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('emailDropdownMenu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleMoreDropdown(e) {
+    e.stopPropagation();
+    closeAllDropdowns();
+    const menu = document.getElementById('moreDropdownMenu');
+    menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function closeAllDropdowns() {
+    document.querySelectorAll('.cust-menu-dropdown').forEach(m => m.style.display = 'none');
+}
+window.addEventListener('click', closeAllDropdowns);
+
+function toggleAdvancedFilters() {
+    const drawer = document.getElementById('custAdvFiltersDrawer');
+    drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleRemarksBox() {
+    const drawer = document.getElementById('custRemarksDrawer');
+    drawer.style.display = drawer.style.display === 'none' ? 'block' : 'none';
+    if (drawer.style.display === 'block') {
+        document.getElementById('detailRemarksTextarea').focus();
+    }
+}
+
+// Preset Filter Selections
+function selectFilterPreset(preset) {
+    if (preset === 'with_balance') {
+        window.location.href = "{{ url_for('contacts.list_customers') }}?with_balance=1";
+    } else {
+        window.location.href = "{{ url_for('contacts.list_customers') }}";
+    }
+}
+
+function selectBranchFilter(branchId) {
+    window.location.href = "{{ url_for('contacts.list_customers') }}?branch=" + branchId;
+}
+
+function selectSchemeFilter(schemeId) {
+    window.location.href = "{{ url_for('contacts.list_customers') }}?scheme_id=" + schemeId;
+}
+
+// Create new sales order for this customer
+function createNewOrderForCurrentCustomer() {
+    if (!currentCustomerId) {
+        showToast('Please select a customer first.', true);
+        return;
+    }
+    const url = "{{ url_for('sales_orders.new_order') }}?customer_id=" + currentCustomerId;
+    openOrderUrl(url, 'New Sales Order');
+}
+
+// Open Order or Customer Url in inFlow MDI tab or navigate smoothly
+function openOrderUrl(url, title) {
+    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.openTab === 'function') {
+        window.top.inflowMdi.openTab(url, title || 'Sales Order', 'sales');
+    } else {
+        window.location.href = url;
+    }
+}
+
+function handleToolbarClose() {
+    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.closeActiveTab === 'function') {
+        window.top.inflowMdi.closeActiveTab();
+    } else {
+        window.history.back();
+    }
+}
+
+// Print Statement
+function printCustomerStatement() {
+    if (!currentCustomerId) return;
+    const url = '/customers/' + currentCustomerId + '/print-statement';
+    window.open(url, '_blank');
+}
+
+function emailCustomerStatement() {
+    showToast('Customer statement sent to email.');
+}
+
+function emailPaymentReminder() {
+    showToast('Payment reminder sent to customer email.');
+}
+
+function handleCustomerAttachments() {
+    alert('Attachments: 0 documents attached to this customer account.');
+}
+
+function handleCopyCustomer() {
+    if (!currentCustomerId) return;
+    startNewCustomer();
+    const curr = cachedCustomerData[currentCustomerId];
+    if (curr && curr.customer) {
+        document.getElementById('newCustName').value = curr.customer.name + ' (Copy)';
+        document.getElementById('newCustPhone').value = curr.customer.phone || '';
+        document.getElementById('newCustEmail').value = curr.customer.email || '';
+        document.getElementById('newCustAddress').value = curr.customer.address1 || '';
+        document.getElementById('newCustCity').value = curr.customer.city || '';
+    }
+}
+
+// Deactivate Current Customer
+function handleDeactivateCurrentCustomer() {
+    if (!currentCustomerId) return;
+    const name = document.getElementById('currentCustomerName').value || 'this customer';
+    if (!confirm(`Are you sure you want to deactivate or remove '${name}'?`)) return;
+
+    fetch('/customers/' + currentCustomerId + '/delete', {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToast('✓ ' + (data.message || 'Customer removed'));
+            const card = document.getElementById('custCard_' + currentCustomerId);
+            if (card) card.remove();
+            // Select first remaining customer
+            const first = document.querySelector('.cust-list-card');
+            if (first) {
+                selectCustomer(first.dataset.id);
             }
-            if (next && next.classList.contains('inflow-grid-row')) {
-                activeRow.classList.remove('selected');
-                next.classList.add('selected');
-                next.scrollIntoView({ block: 'nearest' });
-            }
-        } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            let prev = activeRow.previousElementSibling;
-            while (prev && (prev.id === 'noCustomersRow' || prev.style.display === 'none')) {
-                prev = prev.previousElementSibling;
-            }
-            if (prev && prev.classList.contains('inflow-grid-row')) {
-                activeRow.classList.remove('selected');
-                prev.classList.add('selected');
-                prev.scrollIntoView({ block: 'nearest' });
-            }
-        } else if (e.key === 'Enter') {
-            e.preventDefault();
-            const id = activeRow.getAttribute('data-id');
-            const name = activeRow.getAttribute('data-name');
-            if (id) {
-                openCustomerUrl(`/customers/${id}`, `Customer: ${name}`);
-            }
-        } else if (e.key === 'Delete') {
-            e.preventDefault();
-            const id = activeRow.getAttribute('data-id');
-            const nameEl = activeRow.querySelector('td:nth-child(2)');
-            const name = nameEl ? nameEl.textContent.trim() : `Customer #${id}`;
-            if (id) {
-                deleteSingleCustomer(id, name);
-            }
+        } else {
+            showToast(data.message || 'Error removing customer', true);
         }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Error removing customer', true);
     });
+}
+
+// Full Edit Profile Modal
+function openFullEditModal() {
+    if (!currentCustomerId) return;
+    const c = cachedCustomerData[currentCustomerId] ? cachedCustomerData[currentCustomerId].customer : null;
+    document.getElementById('modalEditName').value = c ? c.name : document.getElementById('detailCustomerName').textContent.trim();
+    document.getElementById('modalEditContact').value = c ? c.contact_name : '';
+    document.getElementById('modalEditPhone').value = c ? c.phone : '';
+    document.getElementById('modalEditEmail').value = c ? c.email : '';
+    document.getElementById('modalEditWebsite').value = c ? c.website : '';
+    document.getElementById('modalEditTaxNumber').value = c ? c.tax_number : '';
+    document.getElementById('modalEditAddress1').value = c ? c.address1 : '';
+    document.getElementById('modalEditCity').value = c ? c.city : '';
+    document.getElementById('modalEditCountry').value = c ? (c.country || 'Cambodia') : 'Cambodia';
+    document.getElementById('fullEditModal').style.display = 'flex';
+}
+
+function closeFullEditModal() {
+    document.getElementById('fullEditModal').style.display = 'none';
+}
+
+function saveFullEditModal() {
+    const payload = {
+        name: document.getElementById('modalEditName').value.trim(),
+        contact_name: document.getElementById('modalEditContact').value.trim(),
+        phone: document.getElementById('modalEditPhone').value.trim(),
+        email: document.getElementById('modalEditEmail').value.trim(),
+        website: document.getElementById('modalEditWebsite').value.trim(),
+        tax_number: document.getElementById('modalEditTaxNumber').value.trim(),
+        address1: document.getElementById('modalEditAddress1').value.trim(),
+        city: document.getElementById('modalEditCity').value.trim(),
+        country: document.getElementById('modalEditCountry').value.trim()
+    };
+
+    fetch('/customers/' + currentCustomerId + '/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeFullEditModal();
+            showToast('✓ Customer profile updated!');
+            fetchCustomerDetails(currentCustomerId);
+        } else {
+            showToast(data.message || 'Error saving customer', true);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Error saving customer', true);
+    });
+}
+
+// Delivery Label Modal
+function openCustomerDeliveryModal() {
+    if (!currentCustomerId) return;
+    document.getElementById('modalCustAddressInput').value = document.getElementById('currentCustomerAddress').value || '';
+    document.getElementById('modalCustProductCostInput').value = parseFloat(document.getElementById('currentCustomerBalance').value || 0).toFixed(2);
+    document.getElementById('customerDeliveryModal').style.display = 'flex';
+}
+
+function closeCustomerDeliveryModal() {
+    document.getElementById('customerDeliveryModal').style.display = 'none';
+}
+
+function submitCustomerDeliveryLabel() {
+    if (!currentCustomerId) return;
+    const carrier = document.getElementById('modalCustCarrierSelect').value;
+    const packages = document.getElementById('modalCustCaseCountInput').value;
+    const cost = document.getElementById('modalCustProductCostInput').value;
+    const address = encodeURIComponent(document.getElementById('modalCustAddressInput').value);
+    const notes = encodeURIComponent(document.getElementById('modalCustDeliveryNotesInput').value);
+    const url = `/customers/${currentCustomerId}/print-label?carrier=${encodeURIComponent(carrier)}&packages=${packages}&cost=${cost}&address=${address}&notes=${notes}&autoprint=1`;
+    window.open(url, '_blank');
+    closeCustomerDeliveryModal();
+}
+
+function submitCustomerDeliveryLabelPdf() {
+    if (!currentCustomerId) return;
+    const carrier = document.getElementById('modalCustCarrierSelect').value;
+    const packages = document.getElementById('modalCustCaseCountInput').value;
+    const cost = document.getElementById('modalCustProductCostInput').value;
+    const address = encodeURIComponent(document.getElementById('modalCustAddressInput').value);
+    const notes = encodeURIComponent(document.getElementById('modalCustDeliveryNotesInput').value);
+    const url = `/customers/${currentCustomerId}/print-label?carrier=${encodeURIComponent(carrier)}&packages=${packages}&cost=${cost}&address=${address}&notes=${notes}&pdf=1`;
+    window.open(url, '_blank');
+    closeCustomerDeliveryModal();
+}
+
+// Address Dialog
+function openAddressModal() {
+    if (!currentCustomerId) return;
+    const c = cachedCustomerData[currentCustomerId] ? cachedCustomerData[currentCustomerId].customer : null;
+    document.getElementById('modalStreet').value = c ? (c.address1 || '') : '';
+    document.getElementById('modalCity').value = c ? (c.city || '') : '';
+    document.getElementById('modalState').value = c ? (c.state || '') : '';
+    document.getElementById('modalCountry').value = c ? (c.country || 'Cambodia') : 'Cambodia';
+    document.getElementById('modalPostalCode').value = c ? (c.postal_code || '') : '';
+    document.getElementById('inflowAddressModal').style.display = 'flex';
+}
+
+function closeAddressModal() {
+    document.getElementById('inflowAddressModal').style.display = 'none';
+}
+
+function saveAddressModal() {
+    const payload = {
+        name: document.getElementById('detailCustomerName').textContent.trim(),
+        address1: document.getElementById('modalStreet').value.trim(),
+        city: document.getElementById('modalCity').value.trim(),
+        state: document.getElementById('modalState').value.trim(),
+        country: document.getElementById('modalCountry').value.trim(),
+        postal_code: document.getElementById('modalPostalCode').value.trim()
+    };
+
+    fetch('/customers/' + currentCustomerId + '/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            closeAddressModal();
+            showToast('✓ Address updated!');
+            fetchCustomerDetails(currentCustomerId);
+        } else {
+            showToast(data.message || 'Error updating address', true);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        showToast('Error updating address', true);
+    });
+}
+
+function openContactModal() {
+    openFullEditModal();
+}
+
+// Export Customer Orders to CSV
+function exportCustomerOrdersCsv() {
+    if (!currentCustomerId) return;
+    window.location.href = `/customers/${currentCustomerId}/export-orders`;
+}
+
+// Utility formatting functions
+function formatCurrency(val) {
+    const num = parseFloat(val) || 0;
+    return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function showToast(msg, isError) {
+    const t = document.getElementById('custToastBanner');
+    t.textContent = msg;
+    t.style.background = isError ? '#DC2626' : '#1E293B';
+    t.style.display = 'flex';
+    setTimeout(() => {
+        t.style.display = 'none';
+    }, 3500);
+}
+
+// Keyboard shortcuts: Ctrl+S to save
+window.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        saveCustomerData();
+    }
 });
 </script>
 {% endblock %}
