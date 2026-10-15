@@ -21,6 +21,14 @@
         document.documentElement.setAttribute('data-lang', savedLang);
         document.documentElement.setAttribute('lang', savedLang);
 
+        // Early View Mode initialization to prevent layout flash
+        var savedViewMode = localStorage.getItem('inflow_view_mode');
+        if (!savedViewMode) {
+            savedViewMode = (window.innerWidth <= 768) ? 'mobile' : 'desktop';
+        }
+        document.documentElement.setAttribute('data-view-mode', savedViewMode);
+        document.documentElement.classList.add(savedViewMode === 'mobile' ? 'is-mobile-view' : 'is-desktop-view');
+
         if (window.self !== window.top || window.location.search.indexOf('embed=1') !== -1) {
             document.documentElement.classList.add('is-embedded');
         } else {
@@ -132,15 +140,20 @@
             </div>
         </div>
 
-        <!-- 8. Integrations / Modules (3 squares + plus sign) -->
-        <div class="inflow-sidebar-nav-item" data-menu="integrations" onclick="toggleSidebarFlyout('integrations', this)" title="Apps & Integrations">
-            <div class="inflow-sidebar-btn">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="sidebar-icon">
-                    <rect x="3.5" y="3.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
-                    <rect x="3.5" y="13.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
-                    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
-                    <path d="M16.7 3.5v6M13.7 6.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- 8. View Mode Switcher: Desktop View ↔ Mobile View -->
+        <div class="inflow-sidebar-nav-item inflow-view-mode-toggle" id="sidebarViewModeItem" data-menu="integrations" onclick="handleViewModeItemClick(event, this)" oncontextmenu="toggleSidebarFlyout('integrations', this); return false;" title="Desktop View (Click to switch to Mobile View)">
+            <div class="inflow-sidebar-btn" id="sidebarViewModeBtn">
+                <!-- Dual-device Switcher SVG (Desktop Monitor + Smartphone) -->
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" class="sidebar-icon" id="viewModeIconSvg">
+                    <!-- Monitor screen on left -->
+                    <rect x="2" y="3.5" width="13" height="10" rx="1.5" stroke="currentColor" stroke-width="1.8"/>
+                    <path d="M5.5 17h6M8.5 13.5v3.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    <!-- Smartphone on right -->
+                    <rect x="13.5" y="7" width="8.5" height="13.5" rx="2" stroke="currentColor" stroke-width="1.8" fill="#112340"/>
+                    <circle cx="17.75" cy="17.8" r="0.8" fill="currentColor"/>
+                    <path d="M16 9.5h3.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
                 </svg>
+                <span class="view-mode-pill-badge badge-desktop" id="viewModePillBadge">PC</span>
             </div>
         </div>
 
@@ -484,9 +497,31 @@
 
         </div>
 
-        <!-- INTEGRATIONS -->
+        <!-- VIEW MODE & INTEGRATIONS -->
         <div class="flyout-section" id="flyout-integrations">
-            <div class="flyout-header">Apps & Integrations</div>
+            <div class="flyout-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <span>Display & View Mode</span>
+                <span id="flyoutCurrentModeLabel" style="font-size: 10px; font-weight: 800; color: #0284C7; background: #E0F2FE; padding: 2px 6px; border-radius: 4px; text-transform: uppercase;">PC MODE</span>
+            </div>
+            
+            <!-- Quick View Mode Toggle Switchers -->
+            <div style="padding: 10px 14px; background: #F8FAFC; border-bottom: 1px solid #E2E8F0; display: flex; flex-direction: column; gap: 8px;">
+                <div style="font-size: 11px; color: #64748B; font-weight: 600;">Choose layout view:</div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button type="button" id="btnSwitchDesktop" onclick="applyViewMode('desktop', true); closeSidebarFlyout();" class="view-switch-btn" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; border: 2px solid #0284C7; border-radius: 8px; background: #F0F9FF; cursor: pointer; transition: all 0.15s ease;">
+                        <span style="font-size: 20px; line-height: 1;">🖥️</span>
+                        <span style="font-size: 12px; font-weight: 700; color: #1E293B; margin-top: 4px;">Desktop</span>
+                        <span style="font-size: 10px; color: #64748B;">កុំព្យូទ័រ (Full)</span>
+                    </button>
+                    <button type="button" id="btnSwitchMobile" onclick="applyViewMode('mobile', true); closeSidebarFlyout();" class="view-switch-btn" style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 10px 6px; border: 2px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; cursor: pointer; transition: all 0.15s ease;">
+                        <span style="font-size: 20px; line-height: 1;">📱</span>
+                        <span style="font-size: 12px; font-weight: 700; color: #1E293B; margin-top: 4px;">Mobile</span>
+                        <span style="font-size: 10px; color: #64748B;">ទូរស័ព្ទ (Touch)</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="flyout-header" style="margin-top: 8px;">Apps & Tools</div>
             <a href="{{ url_for('migration.migration_page') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></span>
                 <span class="flyout-label">inFlow SQL Sync</span>
@@ -808,6 +843,185 @@
                 closeSidebarFlyout();
             }
         });
+
+        /* ==========================================================================
+           View Mode Switcher (Desktop View ↔ Mobile View)
+           ========================================================================== */
+        function getCurrentViewMode() {
+            let mode = localStorage.getItem('inflow_view_mode');
+            if (!mode) {
+                mode = (window.innerWidth <= 768) ? 'mobile' : 'desktop';
+            }
+            return mode;
+        }
+
+        function handleViewModeItemClick(e, el) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            toggleDesktopMobileView();
+        }
+
+        function applyViewMode(mode, broadcast) {
+            if (typeof broadcast === 'undefined') broadcast = true;
+            if (mode !== 'mobile' && mode !== 'desktop') mode = 'desktop';
+
+            // 1. Persist in localStorage and cookie
+            try {
+                localStorage.setItem('inflow_view_mode', mode);
+                document.cookie = "inflow_view_mode=" + mode + "; path=/; max-age=31536000; SameSite=Lax";
+            } catch(e) {}
+
+            // 2. Toggle classes on documentElement
+            const root = document.documentElement;
+            root.setAttribute('data-view-mode', mode);
+            if (mode === 'mobile') {
+                root.classList.add('is-mobile-view');
+                root.classList.remove('is-desktop-view');
+            } else {
+                root.classList.add('is-desktop-view');
+                root.classList.remove('is-mobile-view');
+            }
+
+            // 3. Update Visuals (sidebar button, badge, flyout state)
+            updateViewModeVisuals(mode);
+
+            // 4. Broadcast to top or child tab iframes
+            if (broadcast) {
+                if (window.self === window.top) {
+                    // Host shell: send message to all tab iframes
+                    document.querySelectorAll('#inflowTabWorkspace iframe').forEach(function(iframe) {
+                        try {
+                            if (iframe.contentWindow) {
+                                iframe.contentWindow.postMessage({ type: 'INFLOW_VIEW_MODE_CHANGE', mode: mode }, '*');
+                                if (typeof iframe.contentWindow.applyViewMode === 'function') {
+                                    iframe.contentWindow.applyViewMode(mode, false);
+                                } else {
+                                    const frameDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                    if (frameDoc && frameDoc.documentElement) {
+                                        frameDoc.documentElement.setAttribute('data-view-mode', mode);
+                                        if (mode === 'mobile') {
+                                            frameDoc.documentElement.classList.add('is-mobile-view');
+                                            frameDoc.documentElement.classList.remove('is-desktop-view');
+                                        } else {
+                                            frameDoc.documentElement.classList.add('is-desktop-view');
+                                            frameDoc.documentElement.classList.remove('is-mobile-view');
+                                        }
+                                    }
+                                }
+                            }
+                        } catch(err) {}
+                    });
+                } else {
+                    // Inside iframe: notify host shell
+                    try {
+                        window.top.postMessage({ type: 'INFLOW_VIEW_MODE_CHANGE', mode: mode }, '*');
+                    } catch(err) {}
+                }
+
+                // Show visual toast notification
+                showViewModeToast(mode);
+            }
+        }
+
+        function toggleDesktopMobileView() {
+            const cur = getCurrentViewMode();
+            const next = (cur === 'mobile') ? 'desktop' : 'mobile';
+            applyViewMode(next, true);
+        }
+
+        function updateViewModeVisuals(mode) {
+            const navItem = document.getElementById('sidebarViewModeItem');
+            const badge = document.getElementById('viewModePillBadge');
+            const btnSwitchDesktop = document.getElementById('btnSwitchDesktop');
+            const btnSwitchMobile = document.getElementById('btnSwitchMobile');
+            const modeLabel = document.getElementById('flyoutCurrentModeLabel');
+
+            if (mode === 'mobile') {
+                if (navItem) {
+                    navItem.classList.add('active-mobile');
+                    navItem.setAttribute('title', 'Mobile View Active (Click to switch to Desktop View)');
+                }
+                if (badge) {
+                    badge.textContent = '📱';
+                    badge.className = 'view-mode-pill-badge badge-mobile';
+                }
+                if (modeLabel) {
+                    modeLabel.textContent = 'MOBILE MODE 📱';
+                    modeLabel.style.color = '#10B981';
+                    modeLabel.style.background = '#D1FAE5';
+                }
+                if (btnSwitchMobile) {
+                    btnSwitchMobile.style.borderColor = '#0284C7';
+                    btnSwitchMobile.style.background = '#F0F9FF';
+                    btnSwitchMobile.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.2)';
+                }
+                if (btnSwitchDesktop) {
+                    btnSwitchDesktop.style.borderColor = '#CBD5E1';
+                    btnSwitchDesktop.style.background = '#FFFFFF';
+                    btnSwitchDesktop.style.boxShadow = 'none';
+                }
+            } else {
+                if (navItem) {
+                    navItem.classList.remove('active-mobile');
+                    navItem.setAttribute('title', 'Desktop View Active (Click to switch to Mobile View)');
+                }
+                if (badge) {
+                    badge.textContent = 'PC';
+                    badge.className = 'view-mode-pill-badge badge-desktop';
+                }
+                if (modeLabel) {
+                    modeLabel.textContent = 'PC MODE 🖥️';
+                    modeLabel.style.color = '#0284C7';
+                    modeLabel.style.background = '#E0F2FE';
+                }
+                if (btnSwitchDesktop) {
+                    btnSwitchDesktop.style.borderColor = '#0284C7';
+                    btnSwitchDesktop.style.background = '#F0F9FF';
+                    btnSwitchDesktop.style.boxShadow = '0 0 0 2px rgba(2, 132, 199, 0.2)';
+                }
+                if (btnSwitchMobile) {
+                    btnSwitchMobile.style.borderColor = '#CBD5E1';
+                    btnSwitchMobile.style.background = '#FFFFFF';
+                    btnSwitchMobile.style.boxShadow = 'none';
+                }
+            }
+        }
+
+        function showViewModeToast(mode) {
+            let toast = document.getElementById('inflowViewModeToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'inflowViewModeToast';
+                toast.style.cssText = 'position: fixed; bottom: 70px; left: 50%; transform: translateX(-50%); z-index: 1000000; background: #0F172A; color: #FFFFFF; padding: 10px 20px; border-radius: 9999px; font-size: 13px; font-weight: 700; box-shadow: 0 10px 25px rgba(0,0,0,0.35); display: flex; align-items: center; gap: 8px; pointer-events: none; opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease; border: 1px solid rgba(255,255,255,0.15);';
+                document.body.appendChild(toast);
+            }
+            const isMob = (mode === 'mobile');
+            toast.innerHTML = isMob 
+                ? '<span style="font-size: 16px;">📱</span><span>Switched to <b>Mobile View</b> (ទូរស័ព្ទ)</span>'
+                : '<span style="font-size: 16px;">🖥️</span><span>Switched to <b>Desktop View</b> (កុំព្យូទ័រ)</span>';
+            toast.style.transform = 'translateX(-50%) translateY(0)';
+            toast.style.opacity = '1';
+            clearTimeout(window._viewModeToastTimer);
+            window._viewModeToastTimer = setTimeout(function() {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(-50%) translateY(10px)';
+            }, 2200);
+        }
+
+        // Cross-frame event synchronization
+        window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'INFLOW_VIEW_MODE_CHANGE') {
+                applyViewMode(event.data.mode, false);
+            }
+        });
+
+        // Initialize visuals on load
+        document.addEventListener('DOMContentLoaded', function() {
+            const initialMode = getCurrentViewMode();
+            applyViewMode(initialMode, false);
+        });
     </script>
 
     <!-- inFlow Multi-Language (EN/KM) Translation Engine -->
@@ -823,6 +1037,11 @@
             'System Preferences': 'ចំណង់ចំណូលចិត្តប្រព័ន្ធ',
             'Reports': 'របាយការណ៍',
             'Apps & Integrations': 'កម្មវិធី & តំណភ្ជាប់',
+            'Display & View Mode': 'ការបង្ហាញ & ទម្រង់មើល',
+            'Desktop View': 'ទិដ្ឋភាពកុំព្យូទ័រ',
+            'Mobile View': 'ទិដ្ឋភាពទូរស័ព្ទ',
+            'Desktop': 'កុំព្យូទ័រ',
+            'Mobile': 'ទូរស័ព្ទ',
             'Store Context & Branches': 'ទីតាំងហាង & សាខា',
             'User Account': 'គណនីអ្នកប្រើប្រាស់',
             'New sale order': 'បង្កើតការបញ្ជាទិញថ្មី',

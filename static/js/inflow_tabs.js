@@ -570,6 +570,28 @@
                                 iframe.contentWindow.postMessage({ type: 'INFLOW_LANG_CHANGE', lang: curAppLang }, '*');
                             } catch (e) {}
 
+                            // Ensure newly loaded iframe receives current view mode (desktop/mobile) immediately
+                            const curViewMode = localStorage.getItem('inflow_view_mode') || (window.innerWidth <= 768 ? 'mobile' : 'desktop');
+                            try {
+                                iframe.contentWindow.localStorage.setItem('inflow_view_mode', curViewMode);
+                                if (typeof iframe.contentWindow.applyViewMode === 'function') {
+                                    iframe.contentWindow.applyViewMode(curViewMode, false);
+                                } else {
+                                    const frameDoc = iframe.contentDocument || iframe.contentWindow.document;
+                                    if (frameDoc && frameDoc.documentElement) {
+                                        frameDoc.documentElement.setAttribute('data-view-mode', curViewMode);
+                                        if (curViewMode === 'mobile') {
+                                            frameDoc.documentElement.classList.add('is-mobile-view');
+                                            frameDoc.documentElement.classList.remove('is-desktop-view');
+                                        } else {
+                                            frameDoc.documentElement.classList.add('is-desktop-view');
+                                            frameDoc.documentElement.classList.remove('is-mobile-view');
+                                        }
+                                    }
+                                }
+                                iframe.contentWindow.postMessage({ type: 'INFLOW_VIEW_MODE_CHANGE', mode: curViewMode }, '*');
+                            } catch (e) {}
+
                             // Sync tab category type if page redirected
                             const detected = detectTypeFromUrl(newPath);
                             if (detected && detected !== 'default' && detected !== tab.type) {
