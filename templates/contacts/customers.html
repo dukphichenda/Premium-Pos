@@ -3,980 +3,7 @@
 {% block title %}Customers - inFlow Inventory - Premium Edition{% endblock %}
 {% block body_class %}customer-body-fullscreen{% endblock %}
 
-{% block content %}
-<!-- Top Warm Accent Bar (Matching inFlow Modern Cloud UI) -->
-<div class="inflow-top-accent-bar" style="height: 3px; background: linear-gradient(90deg, #8C6541 0%, #D9A05B 50%, #8C6541 100%);"></div>
-
-<!-- Master-Detail Split Workspace -->
-<div class="inflow-cust-split-workspace">
-    
-    <!-- ========================================================================= -->
-    <!-- LEFT MASTER PANEL: Customer List & Search (Matching Screenshot Left Panel) -->
-    <!-- ========================================================================= -->
-    <aside class="cust-master-sidebar" id="custMasterSidebar">
-        <!-- Top Toolbar: [ 🔍 ] [ All ▾ ] [ + ] -->
-        <div class="cust-master-topbar">
-            <!-- Search Toggle Button -->
-            <button type="button" class="cust-icon-btn" id="btnToggleSearch" onclick="toggleMasterSearch()" title="Toggle Search Bar">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </button>
-
-            <!-- Filter Pill Dropdown: [ All ▾ ] -->
-            <div class="cust-pill-dropdown-wrap">
-                <button type="button" class="cust-pill-btn" id="btnStatusFilter" onclick="toggleStatusDropdown(event)">
-                    <span id="statusFilterLabel">
-                        {% if with_balance == '1' %}With Balance
-                        {% elif scheme_filter %}Pricing Scheme
-                        {% elif current_branch_param == 'main' %}🏢 HQ Main Store
-                        {% elif current_branch_param and current_branch_param != 'all' %}
-                            {% set matched_name = namespace(val=none) %}
-                            {% for b in branches %}
-                                {% if current_branch_param == b.id|string %}
-                                    {% set matched_name.val = b.code or b.name %}
-                                {% endif %}
-                            {% endfor %}
-                            🏪 {{ matched_name.val or ('Branch ' ~ current_branch_param) }}
-                        {% else %}All{% endif %}
-                    </span>
-                    <span style="font-size: 10px; margin-left: 2px;">▾</span>
-                </button>
-                <div class="cust-menu-dropdown" id="statusDropdownMenu" style="display: none;">
-                    <div class="cust-menu-item {% if not with_balance and not scheme_filter and (not current_branch_param or current_branch_param == 'all') %}active{% endif %}" onclick="selectFilterPreset('all')">
-                        <span>All Customers</span>
-                    </div>
-                    <div class="cust-menu-item {% if with_balance == '1' %}active{% endif %}" onclick="selectFilterPreset('with_balance')">
-                        <span>⚠️ With Open Balance</span>
-                    </div>
-                    <div class="cust-menu-separator"></div>
-                    {% if is_main_admin %}
-                    <div style="padding: 4px 12px; font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase;">Branches (HQ)</div>
-                    <div class="cust-menu-item {% if current_branch_param == 'main' %}active{% endif %}" onclick="selectBranchFilter('main')">
-                        <span>🏢 HQ Main Store</span>
-                    </div>
-                    {% for b in branches %}
-                    <div class="cust-menu-item {% if current_branch_param == b.id|string %}active{% endif %}" onclick="selectBranchFilter('{{ b.id }}')">
-                        <span>🏪 {{ b.name }} ({{ b.code }})</span>
-                    </div>
-                    {% endfor %}
-                    <div class="cust-menu-item {% if current_branch_param == 'all' %}active{% endif %}" onclick="selectBranchFilter('all')">
-                        <span>🌐 All Branches</span>
-                    </div>
-                    <div class="cust-menu-separator"></div>
-                    {% endif %}
-                    <div style="padding: 4px 12px; font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase;">Pricing Schemes</div>
-                    {% for ps in pricing_schemes %}
-                    <div class="cust-menu-item {% if scheme_filter == ps.id|string %}active{% endif %}" onclick="selectSchemeFilter('{{ ps.id }}')">
-                        <span>🏷️ {{ ps.name }}</span>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
-
-            <!-- Quick Add Button: [ + ] -->
-            <button type="button" class="cust-icon-btn" onclick="startNewCustomer()" title="Create New Customer (+)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-            </button>
-        </div>
-
-        <!-- Collapsible Search Input Box -->
-        <div class="cust-search-box-wrap" id="custSearchBoxWrap">
-            <div style="position: relative; display: flex; align-items: center; width: 100%;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" style="position: absolute; left: 9px; pointer-events: none;">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-                <input type="text" id="custLiveSearchInput" class="cust-search-input font-khmer" 
-                       placeholder="Search name, phone, city, address..." 
-                       value="{{ search_name or search }}" 
-                       autocomplete="off" 
-                       oninput="handleLiveSearch(this.value)"
-                       onkeydown="if(event.key === 'Enter') { event.preventDefault(); triggerServerSearch(this.value); }">
-                <button type="button" class="cust-clear-search-btn" id="btnClearSearch" onclick="clearLiveSearch()" style="display: {% if search_name or search %}block{% else %}none{% endif %};">✕</button>
-            </div>
-        </div>
-
-        <!-- Sub-header: 🎚️ Filters Toggle -->
-        <div class="cust-filter-toggle-row">
-            <button type="button" class="cust-filter-btn" onclick="toggleAdvancedFilters()">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="4" y1="21" x2="4" y2="14"></line>
-                    <line x1="4" y1="10" x2="4" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="12"></line>
-                    <line x1="12" y1="8" x2="12" y2="3"></line>
-                    <line x1="20" y1="21" x2="20" y2="16"></line>
-                    <line x1="20" y1="12" x2="20" y2="3"></line>
-                    <line x1="1" y1="14" x2="7" y2="14"></line>
-                    <line x1="9" y1="8" x2="15" y2="8"></line>
-                    <line x1="17" y1="16" x2="23" y2="16"></line>
-                </svg>
-                <span>Filters</span>
-                <span id="activeFiltersBadge" class="cust-badge-dot" style="display: {% if search_name or search_phone or search_address or with_balance or scheme_filter %}inline-block{% else %}none{% endif %};"></span>
-            </button>
-            <span style="font-size: 11px; color: #94A3B8; font-weight: 600;" id="custCounterLabel">{{ "{:,}".format(customers|length) if customers else '0' }} Customers</span>
-        </div>
-
-        <!-- Collapsible Advanced Filters Drawer -->
-        <div class="cust-adv-filters-drawer" id="custAdvFiltersDrawer" style="display: none;">
-            <form id="advFilterForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
-                {% if is_main_admin and current_branch_param %}
-                <input type="hidden" name="branch" value="{{ current_branch_param }}">
-                {% endif %}
-                <div class="cust-drawer-field">
-                    <label>Customer Name:</label>
-                    <input type="text" name="search_name" id="advSearchName" value="{{ search_name }}" class="cust-drawer-input font-khmer" placeholder="Search name...">
-                </div>
-                <div class="cust-drawer-field">
-                    <label>Phone Number:</label>
-                    <input type="text" name="search_phone" id="advSearchPhone" value="{{ search_phone }}" class="cust-drawer-input" placeholder="e.g. 012...">
-                </div>
-                <div class="cust-drawer-field">
-                    <label>Address / City:</label>
-                    <input type="text" name="search_address" id="advSearchAddress" value="{{ search_address }}" class="cust-drawer-input font-khmer" placeholder="Phnom Penh, Toul Kork...">
-                </div>
-                <div class="cust-drawer-field" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
-                    <input type="checkbox" name="with_balance" id="advWithBalance" value="1" {% if with_balance == '1' %}checked{% endif %}>
-                    <label for="advWithBalance" style="cursor: pointer; margin: 0; font-weight: 600; color: #DC2626;">Only With Open Balance</label>
-                </div>
-                <div style="display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end;">
-                    <a href="{{ url_for('contacts.list_customers') }}" class="cust-btn-subtle" style="font-size: 11px; text-decoration: none; padding: 4px 8px;">Reset</a>
-                    <button type="submit" class="cust-btn-primary" style="font-size: 11px; padding: 4px 12px;">Apply</button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Section List Subtitle: "Customer" -->
-        <div class="cust-list-section-header">
-            <span>Customer</span>
-            <span style="font-size: 11px; color: #64748B; font-weight: 500;">Balance</span>
-        </div>
-
-        <!-- Customer Cards List (Scrollable) -->
-        <div class="cust-card-scroll-area" id="custCardScrollArea">
-            <div id="custCardList">
-                {% for c in customers %}
-                <div class="cust-list-card {% if selected_id and c.id == selected_id %}active{% elif not selected_id and loop.first %}active{% endif %}"
-                     id="custCard_{{ c.id }}"
-                     data-id="{{ c.id }}"
-                     data-name="{{ (c.name or '')|lower }}"
-                     data-phone="{{ (c.phone or '')|lower }}"
-                     data-city="{{ (c.city or '')|lower }}"
-                     data-contact="{{ (c.contact_name or '')|lower }}"
-                     data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
-                     data-balance="{{ c.open_balance or 0 }}"
-                     onclick="selectCustomer({{ c.id }})">
-                    
-                    <!-- Card Top Row: Name & Status Pill -->
-                    <div class="cust-card-row-top">
-                        <span class="cust-card-name font-khmer" title="{{ c.name }}">{{ c.name }}</span>
-                        {% if c.open_balance and c.open_balance > 0 %}
-                        <span class="cust-status-badge unfulfilled">Unpaid</span>
-                        {% else %}
-                        <span class="cust-status-badge fulfilled">Active</span>
-                        {% endif %}
-                    </div>
-
-                    <!-- Card Bottom Row: Balance Pill & City/Phone -->
-                    <div class="cust-card-row-bottom">
-                        <span class="cust-balance-pill {% if c.open_balance and c.open_balance > 0 %}has-balance{% else %}zero-balance{% endif %}">
-                            {{ (c.open_balance or 0) | currency }}
-                        </span>
-                        <div class="cust-card-meta-text">
-                            {% if c.phone %}
-                            <span>{{ c.phone }}</span>
-                            {% elif c.city %}
-                            <span>{{ c.city }}</span>
-                            {% elif c.contact_name %}
-                            <span>{{ c.contact_name }}</span>
-                            {% endif %}
-                            {% if is_main_admin and c.branch_code %}
-                            <span class="cust-branch-tag">🏪 {{ c.branch_code }}</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-                {% else %}
-                <div id="noCustMessage" style="padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12.5px;">
-                    No customers found matching criteria.
-                </div>
-                {% endfor %}
-            </div>
-            
-            <div id="custNoMatchFilterMsg" style="display: none; padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12.5px; font-style: italic;">
-                No customer cards match this search.
-            </div>
-        </div>
-
-        <!-- Master List Footer: Total Customers & Quick Stats -->
-        <div class="cust-master-footer">
-            <div style="font-size: 11px; color: #64748B;">
-                Total: <strong>{{ total_count }}</strong>
-            </div>
-            <div style="font-size: 11px; color: {% if (summary_stats.total_receivables or 0) > 0 %}#DC2626{% else %}#16A34A{% endif %}; font-weight: 700;">
-                Due: {{ (summary_stats.total_receivables or 0) | currency }}
-            </div>
-        </div>
-    </aside>
-
-
-    <!-- ========================================================================= -->
-    <!-- RIGHT DETAIL PANEL: Customer Control & Order History (Matching Screenshot)-->
-    <!-- ========================================================================= -->
-    <main class="cust-detail-canvas" id="custDetailCanvas">
-        
-        <!-- Top Action Toolbar Matching Screenshot -->
-        <div class="cust-detail-toolbar">
-            <!-- Left: Close Button [ ✕ ] -->
-            <div class="cust-toolbar-left">
-                <button type="button" class="cust-tb-close-btn" onclick="handleToolbarClose()" title="Close details / Return">
-                    ✕
-                </button>
-            </div>
-
-            <!-- Right: Action Links Matching Screenshot -->
-            <div class="cust-toolbar-right">
-                <!-- Deactivate / Delete Button with Red Dot -->
-                <button type="button" class="cust-tb-action-link danger" id="btnCustDeactivate" onclick="handleDeactivateCurrentCustomer()" title="Deactivate or Archive this customer">
-                    <span class="cust-tb-red-dot"></span>
-                    <span id="btnDeactivateLabel">Deactivate</span>
-                </button>
-
-                <!-- Attachments -->
-                <button type="button" class="cust-tb-action-link" onclick="handleCustomerAttachments()" title="Customer Attachments">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
-                    <span>Attachments</span>
-                </button>
-
-                <!-- Copy Customer -->
-                <button type="button" class="cust-tb-action-link" onclick="handleCopyCustomer()" title="Copy / Duplicate this customer profile">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    <span>Copy customer</span>
-                </button>
-
-                <!-- Print Dropdown: [ 🖨️ Print ▾ ] -->
-                <div class="cust-dropdown-wrapper">
-                    <button type="button" class="cust-tb-action-link" onclick="togglePrintDropdown(event)">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-                        <span>Print</span>
-                        <span style="font-size: 10px;">▾</span>
-                    </button>
-                    <div class="cust-menu-dropdown right-aligned" id="printDropdownMenu" style="display: none;">
-                        <div class="cust-menu-item" onclick="printCustomerStatement()">
-                            <span>📄 Print Statement of Account</span>
-                        </div>
-                        <div class="cust-menu-item" onclick="openCustomerDeliveryModal()">
-                            <span>🚚 Print Delivery Label (80x100mm)</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Email Dropdown: [ ✉️ Email ▾ ] -->
-                <div class="cust-dropdown-wrapper">
-                    <button type="button" class="cust-tb-action-link" onclick="toggleEmailDropdown(event)">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-                        <span>Email</span>
-                        <span style="font-size: 10px;">▾</span>
-                    </button>
-                    <div class="cust-menu-dropdown right-aligned" id="emailDropdownMenu" style="display: none;">
-                        <div class="cust-menu-item" onclick="emailCustomerStatement()">
-                            <span>✉️ Email Statement of Account</span>
-                        </div>
-                        <div class="cust-menu-item" onclick="emailPaymentReminder()">
-                            <span>⚠️ Email Payment Reminder</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- More Dropdown: [ ••• More ▾ ] -->
-                <div class="cust-dropdown-wrapper">
-                    <button type="button" class="cust-tb-action-link" onclick="toggleMoreDropdown(event)">
-                        <span>••• More</span>
-                        <span style="font-size: 10px;">▾</span>
-                    </button>
-                    <div class="cust-menu-dropdown right-aligned" id="moreDropdownMenu" style="display: none;">
-                        <div class="cust-menu-item" onclick="exportCustomerOrdersCsv()">
-                            <span>📊 Export Orders to CSV</span>
-                        </div>
-                        <div class="cust-menu-item" onclick="openFullEditModal()">
-                            <span>✏️ Full Edit Profile</span>
-                        </div>
-                        <div class="cust-menu-separator"></div>
-                        <div class="cust-menu-item danger" onclick="handleDeactivateCurrentCustomer()">
-                            <span>🗑️ Delete / Archive Customer</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Save Customer Button (Prominent) -->
-                <button type="button" class="cust-save-btn" id="btnSaveCustomer" onclick="saveCustomerData()" title="Save changes (Ctrl+S)">
-                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    <span>Save</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Scrollable Detail Body Container -->
-        <div class="cust-detail-scroll-content" id="custDetailScrollContent">
-            
-            <!-- VIEW MODE: Shown by default -->
-            <div id="custViewContainer">
-                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout with Full Contact Details) -->
-                <div class="cust-meta-header-grid">
-                    
-                    <!-- COLUMN 1: Customer Identity & Key Contact Details (Name, Contact, Phone, Email) -->
-                    <div class="cust-meta-col-1">
-                        <!-- Top status pill: [ Fulfilled / Active ] -->
-                        <div style="margin-bottom: 6px;">
-                            <span class="cust-status-badge fulfilled" id="detailHeaderStatusPill">
-                                {% if selected_customer and selected_customer.balance and selected_customer.balance > 0 %}Unpaid Balance{% else %}Active Customer{% endif %}
-                            </span>
-                        </div>
-
-                        <!-- Customer Title / Business Name (Directly Editable) -->
-                        <div style="margin-bottom: 8px;">
-                            <input type="text" id="detailCustomerNameInput" class="cust-primary-title-input font-khmer" 
-                                   value="{{ selected_customer.name if selected_customer else '' }}" 
-                                   placeholder="Customer / Business Name..." 
-                                   oninput="markFieldDirty('name'); updateSidebarCardName(this.value);" />
-                            <!-- Hidden compat element for query selectors -->
-                            <span id="detailCustomerName" style="display: none;">{{ selected_customer.name if selected_customer else '' }}</span>
-                        </div>
-
-                        <!-- Contact Person Name (Prominent & Clear) -->
-                        <div class="cust-meta-field-row">
-                            <span class="cust-field-label">👤 Contact:</span>
-                            <input type="text" id="detailContactPersonInput" class="cust-meta-input font-khmer" 
-                                   value="{{ selected_customer.contact_name or '' if selected_customer else '' }}" 
-                                   placeholder="Contact Person Name (e.g. John Doe, Heng Somnang)" 
-                                   oninput="markFieldDirty('contact_name'); updateSidebarCardContact(this.value);" />
-                        </div>
-
-                        <!-- Phone Number (Prominent & Clear with Quick Dial / Copy) -->
-                        <div class="cust-meta-field-row">
-                            <span class="cust-field-label">📞 Phone:</span>
-                            <div style="display: flex; gap: 4px; width: 100%;">
-                                <input type="text" id="detailPhoneInput" class="cust-meta-input" 
-                                       value="{{ selected_customer.phone or '' if selected_customer else '' }}" 
-                                       placeholder="e.g. 012 345 678 / 098 765 432" 
-                                       oninput="markFieldDirty('phone'); updateSidebarCardPhone(this.value);" />
-                                <a href="tel:{{ selected_customer.phone or '' if selected_customer else '' }}" id="detailPhoneCallBtn" class="cust-quick-action-btn" title="Call this phone number">
-                                    📞
-                                </a>
-                                <button type="button" class="cust-quick-action-btn" onclick="copyCustomerPhone()" title="Copy phone number">
-                                    📋
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Email Address -->
-                        <div class="cust-meta-field-row">
-                            <span class="cust-field-label">✉️ Email:</span>
-                            <div style="display: flex; gap: 4px; width: 100%;">
-                                <input type="email" id="detailEmailInput" class="cust-meta-input" 
-                                       value="{{ selected_customer.email or '' if selected_customer else '' }}" 
-                                       placeholder="customer@email.com" 
-                                       oninput="markFieldDirty('email')" />
-                                <a href="mailto:{{ selected_customer.email or '' if selected_customer else '' }}" id="detailEmailMailtoBtn" class="cust-quick-action-btn" title="Send email">
-                                    ✉️
-                                </a>
-                            </div>
-                        </div>
-
-                        <!-- Metadata row: Created Date & Branch -->
-                        <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 11.5px; color: #64748B;">
-                            <span>📅 Since <strong id="detailCreatedAt" style="color: #334155;">{{ (selected_customer.created_at|string)[:10] if selected_customer and selected_customer.created_at else 'Active' }}</strong></span>
-                            <span>🏪 Branch: <strong id="detailBranchText" style="color: #334155;">{{ selected_customer.branch_name if selected_customer and selected_customer.branch_name else 'Main Store (HQ)' }}</strong></span>
-                        </div>
-                    </div>
-
-                    <!-- COLUMN 2: Pricing Scheme, Warehouse, Address & Tax -->
-                    <div class="cust-meta-col-2">
-                        <!-- Pricing Scheme -->
-                        <div class="cust-meta-field-row">
-                            <span class="cust-field-label">🏷️ Scheme:</span>
-                            <select id="detailPricingSchemeSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('pricing_scheme_id')">
-                                {% for ps in pricing_schemes %}
-                                <option value="{{ ps.id }}" {% if selected_customer and selected_customer.default_pricing_scheme_id == ps.id %}selected{% endif %}>{{ ps.name }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-
-                        <!-- Payment Terms -->
-                        <div class="cust-meta-field-row">
-                            <span class="cust-field-label">⏳ Terms:</span>
-                            <select id="detailPaymentTermsSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('payment_terms')">
-                                <option value="Due on Receipt" {% if selected_customer and selected_customer.payment_terms == 'Due on Receipt' %}selected{% endif %}>Due on Receipt</option>
-                                <option value="Net 15" {% if selected_customer and selected_customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
-                                <option value="Net 30" {% if selected_customer and selected_customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
-                                <option value="Net 60" {% if selected_customer and selected_customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
-                                <option value="COD" {% if selected_customer and selected_customer.payment_terms == 'COD' %}selected{% endif %}>COD (Cash on Delivery)</option>
-                                <option value="Prepaid" {% if selected_customer and selected_customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
-                            </select>
-                        </div>
-
-                        <!-- Address Fields: Street & City / Country -->
-                        <div class="cust-meta-field-row" style="align-items: flex-start;">
-                            <span class="cust-field-label" style="margin-top: 5px;">📍 Address:</span>
-                            <div style="flex: 1;">
-                                <input type="text" id="detailAddress1Input" class="cust-meta-input font-khmer" 
-                                       value="{{ selected_customer.address1 or selected_customer.shipping_address or selected_customer.billing_address or '' if selected_customer else '' }}" 
-                                       placeholder="Street address / House # / Sangkat..." 
-                                       oninput="markFieldDirty('address1')" style="margin-bottom: 4px;" />
-                                <div style="display: flex; gap: 4px;">
-                                    <input type="text" id="detailCityInput" class="cust-meta-input font-khmer" 
-                                           value="{{ selected_customer.city or '' if selected_customer else '' }}" 
-                                           placeholder="City / Khan" 
-                                           oninput="markFieldDirty('city')" />
-                                    <input type="text" id="detailCountryInput" class="cust-meta-input" 
-                                           value="{{ selected_customer.country or 'Cambodia' if selected_customer else 'Cambodia' }}" 
-                                           placeholder="Country" 
-                                           oninput="markFieldDirty('country')" style="max-width: 90px;" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Discount & Tax / VAT # -->
-                        <div style="display: flex; gap: 8px; margin-top: 4px;">
-                            <div style="flex: 1;">
-                                <span style="font-size: 11px; color: #64748B; font-weight: 600;">Discount (%):</span>
-                                <input type="number" id="detailDiscountInput" step="any" min="0" max="100" class="cust-meta-input" 
-                                       value="{{ selected_customer.discount_percent or 0 if selected_customer else 0 }}" 
-                                       oninput="markFieldDirty('discount_percent')" style="text-align: right;" />
-                            </div>
-                            <div style="flex: 1.4;">
-                                <span style="font-size: 11px; color: #64748B; font-weight: 600;">VAT / Tax #:</span>
-                                <input type="text" id="detailTaxNumberInput" class="cust-meta-input" 
-                                       value="{{ selected_customer.tax_number or '' if selected_customer else '' }}" 
-                                       placeholder="Enter Tax ID" 
-                                       oninput="markFieldDirty('tax_number')" />
-                            </div>
-                        </div>
-
-                        {% if is_main_admin %}
-                        <div class="cust-meta-field-row" style="margin-top: 6px;">
-                            <span class="cust-field-label">🏪 Store:</span>
-                            <select id="detailBranchSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('branch_id')">
-                                <option value="">Main Warehouse (HQ)</option>
-                                {% for b in branches %}
-                                <option value="{{ b.id }}" {% if selected_customer and selected_customer.branch_id|string == b.id|string %}selected{% endif %}>{{ b.name }} ({{ b.code }})</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        {% endif %}
-                    </div>
-
-                    <!-- COLUMN 3: Financial Summary Box & Remarks / Notes -->
-                    <div class="cust-meta-col-3">
-                        <!-- Top: Paid / Balance Header & Badge -->
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748B; letter-spacing: 0.05em;">Open Balance</span>
-                            <span class="cust-balance-badge-large" id="detailBalanceLargeBadge">
-                                {{ (selected_customer.balance or 0) | currency if selected_customer else '$0.00' }}
-                            </span>
-                        </div>
-
-                        <!-- Lifetime Spent -->
-                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
-                            <span style="font-size: 11px; color: #64748B;">Total Spent: <strong id="detailTotalSpentText" style="color: #0F172A;">{{ (selected_stats.total_spent or selected_customer.total_spent or 0) | currency if selected_customer else '$0.00' }}</strong></span>
-                        </div>
-
-                        <!-- Currency Selector -->
-                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
-                            <span style="font-size: 11.5px; color: #64748B;">💵 Currency:</span>
-                            <strong style="font-size: 12px; color: #1E293B;">US Dollar ($) ▾</strong>
-                        </div>
-
-                        <!-- Directly Visible Customer Remarks / Notes Box -->
-                        <div style="margin-top: 8px;">
-                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                                <span style="font-size: 11px; font-weight: 700; color: #475569;">📝 Remarks & Notes:</span>
-                            </div>
-                            <textarea id="detailRemarksTextarea" class="cust-remarks-box font-khmer" rows="3" 
-                                      placeholder="Add customer remarks, delivery preferences, guidelines..." 
-                                      oninput="markFieldDirty('remarks')">{{ selected_customer.remarks or '' if selected_customer else '' }}</textarea>
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- INTERACTIVE MID STATUS / PROGRESS BAR (Matching Screenshot Progress Bar) -->
-                <div class="cust-mid-progress-bar">
-                    <!-- Left: + Add customer remarks -->
-                    <div style="display: flex; align-items: center; gap: 6px;">
-                        <button type="button" class="cust-remarks-toggle-btn" onclick="toggleRemarksBox()">
-                            <span>+ Add customer remarks</span>
-                        </button>
-                    </div>
-
-                    <!-- Center: Workflow Stepper / Orders Summary -->
-                    <div class="cust-workflow-tracker">
-                        <div class="cust-tracker-step active">
-                            <span class="cust-tracker-icon">🛒</span>
-                            <span>Orders (<strong id="trackerTotalOrders">{{ selected_stats.total_orders or (selected_orders|length) }}</strong>)</span>
-                        </div>
-                        <div class="cust-tracker-line"></div>
-                        <div class="cust-tracker-step completed">
-                            <span class="cust-tracker-icon">✓</span>
-                            <span>Paid (<strong id="trackerPaidOrders">{{ selected_stats.paid_orders or 0 }}</strong>)</span>
-                        </div>
-                        <div class="cust-tracker-line"></div>
-                        <div class="cust-tracker-step {% if (selected_stats.unpaid_orders or 0) > 0 %}warning{% endif %}">
-                            <span class="cust-tracker-icon">⚠️</span>
-                            <span>Unpaid (<strong id="trackerUnpaidOrders">{{ selected_stats.unpaid_orders or 0 }}</strong>)</span>
-                        </div>
-                    </div>
-
-                    <!-- Right: Quick Actions -->
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <button type="button" class="cust-action-pill-btn primary" onclick="createNewOrderForCurrentCustomer()">
-                            <span>+ Create Sales Order</span>
-                        </button>
-                        <button type="button" class="cust-action-pill-btn secondary" onclick="openCustomerDeliveryModal()">
-                            <span>🚚 Delivery Label</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Collapsible Customer Remarks Drawer -->
-                <div id="custRemarksDrawer" class="cust-remarks-drawer" style="display: none;">
-                    <div style="font-weight: 600; font-size: 12px; color: #475569; margin-bottom: 4px;">Remarks & Delivery Notes:</div>
-                    <textarea id="detailRemarksTextarea" class="cust-remarks-input font-khmer" rows="3" placeholder="Enter special delivery instructions, customer notes, or internal remarks..." oninput="markFieldDirty('remarks')">{{ selected_customer.remarks or '' if selected_customer else '' }}</textarea>
-                </div>
-
-
-                <!-- ================================================================= -->
-                <!-- SALES ORDER HISTORY SECTION: Full Functionality (Screenshot Table) -->
-                <!-- ================================================================= -->
-                <div class="cust-orders-section">
-                    
-                    <div class="cust-orders-table-wrapper">
-                        <table class="cust-orders-table" id="custOrdersTable">
-                            <thead>
-                                <tr>
-                                    <th style="width: 120px;">Order #</th>
-                                    <th style="width: 100px;">Date</th>
-                                    <th>Products / Items</th>
-                                    <th style="width: 140px;">Warehouse</th>
-                                    <th style="width: 60px; text-align: center;">Qty</th>
-                                    <th style="width: 110px; text-align: right;">Total</th>
-                                    <th style="width: 110px; text-align: right;">Paid</th>
-                                    <th style="width: 110px; text-align: right;">Balance</th>
-                                    <th style="width: 95px; text-align: center;">Status</th>
-                                    <th style="width: 80px; text-align: center;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody id="custOrdersTableBody">
-                                {% for o in selected_orders %}
-                                <tr class="cust-order-row" id="orderRow_{{ o.id }}" onclick="toggleOrderLinesDrawer({{ o.id }})">
-                                    <!-- Order # Link -->
-                                    <td style="font-weight: 700; font-family: monospace;">
-                                        <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('{{ url_for('sales_orders.detail_order', id=o.id) }}', '{{ o.order_number }}')" class="cust-order-link" title="Open sales order {{ o.order_number }}">
-                                            {{ o.order_number }}
-                                        </a>
-                                    </td>
-
-                                    <!-- Date -->
-                                    <td style="color: #475569;">
-                                        {{ (o.order_date|string)[:10] if o.order_date else '-' }}
-                                    </td>
-
-                                    <!-- Products / Items Summary (Matching Screenshot line items) -->
-                                    <td class="font-khmer" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ o.items_summary or 'Order Items' }}">
-                                        {{ o.items_summary or 'Standard Line Items' }}
-                                    </td>
-
-                                    <!-- Location / Warehouse -->
-                                    <td style="color: #64748B;">
-                                        {{ o.location_name or 'Main Warehouse' }}
-                                    </td>
-
-                                    <!-- Quantity -->
-                                    <td style="text-align: center; font-weight: 600; color: #1E293B;">
-                                        {{ '%.0f'|format(o.total_qty or 0) if o.total_qty else '-' }}
-                                    </td>
-
-                                    <!-- Total Amount -->
-                                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
-                                        {{ (o.total_amount or 0) | currency }}
-                                    </td>
-
-                                    <!-- Paid Amount -->
-                                    <td style="text-align: right; font-weight: 600; color: #16A34A;">
-                                        {{ (o.paid_amount or 0) | currency }}
-                                    </td>
-
-                                    <!-- Balance Due -->
-                                    <td style="text-align: right; font-weight: 700; color: {% if (o.balance_due or 0) > 0 %}#DC2626{% else %}#16A34A{% endif %};">
-                                        {{ (o.balance_due or 0) | currency }}
-                                    </td>
-
-                                    <!-- Status Pill -->
-                                    <td style="text-align: center;">
-                                        {% if o.status == 'PAID' or (o.balance_due is not none and o.balance_due <= 0) %}
-                                        <span class="cust-order-status-badge paid">Paid</span>
-                                        {% elif o.status == 'INVOICED' %}
-                                        <span class="cust-order-status-badge invoiced">Invoiced</span>
-                                        {% elif o.status == 'OPEN' %}
-                                        <span class="cust-order-status-badge open">Open</span>
-                                        {% else %}
-                                        <span class="cust-order-status-badge neutral">{{ o.status or 'Pending' }}</span>
-                                        {% endif %}
-                                    </td>
-
-                                    <!-- Action -->
-                                    <td style="text-align: center;">
-                                        <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('{{ url_for('sales_orders.detail_order', id=o.id) }}', '{{ o.order_number }}')" class="cust-row-view-btn">
-                                            View
-                                        </a>
-                                    </td>
-                                </tr>
-                                <!-- Expandable Line Items Drawer for this Order -->
-                                <tr id="orderLinesSubRow_{{ o.id }}" class="cust-order-subrow" style="display: none;">
-                                    <td colspan="10" style="padding: 0; background: #F8FAFC;">
-                                        <div class="cust-order-lines-container" id="orderLinesContainer_{{ o.id }}">
-                                            <div style="padding: 12px; text-align: center; font-size: 11px; color: #64748B;">
-                                                Loading product details...
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% else %}
-                                <tr id="noOrdersRow">
-                                    <td colspan="10" style="padding: 36px; text-align: center; color: #94A3B8; font-style: italic;">
-                                        No sales order history recorded for this customer yet.
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- TABLE FOOTER & BOTTOM RIGHT SUMMARY BOX (Matching Screenshot) -->
-                    <div class="cust-table-footer-bar">
-                        <!-- Left Action Buttons -->
-                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-                            <button type="button" class="cust-footer-action-btn" onclick="createNewOrderForCurrentCustomer()">
-                                + Add Sales Order
-                            </button>
-                            <button type="button" class="cust-footer-action-btn" onclick="openContactModal()">
-                                📞 Contact Info
-                            </button>
-                            <button type="button" class="cust-footer-action-btn" onclick="openFullEditModal()">
-                                ✏️ Edit Customer Profile
-                            </button>
-                        </div>
-
-                        <!-- Right Summary Box (Matching Bottom Right in Screenshot) -->
-                        <div class="cust-bottom-summary-box">
-                            <div class="cust-summary-line">
-                                <span class="cust-summary-label">Balance:</span>
-                                <span class="cust-summary-val balance" id="bottomSummaryBalance">{{ (selected_customer.balance or 0) | currency if selected_customer else '$0.00' }}</span>
-                            </div>
-                            <div class="cust-summary-line">
-                                <span class="cust-summary-label">Total Orders:</span>
-                                <span class="cust-summary-val total" id="bottomSummaryTotalSpent">{{ (selected_stats.total_spent or 0) | currency if selected_customer else '$0.00' }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-            </div>
-
-            <!-- NEW CUSTOMER FORM MODE: Displayed when clicking [ + ] or New Customer -->
-            <div id="custNewContainer" style="display: none; padding: 24px 32px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
-                    <div>
-                        <span class="cust-status-badge" style="background: #0284C7; color: #FFFFFF; font-weight: 700;">New Customer</span>
-                        <h2 style="font-size: 22px; font-weight: 700; color: #0F172A; margin: 6px 0 0 0;">Create New Customer Profile</h2>
-                    </div>
-                    <div style="display: flex; gap: 8px;">
-                        <button type="button" class="cust-btn-subtle" onclick="cancelNewCustomer()">Cancel</button>
-                        <button type="button" class="cust-save-btn" onclick="submitNewCustomer()">+ Create Customer</button>
-                    </div>
-                </div>
-
-                <form id="newCustomerForm" onsubmit="event.preventDefault(); submitNewCustomer();">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 900px;">
-                        <!-- Left Block: Basic & Contact -->
-                        <div class="card" style="padding: 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
-                            <h3 style="font-size: 14px; font-weight: 700; color: #8C6541; margin-top: 0; margin-bottom: 14px;">Basic Information</h3>
-                            
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Customer Name <span style="color: #DC2626;">*</span></label>
-                                <input type="text" id="newCustName" class="cust-form-input font-khmer" required placeholder="Customer or business name...">
-                            </div>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Contact Person</label>
-                                <input type="text" id="newCustContact" class="cust-form-input font-khmer" placeholder="Contact person name...">
-                            </div>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Phone Number</label>
-                                <input type="text" id="newCustPhone" class="cust-form-input" placeholder="e.g. 012 345 678">
-                            </div>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Email</label>
-                                <input type="email" id="newCustEmail" class="cust-form-input" placeholder="customer@example.com">
-                            </div>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Website</label>
-                                <input type="text" id="newCustWebsite" class="cust-form-input" placeholder="https://...">
-                            </div>
-
-                            {% if is_main_admin %}
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Branch Assignment (HQ)</label>
-                                <select id="newCustBranch" class="cust-form-select">
-                                    <option value="">Main Store (HQ)</option>
-                                    {% for b in branches %}
-                                    <option value="{{ b.id }}" {% if current_branch_param == b.id|string %}selected{% endif %}>{{ b.name }} ({{ b.code }})</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            {% endif %}
-                        </div>
-
-                        <!-- Right Block: Address & Terms -->
-                        <div class="card" style="padding: 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
-                            <h3 style="font-size: 14px; font-weight: 700; color: #8C6541; margin-top: 0; margin-bottom: 14px;">Address & Financial Terms</h3>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Street Address</label>
-                                <input type="text" id="newCustAddress" class="cust-form-input font-khmer" placeholder="Street address or landmark...">
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div class="cust-form-group">
-                                    <label class="cust-form-label">City</label>
-                                    <input type="text" id="newCustCity" class="cust-form-input font-khmer" value="Phnom Penh" placeholder="City">
-                                </div>
-                                <div class="cust-form-group">
-                                    <label class="cust-form-label">Country</label>
-                                    <input type="text" id="newCustCountry" class="cust-form-input" value="Cambodia">
-                                </div>
-                            </div>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Pricing Scheme</label>
-                                <select id="newCustPricingScheme" class="cust-form-select">
-                                    {% for ps in pricing_schemes %}
-                                    <option value="{{ ps.id }}">{{ ps.name }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                                <div class="cust-form-group">
-                                    <label class="cust-form-label">Discount %</label>
-                                    <input type="number" id="newCustDiscount" step="any" min="0" max="100" class="cust-form-input" value="0">
-                                </div>
-                                <div class="cust-form-group">
-                                    <label class="cust-form-label">Payment Terms</label>
-                                    <select id="newCustPaymentTerms" class="cust-form-select">
-                                        <option value="Due on Receipt" selected>Due on Receipt</option>
-                                        <option value="Net 15">Net 15</option>
-                                        <option value="Net 30">Net 30</option>
-                                        <option value="Net 60">Net 60</option>
-                                        <option value="COD">COD</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="cust-form-group">
-                                <label class="cust-form-label">Remarks / Special Notes</label>
-                                <textarea id="newCustRemarks" rows="2" class="cust-form-input font-khmer" placeholder="Optional notes..."></textarea>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="margin-top: 20px; display: flex; gap: 10px;">
-                        <button type="submit" class="cust-save-btn" style="padding: 8px 24px; font-size: 13px;">Create Customer Profile</button>
-                        <button type="button" class="cust-btn-subtle" onclick="cancelNewCustomer()">Cancel</button>
-                    </div>
-                </form>
-            </div>
-
-        </div>
-
-    </main>
-
-</div>
-
-<!-- Hidden inputs for current active customer state -->
-<input type="hidden" id="currentCustomerId" value="{{ selected_customer.id if selected_customer else 0 }}">
-<input type="hidden" id="currentCustomerName" value="{{ selected_customer.name if selected_customer else '' }}">
-<input type="hidden" id="currentCustomerBalance" value="{{ selected_customer.balance if selected_customer else 0 }}">
-<input type="hidden" id="currentCustomerPhone" value="{{ selected_customer.phone if selected_customer else '' }}">
-<input type="hidden" id="currentCustomerAddress" value="{{ selected_customer.address1 or selected_customer.billing_address or '' if selected_customer else '' }}">
-
-
-<!-- ========================================================================= -->
-<!-- MODAL: Full Customer Edit Profile Dialog                                  -->
-<!-- ========================================================================= -->
-<div id="fullEditModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
-    <div class="inflow-modal-box" style="max-width: 680px; width: 95%; background: #FFFFFF; border-radius: 6px; box-shadow: 0 12px 36px rgba(0,0,0,0.3); overflow: hidden;">
-        <div style="padding: 12px 18px; background: #8C6541; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: 700; font-size: 14px;">✏️ Edit Customer Profile</div>
-            <button type="button" onclick="closeFullEditModal()" style="background: none; border: none; color: #FFFFFF; font-size: 16px; cursor: pointer;">✕</button>
-        </div>
-        <div style="padding: 20px; max-height: 75vh; overflow-y: auto;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Customer Name</label>
-                    <input type="text" id="modalEditName" class="cust-form-input font-khmer">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Contact Person</label>
-                    <input type="text" id="modalEditContact" class="cust-form-input font-khmer">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Phone</label>
-                    <input type="text" id="modalEditPhone" class="cust-form-input">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Email</label>
-                    <input type="email" id="modalEditEmail" class="cust-form-input">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Website</label>
-                    <input type="text" id="modalEditWebsite" class="cust-form-input">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Tax / VAT Number</label>
-                    <input type="text" id="modalEditTaxNumber" class="cust-form-input">
-                </div>
-                <div class="cust-form-group" style="grid-column: span 2;">
-                    <label class="cust-form-label">Street Address 1</label>
-                    <input type="text" id="modalEditAddress1" class="cust-form-input font-khmer">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">City</label>
-                    <input type="text" id="modalEditCity" class="cust-form-input font-khmer">
-                </div>
-                <div class="cust-form-group">
-                    <label class="cust-form-label">Country</label>
-                    <input type="text" id="modalEditCountry" class="cust-form-input">
-                </div>
-            </div>
-        </div>
-        <div style="padding: 12px 18px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 8px;">
-            <button type="button" class="cust-btn-subtle" onclick="closeFullEditModal()">Cancel</button>
-            <button type="button" class="cust-save-btn" onclick="saveFullEditModal()">Save Changes</button>
-        </div>
-    </div>
-</div>
-
-
-<!-- ========================================================================= -->
-<!-- MODAL: Customer Delivery & Shipping Label (80x100mm Thermal Sticker)      -->
-<!-- ========================================================================= -->
-<div id="customerDeliveryModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
-    <div class="inflow-modal-box" style="max-width: 460px; width: 95%; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
-        <div class="inflow-modal-header" style="background: #1E293B; color: #FFFFFF; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
-            <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px;">
-                <span>🚚</span>
-                <span>Delivery Service & Label (80x100mm)</span>
-            </div>
-            <button type="button" onclick="closeCustomerDeliveryModal()" style="color: #94A3B8; font-size: 16px; background: none; border: none; cursor: pointer;">✕</button>
-        </div>
-        <div class="inflow-modal-body" style="padding: 16px 20px; background: #FFFFFF; font-size: 12px; color: #1E293B; display: block;">
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Delivery Service (សេវាដឹកជញ្ជូន):</label>
-                <select id="modalCustCarrierSelect" class="cust-form-select" style="font-weight: 600; height: 32px;">
-                    <option value="Virak Buntham">Virak Buntham</option>
-                    <option value="Capitol">Capitol</option>
-                    <option value="J&T Express">J&T Express</option>
-                    <option value="Taxi (ឡានឈ្នួល)">Taxi (ឡានឈ្នួល)</option>
-                    <option value="KEX Express">KEX Express</option>
-                    <option value="Cambodia Post">Cambodia Post</option>
-                </select>
-            </div>
-            <div style="margin-bottom: 12px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">📍 Delivery Address (Top of sticker):</label>
-                <textarea id="modalCustAddressInput" style="width: 100%; height: 46px; font-size: 12px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 3px; resize: vertical; font-weight: 600;" placeholder="Enter delivery address..."></textarea>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
-                <div>
-                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Number of Cases (កេស):</label>
-                    <input type="number" id="modalCustCaseCountInput" value="1" min="1" max="50" style="width: 100%; font-weight: 800; height: 30px; text-align: center; border: 1px solid #CBD5E1; border-radius: 3px;">
-                </div>
-                <div>
-                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Product Cost ($) / តម្លៃ:</label>
-                    <input type="number" id="modalCustProductCostInput" step="0.5" style="width: 100%; font-weight: 800; height: 30px; text-align: right; border: 1px solid #CBD5E1; border-radius: 3px; padding-right: 6px;">
-                </div>
-            </div>
-            <div style="margin-bottom: 8px;">
-                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Note / ចំណាំ:</label>
-                <input type="text" id="modalCustDeliveryNotesInput" placeholder="e.g. ឡានឈ្នួលផ្សារដើមគ / 012 345 678..." style="width: 100%; height: 30px; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 8px;">
-            </div>
-        </div>
-        <div style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
-            <button type="button" onclick="closeCustomerDeliveryModal()" class="cust-btn-subtle">Cancel</button>
-            <button type="button" onclick="submitCustomerDeliveryLabelPdf()" class="cust-btn-primary" style="background: #2563EB;">📄 Export PDF</button>
-            <button type="button" onclick="submitCustomerDeliveryLabel()" class="cust-btn-primary" style="background: #059669;">🖨️ Print Label (80x100mm)</button>
-        </div>
-    </div>
-</div>
-
-
-<!-- ========================================================================= -->
-<!-- MODAL: inFlow Address Dialog                                              -->
-<!-- ========================================================================= -->
-<div id="inflowAddressModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
-    <div class="inflow-modal-box" style="background: #FFFFFF; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); width: 440px; overflow: hidden; border: 1px solid #7F9DB9;">
-        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #E2E8F0 100%); border-bottom: 1px solid #CBD5E1;">
-            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #8C6541;">
-                <span>📍 Address Editor</span>
-            </div>
-            <button type="button" onclick="closeAddressModal()" style="border: none; background: transparent; font-size: 14px; cursor: pointer; color: #64748B;">✕</button>
-        </div>
-        <div style="padding: 16px 20px; font-size: 12px;">
-            <div style="margin-bottom: 10px;">
-                <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Street Address</label>
-                <input type="text" id="modalStreet" class="cust-form-input font-khmer" placeholder="Street address or building">
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">City</label>
-                    <input type="text" id="modalCity" class="cust-form-input font-khmer" placeholder="City">
-                </div>
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">State / Province</label>
-                    <input type="text" id="modalState" class="cust-form-input font-khmer" placeholder="Province">
-                </div>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Country</label>
-                    <input type="text" id="modalCountry" class="cust-form-input" value="Cambodia">
-                </div>
-                <div>
-                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Postal Code</label>
-                    <input type="text" id="modalPostalCode" class="cust-form-input" placeholder="Postal Code">
-                </div>
-            </div>
-        </div>
-        <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; background: #F8FAFC; border-top: 1px solid #CBD5E1;">
-            <button type="button" onclick="closeAddressModal()" class="cust-btn-subtle">Cancel</button>
-            <button type="button" onclick="saveAddressModal()" class="cust-save-btn">OK</button>
-        </div>
-    </div>
-</div>
-
-<!-- Toast Alert Banner -->
-<div id="custToastBanner" class="cust-toast-banner" style="display: none;"></div>
-
-<!-- ========================================================================= -->
-<!-- STYLESHEET (Rich Aesthetics matching screenshot)                          -->
+{% block extra_css %}
 <!-- ========================================================================= -->
 <style>
 /* Reset and Workspace Layout */
@@ -1994,6 +1021,983 @@
     gap: 8px;
 }
 </style>
+{% endblock %}
+
+{% block content %}
+<!-- Top Warm Accent Bar (Matching inFlow Modern Cloud UI) -->
+<div class="inflow-top-accent-bar" style="height: 3px; background: linear-gradient(90deg, #8C6541 0%, #D9A05B 50%, #8C6541 100%);"></div>
+
+<!-- Master-Detail Split Workspace -->
+<div class="inflow-cust-split-workspace">
+    
+    <!-- ========================================================================= -->
+    <!-- LEFT MASTER PANEL: Customer List & Search (Matching Screenshot Left Panel) -->
+    <!-- ========================================================================= -->
+    <aside class="cust-master-sidebar" id="custMasterSidebar">
+        <!-- Top Toolbar: [ 🔍 ] [ All ▾ ] [ + ] -->
+        <div class="cust-master-topbar">
+            <!-- Search Toggle Button -->
+            <button type="button" class="cust-icon-btn" id="btnToggleSearch" onclick="toggleMasterSearch()" title="Toggle Search Bar">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+            </button>
+
+            <!-- Filter Pill Dropdown: [ All ▾ ] -->
+            <div class="cust-pill-dropdown-wrap">
+                <button type="button" class="cust-pill-btn" id="btnStatusFilter" onclick="toggleStatusDropdown(event)">
+                    <span id="statusFilterLabel">
+                        {% if with_balance == '1' %}With Balance
+                        {% elif scheme_filter %}Pricing Scheme
+                        {% elif current_branch_param == 'main' %}🏢 HQ Main Store
+                        {% elif current_branch_param and current_branch_param != 'all' %}
+                            {% set matched_name = namespace(val=none) %}
+                            {% for b in branches %}
+                                {% if current_branch_param == b.id|string %}
+                                    {% set matched_name.val = b.code or b.name %}
+                                {% endif %}
+                            {% endfor %}
+                            🏪 {{ matched_name.val or ('Branch ' ~ current_branch_param) }}
+                        {% else %}All{% endif %}
+                    </span>
+                    <span style="font-size: 10px; margin-left: 2px;">▾</span>
+                </button>
+                <div class="cust-menu-dropdown" id="statusDropdownMenu" style="display: none;">
+                    <div class="cust-menu-item {% if not with_balance and not scheme_filter and (not current_branch_param or current_branch_param == 'all') %}active{% endif %}" onclick="selectFilterPreset('all')">
+                        <span>All Customers</span>
+                    </div>
+                    <div class="cust-menu-item {% if with_balance == '1' %}active{% endif %}" onclick="selectFilterPreset('with_balance')">
+                        <span>⚠️ With Open Balance</span>
+                    </div>
+                    <div class="cust-menu-separator"></div>
+                    {% if is_main_admin %}
+                    <div style="padding: 4px 12px; font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase;">Branches (HQ)</div>
+                    <div class="cust-menu-item {% if current_branch_param == 'main' %}active{% endif %}" onclick="selectBranchFilter('main')">
+                        <span>🏢 HQ Main Store</span>
+                    </div>
+                    {% for b in branches %}
+                    <div class="cust-menu-item {% if current_branch_param == b.id|string %}active{% endif %}" onclick="selectBranchFilter('{{ b.id }}')">
+                        <span>🏪 {{ b.name }} ({{ b.code }})</span>
+                    </div>
+                    {% endfor %}
+                    <div class="cust-menu-item {% if current_branch_param == 'all' %}active{% endif %}" onclick="selectBranchFilter('all')">
+                        <span>🌐 All Branches</span>
+                    </div>
+                    <div class="cust-menu-separator"></div>
+                    {% endif %}
+                    <div style="padding: 4px 12px; font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase;">Pricing Schemes</div>
+                    {% for ps in pricing_schemes %}
+                    <div class="cust-menu-item {% if scheme_filter == ps.id|string %}active{% endif %}" onclick="selectSchemeFilter('{{ ps.id }}')">
+                        <span>🏷️ {{ ps.name }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Quick Add Button: [ + ] -->
+            <button type="button" class="cust-icon-btn" onclick="startNewCustomer()" title="Create New Customer (+)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Collapsible Search Input Box -->
+        <div class="cust-search-box-wrap" id="custSearchBoxWrap">
+            <div style="position: relative; display: flex; align-items: center; width: 100%;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" style="position: absolute; left: 9px; pointer-events: none;">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="custLiveSearchInput" class="cust-search-input font-khmer" 
+                       placeholder="Search name, phone, city, address..." 
+                       value="{{ search_name or search }}" 
+                       autocomplete="off" 
+                       oninput="handleLiveSearch(this.value)"
+                       onkeydown="if(event.key === 'Enter') { event.preventDefault(); triggerServerSearch(this.value); }">
+                <button type="button" class="cust-clear-search-btn" id="btnClearSearch" onclick="clearLiveSearch()" style="display: {% if search_name or search %}block{% else %}none{% endif %};">✕</button>
+            </div>
+        </div>
+
+        <!-- Sub-header: 🎚️ Filters Toggle -->
+        <div class="cust-filter-toggle-row">
+            <button type="button" class="cust-filter-btn" onclick="toggleAdvancedFilters()">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <line x1="1" y1="14" x2="7" y2="14"></line>
+                    <line x1="9" y1="8" x2="15" y2="8"></line>
+                    <line x1="17" y1="16" x2="23" y2="16"></line>
+                </svg>
+                <span>Filters</span>
+                <span id="activeFiltersBadge" class="cust-badge-dot" style="display: {% if search_name or search_phone or search_address or with_balance or scheme_filter %}inline-block{% else %}none{% endif %};"></span>
+            </button>
+            <span style="font-size: 11px; color: #94A3B8; font-weight: 600;" id="custCounterLabel">{{ "{:,}".format(customers|length) if customers else '0' }} Customers</span>
+        </div>
+
+        <!-- Collapsible Advanced Filters Drawer -->
+        <div class="cust-adv-filters-drawer" id="custAdvFiltersDrawer" style="display: none;">
+            <form id="advFilterForm" method="GET" action="{{ url_for('contacts.list_customers') }}">
+                {% if is_main_admin and current_branch_param %}
+                <input type="hidden" name="branch" value="{{ current_branch_param }}">
+                {% endif %}
+                <div class="cust-drawer-field">
+                    <label>Customer Name:</label>
+                    <input type="text" name="search_name" id="advSearchName" value="{{ search_name }}" class="cust-drawer-input font-khmer" placeholder="Search name...">
+                </div>
+                <div class="cust-drawer-field">
+                    <label>Phone Number:</label>
+                    <input type="text" name="search_phone" id="advSearchPhone" value="{{ search_phone }}" class="cust-drawer-input" placeholder="e.g. 012...">
+                </div>
+                <div class="cust-drawer-field">
+                    <label>Address / City:</label>
+                    <input type="text" name="search_address" id="advSearchAddress" value="{{ search_address }}" class="cust-drawer-input font-khmer" placeholder="Phnom Penh, Toul Kork...">
+                </div>
+                <div class="cust-drawer-field" style="display: flex; align-items: center; gap: 8px; margin-top: 4px;">
+                    <input type="checkbox" name="with_balance" id="advWithBalance" value="1" {% if with_balance == '1' %}checked{% endif %}>
+                    <label for="advWithBalance" style="cursor: pointer; margin: 0; font-weight: 600; color: #DC2626;">Only With Open Balance</label>
+                </div>
+                <div style="display: flex; gap: 6px; margin-top: 10px; justify-content: flex-end;">
+                    <a href="{{ url_for('contacts.list_customers') }}" class="cust-btn-subtle" style="font-size: 11px; text-decoration: none; padding: 4px 8px;">Reset</a>
+                    <button type="submit" class="cust-btn-primary" style="font-size: 11px; padding: 4px 12px;">Apply</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Section List Subtitle: "Customer" -->
+        <div class="cust-list-section-header">
+            <span>Customer</span>
+            <span style="font-size: 11px; color: #64748B; font-weight: 500;">Balance</span>
+        </div>
+
+        <!-- Customer Cards List (Scrollable) -->
+        <div class="cust-card-scroll-area" id="custCardScrollArea">
+            <div id="custCardList">
+                {% for c in customers %}
+                <div class="cust-list-card {% if selected_id and c.id == selected_id %}active{% elif not selected_id and loop.first %}active{% endif %}"
+                     id="custCard_{{ c.id }}"
+                     data-id="{{ c.id }}"
+                     data-name="{{ (c.name or '')|lower }}"
+                     data-phone="{{ (c.phone or '')|lower }}"
+                     data-city="{{ (c.city or '')|lower }}"
+                     data-contact="{{ (c.contact_name or '')|lower }}"
+                     data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
+                     data-balance="{{ c.open_balance or 0 }}"
+                     onclick="selectCustomer({{ c.id }})">
+                    
+                    <!-- Card Top Row: Name & Status Pill -->
+                    <div class="cust-card-row-top">
+                        <span class="cust-card-name font-khmer" title="{{ c.name }}">{{ c.name }}</span>
+                        {% if c.open_balance and c.open_balance > 0 %}
+                        <span class="cust-status-badge unfulfilled">Unpaid</span>
+                        {% else %}
+                        <span class="cust-status-badge fulfilled">Active</span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Card Bottom Row: Balance Pill & City/Phone -->
+                    <div class="cust-card-row-bottom">
+                        <span class="cust-balance-pill {% if c.open_balance and c.open_balance > 0 %}has-balance{% else %}zero-balance{% endif %}">
+                            {{ (c.open_balance or 0) | currency }}
+                        </span>
+                        <div class="cust-card-meta-text">
+                            {% if c.phone %}
+                            <span>{{ c.phone }}</span>
+                            {% elif c.city %}
+                            <span>{{ c.city }}</span>
+                            {% elif c.contact_name %}
+                            <span>{{ c.contact_name }}</span>
+                            {% endif %}
+                            {% if is_main_admin and c.branch_code %}
+                            <span class="cust-branch-tag">🏪 {{ c.branch_code }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div id="noCustMessage" style="padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12.5px;">
+                    No customers found matching criteria.
+                </div>
+                {% endfor %}
+            </div>
+            
+            <div id="custNoMatchFilterMsg" style="display: none; padding: 32px 16px; text-align: center; color: #94A3B8; font-size: 12.5px; font-style: italic;">
+                No customer cards match this search.
+            </div>
+        </div>
+
+        <!-- Master List Footer: Total Customers & Quick Stats -->
+        <div class="cust-master-footer">
+            <div style="font-size: 11px; color: #64748B;">
+                Total: <strong>{{ total_count }}</strong>
+            </div>
+            <div style="font-size: 11px; color: {% if (summary_stats.total_receivables or 0) > 0 %}#DC2626{% else %}#16A34A{% endif %}; font-weight: 700;">
+                Due: {{ (summary_stats.total_receivables or 0) | currency }}
+            </div>
+        </div>
+    </aside>
+
+
+    <!-- ========================================================================= -->
+    <!-- RIGHT DETAIL PANEL: Customer Control & Order History (Matching Screenshot)-->
+    <!-- ========================================================================= -->
+    <main class="cust-detail-canvas" id="custDetailCanvas">
+        
+        <!-- Top Action Toolbar Matching Screenshot -->
+        <div class="cust-detail-toolbar">
+            <!-- Left: Close Button [ ✕ ] -->
+            <div class="cust-toolbar-left">
+                <button type="button" class="cust-tb-close-btn" onclick="handleToolbarClose()" title="Close details / Return">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Right: Action Links Matching Screenshot -->
+            <div class="cust-toolbar-right">
+                <!-- Deactivate / Delete Button with Red Dot -->
+                <button type="button" class="cust-tb-action-link danger" id="btnCustDeactivate" onclick="handleDeactivateCurrentCustomer()" title="Deactivate or Archive this customer">
+                    <span class="cust-tb-red-dot"></span>
+                    <span id="btnDeactivateLabel">Deactivate</span>
+                </button>
+
+                <!-- Attachments -->
+                <button type="button" class="cust-tb-action-link" onclick="handleCustomerAttachments()" title="Customer Attachments">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span>Attachments</span>
+                </button>
+
+                <!-- Copy Customer -->
+                <button type="button" class="cust-tb-action-link" onclick="handleCopyCustomer()" title="Copy / Duplicate this customer profile">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy customer</span>
+                </button>
+
+                <!-- Print Dropdown: [ 🖨️ Print ▾ ] -->
+                <div class="cust-dropdown-wrapper">
+                    <button type="button" class="cust-tb-action-link" onclick="togglePrintDropdown(event)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                        <span>Print</span>
+                        <span style="font-size: 10px;">▾</span>
+                    </button>
+                    <div class="cust-menu-dropdown right-aligned" id="printDropdownMenu" style="display: none;">
+                        <div class="cust-menu-item" onclick="printCustomerStatement()">
+                            <span>📄 Print Statement of Account</span>
+                        </div>
+                        <div class="cust-menu-item" onclick="openCustomerDeliveryModal()">
+                            <span>🚚 Print Delivery Label (80x100mm)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Email Dropdown: [ ✉️ Email ▾ ] -->
+                <div class="cust-dropdown-wrapper">
+                    <button type="button" class="cust-tb-action-link" onclick="toggleEmailDropdown(event)">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        <span>Email</span>
+                        <span style="font-size: 10px;">▾</span>
+                    </button>
+                    <div class="cust-menu-dropdown right-aligned" id="emailDropdownMenu" style="display: none;">
+                        <div class="cust-menu-item" onclick="emailCustomerStatement()">
+                            <span>✉️ Email Statement of Account</span>
+                        </div>
+                        <div class="cust-menu-item" onclick="emailPaymentReminder()">
+                            <span>⚠️ Email Payment Reminder</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- More Dropdown: [ ••• More ▾ ] -->
+                <div class="cust-dropdown-wrapper">
+                    <button type="button" class="cust-tb-action-link" onclick="toggleMoreDropdown(event)">
+                        <span>••• More</span>
+                        <span style="font-size: 10px;">▾</span>
+                    </button>
+                    <div class="cust-menu-dropdown right-aligned" id="moreDropdownMenu" style="display: none;">
+                        <div class="cust-menu-item" onclick="exportCustomerOrdersCsv()">
+                            <span>📊 Export Orders to CSV</span>
+                        </div>
+                        <div class="cust-menu-item" onclick="openFullEditModal()">
+                            <span>✏️ Full Edit Profile</span>
+                        </div>
+                        <div class="cust-menu-separator"></div>
+                        <div class="cust-menu-item danger" onclick="handleDeactivateCurrentCustomer()">
+                            <span>🗑️ Delete / Archive Customer</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Save Customer Button (Prominent) -->
+                <button type="button" class="cust-save-btn" id="btnSaveCustomer" onclick="saveCustomerData()" title="Save changes (Ctrl+S)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <span>Save</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Scrollable Detail Body Container -->
+        <div class="cust-detail-scroll-content" id="custDetailScrollContent">
+            
+            <!-- VIEW MODE: Shown by default -->
+            <div id="custViewContainer">
+                <!-- 3-COLUMN HEADER SECTION (Matching Exact Screenshot Layout with Full Contact Details) -->
+                <div class="cust-meta-header-grid">
+                    
+                    <!-- COLUMN 1: Customer Identity & Key Contact Details (Name, Contact, Phone, Email) -->
+                    <div class="cust-meta-col-1">
+                        <!-- Top status pill: [ Fulfilled / Active ] -->
+                        <div style="margin-bottom: 6px;">
+                            <span class="cust-status-badge fulfilled" id="detailHeaderStatusPill">
+                                {% if selected_customer and selected_customer.balance and selected_customer.balance > 0 %}Unpaid Balance{% else %}Active Customer{% endif %}
+                            </span>
+                        </div>
+
+                        <!-- Customer Title / Business Name (Directly Editable) -->
+                        <div style="margin-bottom: 8px;">
+                            <input type="text" id="detailCustomerNameInput" class="cust-primary-title-input font-khmer" 
+                                   value="{{ selected_customer.name if selected_customer else '' }}" 
+                                   placeholder="Customer / Business Name..." 
+                                   oninput="markFieldDirty('name'); updateSidebarCardName(this.value);" />
+                            <!-- Hidden compat element for query selectors -->
+                            <span id="detailCustomerName" style="display: none;">{{ selected_customer.name if selected_customer else '' }}</span>
+                        </div>
+
+                        <!-- Contact Person Name (Prominent & Clear) -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">👤 Contact:</span>
+                            <input type="text" id="detailContactPersonInput" class="cust-meta-input font-khmer" 
+                                   value="{{ selected_customer.contact_name or '' if selected_customer else '' }}" 
+                                   placeholder="Contact Person Name (e.g. John Doe, Heng Somnang)" 
+                                   oninput="markFieldDirty('contact_name'); updateSidebarCardContact(this.value);" />
+                        </div>
+
+                        <!-- Phone Number (Prominent & Clear with Quick Dial / Copy) -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">📞 Phone:</span>
+                            <div style="display: flex; gap: 4px; width: 100%;">
+                                <input type="text" id="detailPhoneInput" class="cust-meta-input" 
+                                       value="{{ selected_customer.phone or '' if selected_customer else '' }}" 
+                                       placeholder="e.g. 012 345 678 / 098 765 432" 
+                                       oninput="markFieldDirty('phone'); updateSidebarCardPhone(this.value);" />
+                                <a href="tel:{{ selected_customer.phone or '' if selected_customer else '' }}" id="detailPhoneCallBtn" class="cust-quick-action-btn" title="Call this phone number">
+                                    📞
+                                </a>
+                                <button type="button" class="cust-quick-action-btn" onclick="copyCustomerPhone()" title="Copy phone number">
+                                    📋
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Email Address -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">✉️ Email:</span>
+                            <div style="display: flex; gap: 4px; width: 100%;">
+                                <input type="email" id="detailEmailInput" class="cust-meta-input" 
+                                       value="{{ selected_customer.email or '' if selected_customer else '' }}" 
+                                       placeholder="customer@email.com" 
+                                       oninput="markFieldDirty('email')" />
+                                <a href="mailto:{{ selected_customer.email or '' if selected_customer else '' }}" id="detailEmailMailtoBtn" class="cust-quick-action-btn" title="Send email">
+                                    ✉️
+                                </a>
+                            </div>
+                        </div>
+
+                        <!-- Metadata row: Created Date & Branch -->
+                        <div style="display: flex; flex-wrap: wrap; gap: 12px; margin-top: 6px; font-size: 11.5px; color: #64748B;">
+                            <span>📅 Since <strong id="detailCreatedAt" style="color: #334155;">{{ (selected_customer.created_at|string)[:10] if selected_customer and selected_customer.created_at else 'Active' }}</strong></span>
+                            <span>🏪 Branch: <strong id="detailBranchText" style="color: #334155;">{{ selected_customer.branch_name if selected_customer and selected_customer.branch_name else 'Main Store (HQ)' }}</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- COLUMN 2: Pricing Scheme, Warehouse, Address & Tax -->
+                    <div class="cust-meta-col-2">
+                        <!-- Pricing Scheme -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">🏷️ Scheme:</span>
+                            <select id="detailPricingSchemeSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('pricing_scheme_id')">
+                                {% for ps in pricing_schemes %}
+                                <option value="{{ ps.id }}" {% if selected_customer and selected_customer.default_pricing_scheme_id == ps.id %}selected{% endif %}>{{ ps.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <!-- Payment Terms -->
+                        <div class="cust-meta-field-row">
+                            <span class="cust-field-label">⏳ Terms:</span>
+                            <select id="detailPaymentTermsSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('payment_terms')">
+                                <option value="Due on Receipt" {% if selected_customer and selected_customer.payment_terms == 'Due on Receipt' %}selected{% endif %}>Due on Receipt</option>
+                                <option value="Net 15" {% if selected_customer and selected_customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
+                                <option value="Net 30" {% if selected_customer and selected_customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
+                                <option value="Net 60" {% if selected_customer and selected_customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
+                                <option value="COD" {% if selected_customer and selected_customer.payment_terms == 'COD' %}selected{% endif %}>COD (Cash on Delivery)</option>
+                                <option value="Prepaid" {% if selected_customer and selected_customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
+                            </select>
+                        </div>
+
+                        <!-- Address Fields: Street & City / Country -->
+                        <div class="cust-meta-field-row" style="align-items: flex-start;">
+                            <span class="cust-field-label" style="margin-top: 5px;">📍 Address:</span>
+                            <div style="flex: 1;">
+                                <input type="text" id="detailAddress1Input" class="cust-meta-input font-khmer" 
+                                       value="{{ selected_customer.address1 or selected_customer.shipping_address or selected_customer.billing_address or '' if selected_customer else '' }}" 
+                                       placeholder="Street address / House # / Sangkat..." 
+                                       oninput="markFieldDirty('address1')" style="margin-bottom: 4px;" />
+                                <div style="display: flex; gap: 4px;">
+                                    <input type="text" id="detailCityInput" class="cust-meta-input font-khmer" 
+                                           value="{{ selected_customer.city or '' if selected_customer else '' }}" 
+                                           placeholder="City / Khan" 
+                                           oninput="markFieldDirty('city')" />
+                                    <input type="text" id="detailCountryInput" class="cust-meta-input" 
+                                           value="{{ selected_customer.country or 'Cambodia' if selected_customer else 'Cambodia' }}" 
+                                           placeholder="Country" 
+                                           oninput="markFieldDirty('country')" style="max-width: 90px;" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Discount & Tax / VAT # -->
+                        <div style="display: flex; gap: 8px; margin-top: 4px;">
+                            <div style="flex: 1;">
+                                <span style="font-size: 11px; color: #64748B; font-weight: 600;">Discount (%):</span>
+                                <input type="number" id="detailDiscountInput" step="any" min="0" max="100" class="cust-meta-input" 
+                                       value="{{ selected_customer.discount_percent or 0 if selected_customer else 0 }}" 
+                                       oninput="markFieldDirty('discount_percent')" style="text-align: right;" />
+                            </div>
+                            <div style="flex: 1.4;">
+                                <span style="font-size: 11px; color: #64748B; font-weight: 600;">VAT / Tax #:</span>
+                                <input type="text" id="detailTaxNumberInput" class="cust-meta-input" 
+                                       value="{{ selected_customer.tax_number or '' if selected_customer else '' }}" 
+                                       placeholder="Enter Tax ID" 
+                                       oninput="markFieldDirty('tax_number')" />
+                            </div>
+                        </div>
+
+                        {% if is_main_admin %}
+                        <div class="cust-meta-field-row" style="margin-top: 6px;">
+                            <span class="cust-field-label">🏪 Store:</span>
+                            <select id="detailBranchSelect" class="cust-meta-select" style="flex: 1;" onchange="markFieldDirty('branch_id')">
+                                <option value="">Main Warehouse (HQ)</option>
+                                {% for b in branches %}
+                                <option value="{{ b.id }}" {% if selected_customer and selected_customer.branch_id|string == b.id|string %}selected{% endif %}>{{ b.name }} ({{ b.code }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- COLUMN 3: Financial Summary Box & Remarks / Notes -->
+                    <div class="cust-meta-col-3">
+                        <!-- Top: Paid / Balance Header & Badge -->
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                            <span style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: #64748B; letter-spacing: 0.05em;">Open Balance</span>
+                            <span class="cust-balance-badge-large" id="detailBalanceLargeBadge">
+                                {{ (selected_customer.balance or 0) | currency if selected_customer else '$0.00' }}
+                            </span>
+                        </div>
+
+                        <!-- Lifetime Spent -->
+                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
+                            <span style="font-size: 11px; color: #64748B;">Total Spent: <strong id="detailTotalSpentText" style="color: #0F172A;">{{ (selected_stats.total_spent or selected_customer.total_spent or 0) | currency if selected_customer else '$0.00' }}</strong></span>
+                        </div>
+
+                        <!-- Currency Selector -->
+                        <div class="cust-meta-line" style="justify-content: flex-end; margin-top: 2px;">
+                            <span style="font-size: 11.5px; color: #64748B;">💵 Currency:</span>
+                            <strong style="font-size: 12px; color: #1E293B;">US Dollar ($) ▾</strong>
+                        </div>
+
+                        <!-- Directly Visible Customer Remarks / Notes Box -->
+                        <div style="margin-top: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
+                                <span style="font-size: 11px; font-weight: 700; color: #475569;">📝 Remarks & Notes:</span>
+                            </div>
+                            <textarea id="detailRemarksTextarea" class="cust-remarks-box font-khmer" rows="3" 
+                                      placeholder="Add customer remarks, delivery preferences, guidelines..." 
+                                      oninput="markFieldDirty('remarks')">{{ selected_customer.remarks or '' if selected_customer else '' }}</textarea>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- INTERACTIVE MID STATUS / PROGRESS BAR (Matching Screenshot Progress Bar) -->
+                <div class="cust-mid-progress-bar">
+                    <!-- Left: + Add customer remarks -->
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <button type="button" class="cust-remarks-toggle-btn" onclick="toggleRemarksBox()">
+                            <span>+ Add customer remarks</span>
+                        </button>
+                    </div>
+
+                    <!-- Center: Workflow Stepper / Orders Summary -->
+                    <div class="cust-workflow-tracker">
+                        <div class="cust-tracker-step active">
+                            <span class="cust-tracker-icon">🛒</span>
+                            <span>Orders (<strong id="trackerTotalOrders">{{ selected_stats.total_orders or (selected_orders|length) }}</strong>)</span>
+                        </div>
+                        <div class="cust-tracker-line"></div>
+                        <div class="cust-tracker-step completed">
+                            <span class="cust-tracker-icon">✓</span>
+                            <span>Paid (<strong id="trackerPaidOrders">{{ selected_stats.paid_orders or 0 }}</strong>)</span>
+                        </div>
+                        <div class="cust-tracker-line"></div>
+                        <div class="cust-tracker-step {% if (selected_stats.unpaid_orders or 0) > 0 %}warning{% endif %}">
+                            <span class="cust-tracker-icon">⚠️</span>
+                            <span>Unpaid (<strong id="trackerUnpaidOrders">{{ selected_stats.unpaid_orders or 0 }}</strong>)</span>
+                        </div>
+                    </div>
+
+                    <!-- Right: Quick Actions -->
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button type="button" class="cust-action-pill-btn primary" onclick="createNewOrderForCurrentCustomer()">
+                            <span>+ Create Sales Order</span>
+                        </button>
+                        <button type="button" class="cust-action-pill-btn secondary" onclick="openCustomerDeliveryModal()">
+                            <span>🚚 Delivery Label</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Collapsible Customer Remarks Drawer -->
+                <div id="custRemarksDrawer" class="cust-remarks-drawer" style="display: none;">
+                    <div style="font-weight: 600; font-size: 12px; color: #475569; margin-bottom: 4px;">Remarks & Delivery Notes:</div>
+                    <textarea id="detailRemarksTextarea" class="cust-remarks-input font-khmer" rows="3" placeholder="Enter special delivery instructions, customer notes, or internal remarks..." oninput="markFieldDirty('remarks')">{{ selected_customer.remarks or '' if selected_customer else '' }}</textarea>
+                </div>
+
+
+                <!-- ================================================================= -->
+                <!-- SALES ORDER HISTORY SECTION: Full Functionality (Screenshot Table) -->
+                <!-- ================================================================= -->
+                <div class="cust-orders-section">
+                    
+                    <div class="cust-orders-table-wrapper">
+                        <table class="cust-orders-table" id="custOrdersTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px;">Order #</th>
+                                    <th style="width: 100px;">Date</th>
+                                    <th>Products / Items</th>
+                                    <th style="width: 140px;">Warehouse</th>
+                                    <th style="width: 60px; text-align: center;">Qty</th>
+                                    <th style="width: 110px; text-align: right;">Total</th>
+                                    <th style="width: 110px; text-align: right;">Paid</th>
+                                    <th style="width: 110px; text-align: right;">Balance</th>
+                                    <th style="width: 95px; text-align: center;">Status</th>
+                                    <th style="width: 80px; text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="custOrdersTableBody">
+                                {% for o in selected_orders %}
+                                <tr class="cust-order-row" id="orderRow_{{ o.id }}" onclick="toggleOrderLinesDrawer({{ o.id }})">
+                                    <!-- Order # Link -->
+                                    <td style="font-weight: 700; font-family: monospace;">
+                                        <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('{{ url_for('sales_orders.detail_order', id=o.id) }}', '{{ o.order_number }}')" class="cust-order-link" title="Open sales order {{ o.order_number }}">
+                                            {{ o.order_number }}
+                                        </a>
+                                    </td>
+
+                                    <!-- Date -->
+                                    <td style="color: #475569;">
+                                        {{ (o.order_date|string)[:10] if o.order_date else '-' }}
+                                    </td>
+
+                                    <!-- Products / Items Summary (Matching Screenshot line items) -->
+                                    <td class="font-khmer" style="max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ o.items_summary or 'Order Items' }}">
+                                        {{ o.items_summary or 'Standard Line Items' }}
+                                    </td>
+
+                                    <!-- Location / Warehouse -->
+                                    <td style="color: #64748B;">
+                                        {{ o.location_name or 'Main Warehouse' }}
+                                    </td>
+
+                                    <!-- Quantity -->
+                                    <td style="text-align: center; font-weight: 600; color: #1E293B;">
+                                        {{ '%.0f'|format(o.total_qty or 0) if o.total_qty else '-' }}
+                                    </td>
+
+                                    <!-- Total Amount -->
+                                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                                        {{ (o.total_amount or 0) | currency }}
+                                    </td>
+
+                                    <!-- Paid Amount -->
+                                    <td style="text-align: right; font-weight: 600; color: #16A34A;">
+                                        {{ (o.paid_amount or 0) | currency }}
+                                    </td>
+
+                                    <!-- Balance Due -->
+                                    <td style="text-align: right; font-weight: 700; color: {% if (o.balance_due or 0) > 0 %}#DC2626{% else %}#16A34A{% endif %};">
+                                        {{ (o.balance_due or 0) | currency }}
+                                    </td>
+
+                                    <!-- Status Pill -->
+                                    <td style="text-align: center;">
+                                        {% if o.status == 'PAID' or (o.balance_due is not none and o.balance_due <= 0) %}
+                                        <span class="cust-order-status-badge paid">Paid</span>
+                                        {% elif o.status == 'INVOICED' %}
+                                        <span class="cust-order-status-badge invoiced">Invoiced</span>
+                                        {% elif o.status == 'OPEN' %}
+                                        <span class="cust-order-status-badge open">Open</span>
+                                        {% else %}
+                                        <span class="cust-order-status-badge neutral">{{ o.status or 'Pending' }}</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Action -->
+                                    <td style="text-align: center;">
+                                        <a href="javascript:void(0);" onclick="event.stopPropagation(); openOrderUrl('{{ url_for('sales_orders.detail_order', id=o.id) }}', '{{ o.order_number }}')" class="cust-row-view-btn">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                                <!-- Expandable Line Items Drawer for this Order -->
+                                <tr id="orderLinesSubRow_{{ o.id }}" class="cust-order-subrow" style="display: none;">
+                                    <td colspan="10" style="padding: 0; background: #F8FAFC;">
+                                        <div class="cust-order-lines-container" id="orderLinesContainer_{{ o.id }}">
+                                            <div style="padding: 12px; text-align: center; font-size: 11px; color: #64748B;">
+                                                Loading product details...
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr id="noOrdersRow">
+                                    <td colspan="10" style="padding: 36px; text-align: center; color: #94A3B8; font-style: italic;">
+                                        No sales order history recorded for this customer yet.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- TABLE FOOTER & BOTTOM RIGHT SUMMARY BOX (Matching Screenshot) -->
+                    <div class="cust-table-footer-bar">
+                        <!-- Left Action Buttons -->
+                        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" class="cust-footer-action-btn" onclick="createNewOrderForCurrentCustomer()">
+                                + Add Sales Order
+                            </button>
+                            <button type="button" class="cust-footer-action-btn" onclick="openContactModal()">
+                                📞 Contact Info
+                            </button>
+                            <button type="button" class="cust-footer-action-btn" onclick="openFullEditModal()">
+                                ✏️ Edit Customer Profile
+                            </button>
+                        </div>
+
+                        <!-- Right Summary Box (Matching Bottom Right in Screenshot) -->
+                        <div class="cust-bottom-summary-box">
+                            <div class="cust-summary-line">
+                                <span class="cust-summary-label">Balance:</span>
+                                <span class="cust-summary-val balance" id="bottomSummaryBalance">{{ (selected_customer.balance or 0) | currency if selected_customer else '$0.00' }}</span>
+                            </div>
+                            <div class="cust-summary-line">
+                                <span class="cust-summary-label">Total Orders:</span>
+                                <span class="cust-summary-val total" id="bottomSummaryTotalSpent">{{ (selected_stats.total_spent or 0) | currency if selected_customer else '$0.00' }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- NEW CUSTOMER FORM MODE: Displayed when clicking [ + ] or New Customer -->
+            <div id="custNewContainer" style="display: none; padding: 24px 32px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px;">
+                    <div>
+                        <span class="cust-status-badge" style="background: #0284C7; color: #FFFFFF; font-weight: 700;">New Customer</span>
+                        <h2 style="font-size: 22px; font-weight: 700; color: #0F172A; margin: 6px 0 0 0;">Create New Customer Profile</h2>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="cust-btn-subtle" onclick="cancelNewCustomer()">Cancel</button>
+                        <button type="button" class="cust-save-btn" onclick="submitNewCustomer()">+ Create Customer</button>
+                    </div>
+                </div>
+
+                <form id="newCustomerForm" onsubmit="event.preventDefault(); submitNewCustomer();">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 900px;">
+                        <!-- Left Block: Basic & Contact -->
+                        <div class="card" style="padding: 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
+                            <h3 style="font-size: 14px; font-weight: 700; color: #8C6541; margin-top: 0; margin-bottom: 14px;">Basic Information</h3>
+                            
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Customer Name <span style="color: #DC2626;">*</span></label>
+                                <input type="text" id="newCustName" class="cust-form-input font-khmer" required placeholder="Customer or business name...">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Contact Person</label>
+                                <input type="text" id="newCustContact" class="cust-form-input font-khmer" placeholder="Contact person name...">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Phone Number</label>
+                                <input type="text" id="newCustPhone" class="cust-form-input" placeholder="e.g. 012 345 678">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Email</label>
+                                <input type="email" id="newCustEmail" class="cust-form-input" placeholder="customer@example.com">
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Website</label>
+                                <input type="text" id="newCustWebsite" class="cust-form-input" placeholder="https://...">
+                            </div>
+
+                            {% if is_main_admin %}
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Branch Assignment (HQ)</label>
+                                <select id="newCustBranch" class="cust-form-select">
+                                    <option value="">Main Store (HQ)</option>
+                                    {% for b in branches %}
+                                    <option value="{{ b.id }}" {% if current_branch_param == b.id|string %}selected{% endif %}>{{ b.name }} ({{ b.code }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Right Block: Address & Terms -->
+                        <div class="card" style="padding: 18px; border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 6px;">
+                            <h3 style="font-size: 14px; font-weight: 700; color: #8C6541; margin-top: 0; margin-bottom: 14px;">Address & Financial Terms</h3>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Street Address</label>
+                                <input type="text" id="newCustAddress" class="cust-form-input font-khmer" placeholder="Street address or landmark...">
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">City</label>
+                                    <input type="text" id="newCustCity" class="cust-form-input font-khmer" value="Phnom Penh" placeholder="City">
+                                </div>
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">Country</label>
+                                    <input type="text" id="newCustCountry" class="cust-form-input" value="Cambodia">
+                                </div>
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Pricing Scheme</label>
+                                <select id="newCustPricingScheme" class="cust-form-select">
+                                    {% for ps in pricing_schemes %}
+                                    <option value="{{ ps.id }}">{{ ps.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">Discount %</label>
+                                    <input type="number" id="newCustDiscount" step="any" min="0" max="100" class="cust-form-input" value="0">
+                                </div>
+                                <div class="cust-form-group">
+                                    <label class="cust-form-label">Payment Terms</label>
+                                    <select id="newCustPaymentTerms" class="cust-form-select">
+                                        <option value="Due on Receipt" selected>Due on Receipt</option>
+                                        <option value="Net 15">Net 15</option>
+                                        <option value="Net 30">Net 30</option>
+                                        <option value="Net 60">Net 60</option>
+                                        <option value="COD">COD</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="cust-form-group">
+                                <label class="cust-form-label">Remarks / Special Notes</label>
+                                <textarea id="newCustRemarks" rows="2" class="cust-form-input font-khmer" placeholder="Optional notes..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px; display: flex; gap: 10px;">
+                        <button type="submit" class="cust-save-btn" style="padding: 8px 24px; font-size: 13px;">Create Customer Profile</button>
+                        <button type="button" class="cust-btn-subtle" onclick="cancelNewCustomer()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
+        </div>
+
+    </main>
+
+</div>
+
+<!-- Hidden inputs for current active customer state -->
+<input type="hidden" id="currentCustomerId" value="{{ selected_customer.id if selected_customer else 0 }}">
+<input type="hidden" id="currentCustomerName" value="{{ selected_customer.name if selected_customer else '' }}">
+<input type="hidden" id="currentCustomerBalance" value="{{ selected_customer.balance if selected_customer else 0 }}">
+<input type="hidden" id="currentCustomerPhone" value="{{ selected_customer.phone if selected_customer else '' }}">
+<input type="hidden" id="currentCustomerAddress" value="{{ selected_customer.address1 or selected_customer.billing_address or '' if selected_customer else '' }}">
+
+
+<!-- ========================================================================= -->
+<!-- MODAL: Full Customer Edit Profile Dialog                                  -->
+<!-- ========================================================================= -->
+<div id="fullEditModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="max-width: 680px; width: 95%; background: #FFFFFF; border-radius: 6px; box-shadow: 0 12px 36px rgba(0,0,0,0.3); overflow: hidden;">
+        <div style="padding: 12px 18px; background: #8C6541; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 14px;">✏️ Edit Customer Profile</div>
+            <button type="button" onclick="closeFullEditModal()" style="background: none; border: none; color: #FFFFFF; font-size: 16px; cursor: pointer;">✕</button>
+        </div>
+        <div style="padding: 20px; max-height: 75vh; overflow-y: auto;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Customer Name</label>
+                    <input type="text" id="modalEditName" class="cust-form-input font-khmer">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Contact Person</label>
+                    <input type="text" id="modalEditContact" class="cust-form-input font-khmer">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Phone</label>
+                    <input type="text" id="modalEditPhone" class="cust-form-input">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Email</label>
+                    <input type="email" id="modalEditEmail" class="cust-form-input">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Website</label>
+                    <input type="text" id="modalEditWebsite" class="cust-form-input">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Tax / VAT Number</label>
+                    <input type="text" id="modalEditTaxNumber" class="cust-form-input">
+                </div>
+                <div class="cust-form-group" style="grid-column: span 2;">
+                    <label class="cust-form-label">Street Address 1</label>
+                    <input type="text" id="modalEditAddress1" class="cust-form-input font-khmer">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">City</label>
+                    <input type="text" id="modalEditCity" class="cust-form-input font-khmer">
+                </div>
+                <div class="cust-form-group">
+                    <label class="cust-form-label">Country</label>
+                    <input type="text" id="modalEditCountry" class="cust-form-input">
+                </div>
+            </div>
+        </div>
+        <div style="padding: 12px 18px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="cust-btn-subtle" onclick="closeFullEditModal()">Cancel</button>
+            <button type="button" class="cust-save-btn" onclick="saveFullEditModal()">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL: Customer Delivery & Shipping Label (80x100mm Thermal Sticker)      -->
+<!-- ========================================================================= -->
+<div id="customerDeliveryModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="max-width: 460px; width: 95%; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: #1E293B; color: #FFFFFF; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 8px;">
+                <span>🚚</span>
+                <span>Delivery Service & Label (80x100mm)</span>
+            </div>
+            <button type="button" onclick="closeCustomerDeliveryModal()" style="color: #94A3B8; font-size: 16px; background: none; border: none; cursor: pointer;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 16px 20px; background: #FFFFFF; font-size: 12px; color: #1E293B; display: block;">
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Delivery Service (សេវាដឹកជញ្ជូន):</label>
+                <select id="modalCustCarrierSelect" class="cust-form-select" style="font-weight: 600; height: 32px;">
+                    <option value="Virak Buntham">Virak Buntham</option>
+                    <option value="Capitol">Capitol</option>
+                    <option value="J&T Express">J&T Express</option>
+                    <option value="Taxi (ឡានឈ្នួល)">Taxi (ឡានឈ្នួល)</option>
+                    <option value="KEX Express">KEX Express</option>
+                    <option value="Cambodia Post">Cambodia Post</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 12px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">📍 Delivery Address (Top of sticker):</label>
+                <textarea id="modalCustAddressInput" style="width: 100%; height: 46px; font-size: 12px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 3px; resize: vertical; font-weight: 600;" placeholder="Enter delivery address..."></textarea>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Number of Cases (កេស):</label>
+                    <input type="number" id="modalCustCaseCountInput" value="1" min="1" max="50" style="width: 100%; font-weight: 800; height: 30px; text-align: center; border: 1px solid #CBD5E1; border-radius: 3px;">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Product Cost ($) / តម្លៃ:</label>
+                    <input type="number" id="modalCustProductCostInput" step="0.5" style="width: 100%; font-weight: 800; height: 30px; text-align: right; border: 1px solid #CBD5E1; border-radius: 3px; padding-right: 6px;">
+                </div>
+            </div>
+            <div style="margin-bottom: 8px;">
+                <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">Note / ចំណាំ:</label>
+                <input type="text" id="modalCustDeliveryNotesInput" placeholder="e.g. ឡានឈ្នួលផ្សារដើមគ / 012 345 678..." style="width: 100%; height: 30px; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 8px;">
+            </div>
+        </div>
+        <div style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
+            <button type="button" onclick="closeCustomerDeliveryModal()" class="cust-btn-subtle">Cancel</button>
+            <button type="button" onclick="submitCustomerDeliveryLabelPdf()" class="cust-btn-primary" style="background: #2563EB;">📄 Export PDF</button>
+            <button type="button" onclick="submitCustomerDeliveryLabel()" class="cust-btn-primary" style="background: #059669;">🖨️ Print Label (80x100mm)</button>
+        </div>
+    </div>
+</div>
+
+
+<!-- ========================================================================= -->
+<!-- MODAL: inFlow Address Dialog                                              -->
+<!-- ========================================================================= -->
+<div id="inflowAddressModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="background: #FFFFFF; border-radius: 4px; box-shadow: 0 10px 30px rgba(0,0,0,0.35); width: 440px; overflow: hidden; border: 1px solid #7F9DB9;">
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #E2E8F0 100%); border-bottom: 1px solid #CBD5E1;">
+            <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #8C6541;">
+                <span>📍 Address Editor</span>
+            </div>
+            <button type="button" onclick="closeAddressModal()" style="border: none; background: transparent; font-size: 14px; cursor: pointer; color: #64748B;">✕</button>
+        </div>
+        <div style="padding: 16px 20px; font-size: 12px;">
+            <div style="margin-bottom: 10px;">
+                <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Street Address</label>
+                <input type="text" id="modalStreet" class="cust-form-input font-khmer" placeholder="Street address or building">
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">City</label>
+                    <input type="text" id="modalCity" class="cust-form-input font-khmer" placeholder="City">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">State / Province</label>
+                    <input type="text" id="modalState" class="cust-form-input font-khmer" placeholder="Province">
+                </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Country</label>
+                    <input type="text" id="modalCountry" class="cust-form-input" value="Cambodia">
+                </div>
+                <div>
+                    <label style="display: block; font-weight: 600; margin-bottom: 3px; color: #334155;">Postal Code</label>
+                    <input type="text" id="modalPostalCode" class="cust-form-input" placeholder="Postal Code">
+                </div>
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; background: #F8FAFC; border-top: 1px solid #CBD5E1;">
+            <button type="button" onclick="closeAddressModal()" class="cust-btn-subtle">Cancel</button>
+            <button type="button" onclick="saveAddressModal()" class="cust-save-btn">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Alert Banner -->
+<div id="custToastBanner" class="cust-toast-banner" style="display: none;"></div>
+
+<!-- ========================================================================= -->
+<!-- STYLESHEET (Rich Aesthetics matching screenshot)                          -->
+
 
 
 <!-- ========================================================================= -->
