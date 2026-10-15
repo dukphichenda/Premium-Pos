@@ -1,293 +1,381 @@
 {% extends 'base.html' %}
 
 {% block title %}{% if is_new %}New Customer{% else %}{{ customer.name }}{% endif %} - Customer Detail - inFlow Premium{% endblock %}
+{% block body_class %}customer-body-fullscreen{% endblock %}
 
 {% block content %}
-<div class="inflow-window-canvas" style="max-width: 1100px; margin: 0 auto; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden;">
+<!-- Top Accent Color Bar (Lime Green for Customer) -->
+<div class="inflow-top-accent-bar" style="height: 4px; background: #659E27;"></div>
+
+<!-- Authentic inFlow Top Ribbon Toolbar -->
+<div class="inflow-win-toolbar inflow-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1; z-index: 20; position: relative;">
+    <div class="inflow-toolbar-left" style="display: flex; align-items: center; gap: 6px;">
+        <!-- Save Button -->
+        <button type="button" class="inflow-tb-btn" id="btnSaveCustomer" onclick="submitSaveCustomer()" title="Save Customer (Ctrl+S)" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 3px; cursor: pointer;">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+                <path d="M2.5 2C2.5 1.72386 2.72386 1.5 3 1.5H11.5L13.5 3.5V13.5C13.5 13.7761 13.2761 14 13 14H3C2.72386 14 2.5 13.7761 2.5 13.5V2Z" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.2"/>
+                <rect x="4.5" y="2" width="6" height="4" rx="0.5" fill="#E0E7FF"/>
+                <rect x="4.5" y="8.5" width="7" height="4.5" rx="0.5" fill="#FFFFFF"/>
+            </svg>
+            <span>Save</span>
+        </button>
+
+        {% if not is_new %}
+        <!-- Remove Button -->
+        <button type="button" class="inflow-tb-btn" id="btnRemoveCustomer" onclick="openDeleteModal()" title="Remove Customer" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #DC2626; background: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 3px; cursor: pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                <line x1="10" y1="11" x2="10" y2="17"></line>
+                <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+            <span>Remove</span>
+        </button>
+        {% endif %}
+
+        <span style="color: #CBD5E1; margin: 0 4px;">|</span>
+
+        <!-- New Button -->
+        <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('contacts.new_customer') }}')" class="inflow-tb-btn" title="Create New Customer" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 500; color: #334155; text-decoration: none; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+                <path d="M3 2C3 1.44772 3.44772 1 4 1H9.58579C9.851 1 10.1054 1.10536 10.2929 1.29289L13.7071 4.70711C13.8946 4.89464 14 5.149 14 5.41421V14C14 14.5523 13.5523 15 13 15H4C3.44772 15 3 14.5523 3 14V2Z" fill="#F8FAFC" stroke="#64748B" stroke-width="1.2"/>
+                <path d="M9.5 1V5H13.5" stroke="#64748B" stroke-width="1.2"/>
+                <path d="M8 8V12M6 10H10" stroke="#0284C7" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <span>New</span>
+        </a>
+
+        {% if not is_new %}
+        <!-- Create Order Button -->
+        <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.new_order') }}?customer_id={{ customer.id }}')" class="inflow-tb-btn" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #047857; text-decoration: none; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 3px;">
+            <span>+ Create Order</span>
+        </a>
+
+        <!-- Print Delivery Label Button -->
+        <button type="button" class="inflow-tb-btn" onclick="openCustomerDeliveryModal()" title="Print Delivery Label (80x100mm)" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 3px; cursor: pointer;">
+            <span>🚚 Print Delivery Label</span>
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="inflow-toolbar-right" style="display: flex; align-items: center; gap: 8px;">
+        <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('contacts.list_customers') }}')" class="inflow-tb-btn" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px; color: #475569; text-decoration: none; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px;">
+            <span>← Customer List</span>
+        </a>
+        <button type="button" class="inflow-tb-btn" onclick="handleClose()" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #DC2626; background: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 3px; cursor: pointer;" title="Close">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span>Close</span>
+        </button>
+    </div>
+</div>
+
+<!-- Two-Panel Workspace Split Layout (Matching Classic inFlow UI & Image 2) -->
+<div class="inflow-cust-workspace" id="custWorkspace">
     
-    <!-- Authentic inFlow Top Toolbar -->
-    <div class="inflow-win-toolbar inflow-toolbar" style="display: flex; justify-content: space-between; align-items: center; padding: 6px 14px; background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1;">
-        <div class="inflow-toolbar-left" style="display: flex; align-items: center; gap: 6px;">
-            <!-- Save Button -->
-            <button type="button" class="inflow-tb-btn" id="btnSaveCustomer" onclick="submitSaveCustomer()" title="Save Customer (Ctrl+S)" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 3px; cursor: pointer;">
-                <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-                    <path d="M2.5 2C2.5 1.72386 2.72386 1.5 3 1.5H11.5L13.5 3.5V13.5C13.5 13.7761 13.2761 14 13 14H3C2.72386 14 2.5 13.7761 2.5 13.5V2Z" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.2"/>
-                    <rect x="4.5" y="2" width="6" height="4" rx="0.5" fill="#E0E7FF"/>
-                    <rect x="4.5" y="8.5" width="7" height="4.5" rx="0.5" fill="#FFFFFF"/>
-                </svg>
-                <span>Save</span>
-            </button>
-
-            {% if not is_new %}
-            <!-- Remove Button -->
-            <button type="button" class="inflow-tb-btn" id="btnRemoveCustomer" onclick="openDeleteModal()" title="Remove Customer" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #DC2626; background: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 3px; cursor: pointer;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="3 6 5 6 21 6"></polyline>
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    <line x1="10" y1="11" x2="10" y2="17"></line>
-                    <line x1="14" y1="11" x2="14" y2="17"></line>
-                </svg>
-                <span>Remove</span>
-            </button>
-            {% endif %}
-
-            <span style="color: #CBD5E1; margin: 0 4px;">|</span>
-
-            <!-- New Button -->
-            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('contacts.new_customer') }}')" class="inflow-tb-btn" title="Create New Customer" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; font-size: 12px; font-weight: 500; color: #334155; text-decoration: none; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px;">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                    <path d="M3 2C3 1.44772 3.44772 1 4 1H9.58579C9.851 1 10.1054 1.10536 10.2929 1.29289L13.7071 4.70711C13.8946 4.89464 14 5.149 14 5.41421V14C14 14.5523 13.5523 15 13 15H4C3.44772 15 3 14.5523 3 14V2Z" fill="#F8FAFC" stroke="#64748B" stroke-width="1.2"/>
-                    <path d="M9.5 1V5H13.5" stroke="#64748B" stroke-width="1.2"/>
-                    <path d="M8 8V12M6 10H10" stroke="#0284C7" stroke-width="1.5" stroke-linecap="round"/>
-                </svg>
-                <span>New</span>
-            </a>
-
-            {% if not is_new %}
-            <!-- Create Order Button -->
-            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.new_order') }}?customer_id={{ customer.id }}')" class="inflow-tb-btn" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #047857; text-decoration: none; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 3px;">
-                <span>+ Create Order</span>
-            </a>
-
-            <!-- Print Delivery Label Button -->
-            <button type="button" class="inflow-tb-btn" onclick="openCustomerDeliveryModal()" title="Print Delivery Label (80x100mm)" style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 3px; cursor: pointer;">
-                <span>🚚 Print Delivery Label</span>
-            </button>
-            {% endif %}
-        </div>
-
-        <div class="inflow-toolbar-right" style="display: flex; align-items: center; gap: 8px;">
-            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('contacts.list_customers') }}')" class="inflow-tb-btn" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px; color: #475569; text-decoration: none; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px;">
-                <span>← Customer List</span>
-            </a>
-            <button type="button" class="inflow-tb-btn" onclick="handleClose()" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; font-size: 12px; font-weight: 600; color: #DC2626; background: #FFFFFF; border: 1px solid #FCA5A5; border-radius: 3px; cursor: pointer;" title="Close">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                <span>Close</span>
-            </button>
-        </div>
-    </div>
-
-    <!-- Breadcrumb & Header Title -->
-    <div style="padding: 14px 24px 10px 24px; border-bottom: 1px solid #F1F5F9; background: #FAFAFA;">
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #64748B; margin-bottom: 4px;">
-            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('contacts.list_customers') }}')" style="color: #64748B; text-decoration: none;">Customers</a>
-            <span style="color: #CBD5E1;">/</span>
-            <span style="font-weight: 600; color: #0F172A;">Customer Detail</span>
-        </div>
-        <h1 style="font-size: 1.45rem; font-weight: 700; color: #0F172A; margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif;">
-            {% if is_new %}New Customer{% else %}{{ customer.name }}{% endif %}
-        </h1>
-    </div>
-
-    <!-- Main Customer Form (Matching Exact Screenshot Layout) -->
-    <form id="customerForm" method="POST" action="{% if is_new %}{{ url_for('contacts.create_customer') }}{% else %}{{ url_for('contacts.save_customer', id=customer.id) }}{% endif %}" style="padding: 24px;">
-        
-        <!-- Top 4-Box Grid: Basic, Addresses, Contact, Purchasing Info -->
-        <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); column-gap: 48px; row-gap: 28px; margin-bottom: 30px;">
+    <!-- Left Panel: Classic inFlow Customer Search Drawer (Matching Image 2) -->
+    <aside class="inflow-cust-search-drawer" id="custSearchDrawer">
+        <!-- Drawer Header -->
+        <div class="cust-drawer-header">
+            <div class="cust-drawer-title-row">
+                <div class="cust-drawer-title">
+                    <span>Search</span>
+                    <span class="cust-drawer-arrow-icon">▶</span>
+                </div>
+                <button type="button" class="cust-drawer-collapse-btn" onclick="toggleCustDrawerCollapse()" title="Collapse drawer">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+            </div>
             
-            <!-- 1. BASIC SECTION (Top Left) -->
-            <div>
-                <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; margin-bottom: 14px; font-family: 'Segoe UI', -apple-system, sans-serif;">
-                    Basic
+            <!-- 4 Filter Fields Matching Image 2: Name, Contact, Phone, Address1 -->
+            <div class="cust-drawer-filters">
+                <div class="cust-filter-row">
+                    <label class="cust-filter-label" for="filterCustName">Name ▾</label>
+                    <input type="text" id="filterCustName" class="cust-filter-input font-khmer" oninput="applyCustDrawerFilters()" autocomplete="off">
                 </div>
+                <div class="cust-filter-row">
+                    <label class="cust-filter-label" for="filterCustContact">Contact ▾</label>
+                    <input type="text" id="filterCustContact" class="cust-filter-input font-khmer" oninput="applyCustDrawerFilters()" autocomplete="off">
+                </div>
+                <div class="cust-filter-row">
+                    <label class="cust-filter-label" for="filterCustPhone">Phone ▾</label>
+                    <input type="text" id="filterCustPhone" class="cust-filter-input" oninput="applyCustDrawerFilters()" autocomplete="off">
+                </div>
+                <div class="cust-filter-row">
+                    <label class="cust-filter-label" for="filterCustAddress">Address1 ▾</label>
+                    <input type="text" id="filterCustAddress" class="cust-filter-input font-khmer" oninput="applyCustDrawerFilters()" autocomplete="off">
+                </div>
+                <div class="cust-filter-actions">
+                    <button type="button" class="cust-refresh-btn" onclick="resetCustDrawerFilters()" title="Reset search filters">Refresh</button>
+                </div>
+            </div>
+        </div>
 
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Name</label>
-                    <input type="text" name="name" id="custNameInput" class="cust-input font-khmer" value="{{ customer.name }}" required style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
-                </div>
+        <!-- Table Column Header Matching Image 2: Name ▲ -->
+        <div class="cust-drawer-list-header">
+            <span>Name</span>
+            <span style="font-size: 9px;">▲</span>
+        </div>
 
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Balance</label>
-                    <input type="text" readonly value="{{ customer.balance | currency }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #F8FAFC; color: {% if customer.balance > 0 %}#DC2626{% else %}#1E293B{% endif %}; font-weight: 600;">
-                </div>
+        <!-- Customer List Body: Alternating pale lime rows & rich green active highlight -->
+        <div class="cust-drawer-list-body" id="custDrawerListBody">
+            {% for c in sidebar_customers %}
+            <a href="javascript:void(0)"
+               onclick="handleSelectCustomer('{{ url_for('contacts.detail_customer', id=c.id) }}', this)"
+               class="cust-drawer-row {% if not is_new and c.id == customer.id %}active{% endif %}"
+               data-id="{{ c.id }}"
+               data-name="{{ (c.name or '')|lower }}"
+               data-contact="{{ (c.contact_name or '')|lower }}"
+               data-phone="{{ (c.phone or '')|lower }}"
+               data-address="{{ (c.address1 or c.billing_address or c.shipping_address or '')|lower }}"
+               title="{{ c.name }}{% if c.phone %} | {{ c.phone }}{% endif %}{% if c.contact_name %} ({{ c.contact_name }}){% endif %}">
+                <span class="cust-drawer-name font-khmer">{{ c.name }}</span>
+            </a>
+            {% else %}
+            <div style="padding: 16px; font-size: 11px; color: #4D7A1D; text-align: center;">No customers found.</div>
+            {% endfor %}
+            <div id="custNoMatchMsg" style="display: none; padding: 16px; font-size: 11.5px; color: #4D7A1D; text-align: center; font-style: italic;">
+                No customers match filter
+            </div>
+        </div>
+    </aside>
 
-                {% if is_main_admin %}
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Branch</label>
-                    <select name="branch_id" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
-                        <option value="">🏢 Main Store (HQ)</option>
-                        {% for b in branches %}
-                        <option value="{{ b.id }}" {% if customer.branch_id|string == b.id|string %}selected{% endif %}>🏪 {{ b.name }} ({{ b.code }})</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% else %}
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Branch</label>
-                    <input type="text" readonly value="🏪 {{ customer.branch_name or 'This Branch' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #F8FAFC; color: #2563EB; font-weight: 600;">
-                </div>
+    <!-- Slim Uncollapse Bar when Drawer Collapsed -->
+    <div class="inflow-cust-uncollapse-bar" id="custUncollapseBar" onclick="toggleCustDrawerCollapse()" title="Click to show Customer Search List">
+        <span>◀ Search Customers</span>
+    </div>
+
+    <!-- Right Panel: Customer Document Canvas -->
+    <div class="inflow-cust-document-canvas" id="custDocumentCanvas">
+        
+        <!-- Breadcrumb & Header Title -->
+        <div style="padding: 14px 24px 10px 24px; border-bottom: 1px solid #F1F5F9; background: #FAFAFA;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #64748B; margin-bottom: 4px;">
+                <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('contacts.list_customers') }}')" style="color: #64748B; text-decoration: none;">Customers</a>
+                <span style="color: #CBD5E1;">/</span>
+                <span style="font-weight: 600; color: #0F172A;">Customer Detail</span>
+            </div>
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                <h1 style="font-size: 1.45rem; font-weight: 700; color: #0F172A; margin: 0; font-family: 'Segoe UI', -apple-system, sans-serif;" class="font-khmer">
+                    {% if is_new %}New Customer{% else %}{{ customer.name }}{% endif %}
+                </h1>
+                {% if customer.branch_name %}
+                <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 700; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE;">
+                    🏪 {{ customer.branch_name }} ({{ customer.branch_code }})
+                </span>
                 {% endif %}
             </div>
+        </div>
 
-            <!-- 2. ADDRESSES SECTION (Top Right) -->
-            <div>
-                <div style="display: flex; justify-content: space-between; align-items: center; width: 380px; margin-bottom: 14px;">
-                    <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; font-family: 'Segoe UI', -apple-system, sans-serif;">
-                        Addresses
+        <!-- Main Customer Form (Matching Exact inFlow Desktop Layout) -->
+        <form id="customerForm" method="POST" action="{% if is_new %}{{ url_for('contacts.create_customer') }}{% else %}{{ url_for('contacts.save_customer', id=customer.id) }}{% endif %}" style="padding: 24px;">
+            
+            <!-- Top 4-Box Grid: Basic, Addresses, Contact, Purchasing Info -->
+            <div style="display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); column-gap: 48px; row-gap: 28px; margin-bottom: 30px;">
+                
+                <!-- 1. BASIC SECTION (Top Left) -->
+                <div>
+                    <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; margin-bottom: 14px; font-family: 'Segoe UI', -apple-system, sans-serif;">
+                        Basic
                     </div>
-                    {% if not is_new %}
-                    <a href="javascript:void(0);" onclick="openCustomerDeliveryModal()" class="inflow-blue-link" style="font-size: 11.5px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 3px; color: #1E293B;" title="Print Delivery Sticker (80x100mm)">
-                        🚚 Print Label
-                    </a>
+
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Name</label>
+                        <input type="text" name="name" id="custNameInput" class="cust-input font-khmer" value="{{ customer.name }}" required style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
+                    </div>
+
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Balance</label>
+                        <input type="text" readonly value="{{ customer.balance | currency }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #F8FAFC; color: {% if customer.balance > 0 %}#DC2626{% else %}#1E293B{% endif %}; font-weight: 600;">
+                    </div>
+
+                    {% if is_main_admin %}
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Branch</label>
+                        <select name="branch_id" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
+                            <option value="">🏢 Main Store (HQ)</option>
+                            {% for b in branches %}
+                            <option value="{{ b.id }}" {% if customer.branch_id|string == b.id|string %}selected{% endif %}>🏪 {{ b.name }} ({{ b.code }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% else %}
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Branch</label>
+                        <input type="text" readonly value="🏪 {{ customer.branch_name or 'This Branch' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #F8FAFC; color: #2563EB; font-weight: 600;">
+                    </div>
                     {% endif %}
                 </div>
 
-                <div style="width: 380px; margin-bottom: 8px;">
-                    <select id="addressTypeSelect" onchange="switchAddressType(this.value)" style="width: 100%; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF; color: #1E293B; cursor: pointer;">
-                        <option value="business" selected>Business Address</option>
-                        <option value="shipping">Shipping Address</option>
-                        <option value="billing">Billing Address</option>
-                    </select>
+                <!-- 2. ADDRESSES SECTION (Top Right) -->
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; width: 380px; margin-bottom: 14px;">
+                        <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; font-family: 'Segoe UI', -apple-system, sans-serif;">
+                            Addresses
+                        </div>
+                        {% if not is_new %}
+                        <a href="javascript:void(0);" onclick="openCustomerDeliveryModal()" class="inflow-blue-link" style="font-size: 11.5px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; background: #F8FAFC; border: 1px solid #CBD5E1; border-radius: 3px; color: #1E293B;" title="Print Delivery Sticker (80x100mm)">
+                            🚚 Print Label
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <div style="width: 380px; margin-bottom: 8px;">
+                        <select id="addressTypeSelect" onchange="switchAddressType(this.value)" style="width: 100%; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF; color: #1E293B; cursor: pointer;">
+                            <option value="business" selected>Business Address</option>
+                            <option value="shipping">Shipping Address</option>
+                            <option value="billing">Billing Address</option>
+                        </select>
+                    </div>
+
+                    <div style="width: 380px;">
+                        <textarea id="addressDisplay" class="font-khmer" rows="5" oninput="onAddressInput(this.value)" placeholder="Street, Khan, Sangkat, City, Landmark..." style="width: 100%; height: 110px; padding: 6px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; resize: vertical; box-sizing: border-box; line-height: 1.45;"></textarea>
+                    </div>
+
+                    <!-- Hidden inputs to persist all 3 addresses -->
+                    <input type="hidden" name="address1" id="businessAddressHidden" value="{{ customer.address1 or customer.shipping_address or '' }}">
+                    <input type="hidden" name="shipping_address" id="shippingAddressHidden" value="{{ customer.shipping_address or customer.address1 or '' }}">
+                    <input type="hidden" name="billing_address" id="billingAddressHidden" value="{{ customer.billing_address or customer.address1 or '' }}">
                 </div>
 
-                <div style="width: 380px;">
-                    <textarea id="addressDisplay" class="font-khmer" rows="5" oninput="onAddressInput(this.value)" placeholder="Street, Khan, Sangkat, City, Landmark..." style="width: 100%; height: 110px; padding: 6px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; resize: vertical; box-sizing: border-box; line-height: 1.45;"></textarea>
-                </div>
+                <!-- 3. CONTACT SECTION (Bottom Left) -->
+                <div>
+                    <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; margin-bottom: 14px; font-family: 'Segoe UI', -apple-system, sans-serif;">
+                        Contact
+                    </div>
 
-                <!-- Hidden inputs to persist all 3 addresses -->
-                <input type="hidden" name="address1" id="businessAddressHidden" value="{{ customer.address1 or customer.shipping_address or '' }}">
-                <input type="hidden" name="shipping_address" id="shippingAddressHidden" value="{{ customer.shipping_address or customer.address1 or '' }}">
-                <input type="hidden" name="billing_address" id="billingAddressHidden" value="{{ customer.billing_address or customer.address1 or '' }}">
-            </div>
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Name</label>
+                        <input type="text" name="contact_name" class="cust-input font-khmer" value="{{ customer.contact_name or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
+                    </div>
 
-            <!-- 3. CONTACT SECTION (Bottom Left) -->
-            <div>
-                <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; margin-bottom: 14px; font-family: 'Segoe UI', -apple-system, sans-serif;">
-                    Contact
-                </div>
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Phone</label>
+                        <input type="text" name="phone" class="cust-input" value="{{ customer.phone or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
+                    </div>
 
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Name</label>
-                    <input type="text" name="contact_name" class="cust-input font-khmer" value="{{ customer.contact_name or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
-                </div>
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Fax</label>
+                        <input type="text" name="fax" class="cust-input" value="{{ customer.fax or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
+                    </div>
 
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Phone</label>
-                    <input type="text" name="phone" class="cust-input" value="{{ customer.phone or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
-                </div>
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Email</label>
+                        <input type="email" name="email" class="cust-input" value="{{ customer.email or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
+                    </div>
 
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Fax</label>
-                    <input type="text" name="fax" class="cust-input" value="{{ customer.fax or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
-                </div>
-
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Email</label>
-                    <input type="email" name="email" class="cust-input" value="{{ customer.email or '' }}" style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
-                </div>
-
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Website</label>
-                    <input type="text" name="website" class="cust-input" value="{{ customer.website or '' }}" placeholder="https://..." style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
-                </div>
-            </div>
-
-            <!-- 4. PURCHASING INFO SECTION (Bottom Right) -->
-            <div>
-                <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; margin-bottom: 14px; font-family: 'Segoe UI', -apple-system, sans-serif;">
-                    Purchasing Info
-                </div>
-
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 140px; font-size: 13px; color: #334155;">Pricing / Currency</label>
-                    <select name="default_pricing_scheme_id" class="cust-input" style="width: 240px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
-                        {% for ps in pricing_schemes %}
-                        <option value="{{ ps.id }}" {% if customer.default_pricing_scheme_id == ps.id %}selected{% endif %}>{{ ps.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 140px; font-size: 13px; color: #334155;">Discount</label>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <input type="number" step="any" min="0" max="100" name="discount_percent" class="cust-input" value="{{ customer.discount_percent or 0 }}" style="width: 216px; height: 26px; padding: 2px 8px; font-size: 13px; text-align: right; border: 1px solid #CBD5E1; border-radius: 2px;">
-                        <span style="font-size: 13px; color: #475569; font-weight: 500;">%</span>
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 100px; font-size: 13px; color: #334155;">Website</label>
+                        <input type="text" name="website" class="cust-input" value="{{ customer.website or '' }}" placeholder="https://..." style="width: 270px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px;">
                     </div>
                 </div>
 
-                <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
-                    <label class="cust-field-label" style="width: 140px; font-size: 13px; color: #334155;">Payment Terms</label>
-                    <select name="payment_terms" class="cust-input" style="width: 240px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
-                        <option value="Due on Receipt" {% if customer.payment_terms == 'Due on Receipt' or not customer.payment_terms %}selected{% endif %}>Due on Receipt</option>
-                        <option value="Net 15" {% if customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
-                        <option value="Net 30" {% if customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
-                        <option value="Net 60" {% if customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
-                        <option value="COD" {% if customer.payment_terms == 'COD' %}selected{% endif %}>COD</option>
-                        <option value="Prepaid" {% if customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
-                    </select>
+                <!-- 4. PURCHASING INFO SECTION (Bottom Right) -->
+                <div>
+                    <div style="font-size: 1.15rem; font-weight: 600; color: #659E27; margin-bottom: 14px; font-family: 'Segoe UI', -apple-system, sans-serif;">
+                        Purchasing Info
+                    </div>
+
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 140px; font-size: 13px; color: #334155;">Pricing / Currency</label>
+                        <select name="default_pricing_scheme_id" class="cust-input" style="width: 240px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
+                            {% for ps in pricing_schemes %}
+                            <option value="{{ ps.id }}" {% if customer.default_pricing_scheme_id == ps.id %}selected{% endif %}>{{ ps.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 140px; font-size: 13px; color: #334155;">Discount</label>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <input type="number" step="any" min="0" max="100" name="discount_percent" class="cust-input" value="{{ customer.discount_percent or 0 }}" style="width: 216px; height: 26px; padding: 2px 8px; font-size: 13px; text-align: right; border: 1px solid #CBD5E1; border-radius: 2px;">
+                            <span style="font-size: 13px; color: #475569; font-weight: 500;">%</span>
+                        </div>
+                    </div>
+
+                    <div class="cust-field-row" style="display: flex; align-items: center; margin-bottom: 10px;">
+                        <label class="cust-field-label" style="width: 140px; font-size: 13px; color: #334155;">Payment Terms</label>
+                        <select name="payment_terms" class="cust-input" style="width: 240px; height: 26px; padding: 2px 8px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 2px; background: #FFFFFF;">
+                            <option value="Due on Receipt" {% if customer.payment_terms == 'Due on Receipt' or not customer.payment_terms %}selected{% endif %}>Due on Receipt</option>
+                            <option value="Net 15" {% if customer.payment_terms == 'Net 15' %}selected{% endif %}>Net 15</option>
+                            <option value="Net 30" {% if customer.payment_terms == 'Net 30' %}selected{% endif %}>Net 30</option>
+                            <option value="Net 60" {% if customer.payment_terms == 'Net 60' %}selected{% endif %}>Net 60</option>
+                            <option value="COD" {% if customer.payment_terms == 'COD' %}selected{% endif %}>COD</option>
+                            <option value="Prepaid" {% if customer.payment_terms == 'Prepaid' %}selected{% endif %}>Prepaid</option>
+                        </select>
+                    </div>
                 </div>
+
             </div>
 
-        </div>
+        </form>
 
-    </form>
+        <!-- Hidden Form for Remove / Delete Customer -->
+        {% if not is_new %}
+        <form id="deleteCustomerForm" method="POST" action="{{ url_for('contacts.delete_customer', id=customer.id) }}" style="display: none;"></form>
+        {% endif %}
 
-    <!-- Hidden Form for Remove / Delete Customer -->
-    {% if not is_new %}
-    <form id="deleteCustomerForm" method="POST" action="{{ url_for('contacts.delete_customer', id=customer.id) }}" style="display: none;"></form>
-    {% endif %}
-
-    <!-- Customer's Sales Order History Grid -->
-    {% if not is_new %}
-    <div style="border-top: 1px solid #E2E8F0; padding: 18px 24px; background: #FAFAFA;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="font-size: 1.05rem; font-weight: 700; color: #1E293B;">
-                Sales Order History (Latest {{ orders|length }})
+        <!-- Customer's Sales Order History Grid -->
+        {% if not is_new %}
+        <div style="border-top: 1px solid #E2E8F0; padding: 18px 24px; background: #FAFAFA;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-size: 1.05rem; font-weight: 700; color: #1E293B;">
+                    Sales Order History (Latest {{ orders|length }})
+                </div>
+                <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.new_order') }}?customer_id={{ customer.id }}')" style="font-size: 12px; font-weight: 600; color: #047857; text-decoration: none;">
+                    + New Sales Order
+                </a>
             </div>
-            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.new_order') }}?customer_id={{ customer.id }}')" style="font-size: 12px; font-weight: 600; color: #047857; text-decoration: none;">
-                + New Sales Order
-            </a>
-        </div>
 
-        <div style="border: 1px solid #CBD5E1; border-radius: 3px; background: #FFFFFF; overflow: hidden;">
-            <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
-                <thead>
-                    <tr style="background: #F1F5F9; border-bottom: 1px solid #CBD5E1; text-align: left;">
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569;">Order #</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569;">Date</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569;">Warehouse</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: right;">Total Amount</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: right;">Paid</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: right;">Balance Due</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: center;">Status</th>
-                        <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: center;">Action</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for o in orders %}
-                    <tr style="border-bottom: 1px solid #F1F5F9;">
-                        <td style="padding: 6px 10px; font-family: var(--font-mono); font-weight: 700;">
-                            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.detail_order', id=o.id) }}')" style="color: #0F766E; text-decoration: none;">
-                                {{ o.order_number }}
-                            </a>
-                        </td>
-                        <td style="padding: 6px 10px;">{{ o.order_date | format_date }}</td>
-                        <td style="padding: 6px 10px; color: #475569;">{{ o.location_name or 'Main Warehouse' }}</td>
-                        <td style="padding: 6px 10px; text-align: right; font-weight: 600;">{{ o.total_amount | currency }}</td>
-                        <td style="padding: 6px 10px; text-align: right; color: #059669; font-weight: 500;">{{ o.paid_amount | currency }}</td>
-                        <td style="padding: 6px 10px; text-align: right; font-weight: 700; color: {% if o.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
-                            {{ o.balance_due | currency }}
-                        </td>
-                        <td style="padding: 6px 10px; text-align: center;">
-                            <span class="badge {% if o.status == 'INVOICED' or o.status == 'PAID' %}badge-success{% elif o.status == 'OPEN' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 11px; padding: 2px 6px;">
-                                {{ o.status }}
-                            </span>
-                        </td>
-                        <td style="padding: 6px 10px; text-align: center;">
-                            <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.detail_order', id=o.id) }}')" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;">View</a>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="8" style="text-align: center; color: #94A3B8; padding: 24px;">No orders found for this customer.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <div style="border: 1px solid #CBD5E1; border-radius: 3px; background: #FFFFFF; overflow: hidden;">
+                <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                    <thead>
+                        <tr style="background: #F1F5F9; border-bottom: 1px solid #CBD5E1; text-align: left;">
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569;">Order #</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569;">Date</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569;">Warehouse</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: right;">Total Amount</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: right;">Paid</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: right;">Balance Due</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: center;">Status</th>
+                            <th style="padding: 6px 10px; font-weight: 600; color: #475569; text-align: center;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for o in orders %}
+                        <tr style="border-bottom: 1px solid #F1F5F9;">
+                            <td style="padding: 6px 10px; font-family: var(--font-mono); font-weight: 700;">
+                                <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.detail_order', id=o.id) }}')" style="color: #0F766E; text-decoration: none;">
+                                    {{ o.order_number }}
+                                </a>
+                            </td>
+                            <td style="padding: 6px 10px;">{{ o.order_date | format_date }}</td>
+                            <td style="padding: 6px 10px; color: #475569;">{{ o.location_name or 'Main Warehouse' }}</td>
+                            <td style="padding: 6px 10px; text-align: right; font-weight: 600;">{{ o.total_amount | currency }}</td>
+                            <td style="padding: 6px 10px; text-align: right; color: #059669; font-weight: 500;">{{ o.paid_amount | currency }}</td>
+                            <td style="padding: 6px 10px; text-align: right; font-weight: 700; color: {% if o.balance_due > 0 %}#DC2626{% else %}#059669{% endif %};">
+                                {{ o.balance_due | currency }}
+                            </td>
+                            <td style="padding: 6px 10px; text-align: center;">
+                                <span class="badge {% if o.status == 'INVOICED' or o.status == 'PAID' %}badge-success{% elif o.status == 'OPEN' %}badge-warning{% else %}badge-neutral{% endif %}" style="font-size: 11px; padding: 2px 6px;">
+                                    {{ o.status }}
+                                </span>
+                            </td>
+                            <td style="padding: 6px 10px; text-align: center;">
+                                <a href="javascript:void(0);" onclick="handleNavigate('{{ url_for('sales_orders.detail_order', id=o.id) }}')" class="btn btn-secondary btn-sm" style="padding: 2px 8px; font-size: 11px;">View</a>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="8" style="text-align: center; color: #94A3B8; padding: 24px;">No orders found for this customer.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
+        {% endif %}
+
     </div>
-    {% endif %}
-
 </div>
 
 <!-- inFlow Save Prompt Modal (Triggered when user edits any info and tries to leave) -->
@@ -367,7 +455,7 @@
                 </div>
             </div>
 
-            <!-- Customer Delivery Address (At the Top) -->
+            <!-- Customer Delivery Address -->
             <div style="margin-bottom: 12px;">
                 <label style="display: block; font-weight: 700; margin-bottom: 4px; color: #334155;">📍 Delivery Address / អាសយដ្ឋានដឹកជញ្ជូន (Top of sticker):</label>
                 <textarea id="modalCustAddressInput" style="width: 100%; height: 46px; font-size: 12px; padding: 4px 8px; border: 1px solid #CBD5E1; border-radius: 3px; resize: vertical; font-weight: 600;" placeholder="Enter delivery address...">{{ customer.shipping_address or customer.address1 or customer.billing_address or '' }}</textarea>
@@ -377,7 +465,7 @@
             <div style="margin-bottom: 12px; display: flex; gap: 12px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 4px; padding: 8px 10px;">
                 <div style="flex: 1;">
                     <span style="font-size: 11px; color: #64748B; font-weight: 600; display: block;">Receiver:</span>
-                    <strong style="font-size: 12.5px; color: #0F172A;">{{ customer.name }}</strong>
+                    <strong style="font-size: 12.5px; color: #0F172A;" class="font-khmer">{{ customer.name }}</strong>
                 </div>
                 <div style="flex: 1;">
                     <span style="font-size: 11px; color: #64748B; font-weight: 600; display: block;">Phone:</span>
@@ -448,16 +536,11 @@ function switchAddressType(type) {
 }
 
 function onAddressInput(val) {
+    isDirty = true;
     addressData[currentAddressType] = val;
     if (currentAddressType === 'business') {
         const el = document.getElementById('businessAddressHidden');
         if (el) el.value = val;
-        // If shipping is empty, also default shipping
-        const shipEl = document.getElementById('shippingAddressHidden');
-        if (shipEl && !shipEl.value) {
-            shipEl.value = val;
-            addressData.shipping = val;
-        }
     } else if (currentAddressType === 'shipping') {
         const el = document.getElementById('shippingAddressHidden');
         if (el) el.value = val;
@@ -465,43 +548,105 @@ function onAddressInput(val) {
         const el = document.getElementById('billingAddressHidden');
         if (el) el.value = val;
     }
-    markDirty();
 }
 
-function markDirty() {
-    isDirty = true;
-}
-
-// Track changes on all inputs in customerForm
+// Track input changes to warn user before navigation
 document.addEventListener('DOMContentLoaded', function() {
     initAddressField();
 
     const form = document.getElementById('customerForm');
     if (form) {
-        const inputs = form.querySelectorAll('input:not([readonly]), textarea, select');
-        inputs.forEach(el => {
-            el.addEventListener('input', markDirty);
-            el.addEventListener('change', markDirty);
+        form.querySelectorAll('input, select, textarea').forEach(input => {
+            input.addEventListener('change', () => { isDirty = true; });
+            input.addEventListener('input', () => { isDirty = true; });
         });
     }
 
-    // Native beforeunload protection
-    window.addEventListener('beforeunload', function(e) {
-        if (isDirty) {
-            e.preventDefault();
-            e.returnValue = 'You have unsaved changes.';
-            return e.returnValue;
-        }
-    });
-
-    // Keyboard shortcut Ctrl+S
-    window.addEventListener('keydown', function(e) {
-        if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
+    // Keyboard shortcut: Ctrl+S to save
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
             e.preventDefault();
             submitSaveCustomer();
         }
     });
+
+    // Check restored collapsed drawer state
+    if (localStorage.getItem('inflow_cust_drawer_collapsed') === '1') {
+        const ws = document.getElementById('custWorkspace');
+        if (ws) ws.classList.add('drawer-collapsed');
+    }
+
+    // Auto-scroll active customer row into view in sidebar
+    scrollActiveCustomerIntoView();
 });
+
+// Customer Search Drawer Live Filtering Matching Image 2
+function applyCustDrawerFilters() {
+    const nameVal = (document.getElementById('filterCustName')?.value || '').toLowerCase().trim();
+    const contactVal = (document.getElementById('filterCustContact')?.value || '').toLowerCase().trim();
+    const phoneVal = (document.getElementById('filterCustPhone')?.value || '').toLowerCase().trim();
+    const addrVal = (document.getElementById('filterCustAddress')?.value || '').toLowerCase().trim();
+
+    const rows = document.querySelectorAll('#custDrawerListBody .cust-drawer-row');
+    let visibleCount = 0;
+
+    rows.forEach(row => {
+        const rName = row.getAttribute('data-name') || '';
+        const rContact = row.getAttribute('data-contact') || '';
+        const rPhone = row.getAttribute('data-phone') || '';
+        const rAddr = row.getAttribute('data-address') || '';
+
+        const match = (!nameVal || rName.includes(nameVal)) &&
+                      (!contactVal || rContact.includes(contactVal)) &&
+                      (!phoneVal || rPhone.includes(phoneVal)) &&
+                      (!addrVal || rAddr.includes(addrVal));
+
+        if (match) {
+            row.style.display = 'flex';
+            visibleCount++;
+        } else {
+            row.style.display = 'none';
+        }
+    });
+
+    const noMatchMsg = document.getElementById('custNoMatchMsg');
+    if (noMatchMsg) {
+        noMatchMsg.style.display = (visibleCount === 0) ? 'block' : 'none';
+    }
+}
+
+function resetCustDrawerFilters() {
+    ['filterCustName', 'filterCustContact', 'filterCustPhone', 'filterCustAddress'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    applyCustDrawerFilters();
+    scrollActiveCustomerIntoView();
+    const nameInput = document.getElementById('filterCustName');
+    if (nameInput) nameInput.focus();
+}
+
+function scrollActiveCustomerIntoView() {
+    const activeRow = document.querySelector('#custDrawerListBody .cust-drawer-row.active');
+    if (activeRow) {
+        activeRow.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+}
+
+function toggleCustDrawerCollapse() {
+    const ws = document.getElementById('custWorkspace');
+    if (!ws) return;
+    const isCollapsed = ws.classList.toggle('drawer-collapsed');
+    localStorage.setItem('inflow_cust_drawer_collapsed', isCollapsed ? '1' : '0');
+}
+
+function handleSelectCustomer(targetUrl, rowEl) {
+    if (isDirty) {
+        openSavePromptModal(targetUrl);
+    } else {
+        window.location.href = targetUrl;
+    }
+}
 
 function submitSaveCustomer() {
     isDirty = false;
@@ -677,5 +822,4 @@ document.addEventListener('click', function(e) {
     }
 });
 </script>
-
 {% endblock %}
