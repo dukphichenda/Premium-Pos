@@ -365,6 +365,83 @@
     font-style: italic;
     flex-shrink: 0;
 }
+
+/* Date Dropdown Menu inside Sidebar */
+.so-date-dropdown {
+    left: 0 !important;
+    top: calc(100% + 4px) !important;
+    transform: none !important;
+    width: 210px !important;
+    max-height: 480px !important;
+    overflow-y: auto !important;
+    z-index: 99999 !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15) !important;
+    border: 1px solid #94A3B8 !important;
+    background: #FFFFFF !important;
+    border-radius: 6px !important;
+    padding: 4px !important;
+}
+
+/* Ensure document canvas and form expand naturally so footer always drops below all items */
+.inflow-document-canvas {
+    display: block !important;
+    overflow-y: auto !important;
+    overflow-x: auto !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    box-sizing: border-box !important;
+    padding-bottom: 90px !important;
+    position: relative !important;
+}
+
+#salesOrderForm {
+    display: block !important;
+    width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
+    clear: both !important;
+    position: relative !important;
+}
+
+.inflow-grid-container {
+    display: block !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 180px !important;
+    overflow-x: auto !important;
+    overflow-y: visible !important;
+    clear: both !important;
+    margin-bottom: 8px !important;
+    position: relative !important;
+}
+
+#lineItemsTable {
+    width: 100% !important;
+    height: auto !important;
+}
+
+.inflow-grid-actions-bar {
+    display: flex !important;
+    clear: both !important;
+    position: static !important;
+    margin-top: 6px !important;
+    margin-bottom: 14px !important;
+}
+
+.inflow-so-footer-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 340px !important;
+    gap: 30px !important;
+    clear: both !important;
+    position: static !important;
+    width: 100% !important;
+    margin-top: 14px !important;
+    margin-bottom: 48px !important;
+}
+
+.inflow-item-dropdown-popup {
+    width: 680px !important;
+}
 </style>
 
 <!-- inFlow Desktop Ribbon Toolbar -->
@@ -493,8 +570,8 @@
         <!-- Top Toolbar: [ 📅 ] [ Open (51) ∨ ] [ + ] -->
         <div class="so-sidebar-topbar">
             <!-- Left: Date Filter Button with Dropdown [ 📅 ] -->
-            <div class="so-pill-dropdown-wrap" style="position: relative;">
-                <button type="button" class="so-icon-btn {% if date_filter and date_filter != 'All' %}active-date-filter{% endif %}" id="btnToggleSoDate" onclick="toggleSoDateDropdown(event)" title="Filter by Date ({{ date_filter or 'All Time' }})">
+            <div style="position: relative; flex-shrink: 0;">
+                <button type="button" class="so-icon-btn {% if date_filter and date_filter != 'All' %}active-date-filter{% endif %}" id="btnToggleSoDate" onclick="toggleSoDateDropdown(event)" title="Filter by Date ({{ date_filter or 'All' }})">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                         <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -506,11 +583,13 @@
                     {% endif %}
                 </button>
 
-                <!-- Date Filter Dropdown Menu -->
-                <div class="so-menu-dropdown" id="soDateDropdownMenu" style="display: none; left: 0; min-width: 155px;">
+                <!-- Date Filter Dropdown Menu (matching Windows inFlow Screenshot 1) -->
+                <div class="so-menu-dropdown so-date-dropdown" id="soDateDropdownMenu" style="display: none;">
                     <div class="so-menu-item {% if not date_filter or date_filter == 'All' %}active{% endif %}" onclick="applySoDateFilter('All')">
-                        <span>All Time</span>
+                        <span>All</span>
                     </div>
+                    <div class="so-menu-separator"></div>
+
                     <div class="so-menu-item {% if date_filter == 'Today' %}active{% endif %}" onclick="applySoDateFilter('Today')">
                         <span>Today</span>
                     </div>
@@ -527,14 +606,67 @@
                         <span>This Year</span>
                     </div>
                     <div class="so-menu-separator"></div>
+
                     <div class="so-menu-item {% if date_filter == 'Yesterday' %}active{% endif %}" onclick="applySoDateFilter('Yesterday')">
                         <span>Yesterday</span>
                     </div>
+                    <div class="so-menu-item {% if date_filter == 'Last Week' %}active{% endif %}" onclick="applySoDateFilter('Last Week')">
+                        <span>Last Week</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last Month' %}active{% endif %}" onclick="applySoDateFilter('Last Month')">
+                        <span>Last Month</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last Quarter' %}active{% endif %}" onclick="applySoDateFilter('Last Quarter')">
+                        <span>Last Quarter</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last Year' %}active{% endif %}" onclick="applySoDateFilter('Last Year')">
+                        <span>Last Year</span>
+                    </div>
+                    <div class="so-menu-separator"></div>
+
                     <div class="so-menu-item {% if date_filter == 'Last 7 Days' %}active{% endif %}" onclick="applySoDateFilter('Last 7 Days')">
                         <span>Last 7 Days</span>
                     </div>
                     <div class="so-menu-item {% if date_filter == 'Last 30 Days' %}active{% endif %}" onclick="applySoDateFilter('Last 30 Days')">
                         <span>Last 30 Days</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last 90 Days' %}active{% endif %}" onclick="applySoDateFilter('Last 90 Days')">
+                        <span>Last 90 Days</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last 365 Days' %}active{% endif %}" onclick="applySoDateFilter('Last 365 Days')">
+                        <span>Last 365 Days</span>
+                    </div>
+                    <div class="so-menu-separator"></div>
+
+                    <div class="so-menu-item {% if date_filter == 'Tomorrow' %}active{% endif %}" onclick="applySoDateFilter('Tomorrow')">
+                        <span>Tomorrow</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Next Week' %}active{% endif %}" onclick="applySoDateFilter('Next Week')">
+                        <span>Next Week</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Next Month' %}active{% endif %}" onclick="applySoDateFilter('Next Month')">
+                        <span>Next Month</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Next Quarter' %}active{% endif %}" onclick="applySoDateFilter('Next Quarter')">
+                        <span>Next Quarter</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Next Year' %}active{% endif %}" onclick="applySoDateFilter('Next Year')">
+                        <span>Next Year</span>
+                    </div>
+                    <div class="so-menu-separator"></div>
+
+                    <!-- Custom Date Range -->
+                    <div style="padding: 6px 10px 4px;" onclick="event.stopPropagation()">
+                        <div style="font-size: 11px; font-weight: 700; color: #334155; margin-bottom: 5px;">Custom Date Range</div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; font-size: 11px;">
+                            <span style="color: #64748B; width: 36px;">From</span>
+                            <input type="date" id="soDateFrom" style="flex: 1; height: 24px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 4px;" value="{{ request.args.get('date_from', '') }}">
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 11px;">
+                            <span style="color: #64748B; width: 36px;">To</span>
+                            <input type="date" id="soDateTo" style="flex: 1; height: 24px; font-size: 11px; border: 1px solid #CBD5E1; border-radius: 3px; padding: 0 4px;" value="{{ request.args.get('date_to', '') }}">
+                        </div>
+                        <button type="button" onclick="applyCustomDateFilter()" style="width: 100%; height: 26px; background: #0D9488; color: #FFFFFF; border: none; border-radius: 4px; font-size: 11px; font-weight: 700; cursor: pointer;">Apply Range</button>
                     </div>
                 </div>
             </div>
@@ -621,7 +753,11 @@
         <!-- Filter / Active Preset Indicator Sub-row -->
         <div class="so-filter-toggle-row" style="padding: 3px 14px 6px;">
             <div style="font-size: 11px; color: #64748B; display: flex; align-items: center; gap: 4px;">
+                {% if date_filter == 'Custom' and (request.args.get('date_from') or request.args.get('date_to')) %}
+                <span>📅 {{ request.args.get('date_from', '...') }} - {{ request.args.get('date_to', '...') }}</span>
+                {% else %}
                 <span>📅 {{ date_filter if date_filter and date_filter != 'All' else 'All Dates' }}</span>
+                {% endif %}
                 {% if date_filter and date_filter != 'All' %}
                 <a href="javascript:void(0)" onclick="applySoDateFilter('All')" style="color: #EF4444; font-weight: 700; text-decoration: none;" title="Reset Date Filter">✕</a>
                 {% endif %}
@@ -1136,10 +1272,11 @@
                     <table class="inflow-item-table">
                         <thead>
                             <tr>
-                                <th style="width: 18%;">Category</th>
-                                <th style="width: 42%;">Item</th>
-                                <th style="width: 20%;">Description</th>
-                                <th style="width: 12%; text-align: right;">Price</th>
+                                <th style="width: 38px; text-align: center;">Photo</th>
+                                <th style="width: 16%;">Category</th>
+                                <th style="width: 36%;">Item</th>
+                                <th style="width: 22%;">Description</th>
+                                <th style="width: 16%; text-align: right;">Price</th>
                                 <th style="width: 8%; text-align: center;">Details</th>
                             </tr>
                         </thead>
@@ -1147,6 +1284,13 @@
                             {% for p in all_products %}
                             <tr onclick="selectItemForActiveRow({{ p.id }}, '{{ p.sku }}', '{{ p.name|replace('\'', '\\\'') }}', '{{ (p.description or '')|replace('\'', '\\\'') }}', {{ p.price or p.default_price or 0 }}, '{{ p.uom or 'pcs' }}')"
                                 data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}" data-cat="{{ (p.category_name or '')|lower }}">
+                                <td style="width: 38px; text-align: center; vertical-align: middle; padding: 2px;">
+                                    {% if p.image_url %}
+                                    <img src="{{ p.image_url }}" alt="" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="event.stopPropagation(); previewImageModal(this.src);" title="Click to preview image">
+                                    {% else %}
+                                    <div style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #94A3B8;">🖼️</div>
+                                    {% endif %}
+                                </td>
                                 <td style="color: #64748B;">{{ p.category_name or 'GENERAL' }}</td>
                                 <td style="font-weight: 600;">{{ p.sku }} {{ p.name }}</td>
                                 <td style="color: #64748B;">{{ p.description or '' }}</td>
@@ -5464,6 +5608,26 @@ function applySoDateFilter(val) {
     } else {
         url.searchParams.delete('date_filter');
     }
+    url.searchParams.delete('search');
+    url.searchParams.delete('customer_search');
+    url.searchParams.delete('date_from');
+    url.searchParams.delete('date_to');
+    window.location.href = url.toString();
+}
+
+function applyCustomDateFilter() {
+    const fromVal = document.getElementById('soDateFrom')?.value || '';
+    const toVal = document.getElementById('soDateTo')?.value || '';
+    if (!fromVal && !toVal) {
+        alert('Please select From or To date.');
+        return;
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('date_filter', 'Custom');
+    if (fromVal) url.searchParams.set('date_from', fromVal);
+    else url.searchParams.delete('date_from');
+    if (toVal) url.searchParams.set('date_to', toVal);
+    else url.searchParams.delete('date_to');
     url.searchParams.delete('search');
     url.searchParams.delete('customer_search');
     window.location.href = url.toString();

@@ -37,5 +37,32 @@ class TestSoFixes(unittest.TestCase):
             self.assertIn('inflow-so-footer-grid', html)
             self.assertIn('line-pic-cell', html)
 
+    def test_date_filter_options_and_custom_range(self):
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Check date filter options matching Screenshot 1
+        self.assertIn("applySoDateFilter('Today')", html)
+        self.assertIn("applySoDateFilter('This Week')", html)
+        self.assertIn("applySoDateFilter('This Month')", html)
+        self.assertIn("applySoDateFilter('Last 90 Days')", html)
+        self.assertIn("applySoDateFilter('Last 365 Days')", html)
+        self.assertIn("applySoDateFilter('Tomorrow')", html)
+        self.assertIn("applySoDateFilter('Next Month')", html)
+        self.assertIn('id="soDateFrom"', html)
+        self.assertIn('id="soDateTo"', html)
+        self.assertIn('applyCustomDateFilter()', html)
+
+    def test_product_search_shows_photo(self):
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Check itemDropdownPopup has Photo column and image thumbnails
+        self.assertIn('id="itemDropdownPopup"', html)
+        self.assertIn('<th style="width: 38px; text-align: center;">Photo</th>', html)
+
 if __name__ == '__main__':
     unittest.main()
+

@@ -680,7 +680,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         except (ValueError, TypeError):
             pass
 
-    # Date filter presets (matching inFlow Desktop Recording_20261008_1053)
+    # Date filter presets (matching inFlow Desktop Recording and Screenshot 1)
     if date_filter == 'Today':
         drawer_where.append("so.order_date = CURRENT_DATE")
     elif date_filter == 'This Week':
@@ -705,6 +705,29 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         drawer_where.append("so.order_date >= CURRENT_DATE - INTERVAL '7 days' AND so.order_date <= CURRENT_DATE")
     elif date_filter == 'Last 30 Days':
         drawer_where.append("so.order_date >= CURRENT_DATE - INTERVAL '30 days' AND so.order_date <= CURRENT_DATE")
+    elif date_filter == 'Last 90 Days':
+        drawer_where.append("so.order_date >= CURRENT_DATE - INTERVAL '90 days' AND so.order_date <= CURRENT_DATE")
+    elif date_filter == 'Last 365 Days':
+        drawer_where.append("so.order_date >= CURRENT_DATE - INTERVAL '365 days' AND so.order_date <= CURRENT_DATE")
+    elif date_filter == 'Tomorrow':
+        drawer_where.append("so.order_date = CURRENT_DATE + INTERVAL '1 day'")
+    elif date_filter == 'Next Week':
+        drawer_where.append("date_trunc('week', so.order_date::timestamp) = date_trunc('week', CURRENT_DATE::timestamp + INTERVAL '1 week')")
+    elif date_filter == 'Next Month':
+        drawer_where.append("date_trunc('month', so.order_date::timestamp) = date_trunc('month', CURRENT_DATE::timestamp + INTERVAL '1 month')")
+    elif date_filter == 'Next Quarter':
+        drawer_where.append("date_trunc('quarter', so.order_date::timestamp) = date_trunc('quarter', CURRENT_DATE::timestamp + INTERVAL '3 months')")
+    elif date_filter == 'Next Year':
+        drawer_where.append("date_trunc('year', so.order_date::timestamp) = date_trunc('year', CURRENT_DATE::timestamp + INTERVAL '1 year')")
+    elif date_filter == 'Custom':
+        custom_from = (request.args.get('date_from') or '').strip()
+        custom_to = (request.args.get('date_to') or '').strip()
+        if custom_from:
+            drawer_where.append("so.order_date >= %s")
+            drawer_params.append(custom_from)
+        if custom_to:
+            drawer_where.append("so.order_date <= %s")
+            drawer_params.append(custom_to)
 
     # Delivery man filter
     delivery_man_filter = (request.args.get('delivery_man') or '').strip()
