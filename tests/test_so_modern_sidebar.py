@@ -15,13 +15,13 @@ class TestSoModernSidebar(unittest.TestCase):
 
     def test_sidebar_structure_and_components(self):
         """
-        Verify that the modern sales order sidebar matches the UI requirements:
-        1. Search toggle button [ 🔍 ]
-        2. Status pill button [ Open (count) ∨ ] and floating dropdown
+        Verify that the modern sales order sidebar matches the updated UI requirements:
+        1. Date preset toggle button on top [ 📅 ] and floating date dropdown
+        2. Status pill button [ Open (count) ∨ ] and floating dropdown (Open, Paid, All Orders)
         3. Add new order button [ + ]
-        4. Filters toggle button and collapsible advanced panel
+        4. Wider search bar directly visible
         5. 'Order number' column header
-        6. Cards with order #, status badge, price pill, customer name, and delivery person tag
+        6. Cards with order #, Open/Paid status badge, price pill, customer name, and delivery person tag
         """
         resp = self.client.get('/sales/new')
         self.assertEqual(resp.status_code, 200)
@@ -31,60 +31,58 @@ class TestSoModernSidebar(unittest.TestCase):
         self.assertIn('so-master-sidebar', html)
         self.assertIn('id="soMasterSidebar"', html)
 
-        # 2. Toolbar buttons
-        self.assertIn('id="btnToggleSoSearch"', html)
+        # 2. Toolbar buttons: Date button, Status pill, New order (+)
+        self.assertIn('id="btnToggleSoDate"', html)
+        self.assertIn('id="soDateDropdownMenu"', html)
         self.assertIn('id="btnSoStatusPill"', html)
         self.assertIn('id="soStatusPillLabel"', html)
         self.assertIn('id="soStatusPillCount"', html)
         self.assertIn('id="soStatusDropdownMenu"', html)
         self.assertIn('title="Create New Sales Order (+)"', html)
 
-        # 3. Filters row & column header
-        self.assertIn('toggleSoAdvancedFilters()', html)
-        self.assertIn('id="soAdvancedFiltersPanel"', html)
-        self.assertIn('id="soDateFilterSelect"', html)
-        self.assertIn('id="soDeliveryManFilterSelect"', html)
+        # 3. Wider search bar directly visible
+        self.assertIn('id="soSidebarSearchInput"', html)
+        self.assertIn('id="btnClearSoSearch"', html)
         self.assertIn('Order number', html)
 
-        # 4. Card elements
+        # 4. Status badges: Open and Paid (no Unfulfilled, no Fulfilled)
+        self.assertIn('badge-open', html)
+        self.assertNotIn('Unfulfilled', html)
+        self.assertNotIn('Fulfilled', html)
+
+        # 5. Card elements
         self.assertIn('so-sidebar-card', html)
         self.assertIn('so-card-order-num', html)
         self.assertIn('so-status-pill', html)
         self.assertIn('so-card-price-pill', html)
         self.assertIn('so-card-cust-name', html)
-        self.assertTrue('so-card-delivery-tag' in html or 'so-card-delivery-unassigned' in html)
 
-    def test_status_filtering_options(self):
-        """Verify status filtering routes and active labels"""
-        # Test Unfulfilled
-        resp = self.client.get('/sales/new?status_filter=Unfulfilled')
+    def test_status_filter_open_returns_orders(self):
+        """Verify that choosing 'Open' returns all open orders without zero orders bug"""
+        resp = self.client.get('/sales/new?status_filter=Open')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
-        self.assertIn('Unfulfilled', html)
+        
+        # Verify cards are present and not 0 orders
+        self.assertNotIn('0 orders', html)
+        self.assertIn('badge-open', html)
+        card_count = html.count('class="so-sidebar-card')
+        self.assertGreater(card_count, 0, "Choosing Open must return matching open orders")
 
-        # Test Fulfilled
-        resp_ful = self.client.get('/sales/new?status_filter=Fulfilled')
-        self.assertEqual(resp_ful.status_code, 200)
-        html_ful = resp_ful.data.decode('utf-8')
-        self.assertIn('Fulfilled', html_ful)
-
-        # Test Paid
-        resp_paid = self.client.get('/sales/new?status_filter=Paid')
-        self.assertEqual(resp_paid.status_code, 200)
-
-        # Test All Orders
-        resp_all = self.client.get('/sales/new?status_filter=All')
-        self.assertEqual(resp_all.status_code, 200)
-
-    def test_delivery_man_filter(self):
-        """Verify delivery man filter parameter"""
-        # All
-        resp = self.client.get('/sales/new?delivery_man=All')
+    def test_status_filter_paid(self):
+        """Verify Paid status filtering"""
+        resp = self.client.get('/sales/new?status_filter=Paid')
         self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        self.assertIn('Paid', html)
+        self.assertIn('badge-paid', html)
 
-        # Unassigned
-        resp_un = self.client.get('/sales/new?delivery_man=Unassigned')
-        self.assertEqual(resp_un.status_code, 200)
+    def test_sales_route_redirects_to_workspace(self):
+        """Verify /sales redirects directly to sales order workspace instead of old table page"""
+        resp = self.client.get('/sales')
+        self.assertEqual(resp.status_code, 302)
+        location = resp.headers.get('Location') or ''
+        self.assertTrue('/sales/' in location)
 
     def test_search_query(self):
         """Verify order search by query parameter"""

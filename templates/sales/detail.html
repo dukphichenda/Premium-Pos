@@ -294,20 +294,22 @@
     font-weight: 700;
     line-height: 1.3;
 }
+.so-status-pill.badge-open,
 .so-status-pill.badge-unfulfilled {
     border: 1px solid #5DA89B;
     color: #2D7A6F;
     background: #F0FDF9;
 }
+.so-status-pill.badge-paid,
 .so-status-pill.badge-fulfilled {
     border: 1px solid #86EFAC;
     color: #166534;
     background: #DCFCE7;
 }
-.so-status-pill.badge-paid {
-    border: 1px solid #93C5FD;
-    color: #1E40AF;
-    background: #EFF6FF;
+.so-status-pill.badge-quote {
+    border: 1px solid #FCD34D;
+    color: #92400E;
+    background: #FEF3C7;
 }
 .so-status-pill.badge-cancelled {
     border: 1px solid #FCA5A5;
@@ -376,27 +378,6 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             <span>Save</span>
         </button>
-        {% if is_branch_mode and current_branch %}
-        <a href="{{ url_for('branches.branch_orders', id=current_branch.id) }}" class="inflow-tb-btn" title="View {{ current_branch.name }} sales orders">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-            <span>Orders List ({{ current_branch.code }})</span>
-        </a>
-        {% elif order.branch_id %}
-        <a href="{{ url_for('branches.branch_orders', id=order.branch_id) }}" class="inflow-tb-btn" title="View {{ order.branch_name or 'Branch' }} sales orders">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-            <span>Orders List ({{ order.branch_code or 'Branch' }})</span>
-        </a>
-        {% elif branch_scope and branch_scope != 'all' and branch_scope != 'main' and branch_scope|int != 0 %}
-        <a href="{{ url_for('branches.branch_orders', id=branch_scope|int) }}" class="inflow-tb-btn" title="View Branch sales orders">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-            <span>Orders List</span>
-        </a>
-        {% else %}
-        <a href="{{ url_for('sales_orders.list_orders', view='table', branch=branch_scope or 'main') }}" class="inflow-tb-btn" title="View sales orders">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
-            <span>Orders List</span>
-        </a>
-        {% endif %}
         <!-- inFlow Desktop Split Button: Preview (Matching F:\sale step 05 / media_1791454500050_d46c178b.png) -->
         <div class="inflow-split-btn-wrapper" id="previewSplitWrapper">
             <button type="button" class="inflow-split-btn-action" onclick="executePreviewAction()" title="Preview selected document">
@@ -509,18 +490,57 @@
 <div class="inflow-so-workspace">
     <!-- Left Panel: Sales Orders Master Sidebar (Matching UI Screenshot) -->
     <aside class="inflow-search-drawer so-master-sidebar" id="soMasterSidebar">
-        <!-- Top Toolbar: [ 🔍 ] [ Open (59) ∨ ] [ + ] -->
+        <!-- Top Toolbar: [ 📅 ] [ Open (51) ∨ ] [ + ] -->
         <div class="so-sidebar-topbar">
-            <!-- Search Toggle Button [ 🔍 ] -->
-            <button type="button" class="so-icon-btn" id="btnToggleSoSearch" onclick="toggleSoSidebarSearch()" title="Toggle Search">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                </svg>
-            </button>
+            <!-- Left: Date Filter Button with Dropdown [ 📅 ] -->
+            <div class="so-pill-dropdown-wrap" style="position: relative;">
+                <button type="button" class="so-icon-btn {% if date_filter and date_filter != 'All' %}active-date-filter{% endif %}" id="btnToggleSoDate" onclick="toggleSoDateDropdown(event)" title="Filter by Date ({{ date_filter or 'All Time' }})">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                        <line x1="16" y1="2" x2="16" y2="6"></line>
+                        <line x1="8" y1="2" x2="8" y2="6"></line>
+                        <line x1="3" y1="10" x2="21" y2="10"></line>
+                    </svg>
+                    {% if date_filter and date_filter != 'All' %}
+                    <span class="so-badge-dot" style="position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; background: #0D9488;"></span>
+                    {% endif %}
+                </button>
 
-            <!-- Center Status Pill Button [ Open (59) ∨ ] -->
-            <div class="so-pill-dropdown-wrap">
+                <!-- Date Filter Dropdown Menu -->
+                <div class="so-menu-dropdown" id="soDateDropdownMenu" style="display: none; left: 0; min-width: 155px;">
+                    <div class="so-menu-item {% if not date_filter or date_filter == 'All' %}active{% endif %}" onclick="applySoDateFilter('All')">
+                        <span>All Time</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Today' %}active{% endif %}" onclick="applySoDateFilter('Today')">
+                        <span>Today</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'This Week' %}active{% endif %}" onclick="applySoDateFilter('This Week')">
+                        <span>This Week</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'This Month' %}active{% endif %}" onclick="applySoDateFilter('This Month')">
+                        <span>This Month</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'This Quarter' %}active{% endif %}" onclick="applySoDateFilter('This Quarter')">
+                        <span>This Quarter</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'This Year' %}active{% endif %}" onclick="applySoDateFilter('This Year')">
+                        <span>This Year</span>
+                    </div>
+                    <div class="so-menu-separator"></div>
+                    <div class="so-menu-item {% if date_filter == 'Yesterday' %}active{% endif %}" onclick="applySoDateFilter('Yesterday')">
+                        <span>Yesterday</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last 7 Days' %}active{% endif %}" onclick="applySoDateFilter('Last 7 Days')">
+                        <span>Last 7 Days</span>
+                    </div>
+                    <div class="so-menu-item {% if date_filter == 'Last 30 Days' %}active{% endif %}" onclick="applySoDateFilter('Last 30 Days')">
+                        <span>Last 30 Days</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Status Pill Button [ Open (51) ∨ ] -->
+            <div class="so-pill-dropdown-wrap" style="position: relative;">
                 <button type="button" class="so-pill-btn" id="btnSoStatusPill" onclick="toggleSoStatusDropdown(event)">
                     {% set cur_st = status_filter if status_filter and status_filter != 'Open, In Progress, Paid' else 'Open' %}
                     <span id="soStatusPillLabel">{{ cur_st }}</span>
@@ -528,12 +548,10 @@
                         {% set st_key = (cur_st)|lower %}
                         {% if st_key in ('open', 'unfulfilled') %}
                             {{ status_counts.open if status_counts else sidebar_orders|length }}
+                        {% elif st_key in ('paid', 'fulfilled', 'invoiced') %}
+                            {{ status_counts.paid if status_counts else sidebar_orders|length }}
                         {% elif st_key in ('all', 'all orders') %}
                             {{ status_counts.total if status_counts else sidebar_orders|length }}
-                        {% elif st_key in ('fulfilled', 'shipped') %}
-                            {{ status_counts.fulfilled if status_counts else sidebar_orders|length }}
-                        {% elif st_key == 'paid' %}
-                            {{ status_counts.paid if status_counts else sidebar_orders|length }}
                         {% else %}
                             {{ sidebar_orders|length }}
                         {% endif %}
@@ -543,22 +561,14 @@
                     </svg>
                 </button>
 
-                <!-- Status Filter Dropdown Menu -->
-                <div class="so-menu-dropdown" id="soStatusDropdownMenu" style="display: none;">
+                <!-- Status Filter Dropdown Menu (Open, Paid, All Orders) -->
+                <div class="so-menu-dropdown" id="soStatusDropdownMenu" style="display: none; left: 50%; transform: translateX(-50%); min-width: 160px;">
                     <div class="so-menu-item {% if (status_filter or 'Open')|lower in ('open', 'unfulfilled') %}active{% endif %}" onclick="selectSoStatusFilter('Open')">
                         <span style="font-weight: 700;">Open</span>
                         <span class="so-menu-badge">{{ status_counts.open if status_counts else 0 }}</span>
                     </div>
-                    <div class="so-menu-item {% if (status_filter or '')|lower == 'unfulfilled' %}active{% endif %}" onclick="selectSoStatusFilter('Unfulfilled')">
-                        <span style="font-weight: 700;">Unfulfilled</span>
-                        <span class="so-menu-badge">{{ status_counts.open if status_counts else 0 }}</span>
-                    </div>
-                    <div class="so-menu-item {% if (status_filter or '')|lower in ('fulfilled', 'shipped') %}active{% endif %}" onclick="selectSoStatusFilter('Fulfilled')">
-                        <span>Fulfilled</span>
-                        <span class="so-menu-badge">{{ status_counts.fulfilled if status_counts else 0 }}</span>
-                    </div>
-                    <div class="so-menu-item {% if (status_filter or '')|lower == 'paid' %}active{% endif %}" onclick="selectSoStatusFilter('Paid')">
-                        <span>Paid</span>
+                    <div class="so-menu-item {% if (status_filter or '')|lower in ('paid', 'fulfilled', 'invoiced') %}active{% endif %}" onclick="selectSoStatusFilter('Paid')">
+                        <span style="font-weight: 700;">Paid</span>
                         <span class="so-menu-badge">{{ status_counts.paid if status_counts else 0 }}</span>
                     </div>
                     <div class="so-menu-separator"></div>
@@ -566,14 +576,18 @@
                         <span>All Orders</span>
                         <span class="so-menu-badge">{{ status_counts.total if status_counts else 0 }}</span>
                     </div>
+                    {% if status_counts.quote and status_counts.quote > 0 %}
                     <div class="so-menu-item {% if (status_filter or '')|lower == 'quote' %}active{% endif %}" onclick="selectSoStatusFilter('Quote')">
                         <span>Quote</span>
-                        <span class="so-menu-badge">{{ status_counts.quote if status_counts else 0 }}</span>
+                        <span class="so-menu-badge">{{ status_counts.quote }}</span>
                     </div>
+                    {% endif %}
+                    {% if status_counts.cancelled and status_counts.cancelled > 0 %}
                     <div class="so-menu-item {% if (status_filter or '')|lower == 'cancelled' %}active{% endif %}" onclick="selectSoStatusFilter('Cancelled')">
                         <span>Cancelled</span>
-                        <span class="so-menu-badge">{{ status_counts.cancelled if status_counts else 0 }}</span>
+                        <span class="so-menu-badge">{{ status_counts.cancelled }}</span>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -586,69 +600,34 @@
             </a>
         </div>
 
-        <!-- Collapsible Search Input Box (Opens on [ 🔍 ]) -->
-        <div class="so-search-box-wrap" id="soSearchBoxWrap" style="{% if search_query %}display: block;{% else %}display: none;{% endif %}">
+        <!-- Wider Search Input Box (Directly visible) -->
+        <div class="so-search-box-wrap" id="soSearchBoxWrap" style="display: block; padding: 6px 12px 4px;">
             <div style="position: relative; display: flex; align-items: center; width: 100%;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" style="position: absolute; left: 9px; pointer-events: none;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" style="position: absolute; left: 10px; pointer-events: none;">
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
                 <input type="text" id="soSidebarSearchInput" class="so-search-input" 
-                       placeholder="Search order #, customer, delivery man, $..." 
+                       placeholder="Search order #, customer, $..." 
                        value="{{ search_query or '' }}"
                        autocomplete="off" 
+                       style="height: 33px; padding-left: 31px; font-size: 12px;"
                        oninput="handleSoLiveSearch(this.value)"
                        onkeydown="handleSoSearchKey(event)">
                 <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query %}display: block;{% else %}display: none;{% endif %}">✕</button>
             </div>
         </div>
 
-        <!-- Filters Toggle Link Row -->
-        <div class="so-filter-toggle-row">
-            <button type="button" class="so-filter-btn" onclick="toggleSoAdvancedFilters()">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
-                    <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
-                    <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
-                    <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line>
-                    <line x1="17" y1="16" x2="23" y2="16"></line>
-                </svg>
-                <span>Filters</span>
-                <span id="activeSoFiltersBadge" class="so-badge-dot" style="display: {% if (date_filter and date_filter != 'All') or (active_delivery_man and active_delivery_man != 'All') or (customer_search) %}inline-block{% else %}none{% endif %};"></span>
-            </button>
+        <!-- Filter / Active Preset Indicator Sub-row -->
+        <div class="so-filter-toggle-row" style="padding: 3px 14px 6px;">
+            <div style="font-size: 11px; color: #64748B; display: flex; align-items: center; gap: 4px;">
+                <span>📅 {{ date_filter if date_filter and date_filter != 'All' else 'All Dates' }}</span>
+                {% if date_filter and date_filter != 'All' %}
+                <a href="javascript:void(0)" onclick="applySoDateFilter('All')" style="color: #EF4444; font-weight: 700; text-decoration: none;" title="Reset Date Filter">✕</a>
+                {% endif %}
+            </div>
             <div style="font-size: 11px; color: #94A3B8;">
                 <span id="soVisibleCountDisplay">{{ sidebar_orders|length }}</span> orders
-            </div>
-        </div>
-
-        <!-- Advanced Filter Controls Panel (Collapsible) -->
-        <div class="so-advanced-filters-panel" id="soAdvancedFiltersPanel" style="display: none;">
-            <div class="so-adv-filter-group">
-                <label>Date Filter:</label>
-                <select id="soDateFilterSelect" onchange="applySoDateFilter(this.value)">
-                    <option value="All" {% if not date_filter or date_filter == 'All' %}selected{% endif %}>All Time</option>
-                    <option value="Today" {% if date_filter == 'Today' %}selected{% endif %}>Today</option>
-                    <option value="This Week" {% if date_filter == 'This Week' %}selected{% endif %}>This Week</option>
-                    <option value="This Month" {% if date_filter == 'This Month' %}selected{% endif %}>This Month</option>
-                    <option value="This Quarter" {% if date_filter == 'This Quarter' %}selected{% endif %}>This Quarter</option>
-                    <option value="This Year" {% if date_filter == 'This Year' %}selected{% endif %}>This Year</option>
-                    <option value="Yesterday" {% if date_filter == 'Yesterday' %}selected{% endif %}>Yesterday</option>
-                    <option value="Last 7 Days" {% if date_filter == 'Last 7 Days' %}selected{% endif %}>Last 7 Days</option>
-                    <option value="Last 30 Days" {% if date_filter == 'Last 30 Days' %}selected{% endif %}>Last 30 Days</option>
-                </select>
-            </div>
-            <div class="so-adv-filter-group" style="margin-top: 6px;">
-                <label>Delivery Person:</label>
-                <select id="soDeliveryManFilterSelect" onchange="applySoDeliveryManFilter(this.value)">
-                    <option value="All" {% if not active_delivery_man or active_delivery_man == 'All' %}selected{% endif %}>All Delivery Persons</option>
-                    <option value="Unassigned" {% if active_delivery_man == 'Unassigned' %}selected{% endif %}>Unassigned</option>
-                    {% for dm in all_delivery_men %}
-                    <option value="{{ dm.name }}" {% if active_delivery_man == dm.name %}selected{% endif %}>{{ dm.name }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-            <div style="display: flex; justify-content: flex-end; margin-top: 8px;">
-                <button type="button" class="btn btn-secondary btn-sm" onclick="resetSoSidebarFilters()" style="font-size: 11px; padding: 2px 8px;">Reset Filters</button>
             </div>
         </div>
 
@@ -660,31 +639,36 @@
         <!-- Scrollable Order Cards List -->
         <div class="so-sidebar-list-body" id="soSidebarListBody">
             {% for s_ord in sidebar_orders %}
-            {% set badge_text = s_ord.fulfillment_badge or s_ord.status or 'Unfulfilled' %}
+            {% set badge_text = s_ord.fulfillment_badge or s_ord.status or 'Open' %}
             {% set badge_lower = badge_text|lower %}
-            {% if badge_lower in ('unfulfilled', 'open') %}
-                {% set badge_class = 'badge-unfulfilled' %}
-            {% elif badge_lower in ('fulfilled', 'fully shipped', 'shipped') %}
-                {% set badge_class = 'badge-fulfilled' %}
-            {% elif badge_lower in ('paid', 'invoiced') %}
+            {% if badge_lower in ('open', 'unfulfilled') %}
+                {% set badge_class = 'badge-open' %}
+                {% set badge_display = 'Open' %}
+            {% elif badge_lower in ('paid', 'fulfilled', 'fully shipped', 'shipped', 'invoiced') %}
                 {% set badge_class = 'badge-paid' %}
+                {% set badge_display = 'Paid' %}
             {% elif badge_lower == 'cancelled' %}
                 {% set badge_class = 'badge-cancelled' %}
+                {% set badge_display = 'Cancelled' %}
+            {% elif badge_lower == 'quote' %}
+                {% set badge_class = 'badge-quote' %}
+                {% set badge_display = 'Quote' %}
             {% else %}
-                {% set badge_class = 'badge-unfulfilled' %}
+                {% set badge_class = 'badge-open' %}
+                {% set badge_display = 'Open' %}
             {% endif %}
 
             <a href="javascript:void(0)" 
-               onclick="handleSelectOrder('{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, customer_search=customer_search, branch=branch_scope, delivery_man=active_delivery_man) }}', this)" 
+               onclick="handleSelectOrder('{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)" 
                class="so-sidebar-card {% if not is_new and s_ord.id == order.id %}active{% endif %}"
                data-order-id="{{ s_ord.id }}"
                data-search="{{ s_ord.order_number|lower }} {{ (s_ord.customer_name or '')|lower }} {{ (s_ord.delivery_man or '')|lower }} {{ '%.2f'|format(s_ord.total_amount or 0) }}"
-               data-status="{{ badge_lower }}">
+               data-status="{{ badge_display|lower }}">
                 
                 <!-- Line 1: Order # and Status Pill -->
                 <div class="so-card-row-top">
                     <span class="so-card-order-num">{{ s_ord.order_number }}</span>
-                    <span class="so-status-pill {{ badge_class }}">{{ badge_text }}</span>
+                    <span class="so-status-pill {{ badge_class }}">{{ badge_display }}</span>
                 </div>
 
                 <!-- Line 2: Minor Text (Total Sale $, Customer Name, Delivery Person) -->
@@ -5273,6 +5257,19 @@ function handleSoSearchKey(e) {
     }
 }
 
+function toggleSoDateDropdown(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const menu = document.getElementById('soDateDropdownMenu');
+    if (!menu) return;
+    const isOpen = (menu.style.display === 'block');
+    menu.style.display = isOpen ? 'none' : 'block';
+    const stMenu = document.getElementById('soStatusDropdownMenu');
+    if (stMenu) stMenu.style.display = 'none';
+}
+
 function toggleSoStatusDropdown(e) {
     if (e) {
         e.preventDefault();
@@ -5282,13 +5279,18 @@ function toggleSoStatusDropdown(e) {
     if (!menu) return;
     const isOpen = (menu.style.display === 'block');
     menu.style.display = isOpen ? 'none' : 'block';
+    const dtMenu = document.getElementById('soDateDropdownMenu');
+    if (dtMenu) dtMenu.style.display = 'none';
 }
 
 document.addEventListener('click', function(e) {
-    const wrap = document.querySelector('.so-pill-dropdown-wrap');
-    if (wrap && !wrap.contains(e.target)) {
-        const menu = document.getElementById('soStatusDropdownMenu');
-        if (menu) menu.style.display = 'none';
+    const dateMenu = document.getElementById('soDateDropdownMenu');
+    if (dateMenu && !e.target.closest('#btnToggleSoDate') && !dateMenu.contains(e.target)) {
+        dateMenu.style.display = 'none';
+    }
+    const statusMenu = document.getElementById('soStatusDropdownMenu');
+    if (statusMenu && !e.target.closest('#btnSoStatusPill') && !statusMenu.contains(e.target)) {
+        statusMenu.style.display = 'none';
     }
 });
 
@@ -5296,13 +5298,11 @@ function selectSoStatusFilter(status) {
     const url = new URL(window.location.href);
     url.searchParams.set('status_filter', status);
     url.searchParams.delete('search');
+    url.searchParams.delete('q');
+    url.searchParams.delete('customer_search');
+    url.searchParams.delete('customer_id');
+    url.searchParams.delete('delivery_man');
     window.location.href = url.toString();
-}
-
-function toggleSoAdvancedFilters() {
-    const panel = document.getElementById('soAdvancedFiltersPanel');
-    if (!panel) return;
-    panel.style.display = (panel.style.display === 'none' || !panel.style.display) ? 'block' : 'none';
 }
 
 function applySoDateFilter(val) {
@@ -5312,24 +5312,8 @@ function applySoDateFilter(val) {
     } else {
         url.searchParams.delete('date_filter');
     }
-    window.location.href = url.toString();
-}
-
-function applySoDeliveryManFilter(val) {
-    const url = new URL(window.location.href);
-    if (val && val !== 'All') {
-        url.searchParams.set('delivery_man', val);
-    } else {
-        url.searchParams.delete('delivery_man');
-    }
-    window.location.href = url.toString();
-}
-
-function resetSoSidebarFilters() {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('date_filter');
-    url.searchParams.delete('delivery_man');
     url.searchParams.delete('search');
+    url.searchParams.delete('customer_search');
     window.location.href = url.toString();
 }
 

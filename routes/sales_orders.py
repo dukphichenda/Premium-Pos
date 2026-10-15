@@ -345,37 +345,26 @@ def list_orders():
         else:
             branch_filter = 'main'  # HQ default overview: Main Store (HQ)
 
-    if view_mode != 'table' and not request.args.get('search') and not request.args.get('status') and not request.args.get('page') and raw_branch is None:
-        if not is_main:
-            if user_bid:
-                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,))
-            else:
-                latest = None
-            if latest:
-                return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
+    # Standalone table view deprecated per user instructions;
+    # redirect directly to Sales Order workspace with modern sidebar.
+    status_filter = request.args.get('status') or request.args.get('status_filter') or 'Open'
+    date_filter = request.args.get('date_filter') or 'All'
+    search = request.args.get('search') or ''
+
+    if not is_main:
+        latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,)) if user_bid else None
+    else:
+        if branch_filter == 'main':
+            latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+        elif branch_filter.isdigit():
+            latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (int(branch_filter),))
         else:
-            if branch_filter == 'main':
-                latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
-            elif branch_filter.isdigit():
-                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (int(branch_filter),))
-            else:
-                latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
-            if latest:
-                return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter))
+            latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
 
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 25))
-    offset = (page - 1) * per_page
+    if latest:
+        return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter, status_filter=status_filter, date_filter=date_filter, search=search))
+    return redirect(url_for('sales_orders.new_order', branch=branch_filter, status_filter=status_filter, date_filter=date_filter, search=search))
 
-    status = request.args.get('status', '').strip()
-    payment_status = request.args.get('payment_status', '').strip()
-    search = request.args.get('search', '').strip()
-    customer_id = request.args.get('customer_id', '').strip()
-
-    where_clauses = ["1=1"]
-    params = []
-
-    # Branch isolation: Main store orders (branch_id IS NULL) are kept strictly separate from branch orders
     if not is_main:
         if user_bid:
             where_clauses.append("so.branch_id = %s")
@@ -773,9 +762,9 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             CASE 
                 WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
                 WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
-                WHEN UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS') THEN 'Unfulfilled'
-                WHEN UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID' THEN 'Fulfilled'
-                ELSE 'Unfulfilled'
+                WHEN UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS') THEN 'Open'
+                WHEN UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID' THEN 'Paid'
+                ELSE 'Open'
             END as fulfillment_badge,
             CASE 
                 WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
@@ -827,14 +816,13 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         SELECT 
             COUNT(*) as total,
             COUNT(*) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')) as open,
-            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('SHIPPED', 'INVOICED') OR UPPER(so.payment_status) = 'PAID') as fulfilled,
-            COUNT(*) FILTER (WHERE UPPER(so.status) = 'PAID' OR UPPER(so.payment_status) = 'PAID') as paid,
+            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID') as paid,
             COUNT(*) FILTER (WHERE UPPER(so.status) = 'CANCELLED') as cancelled,
             COUNT(*) FILTER (WHERE UPPER(so.status) = 'QUOTE') as quote
         FROM sales_orders so
         WHERE {' AND '.join(branch_count_where)}
     """, tuple(branch_count_params))
-    status_counts = dict(raw_counts) if raw_counts else {'total': 0, 'open': 0, 'fulfilled': 0, 'paid': 0, 'cancelled': 0, 'quote': 0}
+    status_counts = dict(raw_counts) if raw_counts else {'total': 0, 'open': 0, 'paid': 0, 'cancelled': 0, 'quote': 0}
 
     cust_where = ["is_active = TRUE"]
     cust_params = []
@@ -1608,20 +1596,18 @@ def new_order():
         date_filter = 'All'
 
     if 'status_filter' in request.args:
-        status_filter = request.args.get('status_filter', 'Open, In Progress, Paid')
+        status_filter = request.args.get('status_filter', 'Open').strip()
         session['so_status_filter'] = status_filter
-    elif 'so_status_filter' in session:
+    elif 'so_status_filter' in session and session.get('so_status_filter'):
         status_filter = session['so_status_filter']
     else:
-        status_filter = 'Open, In Progress, Paid'
+        status_filter = 'Open'
 
-    if 'customer_search' in request.args:
+    if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()
-        session['so_customer_search'] = customer_search
-    elif 'so_customer_search' in session:
-        customer_search = session.get('so_customer_search', '')
     else:
         customer_search = ''
+        session.pop('so_customer_search', None)
 
     customer_filter = request.args.get('customer_id')
 
@@ -1756,20 +1742,18 @@ def detail_order(id):
         date_filter = 'All'
 
     if 'status_filter' in request.args:
-        status_filter = request.args.get('status_filter', 'Open, In Progress, Paid')
+        status_filter = request.args.get('status_filter', 'Open').strip()
         session['so_status_filter'] = status_filter
-    elif 'so_status_filter' in session:
+    elif 'so_status_filter' in session and session.get('so_status_filter'):
         status_filter = session['so_status_filter']
     else:
-        status_filter = 'Open, In Progress, Paid'
+        status_filter = 'Open'
 
-    if 'customer_search' in request.args:
+    if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()
-        session['so_customer_search'] = customer_search
-    elif 'so_customer_search' in session:
-        customer_search = session.get('so_customer_search', '')
     else:
         customer_search = ''
+        session.pop('so_customer_search', None)
 
     customer_filter = request.args.get('customer_id')
 
