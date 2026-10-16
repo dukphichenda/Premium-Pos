@@ -474,14 +474,15 @@
 
                             const newPath = iframe.contentWindow.location.pathname;
 
-                            // Prevent tab from ever displaying /login inside inFlow workspace
+                            // If iframe landed on /login, session has expired — break out to top-level login
                             if (newPath && newPath.startsWith('/login')) {
-                                console.warn('Tab iframe redirected to /login. Redirecting tab to /dashboard...');
-                                tab.url = '/dashboard';
-                                tab.title = 'Main Store Dashboard';
-                                tab.label = 'Main Store Dashboard';
-                                tab.type = 'home';
-                                iframe.contentWindow.location.replace('/dashboard?embed=1');
+                                console.warn('Tab iframe redirected to /login — session expired. Breaking out to login page...');
+                                try {
+                                    localStorage.removeItem(STORAGE_KEY);
+                                    localStorage.removeItem(ACTIVE_TAB_KEY);
+                                    sessionStorage.clear();
+                                } catch(e) {}
+                                window.top.location.href = '/login';
                                 return;
                             }
 

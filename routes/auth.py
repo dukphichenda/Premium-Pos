@@ -272,9 +272,26 @@ def login():
     is_switch = request.args.get('switch')
     is_embed = request.args.get('embed') == '1'
 
-    # If embedded in an iframe tab inside inFlow, NEVER show login page
+    # If embedded in an iframe tab inside inFlow, session has expired — break out to top-level login
     if is_embed and not is_switch:
-        return redirect(url_for('dashboard.index') + '?embed=1')
+        login_url = url_for('auth.login')
+        from flask import Response
+        html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+        <title>Session Expired</title>
+        <script>
+        try {{
+            localStorage.removeItem('inflow_mdi_tabs_v5');
+            localStorage.removeItem('inflow_mdi_active_tab_v5');
+            sessionStorage.clear();
+        }} catch(e) {{}}
+        if (window.top) {{
+            window.top.location.href = "{login_url}";
+        }} else {{
+            window.location.href = "{login_url}";
+        }}
+        </script>
+        </head><body><p>Session expired. <a href="{login_url}" target="_top">Sign in again</a>.</p></body></html>"""
+        return Response(html, mimetype='text/html')
 
     # If session missing, attempt to restore from persistent remember cookie
     if not session.get('user_id') and not is_switch:
