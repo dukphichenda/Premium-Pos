@@ -82,79 +82,332 @@ def list_adjustments():
             SUM(ABS(sal.diff_qty)) as total_diff_units
         FROM stock_adjustments sa
         JOIN locations l ON sa.location_id = l.id
+            l.name as location_name,
+            COUNT(sal.id) as item_count,
+            COALESCE(SUM(ABS(sal.diff_qty)), 0) as total_diff_units,
+            sa.status,
+            sa.notes,
+            sa.created_by
+        FROM stock_adjustments sa
+        JOIN locations l ON sa.location_id = l.id
         LEFT JOIN stock_adjustment_lines sal ON sa.id = sal.adjustment_id
         GROUP BY sa.id, l.name
         ORDER BY sa.adjustment_date DESC, sa.id DESC
-        LIMIT 50
+        LIMIT 100
     """)
     locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     return render_template('inventory/adjustments.html', adjustments=adjustments, locations=locations)
 
-@inventory_bp.route('/inventory/adjustments/create', methods=['POST'])
-def create_adjustment():
+def _get_next_adj_number():
     try:
-        location_id = int(request.form.get('location_id'))
-        reason = request.form.get('reason', 'Recount').strip()
-        notes = request.form.get('notes', '').strip()
-        product_id = int(request.form.get('product_id'))
-        new_qty = float(request.form.get('new_qty', 0))
+        row = query_one("SELECT MAX(SUBSTRING(adjustment_number FROM '[0-9]+')::bigint) as max_val FROM stock_adjustments WHERE adjustment_number ~ 'ADJ-[0-9]+'")
+        max_val = row['max_val'] if row and row.get('max_val') else 0
+        return f"ADJ-{max_val + 1:05d}"
+    except Exception:
+        seq = get_next_sequence_val('adj_number_seq')
+        return f"ADJ-{seq:05d}"
 
-        if new_qty < 0:
-            flash("Physical counted stock quantity cannot be negative.", "error")
-            return redirect(url_for('inventory.list_adjustments'))
+@inventory_bp.route('/inventory/adjustments/new')
+def new_adjustment():
+    """Renders modern inFlow Stock Adjustment editor matching inFlow Cloud UI."""
+    next_adj_num = _get_next_adj_number()
+    locations = query_all("SELECT id, name, is_default, is_central FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, is_central DESC, name ASC")
+    categories = query_all("""
+        SELECT c.id, c.name, COUNT(p.id) as product_count 
+        FROM categories c 
+        LEFT JOIN products p ON c.id = p.category_id AND p.is_active = TRUE AND p.is_sellable = TRUE
+        GROUP BY c.id, c.name 
+        ORDER BY c.name ASC
+    """)
+    total_active_row = query_one("SELECT COUNT(*) as count FROM products WHERE is_active = TRUE AND is_sellable = TRUE")
+    total_active_prods = total_active_row['count'] if total_active_row else 0
 
-        seq_val = get_next_sequence_val('adj_number_seq')
-        adj_number = f"ADJ-{seq_val:05d}"
+    return render_template(
+        'inventory/adjustment_form.html',
+        is_detail=False,
+        next_adj_num=next_adj_num,
+        locations=locations,
+        categories=categories,
+        total_active_prods=total_active_prods,
+        today_date=datetime.now().strftime('%b %d, %Y')
+    )
 
-        with get_db_cursor(commit=True) as cur:
-            # Lock existing inventory row
-            cur.execute("""
-                SELECT COALESCE(quantity, 0) as qty 
-                FROM inventory 
-                WHERE product_id = %s AND location_id = %s 
-                FOR UPDATE
-            """, (product_id, location_id))
-            cur_inv = cur.fetchone()
-            old_qty = float(cur_inv['qty']) if cur_inv else 0.0
-            diff_qty = new_qty - old_qty
-
-            # Product Cost
-            cur.execute("SELECT average_cost, standard_cost FROM products WHERE id = %s", (product_id,))
-            prod = cur.fetchone()
-            unit_cost = float(prod['average_cost'] or prod['standard_cost'] or 0) if prod else 0.0
-
-            cur.execute("""
-                INSERT INTO stock_adjustments (adjustment_number, location_id, reason, status, notes)
-                VALUES (%s, %s, %s, 'COMPLETED', %s)
-                RETURNING id;
-            """, (adj_number, location_id, reason, notes))
-            adj_id = cur.fetchone()['id']
-
-            cur.execute("""
-                INSERT INTO stock_adjustment_lines (adjustment_id, product_id, old_qty, new_qty, diff_qty, unit_cost)
-                VALUES (%s, %s, %s, %s, %s, %s);
-            """, (adj_id, product_id, old_qty, new_qty, diff_qty, unit_cost))
-
-            # Update inventory via upsert
-            cur.execute("""
-                INSERT INTO inventory (product_id, location_id, sublocation, quantity)
-                VALUES (%s, %s, '', %s)
-                ON CONFLICT (product_id, location_id, sublocation)
-                DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
-            """, (product_id, location_id, new_qty))
-
-            # Ledger entry
-            cur.execute("""
-                INSERT INTO inventory_logs (
-                    product_id, movement_type, reference_type, reference_id,
-                    to_location_id, quantity, qty_before, qty_after, unit_cost, reason, notes
-                ) VALUES (%s, 'ADJUSTMENT', 'ADJUST', %s, %s, %s, %s, %s, %s, %s, %s);
-            """, (product_id, adj_number, location_id, diff_qty, old_qty, new_qty, unit_cost, reason, notes))
-
-        flash(f"Stock Adjustment {adj_number} applied successfully! (Diff: {diff_qty:+g} units)", "success")
+@inventory_bp.route('/inventory/adjustments/<int:id>')
+def detail_adjustment(id):
+    """View details of a past stock adjustment in the inFlow Cloud design layout with Print support."""
+    adj = query_one("""
+        SELECT sa.*, l.name as location_name
+        FROM stock_adjustments sa
+        LEFT JOIN locations l ON sa.location_id = l.id
+        WHERE sa.id = %s
+    """, (id,))
+    if not adj:
+        flash("Stock Adjustment not found.", "error")
         return redirect(url_for('inventory.list_adjustments'))
 
+    lines = query_all("""
+        SELECT 
+            sal.*,
+            p.name as product_name,
+            p.sku as product_sku,
+            p.uom as product_uom,
+            p.image_url as product_image_url,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(inv.reserved_quantity, 0) as reserved_qty
+        FROM stock_adjustment_lines sal
+        JOIN products p ON sal.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN inventory inv ON p.id = inv.product_id AND inv.location_id = %s AND inv.sublocation = sal.sublocation
+        WHERE sal.adjustment_id = %s
+        ORDER BY sal.id ASC
+    """, (adj['location_id'], id))
+
+    locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE ORDER BY is_default DESC, name ASC")
+    categories = query_all("SELECT c.id, c.name, COUNT(p.id) as product_count FROM categories c LEFT JOIN products p ON c.id = p.category_id AND p.is_active = TRUE GROUP BY c.id, c.name ORDER BY c.name ASC")
+
+    import json
+    custom_fields = {}
+    if adj.get('custom_fields_json'):
+        try:
+            custom_fields = json.loads(adj['custom_fields_json']) if isinstance(adj['custom_fields_json'], str) else adj['custom_fields_json']
+        except Exception:
+            custom_fields = {}
+
+    return render_template(
+        'inventory/adjustment_form.html',
+        adjustment=adj,
+        lines=lines,
+        is_detail=True,
+        custom_fields=custom_fields,
+        locations=locations,
+        categories=categories
+    )
+
+@inventory_bp.route('/api/inventory/products-for-adjustment')
+def api_products_for_adjustment():
+    """
+    API returning products for stock adjustment selection:
+    Supports One-by-One query, Category batching, or All products.
+    Includes on_hand_qty, reserved_qty (from customer bills), available_qty, and cost.
+    """
+    location_id = request.args.get('location_id', type=int)
+    if not location_id:
+        def_loc = query_one("SELECT id FROM locations WHERE is_default = TRUE LIMIT 1") or query_one("SELECT id FROM locations LIMIT 1")
+        location_id = def_loc['id'] if def_loc else 100
+
+    category_id = request.args.get('category_id', type=int)
+    q = (request.args.get('q') or '').strip()
+    fetch_all = request.args.get('all', 'false').lower() in ('1', 'true', 'yes')
+
+    where_clauses = ["p.is_active = TRUE", "p.is_sellable = TRUE"]
+    params = [location_id]
+
+    if category_id:
+        where_clauses.append("p.category_id = %s")
+        params.append(category_id)
+
+    if q:
+        where_clauses.append("(p.name ILIKE %s OR p.sku ILIKE %s OR p.barcode ILIKE %s)")
+        term = f"%{q}%"
+        params.extend([term, term, term])
+
+    where_sql = " AND ".join(where_clauses)
+    limit_sql = "" if (fetch_all or category_id) else "LIMIT 60"
+
+    sql = f"""
+        SELECT 
+            p.id, p.sku, p.name, p.uom, p.image_url, p.category_id,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(i.quantity, 0) as on_hand_qty,
+            COALESCE(i.reserved_quantity, 0) as reserved_qty,
+            COALESCE(i.quantity - i.reserved_quantity, 0) as available_qty,
+            COALESCE(i.sublocation, '') as sublocation,
+            COALESCE(NULLIF(p.average_cost, 0), p.standard_cost, 0) as unit_cost
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN inventory i ON p.id = i.product_id AND i.location_id = %s
+        WHERE {where_sql}
+        ORDER BY p.name ASC
+        {limit_sql}
+    """
+    products = query_all(sql, tuple(params))
+    return jsonify({
+        'success': True,
+        'count': len(products),
+        'location_id': location_id,
+        'products': [
+            {
+                'id': p['id'],
+                'sku': p['sku'],
+                'name': p['name'],
+                'uom': p.get('uom') or 'Pcs',
+                'image_url': p.get('image_url') or '',
+                'category_id': p.get('category_id'),
+                'category_name': p.get('category_name') or 'General',
+                'on_hand_qty': float(p.get('on_hand_qty') or 0.0),
+                'reserved_qty': float(p.get('reserved_qty') or 0.0),
+                'available_qty': float(p.get('available_qty') or 0.0),
+                'sublocation': p.get('sublocation') or '',
+                'unit_cost': float(p.get('unit_cost') or 0.0)
+            } for p in products
+        ]
+    })
+
+@inventory_bp.route('/inventory/adjustments/create', methods=['POST'])
+def create_adjustment():
+    """
+    Creates stock adjustments with multi-product batching support.
+    Maintains full backward compatibility with single-product legacy calls.
+    Updates inventory and writes atomic entries to stock_adjustments, lines, and inventory_logs.
+    """
+    try:
+        import json
+        from flask import session
+
+        data = request.get_json(silent=True) if request.is_json else None
+        if not data and request.form:
+            raw_lines = request.form.get('lines_json')
+            if raw_lines:
+                try:
+                    lines_data = json.loads(raw_lines)
+                except Exception:
+                    lines_data = []
+            else:
+                pid = request.form.get('product_id')
+                if pid:
+                    lines_data = [{
+                        'product_id': int(pid),
+                        'new_qty': float(request.form.get('new_qty', 0)),
+                        'sublocation': request.form.get('sublocation', '').strip()
+                    }]
+                else:
+                    lines_data = []
+
+            data = {
+                'location_id': request.form.get('location_id'),
+                'adjustment_number': request.form.get('adjustment_number'),
+                'adjustment_date': request.form.get('adjustment_date'),
+                'reason': request.form.get('reason'),
+                'notes': request.form.get('notes'),
+                'custom_fields_json': request.form.get('custom_fields_json'),
+                'lines': lines_data
+            }
+
+        if not data:
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'No adjustment data provided'}), 400
+            flash("No adjustment data provided.", "error")
+            return redirect(url_for('inventory.list_adjustments'))
+
+        location_id = int(data.get('location_id') or 100)
+        reason = (data.get('reason') or 'Correction').strip()
+        notes = (data.get('notes') or '').strip()
+        adj_number = (data.get('adjustment_number') or '').strip()
+        if not adj_number:
+            adj_number = _get_next_adj_number()
+
+        custom_fields_json = data.get('custom_fields_json')
+        if isinstance(custom_fields_json, dict):
+            custom_fields_json = json.dumps(custom_fields_json)
+
+        lines = data.get('lines') or []
+        if not lines:
+            if request.is_json:
+                return jsonify({'success': False, 'error': 'Please add at least one product to adjust.'}), 400
+            flash("Please add at least one product to adjust.", "error")
+            return redirect(url_for('inventory.new_adjustment'))
+
+        current_username = session.get('username') or session.get('display_name') or 'admin'
+        adj_date = data.get('adjustment_date') or datetime.now().strftime('%Y-%m-%d')
+
+        with get_db_cursor(commit=True) as cur:
+            # 1. Insert stock_adjustments header
+            cur.execute("""
+                INSERT INTO stock_adjustments (
+                    adjustment_number, location_id, adjustment_date, reason, status, notes, custom_fields_json, created_by
+                )
+                VALUES (%s, %s, %s, %s, 'COMPLETED', %s, %s, %s)
+                RETURNING id;
+            """, (adj_number, location_id, adj_date, reason, notes, custom_fields_json, current_username))
+            adj_id = cur.fetchone()['id']
+
+            total_diff_count = 0
+            for item in lines:
+                product_id = int(item['product_id'])
+                subloc = (item.get('sublocation') or '').strip()
+
+                # Lock existing inventory row
+                cur.execute("""
+                    SELECT COALESCE(quantity, 0) as qty 
+                    FROM inventory 
+                    WHERE product_id = %s AND location_id = %s AND sublocation = %s
+                    FOR UPDATE
+                """, (product_id, location_id, subloc))
+                cur_inv = cur.fetchone()
+                old_qty = float(cur_inv['qty']) if cur_inv else 0.0
+
+                # Determine change / new_qty
+                if 'change_qty' in item and item['change_qty'] is not None and str(item['change_qty']).strip() != '':
+                    change = float(item['change_qty'])
+                    new_qty = old_qty + change
+                    diff_qty = change
+                elif 'new_qty' in item and item['new_qty'] is not None:
+                    new_qty = float(item['new_qty'])
+                    diff_qty = new_qty - old_qty
+                elif 'final_qty' in item and item['final_qty'] is not None:
+                    new_qty = float(item['final_qty'])
+                    diff_qty = new_qty - old_qty
+                else:
+                    continue
+
+                if new_qty < 0 and abs(diff_qty) < 0.0001:
+                    continue
+
+                # Product cost
+                cur.execute("SELECT average_cost, standard_cost FROM products WHERE id = %s", (product_id,))
+                prod = cur.fetchone()
+                unit_cost = float(prod['average_cost'] or prod['standard_cost'] or 0) if prod else 0.0
+
+                # 2. Insert line
+                cur.execute("""
+                    INSERT INTO stock_adjustment_lines (
+                        adjustment_id, product_id, old_qty, new_qty, diff_qty, unit_cost, sublocation
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s);
+                """, (adj_id, product_id, old_qty, new_qty, diff_qty, unit_cost, subloc))
+
+                # 3. Update inventory
+                cur.execute("""
+                    INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (product_id, location_id, sublocation)
+                    DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                """, (product_id, location_id, subloc, new_qty))
+
+                # 4. Inventory log ledger
+                cur.execute("""
+                    INSERT INTO inventory_logs (
+                        product_id, movement_type, reference_type, reference_id,
+                        to_location_id, quantity, qty_before, qty_after, unit_cost, reason, notes
+                    ) VALUES (%s, 'ADJUSTMENT', 'ADJUST', %s, %s, %s, %s, %s, %s, %s, %s);
+                """, (product_id, adj_number, location_id, diff_qty, old_qty, new_qty, unit_cost, reason, notes))
+
+                total_diff_count += 1
+
+        if request.is_json:
+            return jsonify({
+                'success': True,
+                'message': f"Stock Adjustment {adj_number} applied successfully! ({total_diff_count} item(s) adjusted)",
+                'adjustment_id': adj_id,
+                'adjustment_number': adj_number,
+                'redirect_url': url_for('inventory.detail_adjustment', id=adj_id)
+            })
+
+        flash(f"Stock Adjustment {adj_number} applied successfully! ({total_diff_count} item(s) adjusted)", "success")
+        return redirect(url_for('inventory.detail_adjustment', id=adj_id))
+
     except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'error': str(e)}), 500
         flash(f"Error executing stock adjustment: {e}", "error")
         return redirect(url_for('inventory.list_adjustments'))
 

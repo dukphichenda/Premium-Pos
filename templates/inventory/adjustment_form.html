@@ -1,0 +1,1810 @@
+{% extends 'base.html' %}
+
+{% block title %}
+{{ adjustment.adjustment_number if is_detail else 'New Stock Adjustment' }} - inFlow Premium
+{% endblock %}
+
+{% block content %}
+<div class="inflow-adj-wrapper no-print">
+    <!-- 1. Top Action Toolbar (Matching inFlow Cloud screenshot) -->
+    <div class="inflow-adj-top-bar">
+        <div class="inflow-adj-top-left">
+            <a href="{{ url_for('inventory.list_adjustments') }}" class="inflow-adj-close-btn" title="Back to Adjustments (បិទ / ត្រឡប់ក្រោយ)">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </a>
+            {% if is_detail %}
+            <span class="badge badge-success" style="font-size: 11.5px; padding: 4px 10px; font-weight: 700; letter-spacing: 0.04em;">
+                ✓ COMPLETED
+            </span>
+            {% endif %}
+        </div>
+        <div class="inflow-adj-top-right">
+            <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="copyAdjustmentData()" title="Copy adjustment data to clipboard">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                <span>Copy</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="printAdjustmentSheet()" title="Print adjustment voucher / count sheet">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                <span>Print</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary inflow-adj-tool-btn" onclick="shareAdjustmentEmail()" title="Email or share summary">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                <span>Email</span>
+            </button>
+            {% if not is_detail %}
+            <button type="button" id="topBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
+                <span>Adjust stock</span>
+            </button>
+            {% else %}
+            <a href="{{ url_for('inventory.new_adjustment') }}" class="btn btn-primary btn-adjust-stock" style="text-decoration: none;">
+                <span>+ New Adjustment</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2. Main Adjustment Document Container (White Card) -->
+    <div class="inflow-adj-card">
+        <!-- Document Header Area -->
+        <div class="inflow-adj-doc-header">
+            <!-- Left: Adjustment Number -->
+            <div class="inflow-adj-title-col">
+                <div class="inflow-adj-doc-title">Stock Adjustment Number</div>
+                <div class="inflow-adj-number-row">
+                    {% if not is_detail %}
+                    <input type="text" id="adjNumberInput" value="{{ next_adj_num }}" class="inflow-adj-number-input" placeholder="ADJ-00001" title="Document Number (Auto-sequenced or Custom)">
+                    {% else %}
+                    <div class="inflow-adj-number-text">{{ adjustment.adjustment_number }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Right: Location, Date & Custom Fields -->
+            <div class="inflow-adj-meta-col">
+                <!-- Location Selector with Pin & Down Caret -->
+                <div class="inflow-adj-loc-badge">
+                    <span class="inflow-adj-loc-pin">📍</span>
+                    {% if not is_detail %}
+                    <select id="adjLocationSelect" class="inflow-adj-loc-select" onchange="onAdjustmentLocationChanged()">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if loc.is_default %}selected{% endif %}>{{ loc.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <span class="inflow-adj-loc-caret">⌵</span>
+                    {% else %}
+                    <span class="inflow-adj-loc-static">{{ adjustment.location_name }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- Date -->
+                <div class="inflow-adj-date-picker">
+                    <span class="inflow-adj-date-icon">📅</span>
+                    {% if not is_detail %}
+                    <input type="date" id="adjDateInput" value="{{ current_time.strftime('%Y-%m-%d') }}" class="inflow-adj-date-input">
+                    {% else %}
+                    <span class="inflow-adj-date-text">{{ adjustment.adjustment_date | format_date if adjustment.adjustment_date else today_date }}</span>
+                    {% endif %}
+                </div>
+
+                <!-- + Add Custom Fields Toggle -->
+                {% if not is_detail %}
+                <button type="button" class="inflow-adj-link-btn" onclick="toggleCustomFields()">
+                    <span id="customFieldsToggleIcon">+</span>
+                    <span>Add custom fields</span>
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Collapsible Custom Fields (Auditor / Tag / Reference) -->
+        <div id="adjCustomFieldsRow" style="display: {% if is_detail and (adjustment.created_by or custom_fields) %}flex{% else %}none{% endif %};" class="inflow-adj-custom-fields-panel">
+            <div class="inflow-adj-cf-item">
+                <label>Auditor / Counted By:</label>
+                {% if not is_detail %}
+                <input type="text" id="adjAuditorInput" class="form-input form-input-sm" placeholder="e.g. Sokha Chem" value="{{ current_user.display_name if current_user else '' }}">
+                {% else %}
+                <span class="cf-val">{{ adjustment.created_by or '-' }}</span>
+                {% endif %}
+            </div>
+            <div class="inflow-adj-cf-item">
+                <label>Reference SO/PO #:</label>
+                {% if not is_detail %}
+                <input type="text" id="adjRefDocInput" class="form-input form-input-sm" placeholder="e.g. SO-022829 / PO-0012">
+                {% else %}
+                <span class="cf-val">{{ custom_fields.reference_doc or '-' }}</span>
+                {% endif %}
+            </div>
+            <div class="inflow-adj-cf-item">
+                <label>Audit Department / Tag:</label>
+                {% if not is_detail %}
+                <input type="text" id="adjTagInput" class="form-input form-input-sm" placeholder="e.g. Packaging Warehouse Q3">
+                {% else %}
+                <span class="cf-val">{{ custom_fields.tag or '-' }}</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Reason & Remarks Section (Matching Red Box in Screenshot) -->
+        <div class="inflow-adj-reasons-container">
+            <div class="inflow-adj-reason-block">
+                <div class="inflow-adj-section-label">
+                    <span style="font-size: 15px;">📝</span>
+                    <span>Reason</span>
+                </div>
+                <div class="inflow-adj-reason-input-wrap">
+                    {% if not is_detail %}
+                    <input type="text" id="adjReasonInput" class="inflow-adj-reason-input" value="Correction" placeholder="Select or type reason..." autocomplete="off" onfocus="openReasonDropdown()" onclick="openReasonDropdown()">
+                    <span class="inflow-adj-reason-dropdown-arrow" onclick="toggleReasonDropdown()">⌵</span>
+                    
+                    <!-- Reason Dropdown Menu matching user screenshot -->
+                    <div id="adjReasonDropdownMenu" class="inflow-adj-reason-menu">
+                        <div class="reason-option" onclick="selectReason('Correction')">Correction</div>
+                        <div class="reason-option" onclick="selectReason('Integration import')">Integration import</div>
+                        <div class="reason-option" onclick="selectReason('Internal usage')">Internal usage</div>
+                        <div class="reason-option" onclick="selectReason('Write-Off')">Write-Off</div>
+                        <div class="reason-option" onclick="selectReason('Physical Recount / Cycle Count')">Physical Recount / Cycle Count</div>
+                        <div class="reason-option" onclick="selectReason('Damaged / Broken Goods')">Damaged / Broken Goods</div>
+                        <div class="reason-option" onclick="selectReason('Loss / Shrinkage / Theft')">Loss / Shrinkage / Theft</div>
+                        <div class="reason-option create-custom-option" onclick="createCustomReason()">+ Create custom reason...</div>
+                    </div>
+                    {% else %}
+                    <div class="inflow-adj-reason-static">{{ adjustment.reason or 'Correction' }}</div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Remarks Block -->
+            <div class="inflow-adj-remarks-block">
+                <div class="inflow-adj-section-label">Remarks</div>
+                {% if not is_detail %}
+                <div id="adjRemarksBtnWrap" style="display: block;">
+                    <button type="button" class="inflow-adj-link-btn" onclick="openRemarksInput()">
+                        <span>+ Add remarks</span>
+                    </button>
+                </div>
+                <div id="adjRemarksInputWrap" style="display: none; width: 100%;">
+                    <textarea id="adjRemarksTextarea" class="inflow-adj-remarks-textarea" placeholder="Enter justification, notes, or explanations..."></textarea>
+                </div>
+                {% else %}
+                <div class="inflow-adj-remarks-static">{{ adjustment.notes or 'No remarks recorded.' }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="inflow-adj-divider"></div>
+
+        <!-- 3. Product Selection Options (Requested by User) -->
+        <!-- User Request: "add option choose adjuct for seleted product by adding one by one or by category or all product." -->
+        {% if not is_detail %}
+        <div class="inflow-adj-selection-toolbar">
+            <!-- Mode 1: Add One by One -->
+            <div class="inflow-adj-mode-search">
+                <div class="inflow-search-box-wrap">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="adjProductLiveSearch" class="inflow-search-input" placeholder="Add one by one (Type product name, SKU, or barcode)..." autocomplete="off" oninput="onLiveProductSearchInput(this.value)">
+                    <span id="searchLoadingSpinner" class="search-spinner" style="display: none;">⏳</span>
+                </div>
+                <!-- Live Search Results Dropdown -->
+                <div id="adjLiveSearchResults" class="inflow-live-search-dropdown" style="display: none;"></div>
+            </div>
+
+            <!-- Mode 2: Add by Category -->
+            <div class="inflow-adj-mode-category">
+                <select id="adjCategorySelect" class="form-select form-select-sm" style="max-width: 220px; font-size: 13px;">
+                    <option value="">-- Choose Category --</option>
+                    {% for c in categories %}
+                    <option value="{{ c.id }}">{{ c.name }} ({{ c.product_count }})</option>
+                    {% endfor %}
+                </select>
+                <button type="button" class="btn btn-sm btn-secondary" onclick="addProductsByCategory()" title="Add all products belonging to the selected category">
+                    <span>📁 Add by Category</span>
+                </button>
+            </div>
+
+            <!-- Mode 3: Add All Products -->
+            <div class="inflow-adj-mode-all">
+                <button type="button" class="btn btn-sm btn-secondary" onclick="addAllCatalogProducts()" title="Populate all active catalog products into this stock adjustment sheet">
+                    <span>📦 Add All Products ({{ total_active_prods }})</span>
+                </button>
+            </div>
+
+            <!-- Utility Tools -->
+            <div class="inflow-adj-mode-tools">
+                <input type="text" id="tableFilterInput" class="form-input form-input-sm" placeholder="Filter loaded items..." style="width: 150px; font-size: 12px;" oninput="filterTableRows(this.value)">
+                <button type="button" class="btn btn-sm btn-ghost" onclick="clearUnadjustedItems()" title="Remove rows where Change is zero">
+                    <span>Clean 0s</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-ghost" style="color: #EF4444;" onclick="clearAllAdjustmentRows()" title="Remove all items from table">
+                    <span>Clear All</span>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 4. Stock Adjustment Product Grid Table (Matching user screenshot + Qty on Hand & Qty Reserved columns) -->
+        <div class="inflow-adj-table-container">
+            <table class="inflow-adj-table" id="adjProductTable">
+                <thead>
+                    <tr>
+                        <th style="width: 28%;">Product</th>
+                        <th style="width: 14%;">Sublocation</th>
+                        <th style="width: 11%; text-align: right;" title="Physical quantity currently in warehouse on hand">Qty on Hand</th>
+                        <th style="width: 11%; text-align: right;" title="Quantity reserved on active customer bills / sales orders">Qty Reserved</th>
+                        <th style="width: 10%; text-align: center;" title="Baseline count before adjustment">Initial</th>
+                        <th style="width: 13%; text-align: center;" title="Adjustment delta (+ or -)">Change</th>
+                        <th style="width: 10%; text-align: center;" title="Calculated resulting quantity after adjustment">Final</th>
+                        {% if not is_detail %}
+                        <th style="width: 3%; text-align: center;"></th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody id="adjProductTableBody">
+                    {% if is_detail %}
+                        {% for line in lines %}
+                        <tr class="inflow-adj-row" data-product-id="{{ line.product_id }}">
+                            <!-- Product thumbnail, name and SKU -->
+                            <td>
+                                <div class="inflow-adj-prod-cell">
+                                    <div class="inflow-adj-prod-thumb">
+                                        {% if line.product_image_url %}
+                                        <img src="{{ line.product_image_url }}" alt="{{ line.product_sku }}">
+                                        {% else %}
+                                        <div class="inflow-thumb-placeholder">📦</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="inflow-adj-prod-info">
+                                        <div class="inflow-adj-prod-name font-khmer">{{ line.product_name }}</div>
+                                        <div class="inflow-adj-prod-sku">{{ line.product_sku }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <!-- Sublocation -->
+                            <td>
+                                <span class="inflow-adj-subloc-static">{{ line.sublocation or '-' }}</span>
+                            </td>
+                            <!-- Qty on Hand -->
+                            <td style="text-align: right; font-weight: 700; color: #0F172A;">
+                                {{ "{:,.0f}".format(line.old_qty) }}
+                            </td>
+                            <!-- Qty Reserved (from bills) -->
+                            <td style="text-align: right;">
+                                <span class="badge badge-neutral" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">
+                                    {{ "{:,.0f}".format(line.reserved_qty) }}
+                                </span>
+                            </td>
+                            <!-- Initial -->
+                            <td style="text-align: center;">
+                                <div class="inflow-adj-pill pill-initial">{{ "{:,.0f}".format(line.old_qty) }}</div>
+                            </td>
+                            <!-- Change -->
+                            <td style="text-align: center;">
+                                <div class="inflow-adj-pill {% if line.diff_qty < 0 %}pill-change-neg{% elif line.diff_qty > 0 %}pill-change-pos{% else %}pill-change-zero{% endif %}">
+                                    {{ "{:+,.0f}".format(line.diff_qty) }}
+                                </div>
+                            </td>
+                            <!-- Final -->
+                            <td style="text-align: center;">
+                                <div class="inflow-adj-pill pill-final">{{ "{:,.0f}".format(line.new_qty) }}</div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <!-- Rows dynamically populated via JavaScript -->
+                    {% endif %}
+                </tbody>
+            </table>
+
+            <!-- Empty State Placeholder -->
+            <div id="adjEmptyState" class="inflow-adj-empty-state" style="display: {% if is_detail and lines %}none{% elif not is_detail %}block{% else %}none{% endif %};">
+                <div class="empty-icon">📦</div>
+                <div class="empty-title">No products selected for adjustment</div>
+                <div class="empty-subtitle">Use the options above to add products <strong>one by one</strong>, by <strong>category</strong>, or add <strong>all products</strong>.</div>
+            </div>
+        </div>
+
+        <!-- 5. Bottom Action Bar (Matching user screenshot) -->
+        <div class="inflow-adj-bottom-bar">
+            <!-- Center Buttons: - Remove Stock and + Add Stock -->
+            <div class="inflow-adj-bottom-center">
+                <button type="button" id="btnModeRemoveStock" class="inflow-adj-outline-btn" onclick="applyBatchStockMode('remove')" title="Toggle mode to deduct stock or subtract 1 from selected items">
+                    <span style="font-size: 16px; font-weight: 800;">−</span>
+                    <span>Remove stock</span>
+                </button>
+                <button type="button" id="btnModeAddStock" class="inflow-adj-outline-btn" onclick="applyBatchStockMode('add')" title="Toggle mode to add stock or increment 1 to selected items">
+                    <span style="font-size: 16px; font-weight: 800;">+</span>
+                    <span>Add stock</span>
+                </button>
+            </div>
+
+            <!-- Right: Adjust Stock Primary Action -->
+            <div class="inflow-adj-bottom-right">
+                {% if not is_detail %}
+                <button type="button" id="bottomBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
+                    <span>Adjust stock</span>
+                </button>
+                {% else %}
+                <a href="{{ url_for('inventory.list_adjustments') }}" class="btn btn-secondary" style="border-radius: 8px; padding: 10px 22px; font-weight: 700; text-decoration: none;">
+                    ← Back to List
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================================================
+     PRINTABLE STOCK ADJUSTMENT VOUCHER (Shown only on Print)
+     ========================================================================== -->
+<div class="inflow-print-voucher only-print">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0F172A; padding-bottom: 12px; margin-bottom: 16px;">
+        <div>
+            <h1 style="font-size: 22px; font-weight: 800; color: #0F172A; margin: 0; text-transform: uppercase;">Stock Adjustment Voucher</h1>
+            <div style="font-size: 13px; color: #475569; margin-top: 3px;">inFlow Premium Inventory Control & Physical Audit</div>
+        </div>
+        <div style="text-align: right;">
+            <div style="font-size: 18px; font-weight: 800; font-family: monospace; color: #0F766E;" id="printAdjNumber">{{ adjustment.adjustment_number if is_detail else '' }}</div>
+            <div style="font-size: 12px; color: #64748B;" id="printAdjDate">{{ adjustment.adjustment_date | format_date if is_detail and adjustment.adjustment_date else '' }}</div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 18px; font-size: 12.5px;">
+        <div><strong>Warehouse:</strong> <span id="printWarehouseName">{{ adjustment.location_name if is_detail else '' }}</span></div>
+        <div><strong>Reason:</strong> <span id="printReasonText">{{ adjustment.reason if is_detail else '' }}</span></div>
+        <div><strong>Auditor:</strong> <span id="printAuditorName">{{ adjustment.created_by if is_detail else '' }}</span></div>
+    </div>
+
+    <table style="width: 100%; border-collapse: collapse; font-size: 11.5px; margin-bottom: 24px;">
+        <thead>
+            <tr style="background: #F1F5F9; border-bottom: 1.5px solid #CBD5E1;">
+                <th style="padding: 8px; text-align: left;">Product / Description</th>
+                <th style="padding: 8px; text-align: left;">SKU</th>
+                <th style="padding: 8px; text-align: left;">Subloc</th>
+                <th style="padding: 8px; text-align: right;">On Hand</th>
+                <th style="padding: 8px; text-align: right;">Reserved</th>
+                <th style="padding: 8px; text-align: right;">Initial</th>
+                <th style="padding: 8px; text-align: right;">Change</th>
+                <th style="padding: 8px; text-align: right;">Final</th>
+            </tr>
+        </thead>
+        <tbody id="printTableBody">
+            {% if is_detail %}
+            {% for line in lines %}
+            <tr style="border-bottom: 1px solid #E2E8F0;">
+                <td style="padding: 6px 8px; font-weight: 600;">{{ line.product_name }}</td>
+                <td style="padding: 6px 8px; font-family: monospace;">{{ line.product_sku }}</td>
+                <td style="padding: 6px 8px;">{{ line.sublocation or '-' }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.old_qty) }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.reserved_qty) }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.old_qty) }}</td>
+                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:+,.0f}".format(line.diff_qty) }}</td>
+                <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:,.0f}".format(line.new_qty) }}</td>
+            </tr>
+            {% endfor %}
+            {% endif %}
+        </tbody>
+    </table>
+
+    <div style="display: flex; justify-content: space-between; margin-top: 50px; font-size: 12px; padding: 0 30px;">
+        <div style="text-align: center; border-top: 1px solid #94A3B8; width: 180px; padding-top: 6px;">
+            Auditor Signature
+        </div>
+        <div style="text-align: center; border-top: 1px solid #94A3B8; width: 180px; padding-top: 6px;">
+            Warehouse Manager
+        </div>
+        <div style="text-align: center; border-top: 1px solid #94A3B8; width: 180px; padding-top: 6px;">
+            Approved by HQ
+        </div>
+    </div>
+</div>
+
+<style>
+/* ==========================================================================
+   Modern inFlow Cloud Stock Adjustment Styling
+   Matches exact layout from user screenshot
+   ========================================================================== */
+.inflow-adj-wrapper {
+    max-width: 1220px;
+    margin: 0 auto;
+    padding: 18px 24px 60px 24px;
+    font-family: inherit;
+}
+
+.inflow-adj-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.inflow-adj-top-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.inflow-adj-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    text-decoration: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    transition: all 0.15s ease;
+}
+.inflow-adj-close-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+    transform: scale(1.05);
+}
+
+.inflow-adj-top-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inflow-adj-tool-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 7px 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.inflow-adj-tool-btn:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+}
+
+.btn-adjust-stock {
+    background: #F59E0B !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding: 8px 22px !important;
+    font-size: 13.5px !important;
+    box-shadow: 0 2px 6px rgba(245, 158, 11, 0.35) !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-adjust-stock:hover {
+    background: #D97706 !important;
+    transform: translateY(-1px);
+}
+
+/* Card Body */
+.inflow-adj-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 26px 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.04);
+}
+
+/* Document Header Area */
+.inflow-adj-doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.inflow-adj-doc-title {
+    font-size: 1.45rem;
+    font-weight: 700;
+    color: #334155;
+    letter-spacing: -0.01em;
+    margin-bottom: 6px;
+}
+
+.inflow-adj-number-input {
+    font-family: monospace;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0F172A;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 4px 10px;
+    width: 170px;
+}
+.inflow-adj-number-input:focus {
+    outline: none;
+    border-color: #F59E0B;
+    background: #FFFFFF;
+}
+.inflow-adj-number-text {
+    font-family: monospace;
+    font-size: 1.25rem;
+    font-weight: 800;
+    color: #0F766E;
+}
+
+.inflow-adj-meta-col {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.inflow-adj-loc-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFFFFF;
+    position: relative;
+}
+.inflow-adj-loc-pin {
+    font-size: 16px;
+}
+.inflow-adj-loc-select {
+    appearance: none;
+    border: none;
+    background: transparent;
+    font-size: 14.5px;
+    font-weight: 700;
+    color: #1E293B;
+    cursor: pointer;
+    padding-right: 18px;
+}
+.inflow-adj-loc-select:focus {
+    outline: none;
+    color: #0284C7;
+}
+.inflow-adj-loc-caret {
+    position: absolute;
+    right: 0;
+    font-size: 12px;
+    color: #64748B;
+    pointer-events: none;
+}
+.inflow-adj-loc-static {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1E293B;
+}
+
+.inflow-adj-date-picker {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13.5px;
+    color: #475569;
+}
+.inflow-adj-date-input {
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 13px;
+    color: #1E293B;
+}
+.inflow-adj-date-text {
+    font-weight: 600;
+    color: #334155;
+}
+
+.inflow-adj-link-btn {
+    background: none;
+    border: none;
+    color: #0284C7;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 2px 4px;
+}
+.inflow-adj-link-btn:hover {
+    text-decoration: underline;
+}
+
+/* Custom Fields Panel */
+.inflow-adj-custom-fields-panel {
+    margin-top: 14px;
+    padding: 12px 16px;
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 8px;
+    display: flex;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+.inflow-adj-cf-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.inflow-adj-cf-item label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+}
+.inflow-adj-cf-item .cf-val {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1E293B;
+}
+
+/* Reason & Remarks Section */
+.inflow-adj-reasons-container {
+    display: flex;
+    gap: 40px;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+.inflow-adj-reason-block {
+    flex: 1;
+    min-width: 260px;
+    max-width: 380px;
+    position: relative;
+}
+.inflow-adj-section-label {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.inflow-adj-reason-input-wrap {
+    position: relative;
+}
+.inflow-adj-reason-input {
+    width: 100%;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 8px 30px 8px 12px;
+    font-size: 13.5px;
+    color: #0F172A;
+    background: #FFFFFF;
+}
+.inflow-adj-reason-input:focus {
+    outline: none;
+    border-color: #F59E0B;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+.inflow-adj-reason-dropdown-arrow {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: #94A3B8;
+    cursor: pointer;
+}
+.inflow-adj-reason-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    z-index: 1000;
+    display: none;
+    max-height: 220px;
+    overflow-y: auto;
+}
+.inflow-adj-reason-menu .reason-option {
+    padding: 8px 14px;
+    font-size: 13px;
+    color: #1E293B;
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+.inflow-adj-reason-menu .reason-option:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+.inflow-adj-reason-menu .create-custom-option {
+    color: #0284C7;
+    font-weight: 600;
+    border-top: 1px solid #E2E8F0;
+}
+.inflow-adj-reason-static {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0F766E;
+    background: #F0FDFA;
+    padding: 6px 12px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+/* Remarks Block */
+.inflow-adj-remarks-block {
+    flex: 1.5;
+    min-width: 280px;
+}
+.inflow-adj-remarks-textarea {
+    width: 100%;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #0F172A;
+    min-height: 60px;
+    resize: vertical;
+}
+.inflow-adj-remarks-textarea:focus {
+    outline: none;
+    border-color: #F59E0B;
+}
+.inflow-adj-remarks-static {
+    font-size: 13px;
+    color: #475569;
+    background: #F8FAFC;
+    padding: 8px 12px;
+    border-radius: 6px;
+}
+
+.inflow-adj-divider {
+    height: 1px;
+    background: #E2E8F0;
+    margin: 22px 0;
+}
+
+/* Product Selection Toolbar */
+.inflow-adj-selection-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 10px 14px;
+}
+
+.inflow-adj-mode-search {
+    flex: 1.8;
+    min-width: 260px;
+    position: relative;
+}
+.inflow-search-box-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+.inflow-search-box-wrap .search-icon {
+    position: absolute;
+    left: 10px;
+    font-size: 14px;
+    color: #94A3B8;
+}
+.inflow-search-input {
+    width: 100%;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 7px 10px 7px 32px;
+    font-size: 13px;
+    background: #FFFFFF;
+}
+.inflow-search-input:focus {
+    outline: none;
+    border-color: #F59E0B;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+}
+.inflow-live-search-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    z-index: 1000;
+    max-height: 280px;
+    overflow-y: auto;
+}
+.live-search-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #F1F5F9;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.live-search-item:hover {
+    background: #FEF3C7;
+}
+
+.inflow-adj-mode-category {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.inflow-adj-mode-all {
+    display: flex;
+    align-items: center;
+}
+.inflow-adj-mode-tools {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* Table Grid */
+.inflow-adj-table-container {
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+.inflow-adj-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.inflow-adj-table thead {
+    background: #FAFAFA;
+    border-bottom: 1px solid #E2E8F0;
+}
+.inflow-adj-table th {
+    padding: 12px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: capitalize;
+}
+.inflow-adj-table tbody tr {
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.12s ease;
+}
+.inflow-adj-table tbody tr:hover {
+    background: #FCFDFE;
+}
+.inflow-adj-table td {
+    padding: 10px 14px;
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+/* Product Info Cell */
+.inflow-adj-prod-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.inflow-adj-prod-thumb {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #F1F5F9;
+    border: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.inflow-adj-prod-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.inflow-thumb-placeholder {
+    font-size: 18px;
+}
+.inflow-adj-prod-info {
+    display: flex;
+    flex-direction: column;
+}
+.inflow-adj-prod-name {
+    font-weight: 700;
+    color: #0F172A;
+    font-size: 13.5px;
+    line-height: 1.25;
+}
+.inflow-adj-prod-sku {
+    font-size: 11px;
+    color: #64748B;
+    font-family: monospace;
+    letter-spacing: 0.04em;
+    margin-top: 2px;
+}
+
+/* Sublocation Input */
+.inflow-adj-subloc-input {
+    border: 1px solid transparent;
+    background: transparent;
+    border-radius: 4px;
+    padding: 4px 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #334155;
+    width: 90px;
+    transition: all 0.15s ease;
+}
+.inflow-adj-subloc-input:hover,
+.inflow-adj-subloc-input:focus {
+    border-color: #CBD5E1;
+    background: #FFFFFF;
+    outline: none;
+}
+
+/* Quantitative Pill Boxes Matching Screenshot */
+.inflow-adj-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 54px;
+    height: 32px;
+    padding: 0 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Initial Pill: Soft Gray #F1F5F9 */
+.pill-initial {
+    background: #F1F5F9;
+    color: #1E293B;
+}
+
+/* Change Pill Input */
+.inflow-adj-change-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+.inflow-adj-change-input {
+    min-width: 68px;
+    width: 72px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-align: center;
+    transition: all 0.15s ease;
+    outline: none;
+}
+
+/* Change Negative: Soft Red #FEE2E2 with #DC2626 */
+.pill-change-neg {
+    background-color: #FEE2E2 !important;
+    color: #DC2626 !important;
+}
+
+/* Change Positive: Soft Green #DCFCE7 with #16A34A */
+.pill-change-pos {
+    background-color: #DCFCE7 !important;
+    color: #16A34A !important;
+}
+
+/* Change Zero: Neutral #F8FAFC with #94A3B8 */
+.pill-change-zero {
+    background-color: #F8FAFC !important;
+    color: #94A3B8 !important;
+}
+
+/* Final Pill Input: Soft Amber/Tan #FEF3C7 with #92400E */
+.inflow-adj-final-input {
+    min-width: 68px;
+    width: 72px;
+    height: 32px;
+    border-radius: 6px;
+    border: none;
+    background-color: #FEF3C7 !important;
+    color: #92400E !important;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    transition: all 0.15s ease;
+}
+.inflow-adj-final-input:focus {
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.4);
+}
+.pill-final {
+    background: #FEF3C7;
+    color: #92400E;
+}
+
+/* Row Delete Button */
+.inflow-adj-row-del-btn {
+    background: none;
+    border: none;
+    color: #CBD5E1;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+}
+.inflow-adj-row-del-btn:hover {
+    color: #EF4444;
+    background: #FEE2E2;
+}
+
+/* Empty State */
+.inflow-adj-empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: #64748B;
+}
+.inflow-adj-empty-state .empty-icon {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
+.inflow-adj-empty-state .empty-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1E293B;
+    margin-bottom: 4px;
+}
+.inflow-adj-empty-state .empty-subtitle {
+    font-size: 12.5px;
+    color: #94A3B8;
+}
+
+/* Bottom Bar */
+.inflow-adj-bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-top: 10px;
+}
+.inflow-adj-bottom-center {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 0 auto;
+}
+.inflow-adj-outline-btn {
+    border: 1.5px solid #273A5E;
+    color: #1E293B;
+    background: #FFFFFF;
+    border-radius: 8px;
+    padding: 9px 24px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+.inflow-adj-outline-btn:hover {
+    background: #F8FAFC;
+    border-color: #0F172A;
+    transform: translateY(-1px);
+}
+.inflow-adj-outline-btn.active-mode {
+    background: #273A5E;
+    color: #FFFFFF;
+    box-shadow: 0 2px 6px rgba(39, 58, 94, 0.3);
+}
+
+/* Print Specific Styles */
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .inflow-print-voucher, .inflow-print-voucher * {
+        visibility: visible;
+    }
+    .inflow-print-voucher {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        display: block !important;
+    }
+    .no-print {
+        display: none !important;
+    }
+}
+@media screen {
+    .only-print {
+        display: none !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// State Management for Stock Adjustment
+const IS_DETAIL_VIEW = {{ 'true' if is_detail else 'false' }};
+let loadedProductsMap = new Map(); // id -> product object
+let stockMode = 'default'; // 'add' | 'remove' | 'default'
+
+document.addEventListener('DOMContentLoaded', () => {
+    // If detail view, table is already rendered server-side
+    if (IS_DETAIL_VIEW) return;
+
+    // Load initial products if location preselected
+    const locSelect = document.getElementById('adjLocationSelect');
+    if (locSelect) {
+        // Close reason menu on outside click
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('adjReasonDropdownMenu');
+            const inputWrap = document.querySelector('.inflow-adj-reason-input-wrap');
+            if (menu && inputWrap && !inputWrap.contains(e.target)) {
+                menu.style.display = 'none';
+            }
+            const searchDropdown = document.getElementById('adjLiveSearchResults');
+            const searchWrap = document.querySelector('.inflow-adj-mode-search');
+            if (searchDropdown && searchWrap && !searchWrap.contains(e.target)) {
+                searchDropdown.style.display = 'none';
+            }
+        });
+    }
+});
+
+// Reason Menu Handlers
+function openReasonDropdown() {
+    const menu = document.getElementById('adjReasonDropdownMenu');
+    if (menu) menu.style.display = 'block';
+}
+function toggleReasonDropdown() {
+    const menu = document.getElementById('adjReasonDropdownMenu');
+    if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+}
+function selectReason(reasonVal) {
+    const input = document.getElementById('adjReasonInput');
+    if (input) input.value = reasonVal;
+    const menu = document.getElementById('adjReasonDropdownMenu');
+    if (menu) menu.style.display = 'none';
+}
+function createCustomReason() {
+    const custom = prompt("Enter custom stock adjustment reason / បញ្ចូលមូលហេតុថ្មី:");
+    if (custom && custom.trim()) {
+        selectReason(custom.trim());
+    }
+}
+
+// Remarks Toggle
+function openRemarksInput() {
+    document.getElementById('adjRemarksBtnWrap').style.display = 'none';
+    const wrap = document.getElementById('adjRemarksInputWrap');
+    wrap.style.display = 'block';
+    const txt = document.getElementById('adjRemarksTextarea');
+    if (txt) txt.focus();
+}
+
+// Custom Fields Toggle
+function toggleCustomFields() {
+    const panel = document.getElementById('adjCustomFieldsRow');
+    const icon = document.getElementById('customFieldsToggleIcon');
+    if (panel.style.display === 'none' || !panel.style.display) {
+        panel.style.display = 'flex';
+        if (icon) icon.innerText = '−';
+    } else {
+        panel.style.display = 'none';
+        if (icon) icon.innerText = '+';
+    }
+}
+
+// Location Changed: refresh current rows' initial/on-hand/reserved stock numbers
+async function onAdjustmentLocationChanged() {
+    const locId = document.getElementById('adjLocationSelect').value;
+    if (loadedProductsMap.size === 0) return;
+
+    try {
+        const prodIds = Array.from(loadedProductsMap.keys());
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&all=true`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            const freshMap = new Map();
+            data.products.forEach(p => freshMap.set(p.id, p));
+
+            // Update each row in table
+            loadedProductsMap.forEach((item, pid) => {
+                const fresh = freshMap.get(pid);
+                if (fresh) {
+                    item.on_hand_qty = fresh.on_hand_qty;
+                    item.reserved_qty = fresh.reserved_qty;
+                    item.available_qty = fresh.available_qty;
+                    updateRowVisuals(pid);
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Error refreshing location inventory:", e);
+    }
+}
+
+// Mode Buttons: - Remove Stock and + Add Stock
+function applyBatchStockMode(mode) {
+    const btnRemove = document.getElementById('btnModeRemoveStock');
+    const btnAdd = document.getElementById('btnModeAddStock');
+
+    if (mode === 'remove') {
+        if (stockMode === 'remove') {
+            stockMode = 'default';
+            btnRemove.classList.remove('active-mode');
+        } else {
+            stockMode = 'remove';
+            btnRemove.classList.add('active-mode');
+            btnAdd.classList.remove('active-mode');
+            // If rows exist, ensure positive values become negative
+            loadedProductsMap.forEach((item, pid) => {
+                if (item.change_qty > 0) {
+                    item.change_qty = -Math.abs(item.change_qty);
+                    item.final_qty = item.on_hand_qty + item.change_qty;
+                    updateRowVisuals(pid);
+                } else if (item.change_qty === 0) {
+                    item.change_qty = -1;
+                    item.final_qty = item.on_hand_qty - 1;
+                    updateRowVisuals(pid);
+                }
+            });
+        }
+    } else if (mode === 'add') {
+        if (stockMode === 'add') {
+            stockMode = 'default';
+            btnAdd.classList.remove('active-mode');
+        } else {
+            stockMode = 'add';
+            btnAdd.classList.add('active-mode');
+            btnRemove.classList.remove('active-mode');
+            // If rows exist, ensure negative values become positive
+            loadedProductsMap.forEach((item, pid) => {
+                if (item.change_qty < 0) {
+                    item.change_qty = Math.abs(item.change_qty);
+                    item.final_qty = item.on_hand_qty + item.change_qty;
+                    updateRowVisuals(pid);
+                } else if (item.change_qty === 0) {
+                    item.change_qty = 1;
+                    item.final_qty = item.on_hand_qty + 1;
+                    updateRowVisuals(pid);
+                }
+            });
+        }
+    }
+}
+
+// Live Search: Add One by One
+let searchDebounceTimer = null;
+function onLiveProductSearchInput(val) {
+    clearTimeout(searchDebounceTimer);
+    const resultsDiv = document.getElementById('adjLiveSearchResults');
+    const spinner = document.getElementById('searchLoadingSpinner');
+
+    if (!val || val.trim().length < 1) {
+        resultsDiv.style.display = 'none';
+        resultsDiv.innerHTML = '';
+        return;
+    }
+
+    spinner.style.display = 'inline';
+    searchDebounceTimer = setTimeout(async () => {
+        try {
+            const locId = document.getElementById('adjLocationSelect').value;
+            const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&q=${encodeURIComponent(val.trim())}`);
+            const data = await res.json();
+            spinner.style.display = 'none';
+
+            if (data.success && data.products && data.products.length > 0) {
+                renderLiveSearchResults(data.products);
+            } else {
+                resultsDiv.innerHTML = `<div style="padding: 12px; font-size: 12px; color: #94A3B8; text-align: center;">No matching products found.</div>`;
+                resultsDiv.style.display = 'block';
+            }
+        } catch (e) {
+            spinner.style.display = 'none';
+            console.error(e);
+        }
+    }, 200);
+}
+
+function renderLiveSearchResults(products) {
+    const resultsDiv = document.getElementById('adjLiveSearchResults');
+    resultsDiv.innerHTML = products.map(p => {
+        const isLoaded = loadedProductsMap.has(p.id);
+        const imgHtml = p.image_url ? `<img src="${p.image_url}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">` : `<div style="width: 32px; height: 32px; background: #E2E8F0; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px;">📦</div>`;
+        return `
+            <div class="live-search-item" onclick="onPickProductFromSearch(${JSON.stringify(p).replace(/"/g, '&quot;')})">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    ${imgHtml}
+                    <div>
+                        <div style="font-weight: 700; color: #0F172A; font-size: 13px;">${p.name}</div>
+                        <div style="font-size: 11px; color: #64748B; font-family: monospace;">${p.sku} • ${p.category_name}</div>
+                    </div>
+                </div>
+                <div style="text-align: right; font-size: 11.5px;">
+                    <div>On Hand: <strong style="color: #0F172A;">${formatNum(p.on_hand_qty)}</strong></div>
+                    <div style="color: #0284C7;">Reserved: <strong>${formatNum(p.reserved_qty)}</strong></div>
+                    ${isLoaded ? '<span style="color: #10B981; font-size: 10.5px; font-weight: 700;">✓ Added</span>' : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+    resultsDiv.style.display = 'block';
+}
+
+function onPickProductFromSearch(product) {
+    addProductRowToTable(product);
+    document.getElementById('adjLiveSearchResults').style.display = 'none';
+    document.getElementById('adjProductLiveSearch').value = '';
+
+    // Focus change input of that row
+    setTimeout(() => {
+        const input = document.getElementById(`change_input_${product.id}`);
+        if (input) {
+            input.focus();
+            input.select();
+        }
+    }, 50);
+}
+
+// Add by Category
+async function addProductsByCategory() {
+    const catSelect = document.getElementById('adjCategorySelect');
+    const catId = catSelect.value;
+    if (!catId) {
+        alert("Please select a category first.");
+        return;
+    }
+    const locId = document.getElementById('adjLocationSelect').value;
+
+    try {
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&category_id=${catId}`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            data.products.forEach(p => addProductRowToTable(p));
+            showToast(`${data.products.length} product(s) added from category!`);
+        }
+    } catch (e) {
+        alert("Error loading category products: " + e);
+    }
+}
+
+// Add All Products
+async function addAllCatalogProducts() {
+    const locId = document.getElementById('adjLocationSelect').value;
+    if (!confirm(`Are you sure you want to load all catalog products for physical audit into this adjustment sheet?`)) {
+        return;
+    }
+
+    try {
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&all=true`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            data.products.forEach(p => addProductRowToTable(p));
+            showToast(`All ${data.products.length} products loaded into adjustment sheet!`);
+        }
+    } catch (e) {
+        alert("Error loading all products: " + e);
+    }
+}
+
+// Core: Add Row to Table
+function addProductRowToTable(product) {
+    if (loadedProductsMap.has(product.id)) {
+        // Already loaded: highlight existing row
+        const existingRow = document.getElementById(`adj_row_${product.id}`);
+        if (existingRow) {
+            existingRow.style.backgroundColor = '#FEF3C7';
+            setTimeout(() => { existingRow.style.backgroundColor = ''; }, 600);
+        }
+        return;
+    }
+
+    const item = {
+        product_id: product.id,
+        name: product.name,
+        sku: product.sku,
+        uom: product.uom || 'Pcs',
+        image_url: product.image_url || '',
+        category_name: product.category_name || '',
+        sublocation: product.sublocation || '',
+        on_hand_qty: parseFloat(product.on_hand_qty || 0),
+        reserved_qty: parseFloat(product.reserved_qty || 0),
+        available_qty: parseFloat(product.available_qty || 0),
+        unit_cost: parseFloat(product.unit_cost || 0),
+        change_qty: 0,
+        final_qty: parseFloat(product.on_hand_qty || 0)
+    };
+
+    loadedProductsMap.set(product.id, item);
+
+    // Hide empty state
+    document.getElementById('adjEmptyState').style.display = 'none';
+
+    // Append table row
+    const tbody = document.getElementById('adjProductTableBody');
+    const tr = document.createElement('tr');
+    tr.id = `adj_row_${product.id}`;
+    tr.className = 'inflow-adj-row';
+    tr.dataset.productId = product.id;
+
+    const imgHtml = item.image_url 
+        ? `<img src="${item.image_url}" alt="${item.sku}">`
+        : `<div class="inflow-thumb-placeholder">📦</div>`;
+
+    tr.innerHTML = `
+        <!-- Product Thumbnail, Name and SKU -->
+        <td>
+            <div class="inflow-adj-prod-cell">
+                <div class="inflow-adj-prod-thumb">
+                    ${imgHtml}
+                </div>
+                <div class="inflow-adj-prod-info">
+                    <div class="inflow-adj-prod-name font-khmer">${item.name}</div>
+                    <div class="inflow-adj-prod-sku">${item.sku}</div>
+                </div>
+            </div>
+        </td>
+
+        <!-- Sublocation (e.g. A-5 from screenshot) -->
+        <td>
+            <input type="text" id="subloc_${item.product_id}" class="inflow-adj-subloc-input" value="${item.sublocation || 'A-1'}" placeholder="Bin/Aisle" onchange="onSublocChanged(${item.product_id}, this.value)">
+        </td>
+
+        <!-- Qty on Hand -->
+        <td style="text-align: right; font-weight: 700; color: #0F172A;" id="on_hand_${item.product_id}">
+            ${formatNum(item.on_hand_qty)}
+        </td>
+
+        <!-- Qty Reserved (from customer bills) -->
+        <td style="text-align: right;" id="reserved_${item.product_id}">
+            <span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;" title="Reserved on active customer orders">
+                ${formatNum(item.reserved_qty)}
+            </span>
+        </td>
+
+        <!-- Initial (Baseline Qty on Hand) -->
+        <td style="text-align: center;">
+            <div class="inflow-adj-pill pill-initial" id="initial_pill_${item.product_id}">
+                ${formatNum(item.on_hand_qty)}
+            </div>
+        </td>
+
+        <!-- Change (Delta Input matching Red / Green / Gray pills in screenshot) -->
+        <td style="text-align: center;">
+            <div class="inflow-adj-change-wrap">
+                <input type="number" step="any" id="change_input_${item.product_id}" 
+                       class="inflow-adj-change-input pill-change-zero" 
+                       value="0" 
+                       oninput="onChangeQtyInput(${item.product_id}, this.value)"
+                       onkeydown="onInputKeyDown(event, ${item.product_id})">
+            </div>
+        </td>
+
+        <!-- Final (Resulting Qty Input matching Tan/Amber pill in screenshot) -->
+        <td style="text-align: center;">
+            <input type="number" step="any" id="final_input_${item.product_id}" 
+                   class="inflow-adj-final-input" 
+                   value="${formatNum(item.final_qty)}" 
+                   oninput="onFinalQtyInput(${item.product_id}, this.value)">
+        </td>
+
+        <!-- Row Delete Action -->
+        <td style="text-align: center;">
+            <button type="button" class="inflow-adj-row-del-btn" onclick="removeProductRow(${item.product_id})" title="Remove item">
+                ✕
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(tr);
+}
+
+// When user edits Change input: Final = Initial + Change
+function onChangeQtyInput(productId, val) {
+    const item = loadedProductsMap.get(productId);
+    if (!item) return;
+
+    const diff = parseFloat(val) || 0;
+    item.change_qty = diff;
+    item.final_qty = item.on_hand_qty + diff;
+
+    // Update final input value
+    const finalInput = document.getElementById(`final_input_${productId}`);
+    if (finalInput) finalInput.value = formatNum(item.final_qty);
+
+    updateChangePillColor(productId, diff);
+}
+
+// When user edits Final input: Change = Final - Initial
+function onFinalQtyInput(productId, val) {
+    const item = loadedProductsMap.get(productId);
+    if (!item) return;
+
+    const finalVal = parseFloat(val) || 0;
+    item.final_qty = finalVal;
+    item.change_qty = finalVal - item.on_hand_qty;
+
+    // Update change input value
+    const changeInput = document.getElementById(`change_input_${productId}`);
+    if (changeInput) {
+        changeInput.value = item.change_qty > 0 ? `+${formatNum(item.change_qty)}` : formatNum(item.change_qty);
+    }
+
+    updateChangePillColor(productId, item.change_qty);
+}
+
+function updateChangePillColor(productId, diff) {
+    const changeInput = document.getElementById(`change_input_${productId}`);
+    if (!changeInput) return;
+
+    changeInput.classList.remove('pill-change-neg', 'pill-change-pos', 'pill-change-zero');
+    if (diff < 0) {
+        changeInput.classList.add('pill-change-neg');
+    } else if (diff > 0) {
+        changeInput.classList.add('pill-change-pos');
+    } else {
+        changeInput.classList.add('pill-change-zero');
+    }
+}
+
+function onSublocChanged(productId, val) {
+    const item = loadedProductsMap.get(productId);
+    if (item) item.sublocation = (val || '').trim();
+}
+
+function updateRowVisuals(productId) {
+    const item = loadedProductsMap.get(productId);
+    if (!item) return;
+
+    const onHandEl = document.getElementById(`on_hand_${productId}`);
+    if (onHandEl) onHandEl.innerText = formatNum(item.on_hand_qty);
+
+    const resEl = document.getElementById(`reserved_${productId}`);
+    if (resEl) resEl.innerHTML = `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">${formatNum(item.reserved_qty)}</span>`;
+
+    const initPill = document.getElementById(`initial_pill_${productId}`);
+    if (initPill) initPill.innerText = formatNum(item.on_hand_qty);
+
+    const changeInput = document.getElementById(`change_input_${productId}`);
+    if (changeInput) changeInput.value = formatNum(item.change_qty);
+
+    const finalInput = document.getElementById(`final_input_${productId}`);
+    if (finalInput) finalInput.value = formatNum(item.final_qty);
+
+    updateChangePillColor(productId, item.change_qty);
+}
+
+function removeProductRow(productId) {
+    loadedProductsMap.delete(productId);
+    const row = document.getElementById(`adj_row_${productId}`);
+    if (row) row.remove();
+
+    if (loadedProductsMap.size === 0) {
+        document.getElementById('adjEmptyState').style.display = 'block';
+    }
+}
+
+function clearUnadjustedItems() {
+    const toRemove = [];
+    loadedProductsMap.forEach((item, pid) => {
+        if (Math.abs(item.change_qty) < 0.0001) {
+            toRemove.push(pid);
+        }
+    });
+    toRemove.forEach(pid => removeProductRow(pid));
+    showToast(`Cleaned ${toRemove.length} unadjusted product row(s).`);
+}
+
+function clearAllAdjustmentRows() {
+    if (loadedProductsMap.size === 0) return;
+    if (confirm("Clear all products from this adjustment sheet?")) {
+        loadedProductsMap.clear();
+        document.getElementById('adjProductTableBody').innerHTML = '';
+        document.getElementById('adjEmptyState').style.display = 'block';
+    }
+}
+
+function filterTableRows(query) {
+    const q = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('#adjProductTableBody tr');
+    rows.forEach(tr => {
+        const text = tr.innerText.toLowerCase();
+        tr.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+}
+
+function onInputKeyDown(event, productId) {
+    if (event.key === 'Enter') {
+        event.preventDefault();
+        // Move to next row's change input
+        const rows = Array.from(document.querySelectorAll('.inflow-adj-row'));
+        const currentIndex = rows.findIndex(r => r.dataset.productId == productId);
+        if (currentIndex >= 0 && currentIndex < rows.length - 1) {
+            const nextPid = rows[currentIndex + 1].dataset.productId;
+            const nextInput = document.getElementById(`change_input_${nextPid}`);
+            if (nextInput) {
+                nextInput.focus();
+                nextInput.select();
+            }
+        }
+    }
+}
+
+// SUBMIT ADJUSTMENT FORM
+async function submitStockAdjustmentForm() {
+    if (loadedProductsMap.size === 0) {
+        alert("Please add at least one product to adjust stock.");
+        return;
+    }
+
+    // Filter items with non-zero change (or all loaded items)
+    const lines = [];
+    loadedProductsMap.forEach(item => {
+        lines.push({
+            product_id: item.product_id,
+            sublocation: item.sublocation || '',
+            initial_qty: item.on_hand_qty,
+            change_qty: item.change_qty,
+            final_qty: item.final_qty
+        });
+    });
+
+    const activeChanges = lines.filter(l => Math.abs(l.change_qty) > 0.0001);
+    if (activeChanges.length === 0) {
+        if (!confirm("All product changes are currently 0. Do you still wish to record this cycle count verification?")) {
+            return;
+        }
+    }
+
+    const payload = {
+        location_id: parseInt(document.getElementById('adjLocationSelect').value),
+        adjustment_number: (document.getElementById('adjNumberInput').value || '').trim(),
+        adjustment_date: document.getElementById('adjDateInput').value,
+        reason: (document.getElementById('adjReasonInput').value || 'Correction').trim(),
+        notes: (document.getElementById('adjRemarksTextarea')?.value || '').trim(),
+        custom_fields_json: {
+            auditor: document.getElementById('adjAuditorInput')?.value || '',
+            reference_doc: document.getElementById('adjRefDocInput')?.value || '',
+            tag: document.getElementById('adjTagInput')?.value || ''
+        },
+        lines: lines
+    };
+
+    const topBtn = document.getElementById('topBtnAdjustStock');
+    const bottomBtn = document.getElementById('bottomBtnAdjustStock');
+    if (topBtn) topBtn.disabled = true;
+    if (bottomBtn) bottomBtn.disabled = true;
+
+    try {
+        const res = await fetch("{{ url_for('inventory.create_adjustment') }}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.href = data.redirect_url || "{{ url_for('inventory.list_adjustments') }}";
+        } else {
+            alert(data.error || "Error applying stock adjustment.");
+            if (topBtn) topBtn.disabled = false;
+            if (bottomBtn) bottomBtn.disabled = false;
+        }
+    } catch (e) {
+        alert("Network error executing stock adjustment: " + e);
+        if (topBtn) topBtn.disabled = false;
+        if (bottomBtn) bottomBtn.disabled = false;
+    }
+}
+
+// Print Handler
+function printAdjustmentSheet() {
+    // Populate printable voucher elements
+    const printNum = document.getElementById('printAdjNumber');
+    const printDate = document.getElementById('printAdjDate');
+    const printLoc = document.getElementById('printWarehouseName');
+    const printReason = document.getElementById('printReasonText');
+    const printAuditor = document.getElementById('printAuditorName');
+    const printTbody = document.getElementById('printTableBody');
+
+    if (!IS_DETAIL_VIEW) {
+        if (printNum) printNum.innerText = document.getElementById('adjNumberInput').value;
+        if (printDate) printDate.innerText = document.getElementById('adjDateInput').value;
+        if (printLoc) {
+            const locSelect = document.getElementById('adjLocationSelect');
+            printLoc.innerText = locSelect.options[locSelect.selectedIndex].text;
+        }
+        if (printReason) printReason.innerText = document.getElementById('adjReasonInput').value;
+        if (printAuditor) printAuditor.innerText = document.getElementById('adjAuditorInput')?.value || 'Admin';
+
+        if (printTbody) {
+            printTbody.innerHTML = '';
+            loadedProductsMap.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #E2E8F0';
+                tr.innerHTML = `
+                    <td style="padding: 6px 8px; font-weight: 600;">${item.name}</td>
+                    <td style="padding: 6px 8px; font-family: monospace;">${item.sku}</td>
+                    <td style="padding: 6px 8px;">${item.sublocation || '-'}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.reserved_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${item.change_qty > 0 ? '+' : ''}${formatNum(item.change_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${formatNum(item.final_qty)}</td>
+                `;
+                printTbody.appendChild(tr);
+            });
+        }
+    }
+
+    window.print();
+}
+
+// Copy to Clipboard
+function copyAdjustmentData() {
+    let rows = [];
+    rows.push(['SKU', 'Product Name', 'Sublocation', 'Qty on Hand', 'Qty Reserved', 'Initial', 'Change', 'Final'].join('\t'));
+
+    if (IS_DETAIL_VIEW) {
+        document.querySelectorAll('#adjProductTableBody tr').forEach(tr => {
+            const cells = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.replace(/\n/g, ' ').trim());
+            rows.push(cells.join('\t'));
+        });
+    } else {
+        loadedProductsMap.forEach(item => {
+            rows.push([
+                item.sku,
+                item.name,
+                item.sublocation || '-',
+                formatNum(item.on_hand_qty),
+                formatNum(item.reserved_qty),
+                formatNum(item.on_hand_qty),
+                item.change_qty > 0 ? `+${formatNum(item.change_qty)}` : formatNum(item.change_qty),
+                formatNum(item.final_qty)
+            ].join('\t'));
+        });
+    }
+
+    const tsv = rows.join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+        showToast("Adjustment table copied to clipboard! (Ready to paste in Excel/Sheets)");
+    }).catch(err => {
+        prompt("Copy adjustment table:", tsv);
+    });
+}
+
+// Email / Share Handler
+function shareAdjustmentEmail() {
+    const adjNum = IS_DETAIL_VIEW ? "{{ adjustment.adjustment_number if is_detail else '' }}" : document.getElementById('adjNumberInput').value;
+    const subject = encodeURIComponent(`Stock Adjustment ${adjNum} - inFlow Premium`);
+    const body = encodeURIComponent(`Please review the stock adjustment voucher for ${adjNum}.\nTotal Items: ${loadedProductsMap.size}\nWarehouse: ${document.getElementById('adjLocationSelect')?.value || ''}`);
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+}
+
+function formatNum(n) {
+    if (n === undefined || n === null || isNaN(n)) return '0';
+    return Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function showToast(msg) {
+    const div = document.createElement('div');
+    div.style.cssText = "position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: #FFFFFF; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.25); z-index: 100000; transition: opacity 0.3s ease;";
+    div.innerText = msg;
+    document.body.appendChild(div);
+    setTimeout(() => {
+        div.style.opacity = '0';
+        setTimeout(() => div.remove(), 350);
+    }, 2800);
+}
+</script>
+{% endblock %}
