@@ -760,6 +760,23 @@
     height: auto !important;
 }
 
+.grid-desc-input {
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    transition: all 0.15s ease !important;
+    cursor: text !important;
+}
+.grid-desc-input:hover {
+    border: 1px solid #CBD5E1 !important;
+    background: #FFFFFF !important;
+}
+.grid-desc-input:focus {
+    border: 1.5px solid #0284C7 !important;
+    background: #FFFFFF !important;
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.2) !important;
+}
+
 .inflow-grid-actions-bar {
     display: flex !important;
     clear: both !important;
@@ -939,6 +956,10 @@
         <button type="button" class="inflow-tb-btn" id="soDirectPdfBtn" onclick="directExportOrderPdf()" title="Direct Export Sales Order PDF / Print Invoice" style="border-color: #FECACA; background: #FEF2F2; color: #DC2626; font-weight: 600;">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
             <span>Export PDF</span>
+        </button>
+        <button type="button" class="inflow-tb-btn" id="soDirectJpgBtn" onclick="directExportOrderJpg()" title="Direct Export Sales Order as JPG image" style="border-color: #FED7AA; background: #FFF7ED; color: #EA580C; font-weight: 600;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span>Export JPG</span>
         </button>
     </div>
     <div>
@@ -1326,6 +1347,9 @@
             <input type="hidden" name="branch_id" id="orderBranchIdInput" value="{{ order.branch_id or (branch_scope if (branch_scope and branch_scope != 'main') else '') }}">
             <input type="hidden" name="branch" value="{{ branch_scope or (order.branch_id|string if order.branch_id else 'main') }}">
             <input type="hidden" name="payment_method" id="orderPaymentMethodHidden" value="{{ order_payment_method or '' }}">
+            <input type="hidden" name="carrier" id="hiddenFormCarrier" value="{{ order.carrier or '' }}">
+            <input type="hidden" name="package_count" id="hiddenFormPackageCount" value="{{ (order.get('package_count') if order else 1) or 1 }}">
+            <input type="hidden" name="cod_amount" id="hiddenFormCodAmount" value="{{ '%.2f'|format(order.get('cod_amount') if (order and order.get('cod_amount') is not none) else 0.0) }}">
             <!-- Header Grid: Customer, Sales Rep/Location, Order Details -->
             <div class="inflow-so-top-grid">
                 <!-- Customer Column with Combobox Search matching screenshot0042.JPEG -->
@@ -1594,6 +1618,13 @@
                         </div>
                     </div>
                     <div class="inflow-orderinfo-delivery" style="margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
+                        {% if order.carrier %}
+                        <span id="savedCarrierBadge" style="font-size: 11px; font-weight: 700; color: #1E40AF; background: #DBEAFE; padding: 2px 8px; border-radius: 4px; border: 1px solid #93C5FD;" title="Current delivery carrier">
+                            🚚 {{ order.carrier }}
+                        </span>
+                        {% else %}
+                        <span id="savedCarrierBadge" style="display: none; font-size: 11px; font-weight: 700; color: #1E40AF; background: #DBEAFE; padding: 2px 8px; border-radius: 4px; border: 1px solid #93C5FD;" title="Current delivery carrier"></span>
+                        {% endif %}
                         <a href="javascript:void(0)" class="inflow-blue-link inflow-delivery-label-btn" onclick="openDeliveryModal()" title="Delivery Service & Label (80x100mm)">
                             🚚 Delivery & Label (80x100mm)
                         </a>
@@ -1649,10 +1680,10 @@
                                        onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                                        onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>
                             </td>
-                            <td style="position: relative;">
+                            <td style="position: relative;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
                                 <input type="text" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or '' }}" 
-                                       class="inflow-field-input grid-desc-input" placeholder="" 
-                                       style="border: none; background: transparent; width: 100%; color: #475569; font-size: 11.5px;"
+                                       class="inflow-field-input grid-desc-input" placeholder="Description..." 
+                                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #334155; font-size: 11.5px; padding: 2px 5px; border-radius: 3px;"
                                        oninput="markDirty()" {% if is_paid %}readonly{% endif %}>
                             </td>
                             <td style="position: relative;" class="qty-cell">
@@ -1703,9 +1734,9 @@
                                        onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                                        onkeydown="handleItemDropdownKey(event, this)">
                             </td>
-                            <td>
-                                <input type="text" id="newItemDescInput" class="inflow-field-input grid-desc-input" placeholder="" 
-                                       style="width: 100%; border: none; background: transparent; color: #64748B; font-size: 11.5px;" readonly>
+                            <td onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
+                                <input type="text" id="newItemDescInput" class="inflow-field-input grid-desc-input" placeholder="Description..." 
+                                       style="width: 100%; border: 1px solid transparent; background: transparent; color: #334155; font-size: 11.5px; padding: 2px 5px; border-radius: 3px;">
                             </td>
                             <td><span style="color: #6B7280; margin-left: 20px;">0</span></td>
                             <td>
@@ -2015,6 +2046,9 @@
                 <button type="button" class="inflow-dlg-btn" onclick="closeDeliveryModal()">Cancel</button>
                 <button type="button" class="inflow-dlg-btn" onclick="saveAndExportDeliveryLabelPdf()" style="background: #2563EB; color: #FFFFFF; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
                     <span>📄 Export PDF</span>
+                </button>
+                <button type="button" class="inflow-dlg-btn" onclick="saveAndExportDeliveryLabelJpg()" style="background: #EA580C; color: #FFFFFF; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                    <span>🖼️ Export JPG</span>
                 </button>
                 <button type="button" class="inflow-dlg-btn btn-save" onclick="saveAndOpenDeliveryLabel()" style="background: #059669; color: #FFFFFF; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
                     <span>🖨️ Print Label (80x100mm)</span>
@@ -4022,6 +4056,8 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
 
     if (activeGridRowEl && activeGridRowEl.id === 'newRowEntry') {
         // Asterisk row was selected -> transform it into real line item and add new asterisk row
+        const preTypedDesc = document.getElementById('newItemDescInput')?.value?.trim();
+        const effectiveDesc = preTypedDesc || desc || '';
         const existingCount = tbody.querySelectorAll('tr[data-line-index]').length;
         const tr = document.createElement('tr');
         tr.setAttribute('data-line-index', existingCount);
@@ -4052,10 +4088,10 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                        onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                        onkeydown="handleItemDropdownKey(event, this)">
             </td>
-            <td style="position: relative;">
-                <input type="text" name="lines[${existingCount}][description]" value="${(desc || '').replace(/"/g, '&quot;')}" 
-                       class="inflow-field-input grid-desc-input" placeholder="" 
-                       style="border: none; background: transparent; width: 100%; color: #475569; font-size: 11.5px;"
+            <td style="position: relative;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
+                <input type="text" name="lines[${existingCount}][description]" value="${(effectiveDesc || '').replace(/"/g, '&quot;')}" 
+                       class="inflow-field-input grid-desc-input" placeholder="Description..." 
+                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #334155; font-size: 11.5px; padding: 2px 5px; border-radius: 3px;"
                        oninput="markDirty()">
             </td>
             <td style="position: relative;" class="qty-cell">
@@ -4770,6 +4806,45 @@ function executePreviewAction(docType) {
 /* ==========================================================================
    Delivery Service & Province Sticker Label (72x150mm) Handlers
    ========================================================================== */
+window.currentSavedShipping = {
+    carrier: {{ (order.carrier or 'Virak Buntham')|tojson }},
+    package_count: {{ (order.get('package_count') if order else 1) or 1 }},
+    cod_amount: {{ (order.get('cod_amount') if order and order.get('cod_amount') is not none else ((order.get('total_amount') if (order and order.get('total_amount') is not none) else ((order.get('balance_due') or 0.0) if order else 0.0))))|float }},
+    delivery_notes: {{ (order.delivery_notes or '')|tojson }},
+    customer_address: {{ (order.customer_address or '')|tojson }}
+};
+
+function syncShippingToUiAndForm(data) {
+    window.currentSavedShipping = {
+        carrier: data.carrier,
+        package_count: data.package_count,
+        cod_amount: data.cod_amount,
+        delivery_notes: data.delivery_notes,
+        customer_address: data.customer_address
+    };
+
+    // Sync to hidden form inputs so main order save preserves them
+    const fCarrier = document.getElementById('hiddenFormCarrier');
+    if (fCarrier) fCarrier.value = data.carrier;
+    const fPkgs = document.getElementById('hiddenFormPackageCount');
+    if (fPkgs) fPkgs.value = data.package_count;
+    const fCod = document.getElementById('hiddenFormCodAmount');
+    if (fCod) fCod.value = data.cod_amount;
+
+    // Sync back to main form visible fields
+    const mainAddrInput = document.getElementById('addressInput');
+    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
+    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
+    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
+
+    // Update carrier badge on main page
+    const badge = document.getElementById('savedCarrierBadge');
+    if (badge) {
+        badge.innerHTML = '🚚 ' + data.carrier;
+        badge.style.display = 'inline-flex';
+    }
+}
+
 function openDeliveryModal() {
     const orderId = {{ order.id if order and order.id else 0 }};
     if (!orderId || isNewOrder) {
@@ -4777,20 +4852,37 @@ function openDeliveryModal() {
         return;
     }
 
-    // Populate modal address from main form or order
-    const currentAddr = document.getElementById('addressInput')?.value || `{{ (order.customer_address if order else '') or '' }}`;
+    const ship = window.currentSavedShipping || {};
+
+    // Populate modal address
+    const currentAddr = (ship.customer_address !== undefined && ship.customer_address !== '') ? ship.customer_address : (document.getElementById('addressInput')?.value || `{{ (order.customer_address if order else '') or '' }}`);
     const modalAddrInput = document.getElementById('modalDeliveryAddressInput');
-    if (modalAddrInput && currentAddr) {
+    if (modalAddrInput) {
         modalAddrInput.value = currentAddr;
     }
 
-    const currentNotes = document.querySelector('input[name="delivery_notes"]')?.value || `{{ (order.delivery_notes if order else '') or '' }}`;
+    // Populate modal notes
+    const currentNotes = (ship.delivery_notes !== undefined && ship.delivery_notes !== '') ? ship.delivery_notes : (document.querySelector('input[name="delivery_notes"]')?.value || `{{ (order.delivery_notes if order else '') or '' }}`);
     const modalNotesInput = document.getElementById('modalDeliveryNotesInput');
-    if (modalNotesInput && currentNotes) {
+    if (modalNotesInput) {
         modalNotesInput.value = currentNotes;
     }
 
-    // Load available carriers from API
+    // Populate case count
+    const currentCases = ship.package_count || parseInt(document.getElementById('modalCaseCountInput')?.value) || 1;
+    const modalCasesInput = document.getElementById('modalCaseCountInput');
+    if (modalCasesInput) {
+        modalCasesInput.value = currentCases;
+    }
+
+    // Populate product cost
+    const currentCost = (ship.cod_amount !== undefined && ship.cod_amount !== null) ? ship.cod_amount : (parseFloat(document.getElementById('modalProductCostInput')?.value) || 0.0);
+    const modalCostInput = document.getElementById('modalProductCostInput');
+    if (modalCostInput) {
+        modalCostInput.value = parseFloat(currentCost).toFixed(2);
+    }
+
+    // Load available carriers from API and select current carrier
     loadModalDeliveryServices();
 
     const modal = document.getElementById('inflowDeliveryModal');
@@ -4803,22 +4895,34 @@ function closeDeliveryModal() {
 }
 
 function loadModalDeliveryServices(callback) {
+    const targetCarrier = (window.currentSavedShipping && window.currentSavedShipping.carrier)
+        ? window.currentSavedShipping.carrier
+        : (document.getElementById('modalCarrierSelect')?.value || "{{ order.carrier or 'Virak Buntham' }}");
+
     fetch('/api/delivery-services')
     .then(res => res.json())
     .then(data => {
         const sel = document.getElementById('modalCarrierSelect');
         if (!sel) return;
-        const currentSaved = "{{ order.carrier or 'Virak Buntham' }}";
         sel.innerHTML = '';
+        let matched = false;
         (data.services || []).forEach(s => {
             const opt = document.createElement('option');
             opt.value = s.name;
             opt.textContent = s.name;
-            if (s.name.toLowerCase() === currentSaved.toLowerCase()) {
+            if (s.name.toLowerCase() === targetCarrier.toLowerCase()) {
                 opt.selected = true;
+                matched = true;
             }
             sel.appendChild(opt);
         });
+        if (!matched && targetCarrier) {
+            const opt = document.createElement('option');
+            opt.value = targetCarrier;
+            opt.textContent = targetCarrier;
+            opt.selected = true;
+            sel.appendChild(opt);
+        }
         if (callback) callback();
     })
     .catch(err => console.error('Error fetching delivery services:', err));
@@ -4849,6 +4953,7 @@ function openAddDeliveryServiceInline() {
     .then(res => res.json())
     .then(data => {
         if (data.success) {
+            if (window.currentSavedShipping) window.currentSavedShipping.carrier = name.trim();
             loadModalDeliveryServices(function() {
                 const sel = document.getElementById('modalCarrierSelect');
                 if (sel) sel.value = name.trim();
@@ -4904,11 +5009,7 @@ function saveDeliveryInfoOnly() {
     const orderId = {{ order.id if order and order.id else 0 }};
     const data = getDeliveryModalData();
 
-    // Sync back to main form if present
-    const mainAddrInput = document.getElementById('addressInput');
-    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
-    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
-    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
+    syncShippingToUiAndForm(data);
 
     fetch('/sales/' + orderId + '/update-shipping', {
         method: 'POST',
@@ -4921,7 +5022,7 @@ function saveDeliveryInfoOnly() {
             alert('Delivery information saved successfully.');
             closeDeliveryModal();
         } else {
-            alert(resData.error || 'Failed to save delivery info');
+            alert(resData.message || resData.error || 'Failed to save delivery info');
         }
     })
     .catch(err => alert('Error saving delivery info'));
@@ -4931,11 +5032,7 @@ function saveAndOpenDeliveryLabel() {
     const orderId = {{ order.id if order and order.id else 0 }};
     const data = getDeliveryModalData();
 
-    // Sync back to main form if present
-    const mainAddrInput = document.getElementById('addressInput');
-    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
-    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
-    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
+    syncShippingToUiAndForm(data);
 
     const url = '/sales/' + orderId + '/print?type=label' +
         '&carrier=' + encodeURIComponent(data.carrier) +
@@ -4960,11 +5057,7 @@ function saveAndExportDeliveryLabelPdf() {
     const orderId = {{ order.id if order and order.id else 0 }};
     const data = getDeliveryModalData();
 
-    // Sync back to main form if present
-    const mainAddrInput = document.getElementById('addressInput');
-    if (mainAddrInput && data.customer_address) mainAddrInput.value = data.customer_address;
-    const mainNotesInput = document.querySelector('input[name="delivery_notes"]');
-    if (mainNotesInput && data.delivery_notes) mainNotesInput.value = data.delivery_notes;
+    syncShippingToUiAndForm(data);
 
     const url = '/sales/' + orderId + '/print?type=label' +
         '&carrier=' + encodeURIComponent(data.carrier) +
@@ -4975,6 +5068,32 @@ function saveAndExportDeliveryLabelPdf() {
         '&autopdf=1';
 
     // Open print window with autopdf=1
+    window.open(url, '_blank');
+    closeDeliveryModal();
+
+    // Persist shipping info in background
+    fetch('/sales/' + orderId + '/update-shipping', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+    }).catch(err => console.error('Error saving shipping data:', err));
+}
+
+function saveAndExportDeliveryLabelJpg() {
+    const orderId = {{ order.id if order and order.id else 0 }};
+    const data = getDeliveryModalData();
+
+    syncShippingToUiAndForm(data);
+
+    const url = '/sales/' + orderId + '/print?type=label' +
+        '&carrier=' + encodeURIComponent(data.carrier) +
+        '&packages=' + encodeURIComponent(data.package_count) +
+        '&cost=' + encodeURIComponent(data.cod_amount) +
+        '&address=' + encodeURIComponent(data.customer_address) +
+        '&notes=' + encodeURIComponent(data.delivery_notes) +
+        '&autojpg=1';
+
+    // Open print window with autojpg=1
     window.open(url, '_blank');
     closeDeliveryModal();
 
@@ -6008,6 +6127,21 @@ function directExportOrderPdf() {
     }
     const pdfUrl = '/sales/' + orderId + '/print?type=invoice&autopdf=1';
     window.open(pdfUrl, '_blank');
+}
+
+// --- Direct JPG Export ---
+function directExportOrderJpg() {
+    if (isNewOrder) {
+        alert('Please save the sales order first before exporting JPG.');
+        return;
+    }
+    const orderId = {% if not is_new and order and order.id %}{{ order.id }}{% else %}null{% endif %};
+    if (!orderId) {
+        alert('Please save the sales order first.');
+        return;
+    }
+    const jpgUrl = '/sales/' + orderId + '/print?type=invoice&autojpg=1';
+    window.open(jpgUrl, '_blank');
 }
 
 // =========================================================================

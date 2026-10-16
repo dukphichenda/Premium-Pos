@@ -503,6 +503,10 @@
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 <span>Export PDF</span>
             </button>
+            <button type="button" class="tb-btn" id="exportJpgBtn" onclick="exportToJpg()" title="Direct export to JPG image" style="background: #EA580C; border-color: #EA580C; color: #FFFFFF; font-weight: 600;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span>Export JPG</span>
+            </button>
             <button type="button" class="tb-btn tb-btn-success" onclick="saveShippingAndPrint()" title="Print sticker label on 80mm x 100mm">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                 <span>Print Sticker</span>
@@ -949,6 +953,87 @@
             }
         }
 
+        async function exportToJpg() {
+            const btn = document.getElementById('exportJpgBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">⏳ Rendering JPG...</span>';
+            }
+
+            // Sync shipping data in background
+            try {
+                const carrier = document.getElementById('carrierSelect').value;
+                const packages = currentTotalCases;
+                const cost = currentProductCost;
+                const address = document.getElementById('deliveryAddressInput') ? document.getElementById('deliveryAddressInput').value.trim() : '';
+                const notes = document.getElementById('deliveryNotesInput') ? document.getElementById('deliveryNotesInput').value.trim() : '';
+                if (typeof orderId !== 'undefined' && orderId) {
+                    fetch('/sales/' + orderId + '/update-shipping', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            carrier: carrier,
+                            package_count: packages,
+                            cod_amount: cost,
+                            customer_address: address,
+                            delivery_notes: notes
+                        })
+                    }).catch(e => console.error(e));
+                }
+            } catch (e) {
+                console.error(e);
+            }
+
+            if (typeof html2pdf === 'undefined') {
+                alert('Image rendering library not loaded. Falling back to print.');
+                window.print();
+                if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+                return;
+            }
+
+            try {
+                document.body.classList.add('exporting-pdf');
+                const opt = {
+                    margin: 0,
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 3,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#FFFFFF'
+                    }
+                };
+
+                const pages = document.querySelectorAll('.label-page');
+                const orderNum = '{{ order.order_number }}' || 'Order';
+
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const worker = html2pdf().set(opt).from(page);
+                    const canvas = await worker.toCanvas().get('canvas');
+                    if (canvas) {
+                        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                        const link = document.createElement('a');
+                        link.download = `DeliveryLabel_${orderNum}_Case${i + 1}.jpg`;
+                        link.href = dataUrl;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+                }
+            } catch (err) {
+                console.error('Error generating JPG:', err);
+                alert('Failed to generate JPG directly: ' + (err.message || err));
+            } finally {
+                document.body.classList.remove('exporting-pdf');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('autoprint') === '1') {
@@ -958,6 +1043,10 @@
             } else if (urlParams.get('autopdf') === '1') {
                 setTimeout(function() {
                     exportToPdf();
+                }, 600);
+            } else if (urlParams.get('autojpg') === '1') {
+                setTimeout(function() {
+                    exportToJpg();
                 }, 600);
             }
         });

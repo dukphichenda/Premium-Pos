@@ -1548,7 +1548,7 @@ def new_order():
                     COALESCE(inv.quantity, 0) as stock_on_hand,
                     COALESCE(inv.reserved_quantity, 0) as stock_reserved,
                     (COALESCE(inv.quantity, 0) - COALESCE(inv.reserved_quantity, 0)) as stock_available,
-                    COALESCE(NULLIF(sol.description, ''), NULLIF(p.description, ''), '') as description,
+                    COALESCE(sol.description, p.description, '') as description,
                     addon_p.name as addon_product_name,
                     addon_p.sku as addon_product_sku,
                     addon_p.default_price as addon_default_price,
@@ -1823,7 +1823,7 @@ def detail_order(id):
             COALESCE(inv.quantity, 0) as stock_on_hand,
             COALESCE(inv.reserved_quantity, 0) as stock_reserved,
             (COALESCE(inv.quantity, 0) - COALESCE(inv.reserved_quantity, 0)) as stock_available,
-            COALESCE(NULLIF(sol.description, ''), NULLIF(p.description, ''), '') as description,
+            COALESCE(sol.description, p.description, '') as description,
             addon_p.name as addon_product_name,
             addon_p.sku as addon_product_sku,
             addon_p.default_price as addon_default_price,
@@ -2222,6 +2222,16 @@ def save_order(id=0):
         else:
             payment_method = (order.get('payment_method') if order else '') or ''
 
+        carrier = (str(data.get('carrier') or '').strip()) if 'carrier' in data else ((order.get('carrier') if order else '') or '')
+        try:
+            package_count = max(1, int(data.get('package_count') or (order.get('package_count') if order else 1) or 1))
+        except (ValueError, TypeError):
+            package_count = 1
+        try:
+            cod_amount = max(0.0, float(data.get('cod_amount') if data.get('cod_amount') is not None else ((order.get('cod_amount') if order else 0.0) or 0.0)))
+        except (ValueError, TypeError):
+            cod_amount = 0.0
+
         lines_data = data.get('lines_json') or data.get('lines')
         if isinstance(lines_data, str):
             import json
@@ -2313,10 +2323,11 @@ def save_order(id=0):
                         status, payment_status, subtotal, tax_rate, tax_amount,
                         discount_amount, shipping_fee, total_amount, paid_amount, balance_due,
                         sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone,
-                        branch_id, delivery_man, delivery_helper, delivery_fee_khr, delivery_notes, payment_method
-                    ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', 0, 0, 0, 0, 0, 0, 0, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        branch_id, delivery_man, delivery_helper, delivery_fee_khr, delivery_notes, payment_method,
+                        carrier, package_count, cod_amount
+                    ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', 0, 0, 0, 0, 0, 0, 0, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id;
-                """, (order_number, customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, branch_id, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None))
+                """, (order_number, customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, branch_id, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, carrier or None, package_count, cod_amount))
                 id = cur.fetchone()['id']
             else:
                 order_number = order['order_number']
@@ -2337,9 +2348,12 @@ def save_order(id=0):
                         delivery_notes = %s,
                         payment_method = COALESCE(NULLIF(%s, ''), payment_method),
                         branch_id = %s,
+                        carrier = COALESCE(NULLIF(%s, ''), carrier),
+                        package_count = COALESCE(%s, package_count),
+                        cod_amount = COALESCE(%s, cod_amount),
                         updated_at = CURRENT_TIMESTAMP
                     WHERE id = %s
-                """, (customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, branch_id, id))
+                """, (customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, branch_id, carrier or None, package_count, cod_amount, id))
 
             if customer_id:
                 cur.execute("""
@@ -3572,7 +3586,33 @@ def update_sales_shipping(id):
             WHERE id = %s
         """, (carrier, province, package_count, delivery_notes, cod_amount, id))
 
-    return jsonify({'success': True, 'message': 'Shipping details updated'})
+    return jsonify({
+        'success': True,
+        'message': 'Shipping details updated',
+        'carrier': carrier,
+        'destination_province': province,
+        'package_count': package_count,
+        'delivery_notes': delivery_notes,
+        'cod_amount': cod_amount,
+        'customer_address': customer_address
+    })
+
+
+@sales_orders_bp.route('/sales/<int:id>/shipping', methods=['GET'])
+def get_sales_shipping(id):
+    order = query_one("SELECT id, carrier, destination_province, package_count, delivery_notes, cod_amount, customer_address, total_amount, balance_due FROM sales_orders WHERE id = %s", (id,))
+    if not order or not _check_order_branch_access(order):
+        return jsonify({'success': False, 'message': 'Access denied or order not found'}), 403
+    return jsonify({
+        'success': True,
+        'carrier': order.get('carrier') or 'Virak Buntham',
+        'destination_province': order.get('destination_province') or '',
+        'package_count': order.get('package_count') or 1,
+        'delivery_notes': order.get('delivery_notes') or '',
+        'cod_amount': float(order.get('cod_amount') if order.get('cod_amount') is not None else (order.get('total_amount') or order.get('balance_due') or 0.0)),
+        'customer_address': order.get('customer_address') or ''
+    })
+
 
 
 @sales_orders_bp.route('/sales/<int:id>/update-delivery', methods=['POST'])

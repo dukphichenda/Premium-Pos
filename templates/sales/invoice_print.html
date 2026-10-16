@@ -1655,6 +1655,9 @@
             <button type="button" class="tb-btn primary" id="exportInvoicePdfBtn" onclick="exportInvoiceToPdf()" style="background: #2563EB; border-color: #2563EB;">
                 📄 Export PDF
             </button>
+            <button type="button" class="tb-btn" id="exportInvoiceJpgBtn" onclick="exportInvoiceToJpg()" style="background: #EA580C; border-color: #EA580C; color: #FFFFFF; font-weight: 600;">
+                🖼️ Export JPG
+            </button>
             <button type="button" class="tb-btn primary" onclick="window.print()">
                 🖨️ Print Invoice (A5)
             </button>
@@ -2722,11 +2725,84 @@
             }
         }
 
+        async function exportInvoiceToJpg() {
+            const btn = document.getElementById('exportInvoiceJpgBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">⏳ Rendering JPG...</span>';
+            }
+
+            const savedZoomMode = isFitMode ? 'fit' : currentZoomLevel;
+
+            try {
+                const sheet = document.getElementById('invoiceSheet');
+                if (!sheet) return;
+
+                // Reset zoom for pixel-perfect render
+                setInvoiceZoom(100, false);
+                document.body.classList.add('exporting-pdf');
+
+                const orderNum = '{{ order.order_number }}' || 'Invoice';
+                const filename = `Invoice_${orderNum}.jpg`;
+
+                if (typeof html2pdf === 'undefined') {
+                    window.print();
+                    return;
+                }
+
+                const opt = {
+                    margin: [4, 5, 4, 5],
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: {
+                        scale: 2.5,
+                        useCORS: true,
+                        logging: false,
+                        scrollX: 0,
+                        scrollY: 0,
+                        backgroundColor: '#FFFFFF'
+                    }
+                };
+
+                const worker = html2pdf().set(opt).from(sheet);
+                const canvas = await worker.toCanvas().get('canvas');
+
+                if (canvas) {
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
+            } catch (err) {
+                console.error('Invoice JPG generation error:', err);
+                alert('Error generating JPG image. Falling back to print.');
+                window.print();
+            } finally {
+                document.body.classList.remove('exporting-pdf');
+                if (savedZoomMode === 'fit') {
+                    setInvoiceZoom('fit', true);
+                } else {
+                    setInvoiceZoom(savedZoomMode, true);
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            }
+        }
+
         window.addEventListener('DOMContentLoaded', function() {
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('autopdf') === '1') {
                 setTimeout(function() {
                     exportInvoiceToPdf();
+                }, 600);
+            } else if (urlParams.get('autojpg') === '1') {
+                setTimeout(function() {
+                    exportInvoiceToJpg();
                 }, 600);
             }
         });
