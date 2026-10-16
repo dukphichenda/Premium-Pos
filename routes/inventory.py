@@ -145,14 +145,23 @@ def detail_adjustment(id):
             p.uom as product_uom,
             p.image_url as product_image_url,
             COALESCE(c.name, 'General') as category_name,
-            COALESCE(inv.reserved_quantity, 0) as reserved_qty
+            COALESCE(open_so.reserved_qty, 0) as reserved_qty
         FROM stock_adjustment_lines sal
         JOIN products p ON sal.product_id = p.id
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN inventory inv ON p.id = inv.product_id AND inv.location_id = %s AND inv.sublocation = sal.sublocation
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status = 'OPEN' 
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
         WHERE sal.adjustment_id = %s
         ORDER BY sal.id ASC
-    """, (adj['location_id'], id))
+    """, (adj['location_id'], adj['location_id'], adj['location_id'], id))
 
     locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE ORDER BY is_default DESC, name ASC")
     categories = query_all("SELECT c.id, c.name, COUNT(p.id) as product_count FROM categories c LEFT JOIN products p ON c.id = p.category_id AND p.is_active = TRUE GROUP BY c.id, c.name ORDER BY c.name ASC")
@@ -180,7 +189,7 @@ def api_products_for_adjustment():
     """
     API returning products for stock adjustment selection:
     Supports One-by-One query, Category batching, or All products.
-    Includes on_hand_qty, reserved_qty (from customer bills), available_qty, and cost.
+    Includes on_hand_qty, reserved_qty (accurately accounting only open unpaid SOs), available_qty, and cost.
     """
     location_id = request.args.get('location_id', type=int)
     if not location_id:
@@ -192,7 +201,7 @@ def api_products_for_adjustment():
     fetch_all = request.args.get('all', 'false').lower() in ('1', 'true', 'yes')
 
     where_clauses = ["p.is_active = TRUE", "p.is_sellable = TRUE"]
-    params = [location_id]
+    params = [location_id, location_id, location_id]
 
     if category_id:
         where_clauses.append("p.category_id = %s")
@@ -211,13 +220,22 @@ def api_products_for_adjustment():
             p.id, p.sku, p.name, p.uom, p.image_url, p.category_id,
             COALESCE(c.name, 'General') as category_name,
             COALESCE(i.quantity, 0) as on_hand_qty,
-            COALESCE(i.reserved_quantity, 0) as reserved_qty,
-            COALESCE(i.quantity - i.reserved_quantity, 0) as available_qty,
+            COALESCE(open_so.reserved_qty, 0) as reserved_qty,
+            COALESCE(i.quantity - COALESCE(open_so.reserved_qty, 0), 0) as available_qty,
             COALESCE(i.sublocation, '') as sublocation,
             COALESCE(NULLIF(p.average_cost, 0), p.standard_cost, 0) as unit_cost
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN inventory i ON p.id = i.product_id AND i.location_id = %s
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status = 'OPEN' 
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
         WHERE {where_sql}
         ORDER BY p.name ASC
         {limit_sql}

@@ -265,8 +265,8 @@
                                 <span class="inflow-adj-subloc-static">{{ line.sublocation or '-' }}</span>
                             </td>
                             <!-- Qty on Hand -->
-                            <td style="text-align: right; font-weight: 700; color: #0F172A;">
-                                {{ "{:,.0f}".format(line.old_qty) }}
+                            <td style="text-align: center; font-weight: 700; color: #0F172A;">
+                                {{ "{:,.0f}".format(line.new_qty - line.reserved_qty) }}
                             </td>
                             <!-- Qty Reserved (from bills) -->
                             <td style="text-align: right;">
@@ -1776,12 +1776,12 @@ function addProductRowToTable(product) {
             <input type="text" id="subloc_${item.product_id}" class="inflow-adj-subloc-input" value="${item.sublocation || 'A-1'}" placeholder="Bin/Aisle" onchange="onSublocChanged(${item.product_id}, this.value)">
         </td>
 
-        <!-- Qty on Hand (Directly Editable Count in Hand) -->
+        <!-- Qty on Hand (Directly Editable Count in Hand, accounting for Reserved) -->
         <td style="text-align: center;">
             <input type="text" inputmode="decimal" id="on_hand_input_${item.product_id}"
                    class="inflow-adj-onhand-input"
-                   value="${numVal(item.final_qty)}"
-                   title="Physical count currently in hand (Direct correction)"
+                   value="${numVal(item.final_qty - item.reserved_qty)}"
+                   title="Physical count currently in hand (Accounting for Qty Reserved)"
                    oninput="onOnHandQtyInput(${item.product_id}, this.value)"
                    onblur="onInputBlur(${item.product_id}, 'on_hand')"
                    onfocus="this.select()"
@@ -1855,14 +1855,16 @@ function numVal(n) {
 }
 
 // 1. When user edits Qty on Hand directly:
-//    Final = newOnHand, Change = newOnHand - Initial
+//    Final = newOnHand + reserved_qty (accounting for open SOs so remaining physical stock equals newOnHand after paid)
+//    Change = Final - Initial
 function onOnHandQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
     const newOnHand = parseQty(val);
-    item.final_qty = newOnHand;
-    item.change_qty = newOnHand - item.on_hand_qty;
+    const res = item.reserved_qty || 0;
+    item.final_qty = newOnHand + res;
+    item.change_qty = item.final_qty - item.on_hand_qty;
 
     // Update Change input
     const changeInput = document.getElementById(`change_input_${productId}`);
@@ -1881,19 +1883,21 @@ function onOnHandQtyInput(productId, val) {
 }
 
 // 2. When user edits Change input:
-//    Final = Initial + Change, Qty on Hand = Final
+//    Final = Initial + Change
+//    Qty on Hand = Final - reserved_qty (count in hand after open SO is paid)
 function onChangeQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
     const diff = parseQty(val);
+    const res = item.reserved_qty || 0;
     item.change_qty = diff;
     item.final_qty = item.on_hand_qty + diff;
 
     // Update Qty on Hand input
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (onHandInput) {
-        onHandInput.value = numVal(item.final_qty);
+        onHandInput.value = numVal(item.final_qty - res);
     }
 
     // Update Final input
@@ -1907,19 +1911,21 @@ function onChangeQtyInput(productId, val) {
 }
 
 // 3. When user edits Final input:
-//    Change = Final - Initial, Qty on Hand = Final
+//    Change = Final - Initial
+//    Qty on Hand = Final - reserved_qty (count in hand after open SO is paid)
 function onFinalQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
     const finalVal = parseQty(val);
+    const res = item.reserved_qty || 0;
     item.final_qty = finalVal;
     item.change_qty = finalVal - item.on_hand_qty;
 
     // Update Qty on Hand input
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (onHandInput) {
-        onHandInput.value = numVal(item.final_qty);
+        onHandInput.value = numVal(finalVal - res);
     }
 
     // Update Change input
@@ -1936,10 +1942,11 @@ function onFinalQtyInput(productId, val) {
 function onInputBlur(productId, fieldType) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
+    const res = item.reserved_qty || 0;
 
     if (fieldType === 'on_hand') {
         const input = document.getElementById(`on_hand_input_${productId}`);
-        if (input) input.value = numVal(item.final_qty);
+        if (input) input.value = numVal(item.final_qty - res);
     } else if (fieldType === 'change') {
         const input = document.getElementById(`change_input_${productId}`);
         if (input) input.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
@@ -1981,10 +1988,11 @@ function onSublocChanged(productId, val) {
 function updateRowVisuals(productId) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
+    const res = item.reserved_qty || 0;
 
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
     if (onHandInput) {
-        onHandInput.value = numVal(item.final_qty);
+        onHandInput.value = numVal(item.final_qty - res);
         updateOnHandInputStyle(productId, item.change_qty);
     }
 
@@ -2166,7 +2174,7 @@ function printAdjustmentSheet() {
                     <td style="padding: 6px 8px; font-weight: 600;">${item.name}</td>
                     <td style="padding: 6px 8px; font-family: monospace;">${item.sku}</td>
                     <td style="padding: 6px 8px;">${item.sublocation || '-'}</td>
-                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.final_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.final_qty - item.reserved_qty)}</td>
                     <td style="padding: 6px 8px; text-align: right;">${formatNum(item.reserved_qty)}</td>
                     <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty)}</td>
                     <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${item.change_qty > 0 ? '+' : ''}${formatNum(item.change_qty)}</td>
@@ -2196,7 +2204,7 @@ function copyAdjustmentData() {
                 item.sku,
                 item.name,
                 item.sublocation || '-',
-                formatNum(item.final_qty),
+                formatNum(item.final_qty - item.reserved_qty),
                 formatNum(item.reserved_qty),
                 formatNum(item.on_hand_qty),
                 item.change_qty > 0 ? `+${formatNum(item.change_qty)}` : formatNum(item.change_qty),

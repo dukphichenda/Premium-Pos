@@ -2764,6 +2764,22 @@ def cancel_order_direct(id):
         return redirect(url_for('sales_orders.list_orders'))
 
     with get_db_cursor(commit=True) as cur:
+        # If order was OPEN (unpaid/not shipped), release the reserved stock
+        if (order.get('status') or '').upper() == 'OPEN':
+            loc_id = order.get('location_id') or 100
+            cur.execute("""
+                SELECT product_id, quantity, addon_product_id, addon_quantity
+                FROM sales_order_lines
+                WHERE sales_order_id = %s
+            """, (id,))
+            for l in cur.fetchall():
+                if l['product_id']:
+                    qty = float(l['quantity'] or 0)
+                    _unreserve_order_stock(cur, loc_id, l['product_id'], qty)
+                if l.get('addon_product_id'):
+                    a_qty = float(l['quantity'] or 0) * float(l.get('addon_quantity') or 1.0)
+                    _unreserve_order_stock(cur, loc_id, l['addon_product_id'], a_qty)
+
         cur.execute("""
             UPDATE sales_orders
             SET status = 'CANCELLED',
