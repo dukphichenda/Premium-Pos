@@ -8,24 +8,29 @@
 
 <!-- Store Scope Selector Bar (Separate Data for Each Store) -->
 <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
         <span style="font-size: 12px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 5px;">
             <span>🏪</span> Store Scope (ទិន្នន័យតាមហាង):
         </span>
-        <a href="{{ url_for('dashboard.index', branch='main') }}" 
-           style="padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid {% if branch_scope == 'main' %}#0284C7{% else %}#CBD5E1{% endif %}; background: {% if branch_scope == 'main' %}#E0F2FE{% else %}#F8FAFC{% endif %}; color: {% if branch_scope == 'main' %}#0369A1{% else %}#475569{% endif %};">
-            <span>🏢</span> Main Store (HQ)
-        </a>
-        {% for b in branches %}
-        <a href="{{ url_for('dashboard.index', branch=b.id) }}" 
-           style="padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid {% if branch_scope == b.id|string %}#10B981{% else %}#CBD5E1{% endif %}; background: {% if branch_scope == b.id|string %}#D1FAE5{% else %}#F8FAFC{% endif %}; color: {% if branch_scope == b.id|string %}#065F46{% else %}#475569{% endif %};">
-            <span>🏪</span> {{ b.code }} ({{ b.name }})
-        </a>
-        {% endfor %}
-        <a href="{{ url_for('dashboard.index', branch='all') }}" 
-           style="padding: 5px 13px; border-radius: 20px; font-size: 12px; font-weight: 700; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; border: 1px solid {% if branch_scope == 'all' %}#6366F1{% else %}#CBD5E1{% endif %}; background: {% if branch_scope == 'all' %}#EEF2FF{% else %}#F8FAFC{% endif %}; color: {% if branch_scope == 'all' %}#4338CA{% else %}#475569{% endif %};">
-            <span>🌐</span> All Outlets Combined
-        </a>
+        <div class="store-shortcuts-group">
+            <a href="{{ url_for('dashboard.index', branch='main') }}" 
+               class="store-shortcut-circle hq {% if branch_scope == 'main' %}active{% endif %}"
+               title="Main Store (HQ / ហាងធំ)">
+                HQ
+            </a>
+            {% for b in branches %}
+            <a href="{{ url_for('dashboard.index', branch=b.id) }}" 
+               class="store-shortcut-circle branch {% if branch_scope == b.id|string %}active{% endif %}"
+               title="{{ b.code }} ({{ b.name }})">
+                {{ b.code or (b.name[:2]|upper) }}
+            </a>
+            {% endfor %}
+            <a href="{{ url_for('dashboard.index', branch='all') }}" 
+               class="store-shortcut-circle all {% if branch_scope == 'all' %}active{% endif %}"
+               title="All Outlets Combined (គ្រប់សាខាទាំងអស់)">
+                ALL
+            </a>
+        </div>
     </div>
     <div style="font-size: 12px; color: #64748B;">
         Active Store: <strong style="color: #0F172A;">{{ current_store_name }}</strong>
