@@ -343,14 +343,17 @@ def create_app():
 
                 # If user is branch_admin, restrict all_branches to ONLY their allowable branch!
                 if current_user['is_branch_admin'] and user_bid:
-                    all_branches = query_all("SELECT id, code, name, is_active, settings_json FROM branches WHERE is_active = TRUE AND id = %s ORDER BY id ASC", (user_bid,))
+                    all_branches = query_all("SELECT id, code, name, color, is_active, settings_json FROM branches WHERE is_active = TRUE AND id = %s ORDER BY id ASC", (user_bid,))
                     active_bid = user_bid
                 else:
-                    all_branches = query_all("SELECT id, code, name, is_active, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+                    all_branches = query_all("SELECT id, code, name, color, is_active, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
                     active_bid = session.get('active_branch_id') or request.args.get('branch')
             else:
-                all_branches = query_all("SELECT id, code, name, is_active, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+                all_branches = query_all("SELECT id, code, name, color, is_active, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
                 active_bid = session.get('active_branch_id') or request.args.get('branch')
+
+            if not active_bid and request.view_args and 'id' in request.view_args and request.endpoint and request.endpoint.startswith('branches.') and request.endpoint not in ('branches.switch_branch', 'branches.list_branches', 'branches.branch_launcher'):
+                active_bid = request.view_args['id']
 
             for b in all_branches:
                 raw_s = b.get('settings_json')
@@ -361,16 +364,34 @@ def create_app():
                         except Exception:
                             raw_s = {}
                     b['logo_url'] = raw_s.get('logo_url') or ''
+                    b['primary_color'] = raw_s.get('primary_color') or b.get('color') or '#10B981'
                 else:
                     b['logo_url'] = ''
+                    b['primary_color'] = b.get('color') or '#10B981'
 
             if active_bid and str(active_bid).lower() not in ('main', 'all', 'none', '', '0'):
                 b_row = query_one("SELECT * FROM branches WHERE id = %s", (int(active_bid),))
                 if b_row:
+                    raw_s = b_row.get('settings_json')
+                    if raw_s:
+                        if isinstance(raw_s, str):
+                            try:
+                                raw_s = json.loads(raw_s)
+                            except Exception:
+                                raw_s = {}
+                        logo_url = raw_s.get('logo_url') or ''
+                        primary_color = raw_s.get('primary_color') or b_row.get('color') or '#10B981'
+                    else:
+                        logo_url = ''
+                        primary_color = b_row.get('color') or '#10B981'
+
                     current_branch = {
                         'id': b_row['id'],
                         'code': b_row['code'],
                         'name': b_row['name'],
+                        'color': b_row.get('color') or primary_color,
+                        'primary_color': primary_color,
+                        'logo_url': logo_url,
                         'so_prefix': b_row.get('so_prefix'),
                         'location_id': b_row.get('location_id'),
                         'is_active': b_row.get('is_active')
@@ -385,18 +406,64 @@ def create_app():
         except Exception as e:
             logger.warning(f"Error resolving branch context in inject_global_data: {e}")
 
-        # Resolve HQ Invoice Logo URL
+        # Resolve HQ Invoice Logo URL & Primary Brand Color
         hq_invoice_logo_url = None
+        hq_primary_color = '#112340'
         try:
-            inv_row = query_one("SELECT logo_url FROM invoice_settings LIMIT 1")
-            if inv_row and inv_row.get('logo_url'):
-                hq_invoice_logo_url = inv_row['logo_url']
+            inv_row = query_one("SELECT logo_url, primary_color FROM invoice_settings LIMIT 1")
+            if inv_row:
+                if inv_row.get('logo_url'):
+                    hq_invoice_logo_url = inv_row['logo_url']
+                if inv_row.get('primary_color'):
+                    hq_primary_color = inv_row['primary_color']
             elif company_data and company_data.get('logo_url'):
                 hq_invoice_logo_url = company_data['logo_url']
             elif company_data and company_data.get('app_logo_url'):
                 hq_invoice_logo_url = company_data['app_logo_url']
         except Exception:
             pass
+
+        # Helper to compute complementary shades for store branding
+        def _shade_hex(hex_str, factor):
+            try:
+                h = (hex_str or '#10B981').lstrip('#')
+                if len(h) == 3:
+                    h = ''.join(c * 2 for c in h)
+                r, g, b = (int(h[i:i+2], 16) for i in (0, 2, 4))
+                if factor <= 1:
+                    r2, g2, b2 = r * factor, g * factor, b * factor
+                else:
+                    r2 = r + (255 - r) * (factor - 1)
+                    g2 = g + (255 - g) * (factor - 1)
+                    b2 = b + (255 - b) * (factor - 1)
+                return f'#{max(0, min(255, int(round(r2)))):02X}{max(0, min(255, int(round(g2)))):02X}{max(0, min(255, int(round(b2)))):02X}'
+            except Exception:
+                return hex_str
+
+        if is_branch_mode and current_branch:
+            store_primary = current_branch.get('primary_color') or current_branch.get('color') or '#10B981'
+            store_dark = _shade_hex(store_primary, 0.80)
+            store_sidebar_top = _shade_hex(store_primary, 0.85)
+            store_sidebar_bottom = _shade_hex(store_primary, 0.55)
+            store_theme = {
+                'primary': store_primary,
+                'dark': store_dark,
+                'top_bar_bg': f'linear-gradient(90deg, {store_primary} 0%, {store_dark} 100%)',
+                'sidebar_bg': f'linear-gradient(180deg, {store_sidebar_top} 0%, {store_sidebar_bottom} 100%)',
+                'accent': store_primary,
+                'button_text': store_primary,
+                'is_branch': True
+            }
+        else:
+            store_theme = {
+                'primary': '#112340',
+                'dark': '#0A1526',
+                'top_bar_bg': 'linear-gradient(90deg, #1E293B 0%, #0F172A 100%)',
+                'sidebar_bg': '#112340',
+                'accent': '#F59E0B',
+                'button_text': '#F59E0B',
+                'is_branch': False
+            }
 
         from routes.auth import user_can_edit_prices, user_can_view_costs, check_permission
 
@@ -419,7 +486,9 @@ def create_app():
             'has_permission': check_permission,
             'current_user': current_user,
             'app_logo_url': (company_data.get('app_logo_url') if company_data else None),
-            'hq_logo_url': hq_invoice_logo_url
+            'hq_logo_url': hq_invoice_logo_url,
+            'store_theme': store_theme,
+            'active_store_primary_color': store_theme['primary']
         }
 
 

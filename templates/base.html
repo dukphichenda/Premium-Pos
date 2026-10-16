@@ -55,10 +55,49 @@
             current_user: {{ current_user|tojson if current_user else 'null' }}
         };
     </script>
+    <style id="inflowStoreThemeStyles">
+        :root {
+            --store-primary-color: {{ store_theme.primary if store_theme else '#112340' }};
+            --store-primary-dark: {{ store_theme.dark if store_theme else '#0A1526' }};
+            --store-sidebar-bg: {{ store_theme.sidebar_bg if store_theme else '#112340' }};
+            --store-accent-color: {{ store_theme.accent if store_theme else '#F59E0B' }};
+        }
+        .inflow-cloud-sidebar {
+            background: {{ store_theme.sidebar_bg if store_theme else '#112340' }} !important;
+            transition: background 0.25s ease;
+        }
+        {% if is_branch_mode and current_branch %}
+        .inflow-tab-accent-line,
+        #inflowTabAccentLine {
+            background-color: {{ store_theme.primary }} !important;
+        }
+        .inflow-top-accent-bar.branch {
+            background: {{ store_theme.primary }} !important;
+        }
+        .inflow-sidebar-nav-item.active .inflow-sidebar-btn {
+            color: {{ store_theme.primary }} !important;
+        }
+        .inflow-sidebar-nav-item.active .inflow-sidebar-btn svg {
+            stroke: {{ store_theme.primary }} !important;
+            color: {{ store_theme.primary }} !important;
+        }
+        .inflow-sidebar-btn.btn-create {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            color: #FFFFFF !important;
+            border: 1px solid rgba(255, 255, 255, 0.32) !important;
+        }
+        .inflow-sidebar-btn.btn-create svg {
+            stroke: #FFFFFF !important;
+        }
+        .inflow-sidebar-btn:hover {
+            background-color: rgba(255, 255, 255, 0.16) !important;
+        }
+        {% endif %}
+    </style>
 </head>
 <body class="{% block body_class %}{% endblock %}">
     <!-- inFlow Cloud Left Sidebar (Matching media_1791455161109_513ff4d8.png & media_1791455186533_3a653d4a.png) -->
-    <aside class="inflow-cloud-sidebar no-print" id="inflowCloudSidebar">
+    <aside class="inflow-cloud-sidebar no-print" id="inflowCloudSidebar" style="background: {{ store_theme.sidebar_bg if store_theme else '#112340' }};">
         <!-- 1. Top inFlow Brand Logo Squircle -->
         <div class="inflow-sidebar-logo-item" onclick="handleSidebarLogoClick()" title="inFlow Home">
             <div class="inflow-logo-squircle" style="overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 2px;">
@@ -175,8 +214,14 @@
 
         <!-- 9. Store Context Switcher Circle (26px circle matching account icon) -->
         <div class="inflow-sidebar-nav-item inflow-sidebar-circle-item" data-menu="showroom" onclick="toggleSidebarFlyout('showroom', this)" title="Store Context: {{ current_branch.name ~ ' (' ~ current_branch.code ~ ')' if (is_branch_mode and current_branch) else 'Main Store (HQ)' }} - Click to Switch Store">
-            <div class="inflow-sidebar-circle-btn {{ 'circle-btn-branch' if is_branch_mode else 'circle-btn-store' }}" id="sidebarStoreCircleBtn">
+            <div class="inflow-sidebar-circle-btn {{ 'circle-btn-branch' if is_branch_mode else 'circle-btn-store' }}" id="sidebarStoreCircleBtn" style="border-color: {{ store_theme.primary if store_theme else '#38BDF8' }};">
+                {% if is_branch_mode and current_branch and current_branch.logo_url %}
+                <img src="{{ current_branch.logo_url }}" alt="{{ current_branch.code }}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                {% elif not is_branch_mode and hq_logo_url %}
+                <img src="{{ hq_logo_url }}" alt="HQ" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">
+                {% else %}
                 <span id="sidebarStoreIcon" style="font-size: 13px; line-height: 1;">{{ '🏪' if is_branch_mode else '🏢' }}</span>
+                {% endif %}
             </div>
         </div>
 
@@ -434,13 +479,11 @@
             <div class="flyout-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <span>Store Context & Branches</span>
                 {% if is_branch_mode %}
-                <span style="font-size: 10px; background: #0284C7; color: #FFFFFF; padding: 2px 7px; border-radius: 10px; text-transform: none; font-weight: 700;">Branch Mode</span>
+                <span style="font-size: 10px; background: {{ store_theme.primary if store_theme else '#0284C7' }}; color: #FFFFFF; padding: 2px 7px; border-radius: 10px; text-transform: none; font-weight: 700;">Branch Mode</span>
                 {% else %}
                 <span style="font-size: 10px; background: #10B981; color: #FFFFFF; padding: 2px 7px; border-radius: 10px; text-transform: none; font-weight: 700;">Main Store HQ</span>
                 {% endif %}
             </div>
-
-
 
             <!-- Store Switcher Contexts -->
             <a href="{{ url_for('branches.switch_branch', id=0) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" {% if not is_branch_mode %}style="background: #F8FAFC; font-weight: 700;"{% endif %}>
@@ -448,7 +491,7 @@
                 <span class="flyout-label">Main Store (HQ Enterprise) {% if not is_branch_mode %}✓{% endif %}</span>
             </a>
             {% for b in all_branches %}
-            <a href="{{ url_for('branches.switch_branch', id=b.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" {% if current_branch and current_branch.id == b.id %}style="background: #F0F9FF; color: #0284C7; font-weight: 700;"{% endif %}>
+            <a href="{{ url_for('branches.switch_branch', id=b.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" {% if current_branch and current_branch.id == b.id %}style="background: #F0F9FF; color: {{ b.primary_color or b.color or '#0284C7' }}; font-weight: 700;"{% endif %}>
                 <span class="flyout-icon">🏪</span>
                 <span class="flyout-label">{{ b.name }} ({{ b.code }}) {% if current_branch and current_branch.id == b.id %}✓{% endif %}</span>
             </a>
@@ -458,7 +501,7 @@
             <div style="font-size: 10.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase; padding: 4px 14px;">Branch Functions</div>
 
             {% if is_branch_mode and current_branch %}
-            <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" style="background: #F0F9FF; color: #0369A1; font-weight: 700;">
+            <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)" style="background: #F0F9FF; color: {{ store_theme.primary if store_theme else '#0369A1' }}; font-weight: 700;">
                 <span class="flyout-icon">🏪</span>
                 <span class="flyout-label">{{ current_branch.code }} Dashboard</span>
             </a>
@@ -707,7 +750,7 @@
 
                 {% if is_branch_mode and current_branch %}
                 <!-- Active Branch Mode Indicator Banner -->
-                <div class="branch-context-indicator-bar no-print" style="background: linear-gradient(90deg, #0284C7 0%, #0369A1 100%); color: #FFFFFF; padding: 8px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; border-bottom: 1px solid #0284C7; position: sticky; top: 0; z-index: 9999;">
+                <div class="branch-context-indicator-bar no-print" style="background: {{ store_theme.top_bar_bg if store_theme else 'linear-gradient(90deg, #0284C7 0%, #0369A1 100%)' }}; color: #FFFFFF; padding: 8px 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; border-bottom: 1px solid rgba(255,255,255,0.22); position: sticky; top: 0; z-index: 9999; box-shadow: 0 2px 8px rgba(0,0,0,0.15);">
                     <div style="display: flex; align-items: center; gap: 10px;">
                         <span style="font-size: 16px;">🏪</span>
                         <span>
@@ -716,10 +759,10 @@
                         </span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 8px;">
-                        <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) }}" target="_top" style="background: rgba(255,255,255,0.22); color: #FFFFFF; padding: 4px 10px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 11.5px;">
+                        <a href="{{ url_for('branches.branch_workspace', id=current_branch.id) }}" target="_top" style="background: rgba(255,255,255,0.22); color: #FFFFFF; padding: 4px 10px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 11.5px; border: 1px solid rgba(255,255,255,0.3);">
                             🏪 Branch Dashboard
                         </a>
-                        <a href="{{ url_for('branches.switch_branch', id=0) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext(0, event); }" style="background: #FFFFFF; color: #0284C7; padding: 4px 12px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 11.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
+                        <a href="{{ url_for('branches.switch_branch', id=0) }}" target="_top" onclick="if(window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function'){ window.top.inflowMdi.switchStoreContext(0, event); }" style="background: #FFFFFF; color: {{ store_theme.primary if store_theme else '#0284C7' }}; padding: 4px 12px; border-radius: 4px; text-decoration: none; font-weight: 700; font-size: 11.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.1);">
                             🏢 Return to Main Store (HQ)
                         </a>
                     </div>

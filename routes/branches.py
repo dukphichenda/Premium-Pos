@@ -130,7 +130,7 @@ def _get_branch_settings(branch_or_raw):
 
     # Fallbacks from branch profile if not customized
     if isinstance(branch_or_raw, dict):
-        if branch_or_raw.get('color'):
+        if not settings.get('primary_color') and branch_or_raw.get('color'):
             settings['primary_color'] = branch_or_raw['color']
         if not settings.get('shop_name_en') and branch_or_raw.get('name'):
             settings['shop_name_en'] = branch_or_raw['name']
@@ -551,6 +551,10 @@ def branch_workspace(id):
 
     perms = _get_branch_permissions(branch)
     branch['permissions'] = perms
+    b_settings = _get_branch_settings(branch)
+    branch['settings'] = b_settings
+    branch['primary_color'] = b_settings.get('primary_color') or branch.get('color') or '#10B981'
+    branch['logo_url'] = b_settings.get('logo_url') or ''
 
     # Branch Today Stats
     today_stats = query_one("""
