@@ -249,6 +249,29 @@ def create_app():
                 target = target.rstrip('?')
                 if target in ('/', ''):
                     target = None
+
+            # If unauthenticated request is inside an iframe tab, break out top-level window directly
+            if request.args.get('embed') == '1' or request.headers.get('Sec-Fetch-Dest') == 'iframe':
+                from flask import Response
+                html = """<!DOCTYPE html><html><head><meta charset="utf-8">
+                <script>
+                try {
+                    localStorage.removeItem('inflow_mdi_tabs_v5');
+                    localStorage.removeItem('inflow_mdi_active_tab_v5');
+                    localStorage.removeItem('inflow_mdi_tabs');
+                    localStorage.removeItem('inflow_mdi_active_tab');
+                    localStorage.removeItem('inflow_active_store_id');
+                    sessionStorage.clear();
+                } catch(e) {}
+                if (window.top) {
+                    window.top.location.href = "/login";
+                } else {
+                    window.location.href = "/login";
+                }
+                </script>
+                </head><body><p>Session expired. <a href="/login" target="_top">Sign in</a>.</p></body></html>"""
+                return Response(html, mimetype='text/html')
+
             return redirect(url_for('auth.login', next=target))
 
         # Always maintain permanent session lifetime on active usage

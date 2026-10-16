@@ -51,7 +51,7 @@ class AuthLogoutImmediateTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         html = res.data.decode('utf-8')
         self.assertIn("window.self !== window.top", html)
-        self.assertIn("dashboard", html)
+        self.assertIn("login", html)
 
     def test_login_persistence_no_auto_logout(self):
         """Logged in session accessing dashboard stays logged in without redirecting to login."""

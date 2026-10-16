@@ -314,21 +314,28 @@
                         if (Array.isArray(parsed) && parsed.length > 0) {
                             this.tabs = parsed.map(t => {
                                 const clean = (t.url || '').replace(/[?&]embed=1/, '');
-                                if (!clean || clean === '/' || clean.startsWith('/login') || (t.title && t.title.toLowerCase().includes('sign in'))) {
-                                    return {
-                                        ...t,
-                                        url: '/dashboard',
-                                        title: 'Main Store Dashboard',
-                                        label: 'Main Store Dashboard',
-                                        origTitleEn: 'Main Store Dashboard',
-                                        type: 'home'
-                                    };
+                                if (!clean || clean === '/' || clean.includes('/login') || clean.includes('/logout') || (t.title && (t.title.toLowerCase().includes('sign in') || t.title.toLowerCase().includes('sign out') || t.title.toLowerCase().includes('session expired')))) {
+                                    return null;
                                 }
                                 return t;
-                            }).filter(t => t && t.url && !t.url.startsWith('/login'));
+                            }).filter(t => t && t.url && !t.url.includes('/login') && !t.url.includes('/logout'));
                         }
                     }
-                    this.activeTabId = localStorage.getItem(ACTIVE_TAB_KEY);
+                    if (!this.tabs || this.tabs.length === 0) {
+                        this.tabs = [{
+                            id: 'tab_home_default',
+                            url: '/dashboard',
+                            title: 'Main Store Dashboard',
+                            label: 'Main Store Dashboard',
+                            origTitleEn: 'Main Store Dashboard',
+                            type: 'home',
+                            closable: false
+                        }];
+                        this.activeTabId = 'tab_home_default';
+                    } else {
+                        const savedActive = localStorage.getItem(ACTIVE_TAB_KEY);
+                        this.activeTabId = this.tabs.some(t => t.id === savedActive) ? savedActive : this.tabs[0].id;
+                    }
                 } catch (e) {
                     console.warn('Could not read saved tabs:', e);
                 }
@@ -336,7 +343,8 @@
 
             saveTabsToStorage: function () {
                 try {
-                    localStorage.setItem(STORAGE_KEY, JSON.stringify(this.tabs));
+                    const safeTabs = (this.tabs || []).filter(t => t && t.url && !t.url.includes('/login') && !t.url.includes('/logout'));
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(safeTabs));
                     if (this.activeTabId) {
                         localStorage.setItem(ACTIVE_TAB_KEY, this.activeTabId);
                     }
@@ -474,12 +482,15 @@
 
                             const newPath = iframe.contentWindow.location.pathname;
 
-                            // If iframe landed on /login, session has expired — break out to top-level login
-                            if (newPath && newPath.startsWith('/login')) {
-                                console.warn('Tab iframe redirected to /login — session expired. Breaking out to login page...');
+                            // If iframe landed on /login or /logout, break out to top-level login
+                            if (newPath && (newPath.startsWith('/login') || newPath.startsWith('/logout'))) {
+                                console.warn('Tab iframe redirected to auth endpoint — breaking out to login page...');
                                 try {
                                     localStorage.removeItem(STORAGE_KEY);
                                     localStorage.removeItem(ACTIVE_TAB_KEY);
+                                    localStorage.removeItem('inflow_mdi_tabs');
+                                    localStorage.removeItem('inflow_mdi_active_tab');
+                                    localStorage.removeItem('inflow_active_store_id');
                                     sessionStorage.clear();
                                 } catch(e) {}
                                 window.top.location.href = '/login';
@@ -571,18 +582,21 @@
                 if (!url) url = '/';
                 const cleanUrl = url.replace(/[?&]embed=1/, '');
 
-                // Never open logout inside an MDI tab iframe - navigate window.top immediately!
-                if (cleanUrl.includes('/logout')) {
+                // Never open login or logout inside an MDI tab iframe - navigate window.top immediately!
+                if (cleanUrl.includes('/logout') || cleanUrl.includes('/login')) {
                     try {
                         localStorage.removeItem(STORAGE_KEY);
                         localStorage.removeItem(ACTIVE_TAB_KEY);
+                        localStorage.removeItem('inflow_mdi_tabs');
+                        localStorage.removeItem('inflow_mdi_active_tab');
                         localStorage.removeItem('inflow_active_store_id');
                         sessionStorage.clear();
                     } catch (e) {}
+                    const target = cleanUrl.includes('/logout') ? '/logout' : '/login';
                     if (window.top) {
-                        window.top.location.href = cleanUrl;
+                        window.top.location.href = target;
                     } else {
-                        window.location.href = cleanUrl;
+                        window.location.href = target;
                     }
                     return;
                 }
