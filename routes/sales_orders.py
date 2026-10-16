@@ -647,7 +647,7 @@ def create_order():
         flash(f"Error creating order: {e}", "error")
         return redirect(url_for('sales_orders.create_order'))
 
-def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None):
+def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=''):
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
 
@@ -749,7 +749,8 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             drawer_params.append(delivery_man_filter)
 
     # General search query (order #, customer name, delivery man, or total amount)
-    search_query = (request.args.get('search') or request.args.get('q') or '').strip()
+    if not search_query:
+        search_query = (request.args.get('search') or request.args.get('q') or session.get('so_search_query') or '').strip()
     if search_query:
         sp = f"%{search_query}%"
         drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
@@ -998,7 +999,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         'active_branch_filter': branch_id or ('all' if is_main else 'main')
     }
 
-def _find_upper_or_adjacent_order(current_id, date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', branch_id=None, requested_upper_id=None):
+def _find_upper_or_adjacent_order(current_id, date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', branch_id=None, requested_upper_id=None, search_query=''):
     """
     Finds the upper (order immediately above current_id in the drawer list) or adjacent order
     so that when deleting or completing an SO, the view stays on the detail page and moves to the upper order.
@@ -1022,7 +1023,8 @@ def _find_upper_or_adjacent_order(current_id, date_filter='All', status_filter='
             customer_search=customer_search,
             customer_filter=None,
             scheme_id=100,
-            branch_id=branch_id
+            branch_id=branch_id,
+            search_query=search_query
         )
         sidebar_orders = drawer_data.get('sidebar_orders', [])
         order_ids = [o['id'] for o in sidebar_orders]
@@ -1669,9 +1671,9 @@ def new_order():
                 order['pricing_scheme_id'] = cust_row['default_pricing_scheme_id']
 
     if 'date_filter' in request.args:
-        date_filter = request.args.get('date_filter', 'All')
+        date_filter = request.args.get('date_filter') or 'All'
         session['so_date_filter'] = date_filter
-    elif 'so_date_filter' in session:
+    elif 'so_date_filter' in session and session.get('so_date_filter'):
         date_filter = session['so_date_filter']
     else:
         date_filter = 'All'
@@ -1683,6 +1685,23 @@ def new_order():
         status_filter = session['so_status_filter']
     else:
         status_filter = 'Open'
+
+    if 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        if search_query:
+            session['so_search_query'] = search_query
+        else:
+            session.pop('so_search_query', None)
+    elif 'q' in request.args:
+        search_query = request.args.get('q', '').strip()
+        if search_query:
+            session['so_search_query'] = search_query
+        else:
+            session.pop('so_search_query', None)
+    elif 'so_search_query' in session and session.get('so_search_query'):
+        search_query = session['so_search_query']
+    else:
+        search_query = ''
 
     if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()
@@ -1705,7 +1724,7 @@ def new_order():
     else:
         req_branch = 'main'
     scheme_id = order.get('pricing_scheme_id') or 100
-    drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch)
+    drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch, search_query=search_query)
 
     for l in lines:
         l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
@@ -1817,9 +1836,9 @@ def detail_order(id):
     """, (order['location_id'], id))
 
     if 'date_filter' in request.args:
-        date_filter = request.args.get('date_filter', 'All')
+        date_filter = request.args.get('date_filter') or 'All'
         session['so_date_filter'] = date_filter
-    elif 'so_date_filter' in session:
+    elif 'so_date_filter' in session and session.get('so_date_filter'):
         date_filter = session['so_date_filter']
     else:
         date_filter = 'All'
@@ -1831,6 +1850,23 @@ def detail_order(id):
         status_filter = session['so_status_filter']
     else:
         status_filter = 'Open'
+
+    if 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        if search_query:
+            session['so_search_query'] = search_query
+        else:
+            session.pop('so_search_query', None)
+    elif 'q' in request.args:
+        search_query = request.args.get('q', '').strip()
+        if search_query:
+            session['so_search_query'] = search_query
+        else:
+            session.pop('so_search_query', None)
+    elif 'so_search_query' in session and session.get('so_search_query'):
+        search_query = session['so_search_query']
+    else:
+        search_query = ''
 
     if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()
@@ -1860,7 +1896,7 @@ def detail_order(id):
             branch_scope = 'main'
 
     scheme_id = order.get('pricing_scheme_id') or 100
-    drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope)
+    drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope, search_query=search_query)
 
     # Mark backorder flag if stock is insufficient and resolve case price / display UOM
     for l in lines:
@@ -2445,11 +2481,14 @@ def save_order(id=0):
         date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
         status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
         branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
+        search_param = request.form.get('search') or request.args.get('search') or session.get('so_search_query') or ''
 
         session['so_date_filter'] = date_filter
         session['so_status_filter'] = status_filter
         session['so_customer_search'] = cust_search
         session['so_branch_filter'] = branch_param
+        if search_param:
+            session['so_search_query'] = search_param
 
         target_id = id
         if mark_complete_pay and not is_new:
@@ -2460,7 +2499,8 @@ def save_order(id=0):
                 status_filter=status_filter,
                 customer_search=cust_search,
                 branch_id=branch_param,
-                requested_upper_id=req_upper_id
+                requested_upper_id=req_upper_id,
+                search_query=search_param
             )
             if upper_target:
                 target_id = upper_target
@@ -2473,6 +2513,8 @@ def save_order(id=0):
         }
         if cust_search:
             redirect_kwargs['customer_search'] = cust_search
+        if search_param:
+            redirect_kwargs['search'] = search_param
         redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
 
         if request.is_json:
@@ -2757,11 +2799,14 @@ def delete_order(id):
     status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
     cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
     branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
+    search_param = request.form.get('search') or request.args.get('search') or session.get('so_search_query') or ''
 
     session['so_date_filter'] = date_filter
     session['so_status_filter'] = status_filter
     session['so_customer_search'] = cust_search
     session['so_branch_filter'] = branch_param
+    if search_param:
+        session['so_search_query'] = search_param
 
     req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
 
@@ -2772,7 +2817,8 @@ def delete_order(id):
         status_filter=status_filter,
         customer_search=cust_search,
         branch_id=branch_param,
-        requested_upper_id=req_upper_id
+        requested_upper_id=req_upper_id,
+        search_query=search_param
     )
 
     try:
@@ -2828,6 +2874,8 @@ def delete_order(id):
             }
             if cust_search:
                 redirect_kwargs['customer_search'] = cust_search
+            if search_param:
+                redirect_kwargs['search'] = search_param
             redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
         else:
             # If no remaining orders in drawer/system, stay in sales order workspace with a new order form

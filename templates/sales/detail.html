@@ -765,8 +765,65 @@
     margin-bottom: 48px !important;
 }
 
+/* Product Search / Line Item Autocomplete Popup (Bigger & Can Over The Sheet) */
 .inflow-item-dropdown-popup {
-    width: 680px !important;
+    display: none;
+    position: fixed !important;
+    width: 860px !important;
+    max-width: calc(100vw - 40px) !important;
+    max-height: 400px !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #7F9DB9 !important;
+    border-radius: 6px !important;
+    box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.35), 0 8px 18px -4px rgba(0, 0, 0, 0.2) !important;
+    z-index: 9999999 !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+}
+
+.inflow-item-dropdown-popup.show {
+    display: block !important;
+}
+
+.inflow-item-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 12px !important;
+}
+
+.inflow-item-table thead th {
+    background: linear-gradient(180deg, #F8FAFC 0%, #E2E8F0 100%) !important;
+    border-bottom: 2px solid #CBD5E1 !important;
+    border-right: 1px solid #E2E8F0 !important;
+    padding: 7px 10px !important;
+    font-weight: 700 !important;
+    font-size: 11.5px !important;
+    color: #334155 !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 5 !important;
+    height: 30px !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.03em !important;
+}
+
+.inflow-item-table tbody td {
+    border-bottom: 1px solid #F1F5F9 !important;
+    border-right: 1px solid #F1F5F9 !important;
+    padding: 6px 10px !important;
+    height: 36px !important;
+    vertical-align: middle !important;
+    cursor: pointer !important;
+}
+
+.inflow-item-table tbody tr:nth-child(even) {
+    background: #FAFAFA !important;
+}
+
+.inflow-item-table tbody tr:hover td,
+.inflow-item-table tbody tr.highlighted td {
+    background: #CCFBF1 !important;
+    color: #0F766E !important;
 }
 </style>
 
@@ -1050,7 +1107,7 @@
             </div>
 
             <!-- Add New Order Button [ + ] -->
-            <a href="{{ url_for('sales_orders.new_order', branch=branch_scope) }}" class="so-icon-btn" title="Create New Sales Order (+)">
+            <a href="javascript:void(0)" onclick="createNewOrderInTab()" class="so-icon-btn" title="Create New Sales Order (+)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -1575,7 +1632,7 @@
                                 <input type="hidden" name="lines[{{ loop.index0 }}][combine_option_id]" class="line-combine-option-id" value="{{ l.combine_option_id or '' }}">
                                 <input type="text" class="inflow-field-input grid-item-input" value="{{ l.product_sku }} {{ l.product_name }}" 
                                        placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
-                                       onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
+                                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                                        onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>
                             </td>
                             <td style="position: relative;">
@@ -1629,7 +1686,7 @@
                             <td style="position: relative;">
                                 <input type="text" id="newItemTextInput" class="inflow-field-input grid-item-input" 
                                        placeholder="Type to add item..." style="width: 100%; border: 1px solid #7F9DB9;"
-                                       onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
+                                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                                        onkeydown="handleItemDropdownKey(event, this)">
                             </td>
                             <td>
@@ -3043,6 +3100,9 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
     if (filters.customer_search && !params.has('customer_search')) params.set('customer_search', filters.customer_search);
     if (filters.branch && !params.has('branch')) params.set('branch', filters.branch);
 
+    const liveSearchVal = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    if (liveSearchVal && !params.has('search')) params.set('search', liveSearchVal);
+
     for (const key in extraParams) {
         if (extraParams[key] !== undefined && extraParams[key] !== null) {
             params.set(key, extraParams[key]);
@@ -3097,6 +3157,18 @@ function attachFiltersToForm(form) {
         input.value = filters[field] || '';
     });
 
+    const liveSearchVal = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    if (liveSearchVal) {
+        let searchInput = form.querySelector('input[name="search"]');
+        if (!searchInput) {
+            searchInput = document.createElement('input');
+            searchInput.type = 'hidden';
+            searchInput.name = 'search';
+            form.appendChild(searchInput);
+        }
+        searchInput.value = liveSearchVal;
+    }
+
     const upperId = getUpperOrAdjacentOrderId();
     if (upperId) {
         let upInput = form.querySelector('input[name="upper_order_id"]');
@@ -3140,11 +3212,16 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
         url = new URL(window.location.origin + targetUrl);
     }
 
-    // Retain any active search query from the current view
+    // Retain any active search query from input, storage, or current URL so search remains fixed across order selection
     const currentParams = new URLSearchParams(window.location.search);
-    if (currentParams.has('search') && !url.searchParams.has('search')) {
-        const sVal = currentParams.get('search');
-        if (sVal) url.searchParams.set('search', sVal);
+    const liveSearchVal = document.getElementById('soSidebarSearchInput')?.value?.trim() || 
+                          sessionStorage.getItem('inflow_so_search_query') ||
+                          currentParams.get('search') || '';
+    if (liveSearchVal) {
+        url.searchParams.set('search', liveSearchVal);
+        try {
+            sessionStorage.setItem('inflow_so_search_query', liveSearchVal);
+        } catch(e) {}
     }
 
     const finalUrl = url.pathname + url.search;
@@ -3412,9 +3489,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const itemPopup = document.getElementById('itemDropdownPopup');
-        const gridContainer = document.querySelector('.inflow-grid-container');
-        if (itemPopup && gridContainer && !itemPopup.contains(e.target) && !e.target.classList.contains('grid-item-input')) {
+        if (itemPopup && !itemPopup.contains(e.target) && !e.target.classList.contains('grid-item-input')) {
             itemPopup.classList.remove('show');
+        }
+    });
+
+    // Restore and fix sidebar customer/order search query
+    const sidebarSearchInput = document.getElementById('soSidebarSearchInput');
+    const urlSearch = new URLSearchParams(window.location.search).get('search') || new URLSearchParams(window.location.search).get('q') || '';
+    let savedSearch = '';
+    try {
+        savedSearch = sessionStorage.getItem('inflow_so_search_query') || '';
+    } catch(e) {}
+    const activeSearch = urlSearch || savedSearch || '{{ search_query or "" }}';
+    if (sidebarSearchInput && activeSearch) {
+        sidebarSearchInput.value = activeSearch;
+        try {
+            sessionStorage.setItem('inflow_so_search_query', activeSearch);
+        } catch(e) {}
+        handleSoLiveSearch(activeSearch);
+    }
+
+    // Attach item dropdown popup to body early and register scroll/resize repositioning
+    const itemPopupEl = document.getElementById('itemDropdownPopup');
+    if (itemPopupEl && itemPopupEl.parentElement !== document.body) {
+        document.body.appendChild(itemPopupEl);
+    }
+    window.addEventListener('scroll', function() {
+        const p = document.getElementById('itemDropdownPopup');
+        if (p && p.classList.contains('show') && typeof activeItemInputEl !== 'undefined' && activeItemInputEl) {
+            positionItemDropdown(activeItemInputEl);
+        }
+    }, true);
+    window.addEventListener('resize', function() {
+        const p = document.getElementById('itemDropdownPopup');
+        if (p && p.classList.contains('show') && typeof activeItemInputEl !== 'undefined' && activeItemInputEl) {
+            positionItemDropdown(activeItemInputEl);
         }
     });
 
@@ -3721,8 +3831,42 @@ function onDrawerCustomerType(val) {
 }
 
 /* ==========================================================================
-   Item Typing Autocomplete Dropdown (Matching screenshot0046.JPEG)
+   Item Typing Autocomplete Dropdown (Bigger & Can Over The Sheet)
    ========================================================================== */
+function positionItemDropdown(inputEl) {
+    const popup = document.getElementById('itemDropdownPopup');
+    if (!popup || !inputEl) return;
+    const rect = inputEl.getBoundingClientRect();
+    
+    popup.style.position = 'fixed';
+    popup.style.zIndex = '9999999';
+    
+    // Bigger width: 880px (or clamped to screen)
+    const popupWidth = Math.min(880, window.innerWidth - 30);
+    popup.style.width = popupWidth + 'px';
+    
+    // Vertical boundary: if space below is less than 260px and space above is larger, flip above
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    if (spaceBelow < 260 && spaceAbove > spaceBelow) {
+        popup.style.top = 'auto';
+        popup.style.bottom = (window.innerHeight - rect.top + 3) + 'px';
+        popup.style.maxHeight = Math.min(420, Math.max(180, spaceAbove - 20)) + 'px';
+    } else {
+        popup.style.bottom = 'auto';
+        popup.style.top = (rect.bottom + 3) + 'px';
+        popup.style.maxHeight = Math.min(420, Math.max(180, spaceBelow - 20)) + 'px';
+    }
+    
+    // Horizontal positioning: align with input left, clamped to viewport
+    let leftPos = rect.left;
+    if (leftPos + popupWidth > window.innerWidth - 15) {
+        leftPos = window.innerWidth - popupWidth - 15;
+    }
+    if (leftPos < 10) leftPos = 10;
+    popup.style.left = leftPos + 'px';
+}
+
 function openItemDropdown(inputEl) {
     activeItemInputEl = inputEl;
     activeGridRowEl = inputEl.closest('tr');
@@ -3730,17 +3874,24 @@ function openItemDropdown(inputEl) {
 
     const popup = document.getElementById('itemDropdownPopup');
     if (popup && inputEl) {
-        const rect = inputEl.getBoundingClientRect();
-        const containerRect = document.querySelector('.inflow-grid-container').getBoundingClientRect();
-        popup.style.top = (rect.bottom - containerRect.top + 2) + 'px';
-        popup.style.left = (rect.left - containerRect.left) + 'px';
+        // Detach and append directly to document.body so it floats OVER the entire sheet and is NEVER clipped
+        if (popup.parentElement !== document.body) {
+            document.body.appendChild(popup);
+        }
+        positionItemDropdown(inputEl);
         popup.classList.add('show');
     }
 }
 
 function filterItemDropdown(val) {
     const popup = document.getElementById('itemDropdownPopup');
-    if (popup) popup.classList.add('show');
+    if (popup) {
+        if (popup.parentElement !== document.body) {
+            document.body.appendChild(popup);
+        }
+        if (activeItemInputEl) positionItemDropdown(activeItemInputEl);
+        popup.classList.add('show');
+    }
 
     const query = (val || '').toLowerCase().trim();
     const rows = document.querySelectorAll('#itemDropdownBody tr');
@@ -3860,7 +4011,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
                 <input type="text" class="inflow-field-input grid-item-input" value="${sku} ${name}" 
                        placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
-                       onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
+                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
                        onkeydown="handleItemDropdownKey(event, this)">
             </td>
             <td style="position: relative;">
@@ -5839,7 +5990,18 @@ function toggleSoSidebarSearch() {
 }
 
 function handleSoLiveSearch(val) {
-    const q = (val || '').toLowerCase().trim();
+    const rawVal = val !== undefined && val !== null ? String(val) : '';
+    const q = rawVal.toLowerCase().trim();
+
+    // Persist search query so it stays fixed in search box across clicks/navigation until user deletes or clears it
+    try {
+        if (rawVal.trim()) {
+            sessionStorage.setItem('inflow_so_search_query', rawVal.trim());
+        } else {
+            sessionStorage.removeItem('inflow_so_search_query');
+        }
+    } catch(e) {}
+
     const clearBtn = document.getElementById('btnClearSoSearch');
     if (clearBtn) {
         clearBtn.style.display = q ? 'block' : 'none';
@@ -5941,9 +6103,20 @@ function startNewOrderForCustomer(customerId, customerName) {
 function clearSoLiveSearch() {
     const inp = document.getElementById('soSidebarSearchInput');
     if (inp) inp.value = '';
+    try {
+        sessionStorage.removeItem('inflow_so_search_query');
+    } catch(e) {}
     handleSoLiveSearch('');
     const btn = document.getElementById('btnClearSoSearch');
     if (btn) btn.style.display = 'none';
+
+    // If URL has search parameter, remove it and reload
+    const url = new URL(window.location.href);
+    if (url.searchParams.has('search') || url.searchParams.has('q')) {
+        url.searchParams.delete('search');
+        url.searchParams.delete('q');
+        window.location.href = url.toString();
+    }
 }
 
 function handleSoSearchKey(e) {
@@ -5953,8 +6126,10 @@ function handleSoSearchKey(e) {
         const url = new URL(window.location.href);
         if (val) {
             url.searchParams.set('search', val);
+            try { sessionStorage.setItem('inflow_so_search_query', val); } catch(err) {}
         } else {
             url.searchParams.delete('search');
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(err) {}
         }
         window.location.href = url.toString();
     }
@@ -6000,9 +6175,16 @@ document.addEventListener('click', function(e) {
 function selectSoStatusFilter(status) {
     const url = new URL(window.location.href);
     url.searchParams.set('status_filter', status);
-    url.searchParams.delete('search');
-    url.searchParams.delete('q');
-    url.searchParams.delete('customer_search');
+    try {
+        sessionStorage.setItem('inflow_so_status_filter', status);
+    } catch(e) {}
+
+    // Retain search query
+    const liveSearch = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    if (liveSearch) {
+        url.searchParams.set('search', liveSearch);
+    }
+
     url.searchParams.delete('customer_id');
     url.searchParams.delete('delivery_man');
     window.location.href = url.toString();
@@ -6010,13 +6192,18 @@ function selectSoStatusFilter(status) {
 
 function applySoDateFilter(val) {
     const url = new URL(window.location.href);
-    if (val && val !== 'All') {
-        url.searchParams.set('date_filter', val);
-    } else {
-        url.searchParams.delete('date_filter');
+    const dateVal = val || 'All';
+    url.searchParams.set('date_filter', dateVal);
+    try {
+        sessionStorage.setItem('inflow_so_date_filter', dateVal);
+    } catch(e) {}
+
+    // Retain search query
+    const liveSearch = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    if (liveSearch) {
+        url.searchParams.set('search', liveSearch);
     }
-    url.searchParams.delete('search');
-    url.searchParams.delete('customer_search');
+
     url.searchParams.delete('date_from');
     url.searchParams.delete('date_to');
     window.location.href = url.toString();
@@ -6035,8 +6222,16 @@ function applyCustomDateFilter() {
     else url.searchParams.delete('date_from');
     if (toVal) url.searchParams.set('date_to', toVal);
     else url.searchParams.delete('date_to');
-    url.searchParams.delete('search');
-    url.searchParams.delete('customer_search');
+
+    // Retain search query
+    const liveSearch = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    if (liveSearch) {
+        url.searchParams.set('search', liveSearch);
+    }
+
+    try {
+        sessionStorage.setItem('inflow_so_date_filter', 'Custom');
+    } catch(e) {}
     window.location.href = url.toString();
 }
 
