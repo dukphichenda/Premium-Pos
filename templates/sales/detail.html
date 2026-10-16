@@ -1291,13 +1291,13 @@
                                             {% for c in all_customers %}
                                             <tr class="main-cust-row"
                                                 data-id="{{ c.id }}"
-                                                data-cname="{{ c.name }}"
-                                                data-name="{{ c.name|lower }}" 
-                                                data-contact="{{ (c.contact_name or '')|lower }}" 
-                                                data-ccontact="{{ c.contact_name or '' }}"
-                                                data-phone="{{ (c.phone or '')|lower }}"
-                                                data-cphone="{{ c.phone or '' }}"
-                                                data-caddress="{{ c.customer_address or c.address1 or '' }}"
+                                                data-cname="{{ c.name|e }}"
+                                                data-name="{{ (c.name or '')|lower|e }}" 
+                                                data-contact="{{ (c.contact_name or '')|lower|e }}" 
+                                                data-ccontact="{{ (c.contact_name or '')|e }}"
+                                                data-phone="{{ (c.phone or '')|lower|e }}"
+                                                data-cphone="{{ (c.phone or '')|e }}"
+                                                data-caddress="{{ (c.customer_address or c.address1 or '')|e }}"
                                                 onclick="selectCustomerFromRow(this)">
                                                 <td style="font-weight: 500;">{{ c.name }}</td>
                                                 <td style="color: #4B5563;">{{ c.contact_name or '' }}</td>
@@ -5208,11 +5208,12 @@ function submitQuickAddCustomerAjax() {
             const phoneInput = document.getElementById('phoneInput');
             const addressInput = document.getElementById('addressInput');
 
+            const cAddr = cust.address || cust.address1 || cust.shipping_address || cust.display_address || '';
             if (custInput) custInput.value = cust.name;
             if (custIdHidden) custIdHidden.value = cust.id;
             if (contactInput) contactInput.value = cust.contact_name || '';
             if (phoneInput) phoneInput.value = cust.phone || '';
-            if (addressInput) addressInput.value = cust.address || '';
+            if (addressInput) addressInput.value = cAddr;
 
             // 2. Add row to main customer dropdown table
             const tbody = document.getElementById('customerDropdownBody');
@@ -5226,7 +5227,7 @@ function submitQuickAddCustomerAjax() {
                 tr.setAttribute('data-ccontact', cust.contact_name || '');
                 tr.setAttribute('data-phone', (cust.phone || '').toLowerCase());
                 tr.setAttribute('data-cphone', cust.phone || '');
-                tr.setAttribute('data-caddress', cust.address || '');
+                tr.setAttribute('data-caddress', cAddr);
                 tr.onclick = function() { selectCustomerFromRow(this); };
                 tr.innerHTML = `
                     <td style="font-weight: 500;">${cust.name}</td>

@@ -108,8 +108,8 @@ class TestBranchIsolationImportView(unittest.TestCase):
             sess['role'] = 'branch_admin'
             sess['branch_id'] = 1
 
-        # Sales orders table view
-        resp = self.client.get('/sales?view=table')
+        # Sales orders view (redirects to modern sales orders workspace)
+        resp = self.client.get('/sales?view=table', follow_redirects=True)
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
         self.assertIn('SO-ISO-01', html)
@@ -150,7 +150,7 @@ class TestBranchIsolationImportView(unittest.TestCase):
         self.assertNotIn('Isolation Cust Branch 2', html_cust_b1)
 
         # HQ sales orders overview: All
-        resp_sales = self.client.get('/sales?view=table&branch=all')
+        resp_sales = self.client.get('/sales?view=table&branch=all', follow_redirects=True)
         self.assertEqual(resp_sales.status_code, 200)
         html_sales = resp_sales.get_data(as_text=True)
         self.assertIn('SO-ISO-01', html_sales)

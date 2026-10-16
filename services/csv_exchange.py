@@ -1297,10 +1297,10 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     'date_paid_raw': get_val(r, ['DatePaid', 'Date Paid']),
                     'status_raw': get_val(r, ['OrderStatus', 'Order Status', 'Status', 'State'], 'OPEN'),
                     'customer_name': get_val(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer'),
-                    'contact_name': get_val(r, ['ContactName', 'Contact Name']),
-                    'phone': get_val(r, ['Phone', 'Telephone', 'Mobile']),
+                    'contact_name': get_val(r, ['ContactName', 'Contact Name', 'Contact']),
+                    'phone': get_val(r, ['Phone', 'Telephone', 'Mobile', 'Customer Phone']),
                     'email': get_val(r, ['Email', 'Email Address']),
-                    'address': get_val(r, ['BillingAddress1', 'Address', 'Billing Address']),
+                    'address': get_val(r, ['ShippingAddress1', 'Shipping Address', 'ShippingAddress', 'CustomerAddress', 'Customer Address', 'BillingAddress1', 'Address', 'Billing Address']),
                     'city': get_val(r, ['BillingCity', 'City']),
                     'country': get_val(r, ['BillingCountry', 'Country'], 'Cambodia'),
                     'sales_rep': get_val(r, ['SalesRep', 'Sales Rep', 'Salesperson']),
@@ -1343,9 +1343,11 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
         # Cache existing customers, products, and locations
         if bid is not None:
-            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id = %s;", (bid,))}
+            cust_rows = query_all("SELECT id, name, contact_name, phone, COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr FROM customers WHERE branch_id = %s;", (bid,))
         else:
-            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id IS NULL;")}
+            cust_rows = query_all("SELECT id, name, contact_name, phone, COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr FROM customers WHERE branch_id IS NULL;")
+        cust_map = {c['name'].lower().strip(): c['id'] for c in cust_rows}
+        cust_info_map = {c['name'].lower().strip(): c for c in cust_rows}
 
         products_rows = query_all("""
             SELECT id, sku, name, default_price, standard_cost, average_cost, uom,
@@ -1376,6 +1378,13 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                           order_data['address'], order_data['city'], order_data['country'], order_data['payment_terms'], bid))
                     cust_id = cur.fetchone()['id']
                     cust_map[cn_clean] = cust_id
+                    cust_info_map[cn_clean] = {
+                        'id': cust_id,
+                        'name': cust_name,
+                        'contact_name': order_data['contact_name'],
+                        'phone': order_data['phone'],
+                        'default_addr': order_data['address']
+                    }
 
                 # Location handling
                 loc_id = None
@@ -1543,6 +1552,12 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 cur.execute("SELECT id, branch_id FROM sales_orders WHERE order_number = %s;", (so_num,))
                 existing_so = cur.fetchone()
 
+                # Determine order-level address, contact, and phone with fallback to customer record
+                cached_c = cust_info_map.get(cn_clean) or {}
+                so_address = (order_data.get('address') or '').strip() or (cached_c.get('default_addr') or '').strip()
+                so_contact = (order_data.get('contact_name') or '').strip() or (cached_c.get('contact_name') or '').strip()
+                so_phone = (order_data.get('phone') or '').strip() or (cached_c.get('phone') or '').strip()
+
                 if existing_so and not is_erase_mode:
                     if existing_so.get('branch_id') != bid:
                         errors.append(f"Order #{so_num}: Belongs to another branch or HQ. Cannot overwrite across branches.")
@@ -1564,13 +1579,18 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             sales_rep = COALESCE(NULLIF(%s, ''), sales_rep),
                             po_number = COALESCE(NULLIF(%s, ''), po_number),
                             notes = COALESCE(NULLIF(%s, ''), notes),
+                            customer_address = COALESCE(NULLIF(%s, ''), customer_address),
+                            customer_contact = COALESCE(NULLIF(%s, ''), customer_contact),
+                            customer_phone = COALESCE(NULLIF(%s, ''), customer_phone),
                             invoiced_date = %s,
                             branch_id = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
                     """, (cust_id, loc_id, ord_date, due_date, so_status, payment_status,
                           calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
-                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid, so_id))
+                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'],
+                          so_address, so_contact, so_phone,
+                          invoiced_date, bid, so_id))
                     cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = %s;", (so_id,))
                     updated_cnt += 1
                 else:
@@ -1579,13 +1599,14 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             order_number, customer_id, location_id, order_date, due_date,
                             status, payment_status, subtotal, shipping_fee, total_amount,
                             paid_amount, balance_due, sales_rep, po_number, notes, invoiced_date,
-                            branch_id
+                            branch_id, customer_address, customer_contact, customer_phone
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id;
                     """, (so_num, cust_id, loc_id, ord_date, due_date, so_status, payment_status,
                           calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
-                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid))
+                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid,
+                          so_address, so_contact, so_phone))
                     so_id = cur.fetchone()['id']
                     imported_cnt += 1
 

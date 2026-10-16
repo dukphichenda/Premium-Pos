@@ -588,20 +588,30 @@ def create_order():
         total_amount = max(0.0, subtotal - discount_amount + tax_amount + shipping_fee)
         balance_due = total_amount
 
+        cust_info = query_one("""
+            SELECT COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as customer_address,
+                   contact_name as customer_contact, phone as customer_phone
+            FROM customers WHERE id = %s
+        """, (customer_id,)) if customer_id else None
+        cust_addr_val = cust_info.get('customer_address') if cust_info else None
+        cust_contact_val = cust_info.get('customer_contact') if cust_info else None
+        cust_phone_val = cust_info.get('customer_phone') if cust_info else None
+
         with get_db_cursor(commit=True) as cur:
             cur.execute("""
                 INSERT INTO sales_orders (
                     order_number, customer_id, location_id, order_date,
                     status, payment_status, subtotal, tax_rate, tax_amount,
                     discount_amount, shipping_fee, total_amount, paid_amount, balance_due,
-                    sales_rep, notes, branch_id
-                ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s)
+                    sales_rep, notes, branch_id, customer_address, customer_contact, customer_phone
+                ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', %s, %s, %s, %s, %s, %s, 0, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id;
             """, (
                 order_number, customer_id, location_id, order_date,
                 subtotal, tax_rate, tax_amount,
                 discount_amount, shipping_fee, total_amount, balance_due,
-                sales_rep, notes, branch_id
+                sales_rep, notes, branch_id,
+                cust_addr_val, cust_contact_val, cust_phone_val
             ))
             order_id = cur.fetchone()['id']
 
@@ -1642,7 +1652,7 @@ def new_order():
     if target_cust_id and str(target_cust_id).isdigit():
         cust_row = query_one("""
             SELECT *, 
-                   COALESCE(NULLIF(address1, ''), NULLIF(shipping_address, ''), '') as display_address
+                   COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as display_address
             FROM customers WHERE id = %s
         """, (int(target_cust_id),))
         if cust_row:
@@ -2108,6 +2118,31 @@ def save_order(id=0):
         else:
             customer_phone = (order.get('customer_phone') if order else '') or ''
 
+        # Preserve existing order address/contact/phone if submitted values are blank
+        if not customer_address and order and order.get('customer_address'):
+            customer_address = str(order['customer_address']).strip()
+        if not customer_contact and order and order.get('customer_contact'):
+            customer_contact = str(order['customer_contact']).strip()
+        if not customer_phone and order and order.get('customer_phone'):
+            customer_phone = str(order['customer_phone']).strip()
+
+        # Fallback to customer's saved address, contact, and phone if still blank
+        if customer_id and (not customer_address or not customer_contact or not customer_phone):
+            cust_fallback = query_one("""
+                SELECT 
+                    COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr,
+                    COALESCE(NULLIF(contact_name, ''), '') as default_contact,
+                    COALESCE(NULLIF(phone, ''), '') as default_phone
+                FROM customers WHERE id = %s
+            """, (customer_id,))
+            if cust_fallback:
+                if not customer_address:
+                    customer_address = (cust_fallback.get('default_addr') or '').strip()
+                if not customer_contact:
+                    customer_contact = (cust_fallback.get('default_contact') or '').strip()
+                if not customer_phone:
+                    customer_phone = (cust_fallback.get('default_phone') or '').strip()
+
         pricing_scheme_id = int(data.get('pricing_scheme_id') or (order.get('pricing_scheme_id') if order else 100) or 100)
         paid_amount = float(data.get('paid_amount', (order['paid_amount'] if order else 0) or 0))
         mark_complete_pay = (str(data.get('mark_complete_pay', '0')) == '1')
@@ -2400,7 +2435,8 @@ def save_order(id=0):
 
         # Record version snapshot
         try:
-            ver_action = "Order Created" if is_new else f"Saved Order (Status: {status}, Total: ${total_amount:,.2f})"
+            current_status = (order.get('status') if order else 'Open') or 'Open'
+            ver_action = "Order Created" if is_new else f"Saved Order (Status: {current_status}, Total: ${total_amount:,.2f})"
             _record_order_version(id, change_summary=ver_action)
         except Exception as ve:
             logger.warning(f"Failed to record version on save: {ve}")
