@@ -6142,20 +6142,30 @@ function clearSoLiveSearch() {
     const inp = document.getElementById('soSidebarSearchInput');
     if (inp) {
         inp.value = '';
-        inp.focus();
     }
     try {
         sessionStorage.removeItem('inflow_so_search_query');
     } catch(e) {}
+
+    const btn = document.getElementById('btnClearSoSearch');
+    if (btn) btn.style.display = 'none';
+
     handleSoLiveSearch('');
 
     const url = new URL(window.location.href);
-    if (url.searchParams.has('search') || url.searchParams.has('q')) {
-        url.searchParams.delete('search');
+    const hasSearchInUrl = url.searchParams.has('search') || url.searchParams.has('q');
+    const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
+
+    if (hasSearchInUrl || hadServerSearch) {
+        url.searchParams.set('search', '');
         url.searchParams.delete('q');
-        if (window.history && window.history.replaceState) {
-            window.history.replaceState({}, '', url.pathname + url.search);
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+        } else {
+            window.location.href = url.pathname + url.search;
         }
+    } else {
+        if (inp) inp.focus();
     }
 }
 
