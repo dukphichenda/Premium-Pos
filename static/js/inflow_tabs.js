@@ -570,8 +570,8 @@
                 if (!url) url = '/';
                 const cleanUrl = url.replace(/[?&]embed=1/, '');
 
-                // Never open logout or login inside an MDI tab iframe - navigate window.top immediately!
-                if (cleanUrl.includes('/logout') || cleanUrl === '/login' || cleanUrl.startsWith('/login?') || cleanUrl.startsWith('/login/')) {
+                // Never open logout inside an MDI tab iframe - navigate window.top immediately!
+                if (cleanUrl.includes('/logout')) {
                     try {
                         localStorage.removeItem(STORAGE_KEY);
                         localStorage.removeItem(ACTIVE_TAB_KEY);
@@ -1268,7 +1268,7 @@
         // Proxy commands to parent MDI Shell
         window.inflowMdi = {
             openTab: function (url, title, type, forceNew) {
-                if (url && (url.includes('/logout') || url.includes('/login'))) {
+                if (url && url.includes('/logout')) {
                     if (window.top) window.top.location.href = url;
                     else window.location.href = url;
                     return;
@@ -1280,7 +1280,7 @@
                 }
             },
             navigateOrOpenTab: function (url, title, type, forceNew) {
-                if (url && (url.includes('/logout') || url.includes('/login'))) {
+                if (url && url.includes('/logout')) {
                     if (window.top) window.top.location.href = url;
                     else window.location.href = url;
                     return;

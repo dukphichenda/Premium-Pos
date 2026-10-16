@@ -45,13 +45,27 @@ class AuthLogoutImmediateTestCase(unittest.TestCase):
         self.assertTrue(data['success'])
         self.assertEqual(data['redirect_url'], '/login')
 
-    def test_login_page_contains_frame_buster(self):
-        """Login page must break out of any iframe and force window.top to navigate to login."""
+    def test_login_page_safe_in_iframe(self):
+        """Login page must not render inside an iframe, safely redirecting iframe to dashboard."""
         res = self.client.get('/login')
         self.assertEqual(res.status_code, 200)
         html = res.data.decode('utf-8')
         self.assertIn("window.self !== window.top", html)
-        self.assertIn("window.top.location.href", html)
+        self.assertIn("dashboard", html)
+
+    def test_login_persistence_no_auto_logout(self):
+        """Logging in preserves session and accessing dashboard does not redirect back to login."""
+        # Find active user
+        from database import query_one
+        user = query_one("SELECT username FROM users WHERE role = 'main_admin' AND is_active = TRUE LIMIT 1")
+        if user:
+            res = self.client.post('/login', data={'username': user['username'], 'password': '123'}, follow_redirects=False)
+            self.assertEqual(res.status_code, 302)
+            self.assertIn('/dashboard', res.headers.get('Location', ''))
+
+            # Subsequent request to /dashboard must be authorized (status 200)
+            res2 = self.client.get('/dashboard', follow_redirects=False)
+            self.assertEqual(res2.status_code, 200)
 
 if __name__ == '__main__':
     unittest.main()
