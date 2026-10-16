@@ -9,7 +9,7 @@
     <!-- 1. Top Action Toolbar (Matching inFlow Cloud screenshot) -->
     <div class="inflow-adj-top-bar">
         <div class="inflow-adj-top-left">
-            <a href="{{ url_for('inventory.list_adjustments') }}" class="inflow-adj-close-btn" title="Back to Adjustments (បិទ / ត្រឡប់ក្រោយ)">
+            <a href="{{ url_for('inventory.list_adjustments') }}" class="inflow-adj-close-btn" onclick="return onCloseAdjustmentPage(event)" title="Back to Adjustments (បិទ / ត្រឡប់ក្រោយ)">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </a>
             {% if is_detail %}
@@ -226,15 +226,17 @@
             <table class="inflow-adj-table" id="adjProductTable">
                 <thead>
                     <tr>
-                        <th style="width: 28%;">Product</th>
-                        <th style="width: 14%;">Sublocation</th>
-                        <th style="width: 11%; text-align: right;" title="Physical quantity currently in warehouse on hand">Qty on Hand</th>
+                        <th style="width: 26%;">Product</th>
+                        <th style="width: 13%;">Sublocation</th>
+                        <th style="width: 12%; text-align: center;" title="Physical quantity currently in warehouse on hand (Directly editable / កែសម្រួលចំនួនជាក់ស្ដែង)">
+                            Qty on Hand {% if not is_detail %}<span style="font-size: 11px; opacity: 0.75;" title="Directly editable count">✏️</span>{% endif %}
+                        </th>
                         <th style="width: 11%; text-align: right;" title="Quantity reserved on active customer bills / sales orders">Qty Reserved</th>
                         <th style="width: 10%; text-align: center;" title="Baseline count before adjustment">Initial</th>
-                        <th style="width: 13%; text-align: center;" title="Adjustment delta (+ or -)">Change</th>
-                        <th style="width: 10%; text-align: center;" title="Calculated resulting quantity after adjustment">Final</th>
+                        <th style="width: 12%; text-align: center;" title="Adjustment delta (+ or -)">Change</th>
+                        <th style="width: 12%; text-align: center;" title="Calculated resulting quantity after adjustment">Final</th>
                         {% if not is_detail %}
-                        <th style="width: 3%; text-align: center;"></th>
+                        <th style="width: 4%; text-align: center;"></th>
                         {% endif %}
                     </tr>
                 </thead>
@@ -328,6 +330,35 @@
                 </a>
                 {% endif %}
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Discard / Close Confirmation Alert Modal -->
+<div id="inflowAdjDiscardModal" class="inflow-adj-modal-backdrop" style="display: none;">
+    <div class="inflow-adj-modal-card" role="dialog" aria-modal="true" aria-labelledby="discardModalTitle">
+        <div class="inflow-adj-modal-header">
+            <div class="inflow-adj-modal-icon-wrap">
+                <span class="inflow-adj-modal-icon">⚠️</span>
+            </div>
+            <div>
+                <h3 id="discardModalTitle" class="inflow-adj-modal-title">Unsaved Stock Adjustments</h3>
+                <p class="inflow-adj-modal-subtitle">You have quantity adjustments in progress.</p>
+            </div>
+        </div>
+        <div class="inflow-adj-modal-body">
+            <p>If you close now, any physical counts and quantity changes made on this sheet will be discarded.</p>
+            <p class="font-khmer" style="font-size: 12.5px; color: #64748B; margin-top: 6px;">
+                តើអ្នកចង់បន្តការកែសម្រួលស្តុក ឬបោះបង់ការផ្លាស់ប្តូរទាំងនេះ?
+            </p>
+        </div>
+        <div class="inflow-adj-modal-actions">
+            <button type="button" class="btn btn-secondary inflow-adj-btn-discard" onclick="confirmDiscardChanges()">
+                <span>Discard Changes (បោះបង់)</span>
+            </button>
+            <button type="button" class="btn btn-primary inflow-adj-btn-continue" onclick="dismissDiscardModal()" autofocus>
+                <span>Continue Adjustment (បន្តការកែសម្រួល)</span>
+            </button>
         </div>
     </div>
 </div>
@@ -1023,6 +1054,168 @@
     color: #92400E;
 }
 
+/* Direct Qty on Hand Input */
+.inflow-adj-onhand-input {
+    min-width: 68px;
+    width: 78px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid #CBD5E1;
+    background-color: #FFFFFF;
+    color: #0F172A;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-align: center;
+    outline: none;
+    transition: all 0.15s ease;
+}
+.inflow-adj-onhand-input:hover {
+    border-color: #94A3B8;
+    background-color: #F8FAFC;
+}
+.inflow-adj-onhand-input:focus {
+    border-color: #0284C7;
+    background-color: #FFFFFF;
+    box-shadow: 0 0 0 2.5px rgba(2, 132, 199, 0.2);
+}
+.inflow-adj-onhand-input.is-adjusted {
+    border-color: #0284C7;
+    background-color: #F0F9FF;
+    color: #0369A1;
+    box-shadow: inset 0 1px 2px rgba(2, 132, 199, 0.08);
+}
+
+/* Discard / Close Confirmation Modal */
+.inflow-adj-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.62);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 999999;
+    padding: 20px;
+    animation: inflowFadeIn 0.15s ease-out;
+}
+
+.inflow-adj-modal-card {
+    background: #FFFFFF;
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
+    padding: 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: inflowSlideUp 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes inflowFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes inflowSlideUp {
+    from { transform: translateY(12px) scale(0.97); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.inflow-adj-modal-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.inflow-adj-modal-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #FEF3C7;
+    border: 1px solid #FDE68A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+}
+
+.inflow-adj-modal-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+}
+
+.inflow-adj-modal-subtitle {
+    font-size: 0.85rem;
+    color: #64748B;
+    margin: 2px 0 0 0;
+}
+
+.inflow-adj-modal-body {
+    font-size: 0.92rem;
+    color: #334155;
+    line-height: 1.5;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+
+.inflow-adj-modal-body p {
+    margin: 0;
+}
+
+.inflow-adj-modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.inflow-adj-btn-discard {
+    background: #FFFFFF !important;
+    border: 1.5px solid #FCA5A5 !important;
+    color: #DC2626 !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding: 9px 18px !important;
+    font-size: 13.5px !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.inflow-adj-btn-discard:hover {
+    background: #FEF2F2 !important;
+    border-color: #EF4444 !important;
+    color: #B91C1C !important;
+}
+
+.inflow-adj-btn-continue {
+    background: #273A5E !important;
+    border: 1.5px solid #273A5E !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    border-radius: 8px !important;
+    padding: 9px 20px !important;
+    font-size: 13.5px !important;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(39, 58, 94, 0.2);
+    transition: all 0.15s ease;
+}
+
+.inflow-adj-btn-continue:hover {
+    background: #1B2B47 !important;
+    transform: translateY(-1px);
+}
+
 /* Row Delete Button */
 .inflow-adj-row-del-btn {
     background: none;
@@ -1133,6 +1326,131 @@
 const IS_DETAIL_VIEW = {{ 'true' if is_detail else 'false' }};
 let loadedProductsMap = new Map(); // id -> product object
 let stockMode = 'default'; // 'add' | 'remove' | 'default'
+let isSubmittingOrConfirmedDiscard = false;
+let pendingCloseTarget = null;
+
+// ==========================================================================
+// Unsaved Changes & Discard Modal Lifecycle Handlers
+// ==========================================================================
+function isAdjustmentDirty() {
+    if (IS_DETAIL_VIEW) return false;
+    if (isSubmittingOrConfirmedDiscard) return false;
+
+    // Check if any product has a non-zero change
+    for (const [pid, item] of loadedProductsMap.entries()) {
+        if (Math.abs(item.change_qty) > 0.0001) {
+            return true;
+        }
+    }
+
+    // Check if products have been added to the sheet
+    if (loadedProductsMap.size > 0) {
+        return true;
+    }
+
+    // Check remarks or custom fields
+    const remarksEl = document.getElementById('adjRemarksTextarea');
+    if (remarksEl && remarksEl.value.trim().length > 0) return true;
+
+    const refDoc = document.getElementById('adjRefDocInput')?.value.trim();
+    const tag = document.getElementById('adjTagInput')?.value.trim();
+    if (refDoc || tag) return true;
+
+    return false;
+}
+
+function openDiscardModal() {
+    const modal = document.getElementById('inflowAdjDiscardModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        const continueBtn = modal.querySelector('.inflow-adj-btn-continue');
+        if (continueBtn) continueBtn.focus();
+    }
+}
+
+function dismissDiscardModal() {
+    const modal = document.getElementById('inflowAdjDiscardModal');
+    if (modal) modal.style.display = 'none';
+    pendingCloseTarget = null;
+}
+
+function confirmDiscardChanges() {
+    isSubmittingOrConfirmedDiscard = true;
+    const modal = document.getElementById('inflowAdjDiscardModal');
+    if (modal) modal.style.display = 'none';
+
+    // Disable guards
+    window.onbeforeunload = null;
+    window.handleTabCloseAttempt = function() { return true; };
+
+    const target = pendingCloseTarget || '__CLOSE__';
+    pendingCloseTarget = null;
+
+    if (target === '__CLOSE__') {
+        if (window.parent && window.parent.inflowTabs && typeof window.parent.inflowTabs.closeTab === 'function') {
+            const activeId = window.parent.inflowTabs.activeTabId;
+            window.parent.inflowTabs.closeTab(activeId);
+            return;
+        }
+        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.closeActiveTab === 'function') {
+            window.top.inflowMdi.closeActiveTab();
+            return;
+        }
+        window.location.href = "{{ url_for('inventory.list_adjustments') }}";
+    } else {
+        window.location.href = target;
+    }
+}
+
+function onCloseAdjustmentPage(e) {
+    if (isAdjustmentDirty()) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        pendingCloseTarget = '__CLOSE__';
+        openDiscardModal();
+        return false;
+    }
+    if (window.parent && window.parent.inflowTabs && typeof window.parent.inflowTabs.closeTab === 'function') {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        window.parent.inflowTabs.closeTab(window.parent.inflowTabs.activeTabId);
+        return false;
+    }
+    return true;
+}
+
+// Hook for inFlow MDI tab close & tab switch attempts
+window.handleTabCloseAttempt = function(targetUrl) {
+    if (isSubmittingOrConfirmedDiscard) return true;
+    if (!isAdjustmentDirty()) return true;
+
+    pendingCloseTarget = targetUrl || '__CLOSE__';
+    openDiscardModal();
+    return false; // Blocks the close attempt in inflow_tabs
+};
+
+// Hook for browser reload / back / close window
+window.addEventListener('beforeunload', function(e) {
+    if (isAdjustmentDirty() && !isSubmittingOrConfirmedDiscard) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved stock adjustment changes in progress. Are you sure you want to discard?';
+        return e.returnValue;
+    }
+});
+
+// Escape key to dismiss modal (Continue Adjustment)
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('inflowAdjDiscardModal');
+        if (modal && modal.style.display !== 'none') {
+            dismissDiscardModal();
+        }
+    }
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     // If detail view, table is already rendered server-side
@@ -1458,9 +1776,16 @@ function addProductRowToTable(product) {
             <input type="text" id="subloc_${item.product_id}" class="inflow-adj-subloc-input" value="${item.sublocation || 'A-1'}" placeholder="Bin/Aisle" onchange="onSublocChanged(${item.product_id}, this.value)">
         </td>
 
-        <!-- Qty on Hand -->
-        <td style="text-align: right; font-weight: 700; color: #0F172A;" id="on_hand_${item.product_id}">
-            ${formatNum(item.on_hand_qty)}
+        <!-- Qty on Hand (Directly Editable Count in Hand) -->
+        <td style="text-align: center;">
+            <input type="text" inputmode="decimal" id="on_hand_input_${item.product_id}"
+                   class="inflow-adj-onhand-input"
+                   value="${numVal(item.final_qty)}"
+                   title="Physical count currently in hand (Direct correction)"
+                   oninput="onOnHandQtyInput(${item.product_id}, this.value)"
+                   onblur="onInputBlur(${item.product_id}, 'on_hand')"
+                   onfocus="this.select()"
+                   onkeydown="onInputKeyDown(event, ${item.product_id}, 'on_hand')">
         </td>
 
         <!-- Qty Reserved (from customer bills) -->
@@ -1477,23 +1802,30 @@ function addProductRowToTable(product) {
             </div>
         </td>
 
-        <!-- Change (Delta Input matching Red / Green / Gray pills in screenshot) -->
+        <!-- Change (Delta Input - Editable) -->
         <td style="text-align: center;">
             <div class="inflow-adj-change-wrap">
-                <input type="number" step="any" id="change_input_${item.product_id}" 
+                <input type="text" inputmode="decimal" id="change_input_${item.product_id}" 
                        class="inflow-adj-change-input pill-change-zero" 
                        value="0" 
+                       title="Adjustment delta (+ or -)"
                        oninput="onChangeQtyInput(${item.product_id}, this.value)"
-                       onkeydown="onInputKeyDown(event, ${item.product_id})">
+                       onblur="onInputBlur(${item.product_id}, 'change')"
+                       onfocus="this.select()"
+                       onkeydown="onInputKeyDown(event, ${item.product_id}, 'change')">
             </div>
         </td>
 
-        <!-- Final (Resulting Qty Input matching Tan/Amber pill in screenshot) -->
+        <!-- Final (Resulting Qty Input - Editable) -->
         <td style="text-align: center;">
-            <input type="number" step="any" id="final_input_${item.product_id}" 
+            <input type="text" inputmode="decimal" id="final_input_${item.product_id}" 
                    class="inflow-adj-final-input" 
-                   value="${formatNum(item.final_qty)}" 
-                   oninput="onFinalQtyInput(${item.product_id}, this.value)">
+                   value="${numVal(item.final_qty)}" 
+                   title="Resulting count after adjustment"
+                   oninput="onFinalQtyInput(${item.product_id}, this.value)"
+                   onblur="onInputBlur(${item.product_id}, 'final')"
+                   onfocus="this.select()"
+                   onkeydown="onInputKeyDown(event, ${item.product_id}, 'final')">
         </td>
 
         <!-- Row Delete Action -->
@@ -1507,38 +1839,124 @@ function addProductRowToTable(product) {
     tbody.appendChild(tr);
 }
 
-// When user edits Change input: Final = Initial + Change
+// Number sanitizers avoiding HTML5 input commas blanking
+function parseQty(val) {
+    if (val === undefined || val === null) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    const str = String(val).replace(/,/g, '').trim();
+    if (str === '' || str === '-' || str === '+') return 0;
+    const num = parseFloat(str);
+    return isNaN(num) ? 0 : num;
+}
+
+function numVal(n) {
+    if (n === undefined || n === null || isNaN(n)) return 0;
+    return Number((Number(n)).toFixed(4).replace(/\.?0+$/, '')) || 0;
+}
+
+// 1. When user edits Qty on Hand directly:
+//    Final = newOnHand, Change = newOnHand - Initial
+function onOnHandQtyInput(productId, val) {
+    const item = loadedProductsMap.get(productId);
+    if (!item) return;
+
+    const newOnHand = parseQty(val);
+    item.final_qty = newOnHand;
+    item.change_qty = newOnHand - item.on_hand_qty;
+
+    // Update Change input
+    const changeInput = document.getElementById(`change_input_${productId}`);
+    if (changeInput) {
+        changeInput.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+    }
+
+    // Update Final input
+    const finalInput = document.getElementById(`final_input_${productId}`);
+    if (finalInput) {
+        finalInput.value = numVal(item.final_qty);
+    }
+
+    updateOnHandInputStyle(productId, item.change_qty);
+    updateChangePillColor(productId, item.change_qty);
+}
+
+// 2. When user edits Change input:
+//    Final = Initial + Change, Qty on Hand = Final
 function onChangeQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
-    const diff = parseFloat(val) || 0;
+    const diff = parseQty(val);
     item.change_qty = diff;
     item.final_qty = item.on_hand_qty + diff;
 
-    // Update final input value
-    const finalInput = document.getElementById(`final_input_${productId}`);
-    if (finalInput) finalInput.value = formatNum(item.final_qty);
+    // Update Qty on Hand input
+    const onHandInput = document.getElementById(`on_hand_input_${productId}`);
+    if (onHandInput) {
+        onHandInput.value = numVal(item.final_qty);
+    }
 
+    // Update Final input
+    const finalInput = document.getElementById(`final_input_${productId}`);
+    if (finalInput) {
+        finalInput.value = numVal(item.final_qty);
+    }
+
+    updateOnHandInputStyle(productId, item.change_qty);
     updateChangePillColor(productId, diff);
 }
 
-// When user edits Final input: Change = Final - Initial
+// 3. When user edits Final input:
+//    Change = Final - Initial, Qty on Hand = Final
 function onFinalQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
-    const finalVal = parseFloat(val) || 0;
+    const finalVal = parseQty(val);
     item.final_qty = finalVal;
     item.change_qty = finalVal - item.on_hand_qty;
 
-    // Update change input value
-    const changeInput = document.getElementById(`change_input_${productId}`);
-    if (changeInput) {
-        changeInput.value = item.change_qty > 0 ? `+${formatNum(item.change_qty)}` : formatNum(item.change_qty);
+    // Update Qty on Hand input
+    const onHandInput = document.getElementById(`on_hand_input_${productId}`);
+    if (onHandInput) {
+        onHandInput.value = numVal(item.final_qty);
     }
 
+    // Update Change input
+    const changeInput = document.getElementById(`change_input_${productId}`);
+    if (changeInput) {
+        changeInput.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+    }
+
+    updateOnHandInputStyle(productId, item.change_qty);
     updateChangePillColor(productId, item.change_qty);
+}
+
+// Clean formatting on blur
+function onInputBlur(productId, fieldType) {
+    const item = loadedProductsMap.get(productId);
+    if (!item) return;
+
+    if (fieldType === 'on_hand') {
+        const input = document.getElementById(`on_hand_input_${productId}`);
+        if (input) input.value = numVal(item.final_qty);
+    } else if (fieldType === 'change') {
+        const input = document.getElementById(`change_input_${productId}`);
+        if (input) input.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+    } else if (fieldType === 'final') {
+        const input = document.getElementById(`final_input_${productId}`);
+        if (input) input.value = numVal(item.final_qty);
+    }
+}
+
+function updateOnHandInputStyle(productId, changeQty) {
+    const onHandInput = document.getElementById(`on_hand_input_${productId}`);
+    if (!onHandInput) return;
+    if (Math.abs(changeQty) > 0.0001) {
+        onHandInput.classList.add('is-adjusted');
+    } else {
+        onHandInput.classList.remove('is-adjusted');
+    }
 }
 
 function updateChangePillColor(productId, diff) {
@@ -1564,8 +1982,11 @@ function updateRowVisuals(productId) {
     const item = loadedProductsMap.get(productId);
     if (!item) return;
 
-    const onHandEl = document.getElementById(`on_hand_${productId}`);
-    if (onHandEl) onHandEl.innerText = formatNum(item.on_hand_qty);
+    const onHandInput = document.getElementById(`on_hand_input_${productId}`);
+    if (onHandInput) {
+        onHandInput.value = numVal(item.final_qty);
+        updateOnHandInputStyle(productId, item.change_qty);
+    }
 
     const resEl = document.getElementById(`reserved_${productId}`);
     if (resEl) resEl.innerHTML = `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">${formatNum(item.reserved_qty)}</span>`;
@@ -1574,10 +1995,12 @@ function updateRowVisuals(productId) {
     if (initPill) initPill.innerText = formatNum(item.on_hand_qty);
 
     const changeInput = document.getElementById(`change_input_${productId}`);
-    if (changeInput) changeInput.value = formatNum(item.change_qty);
+    if (changeInput) {
+        changeInput.value = item.change_qty > 0 ? `+${numVal(item.change_qty)}` : `${numVal(item.change_qty)}`;
+    }
 
     const finalInput = document.getElementById(`final_input_${productId}`);
-    if (finalInput) finalInput.value = formatNum(item.final_qty);
+    if (finalInput) finalInput.value = numVal(item.final_qty);
 
     updateChangePillColor(productId, item.change_qty);
 }
@@ -1621,15 +2044,18 @@ function filterTableRows(query) {
     });
 }
 
-function onInputKeyDown(event, productId) {
+function onInputKeyDown(event, productId, fieldType) {
     if (event.key === 'Enter') {
         event.preventDefault();
-        // Move to next row's change input
+        // Move to next row's corresponding input
         const rows = Array.from(document.querySelectorAll('.inflow-adj-row'));
         const currentIndex = rows.findIndex(r => r.dataset.productId == productId);
         if (currentIndex >= 0 && currentIndex < rows.length - 1) {
             const nextPid = rows[currentIndex + 1].dataset.productId;
-            const nextInput = document.getElementById(`change_input_${nextPid}`);
+            const targetId = (fieldType === 'on_hand') ? `on_hand_input_${nextPid}`
+                           : (fieldType === 'final') ? `final_input_${nextPid}`
+                           : `change_input_${nextPid}`;
+            const nextInput = document.getElementById(targetId);
             if (nextInput) {
                 nextInput.focus();
                 nextInput.select();
@@ -1684,6 +2110,8 @@ async function submitStockAdjustmentForm() {
     if (bottomBtn) bottomBtn.disabled = true;
 
     try {
+        isSubmittingOrConfirmedDiscard = true;
+        window.onbeforeunload = null;
         const res = await fetch("{{ url_for('inventory.create_adjustment') }}", {
             method: 'POST',
             headers: {
@@ -1696,11 +2124,13 @@ async function submitStockAdjustmentForm() {
         if (data.success) {
             window.location.href = data.redirect_url || "{{ url_for('inventory.list_adjustments') }}";
         } else {
+            isSubmittingOrConfirmedDiscard = false;
             alert(data.error || "Error applying stock adjustment.");
             if (topBtn) topBtn.disabled = false;
             if (bottomBtn) bottomBtn.disabled = false;
         }
     } catch (e) {
+        isSubmittingOrConfirmedDiscard = false;
         alert("Network error executing stock adjustment: " + e);
         if (topBtn) topBtn.disabled = false;
         if (bottomBtn) bottomBtn.disabled = false;
@@ -1736,7 +2166,7 @@ function printAdjustmentSheet() {
                     <td style="padding: 6px 8px; font-weight: 600;">${item.name}</td>
                     <td style="padding: 6px 8px; font-family: monospace;">${item.sku}</td>
                     <td style="padding: 6px 8px;">${item.sublocation || '-'}</td>
-                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.final_qty)}</td>
                     <td style="padding: 6px 8px; text-align: right;">${formatNum(item.reserved_qty)}</td>
                     <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty)}</td>
                     <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${item.change_qty > 0 ? '+' : ''}${formatNum(item.change_qty)}</td>
@@ -1766,7 +2196,7 @@ function copyAdjustmentData() {
                 item.sku,
                 item.name,
                 item.sublocation || '-',
-                formatNum(item.on_hand_qty),
+                formatNum(item.final_qty),
                 formatNum(item.reserved_qty),
                 formatNum(item.on_hand_qty),
                 item.change_qty > 0 ? `+${formatNum(item.change_qty)}` : formatNum(item.change_qty),
