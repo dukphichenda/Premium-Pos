@@ -826,6 +826,62 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     """
     sidebar_orders = query_all(drawer_sql, tuple(drawer_params))
 
+    # Pre-aggregate items sold preview for instant hover preview ("when mouse over order it will preview total items sell")
+    preview_map = {}
+    if sidebar_orders:
+        s_ids = [o['id'] for o in sidebar_orders]
+        try:
+            lines_summary = query_all("""
+                SELECT 
+                    sol.sales_order_id,
+                    COUNT(sol.id) as line_count,
+                    COALESCE(SUM(COALESCE(sol.quantity_display, sol.quantity, 0)), 0) as total_qty,
+                    json_agg(
+                        json_build_object(
+                            'name', p.name,
+                            'sku', COALESCE(p.sku, ''),
+                            'qty', COALESCE(sol.quantity_display, sol.quantity, 1),
+                            'uom', COALESCE(sol.uom, p.uom, 'pcs.'),
+                            'price', COALESCE(sol.unit_price, 0),
+                            'subtotal', COALESCE(sol.subtotal, 0)
+                        ) ORDER BY sol.line_num ASC
+                    ) as items
+                FROM sales_order_lines sol
+                JOIN products p ON sol.product_id = p.id
+                WHERE sol.sales_order_id = ANY(%s)
+                GROUP BY sol.sales_order_id
+            """, (s_ids,))
+            summary_map = {row['sales_order_id']: row for row in lines_summary}
+            for o in sidebar_orders:
+                oid = o['id']
+                sdata = summary_map.get(oid)
+                if sdata:
+                    t_items = int(sdata.get('line_count') or 0)
+                    t_qty = float(sdata.get('total_qty') or 0)
+                    items_list = sdata.get('items') or []
+                else:
+                    t_items = 0
+                    t_qty = 0.0
+                    items_list = []
+                o['total_items'] = t_items
+                o['total_qty'] = t_qty
+                o['items_preview'] = items_list
+                preview_map[oid] = {
+                    'id': oid,
+                    'order_number': o.get('order_number') or '',
+                    'order_date': str(o.get('order_date') or ''),
+                    'customer_name': o.get('customer_name') or 'No Customer',
+                    'status': o.get('status') or 'Open',
+                    'fulfillment_badge': o.get('fulfillment_badge') or 'Open',
+                    'delivery_man': o.get('delivery_man') or '',
+                    'total_amount': float(o.get('total_amount') or 0),
+                    'total_items': t_items,
+                    'total_qty': t_qty,
+                    'items': items_list
+                }
+        except Exception as e:
+            logger.warning(f"Error querying lines summary for sidebar preview: {e}")
+
     # Branch scope where condition for status counts
     branch_count_where = ["NOT (so.customer_id IS NULL AND so.total_amount = 0)"]
     branch_count_params = []
@@ -928,6 +984,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         'company': company,
         'all_branches': all_branches,
         'all_delivery_men': all_delivery_men,
+        'preview_map': preview_map,
         'active_branch_filter': branch_id or ('all' if is_main else 'main')
     }
 
@@ -1652,6 +1709,7 @@ def new_order():
                            order=order,
                            lines=lines,
                            sidebar_orders=drawer_data['sidebar_orders'],
+                           preview_map=drawer_data.get('preview_map', {}),
                            status_counts=drawer_data.get('status_counts', {}),
                            active_delivery_man=drawer_data.get('active_delivery_man', ''),
                            search_query=drawer_data.get('search_query', ''),
@@ -1893,6 +1951,7 @@ def detail_order(id):
                            order=order,
                            lines=lines,
                            sidebar_orders=drawer_data['sidebar_orders'],
+                           preview_map=drawer_data.get('preview_map', {}),
                            status_counts=drawer_data.get('status_counts', {}),
                            active_delivery_man=drawer_data.get('active_delivery_man', ''),
                            search_query=drawer_data.get('search_query', ''),
@@ -1917,6 +1976,69 @@ def detail_order(id):
                            versions=versions,
                            current_branch=branch_obj,
                            is_branch_order=bool(branch_obj))
+
+@sales_orders_bp.route('/sales/api/preview_items/<int:id>')
+def api_order_preview_items(id):
+    order = query_one("""
+        SELECT so.id, so.order_number, so.order_date, so.status, so.payment_status,
+               so.total_amount, so.delivery_man, COALESCE(c.name, 'No Customer') as customer_name
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE so.id = %s
+    """, (id,))
+    if not order:
+        return jsonify({'error': 'Order not found'}), 404
+
+    lines = query_all("""
+        SELECT 
+            sol.id,
+            sol.line_num,
+            p.name,
+            COALESCE(p.sku, '') as sku,
+            COALESCE(sol.quantity_display, sol.quantity, 1) as qty,
+            COALESCE(sol.uom, p.uom, 'pcs.') as uom,
+            COALESCE(sol.unit_price, 0) as price,
+            COALESCE(sol.subtotal, 0) as subtotal
+        FROM sales_order_lines sol
+        JOIN products p ON sol.product_id = p.id
+        WHERE sol.sales_order_id = %s
+        ORDER BY sol.line_num ASC
+    """, (id,))
+
+    items = [{
+        'name': l['name'],
+        'sku': l['sku'],
+        'qty': float(l['qty'] or 0),
+        'uom': l['uom'],
+        'price': float(l['price'] or 0),
+        'subtotal': float(l['subtotal'] or 0)
+    } for l in lines]
+    total_qty = sum(item['qty'] for item in items)
+
+    st = order.get('status') or 'Open'
+    pst = order.get('payment_status') or ''
+    if str(st).upper() in ('SHIPPED', 'INVOICED', 'PAID') or str(pst).upper() == 'PAID':
+        badge = 'Paid'
+    elif str(st).upper() == 'CANCELLED':
+        badge = 'Cancelled'
+    elif str(st).upper() == 'QUOTE':
+        badge = 'Quote'
+    else:
+        badge = 'Open'
+
+    return jsonify({
+        'id': order['id'],
+        'order_number': order['order_number'],
+        'order_date': str(order['order_date'] or ''),
+        'customer_name': order['customer_name'],
+        'status': st,
+        'fulfillment_badge': badge,
+        'delivery_man': order.get('delivery_man') or '',
+        'total_amount': float(order['total_amount'] or 0),
+        'total_items': len(items),
+        'total_qty': total_qty,
+        'items': items
+    })
 
 @sales_orders_bp.route('/sales/<int:id>/save', methods=['POST'])
 @sales_orders_bp.route('/sales/new/save', methods=['POST'])
