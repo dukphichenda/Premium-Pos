@@ -30,6 +30,8 @@
     justify-content: space-between;
     gap: 8px;
     background: #F8FAFC;
+    position: relative;
+    z-index: 100;
 }
 
 .so-icon-btn {
@@ -173,15 +175,27 @@
 .so-clear-search-btn {
     position: absolute;
     right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
     background: none;
     border: none;
     color: #94A3B8;
-    font-size: 12px;
+    font-size: 13px;
+    font-weight: 700;
     cursor: pointer;
-    padding: 2px 4px;
+    padding: 0;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.12s ease;
+    z-index: 10;
 }
 .so-clear-search-btn:hover {
-    color: #334155;
+    color: #0F172A;
+    background: #E2E8F0;
 }
 
 .so-filter-toggle-row {
@@ -1107,12 +1121,12 @@
             </div>
 
             <!-- Add New Order Button [ + ] -->
-            <a href="javascript:void(0)" onclick="createNewOrderInTab()" class="so-icon-btn" title="Create New Sales Order (+)">
+            <button type="button" class="so-icon-btn" id="btnStartNewOrder" onclick="createNewOrderInTab()" title="Create New Sales Order (+)">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                     <line x1="12" y1="5" x2="12" y2="19"></line>
                     <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-            </a>
+            </button>
         </div>
 
         <!-- Wider Search Input Box (Directly visible) -->
@@ -1126,11 +1140,10 @@
                        placeholder="Search order #, customer, $..." 
                        value="{{ search_query or '' }}"
                        autocomplete="off" 
-                       style="height: 33px; padding-left: 31px; font-size: 12px;"
+                       style="height: 33px; padding-left: 31px; padding-right: 30px; font-size: 12px;"
                        oninput="handleSoLiveSearch(this.value)"
-                       onkeydown="handleSoSearchKey(event)"
-                       onblur="handleSoSearchBlur(this)">
-                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query %}display: block;{% else %}display: none;{% endif %}">✕</button>
+                       onkeydown="handleSoSearchKey(event)">
+                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
             </div>
         </div>
 
@@ -3528,7 +3541,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (sidebarSearchInput) {
         sidebarSearchInput.value = activeSearch;
         const clearBtn = document.getElementById('btnClearSoSearch');
-        if (clearBtn) clearBtn.style.display = activeSearch ? 'block' : 'none';
+        if (clearBtn) clearBtn.style.display = activeSearch ? 'flex' : 'none';
         if (activeSearch) {
             try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
             handleSoLiveSearch(activeSearch);
@@ -6014,30 +6027,23 @@ function toggleSoSidebarSearch() {
     }
 }
 
-let soClearSearchTimer = null;
-
 function handleSoLiveSearch(val) {
-    if (soClearSearchTimer) {
-        clearTimeout(soClearSearchTimer);
-        soClearSearchTimer = null;
-    }
-
     const rawVal = val !== undefined && val !== null ? String(val) : '';
     const q = rawVal.toLowerCase().trim();
 
-    // Persist search query so it stays fixed in search box across clicks/navigation until user deletes or clears it
+    // Toggle cross sign (✕) button exactly as in PO
+    const clearBtn = document.getElementById('btnClearSoSearch');
+    if (clearBtn) {
+        clearBtn.style.display = q ? 'flex' : 'none';
+    }
+
     try {
-        if (rawVal.trim()) {
+        if (q) {
             sessionStorage.setItem('inflow_so_search_query', rawVal.trim());
         } else {
             sessionStorage.removeItem('inflow_so_search_query');
         }
     } catch(e) {}
-
-    const clearBtn = document.getElementById('btnClearSoSearch');
-    if (clearBtn) {
-        clearBtn.style.display = q ? 'block' : 'none';
-    }
 
     const cards = document.querySelectorAll('.so-sidebar-card:not(.so-customer-match-card)');
     let visibleOrders = 0;
@@ -6105,51 +6111,6 @@ function handleSoLiveSearch(val) {
     if (countDisplay) {
         countDisplay.innerText = visibleOrders;
     }
-
-    // Auto-clear logic: when user deletes search text, automatically restore all orders
-    if (!q) {
-        const currentUrl = new URL(window.location.href);
-        const hasSearchInUrl = currentUrl.searchParams.has('search') || currentUrl.searchParams.has('q');
-        const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
-
-        if (hasSearchInUrl || hadServerSearch) {
-            soClearSearchTimer = setTimeout(function() {
-                const searchInp = document.getElementById('soSidebarSearchInput');
-                if (!searchInp || !searchInp.value.trim()) {
-                    currentUrl.searchParams.set('search', '');
-                    currentUrl.searchParams.delete('q');
-                    try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-                    if (window.top && window.top.inflowMdi) {
-                        window.top.inflowMdi.navigateOrOpenTab(currentUrl.pathname + currentUrl.search, 'Sales Order', 'sales');
-                    } else {
-                        window.location.href = currentUrl.pathname + currentUrl.search;
-                    }
-                }
-            }, 300);
-        }
-    }
-}
-
-function handleSoSearchBlur(inputEl) {
-    if (!inputEl || !inputEl.value.trim()) {
-        const currentUrl = new URL(window.location.href);
-        const hasSearchInUrl = currentUrl.searchParams.has('search') || currentUrl.searchParams.has('q');
-        const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
-        if (hasSearchInUrl || hadServerSearch) {
-            if (soClearSearchTimer) {
-                clearTimeout(soClearSearchTimer);
-                soClearSearchTimer = null;
-            }
-            currentUrl.searchParams.set('search', '');
-            currentUrl.searchParams.delete('q');
-            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-            if (window.top && window.top.inflowMdi) {
-                window.top.inflowMdi.navigateOrOpenTab(currentUrl.pathname + currentUrl.search, 'Sales Order', 'sales');
-            } else {
-                window.location.href = currentUrl.pathname + currentUrl.search;
-            }
-        }
-    }
 }
 
 function startNewOrderForCustomer(customerId, customerName) {
@@ -6178,37 +6139,29 @@ function startNewOrderForCustomer(customerId, customerName) {
 }
 
 function clearSoLiveSearch() {
-    if (soClearSearchTimer) {
-        clearTimeout(soClearSearchTimer);
-        soClearSearchTimer = null;
-    }
     const inp = document.getElementById('soSidebarSearchInput');
-    if (inp) inp.value = '';
+    if (inp) {
+        inp.value = '';
+        inp.focus();
+    }
     try {
         sessionStorage.removeItem('inflow_so_search_query');
     } catch(e) {}
     handleSoLiveSearch('');
-    const btn = document.getElementById('btnClearSoSearch');
-    if (btn) btn.style.display = 'none';
 
-    // Remove search parameter and reload clean list
     const url = new URL(window.location.href);
-    url.searchParams.set('search', '');
-    url.searchParams.delete('q');
-    if (window.top && window.top.inflowMdi) {
-        window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
-    } else {
-        window.location.href = url.pathname + url.search;
+    if (url.searchParams.has('search') || url.searchParams.has('q')) {
+        url.searchParams.delete('search');
+        url.searchParams.delete('q');
+        if (window.history && window.history.replaceState) {
+            window.history.replaceState({}, '', url.pathname + url.search);
+        }
     }
 }
 
 function handleSoSearchKey(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
-        if (soClearSearchTimer) {
-            clearTimeout(soClearSearchTimer);
-            soClearSearchTimer = null;
-        }
         const val = (e.target.value || '').trim();
         const url = new URL(window.location.href);
         if (val) {
