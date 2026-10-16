@@ -893,7 +893,7 @@ def branch_pos(id):
     products = query_all("""
         SELECT 
             p.id, p.sku, p.name, p.barcode, p.image_url,
-            p.default_price, p.sales_uom, p.packs_per_case, p.pcs_per_pack,
+            p.default_price, p.sales_uom, p.sales_uom_ratio_std, p.packs_per_case, p.pcs_per_pack,
             p.category_id,
             COALESCE(c.name, 'General') as category_name,
             COALESCE(i.quantity, 0) as stock_qty
@@ -904,7 +904,21 @@ def branch_pos(id):
         ORDER BY p.name ASC
     """, (selected_wh_id,))
 
-    customers = query_all("SELECT id, name, phone, balance FROM customers WHERE is_active = TRUE AND branch_id = %s ORDER BY name ASC", (id,))
+    pricing_schemes = query_all("SELECT id, name, is_active FROM pricing_schemes WHERE is_active = TRUE ORDER BY id ASC")
+    all_prices = query_all("SELECT product_id, pricing_scheme_id, unit_price FROM product_prices")
+    product_prices_map = {}
+    for pr in all_prices:
+        pid = pr['product_id']
+        if pid not in product_prices_map:
+            product_prices_map[pid] = {}
+        product_prices_map[pid][pr['pricing_scheme_id']] = float(pr['unit_price'] or 0)
+
+    customers = query_all("""
+        SELECT id, name, phone, balance, default_pricing_scheme_id 
+        FROM customers 
+        WHERE is_active = TRUE AND (branch_id = %s OR branch_id IS NULL) 
+        ORDER BY name ASC
+    """, (id,))
 
     return render_template('branches/pos.html',
                            branch=branch,
@@ -913,13 +927,16 @@ def branch_pos(id):
                            selected_warehouse=selected_warehouse,
                            categories=categories,
                            products=products,
-                           customers=customers)
+                           customers=customers,
+                           pricing_schemes=pricing_schemes,
+                           product_prices_map=product_prices_map)
 
 @branches_bp.route('/branches/<int:id>/pos/checkout', methods=['POST'])
 def branch_checkout(id):
     """
     Submits a branch sale.
     Atomically deducts stock from the chosen warehouse (default: STM Warehouse) in real-time.
+    Supports UOM (Pack, Case, Pcs), pricing schemes, and Sales Order payment methods.
     """
     try:
         data = request.get_json() or {}
@@ -932,10 +949,14 @@ def branch_checkout(id):
             return jsonify({'success': False, 'message': 'No items selected.'}), 400
 
         customer_id = data.get('customer_id') or None
+        discount_amount = float(data.get('discount_amount') or 0.0)
         from routes.auth import user_can_edit_prices
         can_edit = user_can_edit_prices()
         if not can_edit:
             discount_amount = 0.0
+
+        payment_method = str(data.get('payment_method') or 'Cash').strip()
+        paid_amount = float(data.get('paid_amount') if data.get('paid_amount') is not None else data.get('total_amount', 0.0))
 
         with get_db_cursor(commit=True) as cur:
             # Determine target warehouse location (STM Warehouse by default)
@@ -960,19 +981,19 @@ def branch_checkout(id):
 
             order_number = get_next_order_number('SO', branch_id=id, cur=cur)
 
-            # 1. Lock and validate inventory at target warehouse & verify official prices
+            # 1. Lock and validate inventory at target warehouse & calculate line subtotals
             calc_subtotal = 0.0
             for it in items:
                 pid = int(it['product_id'])
                 qty = float(it['quantity'])
+                uom = str(it.get('uom') or 'Pack').strip()
+                total_pcs = float(it.get('total_pcs') or qty)
                 price = float(it.get('unit_price', 0))
-                if not can_edit:
-                    cur.execute("SELECT default_price FROM products WHERE id = %s", (pid,))
-                    p_price = cur.fetchone()
-                    if p_price:
-                        price = float(p_price['default_price'] or 0.0)
+                scheme_id = int(it.get('pricing_scheme_id') or 100)
+
                 it['verified_price'] = price
                 it['verified_subtotal'] = qty * price
+                it['deduct_qty'] = total_pcs
                 calc_subtotal += (qty * price)
 
                 cur.execute("""
@@ -984,13 +1005,13 @@ def branch_checkout(id):
                 inv_row = cur.fetchone()
                 current_qty = float(inv_row['quantity']) if inv_row else 0.0
 
-                if current_qty < qty:
+                if current_qty < total_pcs:
                     cur.execute("SELECT name, sku FROM products WHERE id = %s", (pid,))
                     p_info = cur.fetchone()
                     p_name = p_info['name'] if p_info else f"Product #{pid}"
                     return jsonify({
                         'success': False, 
-                        'message': f"Insufficient stock at {target_loc_name} for '{p_name}'. Available: {current_qty:g}, Requested: {qty:g}"
+                        'message': f"Insufficient stock at {target_loc_name} for '{p_name}'. Available: {current_qty:g} pcs, Requested: {total_pcs:g} pcs ({qty:g} {uom})"
                     }), 400
 
             # 2. Insert Sales Order stamped with branch_id and target warehouse
@@ -1012,7 +1033,7 @@ def branch_checkout(id):
             """, (
                 order_number, customer_id, id, target_loc_id,
                 pay_status, subtotal, discount_amount,
-                total_amount, paid_amount, balance_due, f"POS Sale from {branch['name']} ({target_loc_name})"
+                total_amount, paid_amount, balance_due, f"POS Sale via {payment_method} from {branch['name']} ({target_loc_name})"
             ))
             so_id = cur.fetchone()['id']
 
@@ -1022,12 +1043,21 @@ def branch_checkout(id):
                 qty = float(it['quantity'])
                 price = float(it.get('verified_price', it.get('unit_price', 0)))
                 line_sub = float(it.get('verified_subtotal', qty * price))
+                uom = str(it.get('uom') or 'Pack').strip()
+                deduct_pcs = float(it.get('deduct_qty') or it.get('total_pcs') or qty)
+                line_scheme_id = int(it.get('pricing_scheme_id') or 100)
+
+                cur.execute("SELECT name FROM products WHERE id = %s", (pid,))
+                p_r = cur.fetchone()
+                p_name = p_r['name'] if p_r else f"Product #{pid}"
 
                 cur.execute("""
                     INSERT INTO sales_order_lines (
-                        sales_order_id, line_num, product_id, quantity, unit_price, subtotal
-                    ) VALUES (%s, %s, %s, %s, %s, %s);
-                """, (so_id, idx, pid, qty, price, line_sub))
+                        sales_order_id, line_num, product_id, description,
+                        quantity, unit_price, discount_percent, subtotal,
+                        uom, quantity_display, pricing_scheme_id
+                    ) VALUES (%s, %s, %s, %s, %s, %s, 0.0, %s, %s, %s, %s);
+                """, (so_id, idx, pid, p_name, deduct_pcs, price, line_sub, uom, qty, line_scheme_id))
 
                 # Deduct target warehouse inventory
                 cur.execute("""
@@ -1042,14 +1072,14 @@ def branch_checkout(id):
                         SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
                         WHERE product_id = %s AND location_id = %s
                         RETURNING quantity;
-                    """, (qty, pid, target_loc_id))
+                    """, (deduct_pcs, pid, target_loc_id))
                     updated_stock = float(cur.fetchone()['quantity'])
                 else:
                     cur.execute("""
                         INSERT INTO inventory (product_id, location_id, quantity, updated_at)
                         VALUES (%s, %s, -%s, CURRENT_TIMESTAMP)
                         RETURNING quantity;
-                    """, (pid, target_loc_id, qty))
+                    """, (pid, target_loc_id, deduct_pcs))
                     updated_stock = float(cur.fetchone()['quantity'])
 
                 # Insert into Stock Audit Ledger with branch and warehouse attribution
@@ -1063,8 +1093,8 @@ def branch_checkout(id):
                     );
                 """, (
                     pid, order_number, target_loc_id,
-                    qty, updated_stock + qty, updated_stock,
-                    id, f"POS Sale at {branch['name']} ({target_loc_name})"
+                    deduct_pcs, updated_stock + deduct_pcs, updated_stock,
+                    id, f"POS Sale ({qty:g} {uom} = {deduct_pcs:g} pcs) at {branch['name']}"
                 ))
 
             # 4. Record Payment if paid
@@ -1073,13 +1103,20 @@ def branch_checkout(id):
                     INSERT INTO order_payments (
                         order_type, order_id, branch_id, amount, payment_method, notes
                     ) VALUES ('SO', %s, %s, %s, %s, %s);
-                """, (so_id, id, paid_amount, payment_method, f"POS Payment at {branch['name']}"))
+                """, (so_id, id, paid_amount, payment_method, f"POS Payment ({payment_method}) at {branch['name']}"))
 
         return jsonify({
             'success': True,
             'message': f"Sale completed successfully! Stock deducted from {target_loc_name}.",
             'sales_order_id': so_id,
-            'order_number': order_number
+            'order_number': order_number,
+            'payment_status': pay_status,
+            'payment_method': payment_method,
+            'subtotal': subtotal,
+            'discount_amount': discount_amount,
+            'total_amount': total_amount,
+            'paid_amount': paid_amount,
+            'balance_due': balance_due
         })
 
     except Exception as e:
