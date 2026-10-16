@@ -476,9 +476,14 @@ def list_orders():
     stats_dict = {r['norm_status']: r['cnt'] for r in status_counts}
 
     if is_main:
-        branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        branches = query_all("SELECT id, code, name, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
     else:
-        branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,))
+        branches = query_all("SELECT id, code, name, settings_json FROM branches WHERE id = %s", (user_bid,))
+
+    for b in branches:
+        raw_s = b.get('settings_json')
+        s_dict = json.loads(raw_s) if isinstance(raw_s, str) else (raw_s or {})
+        b['logo_url'] = s_dict.get('logo_url') or ''
 
     current_branch = query_one("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,)) if user_bid else None
 

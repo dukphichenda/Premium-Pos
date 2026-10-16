@@ -20,7 +20,12 @@ def index():
 
     try:
         # Load all active branches for store selector
-        branches = query_all("SELECT id, code, name, manager_name, phone FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        branches = query_all("SELECT id, code, name, manager_name, phone, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        import json
+        for b in branches:
+            raw_s = b.get('settings_json')
+            s_dict = json.loads(raw_s) if isinstance(raw_s, str) else (raw_s or {})
+            b['logo_url'] = s_dict.get('logo_url') or ''
         central_wh = query_one("SELECT id, name FROM locations WHERE is_central = TRUE LIMIT 1") or query_one("SELECT id, name FROM locations WHERE is_default = TRUE LIMIT 1")
 
         # Determine store scope

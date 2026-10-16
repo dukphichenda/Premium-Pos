@@ -343,14 +343,26 @@ def create_app():
 
                 # If user is branch_admin, restrict all_branches to ONLY their allowable branch!
                 if current_user['is_branch_admin'] and user_bid:
-                    all_branches = query_all("SELECT id, code, name, is_active FROM branches WHERE is_active = TRUE AND id = %s ORDER BY id ASC", (user_bid,))
+                    all_branches = query_all("SELECT id, code, name, is_active, settings_json FROM branches WHERE is_active = TRUE AND id = %s ORDER BY id ASC", (user_bid,))
                     active_bid = user_bid
                 else:
-                    all_branches = query_all("SELECT id, code, name, is_active FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+                    all_branches = query_all("SELECT id, code, name, is_active, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
                     active_bid = session.get('active_branch_id') or request.args.get('branch')
             else:
-                all_branches = query_all("SELECT id, code, name, is_active FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+                all_branches = query_all("SELECT id, code, name, is_active, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
                 active_bid = session.get('active_branch_id') or request.args.get('branch')
+
+            for b in all_branches:
+                raw_s = b.get('settings_json')
+                if raw_s:
+                    if isinstance(raw_s, str):
+                        try:
+                            raw_s = json.loads(raw_s)
+                        except Exception:
+                            raw_s = {}
+                    b['logo_url'] = raw_s.get('logo_url') or ''
+                else:
+                    b['logo_url'] = ''
 
             if active_bid and str(active_bid).lower() not in ('main', 'all', 'none', '', '0'):
                 b_row = query_one("SELECT * FROM branches WHERE id = %s", (int(active_bid),))
@@ -373,6 +385,19 @@ def create_app():
         except Exception as e:
             logger.warning(f"Error resolving branch context in inject_global_data: {e}")
 
+        # Resolve HQ Invoice Logo URL
+        hq_invoice_logo_url = None
+        try:
+            inv_row = query_one("SELECT logo_url FROM invoice_settings LIMIT 1")
+            if inv_row and inv_row.get('logo_url'):
+                hq_invoice_logo_url = inv_row['logo_url']
+            elif company_data and company_data.get('logo_url'):
+                hq_invoice_logo_url = company_data['logo_url']
+            elif company_data and company_data.get('app_logo_url'):
+                hq_invoice_logo_url = company_data['app_logo_url']
+        except Exception:
+            pass
+
         from routes.auth import user_can_edit_prices, user_can_view_costs, check_permission
 
         can_edit_prices = user_can_edit_prices()
@@ -393,7 +418,8 @@ def create_app():
             'can_edit_prices': can_edit_prices,
             'has_permission': check_permission,
             'current_user': current_user,
-            'app_logo_url': (company_data.get('app_logo_url') if company_data else None)
+            'app_logo_url': (company_data.get('app_logo_url') if company_data else None),
+            'hq_logo_url': hq_invoice_logo_url
         }
 
 
