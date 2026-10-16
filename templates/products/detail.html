@@ -246,13 +246,13 @@
                     <!-- 1. Picture -->
                     <div class="inflow-title-blue">Picture</div>
 
-                    <div class="inflow-picture-frame" id="pictureContainer">
+                    <div class="inflow-picture-frame" id="pictureContainer" onclick="document.getElementById('pictureFileInput').click()" style="cursor: pointer; position: relative;" title="Click to browse, or Paste (Ctrl+V) / Drop photo directly">
                         {% if product.image_url %}
                             <img id="productImagePreview" src="{{ product.image_url }}" alt="Product Image">
-                            <div id="productImagePlaceholder" style="display: none; color: #888; font-size: 11px;">No Image Available</div>
+                            <div id="productImagePlaceholder" style="display: none; color: #888; font-size: 11px;">No Image Available (Paste Ctrl+V)</div>
                         {% else %}
                             <img id="productImagePreview" src="" alt="Product Image" style="display: none;">
-                            <div id="productImagePlaceholder" style="display: flex; color: #888; font-size: 11px;">No Image Available</div>
+                            <div id="productImagePlaceholder" style="display: flex; color: #888; font-size: 11px;">No Image Available (Paste Ctrl+V)</div>
                         {% endif %}
                     </div>
 
@@ -1767,6 +1767,121 @@ function clearProductPhoto() {
     preview.style.display = 'none';
     placeholder.style.display = 'flex';
 }
+
+function setPastedImageToDetail(file) {
+    if (!file) return;
+    const preview = document.getElementById('productImagePreview');
+    const placeholder = document.getElementById('productImagePlaceholder');
+    const clearFlag = document.getElementById('clearPictureFlag');
+    if (clearFlag) clearFlag.value = '0';
+
+    try {
+        const localUrl = URL.createObjectURL(file);
+        if (preview) {
+            preview.src = localUrl;
+            preview.style.display = 'block';
+        }
+        if (placeholder) {
+            placeholder.style.display = 'none';
+        }
+    } catch(e) {}
+
+    // Populate file input so standard form submit sends it
+    const fileInput = document.getElementById('pictureFileInput');
+    if (fileInput && window.DataTransfer) {
+        try {
+            const dt = new DataTransfer();
+            dt.items.add(file);
+            fileInput.files = dt.files;
+        } catch(e) {}
+    }
+
+    {% if not is_new and product and product.id %}
+    // For existing product, also save immediately to server
+    const formData = new FormData();
+    const fileName = file.name || ('pasted_image_' + Date.now() + '.png');
+    formData.append('picture', file, fileName);
+    fetch('/products/{{ product.id }}/upload_picture', {
+        method: 'POST',
+        body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data && data.success && data.image_url) {
+            if (preview) preview.src = data.image_url;
+        }
+    })
+    .catch(err => console.error('Error uploading pasted picture:', err));
+    {% endif %}
+}
+
+// Global Paste Listener for Product Detail (Ctrl+V)
+document.addEventListener('paste', function(e) {
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData || !clipboardData.items) return;
+
+    let imageItem = null;
+    for (let i = 0; i < clipboardData.items.length; i++) {
+        const item = clipboardData.items[i];
+        if (item.type && item.type.startsWith('image/')) {
+            imageItem = item;
+            break;
+        }
+    }
+
+    if (!imageItem) return;
+
+    const activeEl = document.activeElement;
+    const isTextEditable = activeEl && (
+        activeEl.tagName === 'INPUT' || 
+        activeEl.tagName === 'TEXTAREA' || 
+        activeEl.isContentEditable
+    );
+
+    const hasText = clipboardData.types && clipboardData.types.includes('text/plain');
+    if (isTextEditable && hasText && activeEl.id !== 'pictureFileInput') {
+        return;
+    }
+
+    e.preventDefault();
+    const file = imageItem.getAsFile();
+    if (file) {
+        setPastedImageToDetail(file);
+    }
+});
+
+// Drag and drop on picture frame
+(function initPictureFrameDragDrop() {
+    const frame = document.getElementById('pictureContainer');
+    if (!frame) return;
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+        frame.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            frame.style.borderColor = '#0284C7';
+            frame.style.backgroundColor = '#EFF6FF';
+        }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+        frame.addEventListener(eventName, function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            frame.style.borderColor = '';
+            frame.style.backgroundColor = '';
+        }, false);
+    });
+
+    frame.addEventListener('drop', function(e) {
+        const dt = e.dataTransfer;
+        if (!dt || !dt.files || !dt.files.length) return;
+        const file = dt.files[0];
+        if (file && file.type && file.type.startsWith('image/')) {
+            setPastedImageToDetail(file);
+        }
+    });
+})();
 
 // Bidirectional Pricing Schemes & Markup Calculation based on Sales UOM
 // Formula: Effective Cost = Cost per piece * (pcs in 1 Sales Unit)

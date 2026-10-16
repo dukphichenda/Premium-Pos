@@ -1294,19 +1294,49 @@ def api_batch_adjust_product_stock(id):
 @products_bp.route('/products/<int:id>/upload_picture', methods=['POST'])
 def upload_product_picture(id):
     try:
+        save_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads', 'products')
+        os.makedirs(save_dir, exist_ok=True)
+
+        # 1. Support JSON base64 data URL
+        if request.is_json:
+            data = request.get_json(silent=True) or {}
+            img_b64 = data.get('picture') or data.get('image') or data.get('image_base64') or ''
+            if img_b64 and 'base64,' in img_b64:
+                import base64
+                header, encoded = img_b64.split('base64,', 1)
+                mime = header.split(';')[0].replace('data:', '').strip()
+                ext_map = {'image/jpeg': '.jpg', 'image/png': '.png', 'image/gif': '.gif', 'image/webp': '.webp'}
+                ext = ext_map.get(mime, '.png')
+                img_bytes = base64.b64decode(encoded)
+                filename = f"prod_{id}_{int(time.time())}{ext}"
+                with open(os.path.join(save_dir, filename), 'wb') as f:
+                    f.write(img_bytes)
+                image_url = f"/static/uploads/products/{filename}"
+                execute("UPDATE products SET image_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (image_url, id))
+                return jsonify({'success': True, 'image_url': image_url})
+
+        # 2. Support standard multipart/form-data upload (including pasted blobs)
         if 'picture' not in request.files:
             return jsonify({'success': False, 'message': 'No picture uploaded'}), 400
         file = request.files['picture']
-        if file.filename == '':
+        if file.filename == '' and not getattr(file, 'mimetype', ''):
             return jsonify({'success': False, 'message': 'No selected file'}), 400
         
-        ext = os.path.splitext(file.filename)[1].lower()
-        if ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-            return jsonify({'success': False, 'message': 'Invalid file type'}), 400
+        ext = os.path.splitext(file.filename)[1].lower() if file.filename else ''
+        if not ext or ext not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
+            mimetype = (getattr(file, 'mimetype', '') or '').lower()
+            if 'png' in mimetype:
+                ext = '.png'
+            elif 'jpeg' in mimetype or 'jpg' in mimetype:
+                ext = '.jpg'
+            elif 'webp' in mimetype:
+                ext = '.webp'
+            elif 'gif' in mimetype:
+                ext = '.gif'
+            else:
+                ext = '.png'
             
         filename = f"prod_{id}_{int(time.time())}{ext}"
-        save_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads', 'products')
-        os.makedirs(save_dir, exist_ok=True)
         file.save(os.path.join(save_dir, filename))
         
         image_url = f"/static/uploads/products/{filename}"
