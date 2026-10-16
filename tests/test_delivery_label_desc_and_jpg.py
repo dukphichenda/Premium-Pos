@@ -63,5 +63,32 @@ class TestDeliveryLabelDescAndJpg(unittest.TestCase):
         self.assertIn(b'exportToJpg', res_label.data)
         self.assertIn(b'Export JPG', res_label.data)
 
+    def test_invoice_left_sidebar_and_telegram_share(self):
+        order = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
+        if not order:
+            self.skipTest("No sales orders in database")
+
+        order_id = order['id']
+        res = self.client.get(f'/sales/{order_id}/print?type=invoice&autoshare=telegram')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b'invoiceStudioSidebar', res.data)
+        self.assertIn(b'invoice-studio-layout', res.data)
+        self.assertIn(b'shareTelegramBtn', res.data)
+        self.assertIn(b'shareInvoiceToTelegram', res.data)
+        self.assertIn(b'generateA5InvoiceCanvas', res.data)
+
+        # Test upload-share-image endpoint
+        # 1x1 transparent GIF base64
+        sample_b64 = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+        post_res = self.client.post(f'/sales/{order_id}/upload-share-image', json={
+            'image_data': sample_b64
+        })
+        self.assertEqual(post_res.status_code, 200)
+        post_data = post_res.get_json()
+        self.assertTrue(post_data.get('success'))
+        self.assertIn('image_url', post_data)
+        self.assertIn('telegram_url', post_data)
+        self.assertIn('t.me/share/url', post_data['telegram_url'])
+
 if __name__ == '__main__':
     unittest.main()

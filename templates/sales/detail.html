@@ -961,6 +961,10 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             <span>Export JPG</span>
         </button>
+        <button type="button" class="inflow-tb-btn" id="soDirectTelegramBtn" onclick="directShareOrderTelegram()" title="Share Sales Order Image to Telegram" style="border-color: #BAE6FD; background: #F0F9FF; color: #0284C7; font-weight: 600;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            <span>Share Telegram</span>
+        </button>
     </div>
     <div>
         <a href="javascript:void(0)" class="inflow-tb-btn danger" onclick="handleCloseOrder(event)" title="Close document">
@@ -6142,6 +6146,21 @@ function directExportOrderJpg() {
     }
     const jpgUrl = '/sales/' + orderId + '/print?type=invoice&autojpg=1';
     window.open(jpgUrl, '_blank');
+}
+
+// --- Direct Telegram Share ---
+function directShareOrderTelegram() {
+    if (isNewOrder) {
+        alert('Please save the sales order first before sharing to Telegram.');
+        return;
+    }
+    const orderId = {% if not is_new and order and order.id %}{{ order.id }}{% else %}null{% endif %};
+    if (!orderId) {
+        alert('Please save the sales order first.');
+        return;
+    }
+    const shareUrl = '/sales/' + orderId + '/print?type=invoice&autoshare=telegram';
+    window.open(shareUrl, '_blank');
 }
 
 // =========================================================================

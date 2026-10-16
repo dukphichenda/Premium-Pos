@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400;1,600&family=Moul&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Siemreap&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', filename='vendor/html2canvas.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
 
     <style>
@@ -33,7 +34,7 @@
         body {
             font-family: var(--font-main);
             margin: 0;
-            padding: 16px 0 40px 0;
+            padding: 0;
             background-color: #F1F5F9;
             color: #1E293B;
             font-size: 11px;
@@ -41,7 +42,7 @@
         }
 
         /* ==========================================================================
-           Clean A5 PDF Export Mode (Exact 148mm x 210mm fit)
+           Clean A5 PDF & Image Export Mode (Exact 148mm x 210mm fit)
            ========================================================================== */
         body.exporting-pdf {
             background: #FFFFFF !important;
@@ -49,8 +50,17 @@
             margin: 0 !important;
             width: 100% !important;
         }
-        body.exporting-pdf .no-print-toolbar {
+        body.exporting-pdf .invoice-studio-sidebar,
+        body.exporting-pdf .no-print-toolbar,
+        body.exporting-pdf .no-print {
             display: none !important;
+        }
+        body.exporting-pdf .invoice-studio-layout,
+        body.exporting-pdf .invoice-studio-main {
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
         }
         body.exporting-pdf .invoice-zoom-container {
             padding: 0 !important;
@@ -338,100 +348,214 @@
             break-inside: avoid !important;
         }
 
-        /* Non-printable Control Toolbar */
-        .no-print-toolbar {
-            max-width: 980px;
-            width: calc(100% - 32px);
-            margin: 0 auto 14px auto;
-            padding: 8px 16px;
-            background: #FFFFFF;
-            border: 1px solid #CBD5E1;
-            border-radius: 8px;
+        /* ==========================================================================
+           Modern Left Sidebar Studio Layout
+           ========================================================================== */
+        .invoice-studio-layout {
             display: flex;
-            justify-content: space-between;
-            align-items: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            min-height: 100vh;
+            background-color: #F1F5F9;
+            width: 100%;
+        }
+
+        .invoice-studio-sidebar {
+            width: 270px;
+            min-width: 270px;
+            max-width: 270px;
+            height: 100vh;
             position: sticky;
-            top: 8px;
+            top: 0;
+            background: #FFFFFF;
+            border-right: 1px solid #CBD5E1;
+            padding: 16px 14px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            gap: 13px;
+            overflow-y: auto;
             z-index: 1000;
-            flex-wrap: wrap;
-            gap: 10px;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.04);
+            flex-shrink: 0;
         }
 
-        .no-print-toolbar .tb-left {
+        .invoice-studio-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 16px 16px 60px 16px;
+            box-sizing: border-box;
+            overflow-x: auto;
+        }
+
+        .sidebar-header {
             display: flex;
             align-items: center;
-            gap: 10px;
-            flex-wrap: wrap;
+            justify-content: space-between;
+            padding-bottom: 11px;
+            border-bottom: 1px solid #E2E8F0;
         }
 
-        .no-print-toolbar .tb-right {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .tb-btn {
+        .sidebar-back-btn {
             display: inline-flex;
             align-items: center;
-            gap: 5px;
-            padding: 5px 12px;
+            gap: 6px;
+            padding: 6px 12px;
             font-size: 12px;
-            font-weight: 600;
-            border-radius: 6px;
+            font-weight: 700;
+            color: #475569;
+            background: #F8FAFC;
             border: 1px solid #CBD5E1;
-            background: #FFFFFF;
-            color: #334155;
+            border-radius: 6px;
             text-decoration: none;
-            cursor: pointer;
             transition: all 0.15s ease;
         }
-
-        .tb-btn:hover {
-            background: #F8FAFC;
+        .sidebar-back-btn:hover {
+            background: #E2E8F0;
+            color: #0F172A;
             border-color: #94A3B8;
         }
 
-        .tb-btn.primary {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
+        .sidebar-badge {
+            font-size: 10.5px;
+            font-weight: 800;
+            color: var(--primary-color);
+            background: #F0F9FF;
+            border: 1px solid #BAE6FD;
+            padding: 3px 8px;
+            border-radius: 12px;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+        }
+
+        .sidebar-section {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .sidebar-section-title {
+            font-size: 10px;
+            font-weight: 800;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .sidebar-action-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+            padding: 8px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            border-radius: 6px;
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+            text-decoration: none;
+            box-sizing: border-box;
+        }
+        .sidebar-action-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+        .sidebar-action-btn:active {
+            transform: translateY(0);
+        }
+        .sidebar-action-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-print {
+            background: #059669;
+            border-color: #047857;
             color: #FFFFFF;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.12);
+        }
+        .btn-print:hover {
+            background: #047857;
         }
 
-        .tb-btn.primary:hover {
-            opacity: 0.92;
+        .btn-pdf {
+            background: #2563EB;
+            border-color: #1D4ED8;
+            color: #FFFFFF;
+        }
+        .btn-pdf:hover {
+            background: #1D4ED8;
         }
 
-        /* Zoom Percentage Controls */
-        .zoom-control-box {
-            display: inline-flex;
+        .btn-jpg {
+            background: #EA580C;
+            border-color: #C2410C;
+            color: #FFFFFF;
+        }
+        .btn-jpg:hover {
+            background: #C2410C;
+        }
+
+        .btn-telegram {
+            background: #0284C7;
+            border-color: #0369A1;
+            color: #FFFFFF;
+        }
+        .btn-telegram:hover {
+            background: #0369A1;
+        }
+
+        .sidebar-card {
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 6px;
+            padding: 8px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+        }
+
+        .zoom-row-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 11px;
+        }
+        .zoom-row-controls {
+            display: flex;
             align-items: center;
             gap: 4px;
-            background: #F8FAFC;
-            padding: 3px 6px;
-            border-radius: 6px;
+        }
+        .zoom-row-controls .zoom-select {
+            flex: 1;
+            height: 25px;
+            padding: 2px 6px;
             border: 1px solid #CBD5E1;
+            border-radius: 4px;
             font-size: 11.5px;
+            font-weight: 600;
+            color: #0F172A;
+            background: #FFFFFF;
+            cursor: pointer;
+            outline: none;
         }
-
-        .zoom-label {
-            font-weight: 700;
-            color: #475569;
-            margin-right: 2px;
-            user-select: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 2px;
+        .zoom-row-controls .zoom-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
         }
-
-        .zoom-btn {
+        .zoom-row-controls .zoom-btn {
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 22px;
-            height: 22px;
+            width: 25px;
+            height: 25px;
             padding: 0;
             border: 1px solid #CBD5E1;
             background: #FFFFFF;
@@ -444,63 +568,38 @@
             line-height: 1;
             user-select: none;
         }
-
-        .zoom-btn:hover {
+        .zoom-row-controls .zoom-btn:hover {
             background: #E2E8F0;
             color: #0F172A;
             border-color: #94A3B8;
         }
-
-        .zoom-btn:active {
-            background: #CBD5E1;
-            transform: scale(0.96);
-        }
-
-        .zoom-btn.reset-btn {
-            width: auto;
-            padding: 0 6px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #475569;
-        }
-
-        .zoom-btn.reset-btn:hover {
-            color: #0F172A;
-            background: #E2E8F0;
-        }
-
-        .zoom-select {
-            padding: 2px 6px;
+        .zoom-pill-btn {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 7px;
+            background: #FFFFFF;
             border: 1px solid #CBD5E1;
             border-radius: 4px;
-            font-size: 11.5px;
-            font-weight: 600;
-            color: #0F172A;
-            background: #FFFFFF;
             cursor: pointer;
-            outline: none;
-            height: 22px;
+            color: #475569;
+            transition: all 0.12s ease;
+        }
+        .zoom-pill-btn:hover {
+            background: #E2E8F0;
+            color: #0F172A;
         }
 
-        .zoom-select:focus {
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
-        }
-
-        .rate-control-box {
-            display: inline-flex;
+        .rate-row {
+            display: flex;
             align-items: center;
-            gap: 5px;
+            justify-content: space-between;
             font-size: 11.5px;
-            background: #F8FAFC;
-            padding: 3px 8px;
-            border-radius: 6px;
-            border: 1px solid #E2E8F0;
+            gap: 6px;
         }
-
-        .rate-input {
-            width: 65px;
-            padding: 2px 5px;
+        .rate-row .rate-input {
+            width: 80px;
+            height: 24px;
+            padding: 2px 6px;
             border: 1px solid #CBD5E1;
             border-radius: 4px;
             font-size: 11.5px;
@@ -509,12 +608,108 @@
             text-align: right;
         }
 
+        .sidebar-toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 600;
+            color: #334155;
+            cursor: pointer;
+            user-select: none;
+            padding: 1px 0;
+        }
+        .sidebar-toggle-row input[type="checkbox"] {
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+            accent-color: var(--primary-color);
+            margin: 0;
+        }
+
+        .sidebar-secondary-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 7px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid #CBD5E1;
+            background: #FFFFFF;
+            color: #1E293B;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        .sidebar-secondary-btn:hover {
+            background: #F1F5F9;
+            border-color: #94A3B8;
+        }
+
+        .sidebar-settings-link {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            padding: 7px 10px;
+            font-size: 11.5px;
+            font-weight: 600;
+            border-radius: 6px;
+            border: 1px solid #CBD5E1;
+            background: #FFFFFF;
+            color: #475569;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+        }
+        .sidebar-settings-link:hover {
+            background: #F8FAFC;
+            color: #0F172A;
+            border-color: #94A3B8;
+        }
+
+        /* Modern Toast Alert */
+        .invoice-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #0F172A;
+            color: #FFFFFF;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.25);
+            z-index: 999999;
+            display: none;
+            max-width: 90vw;
+            text-align: center;
+        }
+        .invoice-toast.show {
+            display: block;
+            animation: toastSlideUp 0.2s ease-out;
+        }
+        @keyframes toastSlideUp {
+            from { opacity: 0; transform: translate(-50%, 15px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
         /* Invoice Preview Viewport Container */
         .invoice-zoom-container {
             width: 100%;
             overflow-x: auto;
             padding: 4px 16px 40px 16px;
             box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         /* Printable Paper Canvas (A5 Standard: 148mm x 210mm) */
@@ -1311,9 +1506,18 @@
                 font-size: 8.8px !important;
                 line-height: 1.25 !important;
             }
+            .invoice-studio-sidebar,
             .no-print-toolbar,
+            .no-print,
             .sig-modal-backdrop {
                 display: none !important;
+            }
+            .invoice-studio-layout,
+            .invoice-studio-main {
+                display: block !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                width: 100% !important;
             }
             .invoice-zoom-container {
                 padding: 0 !important;
@@ -1598,74 +1802,125 @@
 </head>
 <body>
 
-    <!-- Non-printable Top Action Bar -->
-    <div class="no-print-toolbar">
-        <div class="tb-left">
-            <a href="javascript:window.history.back()" class="tb-btn" title="Back to previous page">← Back</a>
-            
-            <!-- Zoom Percentage Controls -->
-            <div class="zoom-control-box" title="Invoice Preview Zoom Percentage">
-                <span class="zoom-label">🔍 Zoom:</span>
-                <button type="button" class="zoom-btn" onclick="adjustZoom(-10)" title="Zoom Out (−10%)" aria-label="Zoom Out">−</button>
-                <select id="invoiceZoomSelect" class="zoom-select" onchange="setInvoiceZoom(this.value)" title="Select Zoom Percentage">
-                    <option value="50">50%</option>
-                    <option value="67">67%</option>
-                    <option value="75">75%</option>
-                    <option value="80">80%</option>
-                    <option value="90">90%</option>
-                    <option value="100" selected>100%</option>
-                    <option value="110">110%</option>
-                    <option value="125">125%</option>
-                    <option value="150">150%</option>
-                    <option value="175">175%</option>
-                    <option value="200">200%</option>
-                    <option value="fit">Fit Width</option>
-                </select>
-                <button type="button" class="zoom-btn" onclick="adjustZoom(10)" title="Zoom In (+10%)" aria-label="Zoom In">+</button>
-                <button type="button" class="zoom-btn reset-btn" onclick="setInvoiceZoom(100)" title="Reset Zoom to 100%">100%</button>
+    <div class="invoice-studio-layout">
+        <!-- Left Sidebar: Controls & Settings (Non-printable) -->
+        <aside class="invoice-studio-sidebar no-print" id="invoiceStudioSidebar">
+            <!-- Sidebar Header & Back Navigation -->
+            <div class="sidebar-header">
+                <a href="javascript:window.history.back()" class="sidebar-back-btn" title="Back to previous page">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    <span>Back</span>
+                </a>
+                <div class="sidebar-badge">A5 Invoice</div>
             </div>
 
-            <!-- Live Exchange Rate Modifier -->
-            <div class="rate-control-box" title="Adjust USD to KHR exchange rate live on this invoice">
-                <span>Rate 1$ =</span>
-                <input type="number" id="liveRateInput" class="rate-input" value="{{ khr_rate }}" step="10" oninput="updateLiveKhrCalculations(this.value)">
-                <span>៛ KHR</span>
+            <!-- Section: Primary Actions -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">
+                    <span>Actions / សកម្មភាព</span>
+                </div>
+                
+                <button type="button" class="sidebar-action-btn btn-print" onclick="window.print()" title="Print A5 Invoice directly (or Save as PDF with selectable vector text)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    <span>Print Invoice (A5)</span>
+                </button>
+
+                <button type="button" class="sidebar-action-btn btn-pdf" id="exportInvoicePdfBtn" onclick="exportInvoiceToPdf()" title="Export crystal-clear A5 PDF (Readable text as original)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    <span>Export PDF</span>
+                </button>
+
+                <button type="button" class="sidebar-action-btn btn-jpg" id="exportInvoiceJpgBtn" onclick="exportInvoiceToJpg()" title="Export 4x High-Resolution Image (Fits A5 Paper Perfectly)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    <span>Export JPG (4x A5)</span>
+                </button>
+
+                <button type="button" class="sidebar-action-btn btn-telegram" id="shareTelegramBtn" onclick="shareInvoiceToTelegram()" title="Share 4x A5 Image Directly to Telegram">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                    <span>Share to Telegram</span>
+                </button>
             </div>
 
-            <!-- Toggle KHR Display -->
-            <label style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; cursor: pointer; color: #475569; user-select: none;">
-                <input type="checkbox" id="chkShowKhr" {% if inv_settings.enable_khr_total %}checked{% endif %} onchange="toggleKhrDisplay(this.checked)">
-                <span>Show Khmer Riel Total</span>
-            </label>
+            <!-- Section: View & Zoom -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">
+                    <span>View / ទិដ្ឋភាព</span>
+                </div>
+                <div class="sidebar-card">
+                    <div class="zoom-row-top">
+                        <span style="font-weight: 700; color: #475569;">🔍 Zoom:</span>
+                        <div style="display: flex; gap: 4px;">
+                            <button type="button" class="zoom-pill-btn" onclick="setInvoiceZoom('fit')" title="Fit to width">Fit</button>
+                            <button type="button" class="zoom-pill-btn" onclick="setInvoiceZoom(100)" title="Reset to 100%">100%</button>
+                        </div>
+                    </div>
+                    <div class="zoom-row-controls">
+                        <button type="button" class="zoom-btn" onclick="adjustZoom(-10)" title="Zoom Out (−10%)">−</button>
+                        <select id="invoiceZoomSelect" class="zoom-select" onchange="setInvoiceZoom(this.value)" title="Select Zoom Percentage">
+                            <option value="50">50%</option>
+                            <option value="67">67%</option>
+                            <option value="75">75%</option>
+                            <option value="80">80%</option>
+                            <option value="90">90%</option>
+                            <option value="100" selected>100%</option>
+                            <option value="110">110%</option>
+                            <option value="125">125%</option>
+                            <option value="150">150%</option>
+                            <option value="175">175%</option>
+                            <option value="200">200%</option>
+                            <option value="fit">Fit Width</option>
+                        </select>
+                        <button type="button" class="zoom-btn" onclick="adjustZoom(10)" title="Zoom In (+10%)">+</button>
+                    </div>
+                </div>
+            </div>
 
-            <!-- Direct Signature Visibility Toggle -->
-            <label style="display: flex; align-items: center; gap: 5px; font-size: 12.5px; cursor: pointer; color: #475569; user-select: none; margin-left: 6px;" title="Show or hide signatures directly in preview / បង្ហាញ ឬលាក់ហត្ថលេខា">
-                <input type="checkbox" id="chkShowSignature" {% if inv_settings.show_signature %}checked{% endif %} onchange="toggleSignatureDisplay(this.checked)">
-                <span>✍️ Signature / ហត្ថលេខា</span>
-            </label>
-        </div>
+            <!-- Section: Currency & KHR Live Modifier -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">
+                    <span>Currency & Exchange Rate</span>
+                </div>
+                <div class="sidebar-card">
+                    <div class="rate-row">
+                        <span style="color: #475569; font-weight: 600;">Rate 1$ =</span>
+                        <input type="number" id="liveRateInput" class="rate-input" value="{{ khr_rate }}" step="10" oninput="updateLiveKhrCalculations(this.value)">
+                        <span style="color: #64748B; font-weight: 700;">៛ KHR</span>
+                    </div>
+                    <label class="sidebar-toggle-row" title="Display total amount converted to Khmer Riel">
+                        <input type="checkbox" id="chkShowKhr" {% if inv_settings.enable_khr_total %}checked{% endif %} onchange="toggleKhrDisplay(this.checked)">
+                        <span>Show Khmer Riel Total</span>
+                    </label>
+                </div>
+            </div>
 
-        <div class="tb-right">
-            <button type="button" class="tb-btn" onclick="openSignatureModal()" title="Upload Seller Signature Stamp and Edit Seller Name" style="display: inline-flex; align-items: center; gap: 4px; background: #FFFFFF; border-color: #CBD5E1; color: #1E293B;">
-                <span>🖋️ Seller Signature {% if is_branch and branch %}({{ branch.name }}){% else %}(HQ){% endif %}</span>
-            </button>
-            <a href="{{ url_for('settings.general_settings', tab='tabInvoice') }}" class="tb-btn" title="Customize invoice fonts, color, logo, and address in Settings">
-                ⚙️ Invoice Settings
-            </a>
-            <button type="button" class="tb-btn primary" id="exportInvoicePdfBtn" onclick="exportInvoiceToPdf()" style="background: #2563EB; border-color: #2563EB;">
-                📄 Export PDF
-            </button>
-            <button type="button" class="tb-btn" id="exportInvoiceJpgBtn" onclick="exportInvoiceToJpg()" style="background: #EA580C; border-color: #EA580C; color: #FFFFFF; font-weight: 600;">
-                🖼️ Export JPG
-            </button>
-            <button type="button" class="tb-btn primary" onclick="window.print()">
-                🖨️ Print Invoice (A5)
-            </button>
-        </div>
-    </div>
+            <!-- Section: Signatures -->
+            <div class="sidebar-section">
+                <div class="sidebar-section-title">
+                    <span>Signature / ហត្ថលេខា</span>
+                </div>
+                <div class="sidebar-card">
+                    <label class="sidebar-toggle-row" title="Show or hide signatures directly in preview / បង្ហាញ ឬលាក់ហត្ថលេខា">
+                        <input type="checkbox" id="chkShowSignature" {% if inv_settings.show_signature %}checked{% endif %} onchange="toggleSignatureDisplay(this.checked)">
+                        <span>✍️ Signature / ហត្ថលេខា</span>
+                    </label>
+                    <button type="button" class="sidebar-secondary-btn" onclick="openSignatureModal()" title="Upload Seller Signature Stamp and Edit Seller Name">
+                        <span>🖋️ Seller Signature {% if is_branch and branch %}({{ branch.name }}){% else %}(HQ){% endif %}</span>
+                    </button>
+                </div>
+            </div>
 
-    <!-- Invoice Preview Viewport Container -->
-    <div class="invoice-zoom-container" id="invoiceZoomContainer">
+            <!-- Section: Invoice Settings Link -->
+            <div class="sidebar-section" style="margin-top: auto; padding-top: 10px; border-top: 1px solid #E2E8F0;">
+                <a href="{{ url_for('settings.general_settings', tab='tabInvoice') }}" class="sidebar-settings-link" title="Customize invoice fonts, color, logo, and address in Settings">
+                    <span>⚙️ Invoice Settings</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Invoice Preview Area -->
+        <main class="invoice-studio-main">
+            <!-- Invoice Preview Viewport Container -->
+            <div class="invoice-zoom-container" id="invoiceZoomContainer">
         <!-- Printable Invoice Sheet (A5) -->
         <div class="invoice-paper style-{{ inv_settings.template_style or 'modern' }}" id="invoiceSheet">
         <!-- Top Colored Accent Bar -->
@@ -2215,6 +2470,8 @@
         </div>
     </div>
     </div> <!-- end #invoiceZoomContainer -->
+    </main>
+</div> <!-- end .invoice-studio-layout -->
 
     <!-- Seller Signature & Name Customization Modal -->
     <div class="sig-modal-backdrop no-print" id="signatureModal" onclick="if(event.target === this) closeSignatureModal()">
@@ -2515,7 +2772,9 @@
             const isThermal = sheet.classList.contains('style-thermal_80mm');
             const baseWidth = isThermal ? 320 : 580;
             
-            const availableWidth = Math.max(300, window.innerWidth - 64);
+            const sidebar = document.getElementById('invoiceStudioSidebar');
+            const sidebarW = (sidebar && window.innerWidth > 860) ? sidebar.offsetWidth : 0;
+            const availableWidth = Math.max(300, window.innerWidth - sidebarW - 48);
             const fitPercent = Math.round((availableWidth / baseWidth) * 100);
             return Math.min(250, Math.max(50, fitPercent));
         }
@@ -2605,12 +2864,124 @@
             }
         })();
 
+        function showToast(msg) {
+            let toast = document.getElementById('invoiceToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'invoiceToast';
+                toast.className = 'invoice-toast';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => { toast.classList.remove('show'); }, 4000);
+        }
+
+        // =========================================================================
+        // High-Precision 4x A5 Paper Canvas Generator
+        // Strictly adheres to Standard A5 Portrait Ratio (148mm : 210mm = 1:1.4189)
+        // High-DPI rasterization (4x scale) for pin-sharp text, QR, barcodes & borders
+        // =========================================================================
+        async function generateA5InvoiceCanvas(scaleMultiplier = 4) {
+            const sheet = document.getElementById('invoiceSheet');
+            if (!sheet) return null;
+
+            // Reset zoom for pixel-perfect render
+            setInvoiceZoom(100, false);
+            document.body.classList.add('exporting-pdf');
+
+            // Wait for WebFonts to be fully rendered
+            if (document.fonts) {
+                await document.fonts.ready;
+            }
+            await new Promise(r => setTimeout(r, 120));
+
+            // Calculate scale: 4x resolution requested by user
+            const renderScale = Math.max(4, scaleMultiplier);
+
+            let rawCanvas = null;
+            if (typeof html2canvas === 'function') {
+                rawCanvas = await html2canvas(sheet, {
+                    scale: renderScale,
+                    useCORS: true,
+                    allowTaint: true,
+                    logging: false,
+                    scrollX: 0,
+                    scrollY: 0,
+                    backgroundColor: '#FFFFFF',
+                    imageTimeout: 15000,
+                    windowWidth: sheet.scrollWidth,
+                    windowHeight: sheet.scrollHeight
+                });
+            } else if (typeof html2pdf !== 'undefined') {
+                const opt = {
+                    margin: 0,
+                    image: { type: 'png' },
+                    html2canvas: {
+                        scale: renderScale,
+                        useCORS: true,
+                        logging: false,
+                        scrollX: 0,
+                        scrollY: 0,
+                        backgroundColor: '#FFFFFF'
+                    }
+                };
+                const worker = html2pdf().set(opt).from(sheet);
+                rawCanvas = await worker.toCanvas().get('canvas');
+            }
+
+            if (!rawCanvas) return null;
+
+            // A5 Standard Paper Dimensions: 148 mm × 210 mm
+            // Aspect Ratio: 210 / 148 = 1.4189189189...
+            const a5Ratio = 210 / 148;
+            const rawW = rawCanvas.width;
+            const rawH = rawCanvas.height;
+
+            // Determine target dimensions that strictly enforce the exact A5 paper aspect ratio
+            let targetW = rawW;
+            let targetH = Math.round(targetW * a5Ratio);
+
+            if (rawH > targetH) {
+                targetH = rawH;
+                targetW = Math.round(targetH / a5Ratio);
+            }
+
+            // Standard proportional A5 paper border padding (clean margin around sheet)
+            const padX = Math.max(16, Math.round(targetW * 0.025));
+            const padY = Math.max(20, Math.round(targetH * 0.025));
+            const finalW = targetW + (padX * 2);
+            const finalH = targetH + (padY * 2);
+
+            const a5Canvas = document.createElement('canvas');
+            a5Canvas.width = finalW;
+            a5Canvas.height = finalH;
+            const ctx = a5Canvas.getContext('2d');
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+
+            // Pure white A5 paper background
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, finalW, finalH);
+
+            // Center invoice content horizontally and align near top with neat margin
+            const drawX = Math.round((finalW - rawW) / 2);
+            const drawY = padY;
+
+            ctx.drawImage(rawCanvas, 0, 0, rawW, rawH, drawX, drawY, rawW, rawH);
+            return a5Canvas;
+        }
+
+        // =========================================================================
+        // High-Quality PDF Export (4x Resolution, Lossless PNG, Readable Text)
+        // =========================================================================
         async function exportInvoiceToPdf() {
             const btn = document.getElementById('exportInvoicePdfBtn');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span>⏳ Exporting A5 PDF...</span>';
+                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">⏳ Exporting A5 PDF...</span>';
             }
 
             // Save active zoom factor so screen zoom doesn't alter capture dimensions
@@ -2646,9 +3017,9 @@
                 const opt = {
                     margin: [4, 5, 4, 5],
                     filename: filename,
-                    image: { type: 'jpeg', quality: 0.98 },
+                    image: { type: 'png' }, // Lossless PNG: razor-sharp readable text as original
                     html2canvas: {
-                        scale: 2.5,
+                        scale: 4, // 4x Resolution (384+ DPI) for pin-sharp Khmer & English typography
                         useCORS: true,
                         logging: false,
                         scrollX: 0,
@@ -2658,7 +3029,8 @@
                     jsPDF: {
                         unit: 'mm',
                         format: 'a5',
-                        orientation: 'portrait'
+                        orientation: 'portrait',
+                        compress: true
                     },
                     pagebreak: {
                         mode: ['css', 'legacy'],
@@ -2694,6 +3066,8 @@
                         scaledCanvas.width = canvasWidth;
                         scaledCanvas.height = maxSinglePageHeight;
                         const ctx = scaledCanvas.getContext('2d');
+                        ctx.imageSmoothingEnabled = true;
+                        ctx.imageSmoothingQuality = 'high';
                         ctx.fillStyle = '#FFFFFF';
                         ctx.fillRect(0, 0, scaledCanvas.width, scaledCanvas.height);
 
@@ -2707,12 +3081,12 @@
                 }
 
                 await worker.save();
+                showToast('✅ A5 PDF with crystal-clear text exported successfully!');
             } catch (err) {
                 console.error('Invoice PDF generation error:', err);
                 window.print();
             } finally {
                 document.body.classList.remove('exporting-pdf');
-                // Restore user's interactive screen zoom
                 if (savedZoomMode === 'fit') {
                     setInvoiceZoom('fit', true);
                 } else {
@@ -2725,61 +3099,148 @@
             }
         }
 
+        // =========================================================================
+        // High-Precision 4x A5 JPG Export (Fits A5 Paper Perfectly)
+        // =========================================================================
         async function exportInvoiceToJpg() {
             const btn = document.getElementById('exportInvoiceJpgBtn');
             const origHtml = btn ? btn.innerHTML : '';
             if (btn) {
                 btn.disabled = true;
-                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:4px;">⏳ Rendering JPG...</span>';
+                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">⏳ Rendering 4x JPG...</span>';
             }
 
             const savedZoomMode = isFitMode ? 'fit' : currentZoomLevel;
 
             try {
-                const sheet = document.getElementById('invoiceSheet');
-                if (!sheet) return;
-
-                // Reset zoom for pixel-perfect render
-                setInvoiceZoom(100, false);
-                document.body.classList.add('exporting-pdf');
-
-                const orderNum = '{{ order.order_number }}' || 'Invoice';
-                const filename = `Invoice_${orderNum}.jpg`;
-
-                if (typeof html2pdf === 'undefined') {
+                const a5Canvas = await generateA5InvoiceCanvas(4);
+                if (!a5Canvas) {
                     window.print();
                     return;
                 }
 
-                const opt = {
-                    margin: [4, 5, 4, 5],
-                    image: { type: 'jpeg', quality: 0.98 },
-                    html2canvas: {
-                        scale: 2.5,
-                        useCORS: true,
-                        logging: false,
-                        scrollX: 0,
-                        scrollY: 0,
-                        backgroundColor: '#FFFFFF'
-                    }
-                };
+                const orderNum = '{{ order.order_number }}' || 'Invoice';
+                const filename = `Invoice_${orderNum}.jpg`;
 
-                const worker = html2pdf().set(opt).from(sheet);
-                const canvas = await worker.toCanvas().get('canvas');
+                const dataUrl = a5Canvas.toDataURL('image/jpeg', 0.98);
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = dataUrl;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
 
-                if (canvas) {
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                    const link = document.createElement('a');
-                    link.download = filename;
-                    link.href = dataUrl;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }
+                showToast('✅ 4x High-Res A5 Image downloaded successfully!');
             } catch (err) {
                 console.error('Invoice JPG generation error:', err);
                 alert('Error generating JPG image. Falling back to print.');
                 window.print();
+            } finally {
+                document.body.classList.remove('exporting-pdf');
+                if (savedZoomMode === 'fit') {
+                    setInvoiceZoom('fit', true);
+                } else {
+                    setInvoiceZoom(savedZoomMode, true);
+                }
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origHtml;
+                }
+            }
+        }
+
+        // =========================================================================
+        // Telegram Share Button: Share 4x High-Resolution Image to Telegram
+        // Supports Native Web Share, Clipboard Copy (Ctrl+V into Telegram), and Direct Link
+        // =========================================================================
+        async function shareInvoiceToTelegram() {
+            const btn = document.getElementById('shareTelegramBtn');
+            const origHtml = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span style="display:inline-flex;align-items:center;gap:6px;">⏳ Preparing 4x Image...</span>';
+            }
+
+            const savedZoomMode = isFitMode ? 'fit' : currentZoomLevel;
+
+            try {
+                const a5Canvas = await generateA5InvoiceCanvas(4);
+                if (!a5Canvas) {
+                    alert('Unable to generate invoice image.');
+                    return;
+                }
+
+                const orderNum = '{{ order.order_number }}' || 'Invoice';
+                const filename = `Invoice_${orderNum}.jpg`;
+
+                // 1. Convert to Blob
+                const blob = await new Promise(resolve => a5Canvas.toBlob(resolve, 'image/jpeg', 0.96));
+                const file = new File([blob], filename, { type: 'image/jpeg' });
+
+                // 2. Try copying PNG to clipboard (so desktop users can immediately Ctrl+V into Telegram)
+                let clipboardCopied = false;
+                try {
+                    if (navigator.clipboard && window.ClipboardItem) {
+                        const pngBlob = await new Promise(resolve => a5Canvas.toBlob(resolve, 'image/png'));
+                        await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+                        clipboardCopied = true;
+                    }
+                } catch (clipErr) {
+                    console.log('Clipboard copy not supported or denied:', clipErr);
+                }
+
+                // 3. Try Native Web Share API if device supports sharing image files (Mobile / Safari)
+                if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                    try {
+                        await navigator.share({
+                            title: `Invoice #${orderNum}`,
+                            text: `Invoice #${orderNum} - {{ order.customer_name or 'Customer' }}`,
+                            files: [file]
+                        });
+                        showToast('✅ Invoice image shared successfully!');
+                        return;
+                    } catch (shareErr) {
+                        if (shareErr.name === 'AbortError') return;
+                        console.log('Native share failed, proceeding with Telegram link:', shareErr);
+                    }
+                }
+
+                // 4. Upload image to server so Telegram receives direct public link
+                let telegramUrl = null;
+                try {
+                    const formData = new FormData();
+                    formData.append('image_file', file);
+                    formData.append('order_id', '{{ order.id }}');
+
+                    const uploadRes = await fetch('/sales/{{ order.id }}/upload-share-image', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await uploadRes.json();
+                    if (data.success && data.telegram_url) {
+                        telegramUrl = data.telegram_url;
+                    }
+                } catch (uploadErr) {
+                    console.error('Server upload failed:', uploadErr);
+                }
+
+                // 5. Open Telegram Share URL
+                if (telegramUrl) {
+                    window.open(telegramUrl, '_blank');
+                } else {
+                    const fallbackCaption = encodeURIComponent(`📄 Invoice: ${orderNum}\n👤 Customer: {{ order.customer_name or 'Customer' }}`);
+                    window.open(`https://t.me/share/url?url=${encodeURIComponent(window.location.href)}&text=${fallbackCaption}`, '_blank');
+                }
+
+                if (clipboardCopied) {
+                    showToast('✅ 4x Image copied to clipboard! Paste (Ctrl+V) directly into Telegram.');
+                } else {
+                    showToast('✅ Telegram opened! 4x image prepared.');
+                }
+
+            } catch (err) {
+                console.error('Telegram share error:', err);
+                alert('Could not share image to Telegram: ' + err.message);
             } finally {
                 document.body.classList.remove('exporting-pdf');
                 if (savedZoomMode === 'fit') {
@@ -2804,6 +3265,10 @@
                 setTimeout(function() {
                     exportInvoiceToJpg();
                 }, 600);
+            } else if (urlParams.get('autoshare') === 'telegram') {
+                setTimeout(function() {
+                    shareInvoiceToTelegram();
+                }, 700);
             }
         });
     </script>

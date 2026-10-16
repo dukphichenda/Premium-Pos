@@ -69,10 +69,11 @@ class TestInvoiceSkuAndSoDescription(unittest.TestCase):
                 sidebar_orders=[],
                 is_paid=False,
                 can_edit_prices=True,
-                payment_types=[]
+                payment_types=[],
+                status_counts={}
             )
             # Check Description column header exists
-            self.assertIn('<th style="width: 20%;">Description</th>', rendered)
+            self.assertIn('>Description</th>', rendered)
             # Check Description input field is rendered with line's description
             self.assertIn('name="lines[0][description]"', rendered)
             self.assertIn('value="Food grade container 500pcs"', rendered)

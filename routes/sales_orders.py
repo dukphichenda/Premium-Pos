@@ -3483,6 +3483,75 @@ def save_invoice_signature_settings():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@sales_orders_bp.route('/sales/<int:id>/upload-share-image', methods=['POST'])
+def upload_sales_share_image(id):
+    try:
+        order = query_one("""
+            SELECT so.id, so.order_number, so.total_amount, c.name as customer_name, so.branch_id
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE so.id = %s
+        """, (id,))
+        if not order or not _check_order_branch_access(order):
+            return jsonify({'success': False, 'message': 'Access denied or order not found'}), 403
+
+        data = request.get_json(silent=True) or request.form
+        image_data = data.get('image_data') if hasattr(data, 'get') else request.form.get('image_data')
+
+        # Support multipart file upload if sent via FormData
+        if not image_data and 'image_file' in request.files:
+            file = request.files['image_file']
+            image_bytes = file.read()
+            ext = 'jpg' if 'jpeg' in (file.content_type or '') or (file.filename and file.filename.endswith(('.jpg', '.jpeg'))) else 'png'
+        elif image_data:
+            import base64
+            if ',' in image_data:
+                header, encoded = image_data.split(',', 1)
+                ext = 'png' if 'png' in header else 'jpg'
+            else:
+                encoded = image_data
+                ext = 'jpg'
+            image_bytes = base64.b64decode(encoded)
+        else:
+            return jsonify({'success': False, 'error': 'No image data provided'}), 400
+
+        # Save to static/uploads/shared_invoices/
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'shared_invoices')
+        os.makedirs(upload_dir, mode=0o777, exist_ok=True)
+
+        clean_order_num = re.sub(r'[^a-zA-Z0-9_\-]', '_', str(order.get('order_number') or f'SO-{id}'))
+        filename = f"Invoice_{clean_order_num}.{ext}"
+        save_path = os.path.join(upload_dir, filename)
+
+        with open(save_path, 'wb') as f:
+            f.write(image_bytes)
+        try:
+            os.chmod(save_path, 0o666)
+        except Exception:
+            pass
+
+        base_host = request.host_url.rstrip('/')
+        image_url = f"{base_host}/static/uploads/shared_invoices/{filename}?v={int(time.time())}"
+
+        cust_name = order.get('customer_name') or 'Customer'
+        total = float(order.get('total_amount') or 0.0)
+        caption = f"📄 Invoice: {order.get('order_number')}\n👤 Customer: {cust_name}\n💵 Total: ${total:,.2f}"
+
+        import urllib.parse
+        telegram_url = f"https://t.me/share/url?url={urllib.parse.quote(image_url)}&text={urllib.parse.quote(caption)}"
+
+        return jsonify({
+            'success': True,
+            'filename': filename,
+            'image_url': image_url,
+            'telegram_url': telegram_url,
+            'caption': caption
+        })
+    except Exception as e:
+        logger.error(f"Error in upload_sales_share_image: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @sales_orders_bp.route('/api/invoice/toggle-signature', methods=['POST'])
 def toggle_invoice_signature():
     try:
