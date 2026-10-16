@@ -381,10 +381,10 @@ def monthly_expenses():
 
     if not is_main_admin and user_bid:
         branch_scope = str(user_bid)
-        branches = query_all("SELECT id, code, name, settings_json FROM branches WHERE id = %s", (user_bid,))
+        branches = query_all("SELECT id, code, name, color, settings_json FROM branches WHERE id = %s", (user_bid,))
     else:
         branch_scope = request.args.get('branch', 'main').strip().lower()
-        branches = query_all("SELECT id, code, name, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        branches = query_all("SELECT id, code, name, color, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
 
     for b in branches:
         raw_s = b.get('settings_json')

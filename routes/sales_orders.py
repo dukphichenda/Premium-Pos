@@ -476,9 +476,9 @@ def list_orders():
     stats_dict = {r['norm_status']: r['cnt'] for r in status_counts}
 
     if is_main:
-        branches = query_all("SELECT id, code, name, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        branches = query_all("SELECT id, code, name, color, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
     else:
-        branches = query_all("SELECT id, code, name, settings_json FROM branches WHERE id = %s", (user_bid,))
+        branches = query_all("SELECT id, code, name, color, settings_json FROM branches WHERE id = %s", (user_bid,))
 
     for b in branches:
         raw_s = b.get('settings_json')
