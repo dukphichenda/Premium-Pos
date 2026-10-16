@@ -433,8 +433,11 @@ def init_db():
                 """)
                 cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_signature_url TEXT;")
                 cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_name VARCHAR(150);")
+                cur.execute("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS custom_fields_json TEXT;")
+                cur.execute("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS created_by VARCHAR(100);")
+                cur.execute("ALTER TABLE stock_adjustment_lines ADD COLUMN IF NOT EXISTS sublocation VARCHAR(100) DEFAULT '';")
             except Exception as mig_err:
-                logger.warning(f"Customer/Invoice columns migration notice: {mig_err}")
+                logger.warning(f"Customer/Invoice/Adjustment columns migration notice: {mig_err}")
 
             # Resynchronize custom numbering sequences with current max IDs
             try:

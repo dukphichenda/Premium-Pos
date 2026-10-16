@@ -481,6 +481,8 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
     reason VARCHAR(100) NOT NULL DEFAULT 'Recount', -- Recount, Damaged, Shrinkage, Found Stock, Internal Use, Other
     status VARCHAR(50) NOT NULL DEFAULT 'COMPLETED', -- DRAFT, COMPLETED
     notes TEXT,
+    custom_fields_json TEXT,
+    created_by VARCHAR(100),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -489,6 +491,7 @@ CREATE TABLE IF NOT EXISTS stock_adjustment_lines (
     id SERIAL PRIMARY KEY,
     adjustment_id INTEGER NOT NULL REFERENCES stock_adjustments(id) ON DELETE CASCADE,
     product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    sublocation VARCHAR(100) DEFAULT '',
     old_qty NUMERIC(14, 4) NOT NULL DEFAULT 0,
     new_qty NUMERIC(14, 4) NOT NULL DEFAULT 0,
     diff_qty NUMERIC(14, 4) NOT NULL DEFAULT 0,
