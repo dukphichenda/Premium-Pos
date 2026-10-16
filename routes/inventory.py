@@ -79,17 +79,9 @@ def list_adjustments():
             sa.*,
             l.name as location_name,
             COUNT(sal.id) as item_count,
-            SUM(ABS(sal.diff_qty)) as total_diff_units
+            COALESCE(SUM(ABS(sal.diff_qty)), 0) as total_diff_units
         FROM stock_adjustments sa
-        JOIN locations l ON sa.location_id = l.id
-            l.name as location_name,
-            COUNT(sal.id) as item_count,
-            COALESCE(SUM(ABS(sal.diff_qty)), 0) as total_diff_units,
-            sa.status,
-            sa.notes,
-            sa.created_by
-        FROM stock_adjustments sa
-        JOIN locations l ON sa.location_id = l.id
+        LEFT JOIN locations l ON sa.location_id = l.id
         LEFT JOIN stock_adjustment_lines sal ON sa.id = sal.adjustment_id
         GROUP BY sa.id, l.name
         ORDER BY sa.adjustment_date DESC, sa.id DESC
