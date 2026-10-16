@@ -678,7 +678,7 @@
             </a>
 
             <div style="border-top: 1px solid #E2E8F0; margin: 8px 10px;"></div>
-            <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444;" onclick="onFlyoutNav(event, this)">
+            <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444;" target="_top" onclick="handleLogoutClick(event, this)">
                 <span class="flyout-icon">🚪</span>
                 <span class="flyout-label">Log Out</span>
             </a>
@@ -724,7 +724,7 @@
                 <span class="flyout-label">Switch Account / Sign In</span>
             </a>
 
-            <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444; font-weight: 700;" onclick="onFlyoutNav(event, this)">
+            <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444; font-weight: 700;" target="_top" onclick="handleLogoutClick(event, this)">
                 <span class="flyout-icon">🚪</span>
                 <span class="flyout-label">Sign Out</span>
             </a>
@@ -889,6 +889,29 @@
 
         window.closeSidebarFlyout = closeSidebarFlyout;
 
+        function handleLogoutClick(event, linkEl) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            closeSidebarFlyout();
+            try {
+                localStorage.removeItem('inflow_mdi_tabs');
+                localStorage.removeItem('inflow_mdi_active_tab');
+                localStorage.removeItem('inflow_active_store_id');
+                sessionStorage.clear();
+            } catch (e) {}
+
+            const logoutUrl = (linkEl && linkEl.getAttribute('href')) || "{{ url_for('auth.logout') }}";
+            // Navigate the entire top window to logout so the screen immediately transitions to login
+            if (window.top) {
+                window.top.location.href = logoutUrl;
+            } else {
+                window.location.href = logoutUrl;
+            }
+        }
+        window.handleLogoutClick = handleLogoutClick;
+
         function onFlyoutNav(event, linkEl) {
             if (event) {
                 event.preventDefault();
@@ -898,6 +921,12 @@
 
             const href = linkEl.getAttribute('href');
             if (!href) return;
+
+            // Handle sign out / log out immediately at top-level window context
+            if (href.includes('/logout') || href.includes('/login')) {
+                handleLogoutClick(event, linkEl);
+                return;
+            }
 
             // Handle store switching directly at top-level window context
             if (href.includes('/branches/switch/')) {

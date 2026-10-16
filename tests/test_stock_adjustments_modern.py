@@ -64,8 +64,8 @@ class ModernStockAdjustmentsTestCase(unittest.TestCase):
         loc = query_one("SELECT id FROM locations WHERE is_default = TRUE LIMIT 1") or query_one("SELECT id FROM locations LIMIT 1")
         loc_id = loc['id'] if loc else 100
 
-        # Post modern JSON adjustment
-        adj_number = f"TEST-ADJ-{p1['id']}"
+        import time
+        adj_number = f"TEST-ADJ-{p1['id']}-{int(time.time()*1000)}"
         payload = {
             'location_id': loc_id,
             'adjustment_number': adj_number,
@@ -94,6 +94,8 @@ class ModernStockAdjustmentsTestCase(unittest.TestCase):
             content_type='application/json',
             headers={'Accept': 'application/json'}
         )
+        if res.status_code != 200:
+            print("FAILED RESPONSE:", res.data.decode('utf-8'))
         self.assertEqual(res.status_code, 200)
         resp_data = json.loads(res.data)
         self.assertTrue(resp_data['success'])

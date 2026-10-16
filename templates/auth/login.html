@@ -5,9 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>User Sign In | inFlow Premium Enterprise</title>
     <script>
-        // Never allow login page to render inside an MDI tab iframe
-        if (window.self !== window.top || window.location.search.indexOf('embed=1') !== -1) {
-            window.location.replace("{{ url_for('dashboard.index') }}?embed=1");
+        // Frame-busting: If login page is rendered inside an MDI tab iframe, force entire top window to login!
+        if (window.self !== window.top) {
+            try {
+                localStorage.removeItem('inflow_mdi_tabs');
+                localStorage.removeItem('inflow_mdi_active_tab');
+                localStorage.removeItem('inflow_active_store_id');
+                sessionStorage.clear();
+            } catch (e) {}
+            window.top.location.href = "{{ url_for('auth.login') }}";
+        } else if (window.location.search.indexOf('embed=1') !== -1) {
+            // Strip embed=1 if present on top-level window
+            window.location.replace("{{ url_for('auth.login') }}");
         }
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">

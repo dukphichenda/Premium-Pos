@@ -335,6 +335,42 @@ def login():
 def logout():
     session.clear()
     flash("You have been signed out safely. / អ្នកបានចាកចេញពីប្រព័ន្ធដោយសុវត្ថិភាព", "success")
+
+    # If called via JSON or Fetch API
+    if request.is_json or request.headers.get('Accept') == 'application/json':
+        from flask import jsonify
+        resp = jsonify({'success': True, 'redirect_url': url_for('auth.login')})
+        resp.delete_cookie('inflow_remember', path='/')
+        resp.delete_cookie('inflow_session', path='/')
+        resp.delete_cookie('session', path='/')
+        return resp
+
+    # If requested inside an iframe or with embed=1 parameter, break out of iframe to window.top
+    if request.args.get('embed') or request.headers.get('Sec-Fetch-Dest') == 'iframe':
+        login_url = url_for('auth.login')
+        html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
+        <title>Signing out...</title>
+        <script>
+        try {{
+            localStorage.removeItem('inflow_mdi_tabs');
+            localStorage.removeItem('inflow_mdi_active_tab');
+            localStorage.removeItem('inflow_active_store_id');
+            sessionStorage.clear();
+        }} catch(e) {{}}
+        if (window.top) {{
+            window.top.location.href = "{login_url}";
+        }} else {{
+            window.location.href = "{login_url}";
+        }}
+        </script>
+        </head><body><p>Signing out safely... <a href="{login_url}">Click here if not redirected</a>.</p></body></html>"""
+        from flask import Response
+        resp = Response(html, mimetype='text/html')
+        resp.delete_cookie('inflow_remember', path='/')
+        resp.delete_cookie('inflow_session', path='/')
+        resp.delete_cookie('session', path='/')
+        return resp
+
     resp = redirect(url_for('auth.login'))
     resp.delete_cookie('inflow_remember', path='/')
     resp.delete_cookie('inflow_session', path='/')

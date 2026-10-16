@@ -569,6 +569,23 @@
             navigateOrOpenTab: function (url, title, type, forceNew = false) {
                 if (!url) url = '/';
                 const cleanUrl = url.replace(/[?&]embed=1/, '');
+
+                // Never open logout or login inside an MDI tab iframe - navigate window.top immediately!
+                if (cleanUrl.includes('/logout') || cleanUrl === '/login' || cleanUrl.startsWith('/login?') || cleanUrl.startsWith('/login/')) {
+                    try {
+                        localStorage.removeItem(STORAGE_KEY);
+                        localStorage.removeItem(ACTIVE_TAB_KEY);
+                        localStorage.removeItem('inflow_active_store_id');
+                        sessionStorage.clear();
+                    } catch (e) {}
+                    if (window.top) {
+                        window.top.location.href = cleanUrl;
+                    } else {
+                        window.location.href = cleanUrl;
+                    }
+                    return;
+                }
+
                 const targetCategory = type || detectTypeFromUrl(cleanUrl);
                 const displayTitle = title || this.guessTitle(cleanUrl, targetCategory);
 
@@ -1251,6 +1268,11 @@
         // Proxy commands to parent MDI Shell
         window.inflowMdi = {
             openTab: function (url, title, type, forceNew) {
+                if (url && (url.includes('/logout') || url.includes('/login'))) {
+                    if (window.top) window.top.location.href = url;
+                    else window.location.href = url;
+                    return;
+                }
                 if (window.top && window.top.inflowMdi) {
                     window.top.inflowMdi.openTab(url, title, type, forceNew);
                 } else {
@@ -1258,6 +1280,11 @@
                 }
             },
             navigateOrOpenTab: function (url, title, type, forceNew) {
+                if (url && (url.includes('/logout') || url.includes('/login'))) {
+                    if (window.top) window.top.location.href = url;
+                    else window.location.href = url;
+                    return;
+                }
                 if (window.top && window.top.inflowMdi) {
                     window.top.inflowMdi.navigateOrOpenTab(url, title, type, forceNew);
                 } else {
