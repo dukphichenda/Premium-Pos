@@ -1128,7 +1128,8 @@
                        autocomplete="off" 
                        style="height: 33px; padding-left: 31px; font-size: 12px;"
                        oninput="handleSoLiveSearch(this.value)"
-                       onkeydown="handleSoSearchKey(event)">
+                       onkeydown="handleSoSearchKey(event)"
+                       onblur="handleSoSearchBlur(this)">
                 <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query %}display: block;{% else %}display: none;{% endif %}">✕</button>
             </div>
         </div>
@@ -3100,8 +3101,13 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
     if (filters.customer_search && !params.has('customer_search')) params.set('customer_search', filters.customer_search);
     if (filters.branch && !params.has('branch')) params.set('branch', filters.branch);
 
-    const liveSearchVal = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
-    if (liveSearchVal && !params.has('search')) params.set('search', liveSearchVal);
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    if (liveSearchVal) {
+        params.set('search', liveSearchVal);
+    } else if (liveSearchInput) {
+        params.set('search', '');
+    }
 
     for (const key in extraParams) {
         if (extraParams[key] !== undefined && extraParams[key] !== null) {
@@ -3157,17 +3163,16 @@ function attachFiltersToForm(form) {
         input.value = filters[field] || '';
     });
 
-    const liveSearchVal = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
-    if (liveSearchVal) {
-        let searchInput = form.querySelector('input[name="search"]');
-        if (!searchInput) {
-            searchInput = document.createElement('input');
-            searchInput.type = 'hidden';
-            searchInput.name = 'search';
-            form.appendChild(searchInput);
-        }
-        searchInput.value = liveSearchVal;
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    let searchInput = form.querySelector('input[name="search"]');
+    if (!searchInput) {
+        searchInput = document.createElement('input');
+        searchInput.type = 'hidden';
+        searchInput.name = 'search';
+        form.appendChild(searchInput);
     }
+    searchInput.value = liveSearchVal || '';
 
     const upperId = getUpperOrAdjacentOrderId();
     if (upperId) {
@@ -3213,15 +3218,21 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
     }
 
     // Retain any active search query from input, storage, or current URL so search remains fixed across order selection
-    const currentParams = new URLSearchParams(window.location.search);
-    const liveSearchVal = document.getElementById('soSidebarSearchInput')?.value?.trim() || 
-                          sessionStorage.getItem('inflow_so_search_query') ||
-                          currentParams.get('search') || '';
-    if (liveSearchVal) {
-        url.searchParams.set('search', liveSearchVal);
-        try {
-            sessionStorage.setItem('inflow_so_search_query', liveSearchVal);
-        } catch(e) {}
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const isSearchEmpty = liveSearchInput && !liveSearchInput.value.trim();
+    if (isSearchEmpty) {
+        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+        url.searchParams.set('search', '');
+        url.searchParams.delete('q');
+    } else {
+        const currentParams = new URLSearchParams(window.location.search);
+        const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || currentParams.get('search') || '');
+        if (liveSearchVal) {
+            url.searchParams.set('search', liveSearchVal);
+            try {
+                sessionStorage.setItem('inflow_so_search_query', liveSearchVal);
+            } catch(e) {}
+        }
     }
 
     const finalUrl = url.pathname + url.search;
@@ -3496,18 +3507,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Restore and fix sidebar customer/order search query
     const sidebarSearchInput = document.getElementById('soSidebarSearchInput');
-    const urlSearch = new URLSearchParams(window.location.search).get('search') || new URLSearchParams(window.location.search).get('q') || '';
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasSearchParam = urlParams.has('search');
+    const urlSearch = urlParams.get('search') || urlParams.get('q') || '';
     let savedSearch = '';
     try {
         savedSearch = sessionStorage.getItem('inflow_so_search_query') || '';
     } catch(e) {}
-    const activeSearch = urlSearch || savedSearch || '{{ search_query or "" }}';
-    if (sidebarSearchInput && activeSearch) {
+
+    let activeSearch = '';
+    if (hasSearchParam) {
+        activeSearch = urlSearch.trim();
+        if (!activeSearch) {
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+        }
+    } else {
+        activeSearch = (savedSearch || '{{ search_query or "" }}').trim();
+    }
+
+    if (sidebarSearchInput) {
         sidebarSearchInput.value = activeSearch;
-        try {
-            sessionStorage.setItem('inflow_so_search_query', activeSearch);
-        } catch(e) {}
-        handleSoLiveSearch(activeSearch);
+        const clearBtn = document.getElementById('btnClearSoSearch');
+        if (clearBtn) clearBtn.style.display = activeSearch ? 'block' : 'none';
+        if (activeSearch) {
+            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+            handleSoLiveSearch(activeSearch);
+        }
     }
 
     // Attach item dropdown popup to body early and register scroll/resize repositioning
@@ -5989,7 +6014,14 @@ function toggleSoSidebarSearch() {
     }
 }
 
+let soClearSearchTimer = null;
+
 function handleSoLiveSearch(val) {
+    if (soClearSearchTimer) {
+        clearTimeout(soClearSearchTimer);
+        soClearSearchTimer = null;
+    }
+
     const rawVal = val !== undefined && val !== null ? String(val) : '';
     const q = rawVal.toLowerCase().trim();
 
@@ -6073,6 +6105,51 @@ function handleSoLiveSearch(val) {
     if (countDisplay) {
         countDisplay.innerText = visibleOrders;
     }
+
+    // Auto-clear logic: when user deletes search text, automatically restore all orders
+    if (!q) {
+        const currentUrl = new URL(window.location.href);
+        const hasSearchInUrl = currentUrl.searchParams.has('search') || currentUrl.searchParams.has('q');
+        const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
+
+        if (hasSearchInUrl || hadServerSearch) {
+            soClearSearchTimer = setTimeout(function() {
+                const searchInp = document.getElementById('soSidebarSearchInput');
+                if (!searchInp || !searchInp.value.trim()) {
+                    currentUrl.searchParams.set('search', '');
+                    currentUrl.searchParams.delete('q');
+                    try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+                    if (window.top && window.top.inflowMdi) {
+                        window.top.inflowMdi.navigateOrOpenTab(currentUrl.pathname + currentUrl.search, 'Sales Order', 'sales');
+                    } else {
+                        window.location.href = currentUrl.pathname + currentUrl.search;
+                    }
+                }
+            }, 300);
+        }
+    }
+}
+
+function handleSoSearchBlur(inputEl) {
+    if (!inputEl || !inputEl.value.trim()) {
+        const currentUrl = new URL(window.location.href);
+        const hasSearchInUrl = currentUrl.searchParams.has('search') || currentUrl.searchParams.has('q');
+        const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
+        if (hasSearchInUrl || hadServerSearch) {
+            if (soClearSearchTimer) {
+                clearTimeout(soClearSearchTimer);
+                soClearSearchTimer = null;
+            }
+            currentUrl.searchParams.set('search', '');
+            currentUrl.searchParams.delete('q');
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+            if (window.top && window.top.inflowMdi) {
+                window.top.inflowMdi.navigateOrOpenTab(currentUrl.pathname + currentUrl.search, 'Sales Order', 'sales');
+            } else {
+                window.location.href = currentUrl.pathname + currentUrl.search;
+            }
+        }
+    }
 }
 
 function startNewOrderForCustomer(customerId, customerName) {
@@ -6101,6 +6178,10 @@ function startNewOrderForCustomer(customerId, customerName) {
 }
 
 function clearSoLiveSearch() {
+    if (soClearSearchTimer) {
+        clearTimeout(soClearSearchTimer);
+        soClearSearchTimer = null;
+    }
     const inp = document.getElementById('soSidebarSearchInput');
     if (inp) inp.value = '';
     try {
@@ -6110,28 +6191,39 @@ function clearSoLiveSearch() {
     const btn = document.getElementById('btnClearSoSearch');
     if (btn) btn.style.display = 'none';
 
-    // If URL has search parameter, remove it and reload
+    // Remove search parameter and reload clean list
     const url = new URL(window.location.href);
-    if (url.searchParams.has('search') || url.searchParams.has('q')) {
-        url.searchParams.delete('search');
-        url.searchParams.delete('q');
-        window.location.href = url.toString();
+    url.searchParams.set('search', '');
+    url.searchParams.delete('q');
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+    } else {
+        window.location.href = url.pathname + url.search;
     }
 }
 
 function handleSoSearchKey(e) {
     if (e.key === 'Enter') {
         e.preventDefault();
+        if (soClearSearchTimer) {
+            clearTimeout(soClearSearchTimer);
+            soClearSearchTimer = null;
+        }
         const val = (e.target.value || '').trim();
         const url = new URL(window.location.href);
         if (val) {
             url.searchParams.set('search', val);
             try { sessionStorage.setItem('inflow_so_search_query', val); } catch(err) {}
         } else {
-            url.searchParams.delete('search');
+            url.searchParams.set('search', '');
+            url.searchParams.delete('q');
             try { sessionStorage.removeItem('inflow_so_search_query'); } catch(err) {}
         }
-        window.location.href = url.toString();
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+        } else {
+            window.location.href = url.pathname + url.search;
+        }
     }
 }
 
@@ -6179,15 +6271,23 @@ function selectSoStatusFilter(status) {
         sessionStorage.setItem('inflow_so_status_filter', status);
     } catch(e) {}
 
-    // Retain search query
-    const liveSearch = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    // Retain search query only if input has text
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
     if (liveSearch) {
         url.searchParams.set('search', liveSearch);
+    } else {
+        url.searchParams.set('search', '');
+        url.searchParams.delete('q');
     }
 
     url.searchParams.delete('customer_id');
     url.searchParams.delete('delivery_man');
-    window.location.href = url.toString();
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+    } else {
+        window.location.href = url.pathname + url.search;
+    }
 }
 
 function applySoDateFilter(val) {
@@ -6198,15 +6298,23 @@ function applySoDateFilter(val) {
         sessionStorage.setItem('inflow_so_date_filter', dateVal);
     } catch(e) {}
 
-    // Retain search query
-    const liveSearch = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    // Retain search query only if input has text
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
     if (liveSearch) {
         url.searchParams.set('search', liveSearch);
+    } else {
+        url.searchParams.set('search', '');
+        url.searchParams.delete('q');
     }
 
     url.searchParams.delete('date_from');
     url.searchParams.delete('date_to');
-    window.location.href = url.toString();
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+    } else {
+        window.location.href = url.pathname + url.search;
+    }
 }
 
 function applyCustomDateFilter() {
@@ -6223,16 +6331,24 @@ function applyCustomDateFilter() {
     if (toVal) url.searchParams.set('date_to', toVal);
     else url.searchParams.delete('date_to');
 
-    // Retain search query
-    const liveSearch = document.getElementById('soSidebarSearchInput')?.value?.trim() || sessionStorage.getItem('inflow_so_search_query');
+    // Retain search query only if input has text
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
     if (liveSearch) {
         url.searchParams.set('search', liveSearch);
+    } else {
+        url.searchParams.set('search', '');
+        url.searchParams.delete('q');
     }
 
     try {
         sessionStorage.setItem('inflow_so_date_filter', 'Custom');
     } catch(e) {}
-    window.location.href = url.toString();
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+    } else {
+        window.location.href = url.pathname + url.search;
+    }
 }
 
 // =========================================================================

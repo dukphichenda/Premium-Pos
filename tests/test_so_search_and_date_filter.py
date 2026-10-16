@@ -71,5 +71,23 @@ class TestSoSearchAndDateFilter(unittest.TestCase):
         self.assertIn('id="itemDropdownPopup"', html)
         self.assertIn('inflow-item-dropdown-popup', html)
 
+    def test_detail_order_clearing_search_removes_session_and_restores_all(self):
+        if not self.order_id:
+            return
+        # 1. Set search in session
+        self.client.get(f'/sales/{self.order_id}?search=Lok+Srey+Mich')
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('so_search_query'), 'Lok Srey Mich')
+
+        # 2. Clear search (?search=)
+        res = self.client.get(f'/sales/{self.order_id}?search=')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+        with self.client.session_transaction() as sess:
+            self.assertIsNone(sess.get('so_search_query'))
+
+        # Input should have empty value and clear button hidden
+        self.assertIn('value=""', html)
+
 if __name__ == '__main__':
     unittest.main()

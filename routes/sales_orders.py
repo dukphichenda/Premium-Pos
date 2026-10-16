@@ -647,7 +647,7 @@ def create_order():
         flash(f"Error creating order: {e}", "error")
         return redirect(url_for('sales_orders.create_order'))
 
-def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=''):
+def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=None):
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
 
@@ -749,8 +749,11 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             drawer_params.append(delivery_man_filter)
 
     # General search query (order #, customer name, delivery man, or total amount)
-    if not search_query:
-        search_query = (request.args.get('search') or request.args.get('q') or session.get('so_search_query') or '').strip()
+    if search_query is None:
+        if 'search' in request.args or 'q' in request.args:
+            search_query = (request.args.get('search') or request.args.get('q') or '').strip()
+        else:
+            search_query = (session.get('so_search_query') or '').strip()
     if search_query:
         sp = f"%{search_query}%"
         drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
@@ -2481,7 +2484,12 @@ def save_order(id=0):
         date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
         status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
         branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
-        search_param = request.form.get('search') or request.args.get('search') or session.get('so_search_query') or ''
+        if 'search' in request.form:
+            search_param = (request.form.get('search') or '').strip()
+        elif 'search' in request.args:
+            search_param = (request.args.get('search') or '').strip()
+        else:
+            search_param = (session.get('so_search_query') or '').strip()
 
         session['so_date_filter'] = date_filter
         session['so_status_filter'] = status_filter
@@ -2489,6 +2497,8 @@ def save_order(id=0):
         session['so_branch_filter'] = branch_param
         if search_param:
             session['so_search_query'] = search_param
+        elif 'search' in request.form or 'search' in request.args:
+            session.pop('so_search_query', None)
 
         target_id = id
         if mark_complete_pay and not is_new:
@@ -2799,7 +2809,12 @@ def delete_order(id):
     status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
     cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
     branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(branch_id) if branch_id else 'main')
-    search_param = request.form.get('search') or request.args.get('search') or session.get('so_search_query') or ''
+    if 'search' in request.form:
+        search_param = (request.form.get('search') or '').strip()
+    elif 'search' in request.args:
+        search_param = (request.args.get('search') or '').strip()
+    else:
+        search_param = (session.get('so_search_query') or '').strip()
 
     session['so_date_filter'] = date_filter
     session['so_status_filter'] = status_filter
@@ -2807,6 +2822,8 @@ def delete_order(id):
     session['so_branch_filter'] = branch_param
     if search_param:
         session['so_search_query'] = search_param
+    elif 'search' in request.form or 'search' in request.args:
+        session.pop('so_search_query', None)
 
     req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
 
