@@ -88,5 +88,58 @@ class TestSalesOrderAddress(unittest.TestCase):
             execute("DELETE FROM sales_orders WHERE customer_id = %s", (cid,))
             execute("DELETE FROM customers WHERE id = %s", (cid,))
 
+    def test_csv_import_sales_order_address_and_customer_sync(self):
+        """Verify sales order CSV import extracts address, sets destination_province, and updates customer"""
+        from services.csv_exchange import preview_import_data, execute_import_data
+
+        test_order_num = "TEST-SO-CSV-ADDR-01"
+        test_cust_name = "CSV Import Test Customer"
+
+        # Multi-row CSV: row 1 has item 1 without address, row 2 has item 2 WITH address (testing multi-row backfill)
+        csv_text = (
+            "OrderNumber,Customer,ShippingAddress1,ShippingCity,ShippingState,ItemName,ItemQuantity,ItemUnitPrice\n"
+            f"{test_order_num},{test_cust_name},,,,\"Widget A\",2,15.00\n"
+            f"{test_order_num},{test_cust_name},\"Street 2004\",\"Phnom Penh\",\"Phnom Penh\",\"Widget B\",1,25.00\n"
+        )
+
+        try:
+            # 1. Test Preview
+            preview_res = preview_import_data('sales_order', csv_text, has_headers=True)
+            self.assertIn('orders_summary', preview_res)
+            self.assertEqual(len(preview_res['orders_summary']), 1)
+            so_summary = preview_res['orders_summary'][0]
+            self.assertEqual(so_summary['order_number'], test_order_num)
+            self.assertEqual(so_summary['address'], 'Street 2004, Phnom Penh')
+
+            # 2. Test Execution
+            import_res = execute_import_data('sales_order', csv_text, has_headers=True)
+            self.assertTrue(import_res.get('success', False) or import_res.get('imported', 0) > 0)
+
+            # Check database for sales order
+            saved_so = query_one("""
+                SELECT id, order_number, customer_address, destination_province, customer_id
+                FROM sales_orders
+                WHERE order_number = %s;
+            """, (test_order_num,))
+            self.assertIsNotNone(saved_so)
+            self.assertEqual(saved_so['customer_address'], 'Street 2004, Phnom Penh')
+            self.assertEqual(saved_so['destination_province'], 'Phnom Penh')
+
+            # Check customer table
+            saved_cust = query_one("""
+                SELECT id, name, address1, shipping_address
+                FROM customers
+                WHERE id = %s;
+            """, (saved_so['customer_id'],))
+            self.assertIsNotNone(saved_cust)
+            self.assertEqual(saved_cust['address1'], 'Street 2004, Phnom Penh')
+            self.assertEqual(saved_cust['shipping_address'], 'Street 2004, Phnom Penh')
+
+        finally:
+            execute("DELETE FROM sales_order_lines WHERE sales_order_id IN (SELECT id FROM sales_orders WHERE order_number = %s)", (test_order_num,))
+            execute("DELETE FROM sales_orders WHERE order_number = %s", (test_order_num,))
+            execute("DELETE FROM customers WHERE name = %s", (test_cust_name,))
+
 if __name__ == '__main__':
     unittest.main()
+

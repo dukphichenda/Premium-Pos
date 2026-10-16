@@ -790,6 +790,56 @@ def erase_existing_data(data_type_key, branch_id=None):
             logger.info("Erased inventory stock records.")
 
 
+def resolve_csv_order_address(row, get_val_fn):
+    """
+    Extracts and resolves full customer shipping / billing address and destination province
+    from CSV row by checking all inFlow and standard CSV aliases.
+    Returns: (resolved_address_str, destination_province_str)
+    """
+    # 1. Shipping address components
+    s1 = get_val_fn(row, [
+        'ShippingAddress1', 'Shipping Address 1', 'ShippingAddress', 'Shipping Address',
+        'CustomerAddress1', 'Customer Address 1', 'CustomerAddress', 'Customer Address',
+        'DeliveryAddress1', 'Delivery Address 1', 'DeliveryAddress', 'Delivery Address',
+        'ShipToAddress1', 'Ship To Address 1', 'ShipToAddress', 'Ship To Address',
+        'Address1', 'Address 1', 'Address', 'Street', 'Customer Street', 'អាសយដ្ឋាន', 'អាស័យដ្ឋាន'
+    ])
+    s2 = get_val_fn(row, [
+        'ShippingAddress2', 'Shipping Address 2', 'CustomerAddress2', 'Customer Address 2',
+        'DeliveryAddress2', 'Delivery Address 2', 'ShipToAddress2', 'Ship To Address 2',
+        'Address2', 'Address 2'
+    ])
+    scity = get_val_fn(row, ['ShippingCity', 'Shipping City', 'City', 'Town'])
+    sstate = get_val_fn(row, ['ShippingState', 'Shipping State', 'DestinationProvince', 'Destination Province', 'Province', 'State'])
+
+    ship_parts = [p.strip() for p in (s1, s2, scity, sstate) if p and p.strip()]
+    combined_ship = []
+    for p in ship_parts:
+        if not any(p.lower() == existing.lower() or p.lower() in existing.lower() for existing in combined_ship):
+            combined_ship.append(p)
+    ship_addr = ", ".join(combined_ship)
+
+    # 2. Billing address components as fallback
+    b1 = get_val_fn(row, [
+        'BillingAddress1', 'Billing Address 1', 'BillingAddress', 'Billing Address',
+        'BillToAddress1', 'Bill To Address 1', 'BillToAddress', 'Bill To Address'
+    ])
+    b2 = get_val_fn(row, ['BillingAddress2', 'Billing Address 2', 'BillToAddress2', 'Bill To Address 2'])
+    bcity = get_val_fn(row, ['BillingCity', 'Billing City'])
+    bstate = get_val_fn(row, ['BillingState', 'Billing State'])
+
+    bill_parts = [p.strip() for p in (b1, b2, bcity, bstate) if p and p.strip()]
+    combined_bill = []
+    for p in bill_parts:
+        if not any(p.lower() == existing.lower() or p.lower() in existing.lower() for existing in combined_bill):
+            combined_bill.append(p)
+    bill_addr = ", ".join(combined_bill)
+
+    resolved_addr = ship_addr or bill_addr or ''
+    resolved_prov = sstate or scity or bstate or bcity or ''
+    return resolved_addr, resolved_prov
+
+
 def preview_import_data(data_type, file_content, has_headers=True, import_mode='keep', branch_id=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
@@ -869,10 +919,14 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 ord_num = get_val_preview(r, ['OrderNumber', 'Order Number', 'SO Number', 'Invoice Number', 'Order #'])
                 if not ord_num:
                     continue
+                row_addr, _ = resolve_csv_order_address(r, get_val_preview)
+                raw_cname = get_val_preview(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer')
+                clean_cname = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', raw_cname).strip() or 'Walk-in Customer'
                 if ord_num not in orders_grouped:
                     orders_grouped[ord_num] = {
                         'order_number': ord_num,
-                        'party_name': get_val_preview(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer'),
+                        'party_name': clean_cname,
+                        'address': row_addr,
                         'order_date': get_val_preview(r, ['OrderDate', 'Order Date', 'Date'], ''),
                         'status': get_val_preview(r, ['OrderStatus', 'Order Status', 'Status', 'State'], 'OPEN').upper(),
                         'freight': clean_num_val(get_val_preview(r, ['Freight', 'Shipping Fee', 'OrderFreight', 'Shipping']), 0.0),
@@ -880,6 +934,11 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                         'total_line_count': 0,
                         'items': []
                     }
+                else:
+                    if not orders_grouped[ord_num].get('address') and row_addr:
+                        orders_grouped[ord_num]['address'] = row_addr
+                    if (not orders_grouped[ord_num].get('party_name') or orders_grouped[ord_num].get('party_name') == 'Walk-in Customer') and clean_cname != 'Walk-in Customer':
+                        orders_grouped[ord_num]['party_name'] = clean_cname
                 item_code = get_val_preview(r, ['ItemCode', 'Item Code', 'SKU', 'Product Code', 'ItemNumber', 'Code'])
                 item_name = get_val_preview(r, ['ItemName', 'Item Name', 'Product Name', 'Title'])
                 if not item_name and not item_code:
@@ -949,6 +1008,7 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
             orders_summary.append({
                 'order_number': ord_num,
                 'party_name': odata['party_name'],
+                'address': odata.get('address') or '',
                 'order_date': odata['order_date'] or '-',
                 'status': odata['status'],
                 'item_count': odata['total_line_count'],
@@ -1289,6 +1349,15 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 errors.append(f"Row {row_idx}: Missing Order Number.")
                 continue
 
+            row_addr, row_prov = resolve_csv_order_address(r, get_val)
+            raw_cname = get_val(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer')
+            clean_cname = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', raw_cname).strip() or 'Walk-in Customer'
+            row_contact = get_val(r, ['ContactName', 'Contact Name', 'Contact'])
+            row_phone = get_val(r, ['Phone', 'Telephone', 'Mobile', 'Customer Phone'])
+            row_email = get_val(r, ['Email', 'Email Address'])
+            row_city = get_val(r, ['ShippingCity', 'BillingCity', 'City'])
+            row_country = get_val(r, ['ShippingCountry', 'BillingCountry', 'Country'], 'Cambodia')
+
             if so_num not in orders_map:
                 orders_map[so_num] = {
                     'order_date_raw': get_val(r, ['OrderDate', 'Order Date', 'Date']),
@@ -1296,13 +1365,14 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     'invoiced_date_raw': get_val(r, ['InvoicedDate', 'Invoiced Date']),
                     'date_paid_raw': get_val(r, ['DatePaid', 'Date Paid']),
                     'status_raw': get_val(r, ['OrderStatus', 'Order Status', 'Status', 'State'], 'OPEN'),
-                    'customer_name': get_val(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer'),
-                    'contact_name': get_val(r, ['ContactName', 'Contact Name', 'Contact']),
-                    'phone': get_val(r, ['Phone', 'Telephone', 'Mobile', 'Customer Phone']),
-                    'email': get_val(r, ['Email', 'Email Address']),
-                    'address': get_val(r, ['ShippingAddress1', 'Shipping Address', 'ShippingAddress', 'CustomerAddress', 'Customer Address', 'BillingAddress1', 'Address', 'Billing Address']),
-                    'city': get_val(r, ['BillingCity', 'City']),
-                    'country': get_val(r, ['BillingCountry', 'Country'], 'Cambodia'),
+                    'customer_name': clean_cname,
+                    'contact_name': row_contact,
+                    'phone': row_phone,
+                    'email': row_email,
+                    'address': row_addr,
+                    'destination_province': row_prov,
+                    'city': row_city,
+                    'country': row_country,
                     'sales_rep': get_val(r, ['SalesRep', 'Sales Rep', 'Salesperson']),
                     'po_number': get_val(r, ['PONumber', 'PO Number', 'Customer PO']),
                     'freight': clean_num_val(get_val(r, ['Freight', 'Shipping Fee', 'OrderFreight', 'Shipping']), 0.0),
@@ -1313,6 +1383,22 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     'location': get_val(r, ['Location', 'Warehouse']),
                     'lines': []
                 }
+            else:
+                # Multi-row backfill: if initial row was missing address/contact/phone/cname, backfill from subsequent rows!
+                if not orders_map[so_num].get('address') and row_addr:
+                    orders_map[so_num]['address'] = row_addr
+                if not orders_map[so_num].get('destination_province') and row_prov:
+                    orders_map[so_num]['destination_province'] = row_prov
+                if not orders_map[so_num].get('contact_name') and row_contact:
+                    orders_map[so_num]['contact_name'] = row_contact
+                if not orders_map[so_num].get('phone') and row_phone:
+                    orders_map[so_num]['phone'] = row_phone
+                if not orders_map[so_num].get('email') and row_email:
+                    orders_map[so_num]['email'] = row_email
+                if not orders_map[so_num].get('city') and row_city:
+                    orders_map[so_num]['city'] = row_city
+                if (not orders_map[so_num].get('customer_name') or orders_map[so_num].get('customer_name') == 'Walk-in Customer') and clean_cname != 'Walk-in Customer':
+                    orders_map[so_num]['customer_name'] = clean_cname
 
             item_code = get_val(r, ['ItemCode', 'Item Code', 'SKU', 'Product Code', 'ItemNumber', 'Code'])
             item_name = get_val(r, ['ItemName', 'Item Name', 'Product Name', 'Title'])
@@ -1343,11 +1429,11 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
         # Cache existing customers, products, and locations
         if bid is not None:
-            cust_rows = query_all("SELECT id, name, contact_name, phone, COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr FROM customers WHERE branch_id = %s;", (bid,))
+            cust_rows = query_all("SELECT id, name, contact_name, phone, address1, shipping_address, billing_address, COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr FROM customers WHERE branch_id = %s;", (bid,))
         else:
-            cust_rows = query_all("SELECT id, name, contact_name, phone, COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr FROM customers WHERE branch_id IS NULL;")
-        cust_map = {c['name'].lower().strip(): c['id'] for c in cust_rows}
-        cust_info_map = {c['name'].lower().strip(): c for c in cust_rows}
+            cust_rows = query_all("SELECT id, name, contact_name, phone, address1, shipping_address, billing_address, COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as default_addr FROM customers WHERE branch_id IS NULL;")
+        cust_map = {re.sub(r'[\u200b\u200c\u200d\ufeff]', '', c['name']).lower().strip(): c['id'] for c in cust_rows if c.get('name')}
+        cust_info_map = {re.sub(r'[\u200b\u200c\u200d\ufeff]', '', c['name']).lower().strip(): c for c in cust_rows if c.get('name')}
 
         products_rows = query_all("""
             SELECT id, sku, name, default_price, standard_cost, average_cost, uom,
@@ -1365,17 +1451,41 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             for so_num, order_data in orders_map.items():
                 batch_count += 1
                 # Customer handling
-                cust_name = (order_data['customer_name'] or 'Walk-in Customer').strip()
+                cust_name = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', (order_data['customer_name'] or 'Walk-in Customer')).strip() or 'Walk-in Customer'
                 cn_clean = cust_name.lower()
+                so_addr = (order_data.get('address') or '').strip()
+                so_cont = (order_data.get('contact_name') or '').strip()
+                so_ph = (order_data.get('phone') or '').strip()
+                so_cty = (order_data.get('city') or '').strip()
+
                 if cn_clean in cust_map:
                     cust_id = cust_map[cn_clean]
+                    # Backfill existing customer with address/contact/phone if missing
+                    cur.execute("""
+                        UPDATE customers
+                        SET address1 = CASE WHEN (address1 IS NULL OR trim(address1) = '') AND %s != '' THEN %s ELSE address1 END,
+                            shipping_address = CASE WHEN (shipping_address IS NULL OR trim(shipping_address) = '') AND %s != '' THEN %s ELSE shipping_address END,
+                            billing_address = CASE WHEN (billing_address IS NULL OR trim(billing_address) = '') AND %s != '' THEN %s ELSE billing_address END,
+                            contact_name = CASE WHEN (contact_name IS NULL OR trim(contact_name) = '') AND %s != '' THEN %s ELSE contact_name END,
+                            phone = CASE WHEN (phone IS NULL OR trim(phone) = '') AND %s != '' THEN %s ELSE phone END,
+                            city = CASE WHEN (city IS NULL OR trim(city) = '') AND %s != '' THEN %s ELSE city END
+                        WHERE id = %s;
+                    """, (so_addr, so_addr, so_addr, so_addr, so_addr, so_addr, so_cont, so_cont, so_ph, so_ph, so_cty, so_cty, cust_id))
+                    cached_c = cust_info_map.get(cn_clean)
+                    if cached_c:
+                        if not cached_c.get('default_addr') and so_addr:
+                            cached_c['default_addr'] = so_addr
+                        if not cached_c.get('contact_name') and so_cont:
+                            cached_c['contact_name'] = so_cont
+                        if not cached_c.get('phone') and so_ph:
+                            cached_c['phone'] = so_ph
                 else:
                     cur.execute("""
-                        INSERT INTO customers (name, contact_name, phone, email, address1, city, country, payment_terms, branch_id, is_active)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                        INSERT INTO customers (name, contact_name, phone, email, address1, shipping_address, billing_address, city, country, payment_terms, branch_id, is_active)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                         RETURNING id;
                     """, (cust_name, order_data['contact_name'], order_data['phone'], order_data['email'],
-                          order_data['address'], order_data['city'], order_data['country'], order_data['payment_terms'], bid))
+                          order_data['address'], order_data['address'], order_data['address'], order_data['city'], order_data['country'], order_data['payment_terms'], bid))
                     cust_id = cur.fetchone()['id']
                     cust_map[cn_clean] = cust_id
                     cust_info_map[cn_clean] = {
@@ -1557,6 +1667,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 so_address = (order_data.get('address') or '').strip() or (cached_c.get('default_addr') or '').strip()
                 so_contact = (order_data.get('contact_name') or '').strip() or (cached_c.get('contact_name') or '').strip()
                 so_phone = (order_data.get('phone') or '').strip() or (cached_c.get('phone') or '').strip()
+                so_prov = (order_data.get('destination_province') or '').strip()
 
                 if existing_so and not is_erase_mode:
                     if existing_so.get('branch_id') != bid:
@@ -1582,6 +1693,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             customer_address = COALESCE(NULLIF(%s, ''), customer_address),
                             customer_contact = COALESCE(NULLIF(%s, ''), customer_contact),
                             customer_phone = COALESCE(NULLIF(%s, ''), customer_phone),
+                            destination_province = COALESCE(NULLIF(%s, ''), destination_province),
                             invoiced_date = %s,
                             branch_id = %s,
                             updated_at = CURRENT_TIMESTAMP
@@ -1589,7 +1701,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     """, (cust_id, loc_id, ord_date, due_date, so_status, payment_status,
                           calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
                           order_data['sales_rep'], order_data['po_number'], order_data['remarks'],
-                          so_address, so_contact, so_phone,
+                          so_address, so_contact, so_phone, so_prov,
                           invoiced_date, bid, so_id))
                     cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = %s;", (so_id,))
                     updated_cnt += 1
@@ -1599,14 +1711,14 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                             order_number, customer_id, location_id, order_date, due_date,
                             status, payment_status, subtotal, shipping_fee, total_amount,
                             paid_amount, balance_due, sales_rep, po_number, notes, invoiced_date,
-                            branch_id, customer_address, customer_contact, customer_phone
+                            branch_id, customer_address, customer_contact, customer_phone, destination_province
                         )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                         RETURNING id;
                     """, (so_num, cust_id, loc_id, ord_date, due_date, so_status, payment_status,
                           calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
                           order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid,
-                          so_address, so_contact, so_phone))
+                          so_address, so_contact, so_phone, so_prov))
                     so_id = cur.fetchone()['id']
                     imported_cnt += 1
 
