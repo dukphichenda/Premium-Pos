@@ -87,24 +87,18 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
     sales_uom_ratio_std = float(product.get('sales_uom_ratio_std') or 0)
     
     # Total pcs per case / carton
-    if packs_per_case > 0 and pcs_per_pack > 0 and (packs_per_case != 3 or pcs_per_pack != 50 or sales_uom_ratio_std <= 1):
-        pcs_per_case = packs_per_case * pcs_per_pack
-    elif sales_uom_ratio_std > 1:
+    if sales_uom_ratio_std > 1:
         pcs_per_case = sales_uom_ratio_std
-        if packs_per_case <= 0 or packs_per_case == 3:
-            if pcs_per_case % 100 == 0:
-                pcs_per_pack = 100.0
-                packs_per_case = pcs_per_case / 100.0
-            elif pcs_per_case % 50 == 0:
-                pcs_per_pack = 50.0
-                packs_per_case = pcs_per_case / 50.0
-            else:
-                pcs_per_pack = pcs_per_case
-                packs_per_case = 1.0
+        if pcs_per_pack <= 0:
+            pcs_per_pack = 50.0
+        if packs_per_case <= 0 or (packs_per_case * pcs_per_pack != pcs_per_case):
+            packs_per_case = round(pcs_per_case / pcs_per_pack) or 1.0
+    elif packs_per_case > 0 and pcs_per_pack > 0:
+        pcs_per_case = packs_per_case * pcs_per_pack
     else:
         pcs_per_case = 400.0
-        packs_per_case = 4.0
-        pcs_per_pack = 100.0
+        packs_per_case = 8.0
+        pcs_per_pack = 50.0
     
     # Default tier amounts:
     # Tier 1 = 100 pcs
