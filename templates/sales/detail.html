@@ -531,7 +531,7 @@
 .so-sidebar-card {
     display: block;
     padding: 10px 14px;
-    border-bottom: 1px solid #F1F5F9;
+    border-bottom: 1px solid #E2E8F0;
     border-left: 3px solid transparent;
     text-decoration: none;
     color: inherit;
@@ -539,12 +539,22 @@
     cursor: pointer;
     background: #FFFFFF;
 }
+.so-sidebar-card:nth-child(even),
+.so-sidebar-card.so-card-shaded {
+    background: #F1F5F9;
+}
+.so-sidebar-card.so-card-white {
+    background: #FFFFFF;
+}
 .so-sidebar-card:hover {
-    background: #F8FAFC;
+    background: #E2E8F0 !important;
 }
 .so-sidebar-card.active {
     border-left: 3px solid #285B52 !important;
-    background: #F8FAFC !important;
+    background: #E6F3F0 !important;
+}
+.so-sidebar-card.active:hover {
+    background: #D8ECE7 !important;
 }
 
 .so-card-row-top {
@@ -552,6 +562,14 @@
     align-items: center;
     justify-content: space-between;
     margin-bottom: 5px;
+    gap: 8px;
+}
+
+.so-card-num-date-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
 }
 
 .so-card-order-num {
@@ -559,6 +577,33 @@
     font-size: 13.5px;
     color: #0F172A;
     letter-spacing: -0.01em;
+    flex-shrink: 0;
+}
+
+.so-card-order-date {
+    font-size: 11px;
+    font-weight: 600;
+    color: #475569;
+    background: rgba(100, 116, 139, 0.12);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    padding: 1px 6px;
+    border-radius: 4px;
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+    line-height: 1.25;
+}
+
+.so-sidebar-card:nth-child(even) .so-card-order-date,
+.so-sidebar-card.so-card-shaded .so-card-order-date {
+    background: rgba(100, 116, 139, 0.16);
+    border-color: rgba(148, 163, 184, 0.35);
+    color: #334155;
+}
+
+.so-sidebar-card.active .so-card-order-date {
+    color: #1E3A34;
+    background: rgba(40, 91, 82, 0.12);
+    border-color: rgba(40, 91, 82, 0.28);
 }
 
 .so-status-pill {
@@ -600,13 +645,19 @@
 }
 
 .so-card-price-pill {
-    background: #F1F5F9;
+    background: #EDF2F7;
+    border: 1px solid #E2E8F0;
     border-radius: 10px;
     padding: 1px 7px;
     font-size: 11px;
     font-weight: 700;
-    color: #1E293B;
+    color: #0F172A;
     flex-shrink: 0;
+}
+.so-sidebar-card:nth-child(even) .so-card-price-pill,
+.so-sidebar-card.so-card-shaded .so-card-price-pill {
+    background: #FFFFFF;
+    border-color: #CBD5E1;
 }
 
 .so-card-cust-name {
@@ -1507,13 +1558,18 @@
                data-order-num="{{ s_ord.order_number }}"
                data-total-items="{{ s_ord.total_items or 0 }}"
                data-total-qty="{{ '%.1f'|format(s_ord.total_qty or 0)|replace('.0', '') }}"
-               data-search="{{ s_ord.order_number|lower }} {{ (s_ord.customer_name or '')|lower }} {{ (s_ord.delivery_man or '')|lower }} {{ '%.2f'|format(s_ord.total_amount or 0) }}"
+               data-search="{{ s_ord.order_number|lower }} {{ (s_ord.order_date | format_inflow_date)|lower }} {{ (s_ord.customer_name or '')|lower }} {{ (s_ord.delivery_man or '')|lower }} {{ '%.2f'|format(s_ord.total_amount or 0) }}"
                data-status="{{ badge_display|lower }}"
                title="Order {{ s_ord.order_number }} • {{ s_ord.total_items or 0 }} items sold • ${{ '%.2f'|format(s_ord.total_amount or 0) }}">
                 
-                <!-- Line 1: Order # and Status Pill -->
+                <!-- Line 1: Order #, Order Date and Status Pill -->
                 <div class="so-card-row-top">
-                    <span class="so-card-order-num">{{ s_ord.order_number }}</span>
+                    <div class="so-card-num-date-wrap">
+                        <span class="so-card-order-num">{{ s_ord.order_number }}</span>
+                        {% if s_ord.order_date %}
+                        <span class="so-card-order-date" title="Order date: {{ s_ord.order_date }}">{{ s_ord.order_date | format_inflow_date }}</span>
+                        {% endif %}
+                    </div>
                     <span class="so-status-pill {{ badge_class }}">{{ badge_display }}</span>
                 </div>
 
@@ -6573,9 +6629,21 @@ function handleSoLiveSearch(val) {
         const searchTxt = card.dataset.search || '';
         if (!q || searchTxt.includes(q)) {
             card.style.display = 'block';
+            if (q) {
+                if (visibleOrders % 2 === 1) {
+                    card.classList.add('so-card-shaded');
+                    card.classList.remove('so-card-white');
+                } else {
+                    card.classList.remove('so-card-shaded');
+                    card.classList.add('so-card-white');
+                }
+            } else {
+                card.classList.remove('so-card-shaded', 'so-card-white');
+            }
             visibleOrders++;
         } else {
             card.style.display = 'none';
+            card.classList.remove('so-card-shaded', 'so-card-white');
         }
     });
 
