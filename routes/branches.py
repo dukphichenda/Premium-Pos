@@ -139,20 +139,21 @@ def _get_branch_settings(branch_or_raw):
         if not settings.get('shop_address_en') and branch_or_raw.get('address'):
             settings['shop_address_en'] = branch_or_raw['address']
 
-    # Directly retrieve uploaded KHQR and banking info from Invoice Customization (invoice_settings)
+    # Retrieve uploaded KHQR and banking info from Invoice Customization (invoice_settings)
+    # ONLY as a fallback if the branch has NOT configured its own!
     try:
         from routes.settings import get_invoice_settings
         inv_set = get_invoice_settings()
         if inv_set:
-            if inv_set.get('qr_code_url'):
+            if not raw.get('qr_code_url') and inv_set.get('qr_code_url'):
                 settings['qr_code_url'] = inv_set['qr_code_url']
-            if inv_set.get('bank_name'):
+            if not raw.get('bank_name') and inv_set.get('bank_name'):
                 settings['bank_name'] = inv_set['bank_name']
-            if inv_set.get('account_name'):
+            if not raw.get('account_name') and inv_set.get('account_name'):
                 settings['account_name'] = inv_set['account_name']
-            if inv_set.get('account_number'):
+            if not raw.get('account_number') and inv_set.get('account_number'):
                 settings['account_number'] = inv_set['account_number']
-            if inv_set.get('khr_exchange_rate'):
+            if not raw.get('khr_exchange_rate') and inv_set.get('khr_exchange_rate'):
                 settings['khr_exchange_rate'] = float(inv_set['khr_exchange_rate'])
     except Exception:
         pass
@@ -1669,8 +1670,17 @@ def branch_save_settings(id):
         color = data.get('primary_color', data.get('color', branch.get('color') or '#FF5A5F')).strip()
         loc_id = int(data.get('location_id')) if data.get('location_id') else branch.get('location_id')
 
-        # Load existing settings and overlay new values
-        cur_settings = _get_branch_settings(branch)
+        # Load existing stored settings of this branch directly so defaults don't overwrite branch's explicit choices
+        raw_b = branch.get('settings_json') if isinstance(branch, dict) else None
+        if isinstance(raw_b, str):
+            try:
+                cur_settings = json.loads(raw_b)
+            except Exception:
+                cur_settings = {}
+        elif isinstance(raw_b, dict):
+            cur_settings = dict(raw_b)
+        else:
+            cur_settings = {}
 
         # Handle Logo file upload / removal
         upload_dir = os.path.join(current_app.root_path, 'static', 'uploads', 'invoice')
@@ -1833,7 +1843,16 @@ def branch_save_invoice_layout_api(id):
 
     try:
         data = request.get_json() or {}
-        cur_settings = _get_branch_settings(branch)
+        raw_b = branch.get('settings_json') if isinstance(branch, dict) else None
+        if isinstance(raw_b, str):
+            try:
+                cur_settings = json.loads(raw_b)
+            except Exception:
+                cur_settings = {}
+        elif isinstance(raw_b, dict):
+            cur_settings = dict(raw_b)
+        else:
+            cur_settings = {}
 
         cur_settings['qr_size'] = int(data.get('qr_size', 180) or 180)
         cur_settings['qr_position'] = str(data.get('qr_position', 'left') or 'left').strip()

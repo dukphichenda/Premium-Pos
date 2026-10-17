@@ -179,5 +179,67 @@ class TestExpenseSalesPaid(unittest.TestCase):
         """)
         self.assertGreater(float(totals_row['total_profit']), 0.0)
 
+    def test_branch_khqr_isolation_does_not_get_overwritten_by_hq(self):
+        """
+        Verify that each branch's own uploaded KHQR and bank details are strictly preserved
+        and NOT overwritten by HQ's invoice settings.
+        Fallback to HQ only occurs when the branch has NOT configured its own.
+        """
+        from routes.branches import _get_branch_settings
+        
+        # Branch with its own custom KHQR code
+        branch_custom = {
+            'id': 1,
+            'name': 'STM Branch',
+            'settings_json': {
+                'qr_code_url': '/static/uploads/invoice/branch_1_qr_custom.jpg',
+                'bank_name': 'Canadia Bank',
+                'account_name': 'STM Shop Account',
+                'account_number': '123-456-789'
+            }
+        }
+        res_custom = _get_branch_settings(branch_custom)
+        self.assertEqual(res_custom['qr_code_url'], '/static/uploads/invoice/branch_1_qr_custom.jpg')
+        self.assertEqual(res_custom['bank_name'], 'Canadia Bank')
+        self.assertEqual(res_custom['account_name'], 'STM Shop Account')
+        self.assertEqual(res_custom['account_number'], '123-456-789')
+
+        # Branch with no custom KHQR code -> should fallback to HQ's settings
+        branch_empty = {
+            'id': 2,
+            'name': 'Branch Without QR',
+            'settings_json': {}
+        }
+        res_empty = _get_branch_settings(branch_empty)
+        from routes.settings import get_invoice_settings
+        hq_inv = get_invoice_settings()
+        if hq_inv and hq_inv.get('qr_code_url'):
+            self.assertEqual(res_empty['qr_code_url'], hq_inv['qr_code_url'])
+
+    def test_dashboard_paid_sales_matches_expense_and_profit_report(self):
+        """
+        Verify that dashboard Month Sales (HQ) paid amount matches
+        Customer Receipts in Expense Report and Total Sales in Sales Order Profit Report.
+        """
+        from app import app
+        from routes.expenses import _get_inflow_sales_data
+        
+        exp_data = _get_inflow_sales_data("2026-10", branch_id="main")
+        
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess['user_id'] = 1
+                sess['username'] = 'admin'
+                sess['role'] = 'main_admin'
+            
+            resp = client.get('/dashboard?branch=main')
+            self.assertEqual(resp.status_code, 200)
+            html = resp.data.decode('utf-8')
+            
+            # Formatted paid string in dashboard must match expense report total_paid
+            paid_str = f"${exp_data['total_paid']:,.2f}"
+            self.assertIn(paid_str, html)
+
 if __name__ == '__main__':
     unittest.main()
+

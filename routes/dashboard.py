@@ -45,15 +45,15 @@ def index():
                 current_store_code = selected_branch['code']
             else:
                 branch_scope = 'main'
-                so_filter = "AND branch_id IS NULL"
-                sol_filter = "AND so.branch_id IS NULL"
+                so_filter = "AND (branch_id IS NULL OR branch_id = 0)"
+                sol_filter = "AND (so.branch_id IS NULL OR so.branch_id = 0)"
                 current_store_name = 'Main Store (HQ)'
                 current_store_code = 'HQ'
                 selected_branch = None
         else:
             branch_scope = 'main'
-            so_filter = "AND branch_id IS NULL"
-            sol_filter = "AND so.branch_id IS NULL"
+            so_filter = "AND (branch_id IS NULL OR branch_id = 0)"
+            sol_filter = "AND (so.branch_id IS NULL OR so.branch_id = 0)"
             current_store_name = 'Main Store (HQ)'
             current_store_code = 'HQ'
             selected_branch = None
@@ -73,7 +73,7 @@ def index():
                 (SELECT COUNT(*) FROM sales_orders WHERE status IN ('OPEN', 'PICKED', 'PACKED') {so_filter}) as pending_sales_orders,
                 (SELECT COUNT(*) FROM purchase_orders WHERE status IN ('DRAFT', 'ISSUED', 'PARTIAL_RECEIVED')) as pending_purchase_orders,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date >= date_trunc('month', CURRENT_DATE) {so_filter}) as month_sales_total,
-                (SELECT COALESCE(SUM(paid_amount), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date >= date_trunc('month', CURRENT_DATE) {so_filter}) as month_paid_total,
+                (SELECT COALESCE(SUM(CASE WHEN status = 'PAID' OR payment_status = 'PAID' THEN total_amount ELSE 0 END), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date >= date_trunc('month', CURRENT_DATE) {so_filter}) as month_paid_total,
                 (SELECT COALESCE(SUM(balance_due), 0) FROM sales_orders WHERE balance_due > 0 AND status != 'CANCELLED' {so_filter}) as total_receivables,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date = CURRENT_DATE {so_filter}) as today_sales_total,
                 (SELECT COUNT(*) FROM sales_orders WHERE status != 'CANCELLED' AND order_date = CURRENT_DATE {so_filter}) as today_sales_count,
@@ -147,11 +147,11 @@ def index():
                 COALESCE(SUM(balance_due), 0) as all_receivables,
                 COUNT(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) THEN 1 END) as month_orders,
                 COALESCE(SUM(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) THEN total_amount ELSE 0 END), 0) as month_sales,
-                COALESCE(SUM(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) THEN paid_amount ELSE 0 END), 0) as month_paid,
+                COALESCE(SUM(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) AND (status = 'PAID' OR payment_status = 'PAID') THEN total_amount ELSE 0 END), 0) as month_paid,
                 COUNT(CASE WHEN order_date = CURRENT_DATE THEN 1 END) as today_orders,
                 COALESCE(SUM(CASE WHEN order_date = CURRENT_DATE THEN total_amount ELSE 0 END), 0) as today_sales
             FROM sales_orders
-            WHERE status != 'CANCELLED' AND branch_id IS NULL
+            WHERE status != 'CANCELLED' AND (branch_id IS NULL OR branch_id = 0)
         """)
 
         branch_perfs = query_all("""
@@ -176,7 +176,7 @@ def index():
                     SUM(balance_due) as all_receivables,
                     COUNT(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) THEN 1 END) as month_orders,
                     SUM(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) THEN total_amount ELSE 0 END) as month_sales,
-                    SUM(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) THEN paid_amount ELSE 0 END) as month_paid,
+                    SUM(CASE WHEN order_date >= date_trunc('month', CURRENT_DATE) AND (status = 'PAID' OR payment_status = 'PAID') THEN total_amount ELSE 0 END) as month_paid,
                     COUNT(CASE WHEN order_date = CURRENT_DATE THEN 1 END) as today_orders,
                     SUM(CASE WHEN order_date = CURRENT_DATE THEN total_amount ELSE 0 END) as today_sales
                 FROM sales_orders
@@ -275,7 +275,7 @@ def chart_data():
         branch_filter = "AND so.branch_id = %s"
         params = (int(branch_scope),)
     else:
-        branch_filter = "AND so.branch_id IS NULL"
+        branch_filter = "AND (so.branch_id IS NULL OR so.branch_id = 0)"
         params = ()
 
     # 1. Monthly Financial Breakdown (Last 12 months) - Scoped to selected store
@@ -300,7 +300,7 @@ def chart_data():
         SELECT 
             TO_CHAR(so.order_date, 'Mon YYYY') as month_label,
             date_trunc('month', so.order_date) as month_date,
-            COALESCE(SUM(so.paid_amount), 0) as paid_sales,
+            COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN so.total_amount ELSE 0 END), 0) as paid_sales,
             COALESCE(SUM(CASE WHEN so.status = 'OPEN' OR so.balance_due > 0 THEN so.balance_due ELSE 0 END), 0) as open_sales,
             COALESCE(SUM(so.total_amount), 0) as revenue,
             COALESCE(SUM(so.total_amount - COALESCE(oc.total_cogs, 0)), 0) as profit,
