@@ -209,6 +209,46 @@ def calculate_date_range(preset, custom_from='', custom_to=''):
     else: # 'All'
         return date(2020, 1, 1), date(2035, 12, 31)
 
+def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p'):
+    """
+    Computes accurate Cost of Goods Sold (COGS) for a sales order line:
+    Focuses on UOM and costing compared to the pricing of the Sales Order:
+    - If cost is already in the same UOM as the line unit price (e.g. packs, pcs, cases),
+      uses quantity_display * cost.
+    - If unit price is per case while cost is per piece, converts to case cost.
+    - If unit price is per piece while cost is per case/pack, converts to piece cost.
+    - Resolves inflated base quantity vs display quantity anomalies.
+    """
+    base_cost = f"COALESCE(NULLIF({sol_alias}.cost_price, 0), NULLIF({p_alias}.standard_cost, 0), NULLIF({p_alias}.average_cost, 0), 0)"
+    return f"""
+    CASE 
+        WHEN {base_cost} = 0 THEN 0
+
+        -- 1. Cost is already matching the SO pricing UOM:
+        WHEN {sol_alias}.unit_price > 0 
+             AND {base_cost} BETWEEN (0.05 * {sol_alias}.unit_price) AND (2.5 * {sol_alias}.unit_price)
+             THEN COALESCE({sol_alias}.quantity_display, {sol_alias}.quantity, 1) * {base_cost}
+
+        -- 2. Cost is per piece while SO pricing is per case (cost * ratio matches unit_price):
+        WHEN {sol_alias}.unit_price > 0 
+             AND {p_alias}.sales_uom_ratio_std > 1 
+             AND ({base_cost} * {p_alias}.sales_uom_ratio_std) BETWEEN (0.05 * {sol_alias}.unit_price) AND (2.5 * {sol_alias}.unit_price)
+             THEN COALESCE({sol_alias}.quantity_display, 1) * ({base_cost} * {p_alias}.sales_uom_ratio_std)
+
+        -- 3. Cost is per case while SO pricing is per piece (cost / ratio matches unit_price):
+        WHEN {sol_alias}.unit_price > 0 
+             AND {p_alias}.sales_uom_ratio_std > 1 
+             AND ({base_cost} / {p_alias}.sales_uom_ratio_std) BETWEEN (0.05 * {sol_alias}.unit_price) AND (2.5 * {sol_alias}.unit_price)
+             THEN COALESCE({sol_alias}.quantity_display, {sol_alias}.quantity, 1) * ({base_cost} / {p_alias}.sales_uom_ratio_std)
+
+        -- 4. Fallback when sol.quantity is in inflated base units (e.g. pieces) but quantity_display is in packs/cases:
+        WHEN COALESCE({sol_alias}.quantity_display, 0) > 0 AND {sol_alias}.quantity > COALESCE({sol_alias}.quantity_display, 1) * 5
+             THEN COALESCE({sol_alias}.quantity_display, 1) * {base_cost}
+
+        ELSE COALESCE({sol_alias}.quantity_display, {sol_alias}.quantity, 1) * {base_cost}
+    END
+    """
+
 # -------------------------------------------------------------------------
 # Report List / Report Center (Matching screenshot0028.JPEG - screenshot0032.JPEG)
 # -------------------------------------------------------------------------
@@ -420,11 +460,12 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
         totals_sql = f"""
             WITH order_costs AS (
                 SELECT 
                     sol.sales_order_id,
-                    COALESCE(SUM(sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, p.standard_cost, 0)), 0) as total_cogs
+                    COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
                 FROM sales_order_lines sol
                 LEFT JOIN products p ON sol.product_id = p.id
                 GROUP BY sol.sales_order_id
@@ -459,7 +500,7 @@ def view_report(report_key):
             WITH order_costs AS (
                 SELECT 
                     sol.sales_order_id,
-                    COALESCE(SUM(sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, p.standard_cost, 0)), 0) as total_cogs
+                    COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
                 FROM sales_order_lines sol
                 LEFT JOIN products p ON sol.product_id = p.id
                 GROUP BY sol.sales_order_id
@@ -509,11 +550,12 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
         totals_sql = f"""
             SELECT 
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
                 COALESCE(SUM(sol.subtotal), 0) as total_sales,
-                COALESCE(SUM(sol.subtotal - (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, 0))), 0) as total_profit
+                COALESCE(SUM(sol.subtotal - ({line_cogs_sql})), 0) as total_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -552,7 +594,7 @@ def view_report(report_key):
                 SUM(sol.quantity) as quantity_sold,
                 COALESCE(sol.uom, p.uom, 'pcs') as uom,
                 SUM(sol.subtotal) as sales_amount,
-                SUM(sol.subtotal - (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, 0))) as gross_profit
+                SUM(sol.subtotal - ({line_cogs_sql})) as gross_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -608,11 +650,12 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
         totals_sql = f"""
             SELECT 
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
                 COALESCE(SUM(sol.subtotal), 0) as total_sales,
-                COALESCE(SUM(sol.subtotal - (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, p.standard_cost, 0))), 0) as total_profit
+                COALESCE(SUM(sol.subtotal - ({line_cogs_sql})), 0) as total_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -638,8 +681,8 @@ def view_report(report_key):
                 COALESCE(sol.uom, p.uom, 'pcs') as uom,
                 sol.unit_price,
                 sol.subtotal as sales_amount,
-                COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, p.standard_cost, 0) as unit_cost,
-                (sol.subtotal - (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, p.standard_cost, 0))) as gross_profit
+                ({line_cogs_sql} / NULLIF(COALESCE(sol.quantity_display, sol.quantity, 1), 0)) as unit_cost,
+                (sol.subtotal - ({line_cogs_sql})) as gross_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -1850,11 +1893,12 @@ def export_report(report_key):
         writer.writerow(['Order Number', 'Status', 'Customer', 'Billing Address', 'Order Date', 'Sales Amount ($)', 'Gross Profit ($)'])
         where_status = "so.payment_status = 'PAID'" if status == 'Paid' else ("so.status = 'INVOICED'" if status == 'Invoiced' else "1=1")
         where_branch = "so.branch_id IS NULL" if branch_scope == 'main' else (f"so.branch_id = {int(branch_scope)}" if branch_scope.isdigit() else "1=1")
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
         rows = query_all(f"""
             WITH order_costs AS (
                 SELECT 
                     sol.sales_order_id,
-                    COALESCE(SUM(sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, p.standard_cost, 0)), 0) as total_cogs
+                    COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
                 FROM sales_order_lines sol
                 LEFT JOIN products p ON sol.product_id = p.id
                 GROUP BY sol.sales_order_id
@@ -1908,13 +1952,14 @@ def export_report(report_key):
         else:
             prod_order_clause = prod_sort
 
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
         rows = query_all(f"""
             SELECT 
                 COALESCE(c.name, 'General') as category_name, p.sku, p.name as item_name,
                 SUM(sol.quantity) as quantity_sold,
                 COALESCE(sol.uom, p.uom, 'pcs') as uom,
                 SUM(sol.subtotal) as sales_amount,
-                SUM(sol.subtotal - (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), p.average_cost, 0))) as gross_profit
+                SUM(sol.subtotal - ({line_cogs_sql})) as gross_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -2298,13 +2343,15 @@ def sales_report():
 
     where_sql = " AND ".join(where_clauses)
 
+    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
     summary = query_one(f"""
         WITH filtered_so AS (
             SELECT id, total_amount FROM sales_orders so WHERE {where_sql}
         ),
         lines_cogs AS (
-            SELECT COALESCE(SUM(sol.quantity * sol.cost_price), 0) as total_cogs
+            SELECT COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
             FROM sales_order_lines sol
+            JOIN products p ON sol.product_id = p.id
             JOIN filtered_so ON sol.sales_order_id = filtered_so.id
         )
         SELECT 
@@ -2320,10 +2367,10 @@ def sales_report():
             p.id, p.sku, p.name,
             SUM(sol.quantity) as units_sold,
             SUM(sol.subtotal) as revenue,
-            SUM(sol.quantity * sol.cost_price) as cogs,
-            SUM(sol.subtotal - (sol.quantity * sol.cost_price)) as gross_profit,
+            SUM({line_cogs_sql}) as cogs,
+            SUM(sol.subtotal - ({line_cogs_sql})) as gross_profit,
             CASE WHEN SUM(sol.subtotal) > 0 
-                 THEN ROUND(((SUM(sol.subtotal - (sol.quantity * sol.cost_price)) / SUM(sol.subtotal)) * 100), 2)
+                 THEN ROUND(((SUM(sol.subtotal - ({line_cogs_sql})) / SUM(sol.subtotal)) * 100), 2)
                  ELSE 0 END as margin_percent
         FROM sales_order_lines sol
         JOIN sales_orders so ON sol.sales_order_id = so.id

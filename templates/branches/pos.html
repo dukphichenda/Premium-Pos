@@ -1944,10 +1944,6 @@
             
             <!-- Header Section -->
             <div style="text-align: center; margin-bottom: 8px;">
-                {% if branch_settings and branch_settings.logo_url %}
-                <img src="{{ branch_settings.logo_url }}" alt="Logo" class="pos-rec-logo" onerror="this.style.display='none'">
-                {% endif %}
-
                 <!-- Shop Name in Khmer & English -->
                 <div style="font-size: 15px; font-weight: 800; color: #0F172A; line-height: 1.25;" class="font-khmer">
                     {{ (branch_settings.shop_name_kh if branch_settings else '') or branch.name }}
@@ -1985,9 +1981,9 @@
 
             <!-- Receipt Meta (2-Column Grid) -->
             <div style="font-size: 10px; line-height: 1.45; margin-bottom: 5px;">
-                <div class="pos-rec-row">
-                    <span>លេខវិក្កយបត្រ / Inv #: <strong id="recOrderNum" style="color: #0F172A; font-family: monospace; font-size: 11px;">SO-00000</strong></span>
-                    <span>កាលបរិច្ឆេទ / Date: <strong id="recDate">17/10/2026</strong></span>
+                <div class="pos-rec-row" style="white-space: nowrap;">
+                    <span style="white-space: nowrap;">លេខវិក្កយបត្រ / Inv #: <strong id="recOrderNum" style="color: #0F172A; font-family: monospace; font-size: 11px; white-space: nowrap;">SO-STM-P-00001</strong></span>
+                    <span style="white-space: nowrap;">កាលបរិច្ឆេទ / Date: <strong id="recDate">17/10/2026</strong></span>
                 </div>
                 <div class="pos-rec-row">
                     <span>អតិថិជន / Cust: <strong id="recCustName" class="font-khmer">Walk-in Customer</strong></span>
@@ -2074,28 +2070,20 @@
                 <div style="display: flex; justify-content: center; align-items: center; margin: 4px 0;">
                     <div id="recQrWrapper" style="padding: 4px; background: #FFFFFF; border-radius: 6px; border: 1px solid #FECDD3; display: inline-block;">
                         {% if branch_settings and branch_settings.qr_code_url %}
-                        <img src="{{ branch_settings.qr_code_url }}" alt="KHQR" style="width: 100px; height: 100px; object-fit: contain; display: block;">
+                        <img src="{{ branch_settings.qr_code_url }}" alt="KHQR" style="width: 105px; height: 105px; object-fit: contain; display: block; border-radius: 4px;">
                         {% else %}
                         <canvas id="recQrCanvas" width="95" height="95" style="display: block;"></canvas>
                         {% endif %}
                     </div>
                 </div>
-                <div style="font-size: 9.5px; color: #475569; line-height: 1.3; margin-top: 2px;">
-                    <div>ធនាគារ / Bank: <strong>{{ (branch_settings.bank_name if branch_settings else '') or 'ABA Bank (KHQR / Bakong)' }}</strong></div>
+                <div style="font-size: 9.5px; color: #475569; line-height: 1.35; margin-top: 3px;">
+                    <div>ធនាគារ / Bank: <strong style="color: #0F172A;">{{ (branch_settings.bank_name if branch_settings else '') or 'ABA Bank (KHQR / Bakong)' }}</strong></div>
                     {% if branch_settings and branch_settings.account_name %}
-                    <div>ឈ្មោះគណនី / Name: <strong>{{ branch_settings.account_name }}</strong></div>
+                    <div>ឈ្មោះគណនី / Name: <strong style="color: #0F172A;">{{ branch_settings.account_name }}</strong></div>
                     {% endif %}
                     {% if branch_settings and branch_settings.account_number %}
-                    <div>លេខគណនី / Acc: <strong style="font-family: monospace;">{{ branch_settings.account_number }}</strong></div>
+                    <div>លេខគណនី / Acc: <strong style="font-family: monospace; color: #0F172A;">{{ branch_settings.account_number }}</strong></div>
                     {% endif %}
-                </div>
-            </div>
-
-            <!-- Order Barcode -->
-            <div class="pos-rec-barcode-wrap">
-                <svg id="recBarcodeSvg" class="pos-rec-barcode-img"></svg>
-                <div style="font-size: 9.5px; font-family: monospace; font-weight: 700; color: #475569; letter-spacing: 1px; margin-top: 1px;" id="recBarcodeText">
-                    * SO-00000 *
                 </div>
             </div>
 
@@ -2886,7 +2874,7 @@ function submitPosCheckout(forceCheckout = false) {
 
             // Populate Thermal Receipt
             populateThermalReceipt({
-                orderNumber: data.order_number || 'SO-00000',
+                orderNumber: data.order_number || 'SO-STM-P-00001',
                 date: new Date().toLocaleString('en-US', { hour12: false }),
                 whName: whName,
                 customerName: custName,
@@ -3066,7 +3054,7 @@ function populateThermalReceipt(info) {
     if (whEl) whEl.textContent = info.whName || 'STM Warehouse';
     
     const orderNumEl = document.getElementById('recOrderNum');
-    if (orderNumEl) orderNumEl.textContent = info.orderNumber || 'SO-00000';
+    if (orderNumEl) orderNumEl.textContent = info.orderNumber || 'SO-STM-P-00001';
     
     const dateEl = document.getElementById('recDate');
     if (dateEl) dateEl.textContent = info.date || new Date().toLocaleString('en-GB');

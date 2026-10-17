@@ -186,6 +186,24 @@ def get_next_order_number(order_type='SO', branch_id=None, cur=None):
                 prefix = 'SO-'
                 seq_name = 'so_number_seq'
                 pad_len = 6
+        elif order_type.upper() in ('POS', 'SO_POS'):
+            table = 'sales_orders'
+            if branch_id:
+                c.execute("SELECT code, so_prefix FROM branches WHERE id = %s;", (branch_id,))
+                branch = c.fetchone()
+                if branch:
+                    b_code = (_row_val(branch, 'code', 0) or 'STM').strip().upper()
+                    prefix = f"SO-{b_code}-P-"
+                    seq_name = f"pos_branch_{branch_id}_seq"
+                    pad_len = 5
+                else:
+                    prefix = 'SO-STM-P-'
+                    seq_name = 'pos_branch_1_seq'
+                    pad_len = 5
+            else:
+                prefix = 'SO-STM-P-'
+                seq_name = 'pos_branch_1_seq'
+                pad_len = 5
         elif order_type.upper() == 'PO':
             table = 'purchase_orders'
             prefix = 'PO-'
@@ -279,6 +297,24 @@ def preview_order_number(order_type='SO', branch_id=None, cur=None):
                 prefix = 'SO-'
                 seq_name = 'so_number_seq'
                 pad_len = 6
+        elif order_type.upper() in ('POS', 'SO_POS'):
+            table = 'sales_orders'
+            if branch_id:
+                c.execute("SELECT code, so_prefix FROM branches WHERE id = %s;", (branch_id,))
+                branch = c.fetchone()
+                if branch:
+                    b_code = (_row_val(branch, 'code', 0) or 'STM').strip().upper()
+                    prefix = f"SO-{b_code}-P-"
+                    seq_name = f"pos_branch_{branch_id}_seq"
+                    pad_len = 5
+                else:
+                    prefix = 'SO-STM-P-'
+                    seq_name = 'pos_branch_1_seq'
+                    pad_len = 5
+            else:
+                prefix = 'SO-STM-P-'
+                seq_name = 'pos_branch_1_seq'
+                pad_len = 5
         elif order_type.upper() == 'PO':
             table = 'purchase_orders'
             prefix = 'PO-'

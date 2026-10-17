@@ -139,6 +139,24 @@ def _get_branch_settings(branch_or_raw):
         if not settings.get('shop_address_en') and branch_or_raw.get('address'):
             settings['shop_address_en'] = branch_or_raw['address']
 
+    # Directly retrieve uploaded KHQR and banking info from Invoice Customization (invoice_settings)
+    try:
+        from routes.settings import get_invoice_settings
+        inv_set = get_invoice_settings()
+        if inv_set:
+            if inv_set.get('qr_code_url'):
+                settings['qr_code_url'] = inv_set['qr_code_url']
+            if inv_set.get('bank_name'):
+                settings['bank_name'] = inv_set['bank_name']
+            if inv_set.get('account_name'):
+                settings['account_name'] = inv_set['account_name']
+            if inv_set.get('account_number'):
+                settings['account_number'] = inv_set['account_number']
+            if inv_set.get('khr_exchange_rate'):
+                settings['khr_exchange_rate'] = float(inv_set['khr_exchange_rate'])
+    except Exception:
+        pass
+
     return settings
 
 def _get_central_location_id(cur=None):
@@ -987,7 +1005,7 @@ def branch_checkout(id):
             target_loc_id = wh_row['id'] if wh_row else 101
             target_loc_name = wh_row['name'] if wh_row else 'STM Warehouse'
 
-            order_number = get_next_order_number('SO', branch_id=id, cur=cur)
+            order_number = get_next_order_number('POS', branch_id=id, cur=cur)
 
             # 1. Lock and validate inventory at target warehouse & calculate line subtotals
             calc_subtotal = 0.0

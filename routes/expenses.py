@@ -127,7 +127,7 @@ def _get_inflow_sales_data(month_key, branch_id='main'):
             COUNT(*) as invoice_count,
             COUNT(CASE WHEN status = 'PAID' OR payment_status = 'PAID' THEN 1 END) as paid_invoice_count,
             COALESCE(SUM(total_amount), 0) as total_invoiced,
-            COALESCE(SUM(paid_amount), 0) as total_paid
+            COALESCE(SUM(CASE WHEN status = 'PAID' OR payment_status = 'PAID' THEN total_amount ELSE 0 END), 0) as total_paid
         FROM sales_orders
         WHERE TO_CHAR(order_date, 'YYYY-MM') = %s
           AND status != 'CANCELLED'
