@@ -928,8 +928,11 @@ def branch_pos(id):
         ORDER BY name ASC
     """, (id,))
 
+    branch_settings = _get_branch_settings(branch)
+
     return render_template('branches/pos.html',
                            branch=branch,
+                           branch_settings=branch_settings,
                            perms=perms,
                            warehouses=warehouses,
                            selected_warehouse=selected_warehouse,

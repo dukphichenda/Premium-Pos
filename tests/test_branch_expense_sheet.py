@@ -49,16 +49,16 @@ class TestBranchExpenseSheet(unittest.TestCase):
         expected_branch_money_in_hand = expected_branch_total_in - report_branch['total_expenses']
         self.assertAlmostEqual(report_branch['money_in_hand'], expected_branch_money_in_hand, places=2)
 
-        # HQ Report Verification
+        # HQ Report Verification (STM and Media are removed/zeroed as requested)
         report_hq = _get_monthly_report_data("2026-10", branch_id="main")
         self.assertFalse(report_hq['is_branch'])
-        expected_hq_total_in = (
-            report_hq['opening_balance']
-            + report_hq['clear_stm']
-            + report_hq['media_total']
-            + report_hq['sales_received']
-        )
+        self.assertEqual(report_hq['clear_stm'], 0.0)
+        self.assertEqual(report_hq['media_total'], 0.0)
+        self.assertEqual(report_hq['media_receipts'], [])
+        expected_hq_total_in = report_hq['opening_balance'] + report_hq['sales_received']
         self.assertAlmostEqual(report_hq['total_money_in'], expected_hq_total_in, places=2)
+        expected_hq_net = report_hq['sales_received'] - report_hq['total_expenses']
+        self.assertAlmostEqual(report_hq['net_operating_income'], expected_hq_net, places=2)
 
     def test_monthly_summary_branch_isolation_in_db(self):
         """
@@ -105,11 +105,11 @@ class TestBranchExpenseSheet(unittest.TestCase):
         self.assertIsNotNone(row_branch)
 
         self.assertAlmostEqual(float(row_hq['opening_balance']), 500.00, places=2)
-        self.assertAlmostEqual(float(row_hq['clear_stm']), 150.00, places=2)
-        self.assertAlmostEqual(float(row_hq['media_expense']), 250.00, places=2)
+        # Clear STM and Media are 0.0 across the board
+        self.assertAlmostEqual(float(row_hq['clear_stm']), 0.00, places=2)
+        self.assertAlmostEqual(float(row_hq['media_expense']), 0.00, places=2)
 
         self.assertAlmostEqual(float(row_branch['opening_balance']), 200.00, places=2)
-        # Branches must have clear_stm and media as 0.0
         self.assertAlmostEqual(float(row_branch['clear_stm']), 0.00, places=2)
         self.assertAlmostEqual(float(row_branch['media_expense']), 0.00, places=2)
 
@@ -163,7 +163,7 @@ class TestBranchExpenseSheet(unittest.TestCase):
         wb_hq = load_workbook(excel_buf_hq)
         sheet_names_hq = wb_hq.sheetnames
         self.assertIn("Expenses & Cash Reconciliation", sheet_names_hq)
-        self.assertIn("Media Receipts", sheet_names_hq)
+        self.assertNotIn("Media Receipts", sheet_names_hq)
 
     def test_export_monthly_pdf_branch_and_hq(self):
         """
@@ -185,8 +185,8 @@ class TestBranchExpenseSheet(unittest.TestCase):
     def test_monthly_expenses_view_branch_vs_hq_html(self):
         """
         Verify HTML output on /expenses/monthly:
-        - For branch: Clear STM & Media cards and Media section are omitted.
-        - For HQ: Clear STM & Media cards and Media section are present.
+        - For both branch and HQ: Clear STM & Media cards and Media section are deleted as requested.
+        - Store scope switcher and 6 clean core financial KPIs are rendered.
         """
         resp_branch = self.client.get('/expenses/monthly?month=2026-10&branch=1')
         self.assertEqual(resp_branch.status_code, 200)
@@ -194,13 +194,23 @@ class TestBranchExpenseSheet(unittest.TestCase):
         self.assertNotIn("id=\"mediaReceiptsSection\"", html_branch)
         self.assertNotIn(">Clear STM<", html_branch)
         self.assertNotIn(">Media (ប្រាក់ពី Media)<", html_branch)
+        self.assertIn("store-shortcuts-group", html_branch)
 
         resp_hq = self.client.get('/expenses/monthly?month=2026-10&branch=main')
         self.assertEqual(resp_hq.status_code, 200)
         html_hq = resp_hq.data.decode('utf-8')
-        self.assertIn("id=\"mediaReceiptsSection\"", html_hq)
-        self.assertIn(">Clear STM<", html_hq)
-        self.assertIn(">Media (ប្រាក់ពី Media)<", html_hq)
+        self.assertNotIn("id=\"mediaReceiptsSection\"", html_hq)
+        self.assertNotIn(">Clear STM<", html_hq)
+        self.assertNotIn(">Media (ប្រាក់ពី Media)<", html_hq)
+        self.assertIn("store-shortcuts-group", html_hq)
+        self.assertIn("Main Store (HQ)", html_hq)
+
+    def test_branch_expenses_endpoint_redirects_to_monthly_sheet(self):
+        """Verify that /branches/<id>/expenses redirects to /expenses/monthly?branch=<id>."""
+        resp = self.client.get('/branches/1/expenses')
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('/expenses/monthly', resp.headers['Location'])
+        self.assertIn('branch=1', resp.headers['Location'])
 
 
 if __name__ == '__main__':
