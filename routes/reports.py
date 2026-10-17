@@ -220,6 +220,38 @@ def reports_center():
 
     active_meta, active_cat = get_report_meta(selected_report)
 
+    # Store Scope resolution: branch users strictly locked to their branch; HQ defaults to 'main'
+    user_role = session.get('role')
+    user_bid = session.get('branch_id')
+    active_bid = session.get('active_branch_id')
+    is_branch_user = (user_role in ('branch_admin', 'branch_cashier') and user_bid)
+
+    req_branch = request.args.get('branch', '').strip().lower()
+    if is_branch_user:
+        branch_scope = str(user_bid)
+    elif req_branch:
+        branch_scope = req_branch
+    elif active_bid:
+        branch_scope = str(active_bid)
+    else:
+        branch_scope = 'main'
+
+    if branch_scope == 'all':
+        branch_scope_label = 'All Outlets (Consolidated)'
+    elif branch_scope == 'main':
+        branch_scope_label = 'Main Store (Headquarters)'
+    else:
+        try:
+            b_row = query_one("SELECT code, name FROM branches WHERE id = %s", (int(branch_scope),))
+            branch_scope_label = f"{b_row['code']} - {b_row['name']}" if b_row else f"Branch #{branch_scope}"
+        except Exception:
+            branch_scope_label = 'All Outlets'
+
+    if is_branch_user:
+        all_branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (int(user_bid),))
+    else:
+        all_branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+
     # Saved reports for "My Reports"
     my_reports = [
         {'key': 'sales-by-product-details', 'title': 'Sales by Product Details', 'date_saved': 'Saved: 08-Jul-26'},
@@ -238,6 +270,10 @@ def reports_center():
                            selected_report=selected_report,
                            active_meta=active_meta,
                            active_cat=active_cat,
+                           branch_scope=branch_scope,
+                           branch_scope_label=branch_scope_label,
+                           all_branches=all_branches,
+                           is_branch_user=is_branch_user,
                            my_reports=my_reports,
                            today_str=today_str)
 
@@ -264,17 +300,26 @@ def view_report(report_key):
     page = max(1, int(request.args.get('page', 1)))
     per_page = 150 if group_by == 'Category' else 36 # Rows per page matching printed sheet size
     
-    # Store Scope: Branch users strictly locked to their branch; HQ defaults to 'all' or 'main'
-    user_role = session.get('role', 'branch_admin')
-    user_bid = session.get('branch_id') or session.get('active_branch_id')
-    is_main_admin = (user_role == 'main_admin')
+    # Store Scope: Branch users strictly locked to their branch; HQ can view main, branch, or all
+    user_role = session.get('role')
+    user_bid = session.get('branch_id')
+    active_bid = session.get('active_branch_id')
+    is_branch_user = (user_role in ('branch_admin', 'branch_cashier') and user_bid)
+    is_main_admin = (user_role == 'main_admin') or (not user_role and not user_bid and not active_bid)
 
-    if not is_main_admin:
-        branch_scope = str(user_bid) if user_bid else 'main'
+    req_branch = request.args.get('branch', '').strip().lower()
+
+    if is_branch_user:
+        # Branch users are strictly locked to their assigned branch
+        branch_scope = str(user_bid)
+    elif req_branch:
+        branch_scope = req_branch
+    elif active_bid:
+        branch_scope = str(active_bid)
     elif report_key == 'branch-sales-summary':
-        branch_scope = request.args.get('branch', 'all').strip().lower()
+        branch_scope = 'all'
     else:
-        branch_scope = request.args.get('branch', 'main').strip().lower()
+        branch_scope = 'main'
 
     # Costing Tier / Price Sheet selection (Defaults to Branch Costing)
     all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Costing%%' THEN 0 ELSE 1 END, name ASC")
@@ -314,16 +359,21 @@ def view_report(report_key):
     start_date, end_date = calculate_date_range(date_range, custom_from, custom_to)
 
     # Master Lookup Lists for Filter Dropdowns
-    if not is_main_admin and user_bid:
-        all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE AND branch_id = %s ORDER BY name", (int(user_bid),))
-    elif not is_main_admin:
+    if branch_scope == 'main':
         all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE AND branch_id IS NULL ORDER BY name")
+    elif branch_scope != 'all' and str(branch_scope).isdigit():
+        all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE AND branch_id = %s ORDER BY name", (int(branch_scope),))
     else:
         all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE ORDER BY name")
+
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name")
     all_categories = query_all("SELECT id, name FROM categories WHERE is_active = TRUE ORDER BY name")
     all_locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
-    all_branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+
+    if is_branch_user:
+        all_branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (int(user_bid),))
+    else:
+        all_branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
 
     def apply_branch_scope(where_list, params_list):
         if branch_scope == 'main':
@@ -916,20 +966,33 @@ def view_report(report_key):
 
     # 9. CUSTOMER LIST
     elif report_key == 'customer-list':
-        total_count = query_one("SELECT COUNT(*) as cnt FROM customers WHERE is_active = TRUE")['cnt']
+        base_where = ["is_active = TRUE"]
+        params = []
+        if branch_scope == 'main':
+            base_where.append("branch_id IS NULL")
+        elif branch_scope != 'all':
+            try:
+                base_where.append("branch_id = %s")
+                params.append(int(branch_scope))
+            except ValueError:
+                base_where.append("branch_id IS NULL")
+        where_sql = " AND ".join(base_where)
+
+        total_count = query_one(f"SELECT COUNT(*) as cnt FROM customers WHERE {where_sql}", tuple(params))['cnt']
         total_pages = max(1, math.ceil(total_count / per_page))
         offset = (page - 1) * per_page
 
-        t = query_one("SELECT COALESCE(SUM(balance), 0) as tot_bal FROM customers WHERE is_active = TRUE")
+        t = query_one(f"SELECT COALESCE(SUM(balance), 0) as tot_bal FROM customers WHERE {where_sql}", tuple(params))
         totals = {'total_customers': total_count, 'balance_due': float(t['tot_bal'] or 0)}
 
-        rows = query_all("""
+        query_params = list(params) + [per_page, offset]
+        rows = query_all(f"""
             SELECT id, name, contact_name, phone, email, address1, city, balance
             FROM customers
-            WHERE is_active = TRUE
+            WHERE {where_sql}
             ORDER BY name ASC
             LIMIT %s OFFSET %s
-        """, (per_page, offset))
+        """, tuple(query_params))
 
     # 10. PURCHASE ORDER SUMMARY
     elif report_key == 'purchase-order-summary':
@@ -1733,6 +1796,7 @@ def view_report(report_key):
                            branch_scope=branch_scope,
                            branch_scope_label=branch_scope_label,
                            all_branches=all_branches,
+                           is_branch_user=is_branch_user,
                            all_pricing_schemes=all_pricing_schemes,
                            costing_scheme_id=costing_scheme_id,
                            active_scheme=active_scheme,
@@ -1756,9 +1820,26 @@ def export_report(report_key):
     vendor_id = request.args.get('vendor_id', '')
     category_id = request.args.get('category_id', '')
     location_id = request.args.get('location_id', '')
-    branch_scope = request.args.get('branch', 'all' if report_key == 'branch-sales-summary' else 'main').strip().lower()
     sort_by = request.args.get('sort_by', 'Sales Amount').strip()
     group_by = request.args.get('group_by', '').strip()
+
+    # Store Scope resolution: branch users strictly locked to their branch; HQ can view main, branch, or all
+    user_role = session.get('role')
+    user_bid = session.get('branch_id')
+    active_bid = session.get('active_branch_id')
+    is_branch_user = (user_role in ('branch_admin', 'branch_cashier') and user_bid)
+
+    req_branch = request.args.get('branch', '').strip().lower()
+    if is_branch_user:
+        branch_scope = str(user_bid)
+    elif req_branch:
+        branch_scope = req_branch
+    elif active_bid:
+        branch_scope = str(active_bid)
+    elif report_key == 'branch-sales-summary':
+        branch_scope = 'all'
+    else:
+        branch_scope = 'main'
 
     start_date, end_date = calculate_date_range(date_range, custom_from, custom_to)
 
@@ -1969,10 +2050,36 @@ def export_report(report_key):
 
     elif report_key == 'customer-list':
         writer.writerow(['Customer Name', 'Contact Person', 'Phone', 'Email', 'Address', 'City', 'Balance ($)'])
-        rows = query_all("SELECT name, contact_name, phone, email, address1, city, balance FROM customers WHERE is_active = TRUE ORDER BY name")
+        where_branch = "branch_id IS NULL" if branch_scope == 'main' else (f"branch_id = {int(branch_scope)}" if branch_scope.isdigit() else "1=1")
+        rows = query_all(f"SELECT name, contact_name, phone, email, address1, city, balance FROM customers WHERE is_active = TRUE AND {where_branch} ORDER BY name")
         for r in rows:
             writer.writerow([r['name'], r['contact_name'], r['phone'], r['email'], r['address1'], r['city'], f"{float(r['balance'] or 0):.2f}"])
         filename = "Customer_List.csv"
+
+    elif report_key == 'sales-order-summary':
+        writer.writerow(['Order Number', 'Date', 'Customer', 'Status', 'Payment Status', 'Subtotal ($)', 'Total Amount ($)', 'Paid Amount ($)', 'Balance Due ($)'])
+        where_branch = "so.branch_id IS NULL" if branch_scope == 'main' else (f"so.branch_id = {int(branch_scope)}" if branch_scope.isdigit() else "1=1")
+        where_status = "1=1"
+        if status == 'Paid':
+            where_status = "so.payment_status = 'PAID'"
+        elif status != 'All':
+            where_status = f"so.status = '{status.upper()}'"
+        rows = query_all(f"""
+            SELECT so.order_number, so.order_date, c.name as customer_name, initcap(so.status) as status_display, initcap(so.payment_status) as payment_status_display,
+                   so.subtotal, so.total_amount, so.paid_amount, so.balance_due
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE so.order_date >= %s AND so.order_date <= %s AND {where_status} AND {where_branch}
+            ORDER BY so.order_date DESC, so.order_number DESC
+        """, (start_date, end_date))
+        for r in rows:
+            writer.writerow([
+                r['order_number'], str(r['order_date']), r['customer_name'] or '',
+                r['status_display'], r['payment_status_display'],
+                f"{float(r['subtotal'] or 0):.2f}", f"{float(r['total_amount'] or 0):.2f}",
+                f"{float(r['paid_amount'] or 0):.2f}", f"{float(r['balance_due'] or 0):.2f}"
+            ])
+        filename = f"Sales_Order_Summary_{start_date}_{end_date}.csv"
 
     elif report_key == 'branch-sales-summary':
         costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()

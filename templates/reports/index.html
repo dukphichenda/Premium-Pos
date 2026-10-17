@@ -37,7 +37,7 @@
             </div>
             <div class="inflow-rep-cat-links {% if selected_cat == 'sales' %}expanded{% endif %}" id="cat-sales">
                 {% for item in catalog['sales']['items'] %}
-                <a href="{{ url_for('reports.reports_center', cat='sales', report=item.key) }}" 
+                <a href="{{ url_for('reports.reports_center', cat='sales', report=item.key, branch=branch_scope) }}" 
                    ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
                    class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
                    title="Double-click to open in new tab">
@@ -54,7 +54,7 @@
             </div>
             <div class="inflow-rep-cat-links {% if selected_cat == 'purchasing' %}expanded{% endif %}" id="cat-purchasing">
                 {% for item in catalog['purchasing']['items'] %}
-                <a href="{{ url_for('reports.reports_center', cat='purchasing', report=item.key) }}" 
+                <a href="{{ url_for('reports.reports_center', cat='purchasing', report=item.key, branch=branch_scope) }}" 
                    ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
                    class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
                    title="Double-click to open in new tab">
@@ -71,7 +71,7 @@
             </div>
             <div class="inflow-rep-cat-links {% if selected_cat == 'inventory' %}expanded{% endif %}" id="cat-inventory">
                 {% for item in catalog['inventory']['items'] %}
-                <a href="{{ url_for('reports.reports_center', cat='inventory', report=item.key) }}" 
+                <a href="{{ url_for('reports.reports_center', cat='inventory', report=item.key, branch=branch_scope) }}" 
                    ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
                    class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
                    title="Double-click to open in new tab">
@@ -88,7 +88,7 @@
             </div>
             <div class="inflow-rep-cat-links {% if selected_cat == 'branch' %}expanded{% endif %}" id="cat-branch">
                 {% for item in catalog['branch']['items'] %}
-                <a href="{{ url_for('reports.reports_center', cat='branch', report=item.key) }}" 
+                <a href="{{ url_for('reports.reports_center', cat='branch', report=item.key, branch=branch_scope) }}" 
                    ondblclick="openReportTab('{{ item.key }}', '{{ item.title }}')"
                    class="inflow-rep-link {% if selected_report == item.key %}active{% endif %}"
                    title="Double-click to open in new tab">
@@ -123,6 +123,22 @@
             <div>
                 <h1 class="inflow-rep-main-title">{{ active_meta.title }}</h1>
                 <p class="inflow-rep-main-desc">{{ active_meta.description }}</p>
+                <div style="display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                    <span style="font-size: 11px; font-weight: 700; color: #475569; text-transform: uppercase;">Store Scope:</span>
+                    {% if not is_branch_user %}
+                    <select onchange="window.location.href = updateBranchParam(this.value)" style="padding: 4px 10px; border: 1.5px solid #93C5FD; border-radius: 5px; font-size: 12px; font-weight: 700; color: #1E3A8A; background: #EFF6FF; cursor: pointer;">
+                        <option value="main" {% if branch_scope == 'main' or not branch_scope %}selected{% endif %}>🏢 Main Store (HQ)</option>
+                        {% for b in all_branches %}
+                        <option value="{{ b.id }}" {% if branch_scope == b.id|string %}selected{% endif %}>🏬 {{ b.code }} - {{ b.name }}</option>
+                        {% endfor %}
+                        <option value="all" {% if branch_scope == 'all' %}selected{% endif %}>🌐 All Outlets (Consolidated)</option>
+                    </select>
+                    {% else %}
+                    <span style="display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; background: #ECFDF5; border: 1.5px solid #6EE7B7; border-radius: 5px; font-size: 12px; font-weight: 700; color: #047857;">
+                        🏬 {{ branch_scope_label }} (Assigned Branch)
+                    </span>
+                    {% endif %}
+                </div>
             </div>
             <div>
                 <button type="button" class="inflow-generate-cta-btn" onclick="openReportTab('{{ selected_report }}', '{{ active_meta.title }}')">
@@ -282,13 +298,23 @@ function switchCategory(catKey) {
 }
 
 function openReportTab(reportKey, reportTitle) {
-    const url = '/reports/view/' + reportKey;
+    let url = '/reports/view/' + reportKey;
+    const currentBranch = '{{ branch_scope }}';
+    if (currentBranch) {
+        url += '?branch=' + encodeURIComponent(currentBranch);
+    }
     const title = reportTitle || 'Report';
     if (window.top && window.top.inflowMdi) {
         window.top.inflowMdi.navigateOrOpenTab(url, title, 'reports', true);
     } else {
         window.location.href = url;
     }
+}
+
+function updateBranchParam(val) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('branch', val);
+    return url.toString();
 }
 </script>
 {% endblock %}
