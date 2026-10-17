@@ -98,5 +98,44 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
         self.assertIn('function toggleProductSidebarCollapse', html)
         self.assertIn('inflow_product_sidebar_collapsed', html)
 
+    def test_customer_sidebar_minimize_and_teal_theme(self):
+        """Verify Customer master-detail view has minimize arrow button, expand tab, and teal green theme."""
+        resp = self.client.get('/customers')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Minimize arrow button on sidebar toolbar
+        self.assertIn('id="btnMinimizeCustomerSidebar"', html)
+        self.assertIn('toggleCustomerSidebarCollapse()', html)
+        self.assertIn('customer-minimize-btn', html)
+
+        # Expand tab on left edge when collapsed
+        self.assertIn('id="customerSidebarExpandTab"', html)
+        self.assertIn('class="inflow-sidebar-edge-tab customer-edge-tab"', html)
+
+        # Topbar expand button
+        self.assertIn('id="customerExpandTbBtn"', html)
+
+        # Mobile view controls (show bar, drawer header, backdrop, floating button)
+        self.assertIn('id="customerMobileSidebarBar"', html)
+        self.assertIn('id="customerMobileDrawerHeader"', html)
+        self.assertIn('id="customerMobileDrawerBackdrop"', html)
+        self.assertIn('id="customerMobileFloatingBtn"', html)
+
+        # JS function and shortcut
+        self.assertIn('function toggleCustomerSidebarCollapse', html)
+        self.assertIn('inflow_customer_sidebar_collapsed', html)
+
+        # Verify teal green theme color palette
+        self.assertIn('#0D9488', html)
+        self.assertIn('#0F766E', html)
+        self.assertIn('#F0FDFA', html)
+        self.assertIn('#CCFBF1', html)
+
+        # Ensure old caramel brown colors are completely eliminated
+        self.assertNotIn('#8C6541', html)
+        self.assertNotIn('#795238', html)
+        self.assertNotIn('#FAF7F2', html)
+
 if __name__ == '__main__':
     unittest.main()
