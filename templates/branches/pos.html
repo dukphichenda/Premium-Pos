@@ -1007,12 +1007,78 @@
 .pos-bill-price-wrap {
     text-align: right;
     line-height: 1.2;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
 }
 
 .pos-unit-price-sub {
     font-size: 10px;
     color: #64748B;
     display: block;
+}
+
+.pos-unit-price-edit-wrap {
+    display: inline-flex;
+    align-items: center;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 5px;
+    padding: 1px 4px;
+    margin-bottom: 2px;
+    transition: all 0.15s ease;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.03);
+}
+
+.pos-unit-price-edit-wrap:hover {
+    background: #FFFFFF;
+    border-color: #94A3B8;
+}
+
+.pos-unit-price-edit-wrap:focus-within {
+    background: #FFFFFF;
+    border-color: #FF5A5F;
+    box-shadow: 0 0 0 2px rgba(255, 90, 95, 0.15);
+}
+
+.pos-unit-price-prefix {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    margin-right: 1px;
+    user-select: none;
+}
+
+.pos-unit-price-input {
+    width: 62px;
+    border: none;
+    outline: none;
+    background: transparent;
+    font-size: 11.5px;
+    font-weight: 800;
+    color: #0F172A;
+    text-align: right;
+    padding: 1px 2px;
+    -moz-appearance: textfield;
+}
+
+.pos-unit-price-input::-webkit-outer-spin-button,
+.pos-unit-price-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.pos-unit-price-input.is-custom {
+    color: #D97706;
+    font-weight: 900;
+}
+
+.pos-unit-price-uom {
+    font-size: 10px;
+    font-weight: 700;
+    color: #94A3B8;
+    margin-left: 2px;
+    user-select: none;
 }
 
 .pos-bill-price {
@@ -1594,7 +1660,7 @@
 
             <div class="pos-calc-row">
                 <span>Discount ($)</span>
-                <input type="number" id="posDiscountInput" class="pos-calc-input" value="0.00" step="0.5" min="0" oninput="recalculateTotals()" {% if not perms.edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Discount editing is restricted by administrator / ការបញ្ចុះតម្លៃត្រូវបានបិទ"{% endif %}>
+                <input type="number" id="posDiscountInput" class="pos-calc-input" value="0.00" step="0.5" min="0" oninput="recalculateTotals()" placeholder="0.00" title="Discount / ការបញ្ចុះតម្លៃ">
             </div>
 
             <div class="pos-calc-row">
@@ -1717,6 +1783,69 @@
                 <button type="button" id="btnPosSaveCust" onclick="submitPosQuickCust()" style="padding: 8px 16px; background: #FF5A5F; color: #FFFFFF; border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">✓ Save & Select</button>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- ==================================================================== -->
+<!-- Stock Alert Modal (Out of Stock / Insufficient Stock Override)       -->
+<!-- ==================================================================== -->
+<div id="posStockAlertModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 10000; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+    <div style="background: #FFFFFF; width: 540px; max-width: 92vw; border-radius: 16px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column;">
+        
+        <!-- Modal Header -->
+        <div style="background: #FFF1F2; padding: 16px 20px; border-bottom: 1.5px solid #FFE4E6; display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div style="width: 40px; height: 40px; border-radius: 10px; background: #EF4444; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; box-shadow: 0 4px 10px rgba(239,68,68,0.25);">
+                    ⚠️
+                </div>
+                <div>
+                    <div style="font-weight: 800; font-size: 16px; color: #991B1B;" class="font-khmer">ការព្រមានអំពីស្តុកទំនិញ / Stock Alert</div>
+                    <div style="font-size: 11.5px; color: #B91C1C;" id="posStockAlertSubtitle">ទំនិញមួយចំនួនមិនមានស្តុកគ្រប់គ្រាន់ទេ</div>
+                </div>
+            </div>
+            <button type="button" onclick="closePosStockAlertModal()" style="background: none; border: none; font-size: 22px; line-height: 1; color: #94A3B8; cursor: pointer;">&times;</button>
+        </div>
+
+        <!-- Modal Body -->
+        <div style="padding: 18px 20px; max-height: 60vh; overflow-y: auto;">
+            <div style="background: #FFFBEB; border: 1px solid #FEF3C7; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px; font-size: 12.5px; color: #92400E; display: flex; align-items: flex-start; gap: 8px;">
+                <span style="font-size: 16px;">⚠️</span>
+                <div>
+                    <strong>សូមពិនិត្យស្តុកឡើងវិញ (Recheck Stock):</strong> ទំនិញខាងក្រោមមិនមានចំនួនគ្រប់គ្រាន់ក្នុងឃ្លាំងទេ។ ប្រសិនបើអ្នកនៅតែចង់បន្តការលក់ សូមចុច <strong>"Accept & Process"</strong>។
+                </div>
+            </div>
+
+            <div style="border: 1px solid #E2E8F0; border-radius: 8px; overflow: hidden; margin-bottom: 12px;">
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left;">
+                    <thead>
+                        <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; color: #475569; font-weight: 700;">
+                            <th style="padding: 8px 10px;">ទំនិញ / Item</th>
+                            <th style="padding: 8px 10px; text-align: center;">កុម្ម៉ង់ / Order</th>
+                            <th style="padding: 8px 10px; text-align: center;">ក្នុងស្តុក / Available</th>
+                            <th style="padding: 8px 10px; text-align: right;">ខ្វះ / Shortage</th>
+                        </tr>
+                    </thead>
+                    <tbody id="posStockAlertTableBody">
+                        <!-- Populated dynamically -->
+                    </tbody>
+                </table>
+            </div>
+
+            <p style="margin: 0; font-size: 11px; color: #64748B; line-height: 1.4;">
+                * ប្រព័ន្ធអនុញ្ញាតឱ្យកាត់ស្តុកអវិជ្ជមាន និងកត់ត្រាក្នុង Stock Audit Logs ដោយស្វ័យប្រវត្តិនូវរាល់ការបញ្ជាទិញដែលបាន Accept។
+            </p>
+        </div>
+
+        <!-- Modal Actions -->
+        <div style="padding: 14px 20px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" onclick="closePosStockAlertModal()" style="padding: 8px 16px; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #FFFFFF; color: #334155; font-size: 12.5px; font-weight: 700; cursor: pointer; transition: background 0.15s;">
+                🔍 Recheck Stock (ត្រួតពិនិត្យ)
+            </button>
+            <button type="button" id="posBtnAcceptOutOfStock" onclick="acceptAndProcessCheckout()" style="padding: 8px 18px; border-radius: 8px; border: none; background: #EA580C; color: #FFFFFF; font-size: 12.5px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 6px; box-shadow: 0 2px 8px rgba(234, 88, 12, 0.35); transition: background 0.15s;">
+                <span>✓</span> Accept & Process (យល់ព្រមបន្ត)
+            </button>
+        </div>
+
     </div>
 </div>
 
@@ -2222,9 +2351,17 @@ function calculateItemDetails(item) {
         }
     }
 
+    // Support for Manual Custom Unit Price Editing in POS
+    let isCustomPrice = false;
+    if (item.customPrice !== undefined && item.customPrice !== null && item.customPrice !== '' && !isNaN(item.customPrice)) {
+        unitPrice = Math.max(0, parseFloat(item.customPrice));
+        isCustomPrice = true;
+    }
+
     return {
         baseCasePrice,
         unitPrice,
+        isCustomPrice,
         totalPcs,
         pcsLabel,
         lineTotal: unitPrice * item.qty
@@ -2273,12 +2410,27 @@ function updateQty(id, delta) {
 function changeItemUom(id, newUom) {
     if (!cart[id]) return;
     cart[id].uom = newUom;
+    // Clear custom price override so the new UOM default formula applies
+    delete cart[id].customPrice;
     renderCart();
 }
 
 function changeItemScheme(id, newSchemeId) {
     if (!cart[id]) return;
     cart[id].pricingSchemeId = parseInt(newSchemeId);
+    // Clear custom price override so the new scheme default formula applies
+    delete cart[id].customPrice;
+    renderCart();
+}
+
+function updateItemCustomPrice(id, newPrice) {
+    if (!cart[id]) return;
+    const parsed = parseFloat(newPrice);
+    if (!isNaN(parsed) && parsed >= 0) {
+        cart[id].customPrice = parsed;
+    } else {
+        delete cart[id].customPrice;
+    }
     renderCart();
 }
 
@@ -2358,7 +2510,19 @@ function renderCart() {
 
                 <div class="pos-bill-controls">
                     <div class="pos-bill-price-wrap">
-                        <span class="pos-unit-price-sub">$${calc.unitPrice.toFixed(2)} / ${it.uom}</span>
+                        <div class="pos-unit-price-edit-wrap" title="Click to edit unit price / ចុចដើម្បីកែប្រែតម្លៃលក់">
+                            <span class="pos-unit-price-prefix">$</span>
+                            <input type="number" 
+                                   step="any" 
+                                   min="0" 
+                                   class="pos-unit-price-input ${calc.isCustomPrice ? 'is-custom' : ''}" 
+                                   value="${Number(calc.unitPrice.toFixed(4))}" 
+                                   onchange="updateItemCustomPrice(${it.id}, this.value)" 
+                                   onkeydown="if(event.key==='Enter'){updateItemCustomPrice(${it.id}, this.value); this.blur();}" 
+                                   onfocus="this.select()" 
+                                   title="Click to edit unit price / កែប្រែតម្លៃលក់">
+                            <span class="pos-unit-price-uom">/${it.uom}</span>
+                        </div>
                         <div class="pos-bill-price">$${calc.lineTotal.toFixed(2)}</div>
                     </div>
                     <div class="pos-stepper">
@@ -2464,7 +2628,7 @@ function updateCreditAmounts() {
 // -------------------------------------------------------------------------
 // Submit POS Checkout & Inventory Deduction
 // -------------------------------------------------------------------------
-function submitPosCheckout() {
+function submitPosCheckout(forceCheckout = false) {
     const keys = Object.keys(cart);
     if (keys.length === 0) {
         alert('Billing cart is empty! Please add items to billing first.');
@@ -2508,8 +2672,10 @@ function submitPosCheckout() {
     const balanceDue = Math.max(0, grandTotal - paidAmount);
 
     const btn = document.getElementById('posBtnCharge');
-    btn.disabled = true;
-    btn.innerHTML = '⏳ Deducting Inventory & Charging...';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = forceCheckout ? '⏳ Processing (Stock Override)...' : '⏳ Deducting Inventory & Charging...';
+    }
 
     fetch('/branches/{{ branch.id }}/pos/checkout', {
         method: 'POST',
@@ -2522,14 +2688,26 @@ function submitPosCheckout() {
             discount_amount: discount,
             total_amount: grandTotal,
             paid_amount: paidAmount,
-            payment_method: finalMethod
+            payment_method: finalMethod,
+            force_checkout: forceCheckout
         })
     })
     .then(r => r.json())
     .then(data => {
-        btn.disabled = false;
-        btn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        }
+
+        // Check if out-of-stock warning confirmation is required
+        if (data.needs_stock_confirmation) {
+            showPosStockAlertModal(data.insufficient_items || [], data.warehouse_name || whName);
+            return;
+        }
+
         if (data.success) {
+            closePosStockAlertModal();
+
             // Populate Thermal Receipt
             populateThermalReceipt({
                 orderNumber: data.order_number || 'SO-00000',
@@ -2558,10 +2736,63 @@ function submitPosCheckout() {
         }
     })
     .catch(err => {
-        btn.disabled = false;
-        btn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+        }
         alert('Checkout error: ' + err);
     });
+}
+
+function showPosStockAlertModal(insufficientItems, whName) {
+    const modal = document.getElementById('posStockAlertModal');
+    if (!modal) return;
+
+    const subTitle = document.getElementById('posStockAlertSubtitle');
+    if (subTitle) {
+        subTitle.textContent = `ឃ្លាំង៖ ${whName} — ខ្វះស្តុក ${insufficientItems.length} មុខទំនិញ`;
+    }
+
+    const tbody = document.getElementById('posStockAlertTableBody');
+    if (tbody) {
+        let html = '';
+        insufficientItems.forEach(item => {
+            const shortPcs = Math.max(0, (item.requested || 0) - (item.available || 0));
+            html += `
+                <tr style="border-bottom: 1px solid #F1F5F9;">
+                    <td style="padding: 10px 12px;">
+                        <div style="font-weight: 700; color: #0F172A;" class="font-khmer">${escapeHtml(item.name)}</div>
+                        ${item.sku ? `<div style="font-size: 10px; color: #94A3B8;">SKU: ${escapeHtml(item.sku)}</div>` : ''}
+                    </td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 700; color: #0F172A;">
+                        ${item.qty} ${item.uom}<br>
+                        <span style="font-size: 10px; color: #64748B;">(${item.requested.toLocaleString()} pcs)</span>
+                    </td>
+                    <td style="padding: 10px 12px; text-align: center; font-weight: 700; color: ${item.available > 0 ? '#D97706' : '#EF4444'};">
+                        ${item.available.toLocaleString()} pcs
+                    </td>
+                    <td style="padding: 10px 12px; text-align: right;">
+                        <span style="background: #FEE2E2; color: #B91C1C; font-weight: 800; font-size: 11px; padding: 2px 7px; border-radius: 4px; display: inline-block;">
+                            -${shortPcs.toLocaleString()} pcs
+                        </span>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closePosStockAlertModal() {
+    const modal = document.getElementById('posStockAlertModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function acceptAndProcessCheckout() {
+    closePosStockAlertModal();
+    submitPosCheckout(true);
 }
 
 // -------------------------------------------------------------------------

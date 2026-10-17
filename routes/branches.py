@@ -957,11 +957,8 @@ def branch_checkout(id):
             return jsonify({'success': False, 'message': 'No items selected.'}), 400
 
         customer_id = data.get('customer_id') or None
-        discount_amount = float(data.get('discount_amount') or 0.0)
-        from routes.auth import user_can_edit_prices
-        can_edit = user_can_edit_prices()
-        if not can_edit:
-            discount_amount = 0.0
+        discount_amount = max(0.0, float(data.get('discount_amount') or 0.0))
+        force_checkout = bool(data.get('force_checkout') or data.get('accept_out_of_stock'))
 
         payment_method = str(data.get('payment_method') or 'Cash').strip()
         paid_amount = float(data.get('paid_amount') if data.get('paid_amount') is not None else data.get('total_amount', 0.0))
@@ -991,6 +988,7 @@ def branch_checkout(id):
 
             # 1. Lock and validate inventory at target warehouse & calculate line subtotals
             calc_subtotal = 0.0
+            insufficient_items = []
             for it in items:
                 pid = int(it['product_id'])
                 qty = float(it['quantity'])
@@ -1017,17 +1015,36 @@ def branch_checkout(id):
                     cur.execute("SELECT name, sku FROM products WHERE id = %s", (pid,))
                     p_info = cur.fetchone()
                     p_name = p_info['name'] if p_info else f"Product #{pid}"
-                    return jsonify({
-                        'success': False, 
-                        'message': f"Insufficient stock at {target_loc_name} for '{p_name}'. Available: {current_qty:g} pcs, Requested: {total_pcs:g} pcs ({qty:g} {uom})"
-                    }), 400
+                    insufficient_items.append({
+                        'product_id': pid,
+                        'name': p_name,
+                        'sku': p_info['sku'] if p_info else '',
+                        'available': current_qty,
+                        'requested': total_pcs,
+                        'qty': qty,
+                        'uom': uom,
+                        'shortage': total_pcs - current_qty
+                    })
+
+            # Check if any items have insufficient stock and user has not confirmed force checkout
+            if insufficient_items and not force_checkout:
+                item_names = [f"'{x['name']}' (ស្តុក: {x['available']:g} pcs, ត្រូវការ: {x['requested']:g} pcs)" for x in insufficient_items]
+                msg = f"ទំនិញមិនមានស្តុកគ្រប់គ្រាន់នៅ {target_loc_name} ទេ៖\n" + "\n".join(item_names) + "\n\nសូមពិនិត្យស្តុកឡើងវិញ ឬចុច 'Accept & Process' ដើម្បីបន្តការលក់។"
+                return jsonify({
+                    'success': False,
+                    'needs_stock_confirmation': True,
+                    'warehouse_name': target_loc_name,
+                    'insufficient_items': insufficient_items,
+                    'message': msg
+                }), 200
 
             # 2. Insert Sales Order stamped with branch_id and target warehouse
-            subtotal = calc_subtotal if not can_edit else float(data.get('subtotal', calc_subtotal))
+            subtotal = calc_subtotal
             total_amount = max(0.0, subtotal - discount_amount)
             balance_due = max(0.0, total_amount - paid_amount)
             pay_status = 'PAID' if balance_due <= 0 else ('PARTIAL' if paid_amount > 0 else 'UNPAID')
 
+            note_suffix = " (Stock Override / Out of Stock Accepted)" if insufficient_items else ""
             cur.execute("""
                 INSERT INTO sales_orders (
                     order_number, customer_id, branch_id, location_id, order_date,
@@ -1041,7 +1058,7 @@ def branch_checkout(id):
             """, (
                 order_number, customer_id, id, target_loc_id,
                 pay_status, subtotal, discount_amount,
-                total_amount, paid_amount, balance_due, f"POS Sale via {payment_method} from {branch['name']} ({target_loc_name})"
+                total_amount, paid_amount, balance_due, f"POS Sale via {payment_method} from {branch['name']} ({target_loc_name}){note_suffix}"
             ))
             so_id = cur.fetchone()['id']
 
@@ -1091,6 +1108,11 @@ def branch_checkout(id):
                     updated_stock = float(cur.fetchone()['quantity'])
 
                 # Insert into Stock Audit Ledger with branch and warehouse attribution
+                is_override = any(x['product_id'] == pid for x in insufficient_items)
+                log_reason = f"POS Sale ({qty:g} {uom} = {deduct_pcs:g} pcs) at {branch['name']}"
+                if is_override:
+                    log_reason += " [Stock Override Accepted]"
+
                 cur.execute("""
                     INSERT INTO inventory_logs (
                         product_id, movement_type, reference_type, reference_id,
@@ -1102,7 +1124,7 @@ def branch_checkout(id):
                 """, (
                     pid, order_number, target_loc_id,
                     deduct_pcs, updated_stock + deduct_pcs, updated_stock,
-                    id, f"POS Sale ({qty:g} {uom} = {deduct_pcs:g} pcs) at {branch['name']}"
+                    id, log_reason
                 ))
 
             # 4. Record Payment if paid
@@ -1265,7 +1287,7 @@ def request_branch_transfer(id):
 
 @branches_bp.route('/branches/<int:id>/expenses')
 def branch_expenses(id):
-    """Branch daily expense recording and monthly summary."""
+    """Branch daily expense recording and monthly summary spreadsheet."""
     branch = query_one("SELECT * FROM branches WHERE id = %s", (id,))
     if not branch:
         flash("Branch not found.", "error")
@@ -1277,22 +1299,7 @@ def branch_expenses(id):
         return redirect(url_for('branches.branch_workspace', id=id))
 
     month_key = request.args.get('month', datetime.now().strftime('%Y-%m')).strip()
-
-    expenses = query_all("""
-        SELECT * FROM expenses
-        WHERE branch_id = %s AND month_key = %s
-        ORDER BY expense_date DESC, id DESC
-    """, (id, month_key))
-
-    total_exp = sum(float(e['total_price'] or 0) for e in expenses)
-
-    return render_template('branches/expenses.html',
-                           branch=branch,
-                           perms=perms,
-                           expenses=expenses,
-                           month_key=month_key,
-                           total_exp=total_exp,
-                           today_date=datetime.now().strftime('%Y-%m-%d'))
+    return redirect(url_for('expenses.monthly_expenses', month=month_key, branch=id))
 
 @branches_bp.route('/branches/<int:id>/expenses/create', methods=['POST'])
 def create_branch_expense(id):
@@ -1322,7 +1329,7 @@ def create_branch_expense(id):
     except Exception as e:
         flash(f"Error saving expense: {e}", "error")
 
-    return redirect(request.referrer or url_for('branches.branch_expenses', id=id))
+    return redirect(request.referrer or url_for('expenses.monthly_expenses', month=m_key, branch=id))
 
 @branches_bp.route('/branches/<int:id>/customers')
 def branch_customers(id):
