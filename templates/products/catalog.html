@@ -1272,6 +1272,7 @@
                                 <th>Date</th>
                                 <th>Customer</th>
                                 <th style="text-align: right;">Quantity</th>
+                                <th style="text-align: left; width: 75px;">UOM</th>
                                 <th style="text-align: right;">Unit Price</th>
                                 <th style="text-align: right;">Total Amount</th>
                                 <th style="text-align: center;">Status</th>
@@ -1285,9 +1286,12 @@
                                 </td>
                                 <td>{{ ord.order_date | format_inflow_date }}</td>
                                 <td>{{ ord.customer_name or ord.party_name or '-' }}</td>
-                                <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(ord.quantity) }}</td>
-                                <td style="text-align: right;">${{ "{:.2f}".format(ord.unit_price) }}</td>
-                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(ord.total_amount) }}</td>
+                                <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(ord.quantity|float) if ord.quantity is not none else '0' }}</td>
+                                <td>
+                                    <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ ord.uom or product.sales_uom or product.uom or 'pcs' }}</span>
+                                </td>
+                                <td style="text-align: right;">${{ "{:,.2f}".format(ord.unit_price|float) }}</td>
+                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(ord.total_amount|float) }}</td>
                                 <td style="text-align: center;">
                                     <span class="badge {% if ord.status == 'Fulfilled' or ord.status == 'Invoiced' %}badge-success{% elif ord.status == 'Canceled' %}badge-danger{% else %}badge-info{% endif %}">
                                         {{ ord.status }}
@@ -1295,7 +1299,7 @@
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No sales order history found for this product.</td></tr>
+                            <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales order history found for this product.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -1319,6 +1323,7 @@
                                 <th>Date</th>
                                 <th>Vendor</th>
                                 <th style="text-align: right;">Ordered Qty</th>
+                                <th style="text-align: left; width: 75px;">UOM</th>
                                 <th style="text-align: right;">Received Qty</th>
                                 {% if can_view_costs %}
                                 <th style="text-align: right;">Unit Cost</th>
@@ -1335,11 +1340,14 @@
                                 </td>
                                 <td>{{ po.order_date | format_inflow_date }}</td>
                                 <td>{{ po.vendor_name or po.party_name or '-' }}</td>
-                                <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(po.quantity) }}</td>
-                                <td style="text-align: right; color: #0F766E; font-weight: 600;">{{ "{:,.0f}".format(po.received_qty or 0) }}</td>
+                                <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(po.quantity|float) if po.quantity is not none else '0' }}</td>
+                                <td>
+                                    <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ po.uom or product.purchasing_uom or product.uom or 'pcs' }}</span>
+                                </td>
+                                <td style="text-align: right; color: #0F766E; font-weight: 600;">{{ "{:g}".format(po.received_qty|float) if po.received_qty is not none else '0' }}</td>
                                 {% if can_view_costs %}
-                                <td style="text-align: right;">${{ "{:.2f}".format(po.unit_cost) }}</td>
-                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(po.total_amount) }}</td>
+                                <td style="text-align: right;">${{ "{:,.2f}".format(po.unit_cost|float) }}</td>
+                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(po.total_amount|float) }}</td>
                                 {% endif %}
                                 <td style="text-align: center;">
                                     <span class="badge {% if po.status == 'Fulfilled' or po.status == 'Received' %}badge-success{% elif po.status == 'Canceled' %}badge-danger{% else %}badge-info{% endif %}">
@@ -1348,7 +1356,7 @@
                                 </td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="{% if can_view_costs %}8{% else %}6{% endif %}" style="text-align: center; padding: 24px; color: #64748B;">No purchase order history found for this product.</td></tr>
+                            <tr><td colspan="{% if can_view_costs %}9{% else %}7{% endif %}" style="text-align: center; padding: 24px; color: #64748B;">No purchase order history found for this product.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>

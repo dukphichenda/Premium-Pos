@@ -558,7 +558,12 @@ def _get_product_detail_bundle(product_id):
     # Order history (SO & PO)
     recent_orders = query_all("""
         (
-            SELECT 'SO' as order_type, so.id as order_id, so.order_number, so.order_date, c.name as party_name, sol.quantity, sol.unit_price, so.status
+            SELECT 'SO' as order_type, so.id as order_id, so.order_number, so.order_date, c.name as party_name, 
+                   COALESCE(sol.quantity_display, sol.quantity) as quantity, 
+                   sol.uom, 
+                   sol.unit_price, 
+                   COALESCE(sol.subtotal, (COALESCE(sol.quantity_display, sol.quantity) * sol.unit_price)) as total_amount,
+                   so.status
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             LEFT JOIN customers c ON so.customer_id = c.id
@@ -566,7 +571,12 @@ def _get_product_detail_bundle(product_id):
         )
         UNION ALL
         (
-            SELECT 'PO' as order_type, po.id as order_id, po.order_number as order_number, po.order_date, v.name as party_name, pol.quantity, pol.unit_cost as unit_price, po.status
+            SELECT 'PO' as order_type, po.id as order_id, po.order_number as order_number, po.order_date, v.name as party_name, 
+                   pol.quantity, 
+                   pol.uom, 
+                   pol.unit_cost as unit_price, 
+                   COALESCE(pol.subtotal, (pol.quantity * pol.unit_cost)) as total_amount,
+                   po.status
             FROM purchase_order_lines pol
             JOIN purchase_orders po ON pol.purchase_order_id = po.id
             LEFT JOIN vendors v ON po.vendor_id = v.id
@@ -583,9 +593,10 @@ def _get_product_detail_bundle(product_id):
             so.order_number, 
             so.order_date, 
             c.name as customer_name, 
-            sol.quantity, 
+            COALESCE(sol.quantity_display, sol.quantity) as quantity, 
+            sol.uom, 
             sol.unit_price, 
-            (sol.quantity * sol.unit_price) as total_amount,
+            COALESCE(sol.subtotal, (COALESCE(sol.quantity_display, sol.quantity) * sol.unit_price)) as total_amount,
             so.status
         FROM sales_order_lines sol
         JOIN sales_orders so ON sol.sales_order_id = so.id
@@ -605,8 +616,9 @@ def _get_product_detail_bundle(product_id):
             v.name as vendor_name, 
             pol.quantity, 
             COALESCE(pol.received_qty, 0) as received_qty,
+            pol.uom,
             pol.unit_cost, 
-            (pol.quantity * pol.unit_cost) as total_amount,
+            COALESCE(pol.subtotal, (pol.quantity * pol.unit_cost)) as total_amount,
             po.status
         FROM purchase_order_lines pol
         JOIN purchase_orders po ON pol.purchase_order_id = po.id

@@ -1007,6 +1007,7 @@
                             <th>Date</th>
                             <th>Customer / Vendor</th>
                             <th style="text-align: right;">Qty</th>
+                            <th style="text-align: left; width: 65px;">UOM</th>
                             <th style="text-align: right;">Unit Price</th>
                             <th style="text-align: center;">Status</th>
                         </tr>
@@ -1028,7 +1029,10 @@
                             </td>
                             <td>{{ ord.order_date | format_date }}</td>
                             <td>{{ ord.party_name or '-' }}</td>
-                            <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(ord.quantity) }}</td>
+                            <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(ord.quantity|float) if ord.quantity is not none else '0' }}</td>
+                            <td>
+                                <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ ord.uom or product.uom or 'pcs' }}</span>
+                            </td>
                             <td style="text-align: right;">
                                 {% if ord.order_type == 'PO' and not can_view_costs %}
                                     <span style="color: #94A3B8; font-size: 11px;">🔒 Hidden</span>
@@ -1040,7 +1044,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="8" style="text-align: center; color: #888; padding: 24px;">No transaction history recorded for this item yet.</td>
+                            <td colspan="9" style="text-align: center; color: #888; padding: 24px;">No transaction history recorded for this item yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
