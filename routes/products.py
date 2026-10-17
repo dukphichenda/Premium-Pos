@@ -254,6 +254,7 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'profit_pct_3': int(profit_pct_3 + 0.5),
         'card_color': final_color,
         'card_font': product.get('price_card_font') or 'Kantumruy Pro',
+        'card_unit': product.get('price_card_unit') or 'ប្រអប់',
         'notes': product.get('price_card_notes') or '',
         'can_view_costs': can_view_costs
     }
@@ -902,7 +903,7 @@ def update_product_ajax(id):
             'packs_per_case', 'pcs_per_pack',
             'tier_qty_1', 'tier_qty_2', 'tier_qty_3',
             'tier_price_1', 'tier_price_2', 'tier_price_3',
-            'price_card_notes', 'price_card_color', 'price_card_font',
+            'price_card_notes', 'price_card_color', 'price_card_font', 'price_card_unit',
             'factory_cost', 'factory_cost_formula',
             'cost_rate', 'cost_rate_formula',
             'shipping_cost', 'shipping_cost_formula',
@@ -3174,3 +3175,44 @@ def price_list_view():
                            categories=categories,
                            items=items,
                            total_products=len(items))
+
+DEFAULT_PRICE_CARD_UNITS = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម']
+
+@products_bp.route('/api/products/price-card-units', methods=['GET', 'POST'])
+def api_price_card_units():
+    """
+    GET: returns available Khmer unit words for price cards.
+    POST: adds a new custom unit word to app_settings.
+    """
+    import json
+    setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'price_card_units'")
+    units = list(DEFAULT_PRICE_CARD_UNITS)
+    if setting and setting.get('setting_value'):
+        try:
+            saved_units = json.loads(setting['setting_value'])
+            if isinstance(saved_units, list):
+                for u in saved_units:
+                    u_clean = str(u).strip()
+                    if u_clean and u_clean not in units:
+                        units.append(u_clean)
+        except Exception:
+            pass
+
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        new_unit = (data.get('unit') or request.form.get('unit') or '').strip()
+        if new_unit and new_unit not in units:
+            units.append(new_unit)
+            try:
+                execute("""
+                    INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
+                    VALUES ('price_card_units', %s, 'Custom Khmer unit words for price cards', CURRENT_TIMESTAMP)
+                    ON CONFLICT (setting_key) 
+                    DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP;
+                """, (json.dumps(units, ensure_ascii=False),))
+            except Exception as e:
+                logger.warning(f"Failed to persist custom unit to app_settings: {e}")
+        return jsonify({'success': True, 'units': units, 'added': new_unit})
+
+    return jsonify({'success': True, 'units': units})
+

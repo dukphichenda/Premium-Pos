@@ -1674,6 +1674,20 @@
                             </select>
                         </div>
 
+                        <!-- Khmer Unit Selector in Toolbar -->
+                        <div class="inflow-style-control-group" title="Change Khmer unit word (ប្រអប់, គូរ, បេ, ឈុត, កែវ, សម, etc.) for price table">
+                            <span class="inflow-style-control-lbl">📦 ខ្នាត / Unit:</span>
+                            <select id="priceCardUnitSelectToolbar" class="inflow-style-select font-khmer" onchange="changePriceCardUnit(this.value)">
+                                <option value="ប្រអប់">ប្រអប់</option>
+                                <option value="គូរ">គូរ</option>
+                                <option value="បេ">បេ</option>
+                                <option value="ឈុត">ឈុត</option>
+                                <option value="កែវ">កែវ</option>
+                                <option value="សម">សម</option>
+                            </select>
+                            <button type="button" class="inflow-spec-add-unit-mini-btn" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យខ្នាតថ្មី (Add new unit word)">+</button>
+                        </div>
+
                         {% if can_view_costs %}
                         <button type="button" class="inflow-btn-showcase-action" id="btnToggleProfit" onclick="toggleInternalProfitDrawer()" title="Click to view internal cost & profit analysis (Screenshot 2)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1760,15 +1774,35 @@
                                 1 កេស មាន <span id="specPacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 3)) }}</span> ដុំ
                             </div>
                             <div class="inflow-spec-info-line" id="specPcsPackValLine">
-                                1 ដុំ មាន <span id="specPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</span> ប្រអប់
+                                1 ដុំ មាន <span id="specPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>
                             </div>
                             <div class="inflow-spec-info-line">
-                                <span id="specPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> ប្រអប់/1កេស
+                                <span id="specPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>/1កេស
                             </div>
                             <div class="inflow-spec-info-sub">
                                 (<span id="specPcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> PCS/ Carton)
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Option above price table to choose Khmer unit word (ប្រអប់, គូរ, បេ, ឈុត, កែវ, សម, etc.) -->
+                    <div class="inflow-spec-unit-bar no-print" data-html2canvas-ignore="true">
+                        <div class="inflow-spec-unit-left">
+                            <span class="inflow-spec-unit-icon">📦</span>
+                            <span class="inflow-spec-unit-label font-khmer">ខ្នាតលក់ / Unit:</span>
+                            <select id="priceCardUnitSelect" class="inflow-spec-unit-select font-khmer" onchange="changePriceCardUnit(this.value)" title="Choose unit word for price table">
+                                <option value="ប្រអប់">ប្រអប់</option>
+                                <option value="គូរ">គូរ</option>
+                                <option value="បេ">បេ</option>
+                                <option value="ឈុត">ឈុត</option>
+                                <option value="កែវ">កែវ</option>
+                                <option value="សម">សម</option>
+                            </select>
+                            <button type="button" class="inflow-spec-add-unit-btn font-khmer" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យថ្មី (Add more unit words)">
+                                + បន្ថែមពាក្យ
+                            </button>
+                        </div>
+                        <span class="inflow-spec-unit-hint font-khmer">ប្តូរពាក្យ «<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>» ក្នុងតារាងតម្លៃ</span>
                     </div>
 
                     <!-- Lower Body: Price Table Header -->
@@ -1778,7 +1812,7 @@
                             <div class="inflow-spec-hdr-en">(Price)</div>
                         </div>
                         <div class="inflow-spec-price-hdr-cell">
-                            <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div>
+                            <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span></div>
                             <div class="inflow-spec-hdr-en">(UNIT PRICE)</div>
                         </div>
                     </div>
@@ -1787,7 +1821,7 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" onchange="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> ប្រអប់ (PCS) =
+                                <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" onchange="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
                                 <input type="text" id="cardTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(1)" onchange="onCardTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
@@ -1803,7 +1837,7 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" onchange="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> ប្រអប់ (PCS) =
+                                <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" onchange="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
                                 <input type="text" id="cardTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(2)" onchange="onCardTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
@@ -1819,7 +1853,7 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" onchange="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> ប្រអប់ (PCS) =
+                                <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" onchange="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
                                 <input type="text" id="cardTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(3)" onchange="onCardTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
@@ -2692,6 +2726,11 @@ function saveProductChanges(callback) {
     const notesEl = document.getElementById('cardNotesInput');
     if (notesEl && (pendingChanges['price_card_notes'] !== undefined || String(notesEl.value).trim() !== String(notesEl.defaultValue || '').trim())) {
         pendingChanges['price_card_notes'] = notesEl.value.trim();
+        isDirty = true;
+    }
+    const unitEl = document.getElementById('priceCardUnitSelect') || document.getElementById('priceCardUnitSelectToolbar');
+    if (unitEl && (pendingChanges['price_card_unit'] !== undefined || String(unitEl.value).trim() !== String(unitEl.defaultValue || '').trim())) {
+        pendingChanges['price_card_unit'] = unitEl.value.trim();
         isDirty = true;
     }
 
@@ -4838,6 +4877,125 @@ function changePriceCardFont(font) {
 }
 
 // ==========================================================================
+// PRICE TABLE KHMER UNIT SELECTOR (ប្រអប់, គូរ, បេ, ឈុត, កែវ, សម, etc.)
+// ==========================================================================
+function changePriceCardUnit(unit) {
+    if (!unit) return;
+    const cleanUnit = unit.trim();
+    if (!cleanUnit) return;
+    
+    // Update all unit labels in the card
+    document.querySelectorAll('.card-unit-label').forEach(el => {
+        el.innerText = cleanUnit;
+    });
+    
+    // Sync select elements
+    const s1 = document.getElementById('priceCardUnitSelect');
+    if (s1) {
+        if (!Array.from(s1.options).some(o => o.value === cleanUnit)) {
+            const opt = new Option(cleanUnit, cleanUnit);
+            s1.appendChild(opt);
+        }
+        s1.value = cleanUnit;
+    }
+    const s2 = document.getElementById('priceCardUnitSelectToolbar');
+    if (s2) {
+        if (!Array.from(s2.options).some(o => o.value === cleanUnit)) {
+            const opt = new Option(cleanUnit, cleanUnit);
+            s2.appendChild(opt);
+        }
+        s2.value = cleanUnit;
+    }
+    
+    markFieldDirty('price_card_unit', cleanUnit);
+    saveProductChanges();
+}
+
+async function promptAddNewPriceCardUnit() {
+    const word = prompt("បញ្ចូលពាក្យខ្នាតថ្មីសម្រាប់តារាងតម្លៃ (Enter new unit word):\nឧទាហរណ៍: ចាន, កញ្ចប់, ដប, ស្លាបព្រា, etc.");
+    if (!word || !word.trim()) return;
+    const cleanWord = word.trim();
+    
+    addUnitWordToSelects(cleanWord);
+    changePriceCardUnit(cleanWord);
+    
+    // Save to server app_settings
+    try {
+        await fetch('/api/products/price-card-units', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ unit: cleanWord })
+        });
+    } catch (e) {
+        console.warn('Failed to save unit to server:', e);
+    }
+    
+    // Save to localStorage
+    try {
+        let stored = JSON.parse(localStorage.getItem('inflow_price_card_custom_units') || '[]');
+        if (!stored.includes(cleanWord)) {
+            stored.push(cleanWord);
+            localStorage.setItem('inflow_price_card_custom_units', JSON.stringify(stored));
+        }
+    } catch(e) {}
+    
+    showToastNotification(`✅ បានបន្ថែមពាក្យ «${cleanWord}» ជោគជ័យ!`);
+}
+
+function addUnitWordToSelects(word) {
+    [document.getElementById('priceCardUnitSelect'), document.getElementById('priceCardUnitSelectToolbar')].forEach(sel => {
+        if (!sel) return;
+        if (!Array.from(sel.options).some(o => o.value === word)) {
+            const opt = document.createElement('option');
+            opt.value = word;
+            opt.textContent = word;
+            sel.appendChild(opt);
+        }
+    });
+}
+
+async function initPriceCardUnits(currentUnit) {
+    const cur = currentUnit || document.getElementById('priceCardUnitSelect')?.value || 'ប្រអប់';
+    const defaultUnits = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម'];
+    let allUnits = [...defaultUnits];
+    
+    // Load local storage custom words
+    try {
+        const stored = JSON.parse(localStorage.getItem('inflow_price_card_custom_units') || '[]');
+        stored.forEach(u => {
+            if (u && !allUnits.includes(u)) allUnits.push(u);
+        });
+    } catch(e) {}
+    
+    // Fetch server custom words
+    try {
+        const res = await fetch('/api/products/price-card-units');
+        const data = await res.json();
+        if (data && data.success && Array.isArray(data.units)) {
+            data.units.forEach(u => {
+                if (u && !allUnits.includes(u)) allUnits.push(u);
+            });
+        }
+    } catch(e) {}
+    
+    if (cur && !allUnits.includes(cur)) {
+        allUnits.push(cur);
+    }
+    
+    [document.getElementById('priceCardUnitSelect'), document.getElementById('priceCardUnitSelectToolbar')].forEach(sel => {
+        if (!sel) return;
+        sel.innerHTML = '';
+        allUnits.forEach(u => {
+            const opt = document.createElement('option');
+            opt.value = u;
+            opt.textContent = u;
+            if (u === cur) opt.selected = true;
+            sel.appendChild(opt);
+        });
+    });
+}
+
+// ==========================================================================
 // DUAL PRICING: PRICE PER CASE & PRICE PER PCS AUTO-CALCULATOR
 // ==========================================================================
 function getPcsPerCase() {
@@ -5186,16 +5344,17 @@ function copyPriceCardText() {
     const u3 = document.getElementById('cardTierUnitDisplay3')?.innerText || '(0.135 $/PCS)';
     
     const note = document.getElementById('cardNotesInput')?.value || '';
+    const unitWord = document.getElementById('priceCardUnitSelect')?.value || 'ប្រអប់';
     
     let text = `📦 ${kmTitle} / ${enTitle}\n`;
     text += `🔹 ព័ត៌មានលម្អិត:\n`;
     text += `• ទំហំ: ${dim}\n`;
-    text += `• 1 កេស មាន ${packs} ដុំ (${pcsPack} ប្រអប់/ដុំ)\n`;
-    text += `• ${pcsCase} ប្រអប់/1កេស (${pcsCase} PCS/ Carton)\n\n`;
+    text += `• 1 កេស មាន ${packs} ដុំ (${pcsPack} ${unitWord}/ដុំ)\n`;
+    text += `• ${pcsCase} ${unitWord}/1កេស (${pcsCase} PCS/ Carton)\n\n`;
     text += `💰 តារាងតម្លៃ (PRICE LIST):\n`;
-    text += `• ${q1} ប្រអប់ (PCS) = $${p1} ${u1}\n`;
-    text += `• ${q2} ប្រអប់ (PCS) = $${p2} ${u2}\n`;
-    text += `• ${q3} ប្រអប់ (PCS) = $${p3} ${u3}\n`;
+    text += `• ${q1} ${unitWord} (PCS) = $${p1} ${u1}\n`;
+    text += `• ${q2} ${unitWord} (PCS) = $${p2} ${u2}\n`;
+    text += `• ${q3} ${unitWord} (PCS) = $${p3} ${u3}\n`;
     if (note) text += `\n📌 ចំណាំ: ${note}\n`;
     
     navigator.clipboard.writeText(text).then(() => {
@@ -5470,6 +5629,8 @@ function renderOffscreenCard(stage, item) {
         </div>`;
     }
     
+    const unitWord = c.card_unit || 'ប្រអប់';
+    
     stage.innerHTML = `
         <div class="inflow-spec-header-grid" style="background: ${cardColor};">
             <div class="inflow-spec-header-cell">
@@ -5488,8 +5649,8 @@ function renderOffscreenCard(stage, item) {
             <div class="inflow-spec-info-box">
                 <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
                 <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
-                <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ប្រអប់</div>
-                <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ប្រអប់/1កេស</div>
+                <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ${unitWord}</div>
+                <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ${unitWord}/1កេស</div>
                 <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
             </div>
         </div>
@@ -5499,13 +5660,13 @@ function renderOffscreenCard(stage, item) {
                 <div class="inflow-spec-hdr-en">(Price)</div>
             </div>
             <div class="inflow-spec-price-hdr-cell">
-                <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div>
+                <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1${unitWord}</div>
                 <div class="inflow-spec-hdr-en">(UNIT PRICE)</div>
             </div>
         </div>
         <div class="inflow-spec-price-row">
             <div class="inflow-spec-price-left-cell">
-                <span class="inflow-spec-qty-label">${c.tier_qty_1} ប្រអប់ (PCS) =</span>
+                <span class="inflow-spec-qty-label">${c.tier_qty_1} ${unitWord} (PCS) =</span>
                 <span class="inflow-spec-total-price">${Number(c.tot_price_1).toFixed(2)} $</span>
             </div>
             <div class="inflow-spec-price-right-cell">
@@ -5514,7 +5675,7 @@ function renderOffscreenCard(stage, item) {
         </div>
         <div class="inflow-spec-price-row">
             <div class="inflow-spec-price-left-cell">
-                <span class="inflow-spec-qty-label">${c.tier_qty_2} ប្រអប់ (PCS) =</span>
+                <span class="inflow-spec-qty-label">${c.tier_qty_2} ${unitWord} (PCS) =</span>
                 <span class="inflow-spec-total-price">${Number(c.tot_price_2).toFixed(2)} $</span>
             </div>
             <div class="inflow-spec-price-right-cell">
@@ -5523,7 +5684,7 @@ function renderOffscreenCard(stage, item) {
         </div>
         <div class="inflow-spec-price-row">
             <div class="inflow-spec-price-left-cell">
-                <span class="inflow-spec-qty-label">${c.tier_qty_3} ប្រអប់ (PCS) =</span>
+                <span class="inflow-spec-qty-label">${c.tier_qty_3} ${unitWord} (PCS) =</span>
                 <span class="inflow-spec-total-price">${Number(c.tot_price_3).toFixed(2)} $</span>
             </div>
             <div class="inflow-spec-price-right-cell">
@@ -6746,6 +6907,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (localStorage.getItem('inflow_product_sidebar_collapsed') === 'true') {
             toggleProductSidebarCollapse(true);
         }
+    } catch(e) {}
+    try {
+        const initUnit = "{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}";
+        initPriceCardUnits(initUnit);
     } catch(e) {}
 });
 

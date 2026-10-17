@@ -420,10 +420,10 @@
                                 1 កេស មាន {{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 4)) }} ដុំ
                             </div>
                             <div class="inflow-spec-info-line">
-                                1 ដុំ មាន {{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 100)) }} ប្រអប់
+                                1 ដុំ មាន {{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 100)) }} {{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}
                             </div>
                             <div class="inflow-spec-info-line">
-                                {{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} ប្រអប់/1កេស
+                                {{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} {{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}/1កេស
                             </div>
                             <div class="inflow-spec-info-sub">
                                 ({{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} PCS/ Carton)
@@ -437,7 +437,7 @@
                             <div class="inflow-spec-hdr-en">(Price)</div>
                         </div>
                         <div class="inflow-spec-price-hdr-cell">
-                            <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div>
+                            <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</div>
                             <div class="inflow-spec-hdr-en">(UNIT PRICE)</div>
                         </div>
                     </div>
@@ -445,7 +445,7 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" name="tier_qty_1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input"> ប្រអប់ (PCS) =
+                                <input type="number" name="tier_qty_1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input"> {{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }} (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
                                 <input type="text" name="tier_price_1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing is restricted by administrator"{% endif %}> $
@@ -461,7 +461,7 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" name="tier_qty_2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input"> ប្រអប់ (PCS) =
+                                <input type="number" name="tier_qty_2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input"> {{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }} (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
                                 <input type="text" name="tier_price_2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing is restricted by administrator"{% endif %}> $
@@ -477,7 +477,7 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" name="tier_qty_3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input"> ប្រអប់ (PCS) =
+                                <input type="number" name="tier_qty_3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input"> {{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }} (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
                                 <input type="text" name="tier_price_3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing is restricted by administrator"{% endif %}> $
@@ -1714,25 +1714,25 @@ async function fetchPriceCardsAndExportZipDetail(apiUrl, zipFileName) {
                     <div class="inflow-spec-info-box">
                         <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
                         <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
-                        <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ប្រអប់</div>
-                        <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ប្រអប់/1កេស</div>
+                        <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ${c.card_unit || 'ប្រអប់'}</div>
+                        <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ${c.card_unit || 'ប្រអប់'}/1កេស</div>
                         <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
                     </div>
                 </div>
                 <div class="inflow-spec-price-header-grid" style="background: ${cardColor};">
                     <div class="inflow-spec-price-hdr-cell"><div class="inflow-spec-hdr-km font-khmer">តម្លៃ</div></div>
-                    <div class="inflow-spec-price-hdr-cell"><div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div></div>
+                    <div class="inflow-spec-price-hdr-cell"><div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1${c.card_unit || 'ប្រអប់'}</div></div>
                 </div>
                 <div class="inflow-spec-price-row">
-                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_1} ប្រអប់ (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_1).toFixed(2)} $</span></div>
+                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_1} ${c.card_unit || 'ប្រអប់'} (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_1).toFixed(2)} $</span></div>
                     <div class="inflow-spec-price-right-cell"><span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_1).toFixed(3)} $/PCS)</span></div>
                 </div>
                 <div class="inflow-spec-price-row">
-                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_2} ប្រអប់ (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_2).toFixed(2)} $</span></div>
+                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_2} ${c.card_unit || 'ប្រអប់'} (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_2).toFixed(2)} $</span></div>
                     <div class="inflow-spec-price-right-cell"><span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_2).toFixed(3)} $/PCS)</span></div>
                 </div>
                 <div class="inflow-spec-price-row">
-                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_3} ប្រអប់ (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_3).toFixed(2)} $</span></div>
+                    <div class="inflow-spec-price-left-cell"><span class="inflow-spec-qty-label">${c.tier_qty_3} ${c.card_unit || 'ប្រអប់'} (PCS) =</span><span class="inflow-spec-total-price">${Number(c.tot_price_3).toFixed(2)} $</span></div>
                     <div class="inflow-spec-price-right-cell"><span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_3).toFixed(3)} $/PCS)</span></div>
                 </div>
             `;
