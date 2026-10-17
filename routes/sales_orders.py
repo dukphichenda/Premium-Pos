@@ -1914,7 +1914,7 @@ def detail_order(id):
         all_locations = query_all("SELECT id, name FROM locations ORDER BY name ASC")
         pricing_schemes = query_all("SELECT id, name FROM pricing_schemes ORDER BY id ASC")
         all_delivery_men = query_all("SELECT * FROM delivery_men ORDER BY name ASC")
-        company = query_one("SELECT * FROM company LIMIT 1") or {}
+        company = query_one("SELECT * FROM companies LIMIT 1") or {}
 
         scheme_id = order.get('pricing_scheme_id') or 100
         for l in lines:
