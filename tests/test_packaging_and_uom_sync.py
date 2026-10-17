@@ -22,7 +22,7 @@ class TestPackagingAndUomSync(unittest.TestCase):
         self.assertIn('id="purchasingConvRow" style="display: none;"', content)
 
         # Check syncPurchasingUomWithSales function exists
-        self.assertIn('function syncPurchasingUomWithSales()', content)
+        self.assertIn('function syncPurchasingUomWithSales', content)
 
         # Check recalcPacksPerCase function exists and calculates pcsPerCase / pcsPack
         self.assertIn('function recalcPacksPerCase(source)', content)
@@ -81,6 +81,31 @@ class TestPackagingAndUomSync(unittest.TestCase):
             self.assertEqual(float(updated['sales_uom_ratio_std']), 500.0)
             self.assertEqual(float(updated['pcs_per_pack']), 50.0)
             self.assertEqual(float(updated['packs_per_case']), 10.0)
+
+    def test_viewing_product_does_not_trigger_unsaved_dirty_state(self):
+        catalog_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'products', 'catalog.html')
+        with open(catalog_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # 1. DOMContentLoaded must not invoke sync/recalc which marks fields dirty
+        dom_loaded_match = re.search(r"document\.addEventListener\('DOMContentLoaded', \(\) => \{(.*?)\}\);", content, re.DOTALL)
+        self.assertIsNotNone(dom_loaded_match, "DOMContentLoaded listener should exist")
+        dom_body = dom_loaded_match.group(1)
+        self.assertNotIn('syncPurchasingUomWithSales()', dom_body)
+        self.assertNotIn("recalcPacksPerCase('init')", dom_body)
+
+        # 2. saveProductChanges must check !isDirty before mutating pendingChanges
+        idx_check = content.find("if (!isDirty && Object.keys(pendingChanges).length === 0")
+        idx_purch = content.find("pendingChanges['purchasing_uom'] = sUom;")
+        self.assertTrue(idx_check != -1 and idx_purch != -1, "Both check and purchasing assignment should exist")
+        self.assertLess(idx_check, idx_purch, "The !isDirty check must come BEFORE pendingChanges['purchasing_uom'] is assigned")
+
+        # 3. syncPurchasingUomWithSales must default markDirty to false
+        self.assertIn("function syncPurchasingUomWithSales(markDirty = false)", content)
+        self.assertIn("if (markDirty) {", content)
+
+        # 4. recalcPacksPerCase must only mark dirty for explicit user actions
+        self.assertIn("else if (source === 'sales_conv' || source === 'pcs_pack')", content)
 
 if __name__ == '__main__':
     unittest.main()

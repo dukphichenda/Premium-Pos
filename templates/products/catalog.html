@@ -2695,18 +2695,18 @@ function saveProductChanges(callback) {
         isDirty = true;
     }
 
-    // Purchases UOM always equal to Sale UOM no need to fill
+    if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0 && !stagedProductImageFile) {
+        if (typeof callback === 'function') callback(true);
+        return;
+    }
+
+    // Purchases UOM always equal to Sale UOM no need to fill (only attach when saving changes)
     const sUom = (document.getElementById('salesUomSelect')?.value || 'cases').trim();
     const sRatio = parseFloat(document.getElementById('salesConvRatio')?.value) || 1;
     const sStd = parseFloat(document.getElementById('salesConvStd')?.value) || 1;
     pendingChanges['purchasing_uom'] = sUom;
     pendingChanges['purchasing_uom_ratio'] = sRatio;
     pendingChanges['purchasing_uom_ratio_std'] = sStd;
-
-    if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0 && !stagedProductImageFile) {
-        if (typeof callback === 'function') callback(true);
-        return;
-    }
 
     const btn = document.getElementById('btnSaveProduct');
     const text = document.getElementById('btnSaveText');
@@ -3939,11 +3939,11 @@ function onSalesUomChange(newSalesUom) {
     const salesTag = document.getElementById('lblSalesUom');
     if (salesTag) salesTag.innerText = newSalesUom;
     markFieldDirty('sales_uom', newSalesUom);
-    syncPurchasingUomWithSales();
+    syncPurchasingUomWithSales(true);
     onConversionRatioChange();
 }
 
-function syncPurchasingUomWithSales() {
+function syncPurchasingUomWithSales(markDirty = false) {
     const salesUom = (document.getElementById('salesUomSelect')?.value || 'cases').trim();
     const salesRatio = parseFloat(document.getElementById('salesConvRatio')?.value) || 1;
     const salesRatioStd = parseFloat(document.getElementById('salesConvStd')?.value) || 1;
@@ -3966,17 +3966,19 @@ function syncPurchasingUomWithSales() {
     const salesStdTag = document.getElementById('lblSalesStdUom');
     if (purchStdTag && salesStdTag) purchStdTag.innerText = salesStdTag.innerText;
     
-    markFieldDirty('purchasing_uom', salesUom);
-    markFieldDirty('purchasing_uom_ratio', salesRatio);
-    markFieldDirty('purchasing_uom_ratio_std', salesRatioStd);
+    if (markDirty) {
+        markFieldDirty('purchasing_uom', salesUom);
+        markFieldDirty('purchasing_uom_ratio', salesRatio);
+        markFieldDirty('purchasing_uom_ratio_std', salesRatioStd);
+    }
 }
 
 function onPurchasingUomChange(newPurchUom) {
-    syncPurchasingUomWithSales();
+    syncPurchasingUomWithSales(true);
 }
 
 function onConversionRatioChange() {
-    syncPurchasingUomWithSales();
+    syncPurchasingUomWithSales(true);
     if (typeof recalcPacksPerCase === 'function') recalcPacksPerCase('sales_conv');
     const cost = parseFloat(document.getElementById('productCostInput')?.value) || 0;
     recalcAllMarkupsFromCost(cost);
@@ -5000,7 +5002,7 @@ function recalcPacksPerCase(source) {
         if (packs > 0) {
             markFieldDirty('packs_per_case', packs);
         }
-    } else {
+    } else if (source === 'sales_conv' || source === 'pcs_pack') {
         // Automatically calculate: number pack per case = number pcs per case / pcs per pack
         if (pcsPerCase > 0 && pcsPack > 0) {
             packs = parseFloat((pcsPerCase / pcsPack).toFixed(2));
@@ -5009,6 +5011,10 @@ function recalcPacksPerCase(source) {
                 markFieldDirty('packs_per_case', packs);
             }
         } else if (packsInput) {
+            packs = parseFloat(packsInput.value) || 0;
+        }
+    } else {
+        if (packsInput) {
             packs = parseFloat(packsInput.value) || 0;
         }
     }
@@ -5030,11 +5036,15 @@ function recalcPacksPerCase(source) {
     const q3Inp = document.getElementById('cardTierQtyInput3');
     if (q2Inp && displayPcsCase > 0) {
         q2Inp.value = Math.round(displayPcsCase);
-        markFieldDirty('tier_qty_2', Math.round(displayPcsCase));
+        if (source === 'sales_conv' || source === 'pcs_pack') {
+            markFieldDirty('tier_qty_2', Math.round(displayPcsCase));
+        }
     }
     if (q3Inp && displayPcsCase > 0) {
         q3Inp.value = Math.round(displayPcsCase * 2);
-        markFieldDirty('tier_qty_3', Math.round(displayPcsCase * 2));
+        if (source === 'sales_conv' || source === 'pcs_pack') {
+            markFieldDirty('tier_qty_3', Math.round(displayPcsCase * 2));
+        }
     }
     
     // Auto sync all Price per Pcs inputs
@@ -6730,12 +6740,8 @@ function toggleProductSidebarCollapse(forceState) {
     if (expandBtn) expandBtn.style.display = willCollapse ? 'inline-flex' : 'none';
 }
 
-// Restore Product sidebar collapse state and initialize packaging/UOM calculations on load
+// Restore Product sidebar collapse state on load
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        if (typeof syncPurchasingUomWithSales === 'function') syncPurchasingUomWithSales();
-        if (typeof recalcPacksPerCase === 'function') recalcPacksPerCase('init');
-    } catch(e) {}
     try {
         if (localStorage.getItem('inflow_product_sidebar_collapsed') === 'true') {
             toggleProductSidebarCollapse(true);
