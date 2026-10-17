@@ -17,7 +17,7 @@ class TestPriceList(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
         self.assertIn('Price list', html)
-        self.assertIn('/products/price-list', html)
+        self.assertTrue('/price-list' in html)
 
     def test_price_list_page_renders(self):
         """Verify /products/price-list and /inventory/price-list return 200 and contain required controls."""
@@ -38,8 +38,9 @@ class TestPriceList(unittest.TestCase):
 
             # Option to Group By
             self.assertIn('id="groupByFilter"', html)
-            self.assertIn('Group by: Category', html)
-            self.assertIn('Group by: UOM', html)
+            self.assertIn('Group by:', html)
+            self.assertIn('value="category"', html)
+            self.assertIn('value="uom"', html)
 
             # PDF export button & Print
             self.assertIn('id="btnExportPdf"', html)

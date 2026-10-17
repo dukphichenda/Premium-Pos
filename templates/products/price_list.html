@@ -2,7 +2,7 @@
 
 {% block title %}Product Price List (តារាងតម្លៃទំនិញ) - inFlow Premium{% endblock %}
 
-{% block head_extra %}
+{% block extra_css %}
 <!-- html2pdf bundle for client-side PDF export -->
 <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
 <style>
@@ -854,6 +854,268 @@
 {% endblock %}
 
 {% block content %}
+<style>
+/* Embedded Price List Cards Styles - Guarantees styling even if head block is bypassed */
+:root {
+    --price-theme-color: #3B4B64;
+    --price-font-family: 'Kantumruy Pro', 'Siemreap', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.price-list-page {
+    padding: 20px 28px 60px;
+    max-width: 1560px;
+    margin: 0 auto;
+    font-family: var(--price-font-family);
+    color: #0F172A;
+}
+.pl-cards-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(540px, 1fr)) !important;
+    gap: 22px !important;
+}
+.pl-price-card {
+    background: #FFFFFF !important;
+    border: 1.5px solid var(--price-theme-color) !important;
+    border-radius: 4px !important;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+    position: relative !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+}
+.pl-card-select-overlay {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    z-index: 10 !important;
+    background: rgba(255, 255, 255, 0.9) !important;
+    border-radius: 4px !important;
+    padding: 3px 6px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 4px !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15) !important;
+}
+.pl-card-header-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    background: var(--price-theme-color) !important;
+    color: #FFFFFF !important;
+    border-bottom: 1.5px solid var(--price-theme-color) !important;
+}
+.pl-card-header-left {
+    padding: 8px 12px !important;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.35) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+.pl-card-header-right {
+    padding: 8px 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    text-align: center !important;
+}
+.pl-card-title-km {
+    font-size: 15px !important;
+    font-weight: 800 !important;
+    line-height: 1.35 !important;
+    color: #FFFFFF !important;
+}
+.pl-card-title-uom {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    margin-top: 3px !important;
+    color: #FFFFFF !important;
+    opacity: 0.95 !important;
+}
+.pl-card-detail-hdr {
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    line-height: 1.3 !important;
+    color: #FFFFFF !important;
+}
+.pl-card-detail-sub {
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    font-style: italic !important;
+    color: #FFFFFF !important;
+    opacity: 0.92 !important;
+    margin-top: 2px !important;
+}
+.pl-card-upper-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    border-bottom: 1.5px solid var(--price-theme-color) !important;
+    height: 220px !important;
+    min-height: 220px !important;
+    max-height: 220px !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+}
+.pl-card-image-box {
+    position: relative !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 8px !important;
+    background: #FFFFFF !important;
+    border-right: 1.5px solid var(--price-theme-color) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    height: 220px !important;
+    max-height: 220px !important;
+}
+.pl-card-img {
+    max-width: 100% !important;
+    max-height: 204px !important;
+    width: auto !important;
+    height: auto !important;
+    object-fit: contain !important;
+    display: block !important;
+    border-radius: 4px !important;
+    margin: 0 auto !important;
+}
+.pl-card-size-badge {
+    position: absolute !important;
+    top: 8px !important;
+    left: 8px !important;
+    background: rgba(100, 116, 139, 0.78) !important;
+    color: #FFFFFF !important;
+    font-size: 16px !important;
+    font-weight: 800 !important;
+    padding: 3px 10px !important;
+    border-radius: 4px !important;
+    letter-spacing: -0.01em !important;
+    backdrop-filter: blur(2px) !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2) !important;
+    z-index: 2 !important;
+    pointer-events: none !important;
+}
+.pl-card-specs-box {
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding: 12px 10px !important;
+    text-align: center !important;
+    gap: 6px !important;
+    background: #FFFFFF !important;
+    height: 220px !important;
+    max-height: 220px !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+}
+.pl-card-spec-line {
+    font-size: 14.5px !important;
+    font-weight: 800 !important;
+    font-style: italic !important;
+    color: var(--price-theme-color) !important;
+    line-height: 1.35 !important;
+}
+.pl-card-spec-carton {
+    font-size: 13px !important;
+    font-weight: 700 !important;
+    font-style: italic !important;
+    color: var(--price-theme-color) !important;
+    margin-top: 1px !important;
+}
+.pl-card-price-hdr-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    background: var(--price-theme-color) !important;
+    color: #FFFFFF !important;
+    text-align: center !important;
+    border-bottom: 1.5px solid var(--price-theme-color) !important;
+}
+.pl-card-price-hdr-cell {
+    padding: 6px 10px !important;
+}
+.pl-card-price-hdr-cell:first-child {
+    border-right: 1.5px solid rgba(255, 255, 255, 0.4) !important;
+}
+.pl-price-hdr-km {
+    font-size: 15.5px !important;
+    font-weight: 800 !important;
+    line-height: 1.25 !important;
+    color: #FFFFFF !important;
+}
+.pl-price-hdr-en {
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    opacity: 0.92 !important;
+    margin-top: 1px !important;
+    color: #FFFFFF !important;
+}
+.pl-card-price-rows {
+    display: flex !important;
+    flex-direction: column !important;
+    background: #FFFFFF !important;
+}
+.pl-card-price-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    border-bottom: 1px dotted var(--price-theme-color) !important;
+    min-height: 42px !important;
+    align-items: center !important;
+}
+.pl-card-price-row:last-child {
+    border-bottom: none !important;
+}
+.pl-price-left-col {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    padding: 6px 14px !important;
+    border-right: 1px dotted var(--price-theme-color) !important;
+    box-sizing: border-box !important;
+    height: 100% !important;
+}
+.pl-price-qty-lbl {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    font-style: italic !important;
+    color: #1E293B !important;
+}
+.pl-price-qty-num {
+    font-size: 14.5px !important;
+    font-weight: 900 !important;
+    font-style: italic !important;
+    color: #0F172A !important;
+}
+.pl-price-tot-val {
+    font-size: 15px !important;
+    font-weight: 900 !important;
+    font-style: italic !important;
+    color: #16A34A !important;
+    white-space: nowrap !important;
+    margin-left: 8px !important;
+}
+.pl-price-right-col {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 6px 12px !important;
+    text-align: center !important;
+    height: 100% !important;
+}
+.pl-price-unit-val {
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    font-style: italic !important;
+    color: var(--price-theme-color) !important;
+    white-space: nowrap !important;
+}
+@media (max-width: 768px) {
+    .pl-cards-grid {
+        grid-template-columns: 1fr !important;
+    }
+}
+</style>
 <div class="price-list-page" id="priceListPage">
 
     <!-- Top Header Bar -->
@@ -1271,7 +1533,7 @@ function buildCardHtml(item) {
     const badgeHtml = item.badge ? `<div class="pl-card-size-badge">${escapeHtml(item.badge)}</div>` : '';
 
     const imgHtml = item.image_url 
-        ? `<img src="${escapeHtml(item.image_url)}" class="pl-card-img" alt="${escapeHtml(item.name)}" loading="lazy">`
+        ? `<img src="${escapeHtml(item.image_url)}" class="pl-card-img" style="max-height: 204px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto;" alt="${escapeHtml(item.name)}" loading="lazy">`
         : `<div class="pl-card-no-img">
              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
              <span style="font-size: 11px; margin-top: 4px; color: #94A3B8;">No Image</span>
@@ -1288,7 +1550,7 @@ function buildCardHtml(item) {
             <!-- Card Header Grid: Product Title & Detail (Dark Navy #3B4B64) -->
             <div class="pl-card-header-grid">
                 <div class="pl-card-header-left">
-                    <div class="pl-card-title-km font-khmer">${escapeHtml(c.khmer_name || item.name)}</div>
+                    <div class="pl-card-title-km font-khmer">${escapeHtml(item.name || c.khmer_name)}</div>
                     <div class="pl-card-title-uom font-khmer">${escapeHtml(item.uom || 'កេស')}</div>
                 </div>
                 <div class="pl-card-header-right">
@@ -1298,12 +1560,12 @@ function buildCardHtml(item) {
             </div>
 
             <!-- Upper Body Grid: Picture (Left) & Specs (Right) -->
-            <div class="pl-card-upper-grid">
-                <div class="pl-card-image-box">
+            <div class="pl-card-upper-grid" style="height: 220px; max-height: 220px; overflow: hidden;">
+                <div class="pl-card-image-box" style="height: 220px; max-height: 220px; overflow: hidden; display: flex; align-items: center; justify-content: center; position: relative;">
                     ${badgeHtml}
                     ${imgHtml}
                 </div>
-                <div class="pl-card-specs-box">
+                <div class="pl-card-specs-box" style="height: 220px; max-height: 220px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center;">
                     <div class="pl-card-spec-line">ទំហំ: ${escapeHtml(c.dim_str || '21cm x 21cm x 4cm')}</div>
                     <div class="pl-card-spec-line font-khmer">1 កេស មាន ${Number(c.packs_per_case || 10)} ដុំ</div>
                     <div class="pl-card-spec-line font-khmer">1 ដុំ មាន ${Number(c.pcs_per_pack || 50)} ប្រអប់</div>
