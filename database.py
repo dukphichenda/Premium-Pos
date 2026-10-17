@@ -433,6 +433,52 @@ def resync_all_sequences(cur=None):
         with get_db_cursor(commit=True) as c:
             _resync(c)
 
+def sync_customers_from_latest_orders(cur=None, customer_ids=None):
+    """
+    Synchronizes customer profile information (phone, address, contact name, city)
+    from their latest sales order bill while preserving the customer name and order-level data.
+    """
+    def _sync(c):
+        where_clause = "WHERE customer_id IS NOT NULL"
+        params = []
+        if customer_ids is not None:
+            clean_ids = [int(cid) for cid in customer_ids if cid]
+            if not clean_ids:
+                return 0
+            where_clause += " AND customer_id = ANY(%s)"
+            params.append(clean_ids)
+
+        sql = f"""
+            UPDATE customers c
+            SET phone = CASE WHEN COALESCE(NULLIF(latest_info.phone, ''), '') != '' THEN latest_info.phone ELSE c.phone END,
+                address1 = CASE WHEN COALESCE(NULLIF(latest_info.address, ''), '') != '' THEN latest_info.address ELSE c.address1 END,
+                shipping_address = CASE WHEN COALESCE(NULLIF(latest_info.address, ''), '') != '' THEN latest_info.address ELSE c.shipping_address END,
+                billing_address = CASE WHEN COALESCE(NULLIF(latest_info.address, ''), '') != '' THEN latest_info.address ELSE c.billing_address END,
+                contact_name = CASE WHEN COALESCE(NULLIF(latest_info.contact, ''), '') != '' THEN latest_info.contact ELSE c.contact_name END,
+                city = CASE WHEN COALESCE(NULLIF(latest_info.province, ''), '') != '' THEN latest_info.province ELSE c.city END,
+                updated_at = CURRENT_TIMESTAMP
+            FROM (
+                SELECT 
+                    customer_id,
+                    (ARRAY_AGG(customer_phone ORDER BY order_date DESC, id DESC) FILTER (WHERE customer_phone IS NOT NULL AND trim(customer_phone) != ''))[1] as phone,
+                    (ARRAY_AGG(customer_address ORDER BY order_date DESC, id DESC) FILTER (WHERE customer_address IS NOT NULL AND trim(customer_address) != ''))[1] as address,
+                    (ARRAY_AGG(customer_contact ORDER BY order_date DESC, id DESC) FILTER (WHERE customer_contact IS NOT NULL AND trim(customer_contact) != ''))[1] as contact,
+                    (ARRAY_AGG(destination_province ORDER BY order_date DESC, id DESC) FILTER (WHERE destination_province IS NOT NULL AND trim(destination_province) != ''))[1] as province
+                FROM sales_orders
+                {where_clause}
+                GROUP BY customer_id
+            ) latest_info
+            WHERE c.id = latest_info.customer_id;
+        """
+        c.execute(sql, tuple(params))
+        return c.rowcount
+
+    if cur is not None:
+        return _sync(cur)
+    else:
+        with get_db_cursor(commit=True) as c:
+            return _sync(c)
+
 def init_db():
     schema_file = os.path.join(os.path.dirname(__file__), 'schema.sql')
     if not os.path.exists(schema_file):
@@ -517,6 +563,11 @@ def init_db():
                     """, (pwd_hash, pwd_hash))
             except Exception as seed_err:
                 logger.warning(f"Initial seed records notice: {seed_err}")
+
+            try:
+                sync_customers_from_latest_orders(cur=cur)
+            except Exception as sync_err:
+                logger.warning(f"Customer latest bill sync notice: {sync_err}")
 
         conn.commit()
     logger.info("inFlow Premium PostgreSQL database schema initialized successfully.")

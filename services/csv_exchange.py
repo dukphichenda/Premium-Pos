@@ -920,13 +920,17 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 if not ord_num:
                     continue
                 row_addr, _ = resolve_csv_order_address(r, get_val_preview)
-                raw_cname = get_val_preview(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer')
+                raw_cname = get_val_preview(r, ['Customer', 'CustomerName', 'Customer Name', 'Client', 'Customer / Vendor', 'Customer/Vendor', 'Name', 'Customer Company', 'Company', 'ឈ្មោះអតិថិជន', 'អតិថិជន'], 'Walk-in Customer')
                 clean_cname = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', raw_cname).strip() or 'Walk-in Customer'
+                row_phone = get_val_preview(r, ['Phone', 'Phone Number', 'PhoneNumber', 'Telephone', 'Mobile', 'Mobile Number', 'Customer Phone', 'CustomerPhone', 'Contact Phone', 'ContactPhone', 'Tel', 'Phone 1', 'Phone1', 'MobilePhone', 'Customer Mobile', 'លេខទូរស័ព្ទ', 'ទូរស័ព្ទ'])
+                row_contact = get_val_preview(r, ['ContactName', 'Contact Name', 'Contact', 'CustomerContact', 'Customer Contact', 'Attn', 'Attention', 'អ្នកទំនាក់ទំនង', 'ឈ្មោះទំនាក់ទំនង', 'អ្នកទទួល'])
                 if ord_num not in orders_grouped:
                     orders_grouped[ord_num] = {
                         'order_number': ord_num,
                         'party_name': clean_cname,
                         'address': row_addr,
+                        'phone': row_phone,
+                        'contact_name': row_contact,
                         'order_date': get_val_preview(r, ['OrderDate', 'Order Date', 'Date'], ''),
                         'status': get_val_preview(r, ['OrderStatus', 'Order Status', 'Status', 'State'], 'OPEN').upper(),
                         'freight': clean_num_val(get_val_preview(r, ['Freight', 'Shipping Fee', 'OrderFreight', 'Shipping']), 0.0),
@@ -937,6 +941,10 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 else:
                     if not orders_grouped[ord_num].get('address') and row_addr:
                         orders_grouped[ord_num]['address'] = row_addr
+                    if not orders_grouped[ord_num].get('phone') and row_phone:
+                        orders_grouped[ord_num]['phone'] = row_phone
+                    if not orders_grouped[ord_num].get('contact_name') and row_contact:
+                        orders_grouped[ord_num]['contact_name'] = row_contact
                     if (not orders_grouped[ord_num].get('party_name') or orders_grouped[ord_num].get('party_name') == 'Walk-in Customer') and clean_cname != 'Walk-in Customer':
                         orders_grouped[ord_num]['party_name'] = clean_cname
                 item_code = get_val_preview(r, ['ItemCode', 'Item Code', 'SKU', 'Product Code', 'ItemNumber', 'Code'])
@@ -1350,13 +1358,13 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 continue
 
             row_addr, row_prov = resolve_csv_order_address(r, get_val)
-            raw_cname = get_val(r, ['Customer', 'CustomerName', 'Customer Name', 'Client'], 'Walk-in Customer')
+            raw_cname = get_val(r, ['Customer', 'CustomerName', 'Customer Name', 'Client', 'Customer / Vendor', 'Customer/Vendor', 'Name', 'Customer Company', 'Company', 'ឈ្មោះអតិថិជន', 'អតិថិជន'], 'Walk-in Customer')
             clean_cname = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', raw_cname).strip() or 'Walk-in Customer'
-            row_contact = get_val(r, ['ContactName', 'Contact Name', 'Contact'])
-            row_phone = get_val(r, ['Phone', 'Telephone', 'Mobile', 'Customer Phone'])
-            row_email = get_val(r, ['Email', 'Email Address'])
-            row_city = get_val(r, ['ShippingCity', 'BillingCity', 'City'])
-            row_country = get_val(r, ['ShippingCountry', 'BillingCountry', 'Country'], 'Cambodia')
+            row_contact = get_val(r, ['ContactName', 'Contact Name', 'Contact', 'CustomerContact', 'Customer Contact', 'Attn', 'Attention', 'អ្នកទំនាក់ទំនង', 'ឈ្មោះទំនាក់ទំនង', 'អ្នកទទួល'])
+            row_phone = get_val(r, ['Phone', 'Phone Number', 'PhoneNumber', 'Telephone', 'Mobile', 'Mobile Number', 'Customer Phone', 'CustomerPhone', 'Contact Phone', 'ContactPhone', 'Tel', 'Phone 1', 'Phone1', 'MobilePhone', 'Customer Mobile', 'លេខទូរស័ព្ទ', 'ទូរស័ព្ទ'])
+            row_email = get_val(r, ['Email', 'Email Address', 'Customer Email', 'CustomerEmail', 'E-mail'])
+            row_city = get_val(r, ['ShippingCity', 'BillingCity', 'City', 'Town', 'ខេត្ត/ក្រុង', 'ក្រុង', 'ខេត្ត'])
+            row_country = get_val(r, ['ShippingCountry', 'BillingCountry', 'Country', 'ប្រទេស'], 'Cambodia')
 
             if so_num not in orders_map:
                 orders_map[so_num] = {
@@ -1447,10 +1455,11 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
         batch_count = 0
         total_orders = len(orders_map)
+        affected_customer_ids = set()
         with get_db_cursor(commit=True) as cur:
             for so_num, order_data in orders_map.items():
                 batch_count += 1
-                # Customer handling
+                # Customer handling - Always keep customer name the same
                 cust_name = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', (order_data['customer_name'] or 'Walk-in Customer')).strip() or 'Walk-in Customer'
                 cn_clean = cust_name.lower()
                 so_addr = (order_data.get('address') or '').strip()
@@ -1460,25 +1469,6 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
                 if cn_clean in cust_map:
                     cust_id = cust_map[cn_clean]
-                    # Backfill existing customer with address/contact/phone if missing
-                    cur.execute("""
-                        UPDATE customers
-                        SET address1 = CASE WHEN (address1 IS NULL OR trim(address1) = '') AND %s != '' THEN %s ELSE address1 END,
-                            shipping_address = CASE WHEN (shipping_address IS NULL OR trim(shipping_address) = '') AND %s != '' THEN %s ELSE shipping_address END,
-                            billing_address = CASE WHEN (billing_address IS NULL OR trim(billing_address) = '') AND %s != '' THEN %s ELSE billing_address END,
-                            contact_name = CASE WHEN (contact_name IS NULL OR trim(contact_name) = '') AND %s != '' THEN %s ELSE contact_name END,
-                            phone = CASE WHEN (phone IS NULL OR trim(phone) = '') AND %s != '' THEN %s ELSE phone END,
-                            city = CASE WHEN (city IS NULL OR trim(city) = '') AND %s != '' THEN %s ELSE city END
-                        WHERE id = %s;
-                    """, (so_addr, so_addr, so_addr, so_addr, so_addr, so_addr, so_cont, so_cont, so_ph, so_ph, so_cty, so_cty, cust_id))
-                    cached_c = cust_info_map.get(cn_clean)
-                    if cached_c:
-                        if not cached_c.get('default_addr') and so_addr:
-                            cached_c['default_addr'] = so_addr
-                        if not cached_c.get('contact_name') and so_cont:
-                            cached_c['contact_name'] = so_cont
-                        if not cached_c.get('phone') and so_ph:
-                            cached_c['phone'] = so_ph
                 else:
                     cur.execute("""
                         INSERT INTO customers (name, contact_name, phone, email, address1, shipping_address, billing_address, city, country, payment_terms, branch_id, is_active)
@@ -1495,6 +1485,8 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                         'phone': order_data['phone'],
                         'default_addr': order_data['address']
                     }
+
+                affected_customer_ids.add(cust_id)
 
                 # Location handling
                 loc_id = None
@@ -1741,6 +1733,12 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 if batch_count % BATCH_SIZE == 0:
                     cur.connection.commit()
                     logger.info(f"Sales order import progress: {batch_count}/{total_orders} orders committed.")
+
+            # Automatically update customer profile information based on their latest bill
+            if affected_customer_ids:
+                from database import sync_customers_from_latest_orders
+                sync_count = sync_customers_from_latest_orders(cur=cur, customer_ids=affected_customer_ids)
+                logger.info(f"Synchronized customer profile info from latest bill for {sync_count} customers.")
 
             # Automatically resynchronize sequences after importing sales orders
             resync_all_sequences(cur=cur)

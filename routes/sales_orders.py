@@ -2361,15 +2361,8 @@ def save_order(id=0):
                 """, (customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, branch_id, carrier or None, package_count, cod_amount, id))
 
             if customer_id:
-                cur.execute("""
-                    UPDATE customers
-                    SET address1 = CASE WHEN (address1 IS NULL OR address1 = '') THEN %s ELSE address1 END,
-                        shipping_address = CASE WHEN (shipping_address IS NULL OR shipping_address = '') THEN %s ELSE shipping_address END,
-                        contact_name = CASE WHEN (contact_name IS NULL OR contact_name = '') THEN %s ELSE contact_name END,
-                        phone = CASE WHEN (phone IS NULL OR phone = '') THEN %s ELSE phone END,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                """, (customer_address or None, customer_address or None, customer_contact or None, customer_phone or None, customer_id))
+                from database import sync_customers_from_latest_orders
+                sync_customers_from_latest_orders(cur=cur, customer_ids=[customer_id])
 
             if lines_data is not None and isinstance(lines_data, list):
                 cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = %s", (id,))
