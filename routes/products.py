@@ -1771,6 +1771,9 @@ def create_product():
         """, (new_id, name, sku, cost_price, default_price))
 
         flash(f"Product '{name}' ({sku}) created successfully!", "success")
+        next_url = request.form.get('next_url')
+        if next_url:
+            return redirect(next_url)
         if request.form.get('save_and_close') == '1':
             return redirect(url_for('products.list_products'))
         active_tab = request.form.get('active_tab', '')
@@ -2085,6 +2088,9 @@ def edit_product(id):
         """, (id, max_ver + 1, name, sku, cost_price, sell_price))
 
         flash("Product saved successfully!", "success")
+        next_url = request.form.get('next_url')
+        if next_url:
+            return redirect(next_url)
         if request.form.get('save_and_close') == '1':
             return redirect(url_for('products.list_products'))
         active_tab = request.form.get('active_tab', '')

@@ -42,6 +42,7 @@
                         <rect x="4.5" y="8.5" width="7" height="4.5" rx="0.5" fill="#FFFFFF"/>
                     </svg>
                     <span>Save</span>
+                    <span id="btnSaveDot" class="inflow-unsaved-dot" style="display: none; width: 6px; height: 6px; border-radius: 50%; background: #F59E0B; margin-left: 3px;"></span>
                 </button>
 
                 <span class="inflow-tb-sep">|</span>
@@ -101,7 +102,7 @@
                 <a href="{{ url_for('products.list_products') }}" class="inflow-tb-btn" style="color: #64748B;">
                     <span>← Product List</span>
                 </a>
-                <button type="button" class="inflow-tb-btn" onclick="if(window.top.inflowMdi){ window.top.inflowMdi.closeActiveTab(); } else { window.location.href='{{ url_for('products.list_products') }}'; }" style="color: #DC2626; font-weight: 600;" title="Close this tab">
+                <button type="button" class="inflow-tb-btn" onclick="closeProductDetailView()" style="color: #DC2626; font-weight: 600;" title="Close this tab">
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     <span>Close</span>
                 </button>
@@ -1061,6 +1062,31 @@
     </form>
 </div>
 
+<!-- Modal: Unsaved Changes Confirmation (inFlow Style) for detail.html -->
+<div class="modal-overlay" id="unsavedChangesModalDetail" style="display: none; z-index: 99999;">
+    <div class="modal-dialog" style="max-width: 440px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; padding: 0;">
+        <div class="modal-header" style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                </svg>
+                <h2 class="modal-title" style="font-size: 14.5px; font-weight: 700; color: #0F172A; margin: 0;">Unsaved Changes</h2>
+            </div>
+            <button class="modal-close" type="button" onclick="closeUnsavedModalDetail()" style="border: none; background: transparent; font-size: 20px; line-height: 1; cursor: pointer; color: #64748B;">×</button>
+        </div>
+        <div style="padding: 20px 20px 22px 20px; font-size: 13.5px; color: #334155; line-height: 1.55;">
+            You have unsaved changes to <strong style="color: #0F172A;">{{ product.name if (not is_new and product) else 'this product' }}</strong>. Do you want to save your changes before leaving?
+        </div>
+        <div class="modal-footer" style="background: #F8FAFC; border-top: 1px solid #E2E8F0; padding: 12px 18px; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="btn btn-secondary" style="font-size: 12.5px; padding: 6px 14px; font-weight: 500;" onclick="closeUnsavedModalDetail()">Cancel</button>
+            <button type="button" class="btn" style="background: #EF4444; color: #FFF; border: none; font-size: 12.5px; padding: 6px 14px; font-weight: 600; border-radius: 4px; cursor: pointer;" onclick="discardAndNavigateDetail()">Don't Save</button>
+            <button type="button" class="btn btn-primary" style="background: #0284C7; color: #FFF; border: none; font-size: 12.5px; padding: 6px 16px; font-weight: 600; border-radius: 4px; cursor: pointer;" onclick="saveAndNavigateDetail()">Save &amp; Continue</button>
+        </div>
+    </div>
+</div>
+
 <!-- Modal: Version History -->
 <div class="modal-overlay" id="versionHistoryModal">
     <div class="modal-dialog" style="max-width: 760px;">
@@ -1742,6 +1768,155 @@ function selectInflowRow(row) {
     if (arrow) arrow.innerText = '▶';
 }
 
+let isDirtyDetail = false;
+let targetNavigationUrlDetail = null;
+
+function markDetailDirty() {
+    isDirtyDetail = true;
+    const dot = document.getElementById('btnSaveDot');
+    if (dot) dot.style.display = 'inline-block';
+    const btn = document.getElementById('btnSaveProduct');
+    if (btn) btn.classList.add('active');
+}
+
+function clearDetailDirty() {
+    isDirtyDetail = false;
+    const dot = document.getElementById('btnSaveDot');
+    if (dot) dot.style.display = 'none';
+    const btn = document.getElementById('btnSaveProduct');
+    if (btn) btn.classList.remove('active');
+}
+
+function openUnsavedModalDetail() {
+    const modal = document.getElementById('unsavedChangesModalDetail');
+    if (modal) {
+        modal.classList.add('active');
+        modal.style.display = 'flex';
+    }
+}
+
+function closeUnsavedModalDetail() {
+    const modal = document.getElementById('unsavedChangesModalDetail');
+    if (modal) {
+        modal.classList.remove('active');
+        modal.style.display = 'none';
+    }
+}
+
+function discardAndNavigateDetail() {
+    isDirtyDetail = false;
+    closeUnsavedModalDetail();
+    proceedNavigationDetail();
+}
+
+function saveAndNavigateDetail() {
+    isDirtyDetail = false;
+    closeUnsavedModalDetail();
+    const form = document.getElementById('productMainForm');
+    if (form) {
+        if (targetNavigationUrlDetail) {
+            if (targetNavigationUrlDetail === '__CLOSE__') {
+                const closeInp = document.getElementById('saveAndCloseInput');
+                if (closeInp) closeInp.value = '1';
+            } else {
+                let nextInput = document.getElementById('nextUrlInput');
+                if (!nextInput) {
+                    nextInput = document.createElement('input');
+                    nextInput.type = 'hidden';
+                    nextInput.name = 'next_url';
+                    nextInput.id = 'nextUrlInput';
+                    form.appendChild(nextInput);
+                }
+                nextInput.value = targetNavigationUrlDetail;
+            }
+        }
+        form.submit();
+    }
+}
+
+function proceedNavigationDetail() {
+    if (!targetNavigationUrlDetail) return;
+    const url = targetNavigationUrlDetail;
+    targetNavigationUrlDetail = null;
+
+    if (url === '__CLOSE__') {
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.closeActiveTab();
+        } else {
+            window.location.href = "{{ url_for('products.list_products') }}";
+        }
+    } else {
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(url);
+        } else {
+            window.location.href = url;
+        }
+    }
+}
+
+function closeProductDetailView() {
+    if (isDirtyDetail) {
+        targetNavigationUrlDetail = '__CLOSE__';
+        openUnsavedModalDetail();
+        return;
+    }
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.closeActiveTab();
+    } else {
+        window.location.href = "{{ url_for('products.list_products') }}";
+    }
+}
+
+window.handleTabCloseAttempt = function(targetUrl) {
+    if (!isDirtyDetail) return true;
+    targetNavigationUrlDetail = targetUrl || '__CLOSE__';
+    openUnsavedModalDetail();
+    return false;
+};
+
+// Intercept all document navigation links when dirty in detail.html
+document.addEventListener('click', function(e) {
+    if (!isDirtyDetail) return;
+    if (e.target.closest('#unsavedChangesModalDetail') || e.target.closest('.modal-overlay')) return;
+    if (e.target.closest('#btnSaveProduct')) return;
+
+    const link = e.target.closest('a');
+    if (!link) return;
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('javascript:') || href.startsWith('#')) return;
+    if (link.target === '_blank' || link.hasAttribute('download')) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    targetNavigationUrlDetail = href;
+    openUnsavedModalDetail();
+}, true);
+
+// Browser unload prompt
+window.addEventListener('beforeunload', function(e) {
+    if (isDirtyDetail) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes.';
+        return e.returnValue;
+    }
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('productMainForm');
+    if (form) {
+        form.addEventListener('input', function(e) {
+            markDetailDirty();
+        });
+        form.addEventListener('change', function(e) {
+            markDetailDirty();
+        });
+        form.addEventListener('submit', function() {
+            isDirtyDetail = false;
+        });
+    }
+});
+
 // Picture live preview & clear
 function previewSelectedImage(input) {
     if (input.files && input.files[0]) {
@@ -1753,6 +1928,7 @@ function previewSelectedImage(input) {
             preview.style.display = 'block';
             placeholder.style.display = 'none';
             document.getElementById('clearPictureFlag').value = '0';
+            markDetailDirty();
         };
         reader.readAsDataURL(input.files[0]);
     }
@@ -1766,6 +1942,7 @@ function clearProductPhoto() {
     preview.src = '';
     preview.style.display = 'none';
     placeholder.style.display = 'flex';
+    markDetailDirty();
 }
 
 function setPastedImageToDetail(file) {
@@ -1796,23 +1973,7 @@ function setPastedImageToDetail(file) {
         } catch(e) {}
     }
 
-    {% if not is_new and product and product.id %}
-    // For existing product, also save immediately to server
-    const formData = new FormData();
-    const fileName = file.name || ('pasted_image_' + Date.now() + '.png');
-    formData.append('picture', file, fileName);
-    fetch('/products/{{ product.id }}/upload_picture', {
-        method: 'POST',
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data && data.success && data.image_url) {
-            if (preview) preview.src = data.image_url;
-        }
-    })
-    .catch(err => console.error('Error uploading pasted picture:', err));
-    {% endif %}
+    markDetailDirty();
 }
 
 // Global Paste Listener for Product Detail (Ctrl+V)

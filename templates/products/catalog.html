@@ -2616,6 +2616,8 @@ let isDirty = false;
 let pendingChanges = {};
 let pendingPrices = {};
 let targetNavigationUrl = null;
+let stagedProductImageFile = null;
+let originalProductImageUrl = {{ (product.image_url or '')|tojson|safe }};
 
 function setDirtyState(dirty) {
     isDirty = dirty;
@@ -2648,7 +2650,7 @@ function markPriceDirty(schemeId, val) {
 }
 
 function saveProductChanges(callback) {
-    if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0) {
+    if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0 && !stagedProductImageFile) {
         if (typeof callback === 'function') callback(true);
         return;
     }
@@ -2659,19 +2661,15 @@ function saveProductChanges(callback) {
 
     if (text) text.innerText = 'Saving...';
 
-    const payload = Object.assign({}, pendingChanges);
-    if (Object.keys(pendingPrices).length > 0) {
-        payload.prices = Object.assign({}, pendingPrices);
-    }
+    // Helper to send pending scalar changes and prices via update_ajax
+    function sendFieldUpdates() {
+        const payload = Object.assign({}, pendingChanges);
+        if (Object.keys(pendingPrices).length > 0) {
+            payload.prices = Object.assign({}, pendingPrices);
+        }
 
-    fetch('/products/' + CURRENT_PRODUCT_ID + '/update_ajax', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
+        // If no pending scalar/price updates, finalize save state
+        if (Object.keys(payload).length === 0) {
             isDirty = false;
             pendingChanges = {};
             pendingPrices = {};
@@ -2682,35 +2680,6 @@ function saveProductChanges(callback) {
             if (text) text.innerText = 'Saved ✓';
             if (dot) dot.style.display = 'none';
 
-            if (payload.category_id !== undefined) {
-                const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
-                if (curItem) {
-                    curItem.setAttribute('data-category-id', payload.category_id || '');
-                }
-            }
-
-            if (payload.name) {
-                const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
-                if (curItem) {
-                    curItem.setAttribute('data-name', payload.name.toLowerCase());
-                    const curTitle = curItem.querySelector('.inflow-catalog-item-title');
-                    if (curTitle) curTitle.innerText = payload.name;
-                }
-                const unsavedTitle = document.getElementById('unsavedProductName');
-                if (unsavedTitle) unsavedTitle.innerText = payload.name;
-            }
-
-            if (payload.sku) {
-                const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
-                if (curItem) {
-                    curItem.setAttribute('data-sku', payload.sku.toLowerCase());
-                    const curSku = curItem.querySelector('.inflow-catalog-item-sku');
-                    if (curSku) curSku.innerText = payload.sku;
-                }
-            }
-
-            applyAllFilters();
-
             setTimeout(() => {
                 if (!isDirty && btn) {
                     btn.classList.remove('saved');
@@ -2719,18 +2688,129 @@ function saveProductChanges(callback) {
             }, 2500);
 
             if (typeof callback === 'function') callback(true);
-        } else {
-            alert('Failed to save changes: ' + (data.message || 'Unknown error'));
+            return;
+        }
+
+        fetch('/products/' + CURRENT_PRODUCT_ID + '/update_ajax', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                isDirty = false;
+                pendingChanges = {};
+                pendingPrices = {};
+                if (btn) {
+                    btn.classList.remove('active');
+                    btn.classList.add('saved');
+                }
+                if (text) text.innerText = 'Saved ✓';
+                if (dot) dot.style.display = 'none';
+
+                if (payload.category_id !== undefined) {
+                    const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
+                    if (curItem) {
+                        curItem.setAttribute('data-category-id', payload.category_id || '');
+                    }
+                }
+
+                if (payload.name) {
+                    const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
+                    if (curItem) {
+                        curItem.setAttribute('data-name', payload.name.toLowerCase());
+                        const curTitle = curItem.querySelector('.inflow-catalog-item-title');
+                        if (curTitle) curTitle.innerText = payload.name;
+                    }
+                    const unsavedTitle = document.getElementById('unsavedProductName');
+                    if (unsavedTitle) unsavedTitle.innerText = payload.name;
+                }
+
+                if (payload.sku) {
+                    const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
+                    if (curItem) {
+                        curItem.setAttribute('data-sku', payload.sku.toLowerCase());
+                        const curSku = curItem.querySelector('.inflow-catalog-item-sku');
+                        if (curSku) curSku.innerText = payload.sku;
+                    }
+                }
+
+                applyAllFilters();
+
+                setTimeout(() => {
+                    if (!isDirty && btn) {
+                        btn.classList.remove('saved');
+                        if (text) text.innerText = 'Save';
+                    }
+                }, 2500);
+
+                if (typeof callback === 'function') callback(true);
+            } else {
+                alert('Failed to save changes: ' + (data.message || 'Unknown error'));
+                if (text) text.innerText = 'Save';
+                if (typeof callback === 'function') callback(false);
+            }
+        })
+        .catch(err => {
+            console.error('Save product error:', err);
+            alert('Server error while saving product.');
             if (text) text.innerText = 'Save';
             if (typeof callback === 'function') callback(false);
-        }
-    })
-    .catch(err => {
-        console.error('Save product error:', err);
-        alert('Server error while saving product.');
-        if (text) text.innerText = 'Save';
-        if (typeof callback === 'function') callback(false);
-    });
+        });
+    }
+
+    // If there is a staged image file, upload it first to /products/<id>/upload_picture
+    if (stagedProductImageFile) {
+        const spinner = document.getElementById('catImgUploadSpinner');
+        if (spinner) spinner.style.display = 'flex';
+        if (text) text.innerText = 'Saving photo...';
+
+        const formData = new FormData();
+        const fileName = stagedProductImageFile.name || ('pasted_image_' + Date.now() + '.png');
+        formData.append('picture', stagedProductImageFile, fileName);
+
+        fetch('/products/' + CURRENT_PRODUCT_ID + '/upload_picture', {
+            method: 'POST',
+            body: formData
+        })
+        .then(res => res.json())
+        .then(imgData => {
+            if (spinner) spinner.style.display = 'none';
+            if (imgData && imgData.success && imgData.image_url) {
+                originalProductImageUrl = imgData.image_url;
+                applyProductImageUrl(imgData.image_url);
+                stagedProductImageFile = null;
+
+                // Update catalog item thumbnail in sidebar
+                const curItemThumb = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"] .inflow-catalog-item-thumb`);
+                if (curItemThumb) {
+                    let curImg = curItemThumb.querySelector('img');
+                    if (!curImg) {
+                        curItemThumb.innerHTML = `<img src="${imgData.image_url}" alt="Thumbnail">`;
+                    } else {
+                        curImg.src = imgData.image_url;
+                    }
+                }
+
+                showProductToast('Product photo saved successfully!');
+                sendFieldUpdates();
+            } else {
+                alert((imgData && imgData.message) || 'Error saving product photo.');
+                if (text) text.innerText = 'Save';
+                if (typeof callback === 'function') callback(false);
+            }
+        })
+        .catch(err => {
+            if (spinner) spinner.style.display = 'none';
+            console.error('Save product photo error:', err);
+            alert('Failed to upload image. Please try again.');
+            if (text) text.innerText = 'Save';
+            if (typeof callback === 'function') callback(false);
+        });
+    } else {
+        sendFieldUpdates();
+    }
 }
 
 function openUnsavedModal() {
@@ -2750,9 +2830,26 @@ function closeUnsavedModal() {
 }
 
 function discardAndNavigate() {
+    if (stagedProductImageFile) {
+        stagedProductImageFile = null;
+        let img = document.getElementById('catProductMainImg');
+        const card = document.getElementById('catImgCardContainer') || document.querySelector('.inflow-cat-img-card');
+        const placeholder = card ? (document.getElementById('catProductPlaceholder') || card.querySelector('.inflow-cat-main-img-placeholder')) : null;
+        if (originalProductImageUrl) {
+            if (img) {
+                img.src = originalProductImageUrl;
+                img.style.display = 'block';
+            }
+            if (placeholder) placeholder.style.display = 'none';
+        } else {
+            if (img) img.style.display = 'none';
+            if (placeholder) placeholder.style.display = 'flex';
+        }
+    }
     isDirty = false;
     pendingChanges = {};
     pendingPrices = {};
+    setDirtyState(false);
     closeUnsavedModal();
     proceedNavigation();
 }
@@ -4223,46 +4320,29 @@ function showProductToast(msg) {
     }, 3000);
 }
 
-function uploadProductImage(input, id) {
-    if (!input.files || !input.files[0]) return;
-    uploadPastedProductImage(input.files[0], id);
-}
-
-function uploadPastedProductImage(file, id) {
+function stageProductImage(file, id) {
     if (!file) return;
-    const spinner = document.getElementById('catImgUploadSpinner');
-    if (spinner) spinner.style.display = 'flex';
 
     // Instant local preview
     try {
         const localUrl = URL.createObjectURL(file);
         applyProductImageUrl(localUrl);
-    } catch(e) {}
+    } catch(e) {
+        console.error('Error creating local image preview:', e);
+    }
 
-    const formData = new FormData();
-    const fileName = file.name || ('pasted_image_' + Date.now() + '.png');
-    formData.append('picture', file, fileName);
+    stagedProductImageFile = file;
+    setDirtyState(true);
+    showProductToast('Photo updated. Click "Save" to apply changes.');
+}
 
-    fetch('/products/' + id + '/upload_picture', {
-        method: 'POST',
-        body: formData
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (spinner) spinner.style.display = 'none';
-        if (data && data.success && data.image_url) {
-            applyProductImageUrl(data.image_url);
-            showProductToast('Product photo updated successfully from clipboard!');
-        } else {
-            alert((data && data.message) || 'Error updating product photo.');
-            window.location.reload();
-        }
-    })
-    .catch(err => {
-        if (spinner) spinner.style.display = 'none';
-        console.error('Image upload error:', err);
-        alert('Failed to upload image. Please try again.');
-    });
+function uploadProductImage(input, id) {
+    if (!input.files || !input.files[0]) return;
+    stageProductImage(input.files[0], id);
+}
+
+function uploadPastedProductImage(file, id) {
+    stageProductImage(file, id);
 }
 
 // Global Paste Handler: Allow pasting image directly into product photo
@@ -4297,7 +4377,7 @@ document.addEventListener('paste', function(e) {
     e.preventDefault();
     const file = imageItem.getAsFile();
     if (file) {
-        uploadPastedProductImage(file, {{ product.id }});
+        stageProductImage(file, {{ product.id }});
     }
 });
 
@@ -4327,7 +4407,7 @@ document.addEventListener('paste', function(e) {
         if (!dt || !dt.files || !dt.files.length) return;
         const file = dt.files[0];
         if (file && file.type && file.type.startsWith('image/')) {
-            uploadPastedProductImage(file, {{ product.id }});
+            stageProductImage(file, {{ product.id }});
         }
     });
 })();
@@ -4363,6 +4443,7 @@ document.addEventListener('click', function(e) {
     if (!link) return;
     const href = link.getAttribute('href');
     if (!href || href.startsWith('javascript:') || href.startsWith('#')) return;
+    if (link.target === '_blank' || link.hasAttribute('download')) return;
 
     if (link.classList.contains('inflow-catalog-item') && link.getAttribute('data-id') == CURRENT_PRODUCT_ID) {
         e.preventDefault();
@@ -4380,8 +4461,8 @@ document.addEventListener('click', function(e) {
 window.addEventListener('beforeunload', function(e) {
     if (isDirty) {
         e.preventDefault();
-        e.returnValue = '';
-        return '';
+        e.returnValue = 'You have unsaved changes.';
+        return e.returnValue;
     }
 });
 
