@@ -113,9 +113,9 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
     saved_q2 = product.get('tier_qty_2')
     saved_q3 = product.get('tier_qty_3')
     
-    tier_qty_1 = int(saved_q1) if saved_q1 and int(saved_q1) > 0 else default_tier_1
-    tier_qty_2 = int(saved_q2) if (saved_q2 and int(saved_q2) not in (300, 0)) else default_tier_2
-    tier_qty_3 = int(saved_q3) if (saved_q3 and int(saved_q3) not in (600, 0)) else default_tier_3
+    tier_qty_1 = int(saved_q1) if (saved_q1 is not None and int(saved_q1) > 0) else default_tier_1
+    tier_qty_2 = int(saved_q2) if (saved_q2 is not None and int(saved_q2) > 0) else default_tier_2
+    tier_qty_3 = int(saved_q3) if (saved_q3 is not None and int(saved_q3) > 0) else default_tier_3
     
     # Extract Retail 1, Retail 2, Retail 3 prices
     r1_price = None
@@ -164,13 +164,13 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
     else:
         tot_price_1 = round(tier_qty_1 * u_price_1, 2)
         
-    if product.get('tier_price_2') is not None and float(product.get('tier_price_2')) > 0 and float(product.get('tier_price_2')) != 42.0:
+    if product.get('tier_price_2') is not None and float(product.get('tier_price_2')) > 0:
         tot_price_2 = float(product.get('tier_price_2'))
         u_price_2 = tot_price_2 / tier_qty_2 if tier_qty_2 > 0 else u_price_2
     else:
         tot_price_2 = round(tier_qty_2 * u_price_2, 2)
         
-    if product.get('tier_price_3') is not None and float(product.get('tier_price_3')) > 0 and float(product.get('tier_price_3')) != 81.0:
+    if product.get('tier_price_3') is not None and float(product.get('tier_price_3')) > 0:
         tot_price_3 = float(product.get('tier_price_3'))
         u_price_3 = tot_price_3 / tier_qty_3 if tier_qty_3 > 0 else u_price_3
     else:
@@ -928,7 +928,7 @@ def update_product_ajax(id):
                 elif field in ('price_decimals', 'cost_decimals', 'qty_decimals'):
                     val = int(val) if val is not None and str(val).strip() not in ('', 'None', 'null', '-1') else None
                 elif field in ('tier_qty_1', 'tier_qty_2', 'tier_qty_3'):
-                    val = int(safe_eval_math(val)) if val and str(val).strip() != '' else (100 if field == 'tier_qty_1' else (400 if field == 'tier_qty_2' else 800))
+                    val = int(safe_eval_math(val)) if val is not None and str(val).strip() not in ('', 'None', 'null') and int(safe_eval_math(val)) > 0 else None
                 elif field in ('length', 'width', 'height', 'weight', 'reorder_point', 'reorder_quantity',
                               'sales_uom_ratio', 'sales_uom_ratio_std', 'purchasing_uom_ratio', 'purchasing_uom_ratio_std',
                               'standard_cost', 'average_cost', 'default_price',
@@ -1835,9 +1835,13 @@ def edit_product(id):
             packs_per_case = round(sales_ratio / pcs_per_pack)
         else:
             packs_per_case = safe_eval_math(req_packs or prod.get('packs_per_case') or 1)
-        tier_qty_1 = int(safe_eval_math(request.form.get('tier_qty_1', prod.get('tier_qty_1') or 100)) or 100)
-        tier_qty_2 = int(safe_eval_math(request.form.get('tier_qty_2', prod.get('tier_qty_2') or 300)) or 300)
-        tier_qty_3 = int(safe_eval_math(request.form.get('tier_qty_3', prod.get('tier_qty_3') or 600)) or 600)
+        tier_qty_1 = int(safe_eval_math(request.form.get('tier_qty_1')) or 100) if request.form.get('tier_qty_1') else prod.get('tier_qty_1')
+        tier_qty_2 = int(safe_eval_math(request.form.get('tier_qty_2')) or 0) if request.form.get('tier_qty_2') else prod.get('tier_qty_2')
+        tier_qty_3 = int(safe_eval_math(request.form.get('tier_qty_3')) or 0) if request.form.get('tier_qty_3') else prod.get('tier_qty_3')
+        if tier_qty_2 == 0:
+            tier_qty_2 = None
+        if tier_qty_3 == 0:
+            tier_qty_3 = None
         if user_can_edit_prices():
             tier_price_1 = safe_eval_math(request.form.get('tier_price_1')) if request.form.get('tier_price_1') else prod.get('tier_price_1')
             tier_price_2 = safe_eval_math(request.form.get('tier_price_2')) if request.form.get('tier_price_2') else prod.get('tier_price_2')

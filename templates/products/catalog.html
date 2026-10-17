@@ -1793,10 +1793,10 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> ប្រអប់ (PCS) =
+                                <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" onchange="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> ប្រអប់ (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
-                                <input type="text" id="cardTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
+                                <input type="text" id="cardTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(1)" onchange="onCardTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
                             </span>
                         </div>
                         <div class="inflow-spec-price-right-cell">
@@ -1809,10 +1809,10 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> ប្រអប់ (PCS) =
+                                <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" onchange="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> ប្រអប់ (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
-                                <input type="text" id="cardTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
+                                <input type="text" id="cardTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(2)" onchange="onCardTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
                             </span>
                         </div>
                         <div class="inflow-spec-price-right-cell">
@@ -1825,10 +1825,10 @@
                     <div class="inflow-spec-price-row">
                         <div class="inflow-spec-price-left-cell">
                             <span class="inflow-spec-qty-label">
-                                <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> ប្រអប់ (PCS) =
+                                <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" onchange="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> ប្រអប់ (PCS) =
                             </span>
                             <span class="inflow-spec-total-price">
-                                <input type="text" id="cardTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
+                                <input type="text" id="cardTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(3)" onchange="onCardTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
                             </span>
                         </div>
                         <div class="inflow-spec-price-right-cell">
@@ -2646,6 +2646,61 @@ function markPriceDirty(schemeId, val) {
 }
 
 function saveProductChanges(callback) {
+    // Harvest any live card tier quantities and prices that user modified
+    [1, 2, 3].forEach(idx => {
+        const qEl = document.getElementById('cardTierQtyInput' + idx);
+        if (qEl && qEl.value !== '') {
+            const q = parseInt(qEl.value, 10);
+            if (!isNaN(q) && q > 0) {
+                if (pendingChanges['tier_qty_' + idx] !== undefined || String(q) !== String(qEl.defaultValue)) {
+                    pendingChanges['tier_qty_' + idx] = q;
+                    isDirty = true;
+                }
+            }
+        }
+        const tEl = document.getElementById('cardTierTotInput' + idx);
+        if (tEl && tEl.value !== '') {
+            const t = evaluateMathExpression(tEl.value);
+            if (t !== null && !isNaN(t) && t >= 0) {
+                if (pendingChanges['tier_price_' + idx] !== undefined || String(t) !== String(tEl.defaultValue)) {
+                    pendingChanges['tier_price_' + idx] = t;
+                    isDirty = true;
+                }
+            }
+        }
+    });
+
+    const packsEl = document.getElementById('packsPerCaseInput');
+    if (packsEl && packsEl.value !== '' && (pendingChanges['packs_per_case'] !== undefined || String(packsEl.value) !== String(packsEl.defaultValue))) {
+        const p = parseFloat(packsEl.value);
+        if (!isNaN(p) && p > 0) { pendingChanges['packs_per_case'] = p; isDirty = true; }
+    }
+    const pcsPackEl = document.getElementById('pcsPerPackInput');
+    if (pcsPackEl && pcsPackEl.value !== '' && (pendingChanges['pcs_per_pack'] !== undefined || String(pcsPackEl.value) !== String(pcsPackEl.defaultValue))) {
+        const p = parseFloat(pcsPackEl.value);
+        if (!isNaN(p) && p > 0) { pendingChanges['pcs_per_pack'] = p; isDirty = true; }
+    }
+    const lenEl = document.getElementById('dimLengthInput');
+    if (lenEl && lenEl.value !== '' && (pendingChanges['length'] !== undefined || String(lenEl.value) !== String(lenEl.defaultValue))) {
+        const l = parseFloat(lenEl.value);
+        if (!isNaN(l)) { pendingChanges['length'] = l; isDirty = true; }
+    }
+    const widEl = document.getElementById('dimWidthInput');
+    if (widEl && widEl.value !== '' && (pendingChanges['width'] !== undefined || String(widEl.value) !== String(widEl.defaultValue))) {
+        const w = parseFloat(widEl.value);
+        if (!isNaN(w)) { pendingChanges['width'] = w; isDirty = true; }
+    }
+    const hgtEl = document.getElementById('dimHeightInput');
+    if (hgtEl && hgtEl.value !== '' && (pendingChanges['height'] !== undefined || String(hgtEl.value) !== String(hgtEl.defaultValue))) {
+        const h = parseFloat(hgtEl.value);
+        if (!isNaN(h)) { pendingChanges['height'] = h; isDirty = true; }
+    }
+    const notesEl = document.getElementById('cardNotesInput');
+    if (notesEl && (pendingChanges['price_card_notes'] !== undefined || String(notesEl.value).trim() !== String(notesEl.defaultValue || '').trim())) {
+        pendingChanges['price_card_notes'] = notesEl.value.trim();
+        isDirty = true;
+    }
+
     if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0 && !stagedProductImageFile) {
         if (typeof callback === 'function') callback(true);
         return;
@@ -2732,6 +2787,32 @@ function saveProductChanges(callback) {
                     }
                 }
 
+                if (data.price_card) {
+                    const c = data.price_card;
+                    [1, 2, 3].forEach(idx => {
+                        const qInp = document.getElementById('cardTierQtyInput' + idx);
+                        if (qInp && c['tier_qty_' + idx] !== undefined) {
+                            qInp.value = c['tier_qty_' + idx];
+                            qInp.defaultValue = c['tier_qty_' + idx];
+                        }
+                        const tInp = document.getElementById('cardTierTotInput' + idx);
+                        if (tInp && c['tot_price_' + idx] !== undefined) {
+                            tInp.value = Number(c['tot_price_' + idx]).toFixed(2);
+                            tInp.defaultValue = Number(c['tot_price_' + idx]).toFixed(2);
+                        }
+                        const uDisp = document.getElementById('cardTierUnitDisplay' + idx);
+                        if (uDisp && c['u_price_' + idx] !== undefined) {
+                            uDisp.innerText = `(${Number(c['u_price_' + idx]).toFixed(3)} $/PCS)`;
+                        }
+                        const pQty = document.getElementById('profitTierQty' + idx);
+                        if (pQty && c['tier_qty_' + idx] !== undefined) {
+                            pQty.innerText = c['tier_qty_' + idx];
+                        }
+                    });
+                    recalcProfitTable();
+                }
+
+                showToastNotification('✅ បានរក្សាទុកដោយជោគជ័យ! (Saved successfully!)');
                 applyAllFilters();
 
                 setTimeout(() => {
@@ -4908,9 +4989,11 @@ function onPackagingChange() {
     const q3Inp = document.getElementById('cardTierQtyInput3');
     if (q2Inp) {
         q2Inp.value = Math.round(pcsPerCase);
+        markFieldDirty('tier_qty_2', Math.round(pcsPerCase));
     }
     if (q3Inp) {
         q3Inp.value = Math.round(pcsPerCase * 2);
+        markFieldDirty('tier_qty_3', Math.round(pcsPerCase * 2));
     }
     
     // Auto sync all Price per Pcs inputs
