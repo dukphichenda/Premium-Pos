@@ -30,6 +30,12 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
         # Ribbon toolbar expand button
         self.assertIn('id="soExpandTbBtn"', html)
 
+        # Mobile view controls (show bar, drawer header, backdrop, floating button)
+        self.assertIn('id="soMobileSidebarBar"', html)
+        self.assertIn('id="soMobileDrawerHeader"', html)
+        self.assertIn('id="soMobileDrawerBackdrop"', html)
+        self.assertIn('id="soMobileFloatingBtn"', html)
+
         # JS function and shortcut
         self.assertIn('function toggleSoSidebarCollapse', html)
         self.assertIn('inflow_so_sidebar_collapsed', html)
@@ -51,6 +57,12 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
 
         # Topbar expand button
         self.assertIn('id="poExpandTbBtn"', html)
+
+        # Mobile view controls (show bar, drawer header, backdrop, floating button)
+        self.assertIn('id="poMobileSidebarBar"', html)
+        self.assertIn('id="poMobileDrawerHeader"', html)
+        self.assertIn('id="poMobileDrawerBackdrop"', html)
+        self.assertIn('id="poMobileFloatingBtn"', html)
 
         # JS function and shortcut
         self.assertIn('function togglePoSidebarCollapse', html)
@@ -75,6 +87,12 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
 
         # Topbar expand button
         self.assertIn('id="productExpandTbBtn"', html)
+
+        # Mobile view controls (show bar, drawer header, backdrop, floating button)
+        self.assertIn('id="productMobileSidebarBar"', html)
+        self.assertIn('id="productMobileDrawerHeader"', html)
+        self.assertIn('id="productMobileDrawerBackdrop"', html)
+        self.assertIn('id="productMobileFloatingBtn"', html)
 
         # JS function and shortcut
         self.assertIn('function toggleProductSidebarCollapse', html)
