@@ -2154,11 +2154,25 @@ function calculateItemDetails(item) {
     const p = productsMap[item.id];
     if (!p) return { unitPrice: 0, totalPcs: 0, pcsLabel: '', lineTotal: 0 };
 
-    const packsPerCase = p.packs_per_case > 0 ? p.packs_per_case : 4;
-    const pcsPerPack = p.pcs_per_pack > 0 ? p.pcs_per_pack : 50;
-    const pcsPerCase = p.sales_uom_ratio_std > 1 ? p.sales_uom_ratio_std : (packsPerCase * pcsPerPack);
+    let pcsPerPack = parseFloat(p.pcs_per_pack) || 50;
+    if (pcsPerPack <= 0) pcsPerPack = 50;
 
-    // Pricing Scheme Resolution (Catalog price is per Case)
+    let pcsPerCase = parseFloat(p.sales_uom_ratio_std) || 0;
+    let packsPerCase = parseFloat(p.packs_per_case) || 0;
+
+    if (pcsPerCase > 1) {
+        // Product is sold in cases of multiple pieces (e.g. 500 pcs/case, 1000 pcs/case)
+        if (packsPerCase <= 0 || packsPerCase === 3 || (packsPerCase * pcsPerPack !== pcsPerCase)) {
+            packsPerCase = Math.round(pcsPerCase / pcsPerPack) || (pcsPerCase / pcsPerPack);
+        }
+    } else if (packsPerCase > 0 && pcsPerPack > 0 && packsPerCase !== 3) {
+        pcsPerCase = packsPerCase * pcsPerPack;
+    } else {
+        pcsPerCase = 1;
+        packsPerCase = 1;
+    }
+
+    // Pricing Scheme Resolution (Catalog price is per Case for case items, or per Piece for single items)
     let baseCasePrice = p.default_price || 0;
     const pid = String(item.id);
     const sid = String(item.pricingSchemeId);
@@ -2173,19 +2187,39 @@ function calculateItemDetails(item) {
     let totalPcs = item.qty;
     let pcsLabel = '';
 
-    // UOM Conversion: Default is Pack
-    if (item.uom === 'Pack') {
-        unitPrice = packsPerCase > 0 ? (baseCasePrice / packsPerCase) : baseCasePrice;
-        totalPcs = item.qty * pcsPerPack;
-        pcsLabel = `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
-    } else if (item.uom === 'Case') {
-        unitPrice = baseCasePrice;
-        totalPcs = item.qty * pcsPerCase;
-        pcsLabel = `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${pcsPerCase} pcs`;
-    } else if (item.uom === 'Pcs') {
-        unitPrice = pcsPerCase > 0 ? (baseCasePrice / pcsPerCase) : baseCasePrice;
-        totalPcs = item.qty;
-        pcsLabel = `${item.qty} pcs`;
+    if (pcsPerCase > 1) {
+        // Price per piece = Case Price / Total Pieces per case
+        const pricePerPcs = baseCasePrice / pcsPerCase;
+
+        if (item.uom === 'Pack') {
+            // Price for 1 pack = price per piece * pieces per pack (e.g. $0.10 * 50 pcs = $5.00)
+            unitPrice = pricePerPcs * pcsPerPack;
+            totalPcs = item.qty * pcsPerPack;
+            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
+        } else if (item.uom === 'Case') {
+            unitPrice = baseCasePrice;
+            totalPcs = item.qty * pcsPerCase;
+            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${pcsPerCase} pcs`;
+        } else if (item.uom === 'Pcs') {
+            unitPrice = pricePerPcs;
+            totalPcs = item.qty;
+            pcsLabel = `${item.qty} pcs`;
+        }
+    } else {
+        // Single piece item (ratio = 1)
+        if (item.uom === 'Pack') {
+            unitPrice = baseCasePrice * pcsPerPack;
+            totalPcs = item.qty * pcsPerPack;
+            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
+        } else if (item.uom === 'Case') {
+            unitPrice = baseCasePrice * (packsPerCase * pcsPerPack);
+            totalPcs = item.qty * (packsPerCase * pcsPerPack);
+            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${packsPerCase * pcsPerPack} pcs`;
+        } else if (item.uom === 'Pcs') {
+            unitPrice = baseCasePrice;
+            totalPcs = item.qty;
+            pcsLabel = `${item.qty} pcs`;
+        }
     }
 
     return {

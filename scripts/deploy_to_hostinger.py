@@ -200,21 +200,25 @@ def generate_deploy_sql():
     return '\n'.join(sql_parts), len(orders), len(lines)
 
 def deploy_to_hostinger():
+    hostinger_ip = os.environ.get('HOSTINGER_IP', sys.argv[1] if len(sys.argv) > 1 else '179.197.243.175').strip()
+    hostinger_port = os.environ.get('HOSTINGER_PORT', sys.argv[2] if len(sys.argv) > 2 else '22').strip()
+
     print("=" * 70)
-    print("  Deploying Sales Orders >= SO-022821 to Hostinger VPS (179.197.243.175)")
+    print(f"  Deploying inFlow Premium to Hostinger VPS ({hostinger_ip}:{hostinger_port})")
     print("=" * 70)
 
     print("Step 1: Generating transactional SQL patch from local database...")
     sql_content, order_count, line_count = generate_deploy_sql()
     patch_file = os.path.abspath("scratch/deploy_so_22821.sql")
+    os.makedirs(os.path.dirname(patch_file), exist_ok=True)
     with open(patch_file, "w", encoding="utf-8") as f:
         f.write(sql_content)
     print(f"  SQL patch generated: {order_count} orders, {line_count} order lines.")
 
-    print("\nStep 2: Transferring and executing SQL patch on Hostinger VPS...")
+    print(f"\nStep 2: Transferring and executing SQL patch on Hostinger VPS ({hostinger_ip})...")
     # Feed SQL script directly via SSH to psql on Hostinger
     cmd = [
-        "ssh", "-o", "BatchMode=yes", "root@179.197.243.175",
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-p", hostinger_port, f"root@{hostinger_ip}",
         "sudo -u postgres psql -d inflow_premium"
     ]
     p = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding='utf-8')
@@ -225,9 +229,9 @@ def deploy_to_hostinger():
     else:
         print("  [OK] Database patch applied successfully on Hostinger!")
 
-    print("\nStep 3: Pulling latest application code on Hostinger VPS...")
+    print(f"\nStep 3: Pulling latest application code on Hostinger VPS ({hostinger_ip})...")
     git_pull_cmd = [
-        "ssh", "-o", "BatchMode=yes", "root@179.197.243.175",
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-p", hostinger_port, f"root@{hostinger_ip}",
         "cd /var/www/inflow && git pull origin main"
     ]
     res = subprocess.run(git_pull_cmd, capture_output=True, text=True, encoding='utf-8')
@@ -235,7 +239,7 @@ def deploy_to_hostinger():
 
     print("\nStep 4: Ensuring permissions and restarting 'inflow' systemd service...")
     restart_cmd = [
-        "ssh", "-o", "BatchMode=yes", "root@179.197.243.175",
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-p", hostinger_port, f"root@{hostinger_ip}",
         "chown -R www-data:www-data /var/www/inflow && systemctl restart inflow && systemctl is-active inflow"
     ]
     res_svc = subprocess.run(restart_cmd, capture_output=True, text=True, encoding='utf-8')
@@ -243,7 +247,7 @@ def deploy_to_hostinger():
 
     print("\nStep 5: Verifying orders >= SO-022820 on Hostinger database...")
     verify_cmd = [
-        "ssh", "-o", "BatchMode=yes", "root@179.197.243.175",
+        "ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=10", "-p", hostinger_port, f"root@{hostinger_ip}",
         "sudo -u postgres psql -d inflow_premium -c \"SELECT order_number, status, payment_status, total_amount, balance_due, (SELECT count(*) FROM sales_order_lines WHERE sales_order_id = sales_orders.id) as lines FROM sales_orders WHERE order_number >= 'SO-022820' ORDER BY order_number;\""
     ]
     res_verify = subprocess.run(verify_cmd, capture_output=True, text=True, encoding='utf-8')

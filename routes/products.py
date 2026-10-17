@@ -1484,7 +1484,7 @@ def new_product():
         'width': None,
         'height': None,
         'weight': None,
-        'packs_per_case': 3,
+        'packs_per_case': 10,
         'pcs_per_pack': 50,
         'price_decimals': None,
         'cost_decimals': None,
@@ -1829,8 +1829,15 @@ def edit_product(id):
         weight_val = safe_eval_math(request.form.get('weight')) if request.form.get('weight') else prod.get('weight')
         remarks = request.form.get('remarks', prod.get('remarks') or '').strip() if 'remarks' in request.form else prod.get('remarks')
 
-        packs_per_case = safe_eval_math(request.form.get('packs_per_case', prod.get('packs_per_case') or 3))
         pcs_per_pack = safe_eval_math(request.form.get('pcs_per_pack', prod.get('pcs_per_pack') or 50))
+        sales_ratio = safe_eval_math(request.form.get('sales_uom_ratio_std', prod.get('sales_uom_ratio_std') or 1))
+        req_packs = request.form.get('packs_per_case')
+        if req_packs and safe_eval_math(req_packs) > 0 and safe_eval_math(req_packs) != 3:
+            packs_per_case = safe_eval_math(req_packs)
+        elif sales_ratio > 1 and pcs_per_pack > 0:
+            packs_per_case = round(sales_ratio / pcs_per_pack)
+        else:
+            packs_per_case = safe_eval_math(req_packs or prod.get('packs_per_case') or 1)
         tier_qty_1 = int(safe_eval_math(request.form.get('tier_qty_1', prod.get('tier_qty_1') or 100)) or 100)
         tier_qty_2 = int(safe_eval_math(request.form.get('tier_qty_2', prod.get('tier_qty_2') or 300)) or 300)
         tier_qty_3 = int(safe_eval_math(request.form.get('tier_qty_3', prod.get('tier_qty_3') or 600)) or 600)
