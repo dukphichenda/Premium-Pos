@@ -1562,7 +1562,7 @@
                 <!-- Warehouse Selector (STM Warehouse Default) -->
                 <div class="pos-wh-selector-pill" title="Stock Location / Fulfillment Warehouse">
                     <span class="pos-wh-label">
-                        <span>🏬</span> WH:
+                        <span>🏬</span> <span class="pos-wh-text">WH:</span>
                     </span>
                     <select id="posWhSelector" class="pos-wh-select" onchange="onWarehouseChange(this.value)">
                         {% for wh in warehouses %}
@@ -1723,7 +1723,7 @@
 
                     <button type="button" class="pos-btn-add" 
                             onclick="addToCart({{ p.id }}, '{{ p.name|replace('\'', '\\\'') }}', {{ p.default_price or 0 }}, '{{ p.image_url or '' }}', {{ stock }})">
-                        <span>+</span> Add to Billing
+                        <span>+</span> <span class="pos-btn-add-label">Add to Billing</span>
                     </button>
                 </div>
 
@@ -2251,6 +2251,7 @@ const customersList = [
 
 // POS State Variables
 let currentCategory = 'all';
+let currentCategoryName = 'All Products';
 let currentSort = 'az';
 let currentSearch = '';
 let selectedPaymentMethod = 'Cash';
@@ -2271,15 +2272,26 @@ function onWarehouseChange(whId) {
 // -------------------------------------------------------------------------
 function selectCategory(catId, catName) {
     currentCategory = catId;
+    currentCategoryName = catName || 'All Products';
     document.querySelectorAll('.pos-cat-card').forEach(el => el.classList.remove('active'));
     const targetCard = document.getElementById(catId === 'all' ? 'catCard-all' : `catCard-${catId}`);
     if (targetCard) targetCard.classList.add('active');
 
-    const titleEl = document.getElementById('posMenuTitle');
-    if (titleEl) {
-        titleEl.textContent = catId === 'all' ? 'All Products Menu' : `${catName} Menu`;
-    }
+    updatePosMenuTitle();
     applyFiltersAndSort();
+}
+
+function updatePosMenuTitle() {
+    const titleEl = document.getElementById('posMenuTitle');
+    if (!titleEl) return;
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
+    if (currentCategory === 'all') {
+        titleEl.textContent = isKm ? 'បញ្ជីមុខទំនិញទាំងអស់' : 'All Products Menu';
+    } else {
+        const cat = currentCategoryName || '';
+        const kmCat = (typeof INFLOW_I18N_KM !== 'undefined' && INFLOW_I18N_KM[cat]) ? INFLOW_I18N_KM[cat] : cat;
+        titleEl.textContent = isKm ? `បញ្ជីមុខទំនិញ ${kmCat}` : `${cat} Menu`;
+    }
 }
 
 function resetToAllCategory() {
@@ -2368,8 +2380,9 @@ function renderCustomerList(q) {
         return name.includes(q) || phone.includes(q);
     });
 
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
     if (filtered.length === 0) {
-        listEl.innerHTML = `<div style="padding: 10px; font-size: 11.5px; color: #94A3B8; text-align: center;">No customer found</div>`;
+        listEl.innerHTML = `<div style="padding: 10px; font-size: 11.5px; color: #94A3B8; text-align: center;">${isKm ? 'រកមិនឃើញអតិថិជនទេ' : 'No customer found'}</div>`;
         return;
     }
 
@@ -2410,7 +2423,8 @@ function selectCustomer(custId) {
 function selectWalkinCustomer() {
     selectedCustomer = null;
     document.getElementById('posCustomerSelect').value = '';
-    document.getElementById('posCustSelectedName').textContent = 'Walk-in Customer (អតិថិជនទូទៅ)';
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
+    document.getElementById('posCustSelectedName').textContent = isKm ? 'អតិថិជនទូទៅ (Walk-in Customer)' : 'Walk-in Customer (អតិថិជនទូទៅ)';
     document.getElementById('btnQuickWalkin')?.classList.add('active');
     document.getElementById('posCustDropdown').style.display = 'none';
 }
@@ -2437,8 +2451,9 @@ function onDirectItemSearch(val) {
         return name.includes(q) || sku.includes(q) || barcode.includes(q);
     }).slice(0, 8); // Top 8 matches
 
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
     if (matched.length === 0) {
-        resultsEl.innerHTML = `<div style="padding: 10px; font-size: 12px; color: #94A3B8; text-align: center;">No matching product found</div>`;
+        resultsEl.innerHTML = `<div style="padding: 10px; font-size: 12px; color: #94A3B8; text-align: center;">${isKm ? 'រកមិនឃើញទំនិញដែលត្រូវគ្នាទេ' : 'No matching product found'}</div>`;
         resultsEl.style.display = 'flex';
         return;
     }
@@ -2456,11 +2471,11 @@ function onDirectItemSearch(val) {
             </div>
             <div style="flex: 1; min-width: 0;">
                 <div style="font-size: 12px; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="font-khmer">${escapeHtml(p.name)}</div>
-                <div style="font-size: 10.5px; color: #64748B;">SKU: ${escapeHtml(p.sku || '-')} | Stock: ${p.stock_qty}</div>
+                <div style="font-size: 10.5px; color: #64748B;">${isKm ? 'កូដ: ' : 'SKU: '}${escapeHtml(p.sku || '-')} | ${isKm ? 'ស្តុក: ' : 'Stock: '}${p.stock_qty}</div>
             </div>
             <div style="text-align: right; flex-shrink: 0;">
                 <div style="font-size: 12px; font-weight: 800; color: #0F172A;">$${(p.default_price || 0).toFixed(2)}</div>
-                <div style="font-size: 10px; color: #059669; font-weight: 700;">+ Add</div>
+                <div style="font-size: 10px; color: #059669; font-weight: 700;">${isKm ? '+ បញ្ចូល' : '+ Add'}</div>
             </div>
         </div>`;
     });
@@ -2545,6 +2560,7 @@ function calculateItemDetails(item) {
     let unitPrice = baseCasePrice;
     let totalPcs = item.qty;
     let pcsLabel = '';
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
 
     if (pcsPerCase > 1) {
         // Price per piece = Case Price / Total Pieces per case
@@ -2554,30 +2570,30 @@ function calculateItemDetails(item) {
             // Price for 1 pack = price per piece * pieces per pack (e.g. $0.10 * 50 pcs = $5.00)
             unitPrice = pricePerPcs * pcsPerPack;
             totalPcs = item.qty * pcsPerPack;
-            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
+            pcsLabel = isKm ? `${item.qty} កញ្ចប់ × ${pcsPerPack} ដុំ` : `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
         } else if (item.uom === 'Case') {
             unitPrice = baseCasePrice;
             totalPcs = item.qty * pcsPerCase;
-            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${pcsPerCase} pcs`;
+            pcsLabel = isKm ? `${item.qty} កេស × ${pcsPerCase} ដុំ` : `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${pcsPerCase} pcs`;
         } else if (item.uom === 'Pcs') {
             unitPrice = pricePerPcs;
             totalPcs = item.qty;
-            pcsLabel = `${item.qty} pcs`;
+            pcsLabel = isKm ? `${item.qty} ដុំ` : `${item.qty} pcs`;
         }
     } else {
         // Single piece item (ratio = 1)
         if (item.uom === 'Pack') {
             unitPrice = baseCasePrice * pcsPerPack;
             totalPcs = item.qty * pcsPerPack;
-            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
+            pcsLabel = isKm ? `${item.qty} កញ្ចប់ × ${pcsPerPack} ដុំ` : `${item.qty} ${item.qty > 1 ? 'Packs' : 'Pack'} × ${pcsPerPack} pcs`;
         } else if (item.uom === 'Case') {
             unitPrice = baseCasePrice * (packsPerCase * pcsPerPack);
             totalPcs = item.qty * (packsPerCase * pcsPerPack);
-            pcsLabel = `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${packsPerCase * pcsPerPack} pcs`;
+            pcsLabel = isKm ? `${item.qty} កេស × ${packsPerCase * pcsPerPack} ដុំ` : `${item.qty} ${item.qty > 1 ? 'Cases' : 'Case'} × ${packsPerCase * pcsPerPack} pcs`;
         } else if (item.uom === 'Pcs') {
             unitPrice = baseCasePrice;
             totalPcs = item.qty;
-            pcsLabel = `${item.qty} pcs`;
+            pcsLabel = isKm ? `${item.qty} ដុំ` : `${item.qty} pcs`;
         }
     }
 
@@ -2688,6 +2704,7 @@ function clearCart() {
 }
 
 function renderCart() {
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
     const listEl = document.getElementById('posBillsItems');
     const keys = Object.keys(cart);
 
@@ -2695,7 +2712,7 @@ function renderCart() {
         listEl.innerHTML = `
             <div id="posEmptyCartMsg" class="pos-empty-cart">
                 <span style="font-size: 32px; opacity: 0.5;">🛒</span>
-                <div>No items added yet.<br>Scan barcode, search above, or click <strong>Add to Billing</strong>.</div>
+                <div>${isKm ? 'មិនទាន់មានទំនិញនៅឡើយទេ។<br>ស្កេនបាកូដ, ស្វែងរកខាងលើ ឬចុច <strong>បញ្ចូលការគិតលុយ</strong>។' : 'No items added yet.<br>Scan barcode, search above, or click <strong>Add to Billing</strong>.'}</div>
             </div>`;
         recalculateTotals();
         return;
@@ -2725,6 +2742,12 @@ function renderCart() {
             schemeOptionsHtml += `<option value="${sc.id}" ${isSel ? 'selected' : ''}>${escapeHtml(sc.name)}</option>`;
         });
 
+        const pcsWord = isKm ? 'ដុំ' : 'pcs';
+        const uomPackText = isKm ? 'កញ្ចប់ (Pack)' : 'Pack (កញ្ចប់)';
+        const uomCaseText = isKm ? 'កេស (Case)' : 'Case (កេស)';
+        const uomPcsText = isKm ? 'គ្រាប់/ដុំ (Pcs)' : 'Pcs (គ្រាប់/ដុំ)';
+        const uomDisplay = isKm ? (it.uom === 'Pack' ? 'កញ្ចប់' : (it.uom === 'Case' ? 'កេស' : 'ដុំ')) : it.uom;
+
         html += `
         <div class="pos-bill-row">
             <div style="display: flex; gap: 8px; width: 100%;">
@@ -2735,9 +2758,9 @@ function renderCart() {
                     <!-- Selectors: UOM & Pricing Scheme -->
                     <div class="pos-bill-config-row">
                         <select class="pos-uom-select" onchange="changeItemUom(${it.id}, this.value)" title="Change Unit of Measure">
-                            <option value="Pack" ${it.uom === 'Pack' ? 'selected' : ''}>Pack (កញ្ចប់)</option>
-                            <option value="Case" ${it.uom === 'Case' ? 'selected' : ''}>Case (កេស)</option>
-                            <option value="Pcs" ${it.uom === 'Pcs' ? 'selected' : ''}>Pcs (គ្រាប់/ដុំ)</option>
+                            <option value="Pack" ${it.uom === 'Pack' ? 'selected' : ''}>${uomPackText}</option>
+                            <option value="Case" ${it.uom === 'Case' ? 'selected' : ''}>${uomCaseText}</option>
+                            <option value="Pcs" ${it.uom === 'Pcs' ? 'selected' : ''}>${uomPcsText}</option>
                         </select>
 
                         <select class="pos-scheme-select" onchange="changeItemScheme(${it.id}, this.value)" title="Choose Price Scheme">
@@ -2748,7 +2771,7 @@ function renderCart() {
                     <!-- Number of Pcs Displayed Below Item -->
                     <div class="pos-bill-pcs-badge" title="Total pieces deducted from warehouse">
                         <span>📦</span>
-                        <span>${calc.totalPcs.toLocaleString()} pcs</span>
+                        <span>${calc.totalPcs.toLocaleString()} ${pcsWord}</span>
                         <span class="pos-bill-pcs-desc">(${calc.pcsLabel})</span>
                     </div>
                 </div>
@@ -2766,7 +2789,7 @@ function renderCart() {
                                    onkeydown="if(event.key==='Enter'){updateItemCustomPrice(${it.id}, this.value); this.blur();}" 
                                    onfocus="this.select()" 
                                    title="Click to edit unit price / កែប្រែតម្លៃលក់">
-                            <span class="pos-unit-price-uom">/${it.uom}</span>
+                            <span class="pos-unit-price-uom">/${uomDisplay}</span>
                         </div>
                         <div class="pos-bill-price">$${calc.lineTotal.toFixed(2)}</div>
                     </div>
@@ -2811,19 +2834,21 @@ function recalculateTotals() {
     
     updateCreditAmounts();
 
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
     const chargeBtn = document.getElementById('posBtnCharge');
     if (chargeBtn) {
         if (selectedPaymentMethod === 'Credit / Debt') {
             const paid = parseFloat(document.getElementById('posCreditPaidInput')?.value) || 0;
             const due = Math.max(0, grandTotal - paid);
-            chargeBtn.innerHTML = `📋 Record Credit Sale (Due: $${due.toFixed(2)})`;
+            chargeBtn.innerHTML = isKm ? `📋 កត់ត្រាការលក់ជំពាក់ (នៅខ្វះ៖ $${due.toFixed(2)})` : `📋 Record Credit Sale (Due: $${due.toFixed(2)})`;
         } else {
-            chargeBtn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
+            chargeBtn.innerHTML = isKm ? `⚡ គិតលុយ $${grandTotal.toFixed(2)}` : `⚡ Charge $${grandTotal.toFixed(2)}`;
         }
         chargeBtn.disabled = (Object.keys(cart).length === 0);
     }
     const prevBtn = document.getElementById('posBtnPreviewReceipt');
     if (prevBtn) {
+        prevBtn.innerHTML = isKm ? `👁️ មើលគំរូវិក្កយបត្រ` : `👁️ Preview Receipt`;
         prevBtn.disabled = (Object.keys(cart).length === 0);
     }
 }
@@ -3423,6 +3448,18 @@ document.addEventListener('click', (e) => {
     if (directContainer && directResults && !directContainer.contains(e.target)) {
         directResults.style.display = 'none';
     }
+});
+
+// Language Change listeners (iframe message + base event)
+window.addEventListener('message', (e) => {
+    if (e.data && e.data.type === 'INFLOW_LANG_CHANGE') {
+        updatePosMenuTitle();
+        renderCart();
+    }
+});
+window.addEventListener('inflow-lang-changed', () => {
+    updatePosMenuTitle();
+    renderCart();
 });
 
 // Initialize on page load
