@@ -92,24 +92,48 @@ def generate_monthly_excel(data):
     sub_cell.alignment = Alignment(horizontal="center", vertical="center")
     ws1.row_dimensions[2].height = 20
 
-    # 2. Executive KPI Summary Row (Matching Google Sheet Top Row - 6 Core Metrics)
-    kpi_headers = [
-        ("ចំណាយសរុប (Expenses)", "A4", "FEE2E2", "DC2626"),
-        ("លុយចាស់ (Opening)", "B4", "DCFCE7", "166534"),
-        ("លុយលក់ (Customer Receipts)", "C4", "CCFBF1", "0F766E"),
-        ("លុយសរុប (Total Inflow)", "D4", "DBEAFE", "1D4ED8"),
-        ("លុយសល់ (Money in Hand)", "E4", "FEF9C3", "B45309"),
-        ("ចំណូល - ចំណាយ (Net Margin)", "F4", "DCFCE7", "15803D")
-    ]
-    kpi_values = [
-        data.get('total_expenses', 0.0),
-        data.get('opening_balance', 0.0),
-        data.get('sales_received', 0.0),
-        data.get('total_money_in', 0.0),
-        data.get('money_in_hand', 0.0),
-        data.get('net_operating_income', 0.0)
-    ]
-    cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    # 2. Executive KPI Summary Row (Matching Google Sheet Top Row)
+    is_branch = data.get('is_branch', False)
+    if is_branch:
+        kpi_headers = [
+            ("ចំណាយសរុប (Expenses)", "A4", "FEE2E2", "DC2626"),
+            ("លុយចាស់ (Opening)", "B4", "DCFCE7", "166534"),
+            ("លុយលក់ (Customer Receipts)", "C4", "CCFBF1", "0F766E"),
+            ("លុយសរុប (Total Inflow)", "D4", "DBEAFE", "1D4ED8"),
+            ("លុយសល់ (Money in Hand)", "E4", "FEF9C3", "B45309"),
+            ("ចំណូល - ចំណាយ (Net Margin)", "F4", "DCFCE7", "15803D")
+        ]
+        kpi_values = [
+            data.get('total_expenses', 0.0),
+            data.get('opening_balance', 0.0),
+            data.get('sales_received', 0.0),
+            data.get('total_money_in', 0.0),
+            data.get('money_in_hand', 0.0),
+            data.get('net_operating_income', 0.0)
+        ]
+        cols = ['A', 'B', 'C', 'D', 'E', 'F']
+    else:
+        kpi_headers = [
+            ("ចំណាយសរុប (Expenses)", "A4", "FEE2E2", "DC2626"),
+            ("លុយចាស់ (Opening)", "B4", "DCFCE7", "166534"),
+            ("Clear STM", "C4", "E0F2FE", "0369A1"),
+            ("Media (ប្រាក់ពី Media)", "D4", "DCFCE7", "15803D"),
+            ("លុយលក់ (Customer Receipts)", "E4", "CCFBF1", "0F766E"),
+            ("លុយសរុប (Total Inflow)", "F4", "DBEAFE", "1D4ED8"),
+            ("លុយសល់ (Money in Hand)", "G4", "FEF9C3", "B45309"),
+            ("ចំណូល - ចំណាយ (Net Margin)", "H4", "DCFCE7", "15803D")
+        ]
+        kpi_values = [
+            data.get('total_expenses', 0.0),
+            data.get('opening_balance', 0.0),
+            data.get('clear_stm', 0.0),
+            data.get('media_total', 0.0),
+            data.get('sales_received', 0.0),
+            data.get('total_money_in', 0.0),
+            data.get('money_in_hand', 0.0),
+            data.get('net_operating_income', 0.0)
+        ]
+        cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
 
     ws1.row_dimensions[4].height = 22
     ws1.row_dimensions[5].height = 28
@@ -308,6 +332,92 @@ def generate_monthly_excel(data):
                 max_len = len(v_str)
         ws1.column_dimensions[col_letter].width = max(max_len + 4, 12)
 
+    # -------------------------------------------------------------------------
+    # SHEET 2: Media Receipts (ប្រាក់ទទួលបានពី Media - HQ Only)
+    # -------------------------------------------------------------------------
+    if not is_branch:
+        ws2 = wb.create_sheet(title="Media Receipts")
+        ws2.views.sheetView[0].showGridLines = True
+
+        # Title
+        ws2.merge_cells("A1:E1")
+        m_title = ws2["A1"]
+        m_title.value = f"inFlow Premium - Money Received from Media ({month_display})"
+        m_title.font = Font(name="Segoe UI", size=13, bold=True, color="FFFFFF")
+        m_title.fill = PatternFill(start_color="166534", end_color="166534", fill_type="solid")
+        m_title.alignment = Alignment(horizontal="center", vertical="center")
+        ws2.row_dimensions[1].height = 32
+
+        # Headers
+        media_headers = ["No", "Date (កាលបរិច្ឆេទ)", "Customer / Client Name (ឈ្មោះអតិថិជន)", "Money Received ($)", "Notes / Remark"]
+        ws2.row_dimensions[3].height = 24
+        for c_idx, h_text in enumerate(media_headers, 1):
+            c = ws2.cell(row=3, column=c_idx, value=h_text)
+            c.font = Font(name="Segoe UI", size=9.5, bold=True, color="FFFFFF")
+            c.fill = PatternFill(start_color="166534", end_color="166534", fill_type="solid")
+            c.alignment = Alignment(horizontal="center" if c_idx in [1, 2] else ("right" if c_idx == 4 else "left"), vertical="center")
+            c.border = thin_border
+
+        m_row = 4
+        for m_idx, m in enumerate(data.get('media_receipts', []), 1):
+            ws2.row_dimensions[m_row].height = 20
+            c1 = ws2.cell(row=m_row, column=1, value=m_idx)
+            c1.alignment = Alignment(horizontal="center", vertical="center")
+            c1.border = thin_border
+
+            m_date = m.get('receipt_date')
+            date_str = m_date.strftime('%d-%b-%Y') if hasattr(m_date, 'strftime') else str(m_date or '')
+            c2 = ws2.cell(row=m_row, column=2, value=date_str)
+            c2.alignment = Alignment(horizontal="center", vertical="center")
+            c2.border = thin_border
+
+            c3 = ws2.cell(row=m_row, column=3, value=m.get('customer_name', ''))
+            c3.font = Font(name="Segoe UI", bold=True, size=9.5)
+            c3.border = thin_border
+
+            c4 = ws2.cell(row=m_row, column=4, value=float(m.get('amount', 0) or 0))
+            c4.number_format = '$#,##0.00'
+            c4.font = Font(name="Segoe UI", bold=True, size=10, color="16A34A")
+            c4.border = thin_border
+
+            c5 = ws2.cell(row=m_row, column=5, value=m.get('notes', ''))
+            c5.font = Font(name="Segoe UI", size=9, color="64748B")
+            c5.border = thin_border
+
+            m_row += 1
+
+        # Total Media row
+        ws2.row_dimensions[m_row].height = 24
+        ws2.merge_cells(start_row=m_row, start_column=1, end_row=m_row, end_column=3)
+        lbl_tot = ws2.cell(row=m_row, column=1, value="សរុបប្រាក់ទទួលបានពី Media (Total Media Received):")
+        lbl_tot.font = Font(name="Segoe UI", bold=True, size=10, color="166534")
+        lbl_tot.alignment = Alignment(horizontal="right", vertical="center")
+        lbl_tot.fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+
+        for c_i in range(1, 4):
+            ws2.cell(row=m_row, column=c_i).border = thin_border
+            ws2.cell(row=m_row, column=c_i).fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+
+        val_tot = ws2.cell(row=m_row, column=4, value=data.get('media_total', 0.0))
+        val_tot.number_format = '$#,##0.00'
+        val_tot.font = Font(name="Segoe UI", bold=True, size=11, color="166534")
+        val_tot.border = thin_border
+        val_tot.fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+
+        c_end = ws2.cell(row=m_row, column=5, value="")
+        c_end.border = thin_border
+        c_end.fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
+
+        # Column widths for Sheet 2
+        for col in ws2.columns:
+            col_letter = get_column_letter(col[0].column)
+            max_len = 0
+            for cell in col:
+                v_str = str(cell.value or '')
+                if len(v_str) > max_len and not cell.coordinate in ['A1']:
+                    max_len = len(v_str)
+            ws2.column_dimensions[col_letter].width = max(max_len + 4, 14)
+
     buf = io.BytesIO()
     wb.save(buf)
     buf.seek(0)
@@ -395,30 +505,60 @@ def generate_monthly_pdf(data):
 
     # 2. Executive Financial KPI Summary Cards Table
     is_branch = data.get('is_branch', False)
-    kpi_data = [
-        [
-            Paragraph("<b>TOTAL EXPENSES</b><br/><font size=10 color='#DC2626'><b>${:,.2f}</b></font>".format(data.get('total_expenses', 0.0)), cell_style),
-            Paragraph("<b>OPENING BALANCE</b><br/><font size=10 color='#166534'><b>${:,.2f}</b></font>".format(data.get('opening_balance', 0.0)), cell_style),
-            Paragraph("<b>SALES RECEIVED</b><br/><font size=10 color='#0F766E'><b>${:,.2f}</b></font>".format(data.get('sales_received', 0.0)), cell_style),
-            Paragraph("<b>TOTAL INFLOW</b><br/><font size=10 color='#1D4ED8'><b>${:,.2f}</b></font>".format(data.get('total_money_in', 0.0)), cell_style),
-            Paragraph("<b>MONEY IN HAND</b><br/><font size=10 color='#B45309'><b>${:,.2f}</b></font>".format(data.get('money_in_hand', 0.0)), cell_style),
-            Paragraph("<b>NET MARGIN</b><br/><font size=10 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('net_operating_income', 0.0)), cell_style)
+    if is_branch:
+        kpi_data = [
+            [
+                Paragraph("<b>TOTAL EXPENSES</b><br/><font size=10 color='#DC2626'><b>${:,.2f}</b></font>".format(data.get('total_expenses', 0.0)), cell_style),
+                Paragraph("<b>OPENING BALANCE</b><br/><font size=10 color='#166534'><b>${:,.2f}</b></font>".format(data.get('opening_balance', 0.0)), cell_style),
+                Paragraph("<b>SALES RECEIVED</b><br/><font size=10 color='#0F766E'><b>${:,.2f}</b></font>".format(data.get('sales_received', 0.0)), cell_style),
+                Paragraph("<b>TOTAL INFLOW</b><br/><font size=10 color='#1D4ED8'><b>${:,.2f}</b></font>".format(data.get('total_money_in', 0.0)), cell_style),
+                Paragraph("<b>MONEY IN HAND</b><br/><font size=10 color='#B45309'><b>${:,.2f}</b></font>".format(data.get('money_in_hand', 0.0)), cell_style),
+                Paragraph("<b>NET MARGIN</b><br/><font size=10 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('net_operating_income', 0.0)), cell_style)
+            ]
         ]
-    ]
-    t_kpi = Table(kpi_data, colWidths=[124] * 6)
-    t_kpi.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#FEE2E2')),
-        ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#DCFCE7')),
-        ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#CCFBF1')),
-        ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#DBEAFE')),
-        ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#FEF9C3')),
-        ('BACKGROUND', (5, 0), (5, 0), colors.HexColor('#DCFCE7')),
-        ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
-        ('TOPPADDING', (0, 0), (-1, -1), 5),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
-        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
-    ]))
+        t_kpi = Table(kpi_data, colWidths=[124] * 6)
+        t_kpi.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#FEE2E2')),
+            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#DCFCE7')),
+            ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#CCFBF1')),
+            ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#DBEAFE')),
+            ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#FEF9C3')),
+            ('BACKGROUND', (5, 0), (5, 0), colors.HexColor('#DCFCE7')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ]))
+    else:
+        kpi_data = [
+            [
+                Paragraph("<b>TOTAL EXPENSES</b><br/><font size=10 color='#DC2626'><b>${:,.2f}</b></font>".format(data.get('total_expenses', 0.0)), cell_style),
+                Paragraph("<b>OPENING BALANCE</b><br/><font size=10 color='#166534'><b>${:,.2f}</b></font>".format(data.get('opening_balance', 0.0)), cell_style),
+                Paragraph("<b>CLEAR STM</b><br/><font size=10 color='#0369A1'><b>${:,.2f}</b></font>".format(data.get('clear_stm', 0.0)), cell_style),
+                Paragraph("<b>MEDIA RECEIPTS</b><br/><font size=10 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('media_total', 0.0)), cell_style),
+                Paragraph("<b>SALES RECEIVED</b><br/><font size=10 color='#0F766E'><b>${:,.2f}</b></font>".format(data.get('sales_received', 0.0)), cell_style),
+                Paragraph("<b>TOTAL INFLOW</b><br/><font size=10 color='#1D4ED8'><b>${:,.2f}</b></font>".format(data.get('total_money_in', 0.0)), cell_style),
+                Paragraph("<b>MONEY IN HAND</b><br/><font size=10 color='#B45309'><b>${:,.2f}</b></font>".format(data.get('money_in_hand', 0.0)), cell_style),
+                Paragraph("<b>NET MARGIN</b><br/><font size=10 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('net_operating_income', 0.0)), cell_style)
+            ]
+        ]
+        t_kpi = Table(kpi_data, colWidths=[93] * 8)
+        t_kpi.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#FEE2E2')),
+            ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#DCFCE7')),
+            ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#E0F2FE')),
+            ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#DCFCE7')),
+            ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#CCFBF1')),
+            ('BACKGROUND', (5, 0), (5, 0), colors.HexColor('#DBEAFE')),
+            ('BACKGROUND', (6, 0), (6, 0), colors.HexColor('#FEF9C3')),
+            ('BACKGROUND', (7, 0), (7, 0), colors.HexColor('#DCFCE7')),
+            ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+            ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
+            ('TOPPADDING', (0, 0), (-1, -1), 5),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ]))
     elements.append(t_kpi)
     elements.append(Spacer(1, 8))
 
@@ -516,11 +656,60 @@ def generate_monthly_pdf(data):
         ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
     ]))
 
-    elements.append(KeepTogether([
-        Paragraph("<b>Cash & Bank Reconciliation</b>", section_style),
-        Spacer(1, 4),
-        t_recon
-    ]))
+    if is_branch:
+        elements.append(KeepTogether([
+            Paragraph("<b>Cash & Bank Reconciliation</b>", section_style),
+            Spacer(1, 4),
+            t_recon
+        ]))
+    else:
+        # Media Receipts Table
+        media_rows = [
+            ["No", "Date", "Customer Name", "Money Received ($)", "Notes"]
+        ]
+        for idx, m in enumerate(data.get('media_receipts', []), 1):
+            m_date = m.get('receipt_date')
+            date_str = m_date.strftime('%d-%b') if hasattr(m_date, 'strftime') else str(m_date or '')
+            media_rows.append([
+                str(idx),
+                date_str,
+                m.get('customer_name', ''),
+                f"${float(m.get('amount', 0) or 0):,.2f}",
+                m.get('notes', '') or '-'
+            ])
+        media_rows.append([
+            "",
+            Paragraph("<b>Total Media:</b>", cell_style),
+            "",
+            f"${data.get('media_total', 0.0):,.2f}",
+            ""
+        ])
+
+        t_media = Table(media_rows, colWidths=[24, 60, 130, 80, 120])
+        t_media.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#166534')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, -1), 7.5),
+            ('ALIGN', (0, 0), (0, -1), 'CENTER'),
+            ('ALIGN', (1, 0), (1, -1), 'CENTER'),
+            ('ALIGN', (3, 0), (3, -1), 'RIGHT'),
+            ('GRID', (0, 0), (-1, -2), 0.5, colors.HexColor('#E2E8F0')),
+            ('BACKGROUND', (0, -1), (-1, -1), colors.HexColor('#DCFCE7')),
+            ('TEXTCOLOR', (3, -1), (3, -1), colors.HexColor('#166534')),
+            ('FONTNAME', (0, -1), (-1, -1), 'Helvetica-Bold'),
+        ]))
+
+        elements.append(KeepTogether([
+            Table([
+                [Paragraph("<b>Cash & Bank Reconciliation</b>", section_style), Paragraph("<b>Media Receipts (ប្រាក់ទទួលបានពី Media)</b>", section_style)],
+                [t_recon, t_media]
+            ], colWidths=[330, 414], style=[
+                ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+                ('LEFTPADDING', (0, 0), (-1, -1), 0),
+                ('RIGHTPADDING', (0, 0), (-1, -1), 0),
+            ])
+        ]))
 
     doc.build(elements, canvasmaker=NumberedCanvas)
     buf.seek(0)

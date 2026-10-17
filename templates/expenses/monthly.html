@@ -61,7 +61,7 @@
 
             <button type="button" class="btn btn-outline" onclick="openBalanceModal()" title="Edit Opening Balance & Sales">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>Edit Balances (លុយចាស់ / លក់)</span>
+                <span>Edit Balances ({% if is_branch %}លុយចាស់ / លក់{% else %}លុយចាស់ / STM{% endif %})</span>
             </button>
             <button type="button" class="btn btn-outline" onclick="openNewMonthModal()" title="Add another month sheet">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
@@ -180,7 +180,40 @@
             </div>
         </div>
 
-        <!-- 3. Customer Receipts (លុយលក់) -->
+        <!-- 3. Clear STM (HQ only) -->
+        {% if not is_branch %}
+        <div class="expense-kpi-card teal-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Clear STM</span>
+                <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">Edit ✎</button>
+            </div>
+            <div class="kpi-card-value teal-text">${{ "{:,.2f}".format(clear_stm) }}</div>
+            <div class="kpi-card-sub">Bank/STM cleared settlement</div>
+        </div>
+
+        <!-- 4. Media Total (HQ only: ប្រាក់ទទួលបានពី Media) -->
+        <div class="expense-kpi-card green-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Media (ប្រាក់ពី Media)</span>
+                {% if is_manual_media %}
+                <span class="kpi-tag blue" title="Manually entered in balances modal">Manual</span>
+                {% else %}
+                <a href="#mediaReceiptsSection" class="kpi-tag green" style="text-decoration: none;" title="Auto-calculated from Media sheet below">{{ media_receipts|length }} items ↓</a>
+                {% endif %}
+                <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">Edit ✎</button>
+            </div>
+            <div class="kpi-card-value green-text">${{ "{:,.2f}".format(media_total) }}</div>
+            <div class="kpi-card-sub">
+                {% if is_manual_media %}
+                Manual Set <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">(Sheet: ${{ "{:,.2f}".format(media_sheet_total) }})</button>
+                {% else %}
+                Auto from Media Sheet ({{ media_receipts|length }} entries)
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 5. Customer Receipts (លុយលក់) -->
         <div class="expense-kpi-card teal-accent">
             <div class="kpi-card-header">
                 <span class="kpi-label">លុយលក់ ({{ current_store_name }})</span>
@@ -199,19 +232,27 @@
             </div>
         </div>
 
-        <!-- 4. Total Cash Inflow (លុយសរុប: ចាស់ + លក់) -->
+        <!-- 6. Total Cash Inflow (លុយសរុប) -->
         <div class="expense-kpi-card blue-accent">
             <div class="kpi-card-header">
                 <span class="kpi-label">លុយសរុប (Total Inflow)</span>
+                {% if is_branch %}
                 <span class="kpi-tag blue">ចាស់ + លក់</span>
+                {% else %}
+                <span class="kpi-tag blue">ចាស់+STM+Media+លក់</span>
+                {% endif %}
             </div>
             <div class="kpi-card-value blue-text">${{ "{:,.2f}".format(total_money_in) }}</div>
             <div class="kpi-card-sub">
+                {% if is_branch %}
                 Opening + Sales (Customer Receipts)
+                {% else %}
+                Opening + Clear STM + Media + Sales
+                {% endif %}
             </div>
         </div>
 
-        <!-- 5. Money in Hand / Remaining (លុយសល់: លុយសរុប - ចំណាយ) -->
+        <!-- 7. Money in Hand / Remaining (លុយសល់: លុយសរុប - ចំណាយ) -->
         <div class="expense-kpi-card amber-spotlight">
             <div class="kpi-card-header">
                 <span class="kpi-label" style="font-weight: 800; color: #92400E;">លុយសល់ (Money in Hand)</span>
@@ -225,7 +266,7 @@
             </div>
         </div>
 
-        <!-- 6. Net Margin / Profit (ចំណូល - ចំណាយ) -->
+        <!-- 8. Net Margin / Profit (ចំណូល - ចំណាយ) -->
         <div class="expense-kpi-card {% if net_operating_income >= 0 %}success-accent{% else %}danger-accent{% endif %}">
             <div class="kpi-card-header">
                 <span class="kpi-label">ចំណូល - ចំណាយ (Net)</span>
@@ -237,7 +278,11 @@
                 ${{ "{:,.2f}".format(net_operating_income) }}
             </div>
             <div class="kpi-card-sub">
+                {% if is_branch %}
                 Sales minus Expenses
+                {% else %}
+                Sales + STM + Media minus Expenses
+                {% endif %}
             </div>
         </div>
     </div>
@@ -487,6 +532,93 @@
         </div>
     </div>
 
+    <!-- BOTTOM SHEET: Money Received from Media (ប្រាក់ទទួលបានពី Media - HQ Only) -->
+    {% if not is_branch %}
+    <div class="media-sheet-panel" id="mediaReceiptsSection">
+        <div class="media-sheet-header">
+            <div class="media-sheet-title">
+                <span style="font-size: 16px;">📺</span>
+                <span>ប្រាក់ទទួលបានពី Media (Money Received from Media)</span>
+                <span class="media-sheet-counter">{{ media_receipts|length }} entries</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 12px; font-weight: 700; color: #166534;">
+                    សរុប Media Total: <span style="font-size: 14.5px; font-family: 'JetBrains Mono', monospace; color: #15803D;">${{ "{:,.2f}".format(media_total) }}</span>
+                </span>
+            </div>
+        </div>
+
+        <div class="media-sheet-table-wrap">
+            <table class="media-sheet-table">
+                <thead>
+                    <tr>
+                        <th style="width: 45px; text-align: center;">No</th>
+                        <th style="width: 130px;">Date (កាលបរិច្ឆេទ)</th>
+                        <th>Customer / Client Name (ឈ្មោះអតិថិជន)</th>
+                        <th style="text-align: right; width: 150px;">Money Received ($)</th>
+                        <th>Notes / Remark (កំណត់សម្គាល់)</th>
+                        <th style="width: 65px; text-align: center;">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="mediaTableBody">
+                    {% for m in media_receipts %}
+                    <tr class="media-row">
+                        <td style="text-align: center; color: #64748B; font-weight: 600;">{{ loop.index }}</td>
+                        <td style="font-family: 'JetBrains Mono', monospace; color: #0F766E; font-weight: 600;">
+                            {{ m.receipt_date.strftime('%d-%b-%Y') if m.receipt_date else '-' }}
+                        </td>
+                        <td style="font-weight: 700; color: #0F172A;">{{ m.customer_name }}</td>
+                        <td style="text-align: right; font-weight: 800; font-family: 'JetBrains Mono', monospace; color: #16A34A; font-size: 12.5px;">
+                            ${{ "{:,.2f}".format(m.amount|float) }}
+                        </td>
+                        <td style="color: #64748B; font-size: 11px;">{{ m.notes or '-' }}</td>
+                        <td style="text-align: center;">
+                            <button type="button" class="action-icon-btn delete" onclick="deleteMediaReceipt({{ m.id }})" title="Delete Receipt">✕</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="6" style="text-align: center; padding: 26px 12px; color: #94A3B8;">
+                            <div style="font-size: 26px; margin-bottom: 4px;">📺</div>
+                            <div style="font-size: 12.5px; font-weight: 600; color: #64748B;">No media receipts recorded yet for {{ month_display }}</div>
+                            <div style="font-size: 11px; margin-top: 3px;">Use the quick entry row below to record payments received from media.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="media-table-footer">
+                        <td colspan="3" style="text-align: right; font-weight: 700; color: #166534; padding: 8px 12px;">
+                            សរុបប្រាក់ទទួលបានពី Media (Total Media Received):
+                        </td>
+                        <td style="text-align: right; font-weight: 800; font-size: 13.5px; color: #166534; font-family: 'JetBrains Mono', monospace; padding: 8px 12px;">
+                            ${{ "{:,.2f}".format(media_total) }}
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- Quick Add Row for Media -->
+        <div class="media-quick-entry-bar">
+            <form id="quickMediaForm" onsubmit="handleQuickMediaSubmit(event)">
+                <div style="font-size: 11px; font-weight: 700; color: #166534; margin-bottom: 6px; display: flex; align-items: center; gap: 4px;">
+                    <span>⚡ Quick Add Media Receipt (បញ្ចូលប្រាក់ទទួលបានពី Media ភ្លាមៗ)</span>
+                </div>
+                <div class="quick-inputs-grid">
+                    <input type="date" id="quickMediaDate" value="{{ today_date }}" style="width: 130px;" required>
+                    <input type="text" id="quickMediaCustomer" placeholder="Customer Name (e.g. Mak Thea, Sekla, FB Media...)" required style="flex: 2;">
+                    <input type="number" id="quickMediaAmount" placeholder="Amount ($)" step="0.01" min="0" required style="width: 120px;">
+                    <input type="text" id="quickMediaNotes" placeholder="Notes / Remark (optional)" style="flex: 1.5;">
+                    <button type="submit" class="btn btn-sm btn-primary" style="background: #16A34A; border-color: #15803D; white-space: nowrap;">
+                        + Add Media Receipt
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Datalists for autocomplete -->
@@ -627,7 +759,7 @@
 <div class="modal-overlay" id="balanceModal">
     <div class="modal-dialog" style="max-width: 500px; padding: 22px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
-            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances for {{ month_display }} ({{ current_store_name }})</h3>
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances {% if not is_branch %}& STM {% endif %}for {{ month_display }} ({{ current_store_name }})</h3>
             <button type="button" class="modal-close-btn" onclick="closeModal('balanceModal')">✕</button>
         </div>
         <form id="summaryBalanceForm" onsubmit="handleSummaryBalanceSubmit(event)">
@@ -652,6 +784,35 @@
                     {% endif %}
                 </small>
             </div>
+
+            {% if not is_branch %}
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Clear STM ($)</label>
+                <input type="number" step="0.01" id="inputClearStm" class="form-control" value="{{ "{:.2f}".format(clear_stm) }}">
+            </div>
+
+            <!-- Media Money with Auto/Manual Selector -->
+            <div class="form-group mb-3">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                    <label class="form-label" style="font-size: 11.5px; font-weight: 600; margin: 0;">
+                        Media ($) (ប្រាក់ទទួលបានពី Media)
+                    </label>
+                    <button type="button" class="btn btn-xs" onclick="resetMediaToAuto()" style="background: #F1F5F9; border: 1px solid #CBD5E1; color: #166534; font-size: 10.5px; padding: 2px 7px; border-radius: 4px; cursor: pointer;" title="Clear manual input to auto-take total from Media sheet">
+                        🔄 Auto from Media Sheet (${{ "{:,.2f}".format(media_sheet_total) }})
+                    </button>
+                </div>
+                <input type="number" step="0.01" id="inputMedia" class="form-control" 
+                       value="{% if is_manual_media %}{{ "{:.2f}".format(media_total) }}{% endif %}" 
+                       placeholder="Leave empty for auto from Media sheet (${{ "{:,.2f}".format(media_sheet_total) }})">
+                <small id="mediaMoneyNote" style="color: #64748B; font-size: 10.5px; display: block; margin-top: 4px;">
+                    {% if is_manual_media %}
+                    <span style="color: #2563EB; font-weight: 700;">● Manual override active (${{ "{:,.2f}".format(media_total) }}).</span> Leave empty or click button above to auto-use Media sheet total (${{ "{:,.2f}".format(media_sheet_total) }}).
+                    {% else %}
+                    <span style="color: #166534; font-weight: 700;">● Auto mode active:</span> automatically using ${{ "{:,.2f}".format(media_sheet_total) }} from Media sheet below.
+                    {% endif %}
+                </small>
+            </div>
+            {% endif %}
 
             <div class="form-group mb-3">
                 <label class="form-label" style="font-size: 11.5px; font-weight: 600;">
@@ -1178,9 +1339,9 @@
                     month_key: CURRENT_MONTH,
                     branch_id: BRANCH_SCOPE,
                     manual_opening_balance: {% if is_manual_opening %}{{ opening_balance }}{% else %}null{% endif %},
-                    clear_stm: 0,
-                    media_expense: 0,
-                    manual_media_income: null,
+                    clear_stm: {% if is_branch %}0{% else %}{{ clear_stm }}{% endif %},
+                    media_expense: {% if is_branch %}0{% else %}{{ media_total }}{% endif %},
+                    manual_media_income: {% if is_branch or not is_manual_media %}null{% else %}{{ media_total }}{% endif %},
                     custom_sales_income: {% if is_custom_sales %}{{ sales_received }}{% else %}null{% endif %},
                     accounts_json: accountsList
                 })
@@ -1228,11 +1389,27 @@
         }
     }
 
-    // Save Balances (Opening, Custom Sales)
+    // Reset media money in modal to auto from media sheet
+    function resetMediaToAuto() {
+        const mediaInput = document.getElementById('inputMedia');
+        if (mediaInput) mediaInput.value = '';
+        const note = document.getElementById('mediaMoneyNote');
+        if (note) {
+            note.innerHTML = `<span style="color: #16A34A; font-weight: 700;">● Reset to Auto:</span> will automatically use $${MEDIA_SHEET_TOTAL.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} from Media sheet upon saving.`;
+        }
+    }
+
+    // Save Balances (Opening, STM, Media, Custom Sales)
     async function handleSummaryBalanceSubmit(e) {
         e.preventDefault();
         const openVal = document.getElementById('inputOpeningBalance').value.trim();
         const manualOpening = openVal !== '' ? parseFloat(openVal) : null;
+        const stmEl = document.getElementById('inputClearStm');
+        const stm = stmEl ? (parseFloat(stmEl.value) || 0) : 0;
+        
+        const mediaEl = document.getElementById('inputMedia');
+        const manualMedia = (mediaEl && mediaEl.value.trim() !== '') ? parseFloat(mediaEl.value.trim()) : null;
+
         const customSalesVal = document.getElementById('inputCustomSales').value.trim();
         const customSales = customSalesVal !== '' ? parseFloat(customSalesVal) : null;
 
@@ -1264,8 +1441,8 @@
                     month_key: CURRENT_MONTH,
                     branch_id: BRANCH_SCOPE,
                     manual_opening_balance: manualOpening,
-                    clear_stm: 0,
-                    manual_media_income: null,
+                    clear_stm: stm,
+                    manual_media_income: manualMedia,
                     custom_sales_income: customSales,
                     accounts_json: accountsList
                 })

@@ -49,15 +49,14 @@ class TestBranchExpenseSheet(unittest.TestCase):
         expected_branch_money_in_hand = expected_branch_total_in - report_branch['total_expenses']
         self.assertAlmostEqual(report_branch['money_in_hand'], expected_branch_money_in_hand, places=2)
 
-        # HQ Report Verification (STM and Media are removed/zeroed as requested)
+        # HQ Report Verification (STM and Media are restored for HQ, except only Branch)
         report_hq = _get_monthly_report_data("2026-10", branch_id="main")
         self.assertFalse(report_hq['is_branch'])
-        self.assertEqual(report_hq['clear_stm'], 0.0)
-        self.assertEqual(report_hq['media_total'], 0.0)
-        self.assertEqual(report_hq['media_receipts'], [])
-        expected_hq_total_in = report_hq['opening_balance'] + report_hq['sales_received']
+        # HQ total_money_in includes opening + clear_stm + media_total + sales_received
+        expected_hq_total_in = report_hq['opening_balance'] + report_hq['clear_stm'] + report_hq['media_total'] + report_hq['sales_received']
         self.assertAlmostEqual(report_hq['total_money_in'], expected_hq_total_in, places=2)
-        expected_hq_net = report_hq['sales_received'] - report_hq['total_expenses']
+        # HQ net_operating_income includes sales_received + clear_stm + media_total - total_expenses
+        expected_hq_net = (report_hq['sales_received'] + report_hq['clear_stm'] + report_hq['media_total']) - report_hq['total_expenses']
         self.assertAlmostEqual(report_hq['net_operating_income'], expected_hq_net, places=2)
 
     def test_monthly_summary_branch_isolation_in_db(self):
@@ -105,9 +104,9 @@ class TestBranchExpenseSheet(unittest.TestCase):
         self.assertIsNotNone(row_branch)
 
         self.assertAlmostEqual(float(row_hq['opening_balance']), 500.00, places=2)
-        # Clear STM and Media are 0.0 across the board
-        self.assertAlmostEqual(float(row_hq['clear_stm']), 0.00, places=2)
-        self.assertAlmostEqual(float(row_hq['media_expense']), 0.00, places=2)
+        # Clear STM and Media are restored for HQ
+        self.assertAlmostEqual(float(row_hq['clear_stm']), 150.00, places=2)
+        self.assertAlmostEqual(float(row_hq['media_expense']), 250.00, places=2)
 
         self.assertAlmostEqual(float(row_branch['opening_balance']), 200.00, places=2)
         self.assertAlmostEqual(float(row_branch['clear_stm']), 0.00, places=2)
@@ -163,7 +162,7 @@ class TestBranchExpenseSheet(unittest.TestCase):
         wb_hq = load_workbook(excel_buf_hq)
         sheet_names_hq = wb_hq.sheetnames
         self.assertIn("Expenses & Cash Reconciliation", sheet_names_hq)
-        self.assertNotIn("Media Receipts", sheet_names_hq)
+        self.assertIn("Media Receipts", sheet_names_hq)
 
     def test_export_monthly_pdf_branch_and_hq(self):
         """
@@ -185,8 +184,8 @@ class TestBranchExpenseSheet(unittest.TestCase):
     def test_monthly_expenses_view_branch_vs_hq_html(self):
         """
         Verify HTML output on /expenses/monthly:
-        - For both branch and HQ: Clear STM & Media cards and Media section are deleted as requested.
-        - Store scope switcher and 6 clean core financial KPIs are rendered.
+        - For branch: Clear STM & Media cards and Media section are isolated/not present.
+        - For HQ: Clear STM & Media cards and Media section are active and present.
         """
         resp_branch = self.client.get('/expenses/monthly?month=2026-10&branch=1')
         self.assertEqual(resp_branch.status_code, 200)
@@ -199,9 +198,9 @@ class TestBranchExpenseSheet(unittest.TestCase):
         resp_hq = self.client.get('/expenses/monthly?month=2026-10&branch=main')
         self.assertEqual(resp_hq.status_code, 200)
         html_hq = resp_hq.data.decode('utf-8')
-        self.assertNotIn("id=\"mediaReceiptsSection\"", html_hq)
-        self.assertNotIn(">Clear STM<", html_hq)
-        self.assertNotIn(">Media (ប្រាក់ពី Media)<", html_hq)
+        self.assertIn("id=\"mediaReceiptsSection\"", html_hq)
+        self.assertIn(">Clear STM<", html_hq)
+        self.assertIn(">Media (ប្រាក់ពី Media)<", html_hq)
         self.assertIn("store-shortcuts-group", html_hq)
         self.assertIn("Main Store (HQ)", html_hq)
 

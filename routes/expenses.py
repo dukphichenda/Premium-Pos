@@ -180,9 +180,23 @@ def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
         else:
             opening = 0.0
 
-    # 2. Clear STM and Media Total (Deleted from cash flow calculations)
-    stm = 0.0
-    media_total = 0.0
+    # 2. Clear STM and Media Total (Branch has NO STM and NO Media; HQ / Main has STM and Media)
+    if is_branch:
+        stm = 0.0
+        media_total = 0.0
+    else:
+        stm = float(summary['clear_stm'] or 0) if summary else 0.0
+        media_rec = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
+        media_sheet_total = float(media_rec['tot'] or 0) if media_rec else 0.0
+
+        if summary and summary.get('manual_media_income') is not None:
+            media_total = float(summary['manual_media_income'])
+        elif media_sheet_total > 0:
+            media_total = media_sheet_total
+        elif summary and summary.get('media_expense') and float(summary['media_expense']) > 0:
+            media_total = float(summary['media_expense'])
+        else:
+            media_total = 0.0
 
     # 3. Sales Received
     if summary and summary.get('custom_sales_income') is not None:
@@ -199,7 +213,7 @@ def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
         exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
     total_exp = float(exp_res['tot'] or 0) if exp_res else 0.0
 
-    total_inflow = opening + sales
+    total_inflow = opening + stm + media_total + sales
     money_in_hand = total_inflow - total_exp
     return money_in_hand
 
@@ -268,12 +282,33 @@ def _get_monthly_report_data(month_key, branch_id='main'):
         """, (month_key,))
     total_expenses = sum(float(e['total_price'] or 0) for e in expenses)
 
-    # 2. Media receipts & Clear STM (Removed/zeroed from calculations as requested)
-    media_receipts = []
-    media_sheet_total = 0.0
-    media_total = 0.0
-    is_manual_media = False
-    clear_stm = 0.0
+    # 2. Media receipts & Clear STM logic
+    if is_branch:
+        # Branches do not have Clear STM or Media money
+        media_receipts = []
+        media_sheet_total = 0.0
+        media_total = 0.0
+        is_manual_media = False
+        clear_stm = 0.0
+    else:
+        # HQ / Main Store
+        media_receipts = query_all("""
+            SELECT * FROM media_receipts
+            WHERE month_key = %s
+            ORDER BY receipt_date ASC, id ASC
+        """, (month_key,))
+        media_sheet_total = sum(float(r['amount'] or 0) for r in media_receipts)
+
+        is_manual_media = (summary.get('manual_media_income') is not None)
+        if is_manual_media:
+            media_total = float(summary['manual_media_income'])
+        else:
+            media_total = media_sheet_total
+            if summary and summary.get('id'):
+                execute("UPDATE monthly_cash_summaries SET media_expense = %s WHERE id = %s", (media_total, summary['id']))
+                summary['media_expense'] = media_total
+
+        clear_stm = float(summary.get('clear_stm') or 0)
 
     # 3. Dynamic Opening Balance logic
     prev_m = _get_previous_month_key(month_key)
@@ -295,10 +330,14 @@ def _get_monthly_report_data(month_key, branch_id='main'):
     else:
         sales_received = inflow_data['total_paid']
 
-    # 5. Inflow & Balances (Opening + Sales without STM/Media)
-    total_money_in = opening_balance + sales_received
+    # 5. Inflow & Balances
+    total_money_in = opening_balance + clear_stm + media_total + sales_received
     money_in_hand = total_money_in - total_expenses
-    net_operating_income = sales_received - total_expenses
+    if is_branch:
+        # Branch net operating income is strictly Sales minus Expenses
+        net_operating_income = sales_received - total_expenses
+    else:
+        net_operating_income = (sales_received + clear_stm + media_total) - total_expenses
 
     # 6. Accounts Reconciliation
     accounts = _normalize_accounts(summary.get('accounts_json'))
@@ -833,10 +872,24 @@ def update_monthly_summary():
             prev_m = _get_previous_month_key(month_key)
             opening_balance = _calculate_month_money_in_hand(prev_m, branch_id=scope_arg) if prev_m else 0.0
 
-        # Clear STM & Media are zeroed/deleted as requested
-        clear_stm = 0.0
-        media_total = 0.0
-        manual_media = None
+        if is_branch:
+            clear_stm = 0.0
+            media_total = 0.0
+            manual_media = None
+        else:
+            clear_stm = float(data.get('clear_stm', 0) or 0)
+            mmi_raw = data.get('manual_media_income')
+            if mmi_raw is None or str(mmi_raw).strip() == '':
+                mmi_raw = data.get('media')
+            if mmi_raw is None or str(mmi_raw).strip() == '':
+                mmi_raw = data.get('media_expense')
+            if mmi_raw is not None and str(mmi_raw).strip() != '':
+                manual_media = float(mmi_raw)
+                media_total = manual_media
+            else:
+                manual_media = None
+                med_tot = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
+                media_total = float(med_tot['tot'] if med_tot else 0)
         
         custom_sales = data.get('custom_sales_income')
         if custom_sales is None or str(custom_sales).strip() == '':

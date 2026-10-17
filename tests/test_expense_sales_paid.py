@@ -40,11 +40,13 @@ class TestExpenseSalesPaid(unittest.TestCase):
         sales = report['sales_received']
         self.assertGreater(sales, 0)
         
-        # Verify Money in Hand = (Opening Balance + Sales) - Expenses
+        # Verify Money in Hand = (Opening Balance + Clear STM + Media + Sales) - Expenses for HQ
         opening = report['opening_balance']
         expenses = report['total_expenses']
+        clear_stm = report['clear_stm']
+        media_total = report['media_total']
         
-        expected_total_in = opening + sales
+        expected_total_in = opening + clear_stm + media_total + sales
         self.assertAlmostEqual(report['total_money_in'], expected_total_in, places=2)
         
         expected_money_in_hand = expected_total_in - expenses
