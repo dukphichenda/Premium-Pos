@@ -415,6 +415,11 @@
                         </div>
 
                         <div class="inflow-spec-info-box">
+                            {% if price_card and price_card.is_custom_detail and price_card.custom_detail %}
+                            <div class="inflow-spec-custom-display font-khmer" style="display: block; font-size: 15px; font-weight: 700; font-style: italic; line-height: 1.4; white-space: pre-line; text-align: center;">
+                                {{ price_card.custom_detail }}
+                            </div>
+                            {% else %}
                             <div class="inflow-spec-info-line">
                                 ទំហំ: {{ price_card.dim_str if price_card else '21cm x 21cm x 4cm' }}
                             </div>
@@ -430,6 +435,7 @@
                             <div class="inflow-spec-info-sub">
                                 ({{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} PCS/ Carton)
                             </div>
+                            {% endif %}
                         </div>
                     </div>
 
@@ -1720,11 +1726,15 @@ async function fetchPriceCardsAndExportZipDetail(apiUrl, zipFileName) {
                         ${item.image_url ? `<img src="${item.image_url}" class="inflow-spec-img" style="width: 100%; max-width: 100%; height: auto; max-height: 320px; object-fit: contain;">` : `<span style="color:#94A3B8;">No Image</span>`}
                     </div>
                     <div class="inflow-spec-info-box">
-                        <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
-                        <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
-                        <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ${c.card_unit || 'ប្រអប់'}</div>
-                        <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ${c.card_unit || 'ប្រអប់'}/1កេស</div>
-                        <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
+                        ${c.is_custom_detail && c.custom_detail ? `
+                            <div class="inflow-spec-custom-display font-khmer" style="display: block; font-size: 15px; font-weight: 700; font-style: italic; color: ${cardColor}; line-height: 1.4; white-space: pre-line; text-align: center;">${c.custom_detail}</div>
+                        ` : `
+                            <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
+                            <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
+                            <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ${c.card_unit || 'ប្រអប់'}</div>
+                            <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ${c.card_unit || 'ប្រអប់'}/1កេស</div>
+                            <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
+                        `}
                     </div>
                 </div>
                 <div class="inflow-spec-price-header-grid" style="background: ${cardColor};">

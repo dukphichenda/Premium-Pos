@@ -454,6 +454,8 @@ def init_db():
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS tax_number VARCHAR(100);")
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id INTEGER;")
                 cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_unit VARCHAR(50) DEFAULT 'ប្រអប់';")
+                cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_custom_detail TEXT DEFAULT NULL;")
+                cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_is_custom_detail BOOLEAN DEFAULT FALSE;")
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS purchase_order_attachments (
                         id SERIAL PRIMARY KEY,

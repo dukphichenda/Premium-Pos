@@ -1698,6 +1698,14 @@
                             <button type="button" class="inflow-spec-add-unit-mini-btn font-khmer" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យខ្នាតថ្មី (Add new unit word)">+ បន្ថែមពាក្យ</button>
                         </div>
 
+                        <!-- Custom Product Detail Checkbox in Toolbar -->
+                        <div class="inflow-style-control-group" title="Tick to edit custom details manually / ដោះធីកដើម្បីទាញស្វ័យប្រវត្តិតាមផលិតផល">
+                            <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; margin: 0;">
+                                <input type="checkbox" id="chkCustomDetailToolbar" onchange="toggleCustomPriceCardDetail(this.checked)" {% if price_card and price_card.is_custom_detail %}checked{% endif %} style="cursor: pointer; width: 14px; height: 14px; accent-color: #0284C7; margin: 0;">
+                                <span class="inflow-style-control-lbl font-khmer" style="font-weight: 700;">✏️ Custom Writing</span>
+                            </label>
+                        </div>
+
                         {% if can_view_costs %}
                         <button type="button" class="inflow-btn-showcase-action" id="btnToggleProfit" onclick="toggleInternalProfitDrawer()" title="Click to view internal cost & profit analysis (Screenshot 2)">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -1757,9 +1765,13 @@
                             <div class="inflow-spec-hdr-km font-khmer" id="cardKhmerTitle">{{ price_card.khmer_name if price_card else product.name }}</div>
                             <div class="inflow-spec-hdr-en" id="cardEnglishTitle">{{ price_card.english_name if price_card else (product.sku or '') }}</div>
                         </div>
-                        <div class="inflow-spec-header-cell">
+                        <div class="inflow-spec-header-cell" style="position: relative;">
                             <div class="inflow-spec-hdr-km font-khmer">ព័ត៌មានលម្អិត</div>
                             <div class="inflow-spec-hdr-en">(Product Detail)</div>
+                            <label class="inflow-spec-custom-toggle no-print" data-html2canvas-ignore="true" title="Tick to edit custom details manually / ធីកដើម្បីសរសេរព័ត៌មានលម្អិតដោយខ្លួនឯង">
+                                <input type="checkbox" id="chkCustomDetail" onchange="toggleCustomPriceCardDetail(this.checked)" {% if price_card and price_card.is_custom_detail %}checked{% endif %}>
+                                <span>Custom</span>
+                            </label>
                         </div>
                     </div>
 
@@ -1777,20 +1789,31 @@
                         </div>
 
                         <div class="inflow-spec-info-box">
-                            <div class="inflow-spec-info-line">
-                                ទំហំ: <span id="specDimVal">{{ price_card.dim_str if price_card else '21cm x 21cm x 4cm' }}</span>
+                            <!-- Auto Details (generated automatically from product) -->
+                            <div id="specInfoAutoContent" style="display: {% if price_card and price_card.is_custom_detail %}none{% else %}flex{% endif %}; flex-direction: column; gap: 10px; width: 100%; align-items: center;">
+                                <div class="inflow-spec-info-line">
+                                    ទំហំ: <span id="specDimVal">{{ price_card.dim_str if price_card else '21cm x 21cm x 4cm' }}</span>
+                                </div>
+                                <div class="inflow-spec-info-line" id="specPacksValLine">
+                                    1 កេស មាន <span id="specPacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 3)) }}</span> ដុំ
+                                </div>
+                                <div class="inflow-spec-info-line" id="specPcsPackValLine">
+                                    1 ដុំ មាន <span id="specPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>
+                                </div>
+                                <div class="inflow-spec-info-line">
+                                    <span id="specPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>/1កេស
+                                </div>
+                                <div class="inflow-spec-info-sub">
+                                    (<span id="specPcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> PCS/ Carton)
+                                </div>
                             </div>
-                            <div class="inflow-spec-info-line" id="specPacksValLine">
-                                1 កេស មាន <span id="specPacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 3)) }}</span> ដុំ
-                            </div>
-                            <div class="inflow-spec-info-line" id="specPcsPackValLine">
-                                1 ដុំ មាន <span id="specPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>
-                            </div>
-                            <div class="inflow-spec-info-line">
-                                <span id="specPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>/1កេស
-                            </div>
-                            <div class="inflow-spec-info-sub">
-                                (<span id="specPcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> PCS/ Carton)
+
+                            <!-- Custom Details (user written text) -->
+                            <div id="specInfoCustomContent" style="display: {% if price_card and price_card.is_custom_detail %}block{% else %}none{% endif %}; width: 100%;">
+                                <textarea id="specCustomDetailTextarea" class="inflow-spec-custom-textarea font-khmer no-print" data-html2canvas-ignore="true" 
+                                          rows="5" placeholder="សរសេរព័ត៌មានលម្អិតនៅទីនេះ...&#10;ទំហំ: 15cm x 21cm x 4cm&#10;1 កេស មាន 8 ដុំ&#10;1 ដុំ មាន 50 បេ&#10;400 បេ/1កេស&#10;(400 PCS/ Carton)" 
+                                          oninput="onCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</textarea>
+                                <div id="specCustomDetailDisplay" class="inflow-spec-custom-display font-khmer">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</div>
                             </div>
                         </div>
                     </div>
@@ -2721,6 +2744,16 @@ function saveProductChanges(callback) {
     const unitEl = document.getElementById('priceCardUnitSelectToolbar');
     if (unitEl && (pendingChanges['price_card_unit'] !== undefined || String(unitEl.value).trim() !== String(unitEl.defaultValue || '').trim())) {
         pendingChanges['price_card_unit'] = unitEl.value.trim();
+        isDirty = true;
+    }
+    const chkCustomEl = document.getElementById('chkCustomDetail') || document.getElementById('chkCustomDetailToolbar');
+    if (chkCustomEl && (pendingChanges['price_card_is_custom_detail'] !== undefined || chkCustomEl.checked !== chkCustomEl.defaultChecked)) {
+        pendingChanges['price_card_is_custom_detail'] = chkCustomEl.checked;
+        isDirty = true;
+    }
+    const customDetailEl = document.getElementById('specCustomDetailTextarea');
+    if (customDetailEl && (pendingChanges['price_card_custom_detail'] !== undefined || String(customDetailEl.value).trim() !== String(customDetailEl.defaultValue || '').trim())) {
+        pendingChanges['price_card_custom_detail'] = customDetailEl.value.trim();
         isDirty = true;
     }
 
@@ -4977,6 +5010,66 @@ async function initPriceCardUnits(currentUnit) {
 }
 
 // ==========================================================================
+// PRODUCT DETAIL: AUTO VS CUSTOM WRITING LOGIC
+// ==========================================================================
+function generateCurrentAutoDetailText() {
+    const dim = document.getElementById('specDimVal')?.innerText.trim() || '21cm x 21cm x 4cm';
+    const packs = document.getElementById('specPacksVal')?.innerText.trim() || '8';
+    const pcsPack = document.getElementById('specPcsPackVal')?.innerText.trim() || '50';
+    const pcsCase = document.getElementById('specPcsCaseVal')?.innerText.trim() || '400';
+    const unitWord = document.getElementById('priceCardUnitSelectToolbar')?.value || 'ប្រអប់';
+    
+    return `ទំហំ: ${dim}\n1 កេស មាន ${packs} ដុំ\n1 ដុំ មាន ${pcsPack} ${unitWord}\n${pcsCase} ${unitWord}/1កេស\n(${pcsCase} PCS/ Carton)`;
+}
+
+function toggleCustomPriceCardDetail(isCustom) {
+    const c1 = document.getElementById('chkCustomDetail');
+    const c2 = document.getElementById('chkCustomDetailToolbar');
+    if (c1) c1.checked = isCustom;
+    if (c2) c2.checked = isCustom;
+
+    const autoBox = document.getElementById('specInfoAutoContent');
+    const customBox = document.getElementById('specInfoCustomContent');
+    const ta = document.getElementById('specCustomDetailTextarea');
+    const disp = document.getElementById('specCustomDetailDisplay');
+
+    if (isCustom) {
+        if (autoBox) autoBox.style.display = 'none';
+        if (customBox) customBox.style.display = 'block';
+        if (ta) {
+            if (!ta.value.trim()) {
+                const autoText = generateCurrentAutoDetailText();
+                ta.value = autoText;
+                if (disp) disp.innerText = autoText;
+            }
+            ta.focus();
+        }
+    } else {
+        if (autoBox) autoBox.style.display = 'flex';
+        if (customBox) customBox.style.display = 'none';
+    }
+
+    markFieldDirty('price_card_is_custom_detail', isCustom);
+    if (ta && ta.value) {
+        markFieldDirty('price_card_custom_detail', ta.value.trim());
+    }
+    saveProductChanges();
+}
+
+function onCustomDetailInput(val) {
+    const disp = document.getElementById('specCustomDetailDisplay');
+    if (disp) disp.innerText = val;
+    markFieldDirty('price_card_custom_detail', val);
+    markFieldDirty('price_card_is_custom_detail', true);
+    setDirtyState(true);
+
+    clearTimeout(window._customDetailTimer);
+    window._customDetailTimer = setTimeout(() => {
+        saveProductChanges();
+    }, 1200);
+}
+
+// ==========================================================================
 // DUAL PRICING: PRICE PER CASE & PRICE PER PCS AUTO-CALCULATOR
 // ==========================================================================
 function getPcsPerCase() {
@@ -5326,12 +5419,18 @@ function copyPriceCardText() {
     
     const note = document.getElementById('cardNotesInput')?.value || '';
     const unitWord = document.getElementById('priceCardUnitSelectToolbar')?.value || 'ប្រអប់';
+    const isCustom = document.getElementById('chkCustomDetail')?.checked || document.getElementById('chkCustomDetailToolbar')?.checked;
+    const customText = document.getElementById('specCustomDetailTextarea')?.value.trim();
     
     let text = `📦 ${kmTitle} / ${enTitle}\n`;
     text += `🔹 ព័ត៌មានលម្អិត:\n`;
-    text += `• ទំហំ: ${dim}\n`;
-    text += `• 1 កេស មាន ${packs} ដុំ (${pcsPack} ${unitWord}/ដុំ)\n`;
-    text += `• ${pcsCase} ${unitWord}/1កេស (${pcsCase} PCS/ Carton)\n\n`;
+    if (isCustom && customText) {
+        text += `${customText}\n\n`;
+    } else {
+        text += `• ទំហំ: ${dim}\n`;
+        text += `• 1 កេស មាន ${packs} ដុំ (${pcsPack} ${unitWord}/ដុំ)\n`;
+        text += `• ${pcsCase} ${unitWord}/1កេស (${pcsCase} PCS/ Carton)\n\n`;
+    }
     text += `💰 តារាងតម្លៃ (PRICE LIST):\n`;
     text += `• ${q1} ${unitWord} (PCS) = $${p1} ${u1}\n`;
     text += `• ${q2} ${unitWord} (PCS) = $${p2} ${u2}\n`;
@@ -5612,6 +5711,19 @@ function renderOffscreenCard(stage, item) {
     
     const unitWord = c.card_unit || 'ប្រអប់';
     
+    let detailBoxHtml = '';
+    if (c.is_custom_detail && c.custom_detail) {
+        detailBoxHtml = `<div class="inflow-spec-custom-display font-khmer" style="display: block !important; font-size: 15px; font-weight: 700; font-style: italic; color: ${cardColor}; line-height: 1.4; white-space: pre-line; text-align: center;">${c.custom_detail}</div>`;
+    } else {
+        detailBoxHtml = `
+            <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
+            <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
+            <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ${unitWord}</div>
+            <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ${unitWord}/1កេស</div>
+            <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
+        `;
+    }
+    
     stage.innerHTML = `
         <div class="inflow-spec-header-grid" style="background: ${cardColor};">
             <div class="inflow-spec-header-cell">
@@ -5628,11 +5740,7 @@ function renderOffscreenCard(stage, item) {
                 ${imgHtml}
             </div>
             <div class="inflow-spec-info-box">
-                <div class="inflow-spec-info-line">ទំហំ: <span>${c.dim_str || '21cm x 21cm x 4cm'}</span></div>
-                <div class="inflow-spec-info-line">1 កេស មាន <span>${c.packs_per_case}</span> ដុំ</div>
-                <div class="inflow-spec-info-line">1 ដុំ មាន <span>${c.pcs_per_pack}</span> ${unitWord}</div>
-                <div class="inflow-spec-info-line"><span>${c.pcs_per_case}</span> ${unitWord}/1កេស</div>
-                <div class="inflow-spec-info-sub">(${c.pcs_per_case} PCS/ Carton)</div>
+                ${detailBoxHtml}
             </div>
         </div>
         <div class="inflow-spec-price-header-grid" style="background: ${cardColor};">

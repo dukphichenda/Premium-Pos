@@ -76,9 +76,12 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
     names = _split_khmer_english(product.get('name'), product.get('sku'))
     
     # Dimensions (default 21cm x 21cm x 4cm matching reference)
-    length = float(product.get('length') or 21)
-    width = float(product.get('width') or 21)
-    height = float(product.get('height') or 4)
+    l_val = product.get('length')
+    w_val = product.get('width')
+    h_val = product.get('height')
+    length = float(l_val) if l_val is not None and float(l_val) > 0 else 21
+    width = float(w_val) if w_val is not None and float(w_val) > 0 else 21
+    height = float(h_val) if h_val is not None and float(h_val) > 0 else 4
     dim_str = f"{length:g}cm x {width:g}cm x {height:g}cm"
     
     # Packaging specs
@@ -99,6 +102,18 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         pcs_per_case = 400.0
         packs_per_case = 8.0
         pcs_per_pack = 50.0
+
+    card_unit = product.get('price_card_unit') or 'ប្រអប់'
+    auto_detail_lines = [
+        f"ទំហំ: {dim_str}",
+        f"1 កេស មាន {packs_per_case:g} ដុំ",
+        f"1 ដុំ មាន {pcs_per_pack:g} {card_unit}",
+        f"{pcs_per_case:g} {card_unit}/1កេស",
+        f"({pcs_per_case:g} PCS/ Carton)"
+    ]
+    auto_detail_text = "\n".join(auto_detail_lines)
+    is_custom_detail = bool(product.get('price_card_is_custom_detail'))
+    custom_detail = product.get('price_card_custom_detail') or ''
     
     # Default tier amounts:
     # Tier 1 = 100 pcs
@@ -254,7 +269,10 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'profit_pct_3': int(profit_pct_3 + 0.5),
         'card_color': final_color,
         'card_font': product.get('price_card_font') or 'Kantumruy Pro',
-        'card_unit': product.get('price_card_unit') or 'ប្រអប់',
+        'card_unit': card_unit,
+        'is_custom_detail': is_custom_detail,
+        'custom_detail': custom_detail,
+        'auto_detail_text': auto_detail_text,
         'notes': product.get('price_card_notes') or '',
         'can_view_costs': can_view_costs
     }
@@ -916,6 +934,7 @@ def update_product_ajax(id):
             'tier_qty_1', 'tier_qty_2', 'tier_qty_3',
             'tier_price_1', 'tier_price_2', 'tier_price_3',
             'price_card_notes', 'price_card_color', 'price_card_font', 'price_card_unit',
+            'price_card_custom_detail', 'price_card_is_custom_detail',
             'factory_cost', 'factory_cost_formula',
             'cost_rate', 'cost_rate_formula',
             'shipping_cost', 'shipping_cost_formula',
@@ -969,6 +988,10 @@ def update_product_ajax(id):
                     val = int(val) if val and str(val).strip() != '' else None
                 elif field in ('price_decimals', 'cost_decimals', 'qty_decimals'):
                     val = int(val) if val is not None and str(val).strip() not in ('', 'None', 'null', '-1') else None
+                elif field == 'price_card_is_custom_detail':
+                    val = bool(val) if val is not None else False
+                elif field == 'price_card_custom_detail':
+                    val = str(val).strip() if val is not None else None
                 elif field in ('tier_qty_1', 'tier_qty_2', 'tier_qty_3'):
                     val = int(safe_eval_math(val)) if val is not None and str(val).strip() not in ('', 'None', 'null') and int(safe_eval_math(val)) > 0 else None
                 elif field in ('length', 'width', 'height', 'weight', 'reorder_point', 'reorder_quantity',
