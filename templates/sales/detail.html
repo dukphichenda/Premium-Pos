@@ -21,24 +21,115 @@
     height: 100% !important;
     overflow: hidden !important;
     box-shadow: 2px 0 8px rgba(15, 23, 42, 0.04) !important;
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease !important;
+}
+
+/* Sidebar Collapsed State (100% full-width document view) */
+.inflow-so-workspace.sidebar-collapsed #soMasterSidebar,
+.inflow-so-workspace.drawer-collapsed #soMasterSidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    overflow: hidden !important;
+    border-right: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.inflow-so-workspace.sidebar-collapsed #soSidebarExpandTab,
+.inflow-so-workspace.drawer-collapsed #soSidebarExpandTab {
+    display: flex !important;
+}
+.inflow-so-workspace.sidebar-collapsed .so-expand-tb-btn,
+.inflow-so-workspace.drawer-collapsed .so-expand-tb-btn {
+    display: inline-flex !important;
+}
+
+/* Modern Unified Sidebar Edge Tab (when collapsed) */
+.inflow-sidebar-edge-tab {
+    display: none;
+    width: 28px;
+    height: 100%;
+    background: #F8FAFC;
+    border-right: 1px solid #CBD5E1;
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 12px;
+    gap: 10px;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+    z-index: 50;
+}
+.inflow-sidebar-edge-tab:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+}
+.inflow-sidebar-edge-tab .edge-tab-icon-wrap {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.inflow-sidebar-edge-tab:hover .edge-tab-icon-wrap {
+    transform: translateX(2px);
+    background: #0D9488;
+    border-color: #0D9488;
+    color: #FFFFFF;
+}
+.inflow-sidebar-edge-tab .edge-tab-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.inflow-sidebar-edge-tab .edge-tab-count {
+    font-size: 10px;
+    font-weight: 800;
+    color: #0D9488;
+    background: #E6F4F1;
+    border-radius: 9999px;
+    padding: 1px 5px;
+    line-height: 1.2;
+}
+.so-minimize-btn {
+    transition: all 0.15s ease;
+}
+.so-minimize-btn:hover {
+    background: #F1F5F9 !important;
+    border-color: #0D9488 !important;
+    color: #0D9488 !important;
 }
 
 .so-sidebar-topbar {
-    padding: 10px 12px 6px;
+    padding: 10px 10px 6px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     background: #F8FAFC;
     position: relative;
     z-index: 100;
 }
 
 .so-icon-btn {
-    width: 34px;
-    height: 34px;
-    border-radius: 7px;
-    border: 1.5px solid #475569;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1.5px solid #CBD5E1;
     background: #FFFFFF;
     color: #475569;
     display: inline-flex;
@@ -861,6 +952,11 @@
 <!-- inFlow Desktop Ribbon Toolbar -->
 <div class="inflow-desktop-toolbar">
     <div class="inflow-toolbar-left">
+        <!-- Expand Sidebar Button (visible when sidebar is collapsed) -->
+        <button type="button" class="inflow-tb-btn so-expand-tb-btn" id="soExpandTbBtn" onclick="toggleSoSidebarCollapse()" title="Expand Orders List / ពង្រីកបញ្ជីលក់ (Ctrl+[)" style="display: none; background: #F0FDF4; border-color: #86EFAC; color: #166534; font-weight: 700;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <span>Orders List</span>
+        </button>
         <a href="javascript:void(0)" onclick="createNewOrderInTab()" class="inflow-tb-btn" title="Create a new sales order in this tab">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
             <span>New</span>
@@ -1145,13 +1241,20 @@
                 </div>
             </div>
 
-            <!-- Add New Order Button [ + ] -->
-            <button type="button" class="so-icon-btn" id="btnStartNewOrder" onclick="createNewOrderInTab()" title="Create New Sales Order (+)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-            </button>
+            <!-- Top Action Buttons: [ + ] and [ ◀ Minimize ] -->
+            <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <button type="button" class="so-icon-btn" id="btnStartNewOrder" onclick="createNewOrderInTab()" title="Create New Sales Order (+)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+                <button type="button" class="so-icon-btn so-minimize-btn" id="btnMinimizeSoSidebar" onclick="toggleSoSidebarCollapse()" title="Minimize Orders List / បង្រួមបញ្ជីលក់ (Ctrl+[)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <!-- Wider Search Input Box (Directly visible) -->
@@ -1338,9 +1441,15 @@
         </div>
     </div>
 
-    <!-- Uncollapse vertical bar (visible when drawer is collapsed) -->
-    <div class="inflow-drawer-uncollapse-bar" onclick="toggleDrawerCollapse()" title="Click to show Search Drawer">
-        <span>🔍 Search & Select Orders ({% if order.order_number %}{{ order.order_number }}{% else %}New{% endif %})</span>
+    <!-- Edge rail tab visible when sidebar is collapsed/minimized -->
+    <div class="inflow-sidebar-edge-tab" id="soSidebarExpandTab" onclick="toggleSoSidebarCollapse()" title="Expand Orders List / ពង្រីកបញ្ជីលក់ (Ctrl+[)">
+        <div class="edge-tab-icon-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </div>
+        <span class="edge-tab-label">Orders</span>
+        <span class="edge-tab-count">{{ status_counts.total if status_counts else (sidebar_orders|length if sidebar_orders else 0) }}</span>
     </div>
 
     <!-- Sales Order Document Area -->
@@ -2930,17 +3039,53 @@ function toggleDrawerExpand() {
     }
 }
 
-// Drawer Collapse Toggle (Collapse sidebar completely for 100% full-width document)
-function toggleDrawerCollapse() {
+// Sidebar Minimize / Collapse Toggle (Collapse sidebar completely for 100% full-width document)
+function toggleSoSidebarCollapse(forceState) {
     const ws = document.querySelector('.inflow-so-workspace');
     if (!ws) return;
     const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
     if (isMobile) {
         ws.classList.toggle('mobile-drawer-open');
-    } else {
-        ws.classList.toggle('drawer-collapsed');
+        return;
     }
+    const isCurrentlyCollapsed = ws.classList.contains('sidebar-collapsed') || ws.classList.contains('drawer-collapsed');
+    const willCollapse = (typeof forceState === 'boolean') ? forceState : !isCurrentlyCollapsed;
+
+    if (willCollapse) {
+        ws.classList.add('sidebar-collapsed', 'drawer-collapsed');
+        try { localStorage.setItem('inflow_so_sidebar_collapsed', 'true'); } catch(e) {}
+    } else {
+        ws.classList.remove('sidebar-collapsed', 'drawer-collapsed');
+        try { localStorage.setItem('inflow_so_sidebar_collapsed', 'false'); } catch(e) {}
+    }
+    const expandBtn = document.getElementById('soExpandTbBtn');
+    if (expandBtn) expandBtn.style.display = willCollapse ? 'inline-flex' : 'none';
 }
+
+function toggleDrawerCollapse() {
+    toggleSoSidebarCollapse();
+}
+
+// Restore SO sidebar collapse state on load
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        if (localStorage.getItem('inflow_so_sidebar_collapsed') === 'true') {
+            toggleSoSidebarCollapse(true);
+        }
+    } catch(e) {}
+});
+
+// Shortcut Ctrl+[ to toggle sidebar
+document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && (e.key === '[' || e.key === '{')) {
+        const activeTag = (document.activeElement && document.activeElement.tagName) || '';
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
+            return;
+        }
+        e.preventDefault();
+        toggleSoSidebarCollapse();
+    }
+});
 
 // Full Screen Toggle Function
 function toggleSalesOrderFullScreen() {

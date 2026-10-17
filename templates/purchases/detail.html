@@ -85,6 +85,94 @@
     overflow: hidden;
     user-select: none;
     flex-shrink: 0;
+    transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease !important;
+}
+
+/* PO Sidebar Collapsed State (100% full-width document view) */
+.inflow-po-split-workspace.sidebar-collapsed .po-master-sidebar {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    overflow: hidden !important;
+    border-right: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+.inflow-po-split-workspace.sidebar-collapsed #poSidebarExpandTab {
+    display: flex !important;
+}
+.inflow-po-split-workspace.sidebar-collapsed .po-expand-tb-btn {
+    display: inline-flex !important;
+}
+
+/* Unified Edge Rail Tab */
+.inflow-sidebar-edge-tab {
+    display: none;
+    width: 28px;
+    height: 100%;
+    background: #F8FAFC;
+    border-right: 1px solid #CBD5E1;
+    cursor: pointer;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 12px;
+    gap: 10px;
+    user-select: none;
+    transition: background 0.15s ease, border-color 0.15s ease;
+    flex-shrink: 0;
+    z-index: 50;
+}
+.inflow-sidebar-edge-tab:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+}
+.inflow-sidebar-edge-tab .edge-tab-icon-wrap {
+    width: 22px;
+    height: 22px;
+    border-radius: 4px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    transition: transform 0.15s ease, background 0.15s ease, color 0.15s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.inflow-sidebar-edge-tab:hover .edge-tab-icon-wrap {
+    transform: translateX(2px);
+    background: #7A5531;
+    border-color: #7A5531;
+    color: #FFFFFF;
+}
+.inflow-sidebar-edge-tab .edge-tab-label {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+}
+.inflow-sidebar-edge-tab .edge-tab-count {
+    font-size: 10px;
+    font-weight: 800;
+    color: #7A5531;
+    background: #F7EFE8;
+    border-radius: 9999px;
+    padding: 1px 5px;
+    line-height: 1.2;
+}
+.po-minimize-btn {
+    transition: all 0.15s ease;
+}
+.po-minimize-btn:hover {
+    background: #F8FAFC !important;
+    border-color: #7A5531 !important;
+    color: #7A5531 !important;
 }
 .po-master-topbar {
     display: flex;
@@ -1268,13 +1356,20 @@ input:checked + .po-toggle-slider:before {
                 </div>
             </div>
 
-            <!-- Quick Add Button: [ + ] -->
-            <button type="button" class="po-icon-btn" onclick="startNewPurchaseOrder()" title="Create New Purchase Order (+)">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-            </button>
+            <!-- Quick Action Buttons: [ + ] and [ ◀ Minimize ] -->
+            <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <button type="button" class="po-icon-btn" onclick="startNewPurchaseOrder()" title="Create New Purchase Order (+)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
+                <button type="button" class="po-icon-btn po-minimize-btn" id="btnMinimizePoSidebar" onclick="togglePoSidebarCollapse()" title="Minimize Purchases List / បង្រួមបញ្ជីទិញ (Ctrl+[)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
         </div>
 
         <!-- Collapsible Search Input Box -->
@@ -1393,6 +1488,17 @@ input:checked + .po-toggle-slider:before {
         </div>
     </aside>
 
+    <!-- Edge rail tab visible when sidebar is collapsed/minimized -->
+    <div class="inflow-sidebar-edge-tab po-edge-tab" id="poSidebarExpandTab" onclick="togglePoSidebarCollapse()" title="Expand Purchases List / ពង្រីកបញ្ជីទិញ (Ctrl+[)">
+        <div class="edge-tab-icon-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+        </div>
+        <span class="edge-tab-label">Purchases</span>
+        <span class="edge-tab-count">{{ sidebar_orders|length if sidebar_orders else 0 }}</span>
+    </div>
+
     <!-- ========================================================================= -->
     <!-- RIGHT DETAIL CANVAS: Purchase Order Detail Form & Products Table          -->
     <!-- ========================================================================= -->
@@ -1406,8 +1512,15 @@ input:checked + .po-toggle-slider:before {
 
             <!-- Canvas Top Actions Bar (Matching Top-Right Links in Screenshot) -->
             <div class="po-canvas-topbar">
-                <div class="po-canvas-topbar-left">
+                <div class="po-canvas-topbar-left" style="display: flex; align-items: center; gap: 8px;">
                     <button type="button" class="po-close-canvas-btn" onclick="handleClosePo(event)" title="Close document">✕</button>
+                    <!-- Expand Button (shown when collapsed) -->
+                    <button type="button" class="po-expand-tb-btn" id="poExpandTbBtn" onclick="togglePoSidebarCollapse()" title="Expand Purchases List (Ctrl+[)" style="display: none; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 5px; background: #F8FAFC; border: 1px solid #CBD5E1; color: #7A5531; font-size: 12px; font-weight: 700; cursor: pointer;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="9 18 15 12 9 6"></polyline>
+                        </svg>
+                        <span>Purchases List</span>
+                    </button>
                     <span id="poDirtyBadge" class="po-dirty-tag" style="display: none;">● Unsaved changes</span>
                 </div>
                 <div class="po-canvas-topbar-right">
@@ -3522,8 +3635,44 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// PO Sidebar Minimize / Collapse Toggle (100% full-width document view)
+function togglePoSidebarCollapse(forceState) {
+    const ws = document.querySelector('.inflow-po-split-workspace');
+    if (!ws) return;
+    const isCurrentlyCollapsed = ws.classList.contains('sidebar-collapsed');
+    const willCollapse = (typeof forceState === 'boolean') ? forceState : !isCurrentlyCollapsed;
+
+    if (willCollapse) {
+        ws.classList.add('sidebar-collapsed');
+        try { localStorage.setItem('inflow_po_sidebar_collapsed', 'true'); } catch(e) {}
+    } else {
+        ws.classList.remove('sidebar-collapsed');
+        try { localStorage.setItem('inflow_po_sidebar_collapsed', 'false'); } catch(e) {}
+    }
+    const expandBtn = document.getElementById('poExpandTbBtn');
+    if (expandBtn) expandBtn.style.display = willCollapse ? 'inline-flex' : 'none';
+}
+
+// Shortcut Ctrl+[ to toggle PO sidebar
+document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === '[' || e.key === '{')) {
+        const activeTag = (document.activeElement && document.activeElement.tagName) || '';
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
+            return;
+        }
+        e.preventDefault();
+        togglePoSidebarCollapse();
+    }
+});
+
 // Initialize line auto counts on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
+    try {
+        if (localStorage.getItem('inflow_po_sidebar_collapsed') === 'true') {
+            togglePoSidebarCollapse(true);
+        }
+    } catch(e) {}
+
     document.querySelectorAll('#poLineItemsBody tr.po-line-row').forEach(row => {
         updateLineAutoCountAndSubtotal(row);
     });
