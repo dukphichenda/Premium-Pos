@@ -1728,10 +1728,6 @@
                                 </a>
                             </div>
                         </div>
-                        <button type="button" class="inflow-btn-showcase-action" style="background: #0284C7; color: #FFFFFF; border-color: #0284C7;" onclick="savePriceCardSettings()" title="Save tier quantities, packaging, notes, color and font">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                            <span class="font-khmer">💾 រក្សាទុក</span>
-                        </button>
                     </div>
                 </div>
 
@@ -4719,11 +4715,6 @@ function changePriceCardColor(color) {
     });
     
     markFieldDirty('price_card_color', color);
-    fetch(`/products/${CURRENT_PRODUCT_ID}/update_ajax`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ price_card_color: color })
-    }).catch(err => console.error('Color save error:', err));
 }
 
 function changePriceCardFont(font) {
@@ -4736,11 +4727,6 @@ function changePriceCardFont(font) {
     if (selectEl) selectEl.value = font;
     
     markFieldDirty('price_card_font', font);
-    fetch(`/products/${CURRENT_PRODUCT_ID}/update_ajax`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ price_card_font: font })
-    }).catch(err => console.error('Font save error:', err));
 }
 
 // ==========================================================================
@@ -4958,6 +4944,11 @@ function onCardTierQtyChange(idx) {
     const totInput = document.getElementById('cardTierTotInput' + idx);
     if (totInput) totInput.value = (qty * unitPrice).toFixed(2);
     
+    markFieldDirty('tier_qty_' + idx, qty);
+    if (totInput) {
+        markFieldDirty('tier_price_' + idx, parseFloat(totInput.value) || 0);
+    }
+    
     recalcProfitTable();
 }
 
@@ -4971,6 +4962,8 @@ function onCardTierTotChange(idx) {
     const unitPrice = qty > 0 ? (tot / qty) : 0;
     const unitDisp = document.getElementById('cardTierUnitDisplay' + idx);
     if (unitDisp) unitDisp.innerText = `(${unitPrice.toFixed(3)} $/PCS)`;
+    
+    markFieldDirty('tier_price_' + idx, tot);
     
     recalcProfitTable();
 }
@@ -5403,44 +5396,7 @@ function renderOffscreenCard(stage, item) {
 }
 
 function savePriceCardSettings() {
-    const payload = {
-        length: parseFloat(document.getElementById('dimLengthInput')?.value) || 21,
-        width: parseFloat(document.getElementById('dimWidthInput')?.value) || 21,
-        height: parseFloat(document.getElementById('dimHeightInput')?.value) || 4,
-        packs_per_case: parseFloat(document.getElementById('packsPerCaseInput')?.value) || 4,
-        pcs_per_pack: parseFloat(document.getElementById('pcsPerPackInput')?.value) || 100,
-        tier_qty_1: parseInt(document.getElementById('cardTierQtyInput1')?.value) || 100,
-        tier_qty_2: parseInt(document.getElementById('cardTierQtyInput2')?.value) || 400,
-        tier_qty_3: parseInt(document.getElementById('cardTierQtyInput3')?.value) || 800,
-        tier_price_1: parseFloat(document.getElementById('cardTierTotInput1')?.value) || 15.0,
-        tier_price_2: parseFloat(document.getElementById('cardTierTotInput2')?.value) || 56.0,
-        tier_price_3: parseFloat(document.getElementById('cardTierTotInput3')?.value) || 108.0,
-        price_card_notes: document.getElementById('cardNotesInput')?.value.trim() || '',
-        price_card_color: document.getElementById('priceCardColorInput')?.value || '#00A3E0',
-        price_card_font: document.getElementById('priceCardFontSelect')?.value || 'Kantumruy Pro',
-        cost_formula: document.getElementById('productCostInput')?.dataset?.formula || null,
-        standard_cost: evaluateMathExpression(document.getElementById('productCostInput')?.value) || 0
-    };
-    
-    fetch(`/products/${CURRENT_PRODUCT_ID}/update_ajax`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            showToastNotification('✅ រក្សាទុកតារាងតម្លៃ & ទំហំបានជោគជ័យ! (Price card saved!)');
-            isDirty = false;
-            updateSaveButtonState();
-        } else {
-            alert('Failed to save: ' + (data.message || 'Unknown error'));
-        }
-    })
-    .catch(err => {
-        console.error('Save error:', err);
-        alert('Error saving price card.');
-    });
+    saveProductChanges();
 }
 
 function showToastNotification(msg) {

@@ -77,5 +77,21 @@ class TestProductImageSaveAndExit(unittest.TestCase):
         self.assertIn("next_url = request.form.get('next_url')", content)
         self.assertIn("if next_url:\n            return redirect(next_url)", content)
 
+    def test_showcase_uses_top_save_button(self):
+        with open(self.catalog_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Verify showcase toolbar does not contain separate Save button
+        showcase_toolbar_idx = content.find('class="inflow-price-showcase-actions"')
+        self.assertNotEqual(showcase_toolbar_idx, -1)
+        toolbar_snippet = content[showcase_toolbar_idx:showcase_toolbar_idx + 3500]
+        self.assertNotIn('onclick="savePriceCardSettings()"', toolbar_snippet)
+        self.assertNotIn('💾 Save', toolbar_snippet)
+        self.assertNotIn('💾 រក្សាទុក', toolbar_snippet)
+
+        # Verify tier changes call markFieldDirty
+        self.assertIn("markFieldDirty('tier_qty_' + idx, qty)", content)
+        self.assertIn("markFieldDirty('tier_price_' + idx, tot)", content)
+
 if __name__ == '__main__':
     unittest.main()
