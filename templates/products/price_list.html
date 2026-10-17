@@ -1,0 +1,1622 @@
+{% extends 'base.html' %}
+
+{% block title %}Product Price List (តារាងតម្លៃទំនិញ) - inFlow Premium{% endblock %}
+
+{% block head_extra %}
+<!-- html2pdf bundle for client-side PDF export -->
+<script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
+<style>
+/* ==========================================================================
+   PRODUCT PRICE LIST STYLES (Matching Screenshot 2 Exact Visual Design)
+   ========================================================================== */
+:root {
+    --price-theme-color: #3B4B64; /* Default slate navy blue matching user reference */
+    --price-font-family: 'Kantumruy Pro', 'Siemreap', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.price-list-page {
+    padding: 20px 28px 60px;
+    max-width: 1560px;
+    margin: 0 auto;
+    font-family: var(--price-font-family);
+    color: #0F172A;
+}
+
+/* Header bar */
+.pl-header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #E2E8F0;
+}
+.pl-header-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+.pl-header-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #1E293B 0%, #3B4B64 100%);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(59, 75, 100, 0.25);
+    flex-shrink: 0;
+}
+.pl-title-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.pl-title-en {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #0F172A;
+    letter-spacing: -0.02em;
+    margin: 0;
+}
+.pl-title-km {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #475569;
+}
+.pl-badge-count {
+    background: #E2E8F0;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 20px;
+}
+.pl-header-sub {
+    font-size: 0.85rem;
+    color: #64748B;
+    margin: 4px 0 0 0;
+}
+.pl-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Action Buttons */
+.pl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+.pl-btn-primary {
+    background: linear-gradient(135deg, #0284C7 0%, #0369A1 100%);
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.28);
+}
+.pl-btn-primary:hover {
+    background: linear-gradient(135deg, #0369A1 0%, #075985 100%);
+    transform: translateY(-1px);
+}
+.pl-btn-pdf {
+    background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.25);
+}
+.pl-btn-pdf:hover {
+    background: linear-gradient(135deg, #B91C1C 0%, #991B1B 100%);
+    transform: translateY(-1px);
+}
+.pl-btn-secondary {
+    background: #FFFFFF;
+    color: #334155;
+    border: 1px solid #CBD5E1;
+}
+.pl-btn-secondary:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+}
+
+/* Color theme swatches */
+.pl-theme-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: #F1F5F9;
+    border-radius: 8px;
+    border: 1px solid #E2E8F0;
+}
+.pl-color-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+    transition: transform 0.12s ease, outline 0.12s ease;
+}
+.pl-color-dot:hover {
+    transform: scale(1.15);
+}
+.pl-color-dot.active {
+    outline: 2px solid #0284C7;
+    outline-offset: 1px;
+}
+
+/* Control & Filter Toolbar */
+.pl-toolbar-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+.pl-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    flex: 1;
+}
+.pl-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+/* Segmented Scope Pill Selector (All Products / By Category / Selected Products) */
+.pl-scope-pills {
+    display: inline-flex;
+    background: #F1F5F9;
+    border-radius: 8px;
+    padding: 3px;
+    border: 1px solid #E2E8F0;
+}
+.pl-scope-btn {
+    padding: 6px 14px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #475569;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+.pl-scope-btn:hover {
+    color: #0F172A;
+}
+.pl-scope-btn.active {
+    background: #FFFFFF;
+    color: #0284C7;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+}
+
+/* Form selects & search */
+.pl-select {
+    height: 36px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #1E293B;
+    background: #FFFFFF;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.15s ease;
+}
+.pl-select:focus {
+    border-color: #0284C7;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+.pl-search-wrap {
+    position: relative;
+    min-width: 260px;
+    flex: 1;
+    max-width: 380px;
+}
+.pl-search-input {
+    width: 100%;
+    height: 36px;
+    padding-left: 34px;
+    padding-right: 28px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 12.5px;
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.15s ease;
+}
+.pl-search-input:focus {
+    border-color: #0284C7;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+}
+.pl-search-icon {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #94A3B8;
+    pointer-events: none;
+}
+.pl-search-clear {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: #94A3B8;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 4px;
+    display: none;
+}
+.pl-search-clear:hover {
+    color: #0F172A;
+}
+
+/* Selected Counter Badge */
+.pl-selected-pill {
+    background: #0284C7;
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 12px;
+}
+
+/* ==========================================================================
+   PRODUCT CARDS GRID & ITEM FORMAT (Matching Screenshot 2 Exactly)
+   ========================================================================== */
+.pl-groups-container {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+.pl-group-section {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 18px 20px 24px;
+}
+.pl-group-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 14px;
+    margin-bottom: 18px;
+    border-bottom: 2px solid #E2E8F0;
+}
+.pl-group-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #1E293B;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pl-group-tag {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+.pl-group-badge {
+    background: #E2E8F0;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 2px 10px;
+    border-radius: 12px;
+}
+
+/* The Cards Grid (2 cards per row on desktop, 1 on tablet/mobile) */
+.pl-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));
+    gap: 22px;
+}
+
+/* Individual Product Price Card (Screenshot 2 Authentic Design) */
+.pl-price-card {
+    background: #FFFFFF;
+    border: 1.5px solid var(--price-theme-color);
+    border-radius: 4px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+.pl-price-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+/* Selection Checkbox Overlay on Card */
+.pl-card-select-overlay {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 4px;
+    padding: 3px 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+.pl-card-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: #0284C7;
+}
+
+/* Card Header Grid: Split 50% / 50% */
+.pl-card-header-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--price-theme-color);
+    color: #FFFFFF;
+    border-bottom: 1.5px solid var(--price-theme-color);
+}
+.pl-card-header-left {
+    padding: 8px 12px;
+    border-right: 1.5px solid rgba(255, 255, 255, 0.35);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+}
+.pl-card-header-right {
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+}
+.pl-card-title-km {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.35;
+    letter-spacing: -0.01em;
+}
+.pl-card-title-uom {
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 3px;
+    opacity: 0.95;
+}
+.pl-card-detail-hdr {
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.3;
+}
+.pl-card-detail-sub {
+    font-size: 12px;
+    font-weight: 500;
+    font-style: italic;
+    opacity: 0.92;
+    margin-top: 2px;
+}
+
+/* Upper Body: Picture on Left, Specs on Right (50% / 50%) */
+.pl-card-upper-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1.5px solid var(--price-theme-color);
+    min-height: 200px;
+}
+.pl-card-image-box {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px;
+    background: #FFFFFF;
+    border-right: 1.5px solid var(--price-theme-color);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+.pl-card-img {
+    width: 100%;
+    max-height: 200px;
+    object-fit: contain;
+    display: block;
+    border-radius: 4px;
+}
+.pl-card-no-img {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #94A3B8;
+    height: 140px;
+}
+/* Volume / Capacity Badge on Image (Exact match from Screenshot 2: "2000 ml") */
+.pl-card-size-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(100, 116, 139, 0.78);
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: -0.01em;
+    backdrop-filter: blur(2px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    pointer-events: none;
+}
+
+/* Specs Box (Right Side) */
+.pl-card-specs-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 14px 12px;
+    text-align: center;
+    gap: 8px;
+    background: #FFFFFF;
+}
+.pl-card-spec-line {
+    font-size: 14px;
+    font-weight: 800;
+    font-style: italic;
+    color: var(--price-theme-color);
+    line-height: 1.35;
+}
+.pl-card-spec-carton {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: var(--price-theme-color);
+    margin-top: 1px;
+}
+
+/* Lower Body: Price Table Header (50% / 50%) */
+.pl-card-price-hdr-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    background: var(--price-theme-color);
+    color: #FFFFFF;
+    text-align: center;
+    border-bottom: 1.5px solid var(--price-theme-color);
+}
+.pl-card-price-hdr-cell {
+    padding: 6px 10px;
+}
+.pl-card-price-hdr-cell:first-child {
+    border-right: 1.5px solid rgba(255, 255, 255, 0.35);
+}
+.pl-price-hdr-km {
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.25;
+}
+.pl-price-hdr-en {
+    font-size: 11.5px;
+    font-weight: 600;
+    opacity: 0.92;
+    margin-top: 1px;
+}
+
+/* Lower Body: Price Rows (3 Tiers with dotted dividers) */
+.pl-card-price-rows {
+    display: flex;
+    flex-direction: column;
+    background: #FFFFFF;
+}
+.pl-card-price-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px dotted var(--price-theme-color);
+    min-height: 44px;
+    align-items: center;
+}
+.pl-card-price-row:last-child {
+    border-bottom: none;
+}
+.pl-card-price-row:hover {
+    background: #F8FAFC;
+}
+.pl-price-left-col {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 16px;
+    border-right: 1px dotted var(--price-theme-color);
+    box-sizing: border-box;
+}
+.pl-price-qty-lbl {
+    font-size: 14.5px;
+    font-weight: 800;
+    font-style: italic;
+    color: var(--price-theme-color);
+}
+.pl-price-qty-num {
+    font-size: 15px;
+    font-weight: 900;
+    font-style: italic;
+}
+.pl-price-tot-val {
+    font-size: 15px;
+    font-weight: 800;
+    font-style: italic;
+    color: #16A34A; /* Emerald green matching Screenshot 2 */
+    white-space: nowrap;
+}
+.pl-price-right-col {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    text-align: center;
+    box-sizing: border-box;
+}
+.pl-price-unit-val {
+    font-size: 14px;
+    font-weight: 800;
+    font-style: italic;
+    color: var(--price-theme-color);
+    letter-spacing: 0.01em;
+}
+
+/* Empty State */
+.pl-empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    background: #FFFFFF;
+    border: 1px dashed #CBD5E1;
+    border-radius: 12px;
+    color: #64748B;
+}
+
+/* ==========================================================================
+   PRODUCT SELECTION MODAL / DRAWER
+   ========================================================================== */
+.pl-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.55);
+    backdrop-filter: blur(3px);
+    z-index: 100050;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+.pl-modal-content {
+    background: #FFFFFF;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 720px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.25);
+    overflow: hidden;
+    animation: plModalIn 0.2s ease-out;
+}
+@keyframes plModalIn {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+.pl-modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #F8FAFC;
+}
+.pl-modal-title {
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.pl-modal-body {
+    padding: 16px 20px;
+    overflow-y: auto;
+    flex: 1;
+}
+.pl-modal-footer {
+    padding: 14px 20px;
+    border-top: 1px solid #E2E8F0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #F8FAFC;
+}
+.pl-picker-search-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.pl-picker-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 380px;
+    overflow-y: auto;
+}
+.pl-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 12px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.pl-picker-item:hover {
+    background: #F0F9FF;
+    border-color: #BAE6FD;
+}
+.pl-picker-item.selected {
+    background: #F0FDF4;
+    border-color: #86EFAC;
+}
+.pl-picker-thumb {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+    border-radius: 4px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    flex-shrink: 0;
+}
+.pl-picker-info {
+    flex: 1;
+    min-width: 0;
+}
+.pl-picker-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0F172A;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.pl-picker-meta {
+    font-size: 11.5px;
+    color: #64748B;
+    display: flex;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+/* ==========================================================================
+   EXPORT PDF SPINNER & PROGRESS OVERLAY
+   ========================================================================== */
+.pl-export-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.7);
+    z-index: 100060;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    text-align: center;
+}
+.pl-spinner {
+    width: 48px;
+    height: 48px;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: #0284C7;
+    border-radius: 50%;
+    animation: plSpin 0.8s linear infinite;
+    margin: 0 auto 16px;
+}
+@keyframes plSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* ==========================================================================
+   PRINT MEDIA STYLES (A4 Page Break Optimization)
+   ========================================================================== */
+@media print {
+    body {
+        background: #FFFFFF !important;
+        color: #000000 !important;
+        font-family: 'Kantumruy Pro', 'Siemreap', sans-serif !important;
+    }
+    .inflow-app-sidebar,
+    .inflow-top-navbar,
+    .pl-header-bar,
+    .pl-toolbar-card,
+    .pl-card-select-overlay,
+    .pl-modal-backdrop,
+    .pl-export-overlay,
+    .btn, button {
+        display: none !important;
+    }
+    .price-list-page {
+        padding: 0 !important;
+        margin: 0 !important;
+        max-width: 100% !important;
+    }
+    .pl-groups-container {
+        gap: 20px !important;
+    }
+    .pl-group-section {
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+    .pl-group-header {
+        border-bottom: 2px solid #000000 !important;
+        page-break-after: avoid !important;
+    }
+    .pl-cards-grid {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 16px !important;
+        page-break-inside: auto !important;
+    }
+    .pl-price-card {
+        box-shadow: none !important;
+        border: 1.5px solid #000000 !important;
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+        margin-bottom: 12px !important;
+    }
+    .pl-card-header-grid,
+    .pl-card-price-hdr-grid {
+        background: #2E3D52 !important;
+        color: #FFFFFF !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .pl-card-size-badge {
+        background: #475569 !important;
+        color: #FFFFFF !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+    .pl-price-tot-val {
+        color: #15803D !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+    }
+}
+
+/* Mobile Responsiveness */
+@media (max-width: 768px) {
+    .price-list-page {
+        padding: 14px 12px 60px;
+    }
+    .pl-cards-grid {
+        grid-template-columns: 1fr;
+    }
+    .pl-toolbar-card {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .pl-toolbar-left, .pl-toolbar-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+    .pl-search-wrap {
+        min-width: 100%;
+        max-width: 100%;
+    }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="price-list-page" id="priceListPage">
+
+    <!-- Top Header Bar -->
+    <div class="pl-header-bar">
+        <div class="pl-header-left">
+            <div class="pl-header-icon">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                </svg>
+            </div>
+            <div>
+                <div class="pl-title-row">
+                    <h1 class="pl-title-en">Product Price List</h1>
+                    <span class="pl-title-km font-khmer">(តារាងតម្លៃទំនិញ)</span>
+                    <span class="pl-badge-count" id="visibleCounter">Showing {{ total_products }} of {{ total_products }}</span>
+                </div>
+                <p class="pl-header-sub">
+                    Clean customer price table cards with 3 pricing tiers and packaging breakdown.
+                </p>
+            </div>
+        </div>
+
+        <div class="pl-header-actions">
+            <!-- Theme Color Selector (Matching Screenshot 2 Slate Navy #3B4B64 default) -->
+            <div class="pl-theme-wrap" title="Change Card Header Theme Color">
+                <span style="font-size: 11px; font-weight: 700; color: #64748B; margin-right: 2px;">Theme:</span>
+                <div class="pl-color-dot active" style="background: #3B4B64;" onclick="setThemeColor('#3B4B64', this)" title="Slate Navy (Reference)"></div>
+                <div class="pl-color-dot" style="background: #00A3E0;" onclick="setThemeColor('#00A3E0', this)" title="inFlow Cyan"></div>
+                <div class="pl-color-dot" style="background: #1E293B;" onclick="setThemeColor('#1E293B', this)" title="Dark Slate"></div>
+                <div class="pl-color-dot" style="background: #1D4ED8;" onclick="setThemeColor('#1D4ED8', this)" title="Royal Blue"></div>
+                <div class="pl-color-dot" style="background: #059669;" onclick="setThemeColor('#059669', this)" title="Emerald Green"></div>
+            </div>
+
+            <!-- Print Button -->
+            <button type="button" class="pl-btn pl-btn-secondary" onclick="window.print()" title="Print Price List (Ctrl+P)">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                    <rect x="6" y="14" width="12" height="8"></rect>
+                </svg>
+                <span>Print</span>
+            </button>
+
+            <!-- Export to PDF Button -->
+            <button type="button" class="pl-btn pl-btn-pdf" onclick="exportPriceListPDF()" id="btnExportPdf" title="Export Visible / Selected Cards to PDF">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <polyline points="9 15 12 18 15 15"></polyline>
+                </svg>
+                <span>Export PDF</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Controls & Filter Toolbar -->
+    <div class="pl-toolbar-card">
+        <div class="pl-toolbar-left">
+            <!-- 1. Scope Option: [ All Products | By Category | Selected Products ] -->
+            <div class="pl-scope-pills">
+                <button type="button" class="pl-scope-btn active" id="scopeAll" onclick="setScopeMode('all')">
+                    <span>🌐 All Products</span>
+                </button>
+                <button type="button" class="pl-scope-btn" id="scopeCategory" onclick="setScopeMode('category')">
+                    <span>📁 By Category</span>
+                </button>
+                <button type="button" class="pl-scope-btn" id="scopeSelected" onclick="setScopeMode('selected')">
+                    <span>☑️ Selected</span>
+                    <span class="pl-selected-pill" id="selectedCountPill">0</span>
+                </button>
+            </div>
+
+            <!-- Category Dropdown (active when By Category or for filtering) -->
+            <select id="categoryFilter" class="pl-select" onchange="applyFiltersAndRender()" title="Filter by Category">
+                <option value="all">📁 All Categories ({{ categories|length }})</option>
+                {% for cat in categories %}
+                <option value="{{ cat.id }}">{{ cat.name }} ({{ cat.product_count }})</option>
+                {% endfor %}
+            </select>
+
+            <!-- 2. Group By Dropdown (Category / UOM / None) -->
+            <div style="display: flex; align-items: center; gap: 6px;">
+                <span style="font-size: 12px; font-weight: 700; color: #64748B;">Group by:</span>
+                <select id="groupByFilter" class="pl-select" onchange="applyFiltersAndRender()" title="Group cards by Category, UOM or flat continuous grid">
+                    <option value="category" selected>📁 Category</option>
+                    <option value="uom">📦 UOM / Packaging</option>
+                    <option value="none">📑 None (Continuous Grid)</option>
+                </select>
+            </div>
+
+            <!-- Quick Picker Trigger Button -->
+            <button type="button" class="pl-btn pl-btn-secondary" onclick="openProductPickerModal()" style="height: 36px; padding: 0 12px;" title="Open product selector modal to check/uncheck products">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 11 12 14 22 4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                <span>Select Products</span>
+            </button>
+        </div>
+
+        <div class="pl-toolbar-right">
+            <!-- 3. Live Instant Search Input -->
+            <div class="pl-search-wrap">
+                <svg class="pl-search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" id="liveSearchInput" class="pl-search-input" placeholder="Search product name, SKU, specs..." autocomplete="off" oninput="onSearchInput(this.value)">
+                <button type="button" id="liveSearchClear" class="pl-search-clear" onclick="clearSearch()" title="Clear search">✕</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN CARDS CONTAINER (Dynamic Render Container) -->
+    <div class="pl-groups-container" id="priceCardsContainer">
+        <!-- Will be populated dynamically by JavaScript based on Scope, Filter & Group By -->
+    </div>
+
+    <!-- Empty State Message -->
+    <div class="pl-empty-state" id="emptyState" style="display: none;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin: 0 auto 12px; display: block;">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: #1E293B; margin: 0 0 6px 0;">No Products Found</h3>
+        <p style="margin: 0; font-size: 0.9rem;">Try adjusting your search terms, selecting another category, or selecting products.</p>
+    </div>
+
+</div>
+
+<!-- ==========================================================================
+     PRODUCT SELECTION MODAL
+     ========================================================================== -->
+<div class="pl-modal-backdrop" id="productPickerModal" onclick="closeProductPickerModal(event)">
+    <div class="pl-modal-content" onclick="event.stopPropagation()">
+        <div class="pl-modal-header">
+            <h3 class="pl-modal-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2.2">
+                    <polyline points="9 11 12 14 22 4"></polyline>
+                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                <span>Select Products for Price List</span>
+            </h3>
+            <button type="button" onclick="closeProductPickerModal()" style="background: none; border: none; font-size: 20px; font-weight: 700; color: #64748B; cursor: pointer;">✕</button>
+        </div>
+
+        <div class="pl-modal-body">
+            <!-- Modal Search & Category Filter -->
+            <div class="pl-picker-search-bar">
+                <div style="position: relative; flex: 1;">
+                    <input type="text" id="modalSearchInput" class="pl-search-input" placeholder="Search products in picker..." oninput="filterPickerList()">
+                </div>
+                <select id="modalCategoryFilter" class="pl-select" onchange="filterPickerList()">
+                    <option value="all">All Categories</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Quick Action Buttons -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 12.5px;">
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="pickerSelectAll(true)" style="padding: 3px 10px; font-size: 12px; font-weight: 700;">Select All Visible</button>
+                    <button type="button" class="btn btn-sm btn-secondary" onclick="pickerSelectAll(false)" style="padding: 3px 10px; font-size: 12px; font-weight: 700;">Deselect All</button>
+                </div>
+                <div style="font-weight: 700; color: #0284C7;">
+                    <span id="modalSelectedCount">0</span> of <span id="modalTotalCount">{{ total_products }}</span> Selected
+                </div>
+            </div>
+
+            <!-- Scrollable Product Checklist -->
+            <div class="pl-picker-list" id="pickerListContainer">
+                <!-- Dynamically built items -->
+            </div>
+        </div>
+
+        <div class="pl-modal-footer">
+            <button type="button" class="pl-btn pl-btn-secondary" onclick="closeProductPickerModal()">Cancel</button>
+            <div style="display: flex; gap: 8px;">
+                <button type="button" class="pl-btn pl-btn-primary" onclick="applyPickerSelection(false)">Apply Selection</button>
+                <button type="button" class="pl-btn pl-btn-pdf" onclick="applyPickerSelection(true)">Apply & Export PDF</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ==========================================================================
+     EXPORT PDF PROGRESS SPINNER MODAL
+     ========================================================================== -->
+<div class="pl-export-overlay" id="exportOverlay">
+    <div>
+        <div class="pl-spinner"></div>
+        <h3 style="font-size: 1.3rem; font-weight: 800; margin: 0 0 6px 0;">Generating Price List PDF...</h3>
+        <p style="font-size: 0.95rem; opacity: 0.9; margin: 0;" id="exportProgressText">Processing cards and layout, please wait...</p>
+    </div>
+</div>
+
+<!-- Off-screen container used strictly for clean PDF compilation -->
+<div id="pdfExportCloneArea" style="position: absolute; left: -9999px; top: -9999px; width: 1000px; background: #FFFFFF;"></div>
+
+<!-- ==========================================================================
+     CLIENT-SIDE JAVASCRIPT: DATA & INTERACTIONS
+     ========================================================================== -->
+<script>
+// Raw Items from Server
+const ALL_PRODUCTS_DATA = {{ items|tojson }};
+const CATEGORIES_DATA = {{ categories|tojson }};
+
+// State
+let currentScope = 'all'; // 'all' | 'category' | 'selected'
+let currentCategory = 'all';
+let currentGroupBy = 'category'; // 'category' | 'uom' | 'none'
+let currentSearch = '';
+let currentThemeColor = '#3B4B64';
+let selectedProductIds = new Set();
+
+// Initialize on Load
+document.addEventListener('DOMContentLoaded', function() {
+    // Default: all products selected initially in the picker set
+    ALL_PRODUCTS_DATA.forEach(p => selectedProductIds.add(p.id));
+    updateSelectedBadges();
+    applyFiltersAndRender();
+});
+
+// Set Theme Color
+function setThemeColor(colorHex, el) {
+    currentThemeColor = colorHex;
+    document.documentElement.style.setProperty('--price-theme-color', colorHex);
+    document.querySelectorAll('.pl-color-dot').forEach(d => d.classList.remove('active'));
+    if (el) el.classList.add('active');
+}
+
+// Scope Mode: 'all' | 'category' | 'selected'
+function setScopeMode(mode) {
+    currentScope = mode;
+    document.getElementById('scopeAll').classList.toggle('active', mode === 'all');
+    document.getElementById('scopeCategory').classList.toggle('active', mode === 'category');
+    document.getElementById('scopeSelected').classList.toggle('active', mode === 'selected');
+
+    const catSelect = document.getElementById('categoryFilter');
+    if (mode === 'category') {
+        catSelect.style.borderColor = '#0284C7';
+        catSelect.focus();
+    } else {
+        catSelect.style.borderColor = '#CBD5E1';
+    }
+
+    applyFiltersAndRender();
+}
+
+// Search handling
+function onSearchInput(val) {
+    currentSearch = (val || '').trim().toLowerCase();
+    const clearBtn = document.getElementById('liveSearchClear');
+    clearBtn.style.display = currentSearch ? 'block' : 'none';
+    applyFiltersAndRender();
+}
+
+function clearSearch() {
+    document.getElementById('liveSearchInput').value = '';
+    currentSearch = '';
+    document.getElementById('liveSearchClear').style.display = 'none';
+    applyFiltersAndRender();
+}
+
+// Update counters
+function updateSelectedBadges() {
+    const count = selectedProductIds.size;
+    const pill = document.getElementById('selectedCountPill');
+    if (pill) pill.textContent = count;
+    const modalCount = document.getElementById('modalSelectedCount');
+    if (modalCount) modalCount.textContent = count;
+}
+
+// Filter and Render Cards
+function applyFiltersAndRender() {
+    const catVal = document.getElementById('categoryFilter').value;
+    const groupVal = document.getElementById('groupByFilter').value;
+    currentCategory = catVal;
+    currentGroupBy = groupVal;
+
+    // Filter Items
+    let filtered = ALL_PRODUCTS_DATA.filter(item => {
+        // 1. Scope filter
+        if (currentScope === 'selected' && !selectedProductIds.has(item.id)) {
+            return false;
+        }
+        if (currentScope === 'category' && currentCategory !== 'all' && String(item.category_id) !== String(currentCategory)) {
+            return false;
+        }
+        if (currentCategory !== 'all' && String(item.category_id) !== String(currentCategory)) {
+            return false;
+        }
+
+        // 2. Search keyword filter
+        if (currentSearch) {
+            const name = (item.name || '').toLowerCase();
+            const sku = (item.sku || '').toLowerCase();
+            const cat = (item.category_name || '').toLowerCase();
+            const dim = (item.card.dim_str || '').toLowerCase();
+            if (!name.includes(currentSearch) && !sku.includes(currentSearch) && !cat.includes(currentSearch) && !dim.includes(currentSearch)) {
+                return false;
+            }
+        }
+        return true;
+    });
+
+    const container = document.getElementById('priceCardsContainer');
+    const emptyState = document.getElementById('emptyState');
+    const counter = document.getElementById('visibleCounter');
+
+    if (counter) {
+        counter.textContent = `Showing ${filtered.length} of ${ALL_PRODUCTS_DATA.length}`;
+    }
+
+    if (filtered.length === 0) {
+        container.innerHTML = '';
+        emptyState.style.display = 'block';
+        return;
+    }
+    emptyState.style.display = 'none';
+
+    // Grouping
+    if (currentGroupBy === 'category') {
+        renderGroupedByCategory(filtered, container);
+    } else if (currentGroupBy === 'uom') {
+        renderGroupedByUOM(filtered, container);
+    } else {
+        renderFlatGrid(filtered, container);
+    }
+}
+
+// Render: Grouped by Category
+function renderGroupedByCategory(items, container) {
+    const groups = {};
+    items.forEach(item => {
+        const catName = item.category_name || 'General';
+        if (!groups[catName]) {
+            groups[catName] = {
+                color: item.category_color || '#00A3E0',
+                items: []
+            };
+        }
+        groups[catName].items.push(item);
+    });
+
+    let html = '';
+    for (const [catName, data] of Object.entries(groups)) {
+        html += `
+            <div class="pl-group-section" data-group="${escapeHtml(catName)}">
+                <div class="pl-group-header">
+                    <div class="pl-group-title">
+                        <span class="pl-group-tag" style="background: ${escapeHtml(data.color)};"></span>
+                        <span>${escapeHtml(catName)}</span>
+                    </div>
+                    <span class="pl-group-badge">${data.items.length} ${data.items.length === 1 ? 'Product' : 'Products'}</span>
+                </div>
+                <div class="pl-cards-grid">
+                    ${data.items.map(item => buildCardHtml(item)).join('')}
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+// Render: Grouped by UOM
+function renderGroupedByUOM(items, container) {
+    const groups = {};
+    items.forEach(item => {
+        const uomName = item.uom || 'កេស';
+        if (!groups[uomName]) groups[uomName] = [];
+        groups[uomName].push(item);
+    });
+
+    let html = '';
+    for (const [uomName, uomItems] of Object.entries(groups)) {
+        html += `
+            <div class="pl-group-section" data-group="${escapeHtml(uomName)}">
+                <div class="pl-group-header">
+                    <div class="pl-group-title">
+                        <span style="font-size: 16px;">📦</span>
+                        <span>${escapeHtml(uomName)}</span>
+                    </div>
+                    <span class="pl-group-badge">${uomItems.length} Products</span>
+                </div>
+                <div class="pl-cards-grid">
+                    ${uomItems.map(item => buildCardHtml(item)).join('')}
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+// Render: Flat Continuous Grid
+function renderFlatGrid(items, container) {
+    container.innerHTML = `
+        <div class="pl-cards-grid" style="grid-template-columns: repeat(auto-fill, minmax(540px, 1fr));">
+            ${items.map(item => buildCardHtml(item)).join('')}
+        </div>
+    `;
+}
+
+// Build Individual Card HTML (Exact Visual Match with Screenshot 2)
+function buildCardHtml(item) {
+    const c = item.card;
+    const isSelected = selectedProductIds.has(item.id);
+    const badgeHtml = item.badge ? `<div class="pl-card-size-badge">${escapeHtml(item.badge)}</div>` : '';
+
+    const imgHtml = item.image_url 
+        ? `<img src="${escapeHtml(item.image_url)}" class="pl-card-img" alt="${escapeHtml(item.name)}" loading="lazy">`
+        : `<div class="pl-card-no-img">
+             <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+             <span style="font-size: 11px; margin-top: 4px; color: #94A3B8;">No Image</span>
+           </div>`;
+
+    return `
+        <div class="pl-price-card" id="card-${item.id}" data-id="${item.id}">
+            <!-- Selection Checkbox in Corner -->
+            <label class="pl-card-select-overlay" onclick="event.stopPropagation()">
+                <input type="checkbox" class="pl-card-checkbox" ${isSelected ? 'checked' : ''} onchange="toggleCardSelected(${item.id}, this.checked)">
+                <span style="font-size: 10.5px; font-weight: 700; color: #475569;">Select</span>
+            </label>
+
+            <!-- Card Header Grid: Product Title & Detail (Dark Navy #3B4B64) -->
+            <div class="pl-card-header-grid">
+                <div class="pl-card-header-left">
+                    <div class="pl-card-title-km font-khmer">${escapeHtml(c.khmer_name || item.name)}</div>
+                    <div class="pl-card-title-uom font-khmer">${escapeHtml(item.uom || 'កេស')}</div>
+                </div>
+                <div class="pl-card-header-right">
+                    <div class="pl-card-detail-hdr font-khmer">ព័ត៌មានលម្អិត</div>
+                    <div class="pl-card-detail-sub">(Product Detail)</div>
+                </div>
+            </div>
+
+            <!-- Upper Body Grid: Picture (Left) & Specs (Right) -->
+            <div class="pl-card-upper-grid">
+                <div class="pl-card-image-box">
+                    ${badgeHtml}
+                    ${imgHtml}
+                </div>
+                <div class="pl-card-specs-box">
+                    <div class="pl-card-spec-line">ទំហំ: ${escapeHtml(c.dim_str || '21cm x 21cm x 4cm')}</div>
+                    <div class="pl-card-spec-line font-khmer">1 កេស មាន ${Number(c.packs_per_case || 10)} ដុំ</div>
+                    <div class="pl-card-spec-line font-khmer">1 ដុំ មាន ${Number(c.pcs_per_pack || 50)} ប្រអប់</div>
+                    <div class="pl-card-spec-line font-khmer">${item.pcs_case_formatted} ប្រអប់/1កេស</div>
+                    <div class="pl-card-spec-carton">(${item.pcs_case_formatted} PCS/ Carton)</div>
+                </div>
+            </div>
+
+            <!-- Lower Body Grid: Price Table Header -->
+            <div class="pl-card-price-hdr-grid">
+                <div class="pl-card-price-hdr-cell">
+                    <div class="pl-price-hdr-km font-khmer">តម្លៃ</div>
+                    <div class="pl-price-hdr-en">(Price)</div>
+                </div>
+                <div class="pl-card-price-hdr-cell">
+                    <div class="pl-price-hdr-km font-khmer">តម្លៃក្នុង1ប្រអប់</div>
+                    <div class="pl-price-hdr-en">(UNIT PRICE)</div>
+                </div>
+            </div>
+
+            <!-- Lower Body Grid: 3 Pricing Tier Rows (Green Totals & Unit Price) -->
+            <div class="pl-card-price-rows">
+                <!-- Tier 1 -->
+                <div class="pl-card-price-row">
+                    <div class="pl-price-left-col">
+                        <span class="pl-price-qty-lbl font-khmer">
+                            <span class="pl-price-qty-num">${c.tier_qty_1 || 100}</span> ប្រអប់ (PCS) =
+                        </span>
+                        <span class="pl-price-tot-val">${formatMoney(c.tot_price_1)} $</span>
+                    </div>
+                    <div class="pl-price-right-col">
+                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_1)} $/PCS)</span>
+                    </div>
+                </div>
+
+                <!-- Tier 2 -->
+                <div class="pl-card-price-row">
+                    <div class="pl-price-left-col">
+                        <span class="pl-price-qty-lbl font-khmer">
+                            <span class="pl-price-qty-num">${c.tier_qty_2 || 500}</span> ប្រអប់ (PCS) =
+                        </span>
+                        <span class="pl-price-tot-val">${formatMoney(c.tot_price_2)} $</span>
+                    </div>
+                    <div class="pl-price-right-col">
+                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_2)} $/PCS)</span>
+                    </div>
+                </div>
+
+                <!-- Tier 3 -->
+                <div class="pl-card-price-row">
+                    <div class="pl-price-left-col">
+                        <span class="pl-price-qty-lbl font-khmer">
+                            <span class="pl-price-qty-num">${c.tier_qty_3 || 1000}</span> ប្រអប់ (PCS) =
+                        </span>
+                        <span class="pl-price-tot-val">${formatMoney(c.tot_price_3)} $</span>
+                    </div>
+                    <div class="pl-price-right-col">
+                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_3)} $/PCS)</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Toggle individual card checkbox
+function toggleCardSelected(productId, isChecked) {
+    if (isChecked) {
+        selectedProductIds.add(productId);
+    } else {
+        selectedProductIds.delete(productId);
+    }
+    updateSelectedBadges();
+    if (currentScope === 'selected') {
+        applyFiltersAndRender();
+    }
+}
+
+// Format Numbers
+function formatMoney(val) {
+    const num = parseFloat(val) || 0;
+    return num.toFixed(2);
+}
+function formatUnitMoney(val) {
+    const num = parseFloat(val) || 0;
+    return num.toFixed(3);
+}
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+// ==========================================================================
+// PRODUCT SELECTION MODAL LOGIC
+// ==========================================================================
+function openProductPickerModal() {
+    renderPickerList();
+    document.getElementById('productPickerModal').style.display = 'flex';
+}
+
+function closeProductPickerModal(e) {
+    if (e && e.target !== e.currentTarget && e.target.tagName !== 'BUTTON') return;
+    document.getElementById('productPickerModal').style.display = 'none';
+}
+
+function renderPickerList() {
+    const search = (document.getElementById('modalSearchInput').value || '').trim().toLowerCase();
+    const catId = document.getElementById('modalCategoryFilter').value;
+    const container = document.getElementById('pickerListContainer');
+
+    const visibleItems = ALL_PRODUCTS_DATA.filter(item => {
+        if (catId !== 'all' && String(item.category_id) !== String(catId)) return false;
+        if (search) {
+            const name = (item.name || '').toLowerCase();
+            const sku = (item.sku || '').toLowerCase();
+            if (!name.includes(search) && !sku.includes(search)) return false;
+        }
+        return true;
+    });
+
+    document.getElementById('modalTotalCount').textContent = visibleItems.length;
+
+    let html = '';
+    visibleItems.forEach(item => {
+        const checked = selectedProductIds.has(item.id);
+        const thumb = item.image_url || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="%2394A3B8"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
+        html += `
+            <div class="pl-picker-item ${checked ? 'selected' : ''}" onclick="togglePickerRow(${item.id})">
+                <input type="checkbox" id="picker-chk-${item.id}" ${checked ? 'checked' : ''} onclick="event.stopPropagation(); togglePickerRow(${item.id})">
+                <img src="${escapeHtml(thumb)}" class="pl-picker-thumb" alt="thumb">
+                <div class="pl-picker-info">
+                    <div class="pl-picker-name">${escapeHtml(item.name)}</div>
+                    <div class="pl-picker-meta">
+                        <span>SKU: ${escapeHtml(item.sku || 'N/A')}</span>
+                        <span>•</span>
+                        <span>${escapeHtml(item.category_name || 'General')}</span>
+                        <span>•</span>
+                        <span>Tier 1: $${formatMoney(item.card.tot_price_1)}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html || '<div style="text-align: center; color: #94A3B8; padding: 20px;">No matching products in picker.</div>';
+    updateSelectedBadges();
+}
+
+function filterPickerList() {
+    renderPickerList();
+}
+
+function togglePickerRow(productId) {
+    if (selectedProductIds.has(productId)) {
+        selectedProductIds.delete(productId);
+    } else {
+        selectedProductIds.add(productId);
+    }
+    const chk = document.getElementById(`picker-chk-${productId}`);
+    if (chk) {
+        chk.checked = selectedProductIds.has(productId);
+        chk.closest('.pl-picker-item')?.classList.toggle('selected', chk.checked);
+    }
+    updateSelectedBadges();
+}
+
+function pickerSelectAll(select) {
+    const search = (document.getElementById('modalSearchInput').value || '').trim().toLowerCase();
+    const catId = document.getElementById('modalCategoryFilter').value;
+
+    ALL_PRODUCTS_DATA.forEach(item => {
+        if (catId !== 'all' && String(item.category_id) !== String(catId)) return;
+        if (search) {
+            const name = (item.name || '').toLowerCase();
+            const sku = (item.sku || '').toLowerCase();
+            if (!name.includes(search) && !sku.includes(search)) return;
+        }
+        if (select) {
+            selectedProductIds.add(item.id);
+        } else {
+            selectedProductIds.delete(item.id);
+        }
+    });
+
+    renderPickerList();
+}
+
+function applyPickerSelection(exportAfter) {
+    closeProductPickerModal();
+    setScopeMode('selected');
+    applyFiltersAndRender();
+    if (exportAfter) {
+        setTimeout(exportPriceListPDF, 300);
+    }
+}
+
+// ==========================================================================
+// EXPORT PDF IMPLEMENTATION (High-Resolution Multi-page A4)
+// ==========================================================================
+async function exportPriceListPDF() {
+    const overlay = document.getElementById('exportOverlay');
+    const progressText = document.getElementById('exportProgressText');
+    overlay.style.display = 'flex';
+    progressText.textContent = 'Gathering price table cards for PDF compilation...';
+
+    try {
+        // Collect currently visible cards
+        const visibleCards = document.querySelectorAll('.pl-price-card');
+        if (visibleCards.length === 0) {
+            alert('No cards available to export. Please select at least one product.');
+            overlay.style.display = 'none';
+            return;
+        }
+
+        const cloneArea = document.getElementById('pdfExportCloneArea');
+        cloneArea.innerHTML = '';
+
+        // Build clean PDF layout container
+        const pdfRoot = document.createElement('div');
+        pdfRoot.style.width = '790px'; // A4 optimal standard width in pixels at 96 DPI
+        pdfRoot.style.padding = '12px 14px';
+        pdfRoot.style.background = '#FFFFFF';
+        pdfRoot.style.boxSizing = 'border-box';
+        pdfRoot.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+
+        // Optional PDF Top Header
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'space-between';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.paddingBottom = '10px';
+        headerDiv.style.marginBottom = '14px';
+        headerDiv.style.borderBottom = `2px solid ${currentThemeColor}`;
+
+        const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+        headerDiv.innerHTML = `
+            <div>
+                <div style="font-size: 18px; font-weight: 800; color: ${currentThemeColor};">Product Price List (តារាងតម្លៃទំនិញ)</div>
+                <div style="font-size: 11px; color: #64748B;">Date: ${dateStr} • Total Items: ${visibleCards.length}</div>
+            </div>
+            <div style="text-align: right;">
+                <div style="font-size: 13px; font-weight: 700; color: #0F172A;">inFlow Premium POS</div>
+                <div style="font-size: 10.5px; color: #64748B;">Customer Price Catalogue</div>
+            </div>
+        `;
+        pdfRoot.appendChild(headerDiv);
+
+        // Grid of 2 cards per row for PDF
+        const cardsGrid = document.createElement('div');
+        cardsGrid.style.display = 'grid';
+        cardsGrid.style.gridTemplateColumns = '1fr 1fr';
+        cardsGrid.style.gap = '14px';
+
+        visibleCards.forEach((card, index) => {
+            const clone = card.cloneNode(true);
+            // Remove selection overlay checkboxes
+            clone.querySelector('.pl-card-select-overlay')?.remove();
+            clone.style.margin = '0';
+            clone.style.boxShadow = 'none';
+            clone.style.pageBreakInside = 'avoid';
+            clone.style.breakInside = 'avoid';
+            // Force exact theme color
+            clone.style.borderColor = currentThemeColor;
+            clone.querySelectorAll('.pl-card-header-grid, .pl-card-price-hdr-grid').forEach(el => {
+                el.style.backgroundColor = currentThemeColor;
+            });
+            cardsGrid.appendChild(clone);
+        });
+
+        pdfRoot.appendChild(cardsGrid);
+        cloneArea.appendChild(pdfRoot);
+
+        progressText.textContent = `Rendering high-res A4 PDF (${visibleCards.length} cards)...`;
+
+        // Configure html2pdf options
+        const filename = `Price_List_${new Date().toISOString().slice(0, 10)}.pdf`;
+        const opt = {
+            margin: [8, 8, 8, 8],
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.96 },
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                logging: false,
+                letterRendering: true
+            },
+            jsPDF: {
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait'
+            },
+            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+
+        if (typeof html2pdf !== 'undefined') {
+            await html2pdf().set(opt).from(pdfRoot).save();
+        } else {
+            window.print();
+        }
+    } catch(err) {
+        console.error('Error generating PDF:', err);
+        alert('Could not generate PDF. Defaulting to print dialog.');
+        window.print();
+    } finally {
+        overlay.style.display = 'none';
+        document.getElementById('pdfExportCloneArea').innerHTML = '';
+    }
+}
+</script>
+{% endblock %}

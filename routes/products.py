@@ -3050,6 +3050,78 @@ def api_bulk_merge_all():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@products_bp.route('/products/price-list')
+@products_bp.route('/inventory/price-list')
+def price_list_view():
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login', next=request.path))
 
+    categories = query_all("""
+        SELECT c.id, c.name, COALESCE(c.color, '#00A3E0') as color, COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
+        WHERE c.is_active = TRUE
+        GROUP BY c.id, c.name, c.color
+        ORDER BY c.name ASC
+    """)
 
+    products = query_all("""
+        SELECT 
+            p.*,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(c.color, '#00A3E0') as category_color
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.is_active = TRUE
+        ORDER BY c.name ASC, p.name ASC, p.id ASC
+    """)
 
+    p_ids = [p['id'] for p in products]
+    tiers_by_pid = {}
+    if p_ids:
+        all_tiers = query_all("""
+            SELECT pp.product_id, ps.id as pricing_scheme_id, ps.name as scheme_name, pp.unit_price
+            FROM product_prices pp
+            JOIN pricing_schemes ps ON pp.pricing_scheme_id = ps.id
+            WHERE pp.product_id = ANY(%s) AND ps.is_active = TRUE
+            ORDER BY ps.is_default DESC, ps.id ASC
+        """, (p_ids,))
+        for t in all_tiers:
+            tiers_by_pid.setdefault(t['product_id'], []).append(t)
+
+    items = []
+    for prod in products:
+        p_tiers = tiers_by_pid.get(prod['id'], [])
+        card_data = _build_price_card_data(prod, p_tiers, can_view_costs=False)
+
+        # Extract volume/capacity badge (e.g. "2000 ml", "500 ml", "5 OZ", etc.) matching Screenshot 2
+        badge = None
+        if prod.get('capacity'):
+            badge = str(prod['capacity']).strip()
+        else:
+            m = re.search(r'(\d+\s*(?:ml|ML|oz|OZ|g|G|kg|KG|l|L)\b)', prod.get('name') or '')
+            if m:
+                badge = m.group(1).strip()
+
+        # Packaging breakdown string for Carton / Case
+        pcs_case = card_data.get('pcs_per_case') or 400
+        pcs_case_formatted = f"{pcs_case:g}" if isinstance(pcs_case, (int, float)) else str(pcs_case)
+
+        items.append({
+            'id': prod['id'],
+            'sku': prod.get('sku') or '',
+            'name': prod.get('name') or '',
+            'uom': prod.get('uom') or 'កេស',
+            'category_id': prod.get('category_id') or 0,
+            'category_name': prod.get('category_name') or 'General',
+            'category_color': prod.get('category_color') or '#00A3E0',
+            'image_url': prod.get('image_url') or '',
+            'badge': badge,
+            'pcs_case_formatted': pcs_case_formatted,
+            'card': card_data
+        })
+
+    return render_template('products/price_list.html',
+                           categories=categories,
+                           items=items,
+                           total_products=len(items))
