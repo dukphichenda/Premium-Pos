@@ -715,6 +715,28 @@
                 this.saveTabsToStorage();
             },
 
+            /**
+             * Fast metadata update for in-place SPA navigation (updates tab title, stored URL, and top browser address bar WITHOUT reloading the iframe).
+             */
+            updateActiveTabMeta: function (cleanUrl, displayTitle) {
+                const tab = this.tabs.find(t => t.id === this.activeTabId);
+                if (!tab) return;
+                const normalized = (cleanUrl || '').replace(/[?&]embed=1/, '');
+                tab.url = normalized;
+                if (displayTitle) {
+                    tab.title = displayTitle;
+                    tab.label = displayTitle;
+                    const lbl = document.getElementById(`tab-label-${tab.id}`);
+                    if (lbl) lbl.textContent = displayTitle;
+                    const tabElem = document.getElementById(`tab-item-${tab.id}`);
+                    if (tabElem) tabElem.title = displayTitle;
+                }
+                if (window.history && window.history.replaceState) {
+                    window.history.replaceState(null, '', normalized || '/');
+                }
+                this.saveTabsToStorage();
+            },
+
             createTab: function (cleanUrl, displayTitle, detectedType) {
                 const newId = `tab-${detectedType}-${Date.now()}`;
                 const newTab = {
@@ -1316,6 +1338,11 @@
             transformTab: function (tabId, url, title, type) {
                 if (window.top && window.top.inflowMdi) {
                     window.top.inflowMdi.transformTab(tabId, url, title, type);
+                }
+            },
+            updateActiveTabMeta: function (url, title) {
+                if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                    window.top.inflowMdi.updateActiveTabMeta(url, title);
                 }
             },
             switchStoreContext: function (branchId, e) {

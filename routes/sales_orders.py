@@ -1774,6 +1774,62 @@ def new_order():
                            versions=[],
                            preview_so_number=preview_so_number)
 
+def _get_order_attachments_and_versions(order_id):
+    _ensure_so_tables_exist()
+    raw_attachments = query_all("""
+        SELECT id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_attachments
+        WHERE sales_order_id = %s
+        ORDER BY created_at DESC, id DESC
+    """, (order_id,))
+    attachments = []
+    for a in raw_attachments:
+        d = dict(a)
+        d['original_name'] = d.get('file_name')
+        d['file_url'] = d.get('file_path')
+        d['mime_type'] = d.get('file_type')
+        ftype = (d.get('file_type') or '').lower()
+        fname = (d.get('file_name') or '').lower()
+        if ftype.startswith('image/') or fname.endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
+            d['file_category'] = 'image'
+        elif 'pdf' in ftype or fname.endswith('.pdf'):
+            d['file_category'] = 'pdf'
+        else:
+            d['file_category'] = 'file'
+        attachments.append(d)
+
+    raw_versions = query_all("""
+        SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+               customer_name, total_amount, paid_amount, balance_due, items_count,
+               user_name, change_summary,
+               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+        FROM sales_order_versions
+        WHERE sales_order_id = %s
+        ORDER BY version_number DESC, created_at DESC
+    """, (order_id,))
+
+    if not raw_versions:
+        _record_order_version(order_id, change_summary="Base Version (v1)")
+        raw_versions = query_all("""
+            SELECT id, sales_order_id, version_number, order_number, status, payment_status,
+                   customer_name, total_amount, paid_amount, balance_due, items_count,
+                   user_name, change_summary,
+                   TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
+            FROM sales_order_versions
+            WHERE sales_order_id = %s
+            ORDER BY version_number DESC, created_at DESC
+        """, (order_id,))
+
+    versions = []
+    for v in raw_versions:
+        vd = dict(v)
+        vd['created_by'] = vd.get('user_name') or 'admin'
+        vd['order_status'] = vd.get('status') or 'UNFULFILLED'
+        versions.append(vd)
+
+    return attachments, versions
+
 @sales_orders_bp.route('/sales/<int:id>')
 def detail_order(id):
     order = query_one("""
@@ -1799,11 +1855,20 @@ def detail_order(id):
         WHERE so.id = %s
     """, (id,))
 
+    is_partial = (
+        request.headers.get('X-Inflow-Partial') == 'canvas' or
+        request.args.get('partial') in ('canvas', '1', 'true')
+    )
+
     if not order:
+        if is_partial:
+            return ("<div class='inflow-error-banner' style='padding:20px;color:#DC2626;'>Order not found.</div>", 404)
         flash("Order not found.", "error")
         return redirect(url_for('sales_orders.list_orders'))
 
     if not _check_order_branch_access(order):
+        if is_partial:
+            return ("<div class='inflow-error-banner' style='padding:20px;color:#DC2626;'>Access denied to this store order.</div>", 403)
         flash("You do not have permission to view orders from another store or Main Store. / អ្នកមិនមានសិទ្ធិមើលការបញ្ជាទិញរបស់សាខាផ្សេង ឬហាងធំទេ", "warning")
         user_bid = _get_user_branch_id()
         if user_bid:
@@ -1842,6 +1907,73 @@ def detail_order(id):
         WHERE sol.sales_order_id = %s
         ORDER BY sol.line_num ASC
     """, (order['location_id'], id))
+
+    if is_partial:
+        # Fast partial response: avoids running heavy drawer queries for 500 orders and customer/product catalogs (~15ms)
+        all_branches = query_all("SELECT id, name, code FROM branches ORDER BY name ASC")
+        all_locations = query_all("SELECT id, name FROM locations ORDER BY name ASC")
+        pricing_schemes = query_all("SELECT id, name FROM pricing_schemes ORDER BY id ASC")
+        all_delivery_men = query_all("SELECT * FROM delivery_men ORDER BY name ASC")
+        company = query_one("SELECT * FROM company LIMIT 1") or {}
+
+        scheme_id = order.get('pricing_scheme_id') or 100
+        for l in lines:
+            l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
+            l['case_price'] = float(l.get('unit_price') or 0)
+            suom = (l.get('sales_uom') or '').strip()
+            sratio = float(l.get('sales_uom_ratio_std') or 1.0)
+            curr_uom = (l.get('display_uom') or '').strip()
+            if suom and sratio > 1:
+                if not curr_uom or curr_uom.lower() in ('pcs', 'pcs.', ''):
+                    case_pr = float(l['case_price'] or 0)
+                    unit_pr = float(l.get('unit_price') or 0)
+                    qty = float(l.get('quantity') or 0)
+                    disp_q = float(l.get('display_qty') or 0)
+                    if case_pr > 0 and abs(unit_pr - case_pr) < (case_pr * 0.15):
+                        l['display_uom'] = suom
+                        if disp_q == qty and qty >= sratio and (qty % sratio == 0):
+                            l['display_qty'] = qty / sratio
+                elif _match_uom(curr_uom, suom):
+                    l['display_uom'] = suom
+
+        payments = query_all("""
+            SELECT * FROM order_payments 
+            WHERE order_type = 'SO' AND order_id = %s 
+            ORDER BY payment_date DESC, id DESC
+        """, (id,))
+
+        st_norm = str(order.get('status') or '').strip().upper()
+        pay_norm = str(order.get('payment_status') or '').strip().upper()
+        is_paid = (
+            st_norm in ('PAID', 'INVOICED') or
+            (st_norm not in ('OPEN', 'CANCELLED', 'QUOTE') and pay_norm == 'PAID')
+        )
+
+        branch_obj = query_one("SELECT * FROM branches WHERE id = %s", (order['branch_id'],)) if order.get('branch_id') else None
+        order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or '').strip()
+
+        attachments, versions = _get_order_attachments_and_versions(id)
+        branch_scope = request.args.get('branch') or (str(order['branch_id']) if order.get('branch_id') else 'main')
+
+        return render_template('sales/_detail_canvas.html',
+                               order=order,
+                               lines=lines,
+                               all_branches=all_branches,
+                               all_locations=all_locations,
+                               pricing_schemes=pricing_schemes,
+                               all_delivery_men=all_delivery_men,
+                               all_customers=[],
+                               all_products=[],
+                               company=company,
+                               payments=payments,
+                               attachments=attachments,
+                               versions=versions,
+                               branch_scope=branch_scope,
+                               current_branch=branch_obj,
+                               is_branch_order=bool(branch_obj),
+                               order_payment_method=order_payment_method,
+                               is_paid=is_paid,
+                               is_new=False)
 
     if 'date_filter' in request.args:
         date_filter = request.args.get('date_filter') or 'All'
@@ -1948,58 +2080,7 @@ def detail_order(id):
     order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or '').strip()
 
     # Load attachments & versions for this sales order
-    _ensure_so_tables_exist()
-    raw_attachments = query_all("""
-        SELECT id, sales_order_id, file_name, file_path, file_size, file_type, caption, uploaded_by,
-               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
-        FROM sales_order_attachments
-        WHERE sales_order_id = %s
-        ORDER BY created_at DESC, id DESC
-    """, (id,))
-    attachments = []
-    for a in raw_attachments:
-        d = dict(a)
-        d['original_name'] = d.get('file_name')
-        d['file_url'] = d.get('file_path')
-        d['mime_type'] = d.get('file_type')
-        ftype = (d.get('file_type') or '').lower()
-        fname = (d.get('file_name') or '').lower()
-        if ftype.startswith('image/') or fname.endswith(('.jpg', '.jpeg', '.png', '.webp', '.gif')):
-            d['file_category'] = 'image'
-        elif 'pdf' in ftype or fname.endswith('.pdf'):
-            d['file_category'] = 'pdf'
-        else:
-            d['file_category'] = 'file'
-        attachments.append(d)
-
-    raw_versions = query_all("""
-        SELECT id, sales_order_id, version_number, order_number, status, payment_status,
-               customer_name, total_amount, paid_amount, balance_due, items_count,
-               user_name, change_summary,
-               TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
-        FROM sales_order_versions
-        WHERE sales_order_id = %s
-        ORDER BY version_number DESC, created_at DESC
-    """, (id,))
-
-    if not raw_versions:
-        _record_order_version(id, change_summary="Base Version (v1)")
-        raw_versions = query_all("""
-            SELECT id, sales_order_id, version_number, order_number, status, payment_status,
-                   customer_name, total_amount, paid_amount, balance_due, items_count,
-                   user_name, change_summary,
-                   TO_CHAR(created_at, 'YYYY-MM-DD HH24:MI:SS') as created_at
-            FROM sales_order_versions
-            WHERE sales_order_id = %s
-            ORDER BY version_number DESC, created_at DESC
-        """, (id,))
-
-    versions = []
-    for v in raw_versions:
-        vd = dict(v)
-        vd['created_by'] = vd.get('user_name') or 'admin'
-        vd['order_status'] = vd.get('status') or 'UNFULFILLED'
-        versions.append(vd)
+    attachments, versions = _get_order_attachments_and_versions(id)
 
     return render_template('sales/detail.html',
                            order=order,

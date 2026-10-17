@@ -1712,617 +1712,7 @@
     </button>
 
     <!-- Sales Order Document Area -->
-    <main class="inflow-document-canvas">
-        <!-- Mobile Show Sidebar Bar with Arrow (visible on mobile screens <= 768px when sidebar is hidden) -->
-        <div class="so-mobile-sidebar-bar" id="soMobileSidebarBar" onclick="toggleSoSidebarCollapse()" title="Show Orders List / បង្ហាញបញ្ជីលក់">
-            <div class="so-mobile-bar-left">
-                <span style="font-size: 16px;">📋</span>
-                <span>Orders List / បញ្ជីលក់</span>
-                <span class="so-mobile-bar-count">{{ status_counts.total if status_counts else (sidebar_orders|length if sidebar_orders else 0) }}</span>
-            </div>
-            <div class="so-mobile-bar-right">
-                <span>Show</span>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-            </div>
-        </div>
-
-        <form id="salesOrderForm" method="POST" action="{% if is_new %}{{ url_for('sales_orders.save_order', id=0) }}{% else %}{{ url_for('sales_orders.save_order', id=order.id) }}{% endif %}">
-            <input type="hidden" name="lines_json" id="linesJsonInput" value="">
-            <input type="hidden" name="mark_complete_pay" id="markCompletePayInput" value="0">
-            <input type="hidden" name="branch_id" id="orderBranchIdInput" value="{{ order.branch_id or (branch_scope if (branch_scope and branch_scope != 'main') else '') }}">
-            <input type="hidden" name="branch" value="{{ branch_scope or (order.branch_id|string if order.branch_id else 'main') }}">
-            <input type="hidden" name="payment_method" id="orderPaymentMethodHidden" value="{{ order_payment_method or '' }}">
-            <input type="hidden" name="carrier" id="hiddenFormCarrier" value="{{ order.carrier or '' }}">
-            <input type="hidden" name="package_count" id="hiddenFormPackageCount" value="{{ (order.get('package_count') if order else 1) or 1 }}">
-            <input type="hidden" name="cod_amount" id="hiddenFormCodAmount" value="{{ '%.2f'|format(order.get('cod_amount') if (order and order.get('cod_amount') is not none) else 0.0) }}">
-            <!-- Header Grid: Customer, Sales Rep/Location, Order Details -->
-            <div class="inflow-so-top-grid">
-                <!-- Customer Column with Combobox Search matching screenshot0042.JPEG -->
-                <div class="inflow-so-col inflow-so-col-customer">
-                    <div class="inflow-field-row" style="position: relative;">
-                        <span class="inflow-field-label">Customer</span>
-                        <div style="display: flex; gap: 4px; align-items: center; flex: 1; position: relative;">
-                            <div class="inflow-combobox-wrapper" style="flex: 1;">
-                                <input type="text" id="customerSearchInput" name="customer_name" 
-                                       class="inflow-field-input" autocomplete="off"
-                                       value="{{ order.customer_name or '' }}" 
-                                       placeholder="Type customer name..."
-                                       {% if not is_paid %}
-                                       onfocus="openCustomerDropdown()"
-                                       oninput="filterCustomerDropdown(this.value)"
-                                       onkeydown="handleMainCustomerKey(event)"
-                                       {% else %}
-                                       readonly
-                                       {% endif %}>
-                                <input type="hidden" name="customer_id" id="customerIdHidden" value="{{ order.customer_id or '' }}">
-                                <button type="button" class="inflow-combo-arrow" {% if not is_paid %}onclick="toggleCustomerDropdown()"{% else %}disabled style="opacity:0.4; cursor:default;"{% endif %} title="Select Customer">▾</button>
-
-                                <!-- Floating Customer Dropdown Popup Table matching screenshot0042.JPEG -->
-                                <div id="customerDropdownPopup" class="inflow-combobox-popup">
-                                    <table class="inflow-combo-table">
-                                        <thead>
-                                            <tr>
-                                                <th style="width: 50%;">Name</th>
-                                                <th style="width: 35%;">Contact</th>
-                                                <th style="width: 15%; text-align: center;">Details</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="customerDropdownBody">
-                                            {% for c in all_customers %}
-                                            <tr class="main-cust-row"
-                                                data-id="{{ c.id }}"
-                                                data-cname="{{ c.name|e }}"
-                                                data-name="{{ (c.name or '')|lower|e }}" 
-                                                data-contact="{{ (c.contact_name or '')|lower|e }}" 
-                                                data-ccontact="{{ (c.contact_name or '')|e }}"
-                                                data-phone="{{ (c.phone or '')|lower|e }}"
-                                                data-cphone="{{ (c.phone or '')|e }}"
-                                                data-caddress="{{ (c.customer_address or c.address1 or '')|e }}"
-                                                onclick="selectCustomerFromRow(this)">
-                                                <td style="font-weight: 500;">{{ c.name }}</td>
-                                                <td style="color: #4B5563;">{{ c.contact_name or '' }}</td>
-                                                <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
-                                            </tr>
-                                            {% endfor %}
-                                        </tbody>
-                                    </table>
-                                    <div class="inflow-combo-footer" style="display: flex; justify-content: space-between; align-items: center; padding: 4px 8px;">
-                                        <button type="button" onclick="openQuickAddCustomerModal()" style="display: inline-flex; align-items: center; gap: 4px; color: #2563EB; font-weight: 700; background: none; border: none; cursor: pointer; font-size: 11px; padding: 2px 4px;" title="Add new customer">
-                                            <span style="font-size: 13px; line-height: 1;">+</span> Add New Customer
-                                        </button>
-                                        <div style="font-size: 10px; color: #64748B;">Type name to search</div>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" onclick="openQuickAddCustomerModal()" title="Add New Customer to system" style="background: #2563EB; color: #FFFFFF; border: none; border-radius: 3px; font-weight: 700; font-size: 12px; height: 21px; width: 22px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                +
-                            </button>
-                        </div>
-                    </div>
-                    <div class="inflow-field-row">
-                        <span class="inflow-field-label">Contact</span>
-                        <input type="text" name="contact" id="contactInput" class="inflow-field-input" value="{{ order.customer_contact or '' }}" {% if is_paid %}readonly{% endif %}>
-                    </div>
-                    <div class="inflow-field-row">
-                        <span class="inflow-field-label">Phone</span>
-                        <input type="text" name="phone" id="phoneInput" class="inflow-field-input" value="{{ order.customer_phone or '' }}" {% if is_paid %}readonly{% endif %}>
-                    </div>
-                    <div class="inflow-field-row" style="align-items: flex-start;">
-                        <span class="inflow-field-label" style="padding-top: 4px;">Address</span>
-                        <textarea name="address" id="addressInput" class="inflow-field-textarea" rows="3" {% if is_paid %}readonly{% endif %}>{{ order.customer_address or '' }}</textarea>
-                    </div>
-                </div>
-
-                <!-- Middle Column: Location & Delivery -->
-                <div class="inflow-so-col inflow-so-col-delivery">
-                    <input type="hidden" name="sales_rep" id="salesRepInput" value="{{ order.sales_rep or '' }}">
-                    {% if session.get('role') == 'main_admin' %}
-                    <div class="inflow-field-row" style="margin-bottom: 4px;">
-                        <span class="inflow-field-label">Store/Branch</span>
-                        <select name="branch_id" id="soBranchSelect" class="inflow-field-select" onchange="handleSoBranchChange(this.value);" {% if is_paid %}disabled{% endif %}>
-                            <option value="" {% if not order.branch_id and (not branch_scope or branch_scope in ('main', 'all')) %}selected{% endif %}>🏢 Main Store (HQ)</option>
-                            {% for br in all_branches %}
-                            <option value="{{ br.id }}" {% if (order.branch_id|string == br.id|string) or (not order.branch_id and branch_scope == br.id|string) %}selected{% endif %}>🏬 {{ br.name }} ({{ br.code }})</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% endif %}
-                    <div class="inflow-field-row">
-                        <span class="inflow-field-label">Location</span>
-                        <select name="location_id" class="inflow-field-select" {% if is_paid %}disabled{% endif %}>
-                            {% for loc in all_locations %}
-                            <option value="{{ loc.id }}" {% if order.location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-
-                    <!-- Delivery By (Choose any 1 person, ALL, or multiple persons with equal split) -->
-                    <div class="inflow-field-row" style="align-items: center; margin-top: 4px; position: relative;">
-                        <span class="inflow-field-label">Delivery By</span>
-                        <div style="display: flex; gap: 4px; align-items: center; flex: 1; position: relative;">
-                            <!-- Hidden input storing value to submit: '' or 'ALL' or 'Dara Delivery' or 'Dara Delivery, Chan Thary' -->
-                            <input type="hidden" name="delivery_man" id="deliveryManInput" value="{{ order.delivery_man or '' }}">
-
-                            <!-- Custom Delivery Person Picker Trigger -->
-                            <div id="deliveryManPickerBtn" onclick="toggleDeliveryDropdown(event)" 
-                                 tabindex="0"
-                                 title="Choose one delivery person, multiple persons, or ALL (fee divides equally)"
-                                 style="flex: 1; min-width: 0; height: 21px; padding: 1px 6px; font-size: 11px; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: space-between; user-select: none; box-sizing: border-box;">
-                                <span id="deliveryManDisplayText" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; color: #0F172A;">
-                                    {% if order.delivery_man %}
-                                        {% if order.delivery_man == 'ALL' %}
-                                            👥 ALL Delivery Persons
-                                        {% else %}
-                                            {{ order.delivery_man }}
-                                        {% endif %}
-                                    {% else %}
-                                        -- None (Unassigned) --
-                                    {% endif %}
-                                </span>
-                                <span style="font-size: 9px; color: #64748B; margin-left: 4px;">▼</span>
-                            </div>
-
-                            <button type="button" onclick="openNewDeliveryManModal('main')" title="Add new delivery person to list" style="background: #2563EB; color: #FFFFFF; border: none; border-radius: 3px; font-weight: 700; font-size: 12px; height: 21px; width: 22px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;">
-                                +
-                            </button>
-
-                            <!-- Dropdown Popup Checklist -->
-                            <div id="deliveryDropdownMenu" style="display: none; position: absolute; top: 24px; left: 0; width: 280px; max-width: 320px; background: #FFFFFF; border: 1px solid #94A3B8; border-radius: 6px; box-shadow: 0 6px 20px rgba(0,0,0,0.18); z-index: 1050; padding: 6px 0;">
-                                <!-- Option 1: None / Unassigned -->
-                                <div class="dm-dropdown-item" onclick="selectNoDeliveryMan()" style="padding: 5px 12px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #64748B;" onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'">
-                                    <input type="radio" name="dm_radio_grp" id="dm_none" style="pointer-events: none;">
-                                    <span>-- None (Unassigned) --</span>
-                                </div>
-                                <div style="height: 1px; background: #E2E8F0; margin: 3px 0;"></div>
-
-                                <!-- Option 2: ALL Delivery Persons (Divide Fee Equally) -->
-                                <div class="dm-dropdown-item" onclick="selectAllDeliveryMen()" style="padding: 6px 12px; font-size: 11.5px; cursor: pointer; display: flex; align-items: center; gap: 8px; background: #F0FDF4; font-weight: 700; color: #15803D;" onmouseover="this.style.background='#DCFCE7'" onmouseout="this.style.background='#F0FDF4'">
-                                    <input type="checkbox" id="dm_all_chk" style="pointer-events: none; accent-color: #16A34A;">
-                                    <div style="flex: 1;">
-                                        <div>👥 ALL Delivery Persons</div>
-                                        <div style="font-size: 10px; font-weight: 500; color: #166534;">Divide delivery fee equally to all</div>
-                                    </div>
-                                </div>
-                                <div style="height: 1px; background: #E2E8F0; margin: 3px 0;"></div>
-
-                                <div style="padding: 4px 12px 2px; font-size: 9.5px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.05em;">
-                                    Select One or Multiple:
-                                </div>
-
-                                <!-- Individual Personnel Checkboxes -->
-                                <div style="max-height: 170px; overflow-y: auto;" id="deliveryMenChecklist">
-                                    {% for dm in all_delivery_men %}
-                                    <div class="dm-dropdown-item" onclick="toggleSingleDeliveryMan('{{ dm.name|replace("'", "\\'") }}')" style="padding: 5px 12px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #0F172A;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" class="dm-person-chk" data-name="{{ dm.name }}" style="pointer-events: none; accent-color: #0284C7;">
-                                        <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                                            <span style="font-weight: 600;">{{ dm.name }}</span>
-                                            {% if dm.phone %}<span style="font-size: 10px; color: #64748B; font-family: monospace;"> ({{ dm.phone }})</span>{% endif %}
-                                        </div>
-                                    </div>
-                                    {% endfor %}
-                                </div>
-
-                                <!-- Footer Split Bar & Done Button -->
-                                <div style="border-top: 1px solid #E2E8F0; padding: 6px 12px; background: #F8FAFC; display: flex; justify-content: space-between; align-items: center; margin-top: 4px;">
-                                    <span id="dmPopupSplitHint" style="font-size: 10px; color: #0284C7; font-weight: 600;"></span>
-                                    <button type="button" onclick="closeDeliveryDropdown()" class="btn btn-primary" style="font-size: 10.5px; padding: 2px 8px; height: 20px;">Done</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Delivery Fee in KHR (with quick buttons: 1000, 1500, 2000, 3000, 4000 KHR + add more custom) -->
-                    <div class="inflow-field-row" style="align-items: flex-start; margin-top: 4px;">
-                        <span class="inflow-field-label" style="padding-top: 3px;">Delivery Fee</span>
-                        <div style="flex: 1;">
-                            <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 4px;">
-                                <input type="number" step="100" min="0" name="delivery_fee_khr" id="deliveryFeeKhrInput" 
-                                       class="inflow-field-input" style="width: 105px; text-align: right; font-weight: 700; color: #B45309;" 
-                                       value="{{ ((order.delivery_fee_khr if 'delivery_fee_khr' in order else 0) or 0) | int }}" 
-                                       oninput="onDeliveryFeeInputChange(this.value)" onchange="markDirty(); persistDeliveryLogisticsIfCompleted();">
-                                <span style="font-size: 11px; font-weight: 700; color: #B45309;">៛ (KHR)</span>
-                            </div>
-                            <div style="display: flex; flex-wrap: wrap; gap: 4px;" id="khrFeeChips">
-                                {% for fee in [1000, 1500, 2000, 3000, 4000] %}
-                                <button type="button" class="khr-chip-btn" data-fee="{{ fee }}" onclick="setDeliveryFeeKhr({{ fee }})" 
-                                        style="background: {% if ((order.delivery_fee_khr if 'delivery_fee_khr' in order else 0) or 0)|int == fee %}#FEF3C7; border: 1px solid #D97706; color: #92400E; font-weight: 700;{% else %}#F1F5F9; border: 1px solid #CBD5E1; color: #475569; font-weight: 500;{% endif %} font-size: 10px; padding: 2px 6px; border-radius: 12px; cursor: pointer; transition: all 0.15s ease;">
-                                    {{ "{:,}".format(fee) }}៛
-                                </button>
-                                {% endfor %}
-                                <button type="button" onclick="focusCustomDeliveryFee()" title="Type custom amount"
-                                        style="background: #F8FAFC; border: 1px dashed #94A3B8; color: #475569; font-size: 10px; padding: 2px 6px; border-radius: 12px; cursor: pointer;">
-                                    + More
-                                </button>
-                            </div>
-
-                            <!-- Real-time Equal Split Notice -->
-                            <div id="feeSplitNotice" style="display: none; font-size: 10.5px; color: #0284C7; font-weight: 700; margin-top: 4px; background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 4px; padding: 3px 8px;">
-                                👥 <span id="feeSplitNoticeText">Divided equally</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Delivery Notes / Instructions -->
-                    <div class="inflow-field-row" style="align-items: center; margin-top: 4px;">
-                        <span class="inflow-field-label">Delivery Note</span>
-                        <input type="text" name="delivery_notes" class="inflow-field-input" placeholder="Delivery fee note or instructions..." value="{{ (order.delivery_notes if 'delivery_notes' in order else '') or '' }}" onchange="markDirty(); persistDeliveryLogisticsIfCompleted();">
-                    </div>
-                </div>
-
-                <!-- Right Column: Order #, Date, Status -->
-                <div class="inflow-so-col inflow-so-col-orderinfo" style="text-align: right;">
-                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-number" style="justify-content: flex-end;">
-                        <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Order #</span>
-                        <span class="inflow-orderinfo-value inflow-order-number-val" style="font-weight: 700; font-size: 12px; color: #111827; width: 110px; text-align: left;">
-                            {% if is_new %}
-                            <input type="text" id="orderNumberInput" name="order_number" value="" readonly 
-                                   placeholder="{% if preview_so_number %}&lt;Auto: {{ preview_so_number }}&gt;{% else %}&lt;Auto&gt;{% endif %}" 
-                                   style="width: 105px; height: 20px; font-size: 11px; padding: 2px 4px; border: 1px solid #9CA3AF; background: #FFFFFF; font-weight: 600; color: #4B5563;" 
-                                   title="Order number auto generated from last SO (Next: {{ preview_so_number or 'Auto' }})" />
-                            {% else %}
-                            {{ order.order_number }}
-                            {% endif %}
-                        </span>
-                    </div>
-
-                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-date" style="justify-content: flex-end;">
-                        <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Date</span>
-                        <div class="gs-datepicker-wrapper inflow-orderinfo-datepicker" style="width: 110px;">
-                            <input type="text" name="order_date" id="orderDateInput" class="inflow-field-input gs-datepicker-input" style="width: 100%; padding-right: 22px; cursor: pointer;" value="{{ order.order_date | format_inflow_date }}" data-original-date="{{ order.order_date | format_inflow_date }}" onchange="handleBillDateChange(this)">
-                            <span class="gs-datepicker-icon" title="Select date">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                                </svg>
-                            </span>
-                        </div>
-                    </div>
-                    <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-status" style="justify-content: flex-end; align-items: flex-start;">
-                        <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px; padding-top: 2px;">Status</span>
-                        <div class="inflow-orderinfo-status-val" style="font-size: 11.5px; width: 140px; text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;">
-                            <span class="inflow-order-status-badge" style="{% if is_paid %}color: #16A34A; font-weight: 700;{% elif (order.status or '')|upper == 'CANCELLED' %}color: #DC2626; font-weight: 700;{% elif (order.status or '')|upper == 'OPEN' %}color: #D97706; font-weight: 700;{% else %}color: #111827; font-weight: 600;{% endif %}">
-                                {% if is_paid %}✓ Paid{% elif (order.status or '')|upper == 'CANCELLED' %}Cancelled{% elif (order.status or '')|upper == 'OPEN' %}Open{% else %}{{ order.status | capitalize }}{% endif %}
-                            </span>
-                            {% if is_paid %}
-                            <span style="font-size: 10.5px; font-weight: 700; color: #15803D; background: #DCFCE7; border: 1px solid #86EFAC; border-radius: 4px; padding: 2px 7px; display: inline-flex; align-items: center; gap: 4px;" title="Payment method received">
-                                {% if order_payment_method|upper in ('ABA', 'ABA BANK') %}🏦 ABA Bank
-                                {% elif order_payment_method|upper in ('ACLEDA', 'ACLEDA BANK', 'ACELEDA') %}🏦 ACLEDA Bank
-                                {% elif order_payment_method|upper in ('KB PRASAC', 'KB PRASAC BANK', 'PRASAC', 'KB') %}🏦 KB PRASAC
-                                {% elif order_payment_method|upper == 'CASH' %}💵 Cash
-                                {% else %}💳 Paid by: {{ order_payment_method or 'Cash' }}
-                                {% endif %}
-                            </span>
-                            {% if order.completed_by %}
-                            <span style="font-size: 10px; font-weight: 600; color: #1E293B; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 6px; display: inline-flex; align-items: center; gap: 3px;" title="Order completed by user">
-                                👤 Completed by: <b>{{ order.completed_by }}</b>
-                            </span>
-                            {% endif %}
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="inflow-orderinfo-delivery" style="margin-top: 8px; display: flex; align-items: center; justify-content: flex-end; gap: 8px;">
-                        {% if order.carrier %}
-                        <span id="savedCarrierBadge" style="font-size: 11px; font-weight: 700; color: #1E40AF; background: #DBEAFE; padding: 2px 8px; border-radius: 4px; border: 1px solid #93C5FD;" title="Current delivery carrier">
-                            🚚 {{ order.carrier }}
-                        </span>
-                        {% else %}
-                        <span id="savedCarrierBadge" style="display: none; font-size: 11px; font-weight: 700; color: #1E40AF; background: #DBEAFE; padding: 2px 8px; border-radius: 4px; border: 1px solid #93C5FD;" title="Current delivery carrier"></span>
-                        {% endif %}
-                        <a href="javascript:void(0)" class="inflow-blue-link inflow-delivery-label-btn" onclick="openDeliveryModal()" title="Delivery Service & Label (80x100mm)">
-                            🚚 Delivery & Label (80x100mm)
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Items DataGrid with Item typing autocomplete matching screenshot0046.JPEG -->
-            <div class="inflow-grid-container" style="position: relative;">
-                <table class="inflow-grid-table" id="lineItemsTable">
-                    <thead>
-                        <tr>
-                            <th class="inflow-grid-selector-col" style="width: 48px; text-align: center; vertical-align: middle;">
-                                <div class="inflow-selector-header-content">
-                                    <input type="checkbox" id="masterSelectAllSoLines" class="inflow-master-chk" title="Select all items" onchange="toggleSelectAllSoLines(this.checked)" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
-                                </div>
-                            </th>
-                            <th style="width: 36px; text-align: center; vertical-align: middle;">Photo</th>
-                            <th style="width: 26%;">Item</th>
-                            <th style="width: 19%;">Description</th>
-                            <th style="width: 12%;">Quantity</th>
-                            <th style="width: 12%;">Price Tier</th>
-                            <th style="width: 10%;">Unit Price</th>
-                            <th style="width: 5%;">Discount</th>
-                            <th style="width: 11%;">Sub-Total</th>
-                        </tr>
-                    </thead>
-                    <tbody id="lineItemsBody">
-                        {% for l in lines %}
-                        <tr data-line-index="{{ loop.index0 }}" onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
-                            <td class="inflow-grid-selector-col">
-                                <div class="inflow-selector-cell-content">
-                                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onSoLineCheckboxChange(this, event)" title="Select item" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
-                                    {% if not is_paid %}
-                                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
-                                    {% endif %}
-                                </div>
-                            </td>
-                            <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
-                                {% if l.product_image_url or l.image_url %}
-                                <img src="{{ l.product_image_url or l.image_url }}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">
-                                {% else %}
-                                <div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;" title="No image">🖼️</div>
-                                {% endif %}
-                            </td>
-                            <td style="position: relative;">
-                                <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}">
-                                <input type="hidden" name="lines[{{ loop.index0 }}][addon_product_id]" class="line-addon-product-id" value="{{ l.addon_product_id or '' }}">
-                                <input type="hidden" name="lines[{{ loop.index0 }}][addon_quantity]" class="line-addon-quantity" value="{{ l.addon_quantity or 1.0 }}">
-                                <input type="hidden" name="lines[{{ loop.index0 }}][combine_option_id]" class="line-combine-option-id" value="{{ l.combine_option_id or '' }}">
-                                <input type="text" class="inflow-field-input grid-item-input" value="{{ l.product_sku }} {{ l.product_name }}" 
-                                       placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
-                                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
-                                       onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>
-                            </td>
-                            <td style="position: relative;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
-                                <input type="text" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or '' }}" 
-                                       class="inflow-field-input grid-desc-input" placeholder="Description..." 
-                                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #334155; font-size: 11.5px; padding: 2px 5px; border-radius: 3px;"
-                                       oninput="markDirty()" {% if is_paid %}readonly{% endif %}>
-                            </td>
-                            <td style="position: relative;" class="qty-cell">
-                                <div class="inflow-qty-cell-wrapper">
-                                    {% if l.is_backordered %}
-                                    <span class="inflow-backorder-badge" title="Insufficient Stock - Backordered">!</span>
-                                    {% endif %}
-                                    <input type="number" step="any" name="lines[{{ loop.index0 }}][quantity]" value="{{ l.display_qty }}" 
-                                           class="inflow-qty-num-input line-qty" 
-                                           oninput="onQtyNumberChange(this)" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}>
-                                    <div class="inflow-qty-uom-btn" {% if not is_paid %}onclick="openQtyDropdown(event, this)"{% endif %} title="Choose Unit / Stock">
-                                        <span class="uom-text">{{ l.display_uom }}</span>
-                                        <span class="uom-arrow">▾</span>
-                                    </div>
-                                    <input type="hidden" name="lines[{{ loop.index0 }}][uom]" class="line-uom" value="{{ l.display_uom }}">
-                                </div>
-                            </td>
-                            <td>
-                                <select name="lines[{{ loop.index0 }}][pricing_scheme_id]" class="inflow-field-select line-scheme-select" style="width: 100%; font-size: 11px; padding: 1px 2px; height: 20px; background: transparent; border: 1px solid #D1D5DB; border-radius: 2px;" onchange="onLinePricingSchemeChange(this)" {% if is_paid %}disabled{% endif %}>
-                                    {% for ps in pricing_schemes %}
-                                    <option value="{{ ps.id }}" {% if (l.pricing_scheme_id == ps.id) or (not l.pricing_scheme_id and (order.pricing_scheme_id == ps.id or (not order.pricing_scheme_id and ps.name == 'Retail 1'))) %}selected{% endif %}>
-                                        {{ ps.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </td>
-                            <td style="text-align: right;">
-                                <input type="number" step="0.0001" name="lines[{{ loop.index0 }}][unit_price]" value="{{ l.unit_price }}" class="inflow-field-input line-price" style="width: 70px; text-align: right;" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}>
-                            </td>
-                            <td style="text-align: right;">
-                                <input type="number" step="any" name="lines[{{ loop.index0 }}][discount_percent]" value="{{ l.discount_percent }}" class="inflow-field-input line-disc" style="width: 40px; text-align: right;" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}> %
-                            </td>
-                            <td style="text-align: right; font-weight: 600;" class="line-subtotal">
-                                ${{ "%.2f"|format(l.subtotal) }}
-                            </td>
-                        </tr>
-                        {% endfor %}
-
-                        <!-- Asterisk Row for Typing / Adding New Items (*) matching screenshot0046.JPEG -->
-                        <tr id="newRowEntry" onclick="selectGridRow(this)" {% if is_paid %}style="display:none;"{% endif %}>
-                            <td class="inflow-grid-selector-col" style="font-weight: bold;">*</td>
-                            <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
-                                <div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>
-                            </td>
-                            <td style="position: relative;">
-                                <input type="text" id="newItemTextInput" class="inflow-field-input grid-item-input" 
-                                       placeholder="Type to add item..." style="width: 100%; border: 1px solid #7F9DB9;"
-                                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
-                                       onkeydown="handleItemDropdownKey(event, this)">
-                            </td>
-                            <td onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
-                                <input type="text" id="newItemDescInput" class="inflow-field-input grid-desc-input" placeholder="Description..." 
-                                       style="width: 100%; border: 1px solid transparent; background: transparent; color: #334155; font-size: 11.5px; padding: 2px 5px; border-radius: 3px;">
-                            </td>
-                            <td><span style="color: #6B7280; margin-left: 20px;">0</span></td>
-                            <td>
-                                <select id="newItemSchemeSelect" class="inflow-field-select line-scheme-select" style="width: 100%; font-size: 11px; padding: 1px 2px; height: 20px; background: transparent; border: 1px solid #D1D5DB; border-radius: 2px;">
-                                    {% for ps in pricing_schemes %}
-                                    <option value="{{ ps.id }}" {% if (order.pricing_scheme_id == ps.id) or (not order.pricing_scheme_id and ps.name == 'Retail 1') %}selected{% endif %}>
-                                        {{ ps.name }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-
-                        <!-- Empty Desktop Grid Rows (Padded only if table has fewer than 5 rows to prevent grid overflow) -->
-                        {% set existing_lines_count = lines|length %}
-                        {% set min_grid_rows = 5 %}
-                        {% set empty_rows_needed = min_grid_rows - existing_lines_count %}
-                        {% if empty_rows_needed > 0 %}
-                        {% for i in range(empty_rows_needed) %}
-                        <tr>
-                            <td class="inflow-grid-selector-col"></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                        </tr>
-                        {% endfor %}
-                        {% endif %}
-                    </tbody>
-                </table>
-
-                <!-- Floating Item Dropdown Popup Table matching screenshot0046.JPEG -->
-                <div id="itemDropdownPopup" class="inflow-item-dropdown-popup">
-                    <table class="inflow-item-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 38px; text-align: center;">Photo</th>
-                                <th style="width: 16%;">Category</th>
-                                <th style="width: 36%;">Item</th>
-                                <th style="width: 22%;">Description</th>
-                                <th style="width: 16%; text-align: right;">Price</th>
-                                <th style="width: 8%; text-align: center;">Details</th>
-                            </tr>
-                        </thead>
-                        <tbody id="itemDropdownBody">
-                            {% for p in all_products %}
-                            <tr onclick="selectItemForActiveRow({{ p.id }}, '{{ p.sku }}', '{{ p.name|replace('\'', '\\\'') }}', '{{ (p.description or '')|replace('\'', '\\\'') }}', {{ p.price or p.default_price or 0 }}, '{{ p.uom or 'pcs' }}')"
-                                data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}" data-cat="{{ (p.category_name or '')|lower }}">
-                                <td style="width: 38px; text-align: center; vertical-align: middle; padding: 2px;">
-                                    {% if p.image_url %}
-                                    <img src="{{ p.image_url }}" alt="" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="event.stopPropagation(); previewImageModal(this.src);" title="Click to preview image">
-                                    {% else %}
-                                    <div style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #94A3B8;">🖼️</div>
-                                    {% endif %}
-                                </td>
-                                <td style="color: #64748B;">{{ p.category_name or 'GENERAL' }}</td>
-                                <td style="font-weight: 600;">{{ p.sku }} {{ p.name }}</td>
-                                <td style="color: #64748B;">{{ p.description or '' }}</td>
-                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(p.price or p.default_price or 0) }}</td>
-                                <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                <!-- Floating Quantity & Unit Conversion Dropdown Popup matching table_grid_step15.png -->
-                <div id="qtyDropdownPopup" class="inflow-qty-dropdown-popup">
-                    <table class="inflow-qty-table">
-                        <thead>
-                            <tr>
-                                <th style="width: 52%;">Quantity</th>
-                                <th style="width: 48%; text-align: right;">Standard Qty</th>
-                            </tr>
-                        </thead>
-                        <tbody id="qtyDropdownBody">
-                            <!-- Populated dynamically -->
-                        </tbody>
-                    </table>
-                    <div class="inflow-qty-stock-panel">
-                        <div class="inflow-qty-stock-row">
-                            <span class="stock-label">Qty On Hand</span>
-                            <span class="stock-val" id="qtyOnHandVal">0</span>
-                        </div>
-                        <div class="inflow-qty-stock-row">
-                            <span class="stock-label">Qty Available</span>
-                            <span class="stock-val" id="qtyAvailVal">0</span>
-                        </div>
-                        <div class="inflow-qty-stock-row">
-                            <span class="stock-label">Qty Reserved</span>
-                            <span class="stock-val" id="qtyReservedVal">0</span>
-                        </div>
-                        <div class="inflow-qty-stock-row">
-                            <span class="stock-label">Qty On Order</span>
-                            <span class="stock-val" id="qtyOnOrderVal">0</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Grid Action Buttons (+, —, ↑, ↓ matching screenshot0046.JPEG) -->
-            <div class="inflow-grid-actions-bar">
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}addNewBlankLine(){% endif %}" title="Add new item row (+)" {% if is_paid %}disabled{% endif %}>+</button>
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}deleteSelectedLine(){% endif %}" title="Delete selected row (&minus;)" {% if is_paid %}disabled{% endif %}>&minus;</button>
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}moveSelectedLineUp(){% endif %}" title="Move selected row up (&uarr;)" {% if is_paid %}disabled{% endif %}>&uarr;</button>
-                <button type="button" class="inflow-grid-btn" onclick="{% if not is_paid %}moveSelectedLineDown(){% endif %}" title="Move selected row down (&darr;)" {% if is_paid %}disabled{% endif %}>&darr;</button>
-            </div>
-
-            <!-- Footer: Pricing Scheme, Remarks, Financial Totals -->
-            <div class="inflow-so-footer-grid">
-                <div>
-                    <div class="inflow-field-row" style="margin-bottom: 12px;">
-                        <span class="inflow-field-label">Pricing / Currency</span>
-                        <select name="pricing_scheme_id" id="masterPricingSchemeSelect" class="inflow-field-select" style="max-width: 180px;" onchange="onMasterPricingSchemeChange(this.value)" {% if is_paid %}disabled{% endif %}>
-                            {% for ps in pricing_schemes %}
-                            <option value="{{ ps.id }}" {% if order.pricing_scheme_id == ps.id or (not order.pricing_scheme_id and ps.name == 'Retail 1') %}selected{% endif %}>
-                                {{ ps.name }}
-                            </option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                            <span style="font-size: 11.5px; font-weight: 700; color: #374151;">Remarks / Notes</span>
-                            <span style="font-size: 10px; color: #64748B;">(Always editable & deletable)</span>
-                        </div>
-                        <textarea name="notes" id="orderNotesInput" class="inflow-field-textarea" style="width: 100%; min-height: 72px; border: 1px solid #CBD5E1; border-radius: 4px; padding: 6px 8px; font-size: 11.5px; line-height: 1.45; font-family: inherit; color: #1E293B; background: #FFFFFF;" placeholder="Enter remarks or notes here..." oninput="markDirty()">{{ order.notes or '' }}</textarea>
-                    </div>
-                </div>
-
-                <!-- Right Totals Block -->
-                <div>
-                    <table class="inflow-totals-table">
-                        <tr>
-                            <td style="color: #4B5563;">Sub-Total</td>
-                            <td class="val" id="dispSubtotal">${{ "%.2f"|format(order.subtotal or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td style="color: #4B5563;">Total</td>
-                            <td class="val" id="dispTotal">${{ "%.2f"|format(order.total_amount or 0) }}</td>
-                        </tr>
-                        <tr>
-                            <td style="color: #4B5563;">Paid</td>
-                            <td class="val">
-                                <input type="number" step="0.01" name="paid_amount" id="paidAmountInput" class="inflow-field-input" style="width: 90px; text-align: right;" value="{{ "%.2f"|format(order.paid_amount or 0) }}" onchange="recalculateTotals()" {% if is_paid %}readonly{% endif %}>
-                            </td>
-                        </tr>
-                        <tr style="border-top: 1px solid #CBD5E1;">
-                            <td style="font-weight: 700; font-size: 14px; padding-top: 6px;">Balance</td>
-                            <td class="val inflow-balance-val" id="dispBalance" style="padding-top: 6px;">
-                                ${{ "%.2f"|format(order.balance_due or 0) }}
-                            </td>
-                        </tr>
-                        {% if is_paid %}
-                        <tr style="background: #F0FDF4; border-top: 1px dashed #BBF7D0;">
-                            <td style="color: #166534; font-weight: 700; font-size: 11.5px; padding: 5px 6px;">Paid by</td>
-                            <td class="val" style="color: #166534; font-weight: 800; font-size: 11.5px; padding: 5px 6px;">
-                                {% if order_payment_method|upper in ('ABA', 'ABA BANK') %}🏦 ABA Bank
-                                {% elif order_payment_method|upper in ('ACLEDA', 'ACLEDA BANK', 'ACELEDA') %}🏦 ACLEDA Bank
-                                {% elif order_payment_method|upper in ('KB PRASAC', 'KB PRASAC BANK', 'PRASAC', 'KB') %}🏦 KB PRASAC
-                                {% elif order_payment_method|upper == 'CASH' %}💵 Cash
-                                {% else %}💳 {{ order_payment_method or 'Cash' }}
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% if order.completed_by %}
-                        <tr style="background: #F8FAFC; border-top: 1px solid #E2E8F0;">
-                            <td style="color: #475569; font-weight: 600; font-size: 11px; padding: 4px 6px;">Completed by</td>
-                            <td class="val" style="color: #0F172A; font-weight: 700; font-size: 11px; padding: 4px 6px;">
-                                👤 {{ order.completed_by }}
-                            </td>
-                        </tr>
-                        {% endif %}
-                        {% endif %}
-                    </table>
-
-                    <div class="inflow-btn-group">
-                        {% if is_paid %}
-                        <button type="button" class="inflow-win-button" onclick="openReopenPromptModal()" style="min-width: 100px; background: #F8FAFC; color: #16A34A; border-color: #86EFAC; font-weight: 600;">Re-open Order</button>
-                        <button type="button" class="inflow-win-button" style="background: #F1F5F9; color: #94A3B8; border-color: #CBD5E1; cursor: not-allowed;" disabled>Complete & Pay ▾</button>
-                        {% else %}
-                        {% if not is_new %}
-                        <button type="button" class="inflow-win-button" onclick="deleteOrderAction()" style="color: #DC2626;" title="Permanently delete this sales order">Delete</button>
-                        {% endif %}
-                        <button type="button" class="inflow-win-button" onclick="cancelOrderAction()">Cancel Order</button>
-                        <button type="button" class="inflow-win-button primary" onclick="completePayAction()">Complete & Pay ▾</button>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        </form>
-    </main>
+    {% include 'sales/_detail_canvas.html' %}
 </div>
 
 <!-- inFlow Save Prompt Modal (Matching inFlow Inventory dialog) -->
@@ -2546,7 +1936,7 @@
             <div style="background: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 8px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
                 <div>
                     <div style="font-size: 11px; text-transform: uppercase; color: #047857; font-weight: 700; letter-spacing: 0.04em;">Total Amount to Pay</div>
-                    <div style="font-size: 12px; color: #065F46; margin-top: 2px;">Order: <b style="font-size: 13px;">{{ order.order_number if not is_new else '<New Order>' }}</b></div>
+                    <div style="font-size: 12px; color: #065F46; margin-top: 2px;">Order: <b id="completePayOrderNum" style="font-size: 13px;">{{ order.order_number if not is_new else '<New Order>' }}</b></div>
                 </div>
                 <div style="text-align: right;">
                     <div id="completePayTotalUsd" style="font-size: 24px; font-weight: 800; color: #047857; line-height: 1.1;">${{ "%.2f"|format(order.total_amount or 0) }}</div>
@@ -2636,11 +2026,7 @@
     </div>
 </div>
 
-<!-- Hidden Action Forms for Direct Server Operations -->
-<form id="completePayForm" method="POST" action="{% if not is_new %}{{ url_for('sales_orders.complete_pay', id=order.id) }}{% endif %}" style="display:none;"></form>
-<form id="cancelOrderForm" method="POST" action="{% if not is_new %}{{ url_for('sales_orders.cancel_order_direct', id=order.id) }}{% endif %}" style="display:none;"></form>
-<form id="deleteOrderForm" method="POST" action="{% if not is_new %}{{ url_for('sales_orders.delete_order', id=order.id) }}{% endif %}" style="display:none;"></form>
-<form id="reopenOrderForm" method="POST" action="{% if not is_new %}{{ url_for('sales_orders.reopen_order', id=order.id) }}{% endif %}" style="display:none;"></form>
+
 
 <!-- Modal: Order Version History -->
 <div id="orderVersionsModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
@@ -2649,7 +2035,7 @@
             <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 16px;">🕒</span>
                 <span>Order Version History (ប្រវត្តិ Version ការកែប្រែ)</span>
-                <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                <span id="orderVersionsModalNumBadge" style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
                     {% if is_new %}&lt;New Order&gt;{% else %}{{ order.order_number }}{% endif %}
                 </span>
             </div>
@@ -2758,7 +2144,7 @@
             <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px;">
                 <span style="font-size: 16px;">📎</span>
                 <span>Order Attachments & Photos (ឯកសារភ្ជាប់ & រូបថត)</span>
-                <span style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
+                <span id="orderAttachmentModalNumBadge" style="background: rgba(255,255,255,0.2); padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 600;">
                     {% if is_new %}&lt;New Order&gt;{% else %}{{ order.order_number }}{% endif %}
                 </span>
             </div>
@@ -2805,7 +2191,7 @@
                     
                     <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                         <input type="text" id="soAttachmentCaptionInput" class="inflow-field-input" placeholder="Optional caption / note (e.g. Bank slip, delivery proof, damage photo...)" style="flex: 1; min-width: 220px; height: 30px; font-size: 12px; padding: 4px 10px;">
-                        <button type="button" id="soUploadSubmitBtn" class="inflow-dlg-btn btn-save" onclick="submitSoAttachmentsUpload({{ order.id }})" style="background: #059669; color: #FFFFFF; font-weight: 700; padding: 6px 18px; border-radius: 4px; border: none; cursor: pointer;">
+                        <button type="button" id="soUploadSubmitBtn" class="inflow-dlg-btn btn-save" onclick="submitSoAttachmentsUpload(getCurrentOrderId())" style="background: #059669; color: #FFFFFF; font-weight: 700; padding: 6px 18px; border-radius: 4px; border: none; cursor: pointer;">
                             <span>⬆️ Upload Now</span>
                         </button>
                         <button type="button" class="inflow-dlg-btn" onclick="clearSoStagedFiles()" style="padding: 6px 12px; font-size: 11.5px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; cursor: pointer;">
@@ -2902,7 +2288,7 @@
 </div>
 
 <script>
-const isNewOrder = {{ 'true' if is_new else 'false' }};
+let isNewOrder = {{ 'true' if is_new else 'false' }};
 const isCopiedDraft = {{ 'true' if is_copied_draft else 'false' }};
 const canEditPrices = {{ 'true' if can_edit_prices else 'false' }};
 let isDirty = isCopiedDraft ? true : false;
@@ -3671,8 +3057,21 @@ function attachFiltersToForm(form) {
     }
 }
 
-// Instant Direct Navigation (Zero Animation Latency - Appear As Fast As Possible)
-function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
+window._soActiveNavRequestId = 0;
+window.currentActiveOrderId = {{ order.id if order and order.id else 0 }};
+
+function getCurrentOrderId() {
+    if (window.currentActiveOrderId) return window.currentActiveOrderId;
+    const form = document.getElementById('salesOrderForm');
+    if (form) {
+        const m = (form.getAttribute('action') || '').match(/\/sales\/save\/(\d+)/);
+        if (m && m[1] && m[1] !== '0') return parseInt(m[1], 10);
+    }
+    return {{ order.id if order and order.id else 0 }};
+}
+
+// Instant Direct Navigation (Zero Animation Latency - Appear As Fast As Possible via SPA Canvas Swap)
+function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     if (!targetUrl) return;
     
     // Save drawer / sidebar scroll position
@@ -3685,21 +3084,27 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
         sessionStorage.setItem('drawerOrdersList_scrollTop', drawerList.scrollTop);
     }
 
-    // Immediate active state highlight
-    if (clickedEl) {
-        document.querySelectorAll('.so-sidebar-card, .inflow-drawer-row, .inflow-expanded-row').forEach(r => r.classList.remove('active'));
-        clickedEl.classList.add('active');
-    }
-
-    // Clear stale customer search in storage so it never wipes out the orders list
-    sessionStorage.removeItem('inflow_so_drawer_customer_search');
-
     let url;
     try {
         url = new URL(targetUrl, window.location.origin);
     } catch (e) {
         url = new URL(window.location.origin + targetUrl);
     }
+
+    const orderIdMatch = url.pathname.match(/\/sales\/(\d+)/);
+    const targetOrderId = orderIdMatch ? parseInt(orderIdMatch[1], 10) : null;
+
+    // Immediate active state highlight (0ms latency!)
+    document.querySelectorAll('.so-sidebar-card, .inflow-drawer-row, .inflow-expanded-row').forEach(r => r.classList.remove('active'));
+    if (clickedEl) {
+        clickedEl.classList.add('active');
+    } else if (targetOrderId) {
+        const matchingCard = document.querySelector(`.so-sidebar-card[data-order-id="${targetOrderId}"]`);
+        if (matchingCard) matchingCard.classList.add('active');
+    }
+
+    // Clear stale customer search in storage so it never wipes out the orders list
+    sessionStorage.removeItem('inflow_so_drawer_customer_search');
 
     // Retain any active search query from input, storage, or current URL so search remains fixed across order selection
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
@@ -3721,13 +3126,186 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl) {
 
     const finalUrl = url.pathname + url.search;
 
-    // Navigate immediately (0ms delay)
-    if (window.top && window.top.inflowMdi) {
-        window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
-    } else {
-        window.location.href = finalUrl;
+    // If not a sales order detail URL (e.g. /sales/new or branch switch), do normal navigation
+    if (!targetOrderId) {
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
+        } else {
+            window.location.href = finalUrl;
+        }
+        return;
     }
+
+    // Blazing-fast SPA partial canvas fetch (0 screen reload, ~20ms load time)
+    const currentReqId = ++window._soActiveNavRequestId;
+    const fetchUrl = finalUrl + (finalUrl.includes('?') ? '&' : '?') + 'partial=canvas';
+
+    fetch(fetchUrl, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'X-Inflow-Partial': 'canvas'
+        }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.text();
+    })
+    .then(html => {
+        if (currentReqId !== window._soActiveNavRequestId) return; // Discard superseded rapid clicks
+
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const newCanvas = doc.querySelector('main.inflow-document-canvas');
+        if (!newCanvas) {
+            if (window.top && window.top.inflowMdi) {
+                window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
+            } else {
+                window.location.href = finalUrl;
+            }
+            return;
+        }
+
+        // Preserve already-parsed heavy customer & item dropdown table bodies (avoids re-rendering 3,800 rows!)
+        const cachedCustBody = document.getElementById('customerDropdownBody');
+        const cachedItemBody = document.getElementById('itemDropdownBody');
+        if (cachedCustBody && cachedCustBody.children.length > 0) {
+            const incomingCustBody = newCanvas.querySelector('#customerDropdownBody');
+            if (incomingCustBody) incomingCustBody.replaceWith(cachedCustBody);
+        }
+        if (cachedItemBody && cachedItemBody.children.length > 0) {
+            const incomingItemBody = newCanvas.querySelector('#itemDropdownBody');
+            if (incomingItemBody) incomingItemBody.replaceWith(cachedItemBody);
+        }
+
+        // Swap out document canvas instantly
+        const currCanvas = document.querySelector('main.inflow-document-canvas');
+        if (currCanvas) {
+            currCanvas.replaceWith(newCanvas);
+        }
+
+        // Synchronize hidden action forms (action URLs with new order ID)
+        ['completePayForm', 'cancelOrderForm', 'deleteOrderForm', 'reopenOrderForm'].forEach(fid => {
+            const newF = doc.getElementById(fid);
+            const curF = document.getElementById(fid);
+            if (newF && curF) {
+                curF.action = newF.action;
+            } else if (newF && !curF) {
+                document.body.appendChild(newF);
+            }
+        });
+
+        // Update Meta, Modals & History
+        const meta = doc.getElementById('soPartialMeta');
+        if (meta) {
+            const newOrderId = meta.getAttribute('data-order-id');
+            const newOrderNum = meta.getAttribute('data-order-num');
+            const pageTitle = meta.getAttribute('data-page-title') || `Sales Order ${newOrderNum} - inFlow Premium`;
+            const tabTitle = meta.getAttribute('data-tab-title') || `Sales Order: ${newOrderNum}`;
+            const totalAmount = meta.getAttribute('data-total-amount') || '0.00';
+
+            window.currentActiveOrderId = parseInt(newOrderId, 10);
+            window.currentOrderId = window.currentActiveOrderId;
+            window.isNewOrder = false;
+            isNewOrder = false;
+            document.title = pageTitle;
+
+            // Update modal badges & headers
+            const cpOrderNum = document.getElementById('completePayOrderNum');
+            if (cpOrderNum) cpOrderNum.innerText = newOrderNum;
+
+            const verBadge = document.getElementById('orderVersionsModalNumBadge');
+            if (verBadge) verBadge.innerText = newOrderNum;
+
+            const attBadgeNum = document.getElementById('orderAttachmentModalNumBadge');
+            if (attBadgeNum) attBadgeNum.innerText = newOrderNum;
+
+            // Update Delivery modal inputs & cached shipping state
+            const delAddr = document.getElementById('modalDeliveryAddressInput');
+            if (delAddr) delAddr.value = meta.getAttribute('data-customer-address') || '';
+            const caseCnt = document.getElementById('modalCaseCountInput');
+            if (caseCnt) caseCnt.value = meta.getAttribute('data-package-count') || '1';
+            const prodCost = document.getElementById('modalProductCostInput');
+            if (prodCost) prodCost.value = totalAmount;
+            const delNotes = document.getElementById('modalDeliveryNotesInput');
+            if (delNotes) delNotes.value = meta.getAttribute('data-delivery-notes') || '';
+            const carrierSel = document.getElementById('modalCarrierSelect');
+            if (carrierSel && meta.getAttribute('data-carrier')) carrierSel.value = meta.getAttribute('data-carrier');
+
+            window.currentSavedShipping = {
+                carrier: meta.getAttribute('data-carrier') || 'Virak Buntham',
+                package_count: parseInt(meta.getAttribute('data-package-count') || '1', 10),
+                cod_amount: parseFloat(totalAmount) || 0,
+                delivery_notes: meta.getAttribute('data-delivery-notes') || '',
+                customer_address: meta.getAttribute('data-customer-address') || ''
+            };
+
+            // Update Complete & Pay modal
+            const cpTotal = document.getElementById('completePayTotalUsd');
+            if (cpTotal) cpTotal.innerText = '$' + totalAmount;
+
+            // Update Versions modal body
+            const partialVersions = doc.getElementById('soPartialVersionsContainer');
+            const versionsTbody = document.getElementById('versionsTableBody');
+            if (partialVersions && versionsTbody) {
+                versionsTbody.innerHTML = partialVersions.innerHTML;
+            }
+
+            // Update Attachments modal grid & badge
+            const partialAtts = doc.getElementById('soPartialAttachmentsContainer');
+            const attsGrid = document.getElementById('soAttachmentsGrid');
+            if (partialAtts && attsGrid) {
+                attsGrid.innerHTML = partialAtts.innerHTML;
+            }
+            const attBadge = document.getElementById('soAttListCountBadge');
+            if (attBadge) attBadge.innerText = meta.getAttribute('data-attachments-count') || '0';
+
+            const attSubmitBtn = document.getElementById('soUploadSubmitBtn');
+            if (attSubmitBtn) {
+                attSubmitBtn.setAttribute('onclick', `submitSoAttachmentsUpload(${window.currentActiveOrderId})`);
+            }
+
+            // Push state into browser history (only if not a popstate Back/Forward action)
+            if (!skipHistoryPush && window.history && window.history.pushState) {
+                window.history.pushState({ orderId: window.currentActiveOrderId }, pageTitle, finalUrl);
+            }
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                window.top.inflowMdi.updateActiveTabMeta(finalUrl, tabTitle);
+            } else if (window.top && window.top.history && window.top.history.replaceState) {
+                window.top.history.replaceState(null, pageTitle, finalUrl);
+            }
+        }
+
+        // Reset dirty flag and re-bind input change listeners
+        isDirty = false;
+        const soForm = document.getElementById('salesOrderForm');
+        if (soForm) {
+            soForm.querySelectorAll('input, select, textarea').forEach(el => {
+                el.addEventListener('input', markDirty);
+                el.addEventListener('change', markDirty);
+            });
+        }
+
+        // Re-initialize UI widgets for new canvas
+        if (typeof recalculateTotals === 'function') recalculateTotals();
+        if (typeof initPreviewToolbar === 'function') initPreviewToolbar();
+        if (typeof initDeliverySelection === 'function') initDeliverySelection();
+    })
+    .catch(err => {
+        console.warn('Fast partial swap error, falling back to full navigation:', err);
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
+        } else {
+            window.location.href = finalUrl;
+        }
+    });
 }
+
+// Support browser Back/Forward buttons with zero screen reload
+window.addEventListener('popstate', function(e) {
+    if (window.location.pathname.match(/\/sales\/\d+/)) {
+        executeAnimatedOrderNavigation(window.location.pathname + window.location.search, null, true);
+    }
+});
 
 // Track drawer scroll in real time so it stays exact
 (function initDrawerScrollPersistence() {
@@ -5120,7 +4698,7 @@ document.addEventListener('click', function(e) {
 
 function executeCopyAction(action) {
     closeCopyDropdown();
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     if (!orderId || isNewOrder) {
         alert('Please save the sales order before copying or generating a Purchase Order.');
         return;
@@ -5224,7 +4802,7 @@ function selectAndExecuteDoc(docType) {
 
 function executePreviewAction(docType) {
     docType = docType || lastSelectedDocType || 'invoice';
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     if (!orderId || isNewOrder) {
         alert('Please save the sales order before previewing, printing, or exporting.');
         return;
@@ -5283,7 +4861,7 @@ function syncShippingToUiAndForm(data) {
 }
 
 function openDeliveryModal() {
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     if (!orderId || isNewOrder) {
         alert('Please save the sales order first before generating delivery stickers.');
         return;
@@ -5443,7 +5021,7 @@ function getDeliveryModalData() {
 }
 
 function saveDeliveryInfoOnly() {
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     const data = getDeliveryModalData();
 
     syncShippingToUiAndForm(data);
@@ -5466,7 +5044,7 @@ function saveDeliveryInfoOnly() {
 }
 
 function saveAndOpenDeliveryLabel() {
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     const data = getDeliveryModalData();
 
     syncShippingToUiAndForm(data);
@@ -5491,7 +5069,7 @@ function saveAndOpenDeliveryLabel() {
 }
 
 function saveAndExportDeliveryLabelPdf() {
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     const data = getDeliveryModalData();
 
     syncShippingToUiAndForm(data);
@@ -5517,7 +5095,7 @@ function saveAndExportDeliveryLabelPdf() {
 }
 
 function saveAndExportDeliveryLabelJpg() {
-    const orderId = {{ order.id if order and order.id else 0 }};
+    const orderId = getCurrentOrderId();
     const data = getDeliveryModalData();
 
     syncShippingToUiAndForm(data);
@@ -5851,8 +5429,8 @@ function submitNewDeliveryManAjax() {
    Quick Add Customer & Delivery Logistics Persistence Functions
    ========================================================================== */
 function persistDeliveryLogisticsIfCompleted() {
-    {% if not is_new and order %}
-    const orderId = {{ order.id }};
+    const orderId = getCurrentOrderId();
+    if (!orderId || isNewOrder) return;
     const deliveryMan = (document.getElementById('deliveryManInput')?.value || '').trim();
     const deliveryFee = parseFloat(document.getElementById('deliveryFeeKhrInput')?.value || 0) || 0;
     const deliveryNotes = (document.querySelector('input[name="delivery_notes"]')?.value || '').trim();
@@ -6153,6 +5731,7 @@ function closeOrderVersionsModal() {
 }
 
 function viewOrderVersionSnapshot(orderId, verId) {
+    orderId = orderId || getCurrentOrderId();
     const sModal = document.getElementById('versionSnapshotModal');
     const sBody = document.getElementById('snapshotModalBody');
     const sTitle = document.getElementById('snapshotModalTitle');
@@ -6328,6 +5907,7 @@ function clearSoStagedFiles() {
 }
 
 function submitSoAttachmentsUpload(orderId) {
+    orderId = orderId || getCurrentOrderId();
     if (!orderId) {
         alert('Please save the order first before uploading photos or documents.');
         return;
@@ -6465,6 +6045,7 @@ function reloadOrderAttachmentsGrid(orderId) {
 }
 
 function deleteSoAttachmentAjax(orderId, attId) {
+    orderId = orderId || getCurrentOrderId();
     if (!confirm('Are you sure you want to delete this attachment?')) return;
     
     fetch('/sales/' + orderId + '/attachments/' + attId + '/delete', {
@@ -6557,7 +6138,7 @@ function directExportOrderPdf() {
         alert('Please save the sales order first before exporting PDF.');
         return;
     }
-    const orderId = {% if not is_new and order and order.id %}{{ order.id }}{% else %}null{% endif %};
+    const orderId = getCurrentOrderId();
     if (!orderId) {
         alert('Please save the sales order first.');
         return;
@@ -6572,7 +6153,7 @@ function directExportOrderJpg() {
         alert('Please save the sales order first before exporting JPG.');
         return;
     }
-    const orderId = {% if not is_new and order and order.id %}{{ order.id }}{% else %}null{% endif %};
+    const orderId = getCurrentOrderId();
     if (!orderId) {
         alert('Please save the sales order first.');
         return;
@@ -6587,7 +6168,7 @@ function directShareOrderTelegram() {
         alert('Please save the sales order first before sharing to Telegram.');
         return;
     }
-    const orderId = {% if not is_new and order and order.id %}{{ order.id }}{% else %}null{% endif %};
+    const orderId = getCurrentOrderId();
     if (!orderId) {
         alert('Please save the sales order first.');
         return;
