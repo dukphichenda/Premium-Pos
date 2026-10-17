@@ -3,6 +3,10 @@
 {% block title %}Product Price List (តារាងតម្លៃទំនិញ) - inFlow Premium{% endblock %}
 
 {% block extra_css %}
+<!-- Google Fonts for crisp Khmer rendering (Kantumruy Pro, Siemreap, Battambang) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&family=Siemreap&display=swap" rel="stylesheet">
 <!-- html2pdf bundle for client-side PDF export -->
 <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
 <style>
@@ -1319,8 +1323,8 @@
     </div>
 </div>
 
-<!-- Off-screen container used strictly for clean PDF compilation -->
-<div id="pdfExportCloneArea" style="position: absolute; left: -9999px; top: -9999px; width: 1000px; background: #FFFFFF;"></div>
+<!-- Staged container used strictly for clean PDF compilation (rendered behind modal overlay) -->
+<div id="pdfExportCloneArea" style="position: fixed; left: 0; top: 0; width: 710px; background: #FFFFFF; z-index: 1000; pointer-events: none; opacity: 1; overflow: visible; display: none;"></div>
 
 <!-- ==========================================================================
      CLIENT-SIDE JAVASCRIPT: DATA & INTERACTIONS
@@ -1769,7 +1773,7 @@ function applyPickerSelection(exportAfter) {
 }
 
 // ==========================================================================
-// EXPORT PDF IMPLEMENTATION (High-Resolution Multi-page A4)
+// EXPORT PDF IMPLEMENTATION (High-Resolution Multi-page A4 - Khmer font preserved)
 // ==========================================================================
 async function exportPriceListPDF() {
     const overlay = document.getElementById('exportOverlay');
@@ -1777,93 +1781,290 @@ async function exportPriceListPDF() {
     overlay.style.display = 'flex';
     progressText.textContent = 'Gathering price table cards for PDF compilation...';
 
+    const cloneArea = document.getElementById('pdfExportCloneArea');
+    cloneArea.style.display = 'block';
+    cloneArea.innerHTML = '';
+
     try {
-        // Collect currently visible cards
-        const visibleCards = document.querySelectorAll('.pl-price-card');
+        // 1. Ensure all web fonts (Kantumruy Pro, Siemreap) are completely loaded
+        if (document.fonts && document.fonts.ready) {
+            await document.fonts.ready;
+        }
+
+        // 2. Collect currently visible cards
+        const allCards = Array.from(document.querySelectorAll('.pl-price-card'));
+        const visibleCards = allCards.filter(c => {
+            return window.getComputedStyle(c).display !== 'none';
+        });
+
         if (visibleCards.length === 0) {
             alert('No cards available to export. Please select at least one product.');
             overlay.style.display = 'none';
+            cloneArea.style.display = 'none';
             return;
         }
 
-        const cloneArea = document.getElementById('pdfExportCloneArea');
-        cloneArea.innerHTML = '';
+        progressText.textContent = `Formatting ${visibleCards.length} cards into standard A4 sheets...`;
 
-        // Build clean PDF layout container
+        // 3. Paginate into exact A4 Pages (4 cards per page: 2 columns x 2 rows)
+        const CARDS_PER_PAGE = 4;
+        const totalPages = Math.max(1, Math.ceil(visibleCards.length / CARDS_PER_PAGE));
+
         const pdfRoot = document.createElement('div');
-        pdfRoot.style.width = '790px'; // A4 optimal standard width in pixels at 96 DPI
-        pdfRoot.style.padding = '12px 14px';
+        pdfRoot.className = 'pdf-export-root';
+        pdfRoot.style.width = '710px';
+        pdfRoot.style.margin = '0 auto';
         pdfRoot.style.background = '#FFFFFF';
-        pdfRoot.style.boxSizing = 'border-box';
-        pdfRoot.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
-
-        // Optional PDF Top Header
-        const headerDiv = document.createElement('div');
-        headerDiv.style.display = 'flex';
-        headerDiv.style.justifyContent = 'space-between';
-        headerDiv.style.alignItems = 'center';
-        headerDiv.style.paddingBottom = '10px';
-        headerDiv.style.marginBottom = '14px';
-        headerDiv.style.borderBottom = `2px solid ${currentThemeColor}`;
+        pdfRoot.style.fontFamily = "'Kantumruy Pro', 'Siemreap', 'Battambang', -apple-system, sans-serif";
+        pdfRoot.style.color = '#0F172A';
 
         const dateStr = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-        headerDiv.innerHTML = `
-            <div>
-                <div style="font-size: 18px; font-weight: 800; color: ${currentThemeColor};">Product Price List (តារាងតម្លៃទំនិញ)</div>
-                <div style="font-size: 11px; color: #64748B;">Date: ${dateStr} • Total Items: ${visibleCards.length}</div>
-            </div>
-            <div style="text-align: right;">
-                <div style="font-size: 13px; font-weight: 700; color: #0F172A;">inFlow Premium POS</div>
-                <div style="font-size: 10.5px; color: #64748B;">Customer Price Catalogue</div>
-            </div>
-        `;
-        pdfRoot.appendChild(headerDiv);
 
-        // Grid of 2 cards per row for PDF
-        const cardsGrid = document.createElement('div');
-        cardsGrid.style.display = 'grid';
-        cardsGrid.style.gridTemplateColumns = '1fr 1fr';
-        cardsGrid.style.gap = '14px';
+        for (let p = 0; p < totalPages; p++) {
+            const pageDiv = document.createElement('div');
+            pageDiv.className = 'pdf-page';
+            pageDiv.style.width = '710px';
+            pageDiv.style.boxSizing = 'border-box';
+            pageDiv.style.padding = '12px 14px';
+            pageDiv.style.background = '#FFFFFF';
+            pageDiv.style.fontFamily = "'Kantumruy Pro', 'Siemreap', 'Battambang', -apple-system, sans-serif";
+            
+            // Add page break after every page except the last
+            if (p < totalPages - 1) {
+                pageDiv.style.pageBreakAfter = 'always';
+                pageDiv.style.breakAfter = 'page';
+            }
 
-        visibleCards.forEach((card, index) => {
-            const clone = card.cloneNode(true);
-            // Remove selection overlay checkboxes
-            clone.querySelector('.pl-card-select-overlay')?.remove();
-            clone.style.margin = '0';
-            clone.style.boxShadow = 'none';
-            clone.style.pageBreakInside = 'avoid';
-            clone.style.breakInside = 'avoid';
-            // Force exact theme color
-            clone.style.borderColor = currentThemeColor;
-            clone.querySelectorAll('.pl-card-header-grid, .pl-card-price-hdr-grid').forEach(el => {
-                el.style.backgroundColor = currentThemeColor;
+            // A4 Page Header
+            const hdr = document.createElement('div');
+            hdr.style.display = 'flex';
+            hdr.style.justifyContent = 'space-between';
+            hdr.style.alignItems = 'center';
+            hdr.style.paddingBottom = '8px';
+            hdr.style.marginBottom = '12px';
+            hdr.style.borderBottom = `2px solid ${currentThemeColor}`;
+            hdr.innerHTML = `
+                <div>
+                    <div style="font-size: 16px; font-weight: 800; color: ${currentThemeColor}; font-family: 'Kantumruy Pro', 'Siemreap', sans-serif;">
+                        Product Price List (តារាងតម្លៃទំនិញ)
+                    </div>
+                    <div style="font-size: 11px; color: #64748B; margin-top: 2px;">
+                        Date: ${dateStr} • Page ${p + 1} of ${totalPages} • Total Items: ${visibleCards.length}
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-size: 12.5px; font-weight: 700; color: #0F172A;">inFlow Premium POS</div>
+                    <div style="font-size: 10px; color: #64748B;">Customer Price Catalogue</div>
+                </div>
+            `;
+            pageDiv.appendChild(hdr);
+
+            // 2-Column Cards Grid for this page (2 rows x 2 columns = 4 cards)
+            const grid = document.createElement('div');
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = '334px 334px';
+            grid.style.gap = '14px';
+            grid.style.justifyContent = 'space-between';
+            grid.style.marginBottom = '10px';
+
+            const pageCards = visibleCards.slice(p * CARDS_PER_PAGE, (p + 1) * CARDS_PER_PAGE);
+            pageCards.forEach(card => {
+                const clone = card.cloneNode(true);
+                clone.querySelector('.pl-card-select-overlay')?.remove();
+                clone.style.width = '334px';
+                clone.style.margin = '0';
+                clone.style.boxShadow = 'none';
+                clone.style.border = `1.5px solid ${currentThemeColor}`;
+                clone.style.borderRadius = '4px';
+                clone.style.overflow = 'hidden';
+                clone.style.backgroundColor = '#FFFFFF';
+                clone.style.pageBreakInside = 'avoid';
+                clone.style.breakInside = 'avoid';
+
+                // Ensure Header styling & Khmer font
+                const hGrid = clone.querySelector('.pl-card-header-grid');
+                if (hGrid) {
+                    hGrid.style.backgroundColor = currentThemeColor;
+                    hGrid.style.color = '#FFFFFF';
+                    hGrid.style.borderBottom = `1.5px solid ${currentThemeColor}`;
+                }
+                const titleKm = clone.querySelector('.pl-card-title-km');
+                if (titleKm) {
+                    titleKm.style.fontSize = '13.5px';
+                    titleKm.style.fontWeight = '800';
+                    titleKm.style.lineHeight = '1.35';
+                    titleKm.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                    titleKm.style.color = '#FFFFFF';
+                }
+                const titleUom = clone.querySelector('.pl-card-title-uom');
+                if (titleUom) {
+                    titleUom.style.fontSize = '11.5px';
+                    titleUom.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                    titleUom.style.color = '#FFFFFF';
+                }
+                const detailHdr = clone.querySelector('.pl-card-detail-hdr');
+                if (detailHdr) {
+                    detailHdr.style.fontSize = '14px';
+                    detailHdr.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                    detailHdr.style.color = '#FFFFFF';
+                }
+                const detailSub = clone.querySelector('.pl-card-detail-sub');
+                if (detailSub) {
+                    detailSub.style.fontSize = '10.5px';
+                    detailSub.style.color = '#FFFFFF';
+                }
+
+                // Upper Grid (Image Left + Specs Right)
+                const upGrid = clone.querySelector('.pl-card-upper-grid');
+                if (upGrid) {
+                    upGrid.style.height = '180px';
+                    upGrid.style.maxHeight = '180px';
+                    upGrid.style.borderBottom = `1.5px solid ${currentThemeColor}`;
+                    upGrid.style.overflow = 'hidden';
+                }
+                const imgBox = clone.querySelector('.pl-card-image-box');
+                if (imgBox) {
+                    imgBox.style.height = '180px';
+                    imgBox.style.maxHeight = '180px';
+                    imgBox.style.borderRight = `1.5px solid ${currentThemeColor}`;
+                    imgBox.style.padding = '6px';
+                    imgBox.style.overflow = 'hidden';
+                }
+                const img = clone.querySelector('.pl-card-img');
+                if (img) {
+                    img.style.maxHeight = '165px';
+                    img.style.maxWidth = '100%';
+                    img.style.objectFit = 'contain';
+                }
+                const specsBox = clone.querySelector('.pl-card-specs-box');
+                if (specsBox) {
+                    specsBox.style.height = '180px';
+                    specsBox.style.maxHeight = '180px';
+                    specsBox.style.padding = '8px 6px';
+                    specsBox.style.gap = '4px';
+                    specsBox.style.overflow = 'hidden';
+                }
+                clone.querySelectorAll('.pl-card-spec-line').forEach(el => {
+                    el.style.fontSize = '12px';
+                    el.style.fontWeight = '800';
+                    el.style.lineHeight = '1.35';
+                    el.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                    el.style.color = currentThemeColor;
+                });
+                const carton = clone.querySelector('.pl-card-spec-carton');
+                if (carton) {
+                    carton.style.fontSize = '11px';
+                    carton.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                    carton.style.color = currentThemeColor;
+                }
+
+                // Price Header
+                const prHdr = clone.querySelector('.pl-card-price-hdr-grid');
+                if (prHdr) {
+                    prHdr.style.backgroundColor = currentThemeColor;
+                    prHdr.style.color = '#FFFFFF';
+                    prHdr.style.borderBottom = `1.5px solid ${currentThemeColor}`;
+                }
+                clone.querySelectorAll('.pl-price-hdr-km').forEach(el => {
+                    el.style.fontSize = '13.5px';
+                    el.style.fontWeight = '800';
+                    el.style.lineHeight = '1.35';
+                    el.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                    el.style.color = '#FFFFFF';
+                });
+                clone.querySelectorAll('.pl-price-hdr-en').forEach(el => {
+                    el.style.fontSize = '10px';
+                    el.style.color = '#FFFFFF';
+                });
+
+                // Price Rows
+                clone.querySelectorAll('.pl-card-price-row').forEach(row => {
+                    row.style.minHeight = '34px';
+                    row.style.height = '34px';
+                    row.style.borderBottom = `1px dotted ${currentThemeColor}`;
+                });
+                clone.querySelectorAll('.pl-price-left-col').forEach(col => {
+                    col.style.padding = '4px 10px';
+                    col.style.borderRight = `1px dotted ${currentThemeColor}`;
+                });
+                clone.querySelectorAll('.pl-price-right-col').forEach(col => {
+                    col.style.padding = '4px 8px';
+                });
+                clone.querySelectorAll('.pl-price-qty-lbl').forEach(el => {
+                    el.style.fontSize = '12px';
+                    el.style.fontWeight = '800';
+                    el.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                });
+                clone.querySelectorAll('.pl-price-tot-val').forEach(el => {
+                    el.style.fontSize = '13.5px';
+                    el.style.fontWeight = '900';
+                    el.style.color = '#16A34A';
+                });
+                clone.querySelectorAll('.pl-price-unit-val').forEach(el => {
+                    el.style.fontSize = '12px';
+                    el.style.fontWeight = '800';
+                    el.style.color = currentThemeColor;
+                    el.style.fontFamily = "'Kantumruy Pro', 'Siemreap', sans-serif";
+                });
+
+                grid.appendChild(clone);
             });
-            cardsGrid.appendChild(clone);
-        });
 
-        pdfRoot.appendChild(cardsGrid);
+            pageDiv.appendChild(grid);
+
+            // A4 Page Footer
+            const ftr = document.createElement('div');
+            ftr.style.display = 'flex';
+            ftr.style.justifyContent = 'space-between';
+            ftr.style.alignItems = 'center';
+            ftr.style.paddingTop = '6px';
+            ftr.style.borderTop = '1px solid #E2E8F0';
+            ftr.style.fontSize = '9.5px';
+            ftr.style.color = '#94A3B8';
+            ftr.innerHTML = `
+                <span>inFlow Premium POS • Phnom Penh, Cambodia</span>
+                <span>Page ${p + 1} of ${totalPages}</span>
+            `;
+            pageDiv.appendChild(ftr);
+
+            pdfRoot.appendChild(pageDiv);
+        }
+
         cloneArea.appendChild(pdfRoot);
 
-        progressText.textContent = `Rendering high-res A4 PDF (${visibleCards.length} cards)...`;
+        // Wait for all images inside cloned cards to finish loading
+        const imgPromises = Array.from(cloneArea.querySelectorAll('img')).map(img => {
+            if (img.complete) return Promise.resolve();
+            return new Promise(resolve => {
+                img.onload = resolve;
+                img.onerror = resolve;
+            });
+        });
+        await Promise.all(imgPromises);
 
-        // Configure html2pdf options
+        progressText.textContent = `Rendering high-res A4 PDF (${visibleCards.length} cards across ${totalPages} pages)...`;
+
+        // Configure html2pdf options (DO NOT set letterRendering: true, to preserve Khmer script ligatures)
         const filename = `Price_List_${new Date().toISOString().slice(0, 10)}.pdf`;
         const opt = {
             margin: [8, 8, 8, 8],
             filename: filename,
-            image: { type: 'jpeg', quality: 0.96 },
+            image: { type: 'jpeg', quality: 0.98 },
             html2canvas: {
                 scale: 2,
                 useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#FFFFFF',
                 logging: false,
-                letterRendering: true
+                scrollX: 0,
+                scrollY: 0
             },
             jsPDF: {
                 unit: 'mm',
                 format: 'a4',
                 orientation: 'portrait'
             },
-            pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+            pagebreak: { mode: ['css', 'legacy'] }
         };
 
         if (typeof html2pdf !== 'undefined') {
@@ -1873,11 +2074,12 @@ async function exportPriceListPDF() {
         }
     } catch(err) {
         console.error('Error generating PDF:', err);
-        alert('Could not generate PDF. Defaulting to print dialog.');
+        alert('Could not generate PDF: ' + (err.message || err) + '. Opening print dialog.');
         window.print();
     } finally {
         overlay.style.display = 'none';
-        document.getElementById('pdfExportCloneArea').innerHTML = '';
+        cloneArea.style.display = 'none';
+        cloneArea.innerHTML = '';
     }
 }
 </script>
