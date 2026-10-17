@@ -226,7 +226,7 @@
         </div>
 
         <!-- 10. Language Switcher Circle (26px circle matching account icon) -->
-        <div class="inflow-sidebar-nav-item inflow-sidebar-circle-item" data-menu="language" onclick="handleSidebarLangItemClick(event, this)" oncontextmenu="toggleSidebarFlyout('language', this); return false;" title="Language / ភាសា (Click to Select / ប្តូរភាសា)">
+        <div class="inflow-sidebar-nav-item inflow-sidebar-circle-item" data-menu="language" onclick="handleSidebarLangItemClick(event, this)" oncontextmenu="toggleSidebarFlyout('language', this); return false;" title="1-Click Language Switch / ចុច ១ ដងដើម្បីប្តូរភាសា (English ⇄ ភាសាខ្មែរ)">
             <div class="inflow-sidebar-circle-btn circle-btn-lang" id="sidebarLangCircleBtn">
                 <span id="sidebarLangFlagIcon" style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border-radius: 50%; overflow: hidden;"></span>
             </div>
@@ -987,13 +987,32 @@
         /* ==========================================================================
            Sidebar Language & Store Switcher Handlers (Circular Buttons at Bottom)
            ========================================================================== */
+        function showMiniLangToast(msg) {
+            let toast = document.getElementById('inflowMiniLangToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'inflowMiniLangToast';
+                toast.style.cssText = 'position: fixed; top: 44px; right: 20px; z-index: 999999; background: #0F172A; color: #FFFFFF; font-size: 12.5px; font-weight: 700; padding: 8px 16px; border-radius: 8px; box-shadow: 0 4px 16px rgba(0,0,0,0.3); display: flex; align-items: center; gap: 8px; transition: opacity 0.22s ease, transform 0.22s ease; opacity: 0; pointer-events: none; border: 1px solid rgba(255,255,255,0.15);';
+                document.body.appendChild(toast);
+            }
+            toast.innerHTML = `<span>🌐</span> <span>${msg}</span>`;
+            toast.style.opacity = '1';
+            toast.style.transform = 'translateY(0)';
+            clearTimeout(window._langToastTimer);
+            window._langToastTimer = setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-6px)';
+            }, 1800);
+        }
+        window.showMiniLangToast = showMiniLangToast;
+
         function handleSidebarLangItemClick(e, el) {
             if (e) {
                 e.preventDefault();
                 e.stopPropagation();
             }
-            const navItem = el || document.querySelector('.inflow-sidebar-circle-item[data-menu="language"]');
-            toggleSidebarFlyout('language', navItem);
+            // 1-Click direct language switch without opening flyout dropdown
+            handleToggleLanguageDirect(e);
         }
 
         function handleSwitchLanguage(lang, e) {
@@ -1010,7 +1029,15 @@
                     document.cookie = `inflow_lang=${lang}; path=/; max-age=31536000; SameSite=Lax`;
                     fetch(`/api/set-language/${lang}`).catch(() => {});
                 } catch(err) {}
-                window.location.reload();
+
+                if (typeof window.inflowApplyI18n === 'function') {
+                    window.inflowApplyI18n(lang);
+                    updateSidebarLanguageFlags(lang);
+                    const toastMsg = lang === 'en' ? 'Language: English' : 'ភាសា៖ ភាសាខ្មែរ (Khmer)';
+                    showMiniLangToast(toastMsg);
+                } else {
+                    window.location.reload();
+                }
             }
         }
 
@@ -1020,50 +1047,68 @@
                 e.stopPropagation();
             }
             closeSidebarFlyout();
+            // If inside MDI shell
             if (window.inflowMdi && typeof window.inflowMdi.toggleLanguageDirect === 'function') {
                 window.inflowMdi.toggleLanguageDirect(e);
-            } else {
-                const cur = (localStorage.getItem('inflow_app_lang') || 'en') === 'km' ? 'en' : 'km';
-                handleSwitchLanguage(cur, e);
+                return;
             }
+            // If inside an iframe of MDI shell
+            try {
+                if (window.parent && window.parent !== window && window.parent.inflowMdi && typeof window.parent.inflowMdi.toggleLanguageDirect === 'function') {
+                    window.parent.inflowMdi.toggleLanguageDirect(e);
+                    return;
+                }
+            } catch(err) {}
+
+            const cur = (localStorage.getItem('inflow_app_lang') || 'en') === 'km' ? 'en' : 'km';
+            handleSwitchLanguage(cur, e);
         }
 
-        (function initSidebarLanguageFlags() {
-            function applyFlags() {
-                const cur = localStorage.getItem('inflow_app_lang') || 'en';
-                const sFlag = document.getElementById('sidebarLangFlagIcon');
-                const sCircleBtn = document.getElementById('sidebarLangCircleBtn');
-                const sFlyoutEn = document.getElementById('sidebarFlyoutFlagEn');
-                const sFlyoutKm = document.getElementById('sidebarFlyoutFlagKm');
-                const sCheckEn = document.getElementById('sidebarFlyoutCheckEn');
-                const sCheckKm = document.getElementById('sidebarFlyoutCheckKm');
-                
-                const fnCirc = window.getCircularFlagSvg || (typeof getCircularFlagSvg === 'function' ? getCircularFlagSvg : null);
-                const fnUk = window.getUkFlagSvg || (typeof getUkFlagSvg === 'function' ? getUkFlagSvg : null);
-                const fnKm = window.getKhmerFlagSvg || (typeof getKhmerFlagSvg === 'function' ? getKhmerFlagSvg : null);
-                
-                if (sFlag) {
-                    if (fnCirc) {
-                        sFlag.innerHTML = fnCirc(cur, 26);
-                    } else if (fnUk && fnKm) {
-                        sFlag.innerHTML = cur === 'km' ? fnKm(26, 26) : fnUk(26, 26);
-                    }
+        function updateSidebarLanguageFlags(targetLang) {
+            const cur = targetLang || localStorage.getItem('inflow_app_lang') || 'en';
+            const sFlag = document.getElementById('sidebarLangFlagIcon');
+            const sCircleBtn = document.getElementById('sidebarLangCircleBtn');
+            const sFlyoutEn = document.getElementById('sidebarFlyoutFlagEn');
+            const sFlyoutKm = document.getElementById('sidebarFlyoutFlagKm');
+            const sCheckEn = document.getElementById('sidebarFlyoutCheckEn');
+            const sCheckKm = document.getElementById('sidebarFlyoutCheckKm');
+            
+            const fnCirc = window.getCircularFlagSvg || (typeof getCircularFlagSvg === 'function' ? getCircularFlagSvg : null);
+            const fnUk = window.getUkFlagSvg || (typeof getUkFlagSvg === 'function' ? getUkFlagSvg : null);
+            const fnKm = window.getKhmerFlagSvg || (typeof getKhmerFlagSvg === 'function' ? getKhmerFlagSvg : null);
+            
+            if (sFlag) {
+                if (fnCirc) {
+                    sFlag.innerHTML = fnCirc(cur, 26);
+                } else if (fnUk && fnKm) {
+                    sFlag.innerHTML = cur === 'km' ? fnKm(26, 26) : fnUk(26, 26);
                 }
-                if (sCircleBtn) {
-                    sCircleBtn.className = `inflow-sidebar-circle-btn circle-btn-lang ${cur === 'km' ? 'lang-km' : 'lang-en'}`;
-                    sCircleBtn.title = cur === 'km' 
-                        ? 'ភាសាខ្មែរ (ចុចដើម្បីជ្រើសរើសភាសា / Click to Select Language)' 
-                        : 'English (Click to Select Language / ជ្រើសរើសភាសា)';
-                }
-                if (sFlyoutEn && fnUk) sFlyoutEn.innerHTML = fnUk(20, 14);
-                if (sFlyoutKm && fnKm) sFlyoutKm.innerHTML = fnKm(20, 14);
-                if (sCheckEn) sCheckEn.style.display = cur === 'en' ? 'inline' : 'none';
-                if (sCheckKm) sCheckKm.style.display = cur === 'km' ? 'inline' : 'none';
             }
+            if (sCircleBtn) {
+                sCircleBtn.className = `inflow-sidebar-circle-btn circle-btn-lang ${cur === 'km' ? 'lang-km' : 'lang-en'}`;
+                sCircleBtn.title = cur === 'km' 
+                    ? 'ភាសាខ្មែរ (ចុច ១ ដងដើម្បីប្តូរទៅ English / Click once for English)' 
+                    : 'English (Click once to switch to ភាសាខ្មែរ / ចុច ១ ដងដើម្បីប្តូរភាសា)';
+            }
+            if (sFlyoutEn && fnUk) sFlyoutEn.innerHTML = fnUk(20, 14);
+            if (sFlyoutKm && fnKm) sFlyoutKm.innerHTML = fnKm(20, 14);
+            if (sCheckEn) sCheckEn.style.display = cur === 'en' ? 'inline' : 'none';
+            if (sCheckKm) sCheckKm.style.display = cur === 'km' ? 'inline' : 'none';
+        }
+        window.updateSidebarLanguageFlags = updateSidebarLanguageFlags;
+
+        // Auto update flags on language change event
+        window.addEventListener('inflow-lang-changed', function(e) {
+            if (e && e.detail && e.detail.lang) {
+                updateSidebarLanguageFlags(e.detail.lang);
+            }
+        });
+
+        (function initSidebarLanguageFlags() {
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', applyFlags);
+                document.addEventListener('DOMContentLoaded', () => updateSidebarLanguageFlags());
             } else {
-                applyFlags();
+                updateSidebarLanguageFlags();
             }
         })();
 

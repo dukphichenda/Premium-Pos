@@ -1044,8 +1044,8 @@
                 if (sCircleBtn) {
                     sCircleBtn.className = `inflow-sidebar-circle-btn circle-btn-lang ${lang === 'km' ? 'lang-km' : 'lang-en'}`;
                     sCircleBtn.setAttribute('title', lang === 'km' 
-                        ? 'ភាសាខ្មែរ (ចុចដើម្បីជ្រើសរើសភាសា / Click to Select Language)' 
-                        : 'English (Click to Select Language / ជ្រើសរើសភាសា)');
+                        ? 'ភាសាខ្មែរ (ចុច ១ ដងដើម្បីប្តូរទៅ English / Click once for English)' 
+                        : 'English (Click once to switch to ភាសាខ្មែរ / ចុច ១ ដងដើម្បីប្តូរភាសា)');
                 }
                 if (badge) {
                     badge.textContent = (lang === 'km') ? 'KH' : 'EN';
