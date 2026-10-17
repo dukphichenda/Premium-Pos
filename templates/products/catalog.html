@@ -1676,7 +1676,7 @@
 
                         <!-- Khmer Unit Selector in Toolbar -->
                         <div class="inflow-style-control-group" title="Change Khmer unit word (ប្រអប់, គូរ, បេ, ឈុត, កែវ, សម, etc.) for price table">
-                            <span class="inflow-style-control-lbl">📦 ខ្នាត / Unit:</span>
+                            <span class="inflow-style-control-lbl font-khmer">📦 ខ្នាត / Unit:</span>
                             <select id="priceCardUnitSelectToolbar" class="inflow-style-select font-khmer" onchange="changePriceCardUnit(this.value)">
                                 <option value="ប្រអប់">ប្រអប់</option>
                                 <option value="គូរ">គូរ</option>
@@ -1685,7 +1685,7 @@
                                 <option value="កែវ">កែវ</option>
                                 <option value="សម">សម</option>
                             </select>
-                            <button type="button" class="inflow-spec-add-unit-mini-btn" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យខ្នាតថ្មី (Add new unit word)">+</button>
+                            <button type="button" class="inflow-spec-add-unit-mini-btn font-khmer" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យខ្នាតថ្មី (Add new unit word)">+ បន្ថែមពាក្យ</button>
                         </div>
 
                         {% if can_view_costs %}
@@ -1783,26 +1783,6 @@
                                 (<span id="specPcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> PCS/ Carton)
                             </div>
                         </div>
-                    </div>
-
-                    <!-- Option above price table to choose Khmer unit word (ប្រអប់, គូរ, បេ, ឈុត, កែវ, សម, etc.) -->
-                    <div class="inflow-spec-unit-bar no-print" data-html2canvas-ignore="true">
-                        <div class="inflow-spec-unit-left">
-                            <span class="inflow-spec-unit-icon">📦</span>
-                            <span class="inflow-spec-unit-label font-khmer">ខ្នាតលក់ / Unit:</span>
-                            <select id="priceCardUnitSelect" class="inflow-spec-unit-select font-khmer" onchange="changePriceCardUnit(this.value)" title="Choose unit word for price table">
-                                <option value="ប្រអប់">ប្រអប់</option>
-                                <option value="គូរ">គូរ</option>
-                                <option value="បេ">បេ</option>
-                                <option value="ឈុត">ឈុត</option>
-                                <option value="កែវ">កែវ</option>
-                                <option value="សម">សម</option>
-                            </select>
-                            <button type="button" class="inflow-spec-add-unit-btn font-khmer" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យថ្មី (Add more unit words)">
-                                + បន្ថែមពាក្យ
-                            </button>
-                        </div>
-                        <span class="inflow-spec-unit-hint font-khmer">ប្តូរពាក្យ «<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>» ក្នុងតារាងតម្លៃ</span>
                     </div>
 
                     <!-- Lower Body: Price Table Header -->
@@ -2728,7 +2708,7 @@ function saveProductChanges(callback) {
         pendingChanges['price_card_notes'] = notesEl.value.trim();
         isDirty = true;
     }
-    const unitEl = document.getElementById('priceCardUnitSelect') || document.getElementById('priceCardUnitSelectToolbar');
+    const unitEl = document.getElementById('priceCardUnitSelectToolbar');
     if (unitEl && (pendingChanges['price_card_unit'] !== undefined || String(unitEl.value).trim() !== String(unitEl.defaultValue || '').trim())) {
         pendingChanges['price_card_unit'] = unitEl.value.trim();
         isDirty = true;
@@ -4889,22 +4869,14 @@ function changePriceCardUnit(unit) {
         el.innerText = cleanUnit;
     });
     
-    // Sync select elements
-    const s1 = document.getElementById('priceCardUnitSelect');
-    if (s1) {
-        if (!Array.from(s1.options).some(o => o.value === cleanUnit)) {
+    // Sync select element
+    const s = document.getElementById('priceCardUnitSelectToolbar');
+    if (s) {
+        if (!Array.from(s.options).some(o => o.value === cleanUnit)) {
             const opt = new Option(cleanUnit, cleanUnit);
-            s1.appendChild(opt);
+            s.appendChild(opt);
         }
-        s1.value = cleanUnit;
-    }
-    const s2 = document.getElementById('priceCardUnitSelectToolbar');
-    if (s2) {
-        if (!Array.from(s2.options).some(o => o.value === cleanUnit)) {
-            const opt = new Option(cleanUnit, cleanUnit);
-            s2.appendChild(opt);
-        }
-        s2.value = cleanUnit;
+        s.value = cleanUnit;
     }
     
     markFieldDirty('price_card_unit', cleanUnit);
@@ -4943,19 +4915,18 @@ async function promptAddNewPriceCardUnit() {
 }
 
 function addUnitWordToSelects(word) {
-    [document.getElementById('priceCardUnitSelect'), document.getElementById('priceCardUnitSelectToolbar')].forEach(sel => {
-        if (!sel) return;
-        if (!Array.from(sel.options).some(o => o.value === word)) {
-            const opt = document.createElement('option');
-            opt.value = word;
-            opt.textContent = word;
-            sel.appendChild(opt);
-        }
-    });
+    const sel = document.getElementById('priceCardUnitSelectToolbar');
+    if (!sel) return;
+    if (!Array.from(sel.options).some(o => o.value === word)) {
+        const opt = document.createElement('option');
+        opt.value = word;
+        opt.textContent = word;
+        sel.appendChild(opt);
+    }
 }
 
 async function initPriceCardUnits(currentUnit) {
-    const cur = currentUnit || document.getElementById('priceCardUnitSelect')?.value || 'ប្រអប់';
+    const cur = currentUnit || document.getElementById('priceCardUnitSelectToolbar')?.value || 'ប្រអប់';
     const defaultUnits = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម'];
     let allUnits = [...defaultUnits];
     
@@ -4982,8 +4953,8 @@ async function initPriceCardUnits(currentUnit) {
         allUnits.push(cur);
     }
     
-    [document.getElementById('priceCardUnitSelect'), document.getElementById('priceCardUnitSelectToolbar')].forEach(sel => {
-        if (!sel) return;
+    const sel = document.getElementById('priceCardUnitSelectToolbar');
+    if (sel) {
         sel.innerHTML = '';
         allUnits.forEach(u => {
             const opt = document.createElement('option');
@@ -4992,7 +4963,7 @@ async function initPriceCardUnits(currentUnit) {
             if (u === cur) opt.selected = true;
             sel.appendChild(opt);
         });
-    });
+    }
 }
 
 // ==========================================================================
@@ -5344,7 +5315,7 @@ function copyPriceCardText() {
     const u3 = document.getElementById('cardTierUnitDisplay3')?.innerText || '(0.135 $/PCS)';
     
     const note = document.getElementById('cardNotesInput')?.value || '';
-    const unitWord = document.getElementById('priceCardUnitSelect')?.value || 'ប្រអប់';
+    const unitWord = document.getElementById('priceCardUnitSelectToolbar')?.value || 'ប្រអប់';
     
     let text = `📦 ${kmTitle} / ${enTitle}\n`;
     text += `🔹 ព័ត៌មានលម្អិត:\n`;
