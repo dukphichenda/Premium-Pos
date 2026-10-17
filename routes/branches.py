@@ -948,9 +948,13 @@ def branch_pos(id):
 
     branch_settings = _get_branch_settings(branch)
 
+    from database import preview_order_number
+    pos_preview_number = preview_order_number('POS', branch_id=id) or f"SO-{(branch.get('code') or 'STM').strip().upper()}-P-00001"
+
     return render_template('branches/pos.html',
                            branch=branch,
                            branch_settings=branch_settings,
+                           pos_preview_number=pos_preview_number,
                            perms=perms,
                            warehouses=warehouses,
                            selected_warehouse=selected_warehouse,

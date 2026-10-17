@@ -993,15 +993,31 @@
 }
 
 .pos-step-qty-input {
-    width: 38px;
-    height: 22px;
+    width: 44px;
+    height: 24px;
     text-align: center;
-    border: 1px solid #CBD5E1;
-    border-radius: 5px;
-    font-size: 12px;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 13px;
     font-weight: 800;
     color: #0F172A;
+    background: #FFFFFF;
     outline: none;
+    padding: 0 2px;
+    transition: all 0.15s ease;
+    -moz-appearance: textfield;
+}
+
+.pos-step-qty-input::-webkit-outer-spin-button,
+.pos-step-qty-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.pos-step-qty-input:focus {
+    border-color: #FF5A5F;
+    box-shadow: 0 0 0 2px rgba(255, 90, 95, 0.2);
+    background: #FFF5F5;
 }
 
 .pos-bill-price-wrap {
@@ -1286,6 +1302,75 @@
     box-shadow: none;
     cursor: not-allowed;
     transform: none;
+}
+
+/* Checkout CTA Buttons & Preview Receipt */
+.pos-checkout-btn-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+}
+
+.pos-btn-preview {
+    flex: 1;
+    height: 48px;
+    background: #F8FAFC;
+    color: #1E293B;
+    border: 1.5px solid #CBD5E1;
+    border-radius: 14px;
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    user-select: none;
+}
+
+.pos-btn-preview:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+    color: #0F172A;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+
+.pos-btn-preview:disabled {
+    background: #F8FAFC;
+    color: #94A3B8;
+    border-color: #E2E8F0;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.pos-checkout-btn-group .pos-btn-charge {
+    flex: 1.5;
+}
+
+.pos-btn-header-preview {
+    padding: 4px 10px;
+    background: #F8FAFC;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #334155;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+
+.pos-btn-header-preview:hover {
+    background: #EFF6FF;
+    border-color: #93C5FD;
+    color: #1E40AF;
 }
 
 /* ==========================================================================
@@ -1656,7 +1741,12 @@
         <!-- Header -->
         <div class="pos-bills-header">
             <h2 class="pos-bills-title">Bills</h2>
-            <button type="button" class="pos-icon-btn" onclick="clearCart()" title="Clear Bills / Reset">•••</button>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <button type="button" class="pos-btn-header-preview" onclick="previewCurrentReceipt()" title="Preview Receipt / មើលគំរូវិក្កយបត្រ">
+                    👁️ Preview
+                </button>
+                <button type="button" class="pos-icon-btn" onclick="clearCart()" title="Clear Bills / Reset">•••</button>
+            </div>
         </div>
 
         <!-- Searchable Customer Selector (Walk-in Customer Default) -->
@@ -1812,10 +1902,15 @@
             <!-- Hidden Paid Amount Input -->
             <input type="hidden" id="posPaidAmountInput" value="0.00">
 
-            <!-- Checkout CTA Button -->
-            <button type="button" id="posBtnCharge" class="pos-btn-charge" onclick="submitPosCheckout()">
-                ⚡ Charge $0.00
-            </button>
+            <!-- Checkout CTA Button Group (Preview Receipt & Charge) -->
+            <div class="pos-checkout-btn-group">
+                <button type="button" id="posBtnPreviewReceipt" class="pos-btn-preview" onclick="previewCurrentReceipt()" title="Preview Receipt before checkout / មើលគំរូវិក្កយបត្រមុនទូទាត់">
+                    👁️ Preview Receipt
+                </button>
+                <button type="button" id="posBtnCharge" class="pos-btn-charge" onclick="submitPosCheckout()">
+                    ⚡ Charge $0.00
+                </button>
+            </div>
 
         </div>
 
@@ -1927,7 +2022,7 @@
         <div class="no-print-thermal" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid #E2E8F0; padding-bottom: 10px;">
             <div style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 16px;">🧾</span>
-                <strong style="font-size: 13.5px; color: #0F172A;" class="font-khmer">វិក្កយបត្របង់ប្រាក់ (80mm)</strong>
+                <strong style="font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px;" class="font-khmer" id="recModalTitle">វិក្កយបត្របង់ប្រាក់ (80mm)</strong>
             </div>
             <div style="display: flex; gap: 8px;">
                 <button type="button" onclick="printReceipt()" class="btn btn-sm btn-primary" style="background: #059669; border: none; font-weight: 700; border-radius: 6px; padding: 5px 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #FFFFFF;">
@@ -2571,6 +2666,21 @@ function updateQty(id, delta) {
     renderCart();
 }
 
+function updateQtyManual(id, val) {
+    if (!cart[id]) return;
+    const q = parseFloat(val);
+    if (isNaN(q) || val === '' || val === null) {
+        renderCart();
+        return;
+    }
+    if (q <= 0) {
+        delete cart[id];
+    } else {
+        cart[id].qty = q;
+    }
+    renderCart();
+}
+
 function changeItemUom(id, newUom) {
     if (!cart[id]) return;
     cart[id].uom = newUom;
@@ -2690,9 +2800,17 @@ function renderCart() {
                         <div class="pos-bill-price">$${calc.lineTotal.toFixed(2)}</div>
                     </div>
                     <div class="pos-stepper">
-                        <button type="button" class="pos-step-btn minus" onclick="updateQty(${it.id}, -1)">-</button>
-                        <span class="pos-step-qty">${it.qty}</span>
-                        <button type="button" class="pos-step-btn plus" onclick="updateQty(${it.id}, 1)">+</button>
+                        <button type="button" class="pos-step-btn minus" onclick="updateQty(${it.id}, -1)" title="Decrease quantity / បន្ថយចំនួន">-</button>
+                        <input type="number" 
+                               step="any" 
+                               min="0" 
+                               class="pos-step-qty-input" 
+                               value="${it.qty}" 
+                               onchange="updateQtyManual(${it.id}, this.value)" 
+                               onkeydown="if(event.key==='Enter'){updateQtyManual(${it.id}, this.value); this.blur();}" 
+                               onfocus="this.select()" 
+                               title="Click or type to put quantity manually / បញ្ចូលចំនួនដោយដៃ">
+                        <button type="button" class="pos-step-btn plus" onclick="updateQty(${it.id}, 1)" title="Increase quantity / បង្កើនចំនួន">+</button>
                     </div>
                 </div>
             </div>
@@ -2732,6 +2850,10 @@ function recalculateTotals() {
             chargeBtn.innerHTML = `⚡ Charge $${grandTotal.toFixed(2)}`;
         }
         chargeBtn.disabled = (Object.keys(cart).length === 0);
+    }
+    const prevBtn = document.getElementById('posBtnPreviewReceipt');
+    if (prevBtn) {
+        prevBtn.disabled = (Object.keys(cart).length === 0);
     }
 }
 
@@ -2892,6 +3014,11 @@ function submitPosCheckout(forceCheckout = false) {
             // Reset Cart
             cart = {};
             renderCart();
+
+            const titleEl = document.getElementById('recModalTitle');
+            if (titleEl) {
+                titleEl.innerHTML = `វិក្កយបត្របង់ប្រាក់ (80mm) <span style="font-size: 11px; font-weight: 800; background: #ECFDF5; color: #059669; padding: 2px 8px; border-radius: 9999px; margin-left: 6px; border: 1px solid #A7F3D0;">✓ PAID</span>`;
+            }
 
             // Open Thermal Receipt Modal
             openPosReceiptModal();
@@ -3169,6 +3296,66 @@ function handleNewSaleAfterPrint() {
         inp.value = '';
         inp.focus();
     }
+}
+
+function previewCurrentReceipt() {
+    const keys = Object.keys(cart);
+    if (keys.length === 0) {
+        alert('Billing cart is empty! Please add items to billing first.\nមិនទាន់មានទំនិញក្នុងកន្ត្រកទេ!');
+        return;
+    }
+
+    let subtotal = 0;
+    Object.values(cart).forEach(it => {
+        const calc = calculateItemDetails(it);
+        subtotal += calc.lineTotal;
+    });
+
+    const discount = Math.max(0, parseFloat(document.getElementById('posDiscountInput')?.value) || 0);
+    const grandTotal = Math.max(0, subtotal - discount);
+    const exchangeRate = parseFloat({{ (branch_settings.khr_exchange_rate if branch_settings else 4100)|tojson }}) || 4100;
+    
+    const custName = selectedCustomer ? selectedCustomer.name : (document.getElementById('posCustSelectedName')?.textContent?.replace(/^[^\w\s\u1780-\u17FF]+/, '').trim() || 'Walk-in Customer');
+    const whSelect = document.getElementById('posWhSelector');
+    const whName = whSelect ? whSelect.options[whSelect.selectedIndex].text : 'STM Warehouse';
+    
+    let finalMethod = selectedPaymentMethod;
+    if (selectedPaymentMethod === 'Other') {
+        const customName = document.getElementById('posCustomBankName')?.value.trim();
+        finalMethod = customName ? `Other (${customName})` : 'Other Bank';
+    }
+
+    let paidAmount = grandTotal;
+    if (selectedPaymentMethod === 'Credit / Debt') {
+        paidAmount = Math.max(0, parseFloat(document.getElementById('posCreditPaidInput')?.value) || 0);
+    }
+    const balanceDue = Math.max(0, grandTotal - paidAmount);
+
+    const previewOrderNum = (window.POS_PREVIEW_ORDER_NUM || {{ (pos_preview_number or 'SO-STM-P-00001')|tojson }});
+
+    populateThermalReceipt({
+        orderNumber: previewOrderNum,
+        date: new Date().toLocaleString('en-US', { hour12: false }),
+        whName: whName,
+        customerName: custName,
+        cashierName: {{ (branch.manager_name or 'Cashier')|tojson }},
+        cartItems: Object.values(cart),
+        subtotal: subtotal,
+        discount: discount,
+        total: grandTotal,
+        totalKhr: Math.round(grandTotal * exchangeRate),
+        paymentMethod: finalMethod,
+        paidAmount: paidAmount,
+        balanceDue: balanceDue,
+        isPreview: true
+    });
+
+    const titleEl = document.getElementById('recModalTitle');
+    if (titleEl) {
+        titleEl.innerHTML = `វិក្កយបត្របង់ប្រាក់ (80mm) <span style="font-size: 11px; font-weight: 800; background: #EFF6FF; color: #2563EB; padding: 2px 8px; border-radius: 9999px; margin-left: 6px; border: 1px solid #BFDBFE;">👁️ PREVIEW</span>`;
+    }
+
+    openPosReceiptModal();
 }
 
 function openPosReceiptModal() {
