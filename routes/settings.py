@@ -82,6 +82,21 @@ def general_settings():
     """)
     all_branches_list = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
 
+    # Fetch pricing schemes for Pricing & Currency tab
+    all_pricing_schemes = query_all("""
+        SELECT ps.id, ps.name, COALESCE(ps.currency, 'US Dollar ($)') as currency, ps.is_active, ps.is_default,
+               COALESCE(pp_count.cnt, 0) as product_count
+        FROM pricing_schemes ps
+        LEFT JOIN (
+            SELECT pricing_scheme_id, COUNT(*) as cnt
+            FROM product_prices
+            GROUP BY pricing_scheme_id
+        ) pp_count ON ps.id = pp_count.pricing_scheme_id
+        ORDER BY ps.is_default DESC, ps.is_active DESC, ps.id ASC
+    """)
+    default_pricing_scheme = next((s for s in all_pricing_schemes if s.get('is_default')), all_pricing_schemes[0] if all_pricing_schemes else None)
+    active_schemes_count = sum(1 for s in all_pricing_schemes if s.get('is_active'))
+
     # Fetch database backups and backup settings for Backup & Restore tab
     backups = list_backups()
     backup_settings = get_backup_settings()
@@ -96,6 +111,9 @@ def general_settings():
                            company=company,
                            inv_settings=inv_settings,
                            pricing_schemes=pricing_schemes,
+                           all_pricing_schemes=all_pricing_schemes,
+                           default_pricing_scheme=default_pricing_scheme,
+                           active_schemes_count=active_schemes_count,
                            locations_count=locations_count,
                            products_count=products_count,
                            users=users,
@@ -106,6 +124,158 @@ def general_settings():
                            backups_formatted_total_size=backups_formatted_total_size,
                            latest_backup=latest_backup,
                            active_tab=active_tab)
+
+@settings_bp.route('/settings/currency/update', methods=['POST'])
+def update_currency_settings():
+    try:
+        currency_code = (request.form.get('currency_code') or 'USD').strip()
+        currency_symbol = (request.form.get('currency_symbol') or '$').strip()
+        khr_exchange_rate = float(request.form.get('khr_exchange_rate') or 4080.0)
+        enable_khr_total = bool(request.form.get('enable_khr_total'))
+
+        # Decimal places
+        decimal_places_price = int(request.form.get('decimal_places_price', 2) or 2)
+        decimal_places_cost = int(request.form.get('decimal_places_cost', 3) or 3)
+        decimal_places_markup = int(request.form.get('decimal_places_markup', 2) or 2)
+
+        # Update companies table
+        execute("""
+            UPDATE companies SET
+                currency_code = %s,
+                currency_symbol = %s,
+                decimal_places_price = %s,
+                decimal_places_cost = %s,
+                decimal_places_markup = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = (SELECT id FROM companies LIMIT 1);
+        """, (currency_code, currency_symbol, decimal_places_price, decimal_places_cost, decimal_places_markup))
+
+        # Update invoice_settings table
+        execute("""
+            UPDATE invoice_settings SET
+                enable_khr_total = %s,
+                khr_exchange_rate = %s,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = (SELECT id FROM invoice_settings LIMIT 1);
+        """, (enable_khr_total, khr_exchange_rate))
+
+        flash("Pricing & currency preferences updated successfully!", "success")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+    except Exception as e:
+        flash(f"Error updating currency settings: {e}", "error")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+
+@settings_bp.route('/settings/pricing-schemes/create', methods=['POST'])
+def create_pricing_scheme():
+    try:
+        name = (request.form.get('name') or '').strip()
+        currency = (request.form.get('currency') or 'US Dollar ($)').strip()
+        is_default = bool(request.form.get('is_default'))
+
+        if not name:
+            flash("Pricing scheme name cannot be empty.", "error")
+            return redirect(url_for('settings.general_settings', tab='tabPricing'))
+
+        if is_default:
+            execute("UPDATE pricing_schemes SET is_default = FALSE")
+
+        execute("""
+            INSERT INTO pricing_schemes (name, currency, is_active, is_default)
+            VALUES (%s, %s, TRUE, %s)
+        """, (name, currency, is_default))
+
+        flash(f"Pricing scheme '{name}' created successfully!", "success")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+    except Exception as e:
+        flash(f"Error creating pricing scheme: {e}", "error")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+
+@settings_bp.route('/settings/pricing-schemes/<int:id>/set-default', methods=['POST'])
+def set_default_pricing_scheme(id):
+    try:
+        execute("UPDATE pricing_schemes SET is_default = FALSE")
+        execute("UPDATE pricing_schemes SET is_default = TRUE, is_active = TRUE WHERE id = %s", (id,))
+        if request.is_json:
+            return jsonify({'success': True, 'message': 'Default pricing scheme updated.'})
+        flash("Default pricing scheme updated successfully!", "success")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'message': str(e)}), 400
+        flash(f"Error updating default scheme: {e}", "error")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+
+@settings_bp.route('/settings/pricing-schemes/<int:id>/toggle-active', methods=['POST'])
+def toggle_pricing_scheme_active(id):
+    try:
+        scheme = query_one("SELECT is_default, is_active FROM pricing_schemes WHERE id = %s", (id,))
+        if not scheme:
+            return jsonify({'success': False, 'message': 'Scheme not found.'}), 404
+        if scheme['is_default'] and scheme['is_active']:
+            return jsonify({'success': False, 'message': 'Cannot deactivate the default pricing scheme.'}), 400
+
+        execute("UPDATE pricing_schemes SET is_active = NOT is_active WHERE id = %s", (id,))
+        return jsonify({'success': True, 'is_active': not scheme['is_active']})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@settings_bp.route('/settings/pricing-schemes/<int:id>/update', methods=['POST'])
+def update_pricing_scheme(id):
+    try:
+        if request.is_json:
+            data = request.get_json() or {}
+            name = (data.get('name') or '').strip()
+            currency = (data.get('currency') or 'US Dollar ($)').strip()
+        else:
+            name = (request.form.get('name') or '').strip()
+            currency = (request.form.get('currency') or 'US Dollar ($)').strip()
+
+        if not name:
+            if request.is_json:
+                return jsonify({'success': False, 'message': 'Name cannot be empty.'}), 400
+            flash("Pricing scheme name cannot be empty.", "error")
+            return redirect(url_for('settings.general_settings', tab='tabPricing'))
+
+        execute("""
+            UPDATE pricing_schemes SET name = %s, currency = %s WHERE id = %s
+        """, (name, currency, id))
+
+        if request.is_json:
+            return jsonify({'success': True, 'message': 'Scheme updated.'})
+        flash("Pricing scheme updated successfully!", "success")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'message': str(e)}), 400
+        flash(f"Error updating scheme: {e}", "error")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+
+@settings_bp.route('/settings/pricing-schemes/<int:id>/delete', methods=['POST'])
+def delete_pricing_scheme_setting(id):
+    try:
+        scheme = query_one("SELECT is_default FROM pricing_schemes WHERE id = %s", (id,))
+        if not scheme:
+            return jsonify({'success': False, 'message': 'Scheme not found.'}), 404
+        if scheme['is_default']:
+            return jsonify({'success': False, 'message': 'Cannot delete the default pricing scheme. Please set another scheme as default first.'}), 400
+
+        cnt = query_one("SELECT COUNT(*) as c FROM product_prices WHERE pricing_scheme_id = %s", (id,))['c']
+        if cnt > 0:
+            execute("UPDATE pricing_schemes SET is_active = FALSE WHERE id = %s", (id,))
+            msg = f"Pricing scheme has {cnt} product prices assigned; it has been deactivated rather than permanently removed."
+        else:
+            execute("DELETE FROM pricing_schemes WHERE id = %s", (id,))
+            msg = "Pricing scheme permanently deleted."
+
+        if request.is_json:
+            return jsonify({'success': True, 'message': msg})
+        flash(msg, "success")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
+    except Exception as e:
+        if request.is_json:
+            return jsonify({'success': False, 'message': str(e)}), 400
+        flash(f"Error deleting scheme: {e}", "error")
+        return redirect(url_for('settings.general_settings', tab='tabPricing'))
 
 @settings_bp.route('/settings/update', methods=['POST'])
 def update_settings():

@@ -302,7 +302,14 @@
                 if (type === 'expenses') return 'Monthly Expenses';
                 if (url.includes('/data/import')) return 'Import Data';
                 if (url.includes('/data/export')) return 'Export Data';
-                if (type === 'settings') return 'Settings';
+                if (type === 'settings') {
+                    if (url.includes('tab=tabPricing') || url.includes('/pricing')) return 'Pricing & Currency';
+                    if (url.includes('tab=tabInvoice')) return 'Invoice Customization';
+                    if (url.includes('tab=tabUsers')) return 'Users & Permissions';
+                    if (url.includes('tab=tabBackup')) return 'Backup & Restore';
+                    if (url.includes('tab=tabDecimals')) return 'Decimal Precision';
+                    return 'Settings';
+                }
                 return 'Homepage';
             },
 
