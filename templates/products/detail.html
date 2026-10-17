@@ -648,33 +648,29 @@
                     <div class="inflow-form-row" style="margin-bottom: 8px;">
                         <label class="inflow-form-lbl" style="padding-left: 18px; width: 92px; color: #333333;">Conversion</label>
                         <div style="display: inline-flex; align-items: center; font-size: 11.5px; gap: 4px;">
-                            <input type="number" step="1" name="sales_uom_ratio" id="salesUomRatioInput" value="{{ '{:g}'.format(product.sales_uom_ratio or 1) }}" class="inflow-txt-input" style="width: 36px; height: 21px; text-align: center; padding: 1px 2px;" oninput="recalcAllPricingMarkups()">
+                            <input type="number" step="1" name="sales_uom_ratio" id="salesUomRatioInput" value="{{ '{:g}'.format(product.sales_uom_ratio or 1) }}" class="inflow-txt-input" style="width: 36px; height: 21px; text-align: center; padding: 1px 2px;" oninput="onDetailSalesConvChange()">
                             <span id="lblSalesUom" style="margin: 0 4px; color: #000000;">{{ product.sales_uom or 'cases' }}</span>
                             <span style="margin: 0 4px; color: #333333;">=</span>
-                            <input type="number" step="1" name="sales_uom_ratio_std" id="salesUomRatioStdInput" value="{{ '{:g}'.format(product.sales_uom_ratio_std or 200) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center; padding: 1px 2px;" oninput="recalcAllPricingMarkups()">
+                            <input type="number" step="1" name="sales_uom_ratio_std" id="salesUomRatioStdInput" value="{{ '{:g}'.format(product.sales_uom_ratio_std or 200) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center; padding: 1px 2px;" oninput="onDetailSalesConvChange()">
                             <span id="lblStdUomForSales" style="margin-left: 4px; color: #000000;">{{ product.uom or 'pcs.' }}</span>
                         </div>
                     </div>
 
                     <div class="inflow-form-row" style="margin-bottom: 4px;">
                         <label class="inflow-form-lbl">Purchasing UoM</label>
-                        <select name="purchasing_uom" id="purchasingUomSelect" class="inflow-combo" style="width: 60px; height: 21px; padding: 1px 2px;" onchange="updatePurchasingUom(this.value)">
-                            <option value="cases" {% if product.purchasing_uom == 'cases' or not product.purchasing_uom %}selected{% endif %}>cases</option>
-                            <option value="pcs." {% if product.purchasing_uom == 'pcs.' %}selected{% endif %}>pcs.</option>
-                            <option value="box" {% if product.purchasing_uom == 'box' %}selected{% endif %}>box</option>
-                            <option value="pack" {% if product.purchasing_uom == 'pack' %}selected{% endif %}>pack</option>
-                        </select>
+                        <div style="display: inline-flex; align-items: center; gap: 6px;">
+                            <select id="purchasingUomSelect" class="inflow-combo" disabled style="width: 60px; height: 21px; padding: 1px 2px; background: #F1F5F9; color: #475569; cursor: not-allowed;" title="Purchasing UoM automatically equals Sales UoM">
+                                <option value="{{ product.sales_uom or product.purchasing_uom or 'cases' }}" selected>{{ product.sales_uom or product.purchasing_uom or 'cases' }}</option>
+                            </select>
+                            <input type="hidden" name="purchasing_uom" id="hiddenPurchasingUom" value="{{ product.sales_uom or product.purchasing_uom or 'cases' }}">
+                            <span style="font-size: 11px; color: #0284C7; font-weight: 600;"><i class="fa fa-lock" style="font-size: 10px;"></i> = Sales UoM</span>
+                        </div>
                     </div>
 
-                    <div class="inflow-form-row" style="margin-bottom: 24px;">
-                        <label class="inflow-form-lbl" style="padding-left: 18px; width: 92px; color: #333333;">Conversion</label>
-                        <div style="display: inline-flex; align-items: center; font-size: 11.5px; gap: 4px;">
-                            <input type="number" step="1" name="purchasing_uom_ratio" id="purchasingUomRatioInput" value="{{ '{:g}'.format(product.purchasing_uom_ratio or 1) }}" class="inflow-txt-input" style="width: 36px; height: 21px; text-align: center; padding: 1px 2px;">
-                            <span id="lblPurchasingUom" style="margin: 0 4px; color: #000000;">{{ product.purchasing_uom or 'cases' }}</span>
-                            <span style="margin: 0 4px; color: #333333;">=</span>
-                            <input type="number" step="1" name="purchasing_uom_ratio_std" id="purchasingUomRatioStdInput" value="{{ '{:g}'.format(product.purchasing_uom_ratio_std or 1) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center; padding: 1px 2px;">
-                            <span id="lblStdUomForPurchasing" style="margin-left: 4px; color: #000000;">{{ product.uom or 'pcs.' }}</span>
-                        </div>
+                    <!-- Conversion Row for Purchasing UoM (Hidden: Purchases UOM always equals Sales UOM) -->
+                    <div class="inflow-form-row" id="detailPurchasingConvRow" style="display: none;">
+                        <input type="hidden" name="purchasing_uom_ratio" id="purchasingUomRatioInput" value="{{ '{:g}'.format(product.sales_uom_ratio or product.purchasing_uom_ratio or 1) }}">
+                        <input type="hidden" name="purchasing_uom_ratio_std" id="purchasingUomRatioStdInput" value="{{ '{:g}'.format(product.sales_uom_ratio_std or product.purchasing_uom_ratio_std or 1) }}">
                     </div>
 
                     <!-- Dimensions & Packaging (Near Unit of Measure) -->
@@ -701,14 +697,14 @@
                             <div>
                                 <label style="font-size: 10.5px; color: #334155; font-weight: 600; display: block;">1 កេស មាន (Packs/Case):</label>
                                 <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
-                                    <input type="number" step="1" name="packs_per_case" id="detailPacksCase" value="{{ '{:g}'.format(product.packs_per_case or 3) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center;" oninput="onDetailPackagingChange()">
+                                    <input type="number" step="any" name="packs_per_case" id="detailPacksCase" value="{{ '{:g}'.format(product.packs_per_case or 10) }}" class="inflow-txt-input" style="width: 52px; height: 21px; text-align: center;" oninput="onDetailPackagingChange('packs')" title="Automatically calculated: (pcs per case) / (pcs per pack)">
                                     <span style="font-size: 10px; color: #64748B;">ដុំ</span>
                                 </div>
                             </div>
                             <div>
                                 <label style="font-size: 10.5px; color: #334155; font-weight: 600; display: block;">1 ដុំ មាន (Pcs/Pack):</label>
                                 <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
-                                    <input type="number" step="1" name="pcs_per_pack" id="detailPcsPack" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-txt-input" style="width: 44px; height: 21px; text-align: center;" oninput="onDetailPackagingChange()">
+                                    <input type="number" step="any" name="pcs_per_pack" id="detailPcsPack" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-txt-input" style="width: 52px; height: 21px; text-align: center;" oninput="onDetailPackagingChange('pcs_pack')">
                                     <span style="font-size: 10px; color: #64748B;">ប្រអប់</span>
                                 </div>
                             </div>
@@ -1268,6 +1264,16 @@ function updateStandardUom(val) {
 function updateSalesUom(val) {
     const lblSales = document.getElementById('lblSalesUom');
     if (lblSales) lblSales.innerText = val;
+    // Purchases UOM always equal to Sale UOM no need to fill
+    const purchSelect = document.getElementById('purchasingUomSelect');
+    if (purchSelect) {
+        purchSelect.innerHTML = `<option value="${val}" selected>${val}</option>`;
+        purchSelect.value = val;
+    }
+    const hidPurch = document.getElementById('hiddenPurchasingUom');
+    if (hidPurch) hidPurch.value = val;
+    const lblPurch = document.getElementById('lblPurchasingUom');
+    if (lblPurch) lblPurch.innerText = val;
     if (typeof recalcAllPricingMarkups === 'function') recalcAllPricingMarkups();
 }
 
@@ -2285,15 +2291,30 @@ function onDetailDimChange() {
     if (tag) tag.innerText = `${l}x${w}x${h}cm`;
 }
 
-function onDetailPackagingChange() {
-    const packs = parseFloat(document.getElementById('detailPacksCase')?.value) || 3;
-    const pcs = parseFloat(document.getElementById('detailPcsPack')?.value) || 50;
-    const totalPcs = packs * pcs;
-    const stdRatioInput = document.getElementById('salesUomRatioStdInput');
-    if (stdRatioInput && parseFloat(stdRatioInput.value) <= 1) {
-        stdRatioInput.value = totalPcs;
-        recalcAllPricingMarkups();
+function onDetailSalesConvChange() {
+    const ratio = document.getElementById('salesUomRatioInput')?.value || 1;
+    const std = document.getElementById('salesUomRatioStdInput')?.value || 1;
+    const purchRatio = document.getElementById('purchasingUomRatioInput');
+    if (purchRatio) purchRatio.value = ratio;
+    const purchStd = document.getElementById('purchasingUomRatioStdInput');
+    if (purchStd) purchStd.value = std;
+    
+    onDetailPackagingChange('sales_conv');
+    if (typeof recalcAllPricingMarkups === 'function') recalcAllPricingMarkups();
+}
+
+function onDetailPackagingChange(source) {
+    const pcsPerCase = parseFloat(document.getElementById('salesUomRatioStdInput')?.value) || 0;
+    const pcs = parseFloat(document.getElementById('detailPcsPack')?.value) || 0;
+    const packsInput = document.getElementById('detailPacksCase');
+    
+    // number pack per case should be automatically calculate number pcs per case / pcs per pack
+    if (source !== 'packs') {
+        if (pcsPerCase > 0 && pcs > 0 && packsInput) {
+            packsInput.value = parseFloat((pcsPerCase / pcs).toFixed(2));
+        }
     }
+    if (typeof recalcAllPricingMarkups === 'function') recalcAllPricingMarkups();
 }
 
 function onCostPriceChanged() {
@@ -2321,6 +2342,9 @@ function submitToggleStatus() {
 
 // Keyboard Shortcut: Ctrl + S to Save, Ctrl + N for New, Ctrl + D for Copy
 document.addEventListener('DOMContentLoaded', function() {
+    try {
+        if (typeof onDetailPackagingChange === 'function') onDetailPackagingChange('init');
+    } catch(e) {}
     if (window.initInflowTabs) {
         window.initInflowTabs({
             id: 'prod-{{ product.id }}',

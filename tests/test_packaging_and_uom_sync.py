@@ -1,0 +1,86 @@
+import unittest
+import os
+import re
+from app import create_app
+from database import query_one, get_db_cursor
+
+class TestPackagingAndUomSync(unittest.TestCase):
+    def setUp(self):
+        self.app = create_app()
+        self.app.config['TESTING'] = True
+        self.client = self.app.test_client()
+
+    def test_frontend_template_catalog_has_auto_sync_and_calc(self):
+        catalog_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'products', 'catalog.html')
+        with open(catalog_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Check Purchasing UOM is locked / auto-synced
+        self.assertIn('id="purchasingUomSelect"', content)
+        self.assertIn('disabled', content)
+        self.assertIn('= Sales UoM', content)
+        self.assertIn('id="purchasingConvRow" style="display: none;"', content)
+
+        # Check syncPurchasingUomWithSales function exists
+        self.assertIn('function syncPurchasingUomWithSales()', content)
+
+        # Check recalcPacksPerCase function exists and calculates pcsPerCase / pcsPack
+        self.assertIn('function recalcPacksPerCase(source)', content)
+        self.assertIn('pcsPerCase / pcsPack', content)
+
+    def test_frontend_template_detail_has_auto_sync_and_calc(self):
+        detail_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'products', 'detail.html')
+        with open(detail_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+
+        # Check Purchasing UOM is locked and hidden input provided
+        self.assertIn('id="purchasingUomSelect"', content)
+        self.assertIn('disabled', content)
+        self.assertIn('name="purchasing_uom"', content)
+        self.assertIn('= Sales UoM', content)
+
+        # Check onDetailPackagingChange calculates pcsPerCase / pcs
+        self.assertIn('function onDetailPackagingChange(source)', content)
+        self.assertIn('pcsPerCase / pcs', content)
+
+    def test_backend_update_ajax_auto_syncs_purchasing_uom_and_calcs_packs(self):
+        with self.app.test_request_context():
+            # Get an existing product or insert a test one
+            test_prod = query_one("SELECT id, sales_uom, sales_uom_ratio_std, pcs_per_pack FROM products LIMIT 1")
+            self.assertIsNotNone(test_prod, "Should find at least one product")
+            pid = test_prod['id']
+
+            # Simulate updating sales_uom_ratio_std to 500 and pcs_per_pack to 50 (like user screenshot)
+            with self.client.session_transaction() as sess:
+                sess['user_id'] = 1
+                sess['username'] = 'admin'
+                sess['role'] = 'admin'
+
+            res = self.client.post(
+                f'/products/{pid}/update_ajax',
+                json={
+                    'sales_uom': 'cases',
+                    'sales_uom_ratio': 1.0,
+                    'sales_uom_ratio_std': 500.0,
+                    'pcs_per_pack': 50.0
+                }
+            )
+            self.assertEqual(res.status_code, 200)
+
+            # Verify in DB: purchasing_uom == sales_uom, and packs_per_case == 500 / 50 = 10
+            updated = query_one("""
+                SELECT sales_uom, purchasing_uom, sales_uom_ratio, purchasing_uom_ratio,
+                       sales_uom_ratio_std, purchasing_uom_ratio_std,
+                       pcs_per_pack, packs_per_case
+                FROM products WHERE id = %s
+            """, (pid,))
+
+            self.assertEqual(updated['purchasing_uom'], updated['sales_uom'])
+            self.assertEqual(float(updated['purchasing_uom_ratio']), float(updated['sales_uom_ratio']))
+            self.assertEqual(float(updated['purchasing_uom_ratio_std']), 500.0)
+            self.assertEqual(float(updated['sales_uom_ratio_std']), 500.0)
+            self.assertEqual(float(updated['pcs_per_pack']), 50.0)
+            self.assertEqual(float(updated['packs_per_case']), 10.0)
+
+if __name__ == '__main__':
+    unittest.main()

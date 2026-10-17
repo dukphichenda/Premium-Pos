@@ -91,8 +91,8 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         pcs_per_case = sales_uom_ratio_std
         if pcs_per_pack <= 0:
             pcs_per_pack = 50.0
-        if packs_per_case <= 0 or (packs_per_case * pcs_per_pack != pcs_per_case):
-            packs_per_case = round(pcs_per_case / pcs_per_pack) or 1.0
+        # Automatically calculate number pack per case = number pcs per case / pcs per pack
+        packs_per_case = round(pcs_per_case / pcs_per_pack, 2)
     elif packs_per_case > 0 and pcs_per_pack > 0:
         pcs_per_case = packs_per_case * pcs_per_pack
     else:
@@ -405,6 +405,17 @@ def _get_product_detail_bundle(product_id):
     product['default_price'] = float(product.get('default_price') or 0.0)
     product['standard_cost'] = float(product.get('standard_cost') or 0.0)
     product['average_cost'] = float(product.get('average_cost') or 0.0)
+
+    # Purchases UOM always equal to Sales UOM
+    product['purchasing_uom'] = product.get('sales_uom') or 'cases'
+    product['purchasing_uom_ratio'] = float(product.get('sales_uom_ratio') or 1.0)
+    product['purchasing_uom_ratio_std'] = float(product.get('sales_uom_ratio_std') or 200.0)
+
+    # Number pack per case should be automatically calculated: pcs per case / pcs per pack
+    ratio_std = float(product.get('sales_uom_ratio_std') or 0.0)
+    pcs_pack = float(product.get('pcs_per_pack') or 0.0)
+    if ratio_std > 0 and pcs_pack > 0:
+        product['packs_per_case'] = round(ratio_std / pcs_pack, 2)
 
     if product.get('cost_formula') in ('None', 'null', 'undefined', ''):
         product['cost_formula'] = None
@@ -917,6 +928,24 @@ def update_product_ajax(id):
         if 'cost_price' in data and 'standard_cost' not in data:
             data['standard_cost'] = data['cost_price']
             data['average_cost'] = data['cost_price']
+
+        # Purchases UOM always equal to Sale UOM no need to fill
+        if 'sales_uom' in data:
+            data['purchasing_uom'] = data['sales_uom']
+        if 'sales_uom_ratio' in data:
+            data['purchasing_uom_ratio'] = data['sales_uom_ratio']
+        if 'sales_uom_ratio_std' in data:
+            data['purchasing_uom_ratio_std'] = data['sales_uom_ratio_std']
+
+        # Number pack per case should automatically calculate: pcs per case / pcs per pack
+        s_std = data.get('sales_uom_ratio_std')
+        p_pack = data.get('pcs_per_pack')
+        if s_std is not None or p_pack is not None:
+            curr_prod = query_one("SELECT sales_uom_ratio_std, pcs_per_pack FROM products WHERE id = %s", (id,)) or {}
+            calc_std = float(s_std if s_std is not None else (curr_prod.get('sales_uom_ratio_std') or 0))
+            calc_pack = float(p_pack if p_pack is not None else (curr_prod.get('pcs_per_pack') or 0))
+            if calc_std > 0 and calc_pack > 0:
+                data['packs_per_case'] = round(calc_std / calc_pack, 2)
 
         updates = []
         params = []
@@ -1555,9 +1584,17 @@ def create_product():
         sales_uom = request.form.get('sales_uom', 'cases').strip()
         sales_uom_ratio = float(request.form.get('sales_uom_ratio', 1) or 1)
         sales_uom_ratio_std = float(request.form.get('sales_uom_ratio_std', 200) or 200)
-        purchasing_uom = request.form.get('purchasing_uom', 'cases').strip()
-        purchasing_uom_ratio = float(request.form.get('purchasing_uom_ratio', 1) or 1)
-        purchasing_uom_ratio_std = float(request.form.get('purchasing_uom_ratio_std', 1) or 1)
+        # Purchases UOM always equal to Sale UOM no need to fill
+        purchasing_uom = sales_uom
+        purchasing_uom_ratio = sales_uom_ratio
+        purchasing_uom_ratio_std = sales_uom_ratio_std
+
+        pcs_per_pack = safe_eval_math(request.form.get('pcs_per_pack', 50))
+        if sales_uom_ratio_std > 0 and pcs_per_pack > 0:
+            packs_per_case = round(sales_uom_ratio_std / pcs_per_pack, 2)
+        else:
+            packs_per_case = safe_eval_math(request.form.get('packs_per_case', 10))
+
         length_val = float(request.form.get('length')) if request.form.get('length') else None
         width_val = float(request.form.get('width')) if request.form.get('width') else None
         height_val = float(request.form.get('height')) if request.form.get('height') else None
@@ -1629,6 +1666,7 @@ def create_product():
                 shipping_cost, shipping_cost_formula,
                 costing_sheet_pcs, costing_sheet_pcs_formula,
                 costing_sheet_cost, costing_sheet_formula,
+                packs_per_case, pcs_per_pack,
                 combine_type
             ) VALUES (
                 %s, %s, %s, %s, %s, %s,
@@ -1642,6 +1680,7 @@ def create_product():
                 %s, %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
+                %s, %s,
                 %s, %s,
                 %s, %s,
                 %s, %s,
@@ -1664,6 +1703,7 @@ def create_product():
             shipping_cost, shipping_cost_formula,
             costing_sheet_pcs, costing_sheet_pcs_formula,
             costing_sheet_cost, costing_sheet_formula,
+            packs_per_case, pcs_per_pack,
             combine_type
         ))
 
@@ -1816,9 +1856,10 @@ def edit_product(id):
         sales_uom = request.form.get('sales_uom', prod.get('sales_uom') or 'cases').strip()
         sales_uom_ratio = float(request.form.get('sales_uom_ratio', prod.get('sales_uom_ratio') or 1) or 1)
         sales_uom_ratio_std = float(request.form.get('sales_uom_ratio_std', prod.get('sales_uom_ratio_std') or 200) or 200)
-        purchasing_uom = request.form.get('purchasing_uom', prod.get('purchasing_uom') or 'cases').strip()
-        purchasing_uom_ratio = float(request.form.get('purchasing_uom_ratio', prod.get('purchasing_uom_ratio') or 1) or 1)
-        purchasing_uom_ratio_std = float(request.form.get('purchasing_uom_ratio_std', prod.get('purchasing_uom_ratio_std') or 1) or 1)
+        # Purchases UOM always equal to Sale UOM no need to fill
+        purchasing_uom = sales_uom
+        purchasing_uom_ratio = sales_uom_ratio
+        purchasing_uom_ratio_std = sales_uom_ratio_std
         
         length_val = safe_eval_math(request.form.get('length')) if request.form.get('length') else prod.get('length')
         width_val = safe_eval_math(request.form.get('width')) if request.form.get('width') else prod.get('width')
@@ -1828,13 +1869,11 @@ def edit_product(id):
 
         pcs_per_pack = safe_eval_math(request.form.get('pcs_per_pack', prod.get('pcs_per_pack') or 50))
         sales_ratio = safe_eval_math(request.form.get('sales_uom_ratio_std', prod.get('sales_uom_ratio_std') or 1))
-        req_packs = request.form.get('packs_per_case')
-        if req_packs and safe_eval_math(req_packs) > 0 and safe_eval_math(req_packs) != 3:
-            packs_per_case = safe_eval_math(req_packs)
-        elif sales_ratio > 1 and pcs_per_pack > 0:
-            packs_per_case = round(sales_ratio / pcs_per_pack)
+        # Number pack per case should automatically calculate: pcs per case / pcs per pack
+        if sales_ratio > 0 and pcs_per_pack > 0:
+            packs_per_case = round(sales_ratio / pcs_per_pack, 2)
         else:
-            packs_per_case = safe_eval_math(req_packs or prod.get('packs_per_case') or 1)
+            packs_per_case = safe_eval_math(request.form.get('packs_per_case') or prod.get('packs_per_case') or 1)
         tier_qty_1 = int(safe_eval_math(request.form.get('tier_qty_1')) or 100) if request.form.get('tier_qty_1') else prod.get('tier_qty_1')
         tier_qty_2 = int(safe_eval_math(request.form.get('tier_qty_2')) or 0) if request.form.get('tier_qty_2') else prod.get('tier_qty_2')
         tier_qty_3 = int(safe_eval_math(request.form.get('tier_qty_3')) or 0) if request.form.get('tier_qty_3') else prod.get('tier_qty_3')

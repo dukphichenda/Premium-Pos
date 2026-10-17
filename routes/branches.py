@@ -915,9 +915,9 @@ def branch_pos(id):
             COALESCE(NULLIF(p.default_price, 0), pp_def.unit_price, 0) as default_price,
             p.sales_uom, p.sales_uom_ratio_std,
             CASE 
-                WHEN p.sales_uom_ratio_std > 1 AND p.pcs_per_pack > 0 AND (p.packs_per_case = 3 OR p.packs_per_case <= 0 OR p.packs_per_case * p.pcs_per_pack != p.sales_uom_ratio_std) 
-                THEN ROUND(p.sales_uom_ratio_std / p.pcs_per_pack)
-                ELSE p.packs_per_case 
+                WHEN p.sales_uom_ratio_std > 0 AND p.pcs_per_pack > 0 
+                THEN ROUND((p.sales_uom_ratio_std / p.pcs_per_pack)::numeric, 2)
+                ELSE COALESCE(p.packs_per_case, 1)
             END as packs_per_case,
             COALESCE(NULLIF(p.pcs_per_pack, 0), 50) as pcs_per_pack,
             p.category_id,

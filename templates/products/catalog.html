@@ -843,28 +843,22 @@
 
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Purchasing UoM</span>
-                                <div class="inflow-cat-field-ctrl">
-                                    <select id="purchasingUomSelect" class="inflow-combo inflow-combo-sm" onchange="onPurchasingUomChange(this.value)">
-                                        <option value="">(None)</option>
-                                        {% set purch_options = ['cases', 'pcs.', 'box', 'ea', 'carton', 'pack', 'set', 'roll', 'bag', 'kg'] %}
-                                        {% if product.purchasing_uom and product.purchasing_uom not in purch_options %}
-                                        <option value="{{ product.purchasing_uom }}" selected>{{ product.purchasing_uom }}</option>
-                                        {% endif %}
-                                        {% for opt in purch_options %}
-                                        <option value="{{ opt }}" {% if product.purchasing_uom == opt %}selected{% endif %}>{{ opt }}</option>
-                                        {% endfor %}
+                                <div class="inflow-cat-field-ctrl" style="display: flex; align-items: center; gap: 6px;">
+                                    <select id="purchasingUomSelect" class="inflow-combo inflow-combo-sm" disabled style="background: #F1F5F9; color: #475569; cursor: not-allowed; opacity: 0.9;" title="Purchasing UoM automatically equals Sales UoM">
+                                        <option value="{{ product.sales_uom or product.purchasing_uom or 'cases' }}" selected>{{ product.sales_uom or product.purchasing_uom or 'cases' }}</option>
                                     </select>
+                                    <span style="font-size: 11px; color: #0284C7; font-weight: 600; white-space: nowrap;"><i class="fa fa-lock" style="font-size: 10px; margin-right: 2px;"></i>= Sales UoM</span>
                                 </div>
                             </div>
 
-                            <!-- Conversion Row for Purchasing UoM -->
-                            <div class="inflow-uom-conv-row" id="purchasingConvRow" style="{% if not product.purchasing_uom or product.purchasing_uom == product.uom %}display: none;{% endif %}">
+                            <!-- Conversion Row for Purchasing UoM (Hidden: Purchases UOM always equals Sales UOM) -->
+                            <div class="inflow-uom-conv-row" id="purchasingConvRow" style="display: none;">
                                 <span class="inflow-uom-conv-lbl">Conversion</span>
                                 <div class="inflow-uom-conv-formula">
-                                    <input type="number" step="any" min="0.0001" id="purchasingConvRatio" class="inflow-conv-input" value="{{ '{:g}'.format(product.purchasing_uom_ratio or 1) }}" oninput="markFieldDirty('purchasing_uom_ratio', this.value);">
-                                    <span class="inflow-conv-unit" id="lblPurchasingUom">{{ product.purchasing_uom or 'cases' }}</span>
+                                    <input type="number" step="any" min="0.0001" id="purchasingConvRatio" class="inflow-conv-input" value="{{ '{:g}'.format(product.sales_uom_ratio or product.purchasing_uom_ratio or 1) }}" oninput="markFieldDirty('purchasing_uom_ratio', this.value);">
+                                    <span class="inflow-conv-unit" id="lblPurchasingUom">{{ product.sales_uom or product.purchasing_uom or 'cases' }}</span>
                                     <span class="inflow-conv-equal">=</span>
-                                    <input type="number" step="any" min="0.0001" id="purchasingConvStd" class="inflow-conv-input wider" value="{{ '{:g}'.format(product.purchasing_uom_ratio_std or 1) }}" oninput="markFieldDirty('purchasing_uom_ratio_std', this.value);">
+                                    <input type="number" step="any" min="0.0001" id="purchasingConvStd" class="inflow-conv-input wider" value="{{ '{:g}'.format(product.sales_uom_ratio_std or product.purchasing_uom_ratio_std or 1) }}" oninput="markFieldDirty('purchasing_uom_ratio_std', this.value);">
                                     <span class="inflow-conv-unit" id="lblPurchasingStdUom">{{ product.uom or 'pcs.' }}</span>
                                 </div>
                             </div>
@@ -900,14 +894,14 @@
                                     <div>
                                         <label style="font-size: 10.5px; color: #334155; display: block; font-weight: 600;" class="font-khmer">1 កេស មាន (Packs/Case):</label>
                                         <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
-                                            <input type="number" step="1" id="packsPerCaseInput" value="{{ '{:g}'.format(product.packs_per_case or 3) }}" class="inflow-dim-mini-input" style="width: 48px;" oninput="onPackagingChange(); markFieldDirty('packs_per_case', this.value);">
+                                            <input type="number" step="any" id="packsPerCaseInput" value="{{ '{:g}'.format(product.packs_per_case or 10) }}" class="inflow-dim-mini-input" style="width: 58px;" oninput="onPackagingChange('packs'); markFieldDirty('packs_per_case', this.value);" title="Automatically calculated: (pcs per case) / (pcs per pack)">
                                             <span style="font-size: 10.5px; color: #64748B;" class="font-khmer">ដុំ</span>
                                         </div>
                                     </div>
                                     <div>
                                         <label style="font-size: 10.5px; color: #334155; display: block; font-weight: 600;" class="font-khmer">1 ដុំ មាន (Pcs/Pack):</label>
                                         <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
-                                            <input type="number" step="1" id="pcsPerPackInput" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-dim-mini-input" style="width: 48px;" oninput="onPackagingChange(); markFieldDirty('pcs_per_pack', this.value);">
+                                            <input type="number" step="any" id="pcsPerPackInput" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-dim-mini-input" style="width: 58px;" oninput="onPackagingChange('pcs_pack'); markFieldDirty('pcs_per_pack', this.value);">
                                             <span style="font-size: 10.5px; color: #64748B;" class="font-khmer">ប្រអប់</span>
                                         </div>
                                     </div>
@@ -2701,6 +2695,14 @@ function saveProductChanges(callback) {
         isDirty = true;
     }
 
+    // Purchases UOM always equal to Sale UOM no need to fill
+    const sUom = (document.getElementById('salesUomSelect')?.value || 'cases').trim();
+    const sRatio = parseFloat(document.getElementById('salesConvRatio')?.value) || 1;
+    const sStd = parseFloat(document.getElementById('salesConvStd')?.value) || 1;
+    pendingChanges['purchasing_uom'] = sUom;
+    pendingChanges['purchasing_uom_ratio'] = sRatio;
+    pendingChanges['purchasing_uom_ratio_std'] = sStd;
+
     if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0 && !stagedProductImageFile) {
         if (typeof callback === 'function') callback(true);
         return;
@@ -3937,22 +3939,45 @@ function onSalesUomChange(newSalesUom) {
     const salesTag = document.getElementById('lblSalesUom');
     if (salesTag) salesTag.innerText = newSalesUom;
     markFieldDirty('sales_uom', newSalesUom);
+    syncPurchasingUomWithSales();
     onConversionRatioChange();
 }
 
-function onPurchasingUomChange(newPurchUom) {
-    newPurchUom = (newPurchUom || '').trim();
-    const purchTag = document.getElementById('lblPurchasingUom');
-    if (purchTag) purchTag.innerText = newPurchUom || 'cases';
-    const stdUom = (document.getElementById('stdUomSelect')?.value || 'pcs.').trim();
-    const row = document.getElementById('purchasingConvRow');
-    if (row) {
-        row.style.display = (!newPurchUom || newPurchUom === stdUom) ? 'none' : 'flex';
+function syncPurchasingUomWithSales() {
+    const salesUom = (document.getElementById('salesUomSelect')?.value || 'cases').trim();
+    const salesRatio = parseFloat(document.getElementById('salesConvRatio')?.value) || 1;
+    const salesRatioStd = parseFloat(document.getElementById('salesConvStd')?.value) || 1;
+    
+    const purchSelect = document.getElementById('purchasingUomSelect');
+    if (purchSelect) {
+        purchSelect.innerHTML = `<option value="${salesUom}" selected>${salesUom}</option>`;
+        purchSelect.value = salesUom;
     }
-    markFieldDirty('purchasing_uom', newPurchUom);
+    const purchTag = document.getElementById('lblPurchasingUom');
+    if (purchTag) purchTag.innerText = salesUom;
+    
+    const purchRatioInp = document.getElementById('purchasingConvRatio');
+    if (purchRatioInp) purchRatioInp.value = salesRatio;
+    
+    const purchStdInp = document.getElementById('purchasingConvStd');
+    if (purchStdInp) purchStdInp.value = salesRatioStd;
+    
+    const purchStdTag = document.getElementById('lblPurchasingStdUom');
+    const salesStdTag = document.getElementById('lblSalesStdUom');
+    if (purchStdTag && salesStdTag) purchStdTag.innerText = salesStdTag.innerText;
+    
+    markFieldDirty('purchasing_uom', salesUom);
+    markFieldDirty('purchasing_uom_ratio', salesRatio);
+    markFieldDirty('purchasing_uom_ratio_std', salesRatioStd);
+}
+
+function onPurchasingUomChange(newPurchUom) {
+    syncPurchasingUomWithSales();
 }
 
 function onConversionRatioChange() {
+    syncPurchasingUomWithSales();
+    if (typeof recalcPacksPerCase === 'function') recalcPacksPerCase('sales_conv');
     const cost = parseFloat(document.getElementById('productCostInput')?.value) || 0;
     recalcAllMarkupsFromCost(cost);
 }
@@ -4961,52 +4986,72 @@ function onDimensionChange() {
     if (specDim) specDim.innerText = summary;
 }
 
-function onPackagingChange() {
-    const packs = parseFloat(document.getElementById('packsPerCaseInput').value) || 4;
-    const pcsPack = parseFloat(document.getElementById('pcsPerPackInput').value) || 100;
-    
-    const specPacks = document.getElementById('specPacksVal');
-    if (specPacks) specPacks.innerText = packs;
-    const specPcsPack = document.getElementById('specPcsPackVal');
-    if (specPcsPack) specPcsPack.innerText = pcsPack;
-    
-    // Auto-derive pcs per case if matching
-    const totalPcs = packs * pcsPack;
+function recalcPacksPerCase(source) {
     const convStdInput = document.getElementById('salesConvStd');
-    if (convStdInput && parseFloat(convStdInput.value) <= 1) {
-        convStdInput.value = totalPcs;
-        markFieldDirty('sales_uom_ratio_std', totalPcs);
+    const pcsPerCase = parseFloat(convStdInput ? convStdInput.value : 0) || 0;
+    const pcsPackInput = document.getElementById('pcsPerPackInput');
+    const pcsPack = parseFloat(pcsPackInput ? pcsPackInput.value : 0) || 0;
+    const packsInput = document.getElementById('packsPerCaseInput');
+    
+    let packs = 0;
+    if (source === 'packs') {
+        // User manually entered packsPerCase
+        packs = parseFloat(packsInput ? packsInput.value : 0) || 0;
+        if (packs > 0) {
+            markFieldDirty('packs_per_case', packs);
+        }
+    } else {
+        // Automatically calculate: number pack per case = number pcs per case / pcs per pack
+        if (pcsPerCase > 0 && pcsPack > 0) {
+            packs = parseFloat((pcsPerCase / pcsPack).toFixed(2));
+            if (packsInput) {
+                packsInput.value = packs;
+                markFieldDirty('packs_per_case', packs);
+            }
+        } else if (packsInput) {
+            packs = parseFloat(packsInput.value) || 0;
+        }
     }
     
-    const pcsPerCase = (convStdInput && parseFloat(convStdInput.value) > 1) ? parseFloat(convStdInput.value) : (totalPcs > 0 ? totalPcs : 400);
+    // Live update packaging summary in specs card
+    const specPacks = document.getElementById('specPacksVal');
+    if (specPacks && packs > 0) specPacks.innerText = packs;
+    const specPcsPack = document.getElementById('specPcsPackVal');
+    if (specPcsPack && pcsPack > 0) specPcsPack.innerText = pcsPack;
+    
+    const displayPcsCase = pcsPerCase > 0 ? pcsPerCase : ((packs > 0 && pcsPack > 0) ? (packs * pcsPack) : 400);
     const specPcsCase = document.getElementById('specPcsCaseVal');
-    if (specPcsCase) specPcsCase.innerText = pcsPerCase;
+    if (specPcsCase) specPcsCase.innerText = displayPcsCase;
     const specPcsCaseEn = document.getElementById('specPcsCaseEnVal');
-    if (specPcsCaseEn) specPcsCaseEn.innerText = pcsPerCase;
+    if (specPcsCaseEn) specPcsCaseEn.innerText = displayPcsCase;
     
     // Default tier amounts: 100 pcs, 1 case in pcs, 2 cases in pcs
     const q2Inp = document.getElementById('cardTierQtyInput2');
     const q3Inp = document.getElementById('cardTierQtyInput3');
-    if (q2Inp) {
-        q2Inp.value = Math.round(pcsPerCase);
-        markFieldDirty('tier_qty_2', Math.round(pcsPerCase));
+    if (q2Inp && displayPcsCase > 0) {
+        q2Inp.value = Math.round(displayPcsCase);
+        markFieldDirty('tier_qty_2', Math.round(displayPcsCase));
     }
-    if (q3Inp) {
-        q3Inp.value = Math.round(pcsPerCase * 2);
-        markFieldDirty('tier_qty_3', Math.round(pcsPerCase * 2));
+    if (q3Inp && displayPcsCase > 0) {
+        q3Inp.value = Math.round(displayPcsCase * 2);
+        markFieldDirty('tier_qty_3', Math.round(displayPcsCase * 2));
     }
     
     // Auto sync all Price per Pcs inputs
     document.querySelectorAll('.inflow-cat-price-input').forEach(caseInp => {
         const sId = caseInp.getAttribute('data-scheme-id');
         const caseP = evaluateMathExpression(caseInp.value) || 0;
-        const pcsP = pcsPerCase > 0 ? (caseP / pcsPerCase) : caseP;
+        const pcsP = displayPcsCase > 0 ? (caseP / displayPcsCase) : caseP;
         const pcsInp = document.getElementById('pcs_price_' + sId);
         if (pcsInp) pcsInp.value = pcsP.toFixed(3);
-        syncTiersFromScheme(sId, caseP, pcsP);
+        if (typeof syncTiersFromScheme === 'function') syncTiersFromScheme(sId, caseP, pcsP);
     });
     
-    recalcCardTiers();
+    if (typeof recalcCardTiers === 'function') recalcCardTiers();
+}
+
+function onPackagingChange(source) {
+    recalcPacksPerCase(source || 'pcs_pack');
 }
 
 // ==========================================================================
@@ -6685,8 +6730,12 @@ function toggleProductSidebarCollapse(forceState) {
     if (expandBtn) expandBtn.style.display = willCollapse ? 'inline-flex' : 'none';
 }
 
-// Restore Product sidebar collapse state on load
+// Restore Product sidebar collapse state and initialize packaging/UOM calculations on load
 document.addEventListener('DOMContentLoaded', () => {
+    try {
+        if (typeof syncPurchasingUomWithSales === 'function') syncPurchasingUomWithSales();
+        if (typeof recalcPacksPerCase === 'function') recalcPacksPerCase('init');
+    } catch(e) {}
     try {
         if (localStorage.getItem('inflow_product_sidebar_collapsed') === 'true') {
             toggleProductSidebarCollapse(true);

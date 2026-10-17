@@ -192,6 +192,17 @@ def generate_deploy_sql():
     END $$;
 
     SELECT setval('so_number_seq', (SELECT COALESCE(MAX(SUBSTRING(order_number FROM '^SO-([0-9]+)$')::bigint), 1) FROM sales_orders WHERE order_number ~ '^SO-[0-9]+$'), true);
+
+    -- Synchronize Purchasing UOM and Packs per Case across all products
+    UPDATE products 
+    SET purchasing_uom = sales_uom,
+        purchasing_uom_ratio = sales_uom_ratio,
+        purchasing_uom_ratio_std = sales_uom_ratio_std
+    WHERE sales_uom IS NOT NULL AND (purchasing_uom != sales_uom OR purchasing_uom_ratio != sales_uom_ratio OR purchasing_uom_ratio_std != sales_uom_ratio_std);
+
+    UPDATE products
+    SET packs_per_case = ROUND((sales_uom_ratio_std / pcs_per_pack)::numeric, 2)
+    WHERE sales_uom_ratio_std > 0 AND pcs_per_pack > 0 AND (packs_per_case IS NULL OR packs_per_case != ROUND((sales_uom_ratio_std / pcs_per_pack)::numeric, 2));
     """)
 
     sql_parts.append("COMMIT;\n")
