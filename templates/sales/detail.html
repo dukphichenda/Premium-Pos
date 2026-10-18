@@ -198,7 +198,7 @@
 }
 
 .so-mobile-drawer-backdrop {
-    display: none;
+    display: none !important;
     position: fixed;
     top: 0;
     left: 0;
@@ -208,6 +208,12 @@
     backdrop-filter: blur(2px);
     z-index: 100004;
     cursor: pointer;
+    pointer-events: none;
+}
+
+.inflow-so-workspace.mobile-drawer-open .so-mobile-drawer-backdrop {
+    display: block !important;
+    pointer-events: auto;
 }
 
 .so-mobile-drawer-header {
@@ -2808,6 +2814,30 @@ function toggleDrawerExpand() {
     }
 }
 
+function closeSoMobileDrawer() {
+    const ws = document.querySelector('.inflow-so-workspace');
+    if (ws) ws.classList.remove('mobile-drawer-open');
+    document.body.classList.remove('so-drawer-backdrop-active');
+    const backdrop = document.getElementById('soMobileDrawerBackdrop');
+    if (backdrop) backdrop.style.display = 'none';
+    const floatBtn = document.getElementById('soMobileFloatingBtn');
+    if (floatBtn) floatBtn.style.display = 'flex';
+    const barBtn = document.getElementById('soMobileSidebarBar');
+    if (barBtn) barBtn.style.display = 'flex';
+}
+
+function openSoMobileDrawer() {
+    const ws = document.querySelector('.inflow-so-workspace');
+    if (ws) ws.classList.add('mobile-drawer-open');
+    document.body.classList.add('so-drawer-backdrop-active');
+    const backdrop = document.getElementById('soMobileDrawerBackdrop');
+    if (backdrop) backdrop.style.display = 'block';
+    const floatBtn = document.getElementById('soMobileFloatingBtn');
+    if (floatBtn) floatBtn.style.display = 'none';
+    const barBtn = document.getElementById('soMobileSidebarBar');
+    if (barBtn) barBtn.style.display = 'none';
+}
+
 // Sidebar Minimize / Collapse Toggle (Collapse sidebar completely for 100% full-width document)
 function toggleSoSidebarCollapse(forceState) {
     const ws = document.querySelector('.inflow-so-workspace');
@@ -2817,18 +2847,10 @@ function toggleSoSidebarCollapse(forceState) {
         const isOpen = ws.classList.contains('mobile-drawer-open');
         const willOpen = (typeof forceState === 'boolean') ? !forceState : !isOpen;
         if (willOpen) {
-            ws.classList.add('mobile-drawer-open');
-            document.body.classList.add('so-drawer-backdrop-active');
+            openSoMobileDrawer();
         } else {
-            ws.classList.remove('mobile-drawer-open');
-            document.body.classList.remove('so-drawer-backdrop-active');
+            closeSoMobileDrawer();
         }
-        const backdrop = document.getElementById('soMobileDrawerBackdrop');
-        if (backdrop) backdrop.style.display = willOpen ? 'block' : 'none';
-        const floatBtn = document.getElementById('soMobileFloatingBtn');
-        if (floatBtn) floatBtn.style.display = willOpen ? 'none' : 'flex';
-        const barBtn = document.getElementById('soMobileSidebarBar');
-        if (barBtn) barBtn.style.display = willOpen ? 'none' : 'flex';
         return;
     }
     const isCurrentlyCollapsed = ws.classList.contains('sidebar-collapsed') || ws.classList.contains('drawer-collapsed');
@@ -3182,6 +3204,7 @@ function getCurrentOrderId() {
 // Instant Direct Navigation (Zero Animation Latency - Appear As Fast As Possible via SPA Canvas Swap)
 function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     if (!targetUrl) return;
+    closeSoMobileDrawer();
     
     // Save drawer / sidebar scroll position
     const soSidebarList = document.getElementById('soSidebarListBody');
@@ -3427,7 +3450,7 @@ window.addEventListener('popstate', function(e) {
 })();
 
 function handleSelectOrder(targetUrl, clickedEl) {
-    document.querySelector('.inflow-so-workspace')?.classList.remove('mobile-drawer-open');
+    closeSoMobileDrawer();
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
@@ -3444,6 +3467,7 @@ function handleSelectOrder(targetUrl, clickedEl) {
 
 function handleCloseOrder(event) {
     if (event) event.preventDefault();
+    closeSoMobileDrawer();
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
@@ -3483,6 +3507,7 @@ function handleCloseOrder(event) {
 }
 
 function createNewOrderInTab() {
+    closeSoMobileDrawer();
     syncDrawerFiltersToStorage();
     {% if is_branch_mode and current_branch %}
     const baseNew = "{{ url_for('sales_orders.new_order', branch=current_branch.id) }}";
@@ -6806,6 +6831,7 @@ function handleSoLiveSearch(val) {
 }
 
 function startNewOrderForCustomer(customerId, customerName) {
+    closeSoMobileDrawer();
     const branchScope = '{{ branch_scope or "" }}';
     const targetUrl = '/sales/new?customer_id=' + encodeURIComponent(customerId) + (branchScope ? '&branch=' + encodeURIComponent(branchScope) : '');
     if (isDirty) {

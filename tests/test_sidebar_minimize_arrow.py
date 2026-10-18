@@ -38,7 +38,10 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
 
         # JS function and shortcut
         self.assertIn('function toggleSoSidebarCollapse', html)
+        self.assertIn('function closeSoMobileDrawer', html)
+        self.assertIn('function openSoMobileDrawer', html)
         self.assertIn('inflow_so_sidebar_collapsed', html)
+        self.assertIn('.inflow-so-workspace.mobile-drawer-open .so-mobile-drawer-backdrop', html)
 
     def test_purchase_order_sidebar_minimize(self):
         """Verify Purchase Order detail view has minimize arrow button and expand tab."""
