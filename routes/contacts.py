@@ -3,6 +3,7 @@ from database import query_one, query_all, execute, execute_returning_id
 import re
 import csv
 import io
+from services.csv_exchange import resolve_customer_phone_and_name
 
 contacts_bp = Blueprint('contacts', __name__)
 
@@ -1095,11 +1096,14 @@ def export_customers():
     ])
 
     for r in rows:
+        c_name, c_contact, c_phone = resolve_customer_phone_and_name(
+            r['name'], r['contact_name'], r['phone'], r['address1'] or r['billing_address'] or ''
+        )
         writer.writerow([
             r['id'],
-            r['name'] or '',
-            r['contact_name'] or '',
-            r['phone'] or '',
+            c_name or '',
+            c_contact or '',
+            c_phone or '',
             r['email'] or '',
             r['website'] or '',
             r['address1'] or r['billing_address'] or '',
@@ -1121,6 +1125,75 @@ def export_customers():
         csv_data,
         mimetype="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment;filename=inflow_customers.csv"}
+    )
+
+
+@contacts_bp.route('/customers/<int:id>/export-orders')
+def export_customer_orders(id):
+    customer = query_one("SELECT * FROM customers WHERE id = %s", (id,))
+    if not customer:
+        flash("Customer not found", "error")
+        return redirect(url_for('contacts.customers_view'))
+
+    if not _check_customer_branch_access(customer):
+        flash("Access denied.", "error")
+        return redirect(url_for('contacts.customers_view'))
+
+    c_name, c_contact, c_phone = resolve_customer_phone_and_name(
+        customer.get('name'), customer.get('contact_name'), customer.get('phone'),
+        customer.get('address1') or customer.get('shipping_address') or ''
+    )
+
+    rows = query_all("""
+        SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
+               so.status, so.payment_status,
+               COALESCE(NULLIF(TRIM(so.customer_phone), ''), %s) as phone,
+               COALESCE(NULLIF(TRIM(so.customer_address), ''), %s) as address,
+               p.sku, COALESCE(NULLIF(sol.description, ''), p.name, '') as item_description,
+               sol.quantity, sol.unit_price, sol.subtotal,
+               so.total_amount, so.paid_amount, so.balance_due
+        FROM sales_orders so
+        LEFT JOIN sales_order_lines sol ON sol.sales_order_id = so.id
+        LEFT JOIN products p ON sol.product_id = p.id
+        WHERE so.customer_id = %s
+        ORDER BY so.id DESC, sol.line_num ASC;
+    """, (c_phone, customer.get('address1') or '', id))
+
+    output = io.StringIO()
+    output.write('\ufeff')  # UTF-8 BOM
+    writer = csv.writer(output)
+    writer.writerow([
+        'Order Number', 'Order Date', 'Status', 'Payment Status',
+        'Customer Name', 'Customer Phone', 'Delivery Address',
+        'Item Code', 'Description', 'Quantity', 'Unit Price', 'Line Subtotal',
+        'Order Total', 'Paid Amount', 'Balance Due'
+    ])
+
+    for r in rows:
+        writer.writerow([
+            r['order_number'] or '',
+            r['order_date'] or '',
+            r['status'] or '',
+            r['payment_status'] or '',
+            c_name or '',
+            r['phone'] or c_phone or '',
+            r['address'] or '',
+            r['sku'] or '',
+            r['item_description'] or '',
+            f"{float(r['quantity'] or 0):g}",
+            f"{float(r['unit_price'] or 0):.2f}",
+            f"{float(r['subtotal'] or 0):.2f}",
+            f"{float(r['total_amount'] or 0):.2f}",
+            f"{float(r['paid_amount'] or 0):.2f}",
+            f"{float(r['balance_due'] or 0):.2f}"
+        ])
+
+    clean_filename = re.sub(r'[^a-zA-Z0-9_\-]', '_', c_name or f"Customer_{id}")
+    filename = f"Orders_{clean_filename}.csv"
+    return Response(
+        output.getvalue().encode('utf-8-sig'),
+        mimetype="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f"attachment; filename=\"{filename}\""}
     )
 
 

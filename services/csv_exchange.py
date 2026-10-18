@@ -47,8 +47,8 @@ DATA_TYPES_META = {
         'default_filename': 'inFlow_SalesOrder.csv',
         'description': 'Import your sales orders, including status (Paid, Open, Invoiced, Fully Shipped), customer information, and items ordered.',
         'export_description': 'Export your sales orders, including status, customer information, items, quantities, and totals.',
-        'headers': ['Order Number', 'Status', 'Customer Name', 'Order Date', 'Item Code', 'Description', 'Quantity', 'Unit Price', 'Subtotal', 'Amount Paid', 'Payment Status'],
-        'sample_row': ['SO-000101', 'Paid', 'Angkor Supermarket', '2026-10-10', 'A1600-QP', 'Paper Box 1600ML', '10', '12.00', '120.00', '120.00', 'PAID']
+        'headers': ['Order Number', 'Status', 'Customer Name', 'Customer Phone', 'Order Date', 'Item Code', 'Description', 'Quantity', 'Unit Price', 'Subtotal', 'Amount Paid', 'Payment Status'],
+        'sample_row': ['SO-000101', 'Paid', 'Angkor Supermarket', '+855 12 345 678', '2026-10-10', 'A1600-QP', 'Paper Box 1600ML', '10', '12.00', '120.00', '120.00', 'PAID']
     },
     'purchase_order': {
         'display_name': 'Purchase Order',
@@ -59,6 +59,78 @@ DATA_TYPES_META = {
         'sample_row': ['PO-000050', 'Received', 'Asia Packaging Co., Ltd', '2026-10-09', 'A1600-QP', 'Paper Box 1600ML', '100', '8.50', '850.00']
     }
 }
+
+CUSTOMER_PHONE_REGEX = re.compile(
+    r'(?:(?:\+?855[\s\-]*)?0[1-9](?:[\s\.\-]*\d){6,9}|(?:\+?855[\s\-]*)[1-9](?:[\s\.\-]*\d){7,9})'
+)
+
+
+def clean_phone_str(p):
+    if not p:
+        return ''
+    return re.sub(r'[\u200b-\u200f\ufeff]', '', str(p)).strip()
+
+
+def is_pure_phone(text):
+    if not text:
+        return False
+    clean = clean_phone_str(text)
+    non_phone_chars = re.sub(r'[\d\+\-\s\/\.\(\)]', '', clean)
+    if len(non_phone_chars) > 0:
+        return False
+    digits = re.sub(r'\D', '', clean)
+    return 8 <= len(digits) <= 20
+
+
+def extract_phone(raw):
+    if not raw:
+        return ''
+    clean = clean_phone_str(raw)
+    m = CUSTOMER_PHONE_REGEX.search(clean)
+    if m:
+        return m.group(0).strip()
+    return ''
+
+
+def resolve_customer_phone_and_name(name, contact_name, phone, address1='', remarks=''):
+    p = clean_phone_str(phone)
+    cust_name = clean_phone_str(name)
+    contact = clean_phone_str(contact_name)
+
+    # 1. If phone is already provided
+    if p:
+        return cust_name, contact, p
+
+    # 2. Check if name is purely a phone number
+    if is_pure_phone(cust_name):
+        p = cust_name
+        # If contact_name has an actual customer name (not another phone)
+        if contact and not is_pure_phone(contact):
+            cust_name = contact
+            contact = ''
+        return cust_name, contact, p
+
+    # 3. Check contact_name
+    if is_pure_phone(contact):
+        p = contact
+        contact = ''
+        return cust_name, contact, p
+
+    found = extract_phone(contact)
+    if found:
+        return cust_name, contact, found
+
+    # 4. Check address1
+    found = extract_phone(address1)
+    if found:
+        return cust_name, contact, found
+
+    # 5. Check remarks
+    found = extract_phone(remarks)
+    if found:
+        return cust_name, contact, found
+
+    return cust_name, contact, ''
 
 
 def get_meta(data_type):
@@ -124,32 +196,35 @@ def export_data_to_csv(data_type, branch_id=None):
             ])
 
     elif key == 'customer':
-        if str(branch_id).strip().lower() == 'all':
+        if str(branch_id).strip().lower() == 'all' or branch_id is None:
             rows = query_all("""
-                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
+                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance, remarks
                 FROM customers
                 WHERE is_active = TRUE
                 ORDER BY name ASC;
             """)
         elif bid is not None:
             rows = query_all("""
-                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
+                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance, remarks
                 FROM customers
                 WHERE is_active = TRUE AND branch_id = %s
                 ORDER BY name ASC;
             """, (bid,))
         else:
             rows = query_all("""
-                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance
+                SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance, remarks
                 FROM customers
-                WHERE is_active = TRUE AND branch_id IS NULL
+                WHERE is_active = TRUE
                 ORDER BY name ASC;
             """)
         for r in rows:
+            c_name, c_contact, c_phone = resolve_customer_phone_and_name(
+                r['name'], r['contact_name'], r['phone'], r['address1'], r.get('remarks', '')
+            )
             writer.writerow([
-                r['name'] or '',
-                r['contact_name'] or '',
-                r['phone'] or '',
+                c_name or '',
+                c_contact or '',
+                c_phone or '',
                 r['email'] or '',
                 r['address1'] or '',
                 r['city'] or '',
@@ -193,46 +268,34 @@ def export_data_to_csv(data_type, branch_id=None):
             ])
 
     elif key == 'sales_order':
-        if str(branch_id).strip().lower() == 'all':
-            rows = query_all("""
-                SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
-                       c.name as customer_name, p.sku, sol.description, sol.quantity,
-                       sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
-                FROM sales_orders so
-                LEFT JOIN customers c ON so.customer_id = c.id
-                JOIN sales_order_lines sol ON sol.sales_order_id = so.id
-                LEFT JOIN products p ON sol.product_id = p.id
-                ORDER BY so.id DESC, sol.line_num ASC;
-            """)
+        sql_base = """
+            SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
+                   c.name as customer_name, c.contact_name as customer_contact,
+                   COALESCE(NULLIF(TRIM(so.customer_phone), ''), NULLIF(TRIM(c.phone), ''), '') as customer_phone,
+                   p.sku, sol.description, sol.quantity,
+                   sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            JOIN sales_order_lines sol ON sol.sales_order_id = so.id
+            LEFT JOIN products p ON sol.product_id = p.id
+        """
+        if str(branch_id).strip().lower() == 'all' or branch_id is None:
+            rows = query_all(sql_base + " ORDER BY so.id DESC, sol.line_num ASC;")
         elif bid is not None:
-            rows = query_all("""
-                SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
-                       c.name as customer_name, p.sku, sol.description, sol.quantity,
-                       sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
-                FROM sales_orders so
-                LEFT JOIN customers c ON so.customer_id = c.id
-                JOIN sales_order_lines sol ON sol.sales_order_id = so.id
-                LEFT JOIN products p ON sol.product_id = p.id
-                WHERE so.branch_id = %s
-                ORDER BY so.id DESC, sol.line_num ASC;
-            """, (bid,))
+            rows = query_all(sql_base + " WHERE so.branch_id = %s ORDER BY so.id DESC, sol.line_num ASC;", (bid,))
         else:
-            rows = query_all("""
-                SELECT so.order_number, to_char(so.order_date, 'YYYY-MM-DD') as order_date,
-                       c.name as customer_name, p.sku, sol.description, sol.quantity,
-                       sol.unit_price, sol.subtotal, so.paid_amount, so.status, so.payment_status
-                FROM sales_orders so
-                LEFT JOIN customers c ON so.customer_id = c.id
-                JOIN sales_order_lines sol ON sol.sales_order_id = so.id
-                LEFT JOIN products p ON sol.product_id = p.id
-                WHERE so.branch_id IS NULL
-                ORDER BY so.id DESC, sol.line_num ASC;
-            """)
+            rows = query_all(sql_base + " ORDER BY so.id DESC, sol.line_num ASC;")
         for r in rows:
+            c_phone = r['customer_phone'] or ''
+            if not c_phone:
+                _, _, c_phone = resolve_customer_phone_and_name(
+                    r['customer_name'], r.get('customer_contact', ''), ''
+                )
             writer.writerow([
                 r['order_number'] or '',
                 r['status'] or 'OPEN',
                 r['customer_name'] or '',
+                c_phone or '',
                 r['order_date'] or '',
                 r['sku'] or '',
                 r['description'] or '',
@@ -1213,10 +1276,14 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 city = get_val(r, ['City', 'BillingCity'])
                 country = get_val(r, ['Country', 'BillingCountry'], 'Cambodia')
                 terms = get_val(r, ['Payment Terms', 'PaymentTerms', 'Terms'], 'Due on Receipt')
-
-                if not name:
+                if not name and not contact and not phone:
                     errors.append(f"Row {row_idx}: Missing customer name.")
                     continue
+
+                # Auto-resolve phone and customer name
+                name, contact, phone = resolve_customer_phone_and_name(name, contact, phone, address)
+                if not name:
+                    name = phone or 'Customer'
 
                 existing_id = None
                 if not is_erase_mode:
@@ -1365,6 +1432,8 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             row_email = get_val(r, ['Email', 'Email Address', 'Customer Email', 'CustomerEmail', 'E-mail'])
             row_city = get_val(r, ['ShippingCity', 'BillingCity', 'City', 'Town', 'ខេត្ត/ក្រុង', 'ក្រុង', 'ខេត្ត'])
             row_country = get_val(r, ['ShippingCountry', 'BillingCountry', 'Country', 'ប្រទេស'], 'Cambodia')
+            if not row_phone:
+                _, _, row_phone = resolve_customer_phone_and_name(clean_cname, row_contact, '', row_addr)
 
             if so_num not in orders_map:
                 orders_map[so_num] = {

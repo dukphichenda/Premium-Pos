@@ -471,7 +471,7 @@ def sync_customers_from_latest_orders(cur=None, customer_ids=None):
             WHERE c.id = latest_info.customer_id;
         """
         c.execute(sql, tuple(params))
-        return c.rowcount
+        return getattr(c, 'rowcount', 0) or 0
 
     if cur is not None:
         return _sync(cur)

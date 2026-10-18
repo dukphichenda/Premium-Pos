@@ -34,6 +34,8 @@ def _resolve_target_branch_id():
             return int(raw_bid)
         except (ValueError, TypeError):
             return None
+    if raw_bid and str(raw_bid).strip().lower() == 'all':
+        return 'all'
     return None
 
 

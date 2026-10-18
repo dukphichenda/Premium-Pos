@@ -8,6 +8,7 @@ import json
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, current_app
 from database import query_one, query_all, execute, get_db_cursor, get_next_sequence_val, execute_returning_id, get_next_order_number
+from services.csv_exchange import resolve_customer_phone_and_name
 
 branches_bp = Blueprint('branches', __name__)
 
@@ -1997,7 +1998,8 @@ def branch_export_csv(id, export_type):
         # inFlow Standard Sales Orders Export
         writer.writerow(['Order Number', 'Order Date', 'Customer Name', 'Customer Phone', 'Status', 'Payment Status', 'Subtotal', 'Discount', 'Total Amount', 'Paid Amount', 'Balance Due', 'Warehouse Location'])
         rows = query_all("""
-            SELECT so.order_number, so.order_date, c.name as customer_name, c.phone as customer_phone,
+            SELECT so.order_number, so.order_date, c.name as customer_name, c.contact_name as customer_contact,
+                   COALESCE(NULLIF(TRIM(so.customer_phone), ''), NULLIF(TRIM(c.phone), ''), '') as customer_phone,
                    so.status, so.payment_status, so.subtotal, so.discount_amount, so.total_amount,
                    so.paid_amount, so.balance_due, l.name as location_name
             FROM sales_orders so
@@ -2007,11 +2009,14 @@ def branch_export_csv(id, export_type):
             ORDER BY so.order_date DESC, so.id DESC
         """, (id,))
         for o in rows:
+            c_phone = o['customer_phone'] or ''
+            if not c_phone:
+                _, _, c_phone = resolve_customer_phone_and_name(o['customer_name'], o.get('customer_contact', ''), '')
             writer.writerow([
                 o['order_number'],
                 str(o['order_date']),
                 o['customer_name'] or 'Walk-in Customer',
-                o['customer_phone'] or '',
+                c_phone or '',
                 o['status'],
                 o['payment_status'] or 'PAID',
                 f"{float(o['subtotal'] or 0):.2f}",
@@ -2027,16 +2032,19 @@ def branch_export_csv(id, export_type):
         # inFlow Standard Customer Directory Export
         writer.writerow(['Customer Name', 'Contact Name', 'Phone', 'Email', 'Address', 'City', 'Balance', 'Payment Terms'])
         rows = query_all("""
-            SELECT name, contact_name, phone, email, address1, city, balance, payment_terms
+            SELECT name, contact_name, phone, email, address1, city, balance, payment_terms, remarks
             FROM customers
             WHERE is_active = TRUE AND (branch_id = %s OR branch_id IS NULL)
             ORDER BY name ASC
         """, (id,))
         for c in rows:
+            c_name, c_contact, c_phone = resolve_customer_phone_and_name(
+                c['name'], c['contact_name'], c['phone'], c['address1'], c.get('remarks', '')
+            )
             writer.writerow([
-                c['name'],
-                c['contact_name'] or '',
-                c['phone'] or '',
+                c_name or '',
+                c_contact or '',
+                c_phone or '',
                 c['email'] or '',
                 c['address1'] or '',
                 c['city'] or 'Phnom Penh',

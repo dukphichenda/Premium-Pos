@@ -3948,6 +3948,8 @@ def export_sales_order(id):
     writer.writerow(["Order Number", order['order_number']])
     writer.writerow(["Document Type", doc_type.upper()])
     writer.writerow(["Customer", order.get('customer_name') or 'N/A'])
+    writer.writerow(["Customer Phone", order.get('customer_phone') or ''])
+    writer.writerow(["Customer Address", order.get('customer_address') or ''])
     writer.writerow(["Order Date", str(order.get('order_date') or '')])
     writer.writerow(["Warehouse", order.get('location_name') or ''])
     writer.writerow(["Status", order.get('status') or ''])
