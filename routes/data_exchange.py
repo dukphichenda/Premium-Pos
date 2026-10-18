@@ -107,6 +107,14 @@ def import_execute_api():
                 selected_rows = json.loads(selected_rows_raw)
             except Exception:
                 selected_rows = [int(s.strip()) for s in selected_rows_raw.split(',') if s.strip().isdigit()]
+
+        product_replacements_raw = request.form.get('product_replacements')
+        product_replacements = None
+        if product_replacements_raw:
+            try:
+                product_replacements = json.loads(product_replacements_raw)
+            except Exception:
+                product_replacements = None
         
         file = request.files.get('file')
         if not file or not file.filename:
@@ -119,7 +127,8 @@ def import_execute_api():
             import_mode=import_mode,
             selected_orders=selected_orders,
             selected_rows=selected_rows,
-            branch_id=target_branch_id
+            branch_id=target_branch_id,
+            product_replacements=product_replacements
         )
         return jsonify(res)
     except Exception as e:

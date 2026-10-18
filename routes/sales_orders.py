@@ -3346,7 +3346,7 @@ def print_invoice(id):
             COALESCE(p.name, 'Item') as product_name,
             p.sku as product_sku,
             p.barcode as product_barcode,
-            COALESCE(sol.uom, p.uom, 'ea') as product_uom,
+            COALESCE(sol.uom, p.uom, 'pcs.') as product_uom,
             COALESCE(NULLIF(sol.description, ''), NULLIF(p.description, ''), '') as line_description
         FROM sales_order_lines sol
         LEFT JOIN products p ON sol.product_id = p.id

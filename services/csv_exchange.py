@@ -404,10 +404,13 @@ UOM_HEADER_ALIASES = [
     'ItemUoM', 'Item UoM', 'Item UOM', 'ItemUnit', 'Item Unit',
     'QuantityUoM', 'Quantity UoM', 'Quantity UOM',
     'QuantityUnit', 'Quantity Unit',
-    'OrderUoM', 'Order UoM', 'Order Unit',
+    'OrderUoM', 'Order UoM', 'Order UOM', 'Order Unit',
+    'LineUoM', 'Line UoM', 'Line UOM', 'Line Unit',
+    'QtyUoM', 'Qty UoM', 'Qty UOM', 'Qty Unit',
     'SalesUoM', 'Sales UoM', 'Sales UOM', 'SalesUnit', 'Sales Unit',
     'PurchasingUoM', 'Purchasing UoM', 'Purchasing Unit',
-    'Unit of Measure', 'UnitOfMeasure',
+    'Unit of Measure', 'UnitOfMeasure', 'Unit of Measurement',
+    'Unit Name', 'UOM Name',
     'UOM', 'UoM', 'Unit', 'Units', 'Meas.', 'Measure', 'ខ្នាត', 'ឯកតា'
 ]
 
@@ -597,13 +600,19 @@ def match_catalog_product(matcher, item_code='', item_name='', desc=''):
 
 def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
     """
-    Intelligently checks and resolves whether the line's unit is 'cases', 'packs', or 'pcs.'.
-    Returns a 3-tuple: (final_uom, display_qty, std_qty)
-    - final_uom: normalized canonical UOM ('cases', 'packs', or product's base uom e.g. 'pcs.')
-    - display_qty: display quantity for the line item (e.g. 1.0 case)
-    - std_qty: standard base inventory quantity (display_qty * ratio, e.g. 300.0 pcs)
+    Intelligently checks and resolves line UOM:
+    - 'pcs' / 'pc' / 'piece': genuine loose pieces with 1.0 ratio
+    - 'case' / 'cases' / 'box' / 'carton': case units with catalog/packaging ratio
+    - 'ea' / 'ea.' / 'each' / 'unit': each units with 1.0 ratio
+    - 'pack' / 'packs' / 'pk': pack units with pack ratio
+    - other custom units ('roll', 'set', 'can', 'bottle', 'kg'): preserved literally
+    Only falls back to contextual price/packaging detection if raw_uom is missing/blank.
+    Returns 3-tuple: (final_uom, display_qty, std_qty)
     """
-    u_str = (raw_uom or '').strip().lower().rstrip('.')
+    raw_uom_clean = (raw_uom or '').strip()
+    u_lower = raw_uom_clean.lower()
+    u_match = u_lower.rstrip('.')
+
     combined_text = f"{item_name or ''} {desc or ''}".strip()
     pkg_spec = extract_packaging_spec(combined_text)
 
@@ -617,48 +626,46 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
 
     CASE_KEYWORDS = {
         'case', 'cases', 'cs', 'box', 'boxes', 'bx', 'carton', 'cartons',
-        'ctn', 'ctns', 'កេស', 'បាវ', 'ធុង'
+        'ctn', 'ctns', 'crate', 'crates', 'កេស', 'បាវ', 'ធុង', 'ប្រអប់'
     }
     PACK_KEYWORDS = {
         'pack', 'packs', 'pk', 'pks', 'pkg', 'pkgs', 'packet', 'packets',
         'bundle', 'bundles', 'កញ្ចប់'
     }
+    EA_KEYWORDS = {
+        'ea', 'each', 'unit', 'units', 'ឯកតា'
+    }
     PCS_KEYWORDS = {
-        'pcs', 'pc', 'piece', 'pieces', 'ea', 'each', 'unit', 'units',
-        'ដុំ', 'ចាន', 'កែវ', 'សន្លឹក', 'គ្រាប់'
+        'pcs', 'pc', 'piece', 'pieces',
+        'ដុំ', 'ចាន', 'កែវ', 'សន្លឹក', 'គ្រាប់', 'ដប'
     }
 
-    target_category = None  # 'case', 'pack', 'pcs', or 'custom'
+    target_category = None  # 'case', 'pack', 'ea', 'pcs', or 'custom'
 
-    # Step 1: Explicit keyword matching in raw_uom
-    if u_str:
-        if u_str in CASE_KEYWORDS or any(kw in u_str for kw in ('case', 'ctn', 'carton', 'កេស')):
+    # Step 1: Explicit keyword matching in raw_uom (MUST NOT be overridden by contextual detection)
+    if u_match:
+        if u_match in CASE_KEYWORDS or any(kw in u_lower for kw in ('case', 'ctn', 'carton', 'កេស')):
             target_category = 'case'
-        elif u_str in PACK_KEYWORDS or any(kw in u_str for kw in ('pack', 'pkg', 'កញ្ចប់')):
+        elif u_match in PACK_KEYWORDS or any(kw in u_lower for kw in ('pack', 'pkg', 'កញ្ចប់')):
             target_category = 'pack'
-        elif u_str in PCS_KEYWORDS:
-            # Could be genuine loose pieces, OR default 'pcs' export when item packaging/pricing dictates otherwise
-            target_category = None
+        elif u_match in EA_KEYWORDS or any(kw in u_lower for kw in ('each', 'unit')):
+            target_category = 'ea'
+        elif u_match in PCS_KEYWORDS or any(kw in u_lower for kw in ('piece',)):
+            target_category = 'pcs'
         else:
             target_category = 'custom'
 
-    # Step 2: Contextual detection if raw_uom is missing, empty, or generic 'pcs'
+    # Step 2: Contextual detection ONLY when raw_uom is completely missing or blank
     if not target_category:
-        # Check packaging spec in item name / description
         if pkg_spec and pkg_spec['type'] == 'case':
             ratio_val = pkg_spec['ratio'] or cat_sales_ratio
             if cat_price > 0 and ratio_val > 1:
                 if unit_price >= (cat_price * 0.35) or unit_price >= 5.0:
                     target_category = 'case'
-                elif unit_price <= ((cat_price / ratio_val) * 1.5):
-                    target_category = 'pcs'
                 else:
-                    target_category = 'case'
+                    target_category = 'pcs'
             else:
-                if unit_price >= 1.0 or not u_str:
-                    target_category = 'case'
-                else:
-                    target_category = 'pcs'
+                target_category = 'case' if unit_price >= 1.0 else 'pcs'
 
         elif pkg_spec and pkg_spec['type'] == 'pack':
             ratio_val = pkg_spec['ratio'] or cat_purch_ratio or cat_sales_ratio
@@ -668,23 +675,16 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
                 else:
                     target_category = 'pcs'
             else:
-                if unit_price >= 1.0 or not u_str:
-                    target_category = 'pack'
-                else:
-                    target_category = 'pcs'
+                target_category = 'pack' if unit_price >= 1.0 else 'pcs'
 
         elif sales_uom and cat_sales_ratio > 1 and any(kw in sales_uom.lower() for kw in CASE_KEYWORDS):
-            # Product in catalog is configured with sales_uom = 'cases'
             if cat_price > 0:
                 if unit_price >= (cat_price * 0.35) or unit_price >= 5.0:
                     target_category = 'case'
                 else:
                     target_category = 'pcs'
             else:
-                if unit_price >= 5.0:
-                    target_category = 'case'
-                else:
-                    target_category = 'pcs' if (u_str and u_str in PCS_KEYWORDS) else 'case'
+                target_category = 'case' if unit_price >= 5.0 else 'pcs'
 
         elif sales_uom and cat_sales_ratio > 1 and any(kw in sales_uom.lower() for kw in PACK_KEYWORDS):
             target_category = 'pack'
@@ -692,13 +692,19 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
         else:
             target_category = 'pcs'
 
-    # Step 3: Compute final canonical UOM and ratio
+    # Step 3: Compute final canonical UOM and inventory conversion ratio
     display_qty = max(0.0001, float(qty or 1.0))
     ratio = 1.0
     final_uom = base_uom
 
     if target_category == 'case':
-        if sales_uom and any(kw in sales_uom.lower() for kw in ('case', 'កេស', 'box', 'ctn')):
+        if raw_uom_clean.lower() in ('box', 'boxes', 'bx', 'ប្រអប់'):
+            final_uom = 'boxes' if raw_uom_clean.lower() in ('boxes', 'ប្រអប់') else 'box'
+        elif raw_uom_clean.lower() in ('carton', 'cartons', 'ctn', 'ctns'):
+            final_uom = 'cartons' if 's' in raw_uom_clean.lower() else 'carton'
+        elif raw_uom_clean.lower() in ('កេស', 'បាវ', 'ធុង'):
+            final_uom = raw_uom_clean
+        elif sales_uom and any(kw in sales_uom.lower() for kw in ('case', 'កេស', 'box', 'ctn')):
             final_uom = sales_uom
         else:
             final_uom = 'cases'
@@ -710,8 +716,7 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
         elif p_info and p_info.get('packs_per_case') and p_info.get('pcs_per_pack'):
             p_case = float(p_info.get('packs_per_case') or 0)
             p_pack = float(p_info.get('pcs_per_pack') or 0)
-            if p_case > 0 and p_pack > 0:
-                ratio = p_case * p_pack
+            ratio = (p_case * p_pack) if (p_case > 0 and p_pack > 0) else 1.0
         else:
             ratio = 1.0
 
@@ -734,8 +739,12 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
         else:
             ratio = 1.0
 
+    elif target_category == 'ea':
+        final_uom = 'ea.'
+        ratio = 1.0
+
     elif target_category == 'custom':
-        final_uom = (raw_uom or base_uom).strip()
+        final_uom = raw_uom_clean or base_uom
         if sales_uom and final_uom.lower() == sales_uom.lower():
             ratio = cat_sales_ratio
         elif purch_uom and final_uom.lower() == purch_uom.lower():
@@ -744,7 +753,13 @@ def resolve_order_line_uom(raw_uom, item_name, desc, p_info, unit_price, qty):
             ratio = 1.0
 
     else:  # 'pcs'
-        final_uom = base_uom if base_uom else 'pcs.'
+        if raw_uom_clean:
+            if raw_uom_clean.lower() in ('pcs', 'pcs.', 'pc', 'pc.', 'piece', 'pieces'):
+                final_uom = 'pcs.'
+            else:
+                final_uom = raw_uom_clean
+        else:
+            final_uom = base_uom if base_uom else 'pcs.'
         ratio = 1.0
 
     std_qty = display_qty * ratio
@@ -977,6 +992,7 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
             logger.warning(f"Could not load products for preview matcher: {e}")
 
         orders_grouped = {}
+        unmatched_map = {}
         for r in data_rows:
             if key == 'sales_order':
                 ord_num = get_val_preview(r, ['OrderNumber', 'Order Number', 'SO Number', 'Invoice Number', 'Order #'])
@@ -1018,6 +1034,21 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 p_desc = get_val_preview(r, ['ItemDescription', 'Description', 'Item Description'], '')
                 p_info = match_catalog_product(catalog_matcher, item_code, item_name, p_desc) if catalog_matcher else None
 
+                if not p_info and (item_name or item_code):
+                    unm_key = f"{item_code}:::{item_name}".strip()
+                    if unm_key not in unmatched_map:
+                        unmatched_map[unm_key] = {
+                            'key': unm_key,
+                            'item_code': item_code,
+                            'item_name': item_name,
+                            'desc': p_desc,
+                            'count': 0,
+                            'sample_orders': []
+                        }
+                    unmatched_map[unm_key]['count'] += 1
+                    if ord_num and ord_num not in unmatched_map[unm_key]['sample_orders'] and len(unmatched_map[unm_key]['sample_orders']) < 3:
+                        unmatched_map[unm_key]['sample_orders'].append(ord_num)
+
                 qty = clean_num_val(get_val_preview(r, ['ItemQuantity', 'Quantity', 'Qty']), 1.0)
                 price = clean_num_val(get_val_preview(r, ['ItemUnitPrice', 'Unit Price', 'Price']), 0.0)
                 disc_raw = str(get_val_preview(r, ['ItemDiscount', 'Discount'], '')).strip()
@@ -1057,6 +1088,21 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 p_desc = get_val_preview(r, ['ItemDescription', 'Description', 'Item Description'], '')
                 p_info = match_catalog_product(catalog_matcher, item_code, item_name, p_desc) if catalog_matcher else None
 
+                if not p_info and (item_name or item_code):
+                    unm_key = f"{item_code}:::{item_name}".strip()
+                    if unm_key not in unmatched_map:
+                        unmatched_map[unm_key] = {
+                            'key': unm_key,
+                            'item_code': item_code,
+                            'item_name': item_name,
+                            'desc': p_desc,
+                            'count': 0,
+                            'sample_orders': []
+                        }
+                    unmatched_map[unm_key]['count'] += 1
+                    if ord_num and ord_num not in unmatched_map[unm_key]['sample_orders'] and len(unmatched_map[unm_key]['sample_orders']) < 3:
+                        unmatched_map[unm_key]['sample_orders'].append(ord_num)
+
                 qty = clean_num_val(get_val_preview(r, ['ItemQuantity', 'Quantity', 'Qty']), 1.0)
                 cost = clean_num_val(get_val_preview(r, ['ItemUnitPrice', 'Unit Cost', 'Cost']), 0.0)
                 subtot_raw = clean_num_val(get_val_preview(r, ['ItemSubtotal', 'Subtotal']), None)
@@ -1090,11 +1136,24 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
 
         result['orders_summary'] = orders_summary
         result['total_orders'] = len(orders_summary)
+        result['unmatched_products'] = list(unmatched_map.values())
+        result['catalog_products'] = [
+            {
+                'id': p.get('id'),
+                'sku': p.get('sku') or '',
+                'name': p.get('name') or '',
+                'uom': p.get('uom') or 'pcs.',
+                'price': float(p.get('default_price') or 0.0)
+            }
+            for p in (prod_rows or [])
+            if isinstance(p, dict) and p.get('id') is not None
+        ]
+        result['catalog_products'].sort(key=lambda x: ((x.get('sku') or '') + ' ' + (x.get('name') or '')).lower())
 
     return result
 
 
-def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep', selected_orders=None, selected_rows=None, branch_id=None):
+def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep', selected_orders=None, selected_rows=None, branch_id=None, product_replacements=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
 
@@ -1519,6 +1578,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             FROM products;
         """)
         catalog_matcher = build_product_matcher(products_rows or [])
+        products_by_id = {p['id']: p for p in (products_rows or [])}
 
         loc_map = {l['name'].lower().strip(): l['id'] for l in query_all("SELECT id, name FROM locations;")}
 
@@ -1594,6 +1654,20 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     # Match product from existing product list (SKU + Name)
                     # Requirement: NO NEED to create new product!
                     p_info = match_catalog_product(catalog_matcher, i_code, i_name, i_desc)
+                    if not p_info and product_replacements:
+                        rep_key = f"{i_code}:::{i_name}".strip()
+                        rep_id = (product_replacements.get(rep_key) or
+                                  product_replacements.get(i_code) or
+                                  product_replacements.get(i_name))
+                        if rep_id:
+                            try:
+                                rep_id_int = int(rep_id)
+                                rep_prod = products_by_id.get(rep_id_int)
+                                if rep_prod:
+                                    p_info = rep_prod
+                            except (ValueError, TypeError):
+                                pass
+
                     prod_id = p_info['id'] if p_info else None
 
                     qty = line['qty']
@@ -1865,6 +1939,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             FROM products;
         """)
         catalog_matcher = build_product_matcher(products_rows or [])
+        products_by_id = {p['id']: p for p in (products_rows or [])}
 
         with get_db_cursor(commit=True) as cur:
             for po_num, order_data in orders_map.items():
@@ -1909,6 +1984,20 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     i_desc = (line.get('desc') or '').strip()
 
                     p_info = match_catalog_product(catalog_matcher, i_code, i_name, i_desc)
+                    if not p_info and product_replacements:
+                        rep_key = f"{i_code}:::{i_name}".strip()
+                        rep_id = (product_replacements.get(rep_key) or
+                                  product_replacements.get(i_code) or
+                                  product_replacements.get(i_name))
+                        if rep_id:
+                            try:
+                                rep_id_int = int(rep_id)
+                                rep_prod = products_by_id.get(rep_id_int)
+                                if rep_prod:
+                                    p_info = rep_prod
+                            except (ValueError, TypeError):
+                                pass
+
                     prod_id = p_info['id'] if p_info else None
                     qty = line['qty']
                     cost = line['cost'] if line['cost'] > 0 else (float(p_info['standard_cost']) if p_info and p_info.get('standard_cost') else 0.0)

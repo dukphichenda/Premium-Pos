@@ -184,6 +184,44 @@
                 <div id="step2ModeBanner" style="margin-bottom: 12px; padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
                 </div>
 
+                <!-- UNMATCHED PRODUCTS MAPPING CARD (Shown when items in bill cannot be found in product catalog) -->
+                <div id="unmatchedProductsCard" style="display: none; margin-bottom: 14px;">
+                    <div style="background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 6px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+                            <div style="display: flex; align-items: flex-start; gap: 8px;">
+                                <span style="font-size: 18px; line-height: 1;">⚠️</span>
+                                <div>
+                                    <div style="font-size: 13px; font-weight: 700; color: #92400E; display: flex; align-items: center; gap: 6px;">
+                                        <span>Unmatched Products Detected</span>
+                                        <span class="order-badge-type" style="background: #FEF3C7; color: #92400E; border: 1px solid #FDE68A;"><span id="unmatchedProductsCount">0</span> items</span>
+                                    </div>
+                                    <div style="font-size: 11.5px; color: #78350F; margin-top: 2px;">
+                                        The following items in this file were not found in your product list. Please select an existing product from your product list to replace each item, or keep as an unlinked item.
+                                    </div>
+                                </div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <button type="button" class="inflow-win-btn-sm" onclick="setAllReplacements('__CUSTOM__')" title="Keep all unmatched items as unlinked custom lines">Keep All Unlinked</button>
+                            </div>
+                        </div>
+
+                        <div class="inflow-preview-table-wrapper" style="max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 1px solid #FDE68A; border-radius: 4px;">
+                            <table class="inflow-preview-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                                <thead>
+                                    <tr style="background: #FEF3C7; color: #92400E;">
+                                        <th style="width: 130px; text-align: left; padding: 6px 10px;">Bill Item Code</th>
+                                        <th style="text-align: left; padding: 6px 10px;">Bill Item Name</th>
+                                        <th style="width: 75px; text-align: center; padding: 6px 10px;">Count</th>
+                                        <th style="width: 320px; text-align: left; padding: 6px 10px;">Replace with Product in Product List</th>
+                                        <th style="width: 100px; text-align: center; padding: 6px 10px;">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="unmatchedProductsTableBody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- ORDER SELECTION SECTION (Shown for SO & PO) -->
                 <div id="orderSelectionCard" style="display: none; margin-bottom: 14px;">
                     <div class="order-selection-card">
@@ -842,6 +880,14 @@ async function onNextStep() {
         const winBox = document.querySelector('.inflow-win-window');
         if (winBox) winBox.classList.add('wide-mode');
 
+        // Check if unmatched products were detected
+        if (res.unmatched_products && res.unmatched_products.length > 0) {
+            renderUnmatchedProducts(res.unmatched_products, res.catalog_products || []);
+        } else {
+            const unmatchedCard = document.getElementById('unmatchedProductsCard');
+            if (unmatchedCard) unmatchedCard.style.display = 'none';
+        }
+
         // Check if order selection is available (SO and PO)
         if (res.orders_summary && res.orders_summary.length > 0) {
             currentOrdersSummary = res.orders_summary;
@@ -1052,9 +1098,102 @@ function renderPreviewTable(headers, rows) {
     tbody.innerHTML = bHtml;
 }
 
+let currentUnmatchedProducts = [];
+let currentCatalogProducts = [];
+
+function renderUnmatchedProducts(unmatchedItems, catalogProducts) {
+    currentUnmatchedProducts = unmatchedItems || [];
+    currentCatalogProducts = catalogProducts || [];
+
+    const card = document.getElementById('unmatchedProductsCard');
+    const tbody = document.getElementById('unmatchedProductsTableBody');
+    const countEl = document.getElementById('unmatchedProductsCount');
+
+    if (!currentUnmatchedProducts || currentUnmatchedProducts.length === 0) {
+        if (card) card.style.display = 'none';
+        return;
+    }
+
+    if (card) card.style.display = 'block';
+    if (countEl) countEl.textContent = currentUnmatchedProducts.length;
+
+    let html = '';
+    currentUnmatchedProducts.forEach((item, idx) => {
+        const codeDisplay = escapeHtml(item.item_code || '-');
+        const nameDisplay = escapeHtml(item.item_name || item.desc || 'Unknown Item');
+        const sampleOrders = (item.sample_orders || []).map(o => `<span style="background: #FEF3C7; color: #92400E; padding: 1px 4px; border-radius: 3px; font-size: 10px; margin-right: 2px;">#${escapeHtml(o)}</span>`).join('');
+
+        html += `
+            <tr class="unmatched-row" id="unmatchedRow_${idx}" style="border-bottom: 1px solid #FDE68A; background: #FFFDF5;">
+                <td style="padding: 7px 10px; font-weight: 600; color: #1E293B; vertical-align: middle;">
+                    <code>${codeDisplay}</code>
+                </td>
+                <td style="padding: 7px 10px; color: #334155; vertical-align: middle;">
+                    <div style="font-weight: 600;">${nameDisplay}</div>
+                    ${item.desc && item.desc !== item.item_name ? `<div style="font-size: 11px; color: #64748B;">${escapeHtml(item.desc)}</div>` : ''}
+                </td>
+                <td style="padding: 7px 10px; text-align: center; vertical-align: middle;">
+                    <span style="font-weight: 700; color: #D97706;">${item.count}</span>
+                    <div style="margin-top: 2px;">${sampleOrders}</div>
+                </td>
+                <td style="padding: 7px 10px; vertical-align: middle;">
+                    <select class="inflow-win-dropdown unmatched-replace-select" data-key="${escapeHtml(item.key)}" data-row-idx="${idx}" onchange="onReplacementSelectChange(this)" style="width: 100%; font-size: 11.5px; padding: 4px 6px; border-color: #FBBF24;">
+                        <option value="">-- Choose Replacement Product --</option>
+                        <option value="__CUSTOM__">⚪ Keep as Custom Line Item (Unlinked)</option>
+                        <optgroup label="Product List (${currentCatalogProducts.length} products)">
+                            ${currentCatalogProducts.map(p => `
+                                <option value="${p.id}">${escapeHtml(p.sku ? p.sku + ' - ' : '')}${escapeHtml(p.name)} (${escapeHtml(p.uom || 'pcs.')})</option>
+                            `).join('')}
+                        </optgroup>
+                    </select>
+                </td>
+                <td style="padding: 7px 10px; text-align: center; vertical-align: middle;" id="unmatchedStatus_${idx}">
+                    <span style="font-size: 11px; font-weight: 600; color: #D97706; background: #FEF3C7; padding: 2px 6px; border-radius: 3px;">⚠️ Unmapped</span>
+                </td>
+            </tr>
+        `;
+    });
+
+    tbody.innerHTML = html;
+}
+
+function onReplacementSelectChange(selectEl) {
+    const rowIdx = selectEl.getAttribute('data-row-idx');
+    const row = document.getElementById(`unmatchedRow_${rowIdx}`);
+    const statusCell = document.getElementById(`unmatchedStatus_${rowIdx}`);
+    const val = selectEl.value;
+
+    if (!row || !statusCell) return;
+
+    if (val === '__CUSTOM__') {
+        row.style.background = '#F8FAFC';
+        selectEl.style.borderColor = '#94A3B8';
+        statusCell.innerHTML = `<span style="font-size: 11px; font-weight: 600; color: #475569; background: #E2E8F0; padding: 2px 6px; border-radius: 3px;">⚪ Custom</span>`;
+    } else if (val) {
+        row.style.background = '#F0FDF4';
+        selectEl.style.borderColor = '#16A34A';
+        statusCell.innerHTML = `<span style="font-size: 11px; font-weight: 600; color: #15803D; background: #DCFCE7; padding: 2px 6px; border-radius: 3px;">✓ Replaced</span>`;
+    } else {
+        row.style.background = '#FFFDF5';
+        selectEl.style.borderColor = '#FBBF24';
+        statusCell.innerHTML = `<span style="font-size: 11px; font-weight: 600; color: #D97706; background: #FEF3C7; padding: 2px 6px; border-radius: 3px;">⚠️ Unmapped</span>`;
+    }
+}
+
+function setAllReplacements(action) {
+    const selects = document.querySelectorAll('.unmatched-replace-select');
+    selects.forEach(sel => {
+        sel.value = action;
+        onReplacementSelectChange(sel);
+    });
+}
+
 function onBackStep() {
     const winBox = document.querySelector('.inflow-win-window');
     if (winBox) winBox.classList.remove('wide-mode');
+
+    const unmatchedCard = document.getElementById('unmatchedProductsCard');
+    if (unmatchedCard) unmatchedCard.style.display = 'none';
 
     document.getElementById('step1Container').style.display = 'block';
     document.getElementById('step2Container').style.display = 'none';
@@ -1095,6 +1234,33 @@ async function onExecuteImport() {
         }
         const checkedOrders = Array.from(checkedChks).map(el => el.getAttribute('data-order'));
         formData.append('selected_orders', JSON.stringify(checkedOrders));
+    }
+
+    // Check unmatched products resolution
+    const unmappedSelects = Array.from(document.querySelectorAll('.unmatched-replace-select')).filter(s => !s.value);
+    if (unmappedSelects.length > 0) {
+        const proceedWithUnlinked = confirm(
+            `Notice: ${unmappedSelects.length} product(s) in this file were not found in your product list and do not have a replacement selected.\n\n` +
+            `• Click OK to keep them as custom unlinked items on the bill.\n` +
+            `• Click Cancel to go back and choose replacement products from the product list.`
+        );
+        if (!proceedWithUnlinked) {
+            unmappedSelects[0].scrollIntoView({ behavior: 'smooth', block: 'center' });
+            unmappedSelects[0].focus();
+            return;
+        }
+    }
+
+    const replacements = {};
+    document.querySelectorAll('.unmatched-replace-select').forEach(sel => {
+        const key = sel.getAttribute('data-key');
+        const val = sel.value;
+        if (val && val !== '__CUSTOM__') {
+            replacements[key] = parseInt(val, 10);
+        }
+    });
+    if (Object.keys(replacements).length > 0) {
+        formData.append('product_replacements', JSON.stringify(replacements));
     }
 
     const btnExec = document.getElementById('btnExecuteImport');
