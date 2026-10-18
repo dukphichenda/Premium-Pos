@@ -563,6 +563,9 @@
     flex: 1;
     overflow-y: auto;
     background: #FFFFFF;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    overscroll-behavior-y: contain;
 }
 
 .so-sidebar-card {
@@ -577,6 +580,7 @@
     background: #FFFFFF;
     position: relative;
     user-select: none;
+    touch-action: pan-y;
 }
 .so-sidebar-card:nth-child(odd),
 .so-sidebar-card.so-card-white {
@@ -1623,7 +1627,6 @@
 
             <a href="javascript:void(0)" 
                onclick="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)" 
-               ontouchend="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)"
                class="so-sidebar-card {% if not is_new and s_ord.id == order.id %}active{% endif %}"
                data-order-id="{{ s_ord.id }}"
                data-order-num="{{ s_ord.order_number }}"
@@ -3534,7 +3537,48 @@ window.addEventListener('popstate', function(e) {
     }
 })();
 
+// Touch-scroll detection: prevent scrolling in sidebar from triggering order selection
+let _soTouchStartX = 0;
+let _soTouchStartY = 0;
+let _soIsTouchScrolling = false;
+
+document.addEventListener('touchstart', function(e) {
+    if (e.target.closest('#soSidebarListBody') || e.target.closest('.so-master-sidebar')) {
+        if (e.touches && e.touches[0]) {
+            _soTouchStartX = e.touches[0].clientX;
+            _soTouchStartY = e.touches[0].clientY;
+        }
+        _soIsTouchScrolling = false;
+    }
+}, { passive: true });
+
+document.addEventListener('touchmove', function(e) {
+    if (!_soIsTouchScrolling && e.touches && e.touches[0]) {
+        const dx = Math.abs(e.touches[0].clientX - _soTouchStartX);
+        const dy = Math.abs(e.touches[0].clientY - _soTouchStartY);
+        if (dx > 7 || dy > 7) {
+            _soIsTouchScrolling = true;
+        }
+    }
+}, { passive: true });
+
+document.addEventListener('touchend', function(e) {
+    if (_soIsTouchScrolling) {
+        setTimeout(function() {
+            _soIsTouchScrolling = false;
+        }, 300);
+    }
+}, { passive: true });
+
+document.addEventListener('mousedown', function() {
+    _soIsTouchScrolling = false;
+}, { passive: true });
+
 function handleSelectOrder(event, targetUrl, clickedEl) {
+    if (_soIsTouchScrolling) {
+        // User was scrolling, ignore click/tap
+        return;
+    }
     if (event) {
         try { if (typeof event.preventDefault === 'function') event.preventDefault(); } catch(e) {}
         try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
@@ -3544,7 +3588,7 @@ function handleSelectOrder(event, targetUrl, clickedEl) {
         clickedEl = targetUrl;
         targetUrl = event;
     }
-    // Debounce rapid dual events (e.g. touchend followed immediately by synthesized click)
+    // Debounce rapid dual events
     const now = Date.now();
     if (window._soLastOrderSelectTime && (now - window._soLastOrderSelectTime < 350)) {
         return;
@@ -6947,6 +6991,9 @@ function handleSoLiveSearch(val) {
 }
 
 function startNewOrderForCustomer(customerId, customerName) {
+    if (typeof _soIsTouchScrolling !== 'undefined' && _soIsTouchScrolling) {
+        return;
+    }
     closeSoMobileDrawer();
     const branchScope = '{{ branch_scope or "" }}';
     const targetUrl = '/sales/new?customer_id=' + encodeURIComponent(customerId) + (branchScope ? '&branch=' + encodeURIComponent(branchScope) : '');
