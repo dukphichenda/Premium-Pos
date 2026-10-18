@@ -198,6 +198,18 @@ def create_app():
         if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language'):
             return None
 
+        # Allow public direct print for sales orders with valid share token
+        if request.path.startswith('/sales/') and request.path.endswith('/print'):
+            import re
+            m = re.match(r'^/sales/(\d+)/print$', request.path)
+            if m:
+                order_id = int(m.group(1))
+                tok = request.args.get('token') or request.args.get('share_token')
+                if tok:
+                    from routes.sales_orders import verify_order_share_token
+                    if verify_order_share_token(order_id, tok):
+                        return None
+
         # Check session or restore from persistent remember cookie
         if 'user_id' not in session or not session.get('user_id'):
             from routes.auth import verify_remember_token

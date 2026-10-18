@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ order.order_number }} - {{ inv_settings.invoice_title_kh or 'វិក្កយបត្រ' }} ({{ inv_settings.invoice_title_en or 'INVOICE' }})</title>
+    <meta property="og:title" content="Invoice #{{ order.order_number }} - {{ order.customer_name or 'Customer' }}">
+    <meta property="og:description" content="Total: ${{ '%.2f'|format(order.total_amount or 0) }} - Direct Print / បោះពុម្ពផ្ទាល់">
+    <meta property="og:type" content="website">
     
     <!-- Google Fonts: Popular Cambodian Typography Suite -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -415,6 +418,36 @@
             background: #E2E8F0;
             color: #0F172A;
             border-color: #94A3B8;
+        }
+
+        @media (max-width: 768px) {
+            .invoice-studio-layout {
+                flex-direction: column !important;
+            }
+            .invoice-studio-sidebar {
+                width: 100% !important;
+                min-width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                position: sticky !important;
+                top: 0 !important;
+                border-right: none !important;
+                border-bottom: 1px solid #CBD5E1 !important;
+                padding: 10px 14px !important;
+                gap: 8px !important;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+                z-index: 1000 !important;
+            }
+            .invoice-studio-sidebar .sidebar-section {
+                gap: 6px !important;
+            }
+            .invoice-studio-sidebar .sidebar-action-btn {
+                padding: 8px 12px !important;
+                font-size: 12px !important;
+            }
+            .invoice-studio-main {
+                padding: 12px 6px 40px 6px !important;
+            }
         }
 
         .sidebar-badge {
@@ -1807,10 +1840,17 @@
         <aside class="invoice-studio-sidebar no-print" id="invoiceStudioSidebar">
             <!-- Sidebar Header & Back Navigation -->
             <div class="sidebar-header">
+                {% if not is_shared %}
                 <a href="javascript:window.history.back()" class="sidebar-back-btn" title="Back to previous page">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                     <span>Back</span>
                 </a>
+                {% else %}
+                <div style="display: flex; align-items: center; gap: 6px; font-weight: 700; color: #0284C7; font-size: 13px;">
+                    <span>📄</span>
+                    <span>{{ order.order_number }}</span>
+                </div>
+                {% endif %}
                 <div class="sidebar-badge">A5 Invoice</div>
             </div>
 
@@ -1875,8 +1915,9 @@
                 </div>
             </div>
 
+            {% if not is_shared %}
             <!-- Section: Currency & KHR Live Modifier -->
-            <div class="sidebar-section">
+            <div class="sidebar-section sidebar-settings-section">
                 <div class="sidebar-section-title">
                     <span>Currency & Exchange Rate</span>
                 </div>
@@ -1894,7 +1935,7 @@
             </div>
 
             <!-- Section: Signatures -->
-            <div class="sidebar-section">
+            <div class="sidebar-section sidebar-settings-section">
                 <div class="sidebar-section-title">
                     <span>Signature / ហត្ថលេខា</span>
                 </div>
@@ -1910,11 +1951,12 @@
             </div>
 
             <!-- Section: Invoice Settings Link -->
-            <div class="sidebar-section" style="margin-top: auto; padding-top: 10px; border-top: 1px solid #E2E8F0;">
+            <div class="sidebar-section sidebar-settings-section" style="margin-top: auto; padding-top: 10px; border-top: 1px solid #E2E8F0;">
                 <a href="{{ url_for('settings.general_settings', tab='tabInvoice') }}" class="sidebar-settings-link" title="Customize invoice fonts, color, logo, and address in Settings">
                     <span>⚙️ Invoice Settings</span>
                 </a>
             </div>
+            {% endif %}
         </aside>
 
         <!-- Main Invoice Preview Area -->
@@ -2451,14 +2493,20 @@
                 <div class="sig-box sig-box-seller" id="sigBoxSeller">
                     <div class="sig-title-kh">ហត្ថលេខា និងឈ្មោះអ្នកលក់</div>
                     <div class="sig-title-en">Seller's Authorized Signature</div>
-                    <div class="sig-space seller-sig-space" id="sellerSigSpace" onclick="openSignatureModal()" title="Click to upload or change seller signature (ចុចដើម្បីដាក់ ឬប្តូរហត្ថលេខាអ្នកលក់)">
+                    <div class="sig-space seller-sig-space" id="sellerSigSpace" {% if not is_shared %}onclick="openSignatureModal()" title="Click to upload or change seller signature (ចុចដើម្បីដាក់ ឬប្តូរហត្ថលេខាអ្នកលក់)" style="cursor: pointer;"{% else %}style="cursor: default;"{% endif %}>
                         <img id="sellerSigImg" class="seller-sig-img" src="{{ inv_settings.seller_signature_url or '' }}" alt="Seller Signature" style="{% if not inv_settings.seller_signature_url %}display: none;{% endif %}">
+                        {% if not is_shared %}
                         <span id="sellerSigPlaceholder" class="no-print seller-sig-hint" style="{% if inv_settings.seller_signature_url %}display: none;{% endif %}">
                             ✍️ + Upload Signature (ដាក់ហត្ថលេខា)
                         </span>
+                        {% endif %}
                     </div>
                     <div class="sig-meta">
+                        {% if not is_shared %}
                         <span class="seller-name-clickable" onclick="openSignatureModal()" title="Click to edit seller signature or name">ឈ្មោះ / Name: <b id="sellerNameDisplay">{{ inv_settings.seller_name or order.completed_by or order.salesperson or '....................................................' }}</b></span>
+                        {% else %}
+                        <span>ឈ្មោះ / Name: <b id="sellerNameDisplay">{{ inv_settings.seller_name or order.completed_by or order.salesperson or '....................................................' }}</b></span>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -2473,6 +2521,7 @@
     </main>
 </div> <!-- end .invoice-studio-layout -->
 
+    {% if not is_shared %}
     <!-- Seller Signature & Name Customization Modal -->
     <div class="sig-modal-backdrop no-print" id="signatureModal" onclick="if(event.target === this) closeSignatureModal()">
         <div class="sig-modal-card">
@@ -2541,6 +2590,7 @@
             </form>
         </div>
     </div>
+    {% endif %}
 
     <!-- Live Dynamic Calculation Scripts -->
     <script>
@@ -2630,6 +2680,7 @@
             } catch(e) {}
         })();
 
+        {% if not is_shared %}
         function openSignatureModal() {
             const modal = document.getElementById('signatureModal');
             if (modal) modal.classList.add('active');
@@ -2734,6 +2785,7 @@
                 }
             }
         }
+        {% endif %}
 
         // Auto-print support if requested via ?autoprint=1
         const urlParams = new URLSearchParams(window.location.search);
@@ -2741,6 +2793,9 @@
             window.addEventListener('load', () => {
                 setTimeout(() => window.print(), 400);
             });
+        }
+        if (urlParams.get('token') || urlParams.get('share_token') || urlParams.get('shared') === '1' || urlParams.get('nosettings') === '1') {
+            document.querySelectorAll('.sidebar-settings-section').forEach(el => el.style.display = 'none');
         }
 
         /* ==========================================================================
@@ -3217,8 +3272,14 @@
                         body: formData
                     });
                     const data = await uploadRes.json();
-                    if (data.success && data.telegram_url) {
+                    if (data.success) {
                         telegramUrl = data.telegram_url;
+                        if (data.caption && navigator.clipboard && navigator.clipboard.writeText) {
+                            try {
+                                await navigator.clipboard.writeText(data.caption);
+                                clipboardCopied = true;
+                            } catch(clipTxtErr) {}
+                        }
                     }
                 } catch (uploadErr) {
                     console.error('Server upload failed:', uploadErr);
@@ -3233,9 +3294,9 @@
                 }
 
                 if (clipboardCopied) {
-                    showToast('✅ 4x Image copied to clipboard! Paste (Ctrl+V) directly into Telegram.');
+                    showToast('✅ Direct print link copied to clipboard! Paste (Ctrl+V) directly into Telegram to print without saving image.');
                 } else {
-                    showToast('✅ Telegram opened! 4x image prepared.');
+                    showToast('✅ Telegram opened! Direct print link prepared.');
                 }
 
             } catch (err) {

@@ -1,13 +1,64 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
 from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number, resync_all_sequences
 from datetime import datetime, date, timedelta
-import re, os, time, json, mimetypes, logging, uuid
+import re, os, time, json, mimetypes, logging, uuid, hmac, hashlib
 from werkzeug.utils import secure_filename
 from routes.auth import user_can_edit_prices, user_can_view_costs
 
 logger = logging.getLogger(__name__)
 
 sales_orders_bp = Blueprint('sales_orders', __name__)
+
+def generate_order_share_token(order_id):
+    from config import Config
+    secret = (getattr(Config, 'SECRET_KEY', None) or 'inflow_premium_super_secret_key_2026_boost').encode('utf-8')
+    return hmac.new(secret, f"inflow_so_print_{order_id}".encode('utf-8'), hashlib.sha256).hexdigest()[:16]
+
+def verify_order_share_token(order_id, token):
+    if not token or not order_id:
+        return False
+    try:
+        expected = generate_order_share_token(order_id)
+        return hmac.compare_digest(str(token).strip(), expected)
+    except Exception:
+        return False
+
+def build_order_telegram_share(order, base_host, image_url=None):
+    import urllib.parse
+    order_id = order['id']
+    token = generate_order_share_token(order_id)
+    preview_url = f"{base_host}/sales/{order_id}/print?type=invoice&token={token}"
+    
+    order_num = order.get('order_number') or f"SO-{order_id}"
+    cust_name = order.get('customer_name') or 'Customer'
+    total = float(order.get('total_amount') or 0.0)
+    
+    caption_lines = [
+        f"📄 Invoice: {order_num}",
+        f"👤 Customer: {cust_name}",
+        f"💵 Total: ${total:,.2f}",
+        "",
+        f"🔗 Invoice Print Preview / មើលនិងបោះពុម្ពវិក្កយបត្រ:",
+        preview_url
+    ]
+    if image_url:
+        caption_lines.extend(["", f"🖼️ Invoice Image / រូបភាព:", image_url])
+        
+    caption = "\n".join(caption_lines)
+    telegram_url = f"https://t.me/share/url?url={urllib.parse.quote(preview_url)}&text={urllib.parse.quote(caption)}"
+    
+    return {
+        'order_id': order_id,
+        'order_number': order_num,
+        'customer_name': cust_name,
+        'total_amount': total,
+        'token': token,
+        'preview_url': preview_url,
+        'direct_print_url': preview_url,
+        'image_url': image_url,
+        'caption': caption,
+        'telegram_url': telegram_url
+    }
 
 def _ensure_so_tables_exist():
     try:
@@ -3269,8 +3320,14 @@ def print_invoice(id):
 
     if not order:
         return "Order not found", 404
-    if not _check_order_branch_access(order):
+
+    token = request.args.get('token') or request.args.get('share_token')
+    is_valid_token = verify_order_share_token(id, token)
+
+    if not is_valid_token and not _check_order_branch_access(order):
         return "Access denied: Order belongs to another branch.", 403
+
+    is_shared = bool(is_valid_token or request.args.get('shared') == '1' or request.args.get('nosettings') == '1' or not session.get('user_id'))
 
     lines = query_all("""
         SELECT 
@@ -3443,7 +3500,8 @@ def print_invoice(id):
                            khr_rate=rate,
                            total_khr=total_khr,
                            paid_khr=paid_khr,
-                           balance_khr=balance_khr)
+                           balance_khr=balance_khr,
+                           is_shared=is_shared)
 
 
 @sales_orders_bp.route('/api/invoice/save-signature-settings', methods=['POST'])
@@ -3628,22 +3686,55 @@ def upload_sales_share_image(id):
         base_host = request.host_url.rstrip('/')
         image_url = f"{base_host}/static/uploads/shared_invoices/{filename}?v={int(time.time())}"
 
-        cust_name = order.get('customer_name') or 'Customer'
-        total = float(order.get('total_amount') or 0.0)
-        caption = f"📄 Invoice: {order.get('order_number')}\n👤 Customer: {cust_name}\n💵 Total: ${total:,.2f}"
-
-        import urllib.parse
-        telegram_url = f"https://t.me/share/url?url={urllib.parse.quote(image_url)}&text={urllib.parse.quote(caption)}"
+        share_data = build_order_telegram_share(order, base_host, image_url)
 
         return jsonify({
             'success': True,
             'filename': filename,
             'image_url': image_url,
-            'telegram_url': telegram_url,
-            'caption': caption
+            'token': share_data['token'],
+            'preview_url': share_data['preview_url'],
+            'direct_print_url': share_data['direct_print_url'],
+            'telegram_url': share_data['telegram_url'],
+            'caption': share_data['caption']
         })
     except Exception as e:
         logger.error(f"Error in upload_sales_share_image: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@sales_orders_bp.route('/sales/<int:id>/telegram-share-data', methods=['GET'])
+def get_order_telegram_share_data(id):
+    try:
+        order = query_one("""
+            SELECT so.id, so.order_number, so.total_amount, c.name as customer_name, so.branch_id
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE so.id = %s
+        """, (id,))
+        if not order:
+            return jsonify({'success': False, 'message': 'Order not found'}), 404
+
+        token = request.args.get('token') or request.args.get('share_token')
+        is_valid_token = verify_order_share_token(id, token)
+        if not is_valid_token and not _check_order_branch_access(order):
+            return jsonify({'success': False, 'message': 'Access denied or unauthorized branch'}), 403
+
+        base_host = request.host_url.rstrip('/')
+        clean_order_num = re.sub(r'[^a-zA-Z0-9_\-]', '_', str(order.get('order_number') or f'SO-{id}'))
+        upload_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static', 'uploads', 'shared_invoices')
+        image_url = None
+        for ext in ('jpg', 'jpeg', 'png'):
+            fn = f"Invoice_{clean_order_num}.{ext}"
+            if os.path.exists(os.path.join(upload_dir, fn)):
+                image_url = f"{base_host}/static/uploads/shared_invoices/{fn}"
+                break
+
+        share_data = build_order_telegram_share(order, base_host, image_url)
+        share_data['success'] = True
+        return jsonify(share_data)
+    except Exception as e:
+        logger.error(f"Error in get_order_telegram_share_data: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
 
 

@@ -8,6 +8,19 @@
 <div class="inflow-top-accent-bar sales"></div>
 
 <style>
+@keyframes aiPulse {
+    0% { box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.6); }
+    50% { box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.5); }
+    100% { box-shadow: none; }
+}
+.ai-field-pulsing {
+    animation: aiPulse 1.8s ease-in-out;
+    background-color: #F0FDF4 !important;
+    border-color: #10B981 !important;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+.inflow-spin { display: inline-block; animation: spin 1s linear infinite; }
+
 /* ========================================================================= */
 /* Modern Sales Order Master Sidebar (Matching UI Screenshot)               */
 /* ========================================================================= */
@@ -1285,10 +1298,29 @@
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             <span>Export JPG</span>
         </button>
-        <button type="button" class="inflow-tb-btn" id="soDirectTelegramBtn" onclick="directShareOrderTelegram()" title="Share Sales Order Image to Telegram" style="border-color: #BAE6FD; background: #F0F9FF; color: #0284C7; font-weight: 600;">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-            <span>Share Telegram</span>
-        </button>
+        <div class="inflow-split-btn-wrapper" id="telegramShareSplitWrapper">
+            <button type="button" class="inflow-split-btn-action" id="soDirectTelegramBtn" onclick="directShareOrderTelegram('direct')" title="Share to Telegram with Direct Print Link (Print directly without saving picture)" style="border-color: #BAE6FD; background: #F0F9FF; color: #0284C7; font-weight: 600;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                <span>Share Telegram</span>
+            </button>
+            <button type="button" class="inflow-split-btn-arrow" onclick="toggleTelegramShareDropdown(event)" title="Telegram share options" style="border-color: #BAE6FD; background: #F0F9FF; color: #0284C7;">
+                <span>▾</span>
+            </button>
+            <div id="telegramShareDropdownMenu" class="inflow-win-menu" style="display: none; min-width: 250px;">
+                <div class="win-menu-item" onclick="directShareOrderTelegram('direct')">
+                    <span style="font-size: 14px; margin-right: 6px;">🖨️</span>
+                    <span class="win-menu-text">Direct Print Link (No Image Save)</span>
+                </div>
+                <div class="win-menu-item" onclick="directShareOrderTelegram('image')">
+                    <span style="font-size: 14px; margin-right: 6px;">🖼️</span>
+                    <span class="win-menu-text">Share 4x Image & Link</span>
+                </div>
+                <div class="win-menu-item" onclick="directShareOrderTelegram('copy')">
+                    <span style="font-size: 14px; margin-right: 6px;">📋</span>
+                    <span class="win-menu-text">Copy Direct Print Link</span>
+                </div>
+            </div>
+        </div>
     </div>
     <div>
         <a href="javascript:void(0)" class="inflow-tb-btn danger" onclick="handleCloseOrder(event)" title="Close document">
@@ -1846,6 +1878,53 @@
             <button type="button" onclick="closeQuickAddCustomerModal()" style="color: #DBEAFE; font-size: 16px; background: none; border: none; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
         </div>
         <div class="inflow-modal-body" style="padding: 16px 18px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px;">
+            <!-- AI Customer Auto-Fill / Image Upload Card -->
+            <div id="quickAddAiUploadCard" style="background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%); border: 1.5px dashed #3B82F6; border-radius: 6px; padding: 10px 12px; position: relative; transition: all 0.2s ease;">
+                <input type="file" id="quickAddCustImageInput" accept="image/*" style="display: none;" onchange="handleQuickAddCustomerImageUpload(this)">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+                    <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+                        <div style="width: 34px; height: 34px; border-radius: 6px; background: #2563EB; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; box-shadow: 0 2px 4px rgba(37,99,235,0.25);">
+                            📷
+                        </div>
+                        <div style="min-width: 0;">
+                            <div style="font-size: 12px; font-weight: 700; color: #1E3A8A; display: flex; align-items: center; gap: 5px;">
+                                <span>AI Scan & Auto-Fill</span>
+                                <span id="quickAddAiKeyBadge" style="font-size: 9.5px; background: #DBEAFE; color: #1E40AF; padding: 1px 5px; border-radius: 9999px; font-weight: 800;">AI READY</span>
+                            </div>
+                            <div style="font-size: 10.5px; color: #64748B; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                Upload business card, chat screenshot, or press <kbd style="background: #E2E8F0; padding: 1px 4px; border-radius: 3px; font-size: 9.5px; font-family: monospace;">Ctrl+V</kbd>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                        <button type="button" id="btnQuickAddAiUpload" onclick="document.getElementById('quickAddCustImageInput').click()" style="background: #2563EB; color: #FFFFFF; border: none; border-radius: 5px; padding: 6px 11px; font-size: 11.5px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; box-shadow: 0 1px 3px rgba(37,99,235,0.3); transition: all 0.15s ease;">
+                            <span>✨ Upload Image</span>
+                        </button>
+                        <button type="button" onclick="openAiKeyConfigModal()" title="Configure AI / Google Gemini Key" style="background: #FFFFFF; color: #475569; border: 1px solid #CBD5E1; border-radius: 5px; padding: 5px 7px; font-size: 11px; cursor: pointer; display: inline-flex; align-items: center; height: 28px;">
+                            ⚙️
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI Scanning / Status Indicator -->
+                <div id="quickAddAiStatusBox" style="display: none; margin-top: 8px; padding: 6px 10px; background: #FFFFFF; border-radius: 4px; border: 1px solid #BAE6FD; font-size: 11px; align-items: center; justify-content: space-between;">
+                    <div style="display: flex; align-items: center; gap: 6px; color: #0284C7; font-weight: 600;">
+                        <span id="quickAddAiSpinner" class="inflow-spin">⏳</span>
+                        <span id="quickAddAiStatusText">AI is reading customer details...</span>
+                    </div>
+                    <button type="button" id="quickAddAiClearBtn" onclick="clearQuickAddAiPreview()" style="display: none; background: none; border: none; color: #DC2626; font-size: 11px; cursor: pointer; font-weight: 700;">✕ Clear</button>
+                </div>
+
+                <!-- Thumbnail Preview if image chosen -->
+                <div id="quickAddAiImagePreview" style="display: none; margin-top: 8px; align-items: center; gap: 8px;">
+                    <img id="quickAddAiPreviewImg" src="" style="width: 44px; height: 44px; object-fit: cover; border-radius: 4px; border: 1px solid #CBD5E1;">
+                    <div style="font-size: 11px; color: #475569; flex: 1; min-width: 0;">
+                        <div id="quickAddAiFilename" style="font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+                        <div id="quickAddAiExtractSummary" style="font-size: 10.5px; color: #16A34A; font-weight: 700;">✅ Info Extracted into form below</div>
+                    </div>
+                </div>
+            </div>
+
             <div>
                 <label style="display: block; font-size: 11.5px; font-weight: 700; color: #1E293B; margin-bottom: 3px;">
                     Customer Name / ឈ្មោះអតិថិជន <span style="color: #DC2626;">*</span>
@@ -1889,6 +1968,36 @@
             <button type="button" class="inflow-dlg-btn btn-save" onclick="submitQuickAddCustomerAjax()" style="background: #2563EB; color: #FFFFFF; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
                 <span>Save & Select Customer</span>
             </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Configure Gemini AI Key -->
+<div id="modalAiKeyConfig" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100000; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div class="inflow-modal-box" style="max-width: 440px; width: 92%; border-radius: 8px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: linear-gradient(135deg, #1E40AF, #3B82F6); color: #FFFFFF; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 6px;">
+                <span>✨</span>
+                <span>Google Gemini AI Vision Settings</span>
+            </div>
+            <button type="button" onclick="closeAiKeyConfigModal()" style="color: #DBEAFE; font-size: 16px; background: none; border: none; cursor: pointer;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 16px 18px; font-size: 12px; color: #334155; display: flex; flex-direction: column; gap: 10px;">
+            <div style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; padding: 8px 12px; font-size: 11.5px; color: #0369A1; line-height: 1.4;">
+                <span>💡</span> <b>Google Gemini 2.0 / 1.5 Flash</b> provides high-accuracy Khmer (ភាសាខ្មែរ) & English handwriting, business card, and chat screenshot understanding. Free tier available from Google AI Studio.
+            </div>
+            <div>
+                <label style="display: block; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Gemini API Key (Google AI Studio):</label>
+                <input type="password" id="inputAiKeyConfig" class="inflow-field-input" placeholder="AIzaSy..." style="width: 100%; height: 30px; font-size: 12px; padding: 4px 8px; border: 1px solid #94A3B8; border-radius: 4px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px; font-size: 11px;">
+                    <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #2563EB; text-decoration: underline; font-weight: 600;">Get a free Gemini API Key ↗</a>
+                    <span id="aiKeyCurrentStatus" style="color: #64748B;">Checking status...</span>
+                </div>
+            </div>
+        </div>
+        <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
+            <button type="button" class="inflow-dlg-btn" onclick="closeAiKeyConfigModal()">Cancel</button>
+            <button type="button" class="inflow-dlg-btn btn-save" onclick="saveAiKeyConfig()" style="background: #2563EB; color: #FFFFFF; font-weight: 700;">Save Key</button>
         </div>
     </div>
 </div>
@@ -4685,6 +4794,32 @@ function closeCopyDropdown() {
     if (wrapper) wrapper.classList.remove('open');
 }
 
+function toggleTelegramShareDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const menu = document.getElementById('telegramShareDropdownMenu');
+    const wrapper = document.getElementById('telegramShareSplitWrapper');
+    if (!menu) return;
+    const isShown = menu.style.display === 'block';
+    if (isShown) {
+        closeTelegramShareDropdown();
+    } else {
+        closePreviewDropdown();
+        closeCopyDropdown();
+        menu.style.display = 'block';
+        if (wrapper) wrapper.classList.add('open');
+    }
+}
+
+function closeTelegramShareDropdown() {
+    const menu = document.getElementById('telegramShareDropdownMenu');
+    const wrapper = document.getElementById('telegramShareSplitWrapper');
+    if (menu) menu.style.display = 'none';
+    if (wrapper) wrapper.classList.remove('open');
+}
+
 document.addEventListener('click', function(e) {
     const previewWrapper = document.getElementById('previewSplitWrapper');
     if (previewWrapper && !previewWrapper.contains(e.target)) {
@@ -4693,6 +4828,10 @@ document.addEventListener('click', function(e) {
     const copyWrapper = document.getElementById('copySplitWrapper');
     if (copyWrapper && !copyWrapper.contains(e.target)) {
         closeCopyDropdown();
+    }
+    const teleWrapper = document.getElementById('telegramShareSplitWrapper');
+    if (teleWrapper && !teleWrapper.contains(e.target)) {
+        closeTelegramShareDropdown();
     }
 });
 
@@ -5453,7 +5592,318 @@ function persistDeliveryLogisticsIfCompleted() {
     .catch(err => console.error('Error auto-syncing delivery:', err));
 }
 
+/* ==========================================================================
+   AI Customer Auto-Fill from Image / Screenshot
+   ========================================================================== */
+let quickAddAiProcessing = false;
+
+function openAiKeyConfigModal() {
+    const modal = document.getElementById('modalAiKeyConfig');
+    if (modal) {
+        modal.style.display = 'flex';
+        checkAiKeyStatus();
+    }
+}
+
+function closeAiKeyConfigModal() {
+    const modal = document.getElementById('modalAiKeyConfig');
+    if (modal) modal.style.display = 'none';
+}
+
+function checkAiKeyStatus() {
+    const statusSpan = document.getElementById('aiKeyCurrentStatus');
+    const badge = document.getElementById('quickAddAiKeyBadge');
+    fetch('/api/customers/ai-key-status')
+        .then(r => r.json())
+        .then(d => {
+            if (d.success && d.has_key) {
+                if (statusSpan) statusSpan.innerHTML = '<span style="color:#16A34A;font-weight:700;">✅ Active (' + d.masked_key + ')</span>';
+                if (badge) {
+                    badge.innerText = '⚡ GEMINI ACTIVE';
+                    badge.style.background = '#DCFCE7';
+                    badge.style.color = '#15803D';
+                }
+            } else {
+                if (statusSpan) statusSpan.innerHTML = '<span style="color:#DC2626;font-weight:600;">❌ No Key Configured</span>';
+                if (badge) {
+                    badge.innerText = 'AI SCAN';
+                    badge.style.background = '#DBEAFE';
+                    badge.style.color = '#1E40AF';
+                }
+            }
+        })
+        .catch(() => {});
+}
+
+function saveAiKeyConfig() {
+    const input = document.getElementById('inputAiKeyConfig');
+    const key = (input ? input.value : '').trim();
+    if (!key) {
+        alert('Please enter a valid Gemini API key.');
+        return;
+    }
+
+    fetch('/api/customers/save-ai-key', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key })
+    })
+    .then(r => r.json())
+    .then(d => {
+        if (d.success) {
+            alert('✅ Gemini API Key saved successfully!');
+            closeAiKeyConfigModal();
+            checkAiKeyStatus();
+        } else {
+            alert('Failed to save key: ' + (d.message || 'Error'));
+        }
+    })
+    .catch(err => alert('Network error saving key: ' + err.message));
+}
+
+function clearQuickAddAiPreview() {
+    const statusBox = document.getElementById('quickAddAiStatusBox');
+    const previewBox = document.getElementById('quickAddAiImagePreview');
+    const input = document.getElementById('quickAddCustImageInput');
+    if (statusBox) statusBox.style.display = 'none';
+    if (previewBox) previewBox.style.display = 'none';
+    if (input) input.value = '';
+    quickAddAiProcessing = false;
+}
+
+function handleQuickAddCustomerImageUpload(input) {
+    if (!input || !input.files || !input.files[0]) return;
+    const file = input.files[0];
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        processQuickAddCustomerImage(file, e.target.result);
+    };
+    reader.readAsDataURL(file);
+}
+
+async function processQuickAddCustomerImage(file, dataUrl) {
+    if (quickAddAiProcessing) return;
+    quickAddAiProcessing = true;
+
+    const statusBox = document.getElementById('quickAddAiStatusBox');
+    const statusText = document.getElementById('quickAddAiStatusText');
+    const spinner = document.getElementById('quickAddAiSpinner');
+    const clearBtn = document.getElementById('quickAddAiClearBtn');
+    const previewBox = document.getElementById('quickAddAiImagePreview');
+    const previewImg = document.getElementById('quickAddAiPreviewImg');
+    const filenameEl = document.getElementById('quickAddAiFilename');
+    const summaryEl = document.getElementById('quickAddAiExtractSummary');
+    const uploadBtn = document.getElementById('btnQuickAddAiUpload');
+
+    if (previewImg) previewImg.src = dataUrl;
+    if (filenameEl) filenameEl.innerText = file.name || 'Pasted Screenshot / Image';
+    if (previewBox) previewBox.style.display = 'flex';
+    if (statusBox) statusBox.style.display = 'flex';
+    if (clearBtn) clearBtn.style.display = 'none';
+    if (spinner) spinner.style.display = 'inline-block';
+    if (statusText) statusText.innerText = '✨ AI is reading customer details from image...';
+    if (uploadBtn) uploadBtn.disabled = true;
+
+    try {
+        // 1. Try server-side AI extraction (Gemini Vision or server heuristic parser)
+        const formData = new FormData();
+        formData.append('image', file);
+
+        let data = null;
+        try {
+            const res = await fetch('/api/customers/ai-extract', {
+                method: 'POST',
+                body: formData
+            });
+            data = await res.json();
+        } catch(netErr) {
+            console.warn('Server AI extraction call failed:', netErr);
+        }
+
+        // If Gemini or server extraction succeeded with details
+        if (data && data.success && data.extracted && (data.extracted.name || data.extracted.phone)) {
+            applyExtractedCustomerData(data.extracted, data.message || 'Customer details auto-filled via AI');
+            return;
+        }
+
+        // 2. Fallback: Client-side Tesseract.js OCR
+        if (statusText) statusText.innerText = '⏳ Extracting text with OCR scanner...';
+        await runClientSideOcrFallback(dataUrl);
+
+    } catch (err) {
+        console.error('Error during AI customer extraction:', err);
+        if (statusText) statusText.innerHTML = '<span style="color:#DC2626;">⚠️ AI extraction failed: ' + (err.message || 'Error') + '</span>';
+        if (clearBtn) clearBtn.style.display = 'inline-block';
+        if (spinner) spinner.style.display = 'none';
+    } finally {
+        quickAddAiProcessing = false;
+        if (uploadBtn) uploadBtn.disabled = false;
+    }
+}
+
+async function runClientSideOcrFallback(dataUrl) {
+    const statusText = document.getElementById('quickAddAiStatusText');
+    const clearBtn = document.getElementById('quickAddAiClearBtn');
+    const spinner = document.getElementById('quickAddAiSpinner');
+
+    // Dynamically load Tesseract.js if not already loaded
+    if (typeof Tesseract === 'undefined') {
+        try {
+            await new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+        } catch(scriptErr) {
+            console.warn('Could not load Tesseract.js from CDN:', scriptErr);
+            promptForGeminiKeyIfNoDetails();
+            return;
+        }
+    }
+
+    try {
+        const worker = await Tesseract.createWorker('eng');
+        const ret = await worker.recognize(dataUrl);
+        await worker.terminate();
+        const ocrText = ret.data.text || '';
+
+        if (ocrText.trim()) {
+            // Send extracted OCR text to server heuristic parser
+            const parseRes = await fetch('/api/customers/ai-extract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: ocrText })
+            });
+            const pData = await parseRes.json();
+            if (pData.success && pData.extracted && (pData.extracted.name || pData.extracted.phone)) {
+                applyExtractedCustomerData(pData.extracted, 'Details recognized via OCR Scanner & Heuristics');
+                return;
+            }
+        }
+    } catch(ocrErr) {
+        console.warn('Tesseract recognition error:', ocrErr);
+    }
+
+    promptForGeminiKeyIfNoDetails();
+}
+
+function promptForGeminiKeyIfNoDetails() {
+    const statusText = document.getElementById('quickAddAiStatusText');
+    const clearBtn = document.getElementById('quickAddAiClearBtn');
+    const spinner = document.getElementById('quickAddAiSpinner');
+    if (spinner) spinner.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'inline-block';
+    if (statusText) {
+        statusText.innerHTML = '<span style="color:#DC2626;">Could not read details. </span><a href="javascript:void(0)" onclick="openAiKeyConfigModal()" style="color:#2563EB;font-weight:700;text-decoration:underline;">Add free Gemini AI key for high accuracy ↗</a>';
+    }
+}
+
+function applyExtractedCustomerData(extracted, message) {
+    const nameIn = document.getElementById('quickAddCustNameInput');
+    const contactIn = document.getElementById('quickAddCustContactInput');
+    const phoneIn = document.getElementById('quickAddCustPhoneInput');
+    const addrIn = document.getElementById('quickAddCustAddressInput');
+    const pricingSelect = document.getElementById('quickAddCustPricingSelect');
+    const statusText = document.getElementById('quickAddAiStatusText');
+    const clearBtn = document.getElementById('quickAddAiClearBtn');
+    const spinner = document.getElementById('quickAddAiSpinner');
+    const summaryEl = document.getElementById('quickAddAiExtractSummary');
+
+    let filledCount = 0;
+    const highlightField = (input, val) => {
+        if (!input || !val) return;
+        input.value = val;
+        filledCount++;
+        input.classList.remove('ai-field-pulsing');
+        void input.offsetWidth; // trigger reflow
+        input.classList.add('ai-field-pulsing');
+        setTimeout(() => input.classList.remove('ai-field-pulsing'), 2500);
+    };
+
+    if (extracted.name) highlightField(nameIn, extracted.name);
+    if (extracted.contact_name) highlightField(contactIn, extracted.contact_name);
+    if (extracted.phone) highlightField(phoneIn, extracted.phone);
+    if (extracted.address) highlightField(addrIn, extracted.address);
+
+    if (extracted.pricing_scheme && pricingSelect) {
+        for (let opt of pricingSelect.options) {
+            if (opt.text.toLowerCase().includes(extracted.pricing_scheme.toLowerCase())) {
+                pricingSelect.value = opt.value;
+                break;
+            }
+        }
+    }
+
+    if (spinner) spinner.style.display = 'none';
+    if (clearBtn) clearBtn.style.display = 'inline-block';
+    if (statusText) {
+        statusText.innerHTML = '<span style="color:#16A34A;font-weight:700;">✅ ' + (message || 'Extracted customer details!') + '</span>';
+    }
+    if (summaryEl) {
+        summaryEl.innerText = `✅ Auto-filled ${filledCount} field(s)! Please review before saving.`;
+        summaryEl.style.color = '#16A34A';
+    }
+}
+
+// Clipboard paste listener (Ctrl+V) when modalQuickAddCustomer is open
+window.addEventListener('paste', function(e) {
+    const modal = document.getElementById('modalQuickAddCustomer');
+    if (!modal || modal.style.display === 'none') return;
+
+    if (e.clipboardData && e.clipboardData.items) {
+        for (let item of e.clipboardData.items) {
+            if (item.type.indexOf('image') !== -1) {
+                const file = item.getAsFile();
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(evt) {
+                        processQuickAddCustomerImage(file, evt.target.result);
+                    };
+                    reader.readAsDataURL(file);
+                    e.preventDefault();
+                    break;
+                }
+            }
+        }
+    }
+});
+
+// Drag and drop setup for quickAddAiUploadCard
+document.addEventListener('DOMContentLoaded', function() {
+    const card = document.getElementById('quickAddAiUploadCard');
+    if (card) {
+        card.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            card.style.borderColor = '#1D4ED8';
+            card.style.background = '#DBEAFE';
+        });
+        card.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            card.style.borderColor = '#3B82F6';
+            card.style.background = 'linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%)';
+        });
+        card.addEventListener('drop', function(e) {
+            e.preventDefault();
+            card.style.borderColor = '#3B82F6';
+            card.style.background = 'linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%)';
+            if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) {
+                const file = e.dataTransfer.files[0];
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    processQuickAddCustomerImage(file, evt.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+});
+
 function openQuickAddCustomerModal() {
+    clearQuickAddAiPreview();
+    checkAiKeyStatus();
+
     const nameIn = document.getElementById('quickAddCustNameInput');
     const contactIn = document.getElementById('quickAddCustContactInput');
     const phoneIn = document.getElementById('quickAddCustPhoneInput');
@@ -6161,8 +6611,11 @@ function directExportOrderJpg() {
     window.open(jpgUrl, '_blank');
 }
 
-// --- Direct Telegram Share ---
-function directShareOrderTelegram() {
+// --- Direct Telegram Share with Direct Print Link ---
+async function directShareOrderTelegram(mode) {
+    mode = mode || 'direct';
+    closeTelegramShareDropdown();
+
     if (isNewOrder) {
         alert('Please save the sales order first before sharing to Telegram.');
         return;
@@ -6172,8 +6625,69 @@ function directShareOrderTelegram() {
         alert('Please save the sales order first.');
         return;
     }
-    const shareUrl = '/sales/' + orderId + '/print?type=invoice&autoshare=telegram';
-    window.open(shareUrl, '_blank');
+
+    if (mode === 'image') {
+        const shareUrl = '/sales/' + orderId + '/print?type=invoice&autoshare=telegram';
+        window.open(shareUrl, '_blank');
+        return;
+    }
+
+    const btn = document.getElementById('soDirectTelegramBtn');
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span style="font-size:11px;">⏳ Loading...</span>';
+    }
+
+    try {
+        const res = await fetch('/sales/' + orderId + '/telegram-share-data');
+        const data = await res.json();
+
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+
+        if (!data || !data.success) {
+            alert('Failed to generate Telegram share link: ' + (data && data.message ? data.message : 'Unknown error'));
+            return;
+        }
+
+        let copied = false;
+        try {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                await navigator.clipboard.writeText(data.caption);
+                copied = true;
+            }
+        } catch(clipErr) {
+            console.log('Clipboard copy failed:', clipErr);
+        }
+
+        if (mode === 'copy') {
+            if (copied) {
+                alert('✅ Direct Print Link copied to clipboard!\n\nYou can paste (Ctrl+V) directly into Telegram. Recipients can print directly without saving picture.');
+            } else {
+                prompt('Copy this Direct Print Link for Telegram:', data.direct_print_url);
+            }
+            return;
+        }
+
+        // Open Telegram with pre-filled direct print link & details
+        window.open(data.telegram_url, '_blank');
+
+        if (copied) {
+            showToast('✅ Direct print link copied & Telegram opened! Recipients can print directly without saving picture.');
+        } else {
+            showToast('✅ Telegram opened with direct print link!');
+        }
+    } catch (err) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+        console.error('Error sharing to Telegram:', err);
+        alert('Connection error sharing to Telegram: ' + err.message);
+    }
 }
 
 // =========================================================================

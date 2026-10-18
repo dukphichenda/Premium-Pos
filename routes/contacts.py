@@ -1290,6 +1290,78 @@ def quick_add_customer_ajax():
         return jsonify({'success': False, 'message': str(e)}), 500
 
 
+@contacts_bp.route('/api/customers/ai-extract', methods=['POST'])
+def ai_extract_customer():
+    try:
+        from services.ai_customer_extractor import extract_customer_info
+        import base64
+
+        image_bytes = None
+        image_b64 = None
+        mime_type = "image/jpeg"
+        text_fallback = ""
+        api_key = None
+
+        if request.content_type and 'multipart/form-data' in request.content_type:
+            if 'image' in request.files and request.files['image'].filename:
+                file = request.files['image']
+                image_bytes = file.read()
+                mime_type = file.mimetype or "image/jpeg"
+            elif 'file' in request.files and request.files['file'].filename:
+                file = request.files['file']
+                image_bytes = file.read()
+                mime_type = file.mimetype or "image/jpeg"
+            text_fallback = request.form.get('text', '')
+            api_key = request.form.get('api_key')
+        else:
+            json_data = request.get_json(silent=True) or {}
+            raw_b64 = json_data.get('image_data') or json_data.get('image_base64')
+            if raw_b64:
+                if ',' in raw_b64:
+                    header, raw_b64 = raw_b64.split(',', 1)
+                    if 'image/png' in header:
+                        mime_type = 'image/png'
+                    elif 'image/webp' in header:
+                        mime_type = 'image/webp'
+                    elif 'image/jpeg' in header or 'image/jpg' in header:
+                        mime_type = 'image/jpeg'
+                image_b64 = raw_b64
+            text_fallback = json_data.get('text', '')
+            api_key = json_data.get('api_key')
+
+        result = extract_customer_info(
+            image_bytes=image_bytes,
+            image_b64=image_b64,
+            mime_type=mime_type,
+            text_fallback=text_fallback,
+            api_key=api_key
+        )
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'message': f"Extraction error: {str(e)}"}), 500
+
+
+@contacts_bp.route('/api/customers/ai-key-status', methods=['GET'])
+def ai_key_status():
+    from services.ai_customer_extractor import get_configured_gemini_api_key
+    key = get_configured_gemini_api_key()
+    has_key = bool(key)
+    masked = (key[:4] + '...' + key[-4:]) if has_key and len(key) >= 8 else ('****' if has_key else '')
+    return jsonify({'success': True, 'has_key': has_key, 'masked_key': masked})
+
+
+@contacts_bp.route('/api/customers/save-ai-key', methods=['POST'])
+def save_ai_key():
+    try:
+        from services.ai_customer_extractor import save_gemini_api_key
+        data = request.get_json(silent=True) or request.form or {}
+        key = (data.get('api_key') or '').strip()
+        ok = save_gemini_api_key(key)
+        return jsonify({'success': ok, 'has_key': bool(key)})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+
 @contacts_bp.route('/customers/<int:id>/print-label')
 def print_customer_label(id):
     from datetime import date
