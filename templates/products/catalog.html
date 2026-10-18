@@ -9,6 +9,17 @@
 {% set item_cost_dec = p_cost_dec if p_cost_dec is not none else (company.decimal_places_cost if (company and company.decimal_places_cost is defined and company.decimal_places_cost is not none) else 3) %}
 
 <style>
+/* Category search filter options in catalog dropdown */
+#catFilterCategoryList .cat-filter-opt.is-cat-hidden,
+#catFilterCategoryList .cat-filter-opt[style*="display: none"] {
+    display: none !important;
+}
+
+#catFilterSearchInput:focus {
+    border-color: #0284C7 !important;
+    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15) !important;
+}
+
 /* Product Catalog Sidebar Collapsed State (100% full-width document view) */
 .inflow-catalog-sidebar {
     transition: width 0.22s cubic-bezier(0.4, 0, 0.2, 1), min-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), max-width 0.22s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.18s ease !important;
@@ -301,6 +312,38 @@
                         <a href="javascript:void(0)" onclick="clearAllFilters()" id="catFilterClearLink" style="font-size: 11px; color: #0284C7; font-weight: 600; text-decoration: none; display: none;">Clear all</a>
                     </div>
 
+                    <!-- Category Section (Top filter) -->
+                    <div style="padding: 8px 12px 4px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;">
+                        <span>Category / ប្រភេទ</span>
+                        <span id="catActiveBadge" style="font-size: 10px; color: #0284C7; font-weight: 600; display: none;">Filtered</span>
+                    </div>
+                    <div style="padding: 3px 10px 6px 10px;">
+                        <div style="position: relative; display: flex; align-items: center;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" style="position: absolute; left: 8px; pointer-events: none;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="catFilterSearchInput" placeholder="Search categories..." oninput="filterCategoryOptions(this.value)" onclick="event.stopPropagation()" onkeydown="event.stopPropagation()" style="width: 100%; padding: 4px 24px 4px 26px; font-size: 11.5px; border: 1px solid #CBD5E1; border-radius: 4px; outline: none; background: #FFFFFF; transition: border-color 0.15s, box-shadow 0.15s;">
+                            <button type="button" id="catFilterSearchClearBtn" onclick="clearCategorySearch(event)" title="Clear category search" style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: transparent; border: none; font-size: 12px; color: #94A3B8; cursor: pointer; display: none; padding: 2px 4px; line-height: 1;">✕</button>
+                        </div>
+                    </div>
+                    <div id="catFilterCategoryList" style="max-height: 160px; overflow-y: auto; border-bottom: 1px solid #F1F5F9;">
+                        <a href="javascript:void(0)" class="cat-filter-opt active" data-cat="all" onclick="filterByCategory('all')">
+                            <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700;">✓</span>
+                            <span>All Categories</span>
+                        </a>
+                        {% for c in categories %}
+                        <a href="javascript:void(0)" class="cat-filter-opt" data-cat="{{ c.id }}" data-name="{{ c.name | lower }}" onclick="filterByCategory('{{ c.id }}')">
+                            <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700; visibility: hidden;">✓</span>
+                            <span>{{ c.name }}</span>
+                        </a>
+                        {% endfor %}
+                        <a href="javascript:void(0)" class="cat-filter-opt" data-cat="uncategorized" data-name="uncategorized" onclick="filterByCategory('uncategorized')">
+                            <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700; visibility: hidden;">✓</span>
+                            <span style="color: #64748B; font-style: italic;">(Uncategorized)</span>
+                        </a>
+                        <div id="catFilterNoMatchMsg" style="display: none; padding: 10px 12px; font-size: 11px; color: #94A3B8; text-align: center;">
+                            No categories found / គ្មានប្រភេទស្វែងរកឃើញ
+                        </div>
+                    </div>
+
                     <!-- Sort & Ranking Section -->
                     <div style="padding: 8px 12px 4px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;">
                         <span>Sort & Ranking / តម្រៀប</span>
@@ -346,31 +389,6 @@
                         <a href="javascript:void(0)" class="sales-filter-opt" data-sales="best_sellers" onclick="filterBySales('best_sellers')">
                             <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700; visibility: hidden;">✓</span>
                             <span>🔥 Best Sellers Only (Sold &gt; 0)</span>
-                        </a>
-                    </div>
-
-                    <!-- Category Section -->
-                    <div style="padding: 8px 12px 4px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; display: flex; justify-content: space-between; align-items: center;">
-                        <span>Category</span>
-                        <span id="catActiveBadge" style="font-size: 10px; color: #0284C7; font-weight: 600; display: none;">Filtered</span>
-                    </div>
-                    <div style="padding: 3px 10px 6px 10px;">
-                        <input type="text" id="catFilterSearchInput" placeholder="Search categories..." oninput="filterCategoryOptions(this.value)" style="width: 100%; padding: 4px 8px; font-size: 11.5px; border: 1px solid #CBD5E1; border-radius: 4px; outline: none; background: #FFFFFF;">
-                    </div>
-                    <div id="catFilterCategoryList" style="max-height: 160px; overflow-y: auto; border-bottom: 1px solid #F1F5F9;">
-                        <a href="javascript:void(0)" class="cat-filter-opt active" data-cat="all" onclick="filterByCategory('all')">
-                            <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700;">✓</span>
-                            <span>All Categories</span>
-                        </a>
-                        {% for c in categories %}
-                        <a href="javascript:void(0)" class="cat-filter-opt" data-cat="{{ c.id }}" data-name="{{ c.name | lower }}" onclick="filterByCategory('{{ c.id }}')">
-                            <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700; visibility: hidden;">✓</span>
-                            <span>{{ c.name }}</span>
-                        </a>
-                        {% endfor %}
-                        <a href="javascript:void(0)" class="cat-filter-opt" data-cat="uncategorized" data-name="uncategorized" onclick="filterByCategory('uncategorized')">
-                            <span class="chk" style="display: inline-block; width: 14px; color: #0284C7; font-weight: 700; visibility: hidden;">✓</span>
-                            <span style="color: #64748B; font-style: italic;">(Uncategorized)</span>
                         </a>
                     </div>
 
@@ -3375,18 +3393,59 @@ function onCatSearchKeydown(e) {
     }
 }
 
+function clearCategorySearch(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    const input = document.getElementById('catFilterSearchInput');
+    if (input) {
+        input.value = '';
+        input.focus();
+    }
+    filterCategoryOptions('');
+}
+
 function filterCategoryOptions(q) {
     q = (q || '').toLowerCase().trim();
     const rows = document.querySelectorAll('#catFilterCategoryList .cat-filter-opt');
+    const clearBtn = document.getElementById('catFilterSearchClearBtn');
+    if (clearBtn) {
+        clearBtn.style.display = q ? 'block' : 'none';
+    }
+
+    let matchCount = 0;
     rows.forEach(r => {
         const cat = r.getAttribute('data-cat');
         if (cat === 'all') {
-            r.style.display = 'flex';
+            const showAll = !q || 'all categories'.includes(q);
+            if (showAll) {
+                r.classList.remove('is-cat-hidden');
+                r.style.setProperty('display', 'flex', 'important');
+                matchCount++;
+            } else {
+                r.classList.add('is-cat-hidden');
+                r.style.setProperty('display', 'none', 'important');
+            }
             return;
         }
-        const name = (r.getAttribute('data-name') || '').toLowerCase();
-        r.style.display = (!q || name.includes(q)) ? 'flex' : 'none';
+
+        const name = (r.getAttribute('data-name') || r.textContent || '').toLowerCase();
+        const matches = !q || name.includes(q);
+        if (matches) {
+            r.classList.remove('is-cat-hidden');
+            r.style.setProperty('display', 'flex', 'important');
+            matchCount++;
+        } else {
+            r.classList.add('is-cat-hidden');
+            r.style.setProperty('display', 'none', 'important');
+        }
     });
+
+    const noMatchMsg = document.getElementById('catFilterNoMatchMsg');
+    if (noMatchMsg) {
+        noMatchMsg.style.display = (matchCount === 0 && q) ? 'block' : 'none';
+    }
 }
 
 function filterByCategory(catId) {
@@ -4577,7 +4636,16 @@ document.addEventListener('paste', function(e) {
 function toggleFilterMenu(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('catFilterDropdown');
-    if (menu) menu.classList.toggle('show');
+    if (menu) {
+        const willShow = !menu.classList.contains('show');
+        menu.classList.toggle('show');
+        if (willShow && window.innerWidth > 768) {
+            const catSearch = document.getElementById('catFilterSearchInput');
+            if (catSearch) {
+                setTimeout(() => { catSearch.focus(); }, 60);
+            }
+        }
+    }
 }
 
 function toggleMoreMenu(e) {
