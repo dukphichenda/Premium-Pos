@@ -70,6 +70,8 @@ def general_settings():
     pricing_schemes = query_one("SELECT COUNT(*) as cnt FROM pricing_schemes")['cnt']
     locations_count = query_one("SELECT COUNT(*) as cnt FROM locations WHERE is_active = TRUE")['cnt']
     products_count = query_one("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE")['cnt']
+    customers_count = query_one("SELECT COUNT(*) as cnt FROM customers WHERE is_active = TRUE")['cnt']
+    sales_orders_count = query_one("SELECT COUNT(*) as cnt FROM sales_orders")['cnt']
 
     # Fetch users for User Management tab
     users = query_all("""
@@ -116,6 +118,8 @@ def general_settings():
                            active_schemes_count=active_schemes_count,
                            locations_count=locations_count,
                            products_count=products_count,
+                           customers_count=customers_count,
+                           sales_orders_count=sales_orders_count,
                            users=users,
                            all_branches_list=all_branches_list,
                            backups=backups,
