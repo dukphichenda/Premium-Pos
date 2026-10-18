@@ -39,5 +39,18 @@ class TestSettingsImportTab(unittest.TestCase):
         self.assertIn('/data/template/customer', html)
         self.assertIn('/data/template/sales_order', html)
 
+    def test_sidebar_flyout_settings_links(self):
+        resp = self.client.get('/dashboard')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        # Check flyout-settings section
+        self.assertIn('id="flyout-settings"', html)
+        self.assertIn('positionSidebarFlyout', html)
+        self.assertIn('tab=tabImport', html)
+        self.assertIn('tab=tabBackup', html)
+        self.assertIn('Import Data Wizard', html)
+        self.assertIn('Export Data Center', html)
+
 if __name__ == '__main__':
     unittest.main()
+

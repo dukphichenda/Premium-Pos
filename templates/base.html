@@ -682,8 +682,16 @@
                 <span class="flyout-label">Users & Permissions</span>
             </a>
             {% endif %}
+            <a href="{{ url_for('settings.general_settings', tab='tabImport') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                <span class="flyout-label">Import & Export Data</span>
+            </a>
+            <a href="{{ url_for('settings.general_settings', tab='tabBackup') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
+                <span class="flyout-label">Backup & Restore (.sql)</span>
+            </a>
 
-            <div class="flyout-header" style="margin-top: 10px;">System Preferences</div>
+            <div class="flyout-header" style="margin-top: 8px;">System Preferences</div>
             <a href="{{ url_for('locations.list_locations') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
                 <span class="flyout-label">Locations & Warehouses</span>
@@ -694,22 +702,18 @@
             </a>
             <a href="{{ url_for('data_exchange.import_data') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
-                <span class="flyout-label">Import Data</span>
+                <span class="flyout-label">Import Data Wizard</span>
             </a>
             <a href="{{ url_for('data_exchange.export_data') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></span>
-                <span class="flyout-label">Export Data</span>
-            </a>
-            <a href="{{ url_for('settings.general_settings', tab='tabBackup') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
-                <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
-                <span class="flyout-label">Backup & Restore (.sql)</span>
+                <span class="flyout-label">Export Data Center</span>
             </a>
             <a href="{{ url_for('migration.migration_page') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg></span>
                 <span class="flyout-label">inFlow SQL Migration</span>
             </a>
 
-            <div style="border-top: 1px solid #E2E8F0; margin: 8px 10px;"></div>
+            <div style="border-top: 1px solid #E2E8F0; margin: 6px 10px;"></div>
             <a href="{{ url_for('auth.logout') }}" class="flyout-item" style="color: #EF4444;" target="_top" onclick="handleLogoutClick(event, this)">
                 <span class="flyout-icon">🚪</span>
                 <span class="flyout-label">Log Out</span>
@@ -872,6 +876,50 @@
             }
         }
 
+        function positionSidebarFlyout(triggerEl) {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            if (!flyout || !triggerEl) return;
+
+            // In mobile view, CSS positions it as a bottom sheet
+            const isMobile = document.documentElement.classList.contains('is-mobile-view') || window.innerWidth <= 768;
+            if (isMobile) {
+                flyout.style.top = '';
+                flyout.style.maxHeight = '';
+                return;
+            }
+
+            const rect = triggerEl.getBoundingClientRect();
+            const windowHeight = window.innerHeight;
+            
+            // Allow measuring actual height by resetting maxHeight first
+            flyout.style.maxHeight = (windowHeight - 20) + 'px';
+            const actualHeight = flyout.offsetHeight || flyout.scrollHeight || 380;
+            
+            // If trigger button is in the lower half of viewport, anchor flyout upwards
+            let topPos;
+            if (rect.top > windowHeight / 2) {
+                topPos = rect.bottom - actualHeight;
+            } else {
+                topPos = rect.top;
+            }
+
+            // Ensure top is not above top margin (10px)
+            if (topPos < 10) {
+                topPos = 10;
+            }
+            
+            // Ensure bottom does not extend below bottom margin (10px)
+            if (topPos + actualHeight > windowHeight - 10) {
+                topPos = Math.max(10, windowHeight - actualHeight - 10);
+            }
+
+            flyout.style.top = topPos + 'px';
+            
+            // Calculate maximum available height from topPos down to bottom margin
+            const maxH = Math.max(160, windowHeight - topPos - 12);
+            flyout.style.maxHeight = maxH + 'px';
+        }
+
         function toggleSidebarFlyout(menuKey, triggerEl) {
             const flyout = document.getElementById('inflowSidebarFlyout');
             if (!flyout) return;
@@ -897,19 +945,23 @@
                 targetSec.style.display = 'block';
             }
 
-            // Position flyout vertically relative to clicked button
-            if (triggerEl) {
-                const rect = triggerEl.getBoundingClientRect();
-                let topPos = rect.top;
-                const flyoutHeight = 360;
-                if (topPos + flyoutHeight > window.innerHeight - 10) {
-                    topPos = Math.max(10, window.innerHeight - flyoutHeight - 10);
-                }
-                flyout.style.top = topPos + 'px';
-            }
-
             flyout.classList.add('show');
+
+            if (triggerEl) {
+                positionSidebarFlyout(triggerEl);
+                requestAnimationFrame(() => positionSidebarFlyout(triggerEl));
+            }
         }
+
+        window.addEventListener('resize', function() {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            if (flyout && flyout.classList.contains('show')) {
+                const activeTrigger = document.querySelector('.inflow-sidebar-nav-item.active');
+                if (activeTrigger) {
+                    positionSidebarFlyout(activeTrigger);
+                }
+            }
+        });
 
         function closeSidebarFlyout() {
             const flyout = document.getElementById('inflowSidebarFlyout');
