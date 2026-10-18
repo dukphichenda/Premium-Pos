@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 import dateutil.parser
 from database import query_all, query_one, execute, execute_returning_id, get_db_cursor, resync_all_sequences
+from psycopg2.extras import execute_values
 
 logger = logging.getLogger('inflow.csv_exchange')
 
@@ -1153,6 +1154,33 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
     return result
 
 
+def bulk_insert_so_lines(cur, lines_buffer):
+    if not lines_buffer:
+        return
+    try:
+        execute_values(
+            cur,
+            """
+            INSERT INTO sales_order_lines (
+                sales_order_id, line_num, product_id, description,
+                quantity, unit_price, discount_percent, subtotal, cost_price,
+                uom, quantity_display, pricing_scheme_id
+            ) VALUES %s;
+            """,
+            lines_buffer,
+            page_size=2000
+        )
+    except Exception:
+        for l in lines_buffer:
+            cur.execute("""
+                INSERT INTO sales_order_lines (
+                    sales_order_id, line_num, product_id, description,
+                    quantity, unit_price, discount_percent, subtotal, cost_price,
+                    uom, quantity_display, pricing_scheme_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+            """, l)
+
+
 def execute_import_data(data_type, file_content, has_headers=True, import_mode='keep', selected_orders=None, selected_rows=None, branch_id=None, product_replacements=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
@@ -1585,7 +1613,28 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
         batch_count = 0
         total_orders = len(orders_map)
         affected_customer_ids = set()
+
+        all_so_nums = list(orders_map.keys())
+        existing_so_map = {}
+        lines_buffer = []
+
         with get_db_cursor(commit=True) as cur:
+            # High-performance bulk lookup of existing orders (5,000 per chunk)
+            for i in range(0, len(all_so_nums), 5000):
+                chunk_nums = all_so_nums[i:i + 5000]
+                cur.execute("SELECT id, order_number, branch_id FROM sales_orders WHERE order_number = ANY(%s);", (chunk_nums,))
+                for r in cur.fetchall():
+                    existing_so_map[r['order_number']] = r
+
+            # Fast bulk delete of lines for updated orders in this branch
+            if not is_erase_mode:
+                so_ids_to_clean = [
+                    existing_so_map[s]['id'] for s in all_so_nums
+                    if s in existing_so_map and existing_so_map[s].get('branch_id') == bid
+                ]
+                for i in range(0, len(so_ids_to_clean), 5000):
+                    cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = ANY(%s);", (so_ids_to_clean[i:i + 5000],))
+
             for so_num, order_data in orders_map.items():
                 batch_count += 1
                 # Customer handling - Always keep customer name the same
@@ -1794,8 +1843,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     invoiced_date = dt_order or datetime.now()
 
                 # Upsert Sales Order
-                cur.execute("SELECT id, branch_id FROM sales_orders WHERE order_number = %s;", (so_num,))
-                existing_so = cur.fetchone()
+                existing_so = existing_so_map.get(so_num)
 
                 # Determine order-level address, contact, and phone with fallback to customer record
                 cached_c = cust_info_map.get(cn_clean) or {}
@@ -1838,7 +1886,6 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                           order_data['sales_rep'], order_data['po_number'], order_data['remarks'],
                           so_address, so_contact, so_phone, so_prov,
                           invoiced_date, bid, so_id))
-                    cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = %s;", (so_id,))
                     updated_cnt += 1
                 else:
                     cur.execute("""
@@ -1855,32 +1902,42 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                           order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid,
                           so_address, so_contact, so_phone, so_prov))
                     so_id = cur.fetchone()['id']
+                    existing_so_map[so_num] = {'id': so_id, 'branch_id': bid}
                     imported_cnt += 1
 
-                # Insert lines
+                # Buffer lines for high-throughput batch insertion
                 for l_idx, pline in enumerate(parsed_lines, start=1):
-                    cur.execute("""
-                        INSERT INTO sales_order_lines (
-                            sales_order_id, line_num, product_id, description,
-                            quantity, unit_price, discount_percent, subtotal, cost_price,
-                            uom, quantity_display, pricing_scheme_id
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 100);
-                    """, (
+                    lines_buffer.append((
                         so_id, l_idx, pline['prod_id'], pline['desc'],
                         pline['std_qty'], pline['unit_price'], pline['discount'], pline['subtotal'], pline['cost_price'],
-                        pline['uom'], pline['display_qty']
+                        pline['uom'], pline['display_qty'], 100
                     ))
 
-                # Periodic batch commit to avoid timeout on large imports
+                # Flush line buffer when it reaches threshold
+                if len(lines_buffer) >= 2000:
+                    bulk_insert_so_lines(cur, lines_buffer)
+                    lines_buffer = []
+
+                # Periodic batch commit to prevent locks and reduce memory overhead
                 if batch_count % BATCH_SIZE == 0:
+                    if lines_buffer:
+                        bulk_insert_so_lines(cur, lines_buffer)
+                        lines_buffer = []
                     cur.connection.commit()
                     logger.info(f"Sales order import progress: {batch_count}/{total_orders} orders committed.")
 
-            # Automatically update customer profile information based on their latest bill
+            # Flush any remaining lines
+            if lines_buffer:
+                bulk_insert_so_lines(cur, lines_buffer)
+                lines_buffer = []
+
+            # Automatically update customer profile information based on their latest bill (chunked)
             if affected_customer_ids:
                 from database import sync_customers_from_latest_orders
-                sync_count = sync_customers_from_latest_orders(cur=cur, customer_ids=affected_customer_ids)
+                aff_list = list(affected_customer_ids)
+                sync_count = 0
+                for i in range(0, len(aff_list), 1000):
+                    sync_count += sync_customers_from_latest_orders(cur=cur, customer_ids=set(aff_list[i:i + 1000]))
                 logger.info(f"Synchronized customer profile info from latest bill for {sync_count} customers.")
 
             # Automatically resynchronize sequences after importing sales orders
@@ -1941,7 +1998,20 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
         catalog_matcher = build_product_matcher(products_rows or [])
         products_by_id = {p['id']: p for p in (products_rows or [])}
 
+        all_po_nums = list(orders_map.keys())
+        existing_po_map = {}
         with get_db_cursor(commit=True) as cur:
+            for i in range(0, len(all_po_nums), 5000):
+                chunk_nums = all_po_nums[i:i + 5000]
+                cur.execute("SELECT id, order_number FROM purchase_orders WHERE order_number = ANY(%s);", (chunk_nums,))
+                for r in cur.fetchall():
+                    existing_po_map[r['order_number']] = r
+
+            if not is_erase_mode:
+                po_ids_to_clean = [existing_po_map[s]['id'] for s in all_po_nums if s in existing_po_map]
+                for i in range(0, len(po_ids_to_clean), 5000):
+                    cur.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = ANY(%s);", (po_ids_to_clean[i:i + 5000],))
+
             for po_num, order_data in orders_map.items():
                 v_name = order_data['vendor_name'].strip()
                 vn_clean = v_name.lower()
@@ -1956,8 +2026,7 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 ord_date = dt_order.date() if dt_order else datetime.now().date()
                 po_status = (order_data['status_raw'] or 'DRAFT').upper()
 
-                cur.execute("SELECT id FROM purchase_orders WHERE order_number = %s;", (po_num,))
-                existing_po = cur.fetchone()
+                existing_po = existing_po_map.get(po_num)
 
                 if existing_po and not is_erase_mode:
                     po_id = existing_po['id']
@@ -1966,7 +2035,6 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                         SET vendor_id = %s, order_date = %s, status = %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
                     """, (vend_id, ord_date, po_status, po_id))
-                    cur.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = %s;", (po_id,))
                     updated_cnt += 1
                 else:
                     cur.execute("""

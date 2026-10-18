@@ -1983,20 +1983,11 @@ def detail_order(id):
             l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
             l['case_price'] = float(l.get('unit_price') or 0)
             suom = (l.get('sales_uom') or '').strip()
-            sratio = float(l.get('sales_uom_ratio_std') or 1.0)
             curr_uom = (l.get('display_uom') or '').strip()
-            if suom and sratio > 1:
-                if not curr_uom or curr_uom.lower() in ('pcs', 'pcs.', ''):
-                    case_pr = float(l['case_price'] or 0)
-                    unit_pr = float(l.get('unit_price') or 0)
-                    qty = float(l.get('quantity') or 0)
-                    disp_q = float(l.get('display_qty') or 0)
-                    if case_pr > 0 and abs(unit_pr - case_pr) < (case_pr * 0.15):
-                        l['display_uom'] = suom
-                        if disp_q == qty and qty >= sratio and (qty % sratio == 0):
-                            l['display_qty'] = qty / sratio
-                elif _match_uom(curr_uom, suom):
-                    l['display_uom'] = suom
+            if not curr_uom:
+                l['display_uom'] = l.get('base_uom') or 'pcs.'
+            elif suom and _match_uom(curr_uom, suom):
+                l['display_uom'] = suom
 
         payments = query_all("""
             SELECT * FROM order_payments 
@@ -2107,22 +2098,12 @@ def detail_order(id):
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
 
-        # Self-heal legacy display UOM if missing or generic
         suom = (l.get('sales_uom') or '').strip()
-        sratio = float(l.get('sales_uom_ratio_std') or 1.0)
         curr_uom = (l.get('display_uom') or '').strip()
-        if suom and sratio > 1:
-            if not curr_uom or curr_uom.lower() in ('pcs', 'pcs.', ''):
-                case_pr = float(l['case_price'] or 0)
-                unit_pr = float(l.get('unit_price') or 0)
-                qty = float(l.get('quantity') or 0)
-                disp_q = float(l.get('display_qty') or 0)
-                if case_pr > 0 and abs(unit_pr - case_pr) < (case_pr * 0.15):
-                    l['display_uom'] = suom
-                    if disp_q == qty and qty >= sratio and (qty % sratio == 0):
-                        l['display_qty'] = qty / sratio
-            elif _match_uom(curr_uom, suom):
-                l['display_uom'] = suom
+        if not curr_uom:
+            l['display_uom'] = l.get('base_uom') or 'pcs.'
+        elif suom and _match_uom(curr_uom, suom):
+            l['display_uom'] = suom
 
     # Payment receipts history
     payments = query_all("""

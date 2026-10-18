@@ -214,11 +214,8 @@ class TestImportUomAndProductReplacement(unittest.TestCase):
             mock_qo.return_value = None
 
             mock_cur = MagicMock()
-            mock_cur.fetchone.side_effect = [
-                None,          # SELECT id, branch_id FROM sales_orders (not existing)
-                {'id': 123},   # INSERT INTO sales_orders RETURNING id
-                None
-            ]
+            mock_cur.fetchall.return_value = []
+            mock_cur.fetchone.return_value = {'id': 123}
             mock_cursor.return_value.__enter__.return_value = mock_cur
 
             # User mapped 'OLD-CODE:::Discontinued Item' -> 88
@@ -226,33 +223,29 @@ class TestImportUomAndProductReplacement(unittest.TestCase):
                 'OLD-CODE:::Discontinued Item': 88
             }
 
-            res = execute_import_data(
-                data_type='sales_order',
-                file_content=csv_content,
-                has_headers=True,
-                import_mode='keep',
-                product_replacements=replacements
-            )
+            with patch('services.csv_exchange.execute_values') as mock_exec_val:
+                res = execute_import_data(
+                    data_type='sales_order',
+                    file_content=csv_content,
+                    has_headers=True,
+                    import_mode='keep',
+                    product_replacements=replacements
+                )
 
-            self.assertTrue(res['success'])
-            self.assertEqual(res['imported'], 1)
+                self.assertTrue(res['success'])
+                self.assertEqual(res['imported'], 1)
 
-            # Check lines inserted into sales_order_lines
-            line_insert_call = None
-            for call in mock_cur.execute.call_args_list:
-                args, _ = call
-                if args and 'INSERT INTO sales_order_lines' in args[0]:
-                    line_insert_call = args
-                    break
-
-            self.assertIsNotNone(line_insert_call)
-            params = line_insert_call[1]
-            # Params: (so_id, l_idx, pline['prod_id'], pline['desc'], pline['std_qty'], pline['unit_price'], ...)
-            so_id, line_num, prod_id, desc, std_qty, unit_p, disc, sub, cost, uom, disp_qty = params
-            self.assertEqual(prod_id, 88)
-            self.assertEqual(uom, 'pcs.')
-            self.assertEqual(disp_qty, 4.0)
-            self.assertEqual(std_qty, 4.0)
+                # Check lines inserted into sales_order_lines via execute_values
+                self.assertTrue(mock_exec_val.called)
+                val_args = mock_exec_val.call_args[0]
+                self.assertIn('INSERT INTO sales_order_lines', val_args[1])
+                lines_list = val_args[2]
+                self.assertEqual(len(lines_list), 1)
+                so_id, line_num, prod_id, desc, std_qty, unit_p, disc, sub, cost, uom, disp_qty, scheme_id = lines_list[0]
+                self.assertEqual(prod_id, 88)
+                self.assertEqual(uom, 'pcs.')
+                self.assertEqual(disp_qty, 4.0)
+                self.assertEqual(std_qty, 4.0)
 
 
 if __name__ == '__main__':

@@ -90,6 +90,7 @@ SO-303,2026-10-14,Cust C,OPEN,Item 3,1,30.00
             
             mock_cur = mock_cursor.return_value.__enter__.return_value
             mock_cur.fetchone.return_value = {'id': 1}
+            mock_cur.fetchall.return_value = [{'id': 1, 'order_number': 'SO-301', 'branch_id': None}, {'id': 2, 'order_number': 'SO-303', 'branch_id': None}]
 
             res = execute_import_data(
                 'sales_order',
