@@ -70,14 +70,53 @@
                         {% endif %}
                     </select>
                 </div>
-                <div class="inflow-rep-param-row">
+                <div class="inflow-rep-param-row" style="position: relative;">
                     <span class="inflow-rep-param-label">Customer</span>
-                    <select name="customer_id" class="inflow-rep-param-select">
-                        <option value="" {% if not customer_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for c in all_customers %}
-                        <option value="{{ c.id }}" {% if customer_id == c.id|string %}selected{% endif %}>{{ c.name }}</option>
-                        {% endfor %}
-                    </select>
+                    <div class="inflow-rep-combobox-wrap" id="repCustomerComboboxWrap">
+                        <input type="hidden" name="customer_id" id="repCustomerId" value="{{ customer_id or '' }}">
+                        <div class="inflow-rep-combobox-inner">
+                            <input type="text" 
+                                   id="repCustomerSearchInput" 
+                                   name="customer_search"
+                                   class="inflow-rep-param-input inflow-rep-combobox-input" 
+                                   placeholder="Search Customer..." 
+                                   value="{{ selected_customer_name or '<All>' }}" 
+                                   autocomplete="off"
+                                   onfocus="handleRepCustomerFocus(this)" 
+                                   onclick="openRepCustomerDropdown()" 
+                                   oninput="filterRepCustomerDropdown(this.value)"
+                                   onkeydown="handleRepCustomerKey(event)">
+                            <button type="button" 
+                                    id="repCustomerClearBtn" 
+                                    class="inflow-rep-combobox-clear" 
+                                    title="Clear customer selection" 
+                                    onclick="clearRepCustomerSelection(event)" 
+                                    style="display: {% if customer_id or (customer_search and customer_search != '<All>') %}inline-flex{% else %}none{% endif %};">✕</button>
+                            <button type="button" 
+                                    class="inflow-rep-combobox-arrow" 
+                                    onclick="toggleRepCustomerDropdown(event)" 
+                                    tabindex="-1">▾</button>
+                        </div>
+                        <div id="repCustomerDropdownMenu" class="inflow-rep-dropdown-menu">
+                            <div class="rep-cust-item {% if not customer_id and (not customer_search or customer_search == '<All>') %}selected{% endif %}" 
+                                 data-id="" 
+                                 data-name="<All>" 
+                                 onclick="selectRepCustomer('', '&lt;All&gt;')">
+                                <span class="rep-cust-name" style="font-weight: 600; color: #1E3A8A;">&lt;All&gt;</span>
+                            </div>
+                            {% for c in all_customers %}
+                            <div class="rep-cust-item {% if customer_id == c.id|string %}selected{% endif %}" 
+                                 data-id="{{ c.id }}" 
+                                 data-name="{{ c.name|e }}" 
+                                 onclick="selectRepCustomer('{{ c.id }}', '{{ c.name|e }}')">
+                                <span class="rep-cust-name">{{ c.name }}</span>
+                            </div>
+                            {% endfor %}
+                            <div id="repCustomerNoMatch" class="rep-cust-no-match" style="display: none;">
+                                No matching customers
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 {% if report_key in ['sales-by-product-summary', 'sales-by-product-details', 'customer-order-history'] %}
@@ -463,13 +502,14 @@
                     {% if report_key == 'sales-order-profit' %}
                     <thead>
                         <tr>
-                            <th style="width: 13%;">ORDER NUMBER</th>
-                            <th style="width: 8%;">STATUS</th>
-                            <th style="width: 22%;">CUSTOMER</th>
-                            <th style="width: 25%;">BILLING ADDRESS</th>
-                            <th style="width: 12%;">ORDER DATE</th>
-                            <th style="width: 10%; text-align: right;">SALES AMOUNT</th>
-                            <th style="width: 10%; text-align: right;">GROSS PROFIT</th>
+                            <th style="width: 12%;">ORDER NUMBER</th>
+                            <th style="width: 7%;">STATUS</th>
+                            <th style="width: 21%;">CUSTOMER</th>
+                            <th style="width: 24%;">BILLING ADDRESS</th>
+                            <th style="width: 10%;">ORDER DATE</th>
+                            <th style="width: 8%; text-align: right;">SALES AMOUNT</th>
+                            <th style="width: 9%; text-align: right;">COSTING</th>
+                            <th style="width: 9%; text-align: right;">GROSS PROFIT</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -483,10 +523,11 @@
                             <td style="font-size: 11px; color: #374151;">{{ r.billing_address or '' }}</td>
                             <td>{{ r.order_date | format_inflow_date }}</td>
                             <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                            <td style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.costing or 0) }}</td>
                             <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No sales orders found matching filter criteria.</td></tr>
+                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales orders found matching filter criteria.</td></tr>
                         {% endfor %}
                     </tbody>
                     {% if page == total_pages and rows %}
@@ -494,6 +535,7 @@
                         <tr class="inflow-crys-totals-row">
                             <td colspan="5" style="text-align: right; font-weight: bold; font-style: italic;"></td>
                             <td style="text-align: right; font-weight: bold; font-style: italic; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
+                            <td style="text-align: right; font-weight: bold; font-style: italic; font-size: 13px; color: #475569;">${{ "%.2f"|format(totals.costing or 0) }}</td>
                             <td style="text-align: right; font-weight: bold; font-style: italic; font-size: 13px;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
                         </tr>
                     </tfoot>
@@ -1519,14 +1561,158 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Close export dropdown if clicking outside
+    // Close export dropdown or customer dropdown if clicking outside
     document.addEventListener('click', function(e) {
         const menu = document.getElementById('reportExportMenu');
         if (menu && menu.classList.contains('show') && !menu.contains(e.target) && !e.target.closest('.inflow-tb-btn')) {
             menu.classList.remove('show');
         }
+
+        const custWrap = document.getElementById('repCustomerComboboxWrap');
+        const custMenu = document.getElementById('repCustomerDropdownMenu');
+        if (custMenu && custMenu.classList.contains('show') && (!custWrap || !custWrap.contains(e.target))) {
+            custMenu.classList.remove('show');
+            const custInput = document.getElementById('repCustomerSearchInput');
+            if (custInput && (!custInput.value || !custInput.value.trim())) {
+                custInput.value = '<All>';
+            }
+        }
     });
 });
+
+// Customer Combobox Functions
+function openRepCustomerDropdown() {
+    const menu = document.getElementById('repCustomerDropdownMenu');
+    if (menu) menu.classList.add('show');
+}
+
+function toggleRepCustomerDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('repCustomerDropdownMenu');
+    if (menu) {
+        menu.classList.toggle('show');
+        if (menu.classList.contains('show')) {
+            document.getElementById('repCustomerSearchInput').focus();
+        }
+    }
+}
+
+function handleRepCustomerFocus(input) {
+    if (input.value === '<All>') {
+        input.select();
+    }
+    openRepCustomerDropdown();
+    filterRepCustomerDropdown(input.value === '<All>' ? '' : input.value);
+}
+
+function filterRepCustomerDropdown(val) {
+    val = (val || '').toLowerCase().trim();
+    openRepCustomerDropdown();
+    const items = document.querySelectorAll('#repCustomerDropdownMenu .rep-cust-item');
+    let matched = 0;
+    items.forEach(item => {
+        const name = (item.getAttribute('data-name') || '').toLowerCase();
+        if (name === '<all>' || !val || name.includes(val)) {
+            item.style.display = 'flex';
+            matched++;
+        } else {
+            item.style.display = 'none';
+        }
+    });
+    const noMatch = document.getElementById('repCustomerNoMatch');
+    if (noMatch) noMatch.style.display = (matched === 0) ? 'block' : 'none';
+    const clearBtn = document.getElementById('repCustomerClearBtn');
+    if (clearBtn) clearBtn.style.display = (val && val !== '<all>') ? 'inline-flex' : 'none';
+
+    // Auto-sync exact customer match to hidden customer_id
+    const hid = document.getElementById('repCustomerId');
+    if (hid && val && val !== '<all>') {
+        let exactItem = Array.from(items).find(it => (it.getAttribute('data-name') || '').toLowerCase() === val);
+        if (exactItem) {
+            hid.value = exactItem.getAttribute('data-id') || '';
+        } else {
+            hid.value = '';
+        }
+    }
+}
+
+function selectRepCustomer(id, name) {
+    const hid = document.getElementById('repCustomerId');
+    const input = document.getElementById('repCustomerSearchInput');
+    const menu = document.getElementById('repCustomerDropdownMenu');
+    const clearBtn = document.getElementById('repCustomerClearBtn');
+
+    if (hid) hid.value = id;
+    if (input) input.value = name;
+    if (menu) menu.classList.remove('show');
+    if (clearBtn) clearBtn.style.display = (id || (name && name !== '<All>')) ? 'inline-flex' : 'none';
+
+    document.querySelectorAll('#repCustomerDropdownMenu .rep-cust-item').forEach(it => {
+        if ((it.getAttribute('data-id') || '') === (id || '')) {
+            it.classList.add('selected');
+        } else {
+            it.classList.remove('selected');
+        }
+    });
+}
+
+function clearRepCustomerSelection(e) {
+    if (e) e.stopPropagation();
+    selectRepCustomer('', '<All>');
+    const input = document.getElementById('repCustomerSearchInput');
+    if (input) {
+        input.focus();
+        input.select();
+    }
+    filterRepCustomerDropdown('');
+}
+
+function handleRepCustomerKey(e) {
+    const menu = document.getElementById('repCustomerDropdownMenu');
+    if (!menu) return;
+    const isShowing = menu.classList.contains('show');
+    const visibleItems = Array.from(menu.querySelectorAll('.rep-cust-item')).filter(it => it.style.display !== 'none');
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (!isShowing) {
+            openRepCustomerDropdown();
+            return;
+        }
+        let curIdx = visibleItems.findIndex(it => it.classList.contains('highlighted'));
+        visibleItems.forEach(it => it.classList.remove('highlighted'));
+        let nextIdx = (curIdx + 1 < visibleItems.length) ? curIdx + 1 : 0;
+        if (visibleItems[nextIdx]) {
+            visibleItems[nextIdx].classList.add('highlighted');
+            visibleItems[nextIdx].scrollIntoView({ block: 'nearest' });
+        }
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!isShowing) return;
+        let curIdx = visibleItems.findIndex(it => it.classList.contains('highlighted'));
+        visibleItems.forEach(it => it.classList.remove('highlighted'));
+        let prevIdx = (curIdx - 1 >= 0) ? curIdx - 1 : visibleItems.length - 1;
+        if (visibleItems[prevIdx]) {
+            visibleItems[prevIdx].classList.add('highlighted');
+            visibleItems[prevIdx].scrollIntoView({ block: 'nearest' });
+        }
+    } else if (e.key === 'Enter') {
+        if (isShowing) {
+            let highlighted = visibleItems.find(it => it.classList.contains('highlighted'));
+            if (highlighted) {
+                e.preventDefault();
+                selectRepCustomer(highlighted.getAttribute('data-id'), highlighted.getAttribute('data-name'));
+                return;
+            } else if (visibleItems.length === 1) {
+                e.preventDefault();
+                selectRepCustomer(visibleItems[0].getAttribute('data-id'), visibleItems[0].getAttribute('data-name'));
+                return;
+            }
+        }
+    } else if (e.key === 'Escape') {
+        menu.classList.remove('show');
+    }
+}
 
 function toggleParamsPanel() {
     const panel = document.getElementById('reportParamsPanel');

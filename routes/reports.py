@@ -325,7 +325,10 @@ def view_report(report_key):
     meta, cat = get_report_meta(report_key)
 
     # Filter parameters
-    customer_id = request.args.get('customer_id', '')
+    customer_id = request.args.get('customer_id', '').strip()
+    customer_search = request.args.get('customer_search', '').strip()
+    if customer_search == '<All>':
+        customer_search = ''
     vendor_id = request.args.get('vendor_id', '')
     category_id = request.args.get('category_id', '')
     location_id = request.args.get('location_id', '')
@@ -415,6 +418,30 @@ def view_report(report_key):
     else:
         all_branches = query_all("SELECT id, code, name FROM branches WHERE is_active = TRUE ORDER BY id ASC")
 
+    selected_customer_name = ''
+    if customer_id and customer_id.lower() != 'all':
+        if str(customer_id).isdigit():
+            for c in all_customers:
+                if str(c['id']) == str(customer_id):
+                    selected_customer_name = c['name']
+                    break
+        else:
+            if not customer_search:
+                customer_search = customer_id
+            customer_id = ''
+
+    if not selected_customer_name and customer_search:
+        matched_c = [c for c in all_customers if customer_search.lower() in c['name'].lower()]
+        if len(matched_c) == 1:
+            customer_id = str(matched_c[0]['id'])
+            selected_customer_name = matched_c[0]['name']
+        elif matched_c and any(c['name'].lower() == customer_search.lower() for c in matched_c):
+            exact = next(c for c in matched_c if c['name'].lower() == customer_search.lower())
+            customer_id = str(exact['id'])
+            selected_customer_name = exact['name']
+        else:
+            selected_customer_name = customer_search
+
     def apply_branch_scope(where_list, params_list):
         if branch_scope == 'main':
             where_list.append("so.branch_id IS NULL")
@@ -439,9 +466,12 @@ def view_report(report_key):
         params = [start_date, end_date]
         apply_branch_scope(base_where, params)
 
-        if customer_id and customer_id != 'all':
+        if customer_id and customer_id != 'all' and str(customer_id).isdigit():
             base_where.append("so.customer_id = %s")
             params.append(int(customer_id))
+        elif customer_search:
+            base_where.append("c.name ILIKE %s")
+            params.append(f"%{customer_search}%")
 
         if status == 'Paid':
             base_where.append("so.payment_status = 'PAID'")
@@ -455,7 +485,7 @@ def view_report(report_key):
 
         where_sql = " AND ".join(base_where)
 
-        total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so WHERE {where_sql}", tuple(params))['cnt']
+        total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so LEFT JOIN customers c ON so.customer_id = c.id WHERE {where_sql}", tuple(params))['cnt']
         total_pages = max(1, math.ceil(total_count / per_page))
         page = min(page, total_pages)
         offset = (page - 1) * per_page
@@ -473,14 +503,17 @@ def view_report(report_key):
             SELECT 
                 COUNT(*) as total_orders,
                 COALESCE(SUM(so.total_amount), 0) as total_sales,
+                COALESCE(SUM(COALESCE(oc.total_cogs, 0)), 0) as total_cost,
                 COALESCE(SUM(so.total_amount - COALESCE(oc.total_cogs, 0)), 0) as total_profit
             FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
             LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
             WHERE {where_sql}
         """
         totals_row = query_one(totals_sql, tuple(params))
         totals = {
             'sales_amount': float(totals_row['total_sales'] or 0),
+            'costing': float(totals_row['total_cost'] or 0),
             'gross_profit': float(totals_row['total_profit'] or 0),
             'total_orders': totals_row['total_orders'] or 0
         }
@@ -492,6 +525,8 @@ def view_report(report_key):
             order_col = "c.name ASC, so.order_number ASC"
         elif sort_by == 'Sales Amount':
             order_col = "so.total_amount DESC"
+        elif sort_by in ('Total Cost', 'Costing', 'Branch Cost'):
+            order_col = "costing DESC"
         elif sort_by == 'Gross Profit':
             order_col = "gross_profit DESC"
 
@@ -513,6 +548,7 @@ def view_report(report_key):
                 COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), c.city, '') as billing_address,
                 so.order_date,
                 so.total_amount as sales_amount,
+                COALESCE(oc.total_cogs, 0) as costing,
                 (so.total_amount - COALESCE(oc.total_cogs, 0)) as gross_profit
             FROM sales_orders so
             LEFT JOIN customers c ON so.customer_id = c.id
@@ -1821,6 +1857,8 @@ def view_report(report_key):
                            total_pages=total_pages,
                            per_page=per_page,
                            customer_id=customer_id,
+                           customer_search=customer_search,
+                           selected_customer_name=selected_customer_name,
                            vendor_id=vendor_id,
                            category_id=category_id,
                            location_id=location_id,
@@ -1859,7 +1897,13 @@ def export_report(report_key):
     custom_from = request.args.get('date_from', '')
     custom_to = request.args.get('date_to', '')
     status = request.args.get('status', 'Paid')
-    customer_id = request.args.get('customer_id', '')
+    customer_id = request.args.get('customer_id', '').strip()
+    customer_search = request.args.get('customer_search', '').strip()
+    if customer_search == '<All>':
+        customer_search = ''
+    if customer_id and not str(customer_id).isdigit() and not customer_search:
+        customer_search = customer_id
+        customer_id = ''
     vendor_id = request.args.get('vendor_id', '')
     category_id = request.args.get('category_id', '')
     location_id = request.args.get('location_id', '')
@@ -1890,9 +1934,33 @@ def export_report(report_key):
     writer = csv.writer(output)
 
     if report_key == 'sales-order-profit':
-        writer.writerow(['Order Number', 'Status', 'Customer', 'Billing Address', 'Order Date', 'Sales Amount ($)', 'Gross Profit ($)'])
-        where_status = "so.payment_status = 'PAID'" if status == 'Paid' else ("so.status = 'INVOICED'" if status == 'Invoiced' else "1=1")
-        where_branch = "so.branch_id IS NULL" if branch_scope == 'main' else (f"so.branch_id = {int(branch_scope)}" if branch_scope.isdigit() else "1=1")
+        writer.writerow(['Order Number', 'Status', 'Customer', 'Billing Address', 'Order Date', 'Sales Amount ($)', 'Costing ($)', 'Gross Profit ($)'])
+        base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
+        params = [start_date, end_date]
+        if branch_scope == 'main':
+            base_where.append("so.branch_id IS NULL")
+        elif branch_scope != 'all' and str(branch_scope).isdigit():
+            base_where.append("so.branch_id = %s")
+            params.append(int(branch_scope))
+
+        if customer_id and customer_id != 'all' and str(customer_id).isdigit():
+            base_where.append("so.customer_id = %s")
+            params.append(int(customer_id))
+        elif customer_search:
+            base_where.append("c.name ILIKE %s")
+            params.append(f"%{customer_search}%")
+
+        if status == 'Paid':
+            base_where.append("so.payment_status = 'PAID'")
+        elif status == 'Open':
+            base_where.append("so.status = 'OPEN'")
+        elif status == 'Invoiced':
+            base_where.append("so.status = 'INVOICED'")
+        elif status != 'All':
+            base_where.append("so.status = %s")
+            params.append(status)
+
+        where_sql = " AND ".join(base_where)
         line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
         rows = query_all(f"""
             WITH order_costs AS (
@@ -1910,13 +1978,14 @@ def export_report(report_key):
                 COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), c.city, '') as billing_address,
                 so.order_date,
                 so.total_amount as sales_amount,
+                COALESCE(oc.total_cogs, 0) as costing,
                 (so.total_amount - COALESCE(oc.total_cogs, 0)) as gross_profit
             FROM sales_orders so
             LEFT JOIN customers c ON so.customer_id = c.id
             LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
-            WHERE so.order_date >= %s AND so.order_date <= %s AND so.status != 'CANCELLED' AND {where_status} AND {where_branch}
+            WHERE {where_sql}
             ORDER BY so.order_date ASC, so.order_number ASC
-        """, (start_date, end_date))
+        """, tuple(params))
 
         for r in rows:
             writer.writerow([
@@ -1926,6 +1995,7 @@ def export_report(report_key):
                 r['billing_address'] or '',
                 str(r['order_date']),
                 f"{float(r['sales_amount'] or 0):.2f}",
+                f"{float(r['costing'] or 0):.2f}",
                 f"{float(r['gross_profit'] or 0):.2f}"
             ])
         filename = f"Sales_Order_Profit_Report_{start_date}_{end_date}.csv"
