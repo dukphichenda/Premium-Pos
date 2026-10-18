@@ -48,52 +48,6 @@
   color: #4C1D95;
   margin: 0;
 }
-.inflow-trial-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  background: #FEF3C7;
-  border: 1px solid #FDE68A;
-  border-radius: 9999px;
-  padding: 3px 6px 3px 12px;
-  font-size: 11.5px;
-  font-weight: 700;
-  color: #92400E;
-}
-.inflow-trial-pill .subscribe-btn {
-  background: #F59E0B;
-  color: #1E293B;
-  border: none;
-  border-radius: 9999px;
-  padding: 3px 10px;
-  font-size: 11px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s ease;
-}
-.header-icon-btn {
-  background: none;
-  border: none;
-  color: #6B7280;
-  cursor: pointer;
-  padding: 4px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.header-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #6D28D9;
-  color: #FFFFFF;
-  font-weight: 700;
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
 .inflow-web-filterbar {
   min-height: 48px;
   background: #FFFFFF;
@@ -480,7 +434,7 @@
     <!-- Top Global Bar matching Screenshot 2 -->
     <div class="inflow-web-viewer-topbar">
         <div style="display: flex; align-items: center; gap: 14px;">
-            <a href="{{ url_for('reports.reports_center', cat=cat.key, branch=branch_scope) }}" onclick="navigateBackToHub(); return false;" class="inflow-back-btn" title="Back to Reports list">
+            <a href="{{ url_for('reports.reports_center', cat=cat.key, branch=branch_scope) }}" onclick="navigateBackToHub(); return false;" class="inflow-back-btn" title="Back to Reports list" data-no-tab="true">
                 <span class="inflow-back-arrow">←</span>
             </a>
             <h1 class="inflow-report-viewer-title">{{ meta.title }}</h1>
@@ -492,14 +446,6 @@
                 🏬 {{ branch_scope_label }} (Assigned)
             </span>
             {% endif %}
-            <div class="inflow-trial-pill">
-                <span>1663 days left</span>
-                <button type="button" class="subscribe-btn">Subscribe now ✨</button>
-            </div>
-            <button type="button" class="header-icon-btn" title="Help">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-            </button>
-            <div class="header-avatar" title="System Administrator">K</div>
         </div>
     </div>
 
@@ -1182,11 +1128,10 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 function navigateBackToHub() {
-    const url = "{{ url_for('reports.reports_center', branch=branch_scope) }}";
-    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
-        window.top.inflowMdi.navigateOrOpenTab(url, 'Reports', 'reports');
+    if (window.history && window.history.length > 1) {
+        window.history.back();
     } else {
-        window.location.href = url;
+        window.location.href = "{{ url_for('reports.reports_center', branch=branch_scope) }}";
     }
 }
 
