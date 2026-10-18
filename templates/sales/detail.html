@@ -1560,14 +1560,20 @@
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
-                <input type="text" id="soSidebarSearchInput" class="so-search-input" 
+                <input type="search" id="soSidebarSearchInput" class="so-search-input" 
+                       name="so_filter_search_field"
                        placeholder="Search order #, customer, $..." 
-                       value="{{ search_query or '' }}"
-                       autocomplete="off" 
+                       value="{% if request.args.get('search') or request.args.get('q') %}{{ search_query or '' }}{% endif %}"
+                       autocomplete="one-time-code" 
+                       autocorrect="off"
+                       autocapitalize="off"
+                       spellcheck="false"
+                       data-lpignore="true"
+                       data-form-type="other"
                        style="height: 33px; padding-left: 31px; padding-right: 30px; font-size: 12px;"
                        oninput="handleSoLiveSearch(this.value)"
                        onkeydown="handleSoSearchKey(event)">
-                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
+                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if request.args.get('search') or request.args.get('q') %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
             </div>
         </div>
 
@@ -3146,7 +3152,7 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
     if (filters.branch && !params.has('branch')) params.set('branch', filters.branch);
 
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : '';
     if (liveSearchVal) {
         params.set('search', liveSearchVal);
     } else if (liveSearchInput) {
@@ -3208,7 +3214,7 @@ function attachFiltersToForm(form) {
     });
 
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : '';
     let searchInput = form.querySelector('input[name="search"]');
     if (!searchInput) {
         searchInput = document.createElement('input');
@@ -3292,21 +3298,33 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     // Clear stale customer search in storage so it never wipes out the orders list
     sessionStorage.removeItem('inflow_so_drawer_customer_search');
 
-    // Retain any active search query from input, storage, or current URL so search remains fixed across order selection
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const isSearchEmpty = liveSearchInput && !liveSearchInput.value.trim();
-    if (isSearchEmpty) {
-        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-        url.searchParams.set('search', '');
+
+    // When clicking a specific sales order card from sidebar, strip search param from URL
+    // so the order detail view is NEVER hijacked or filtered by stale search
+    if (targetOrderId) {
+        url.searchParams.delete('search');
         url.searchParams.delete('q');
+        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+        if (liveSearchInput) {
+            liveSearchInput.value = '';
+            const clearBtn = document.getElementById('btnClearSoSearch');
+            if (clearBtn) clearBtn.style.display = 'none';
+        }
+        const allCards = document.querySelectorAll('.so-sidebar-card:not(.so-customer-match-card)');
+        allCards.forEach(c => c.style.display = 'block');
+        const custWrap = document.getElementById('soSidebarCustomerMatches');
+        if (custWrap) { custWrap.innerHTML = ''; custWrap.style.display = 'none'; }
+        const noMatch = document.getElementById('soSidebarNoSearchMatch');
+        if (noMatch) noMatch.style.display = 'none';
     } else {
-        const currentParams = new URLSearchParams(window.location.search);
-        const liveSearchVal = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || currentParams.get('search') || '');
-        if (liveSearchVal) {
-            url.searchParams.set('search', liveSearchVal);
-            try {
-                sessionStorage.setItem('inflow_so_search_query', liveSearchVal);
-            } catch(e) {}
+        const isSearchEmpty = liveSearchInput && !liveSearchInput.value.trim();
+        if (isSearchEmpty) {
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+            url.searchParams.set('search', '');
+            url.searchParams.delete('q');
+        } else if (liveSearchInput && liveSearchInput.value.trim()) {
+            url.searchParams.set('search', liveSearchInput.value.trim());
         }
     }
 
@@ -3787,32 +3805,47 @@ document.addEventListener('DOMContentLoaded', function () {
     // Restore and fix sidebar customer/order search query
     const sidebarSearchInput = document.getElementById('soSidebarSearchInput');
     const soSearchUrlParams = new URLSearchParams(window.location.search);
-    const hasSearchParam = soSearchUrlParams.has('search');
-    const urlSearch = soSearchUrlParams.get('search') || soSearchUrlParams.get('q') || '';
-    let savedSearch = '';
-    try {
-        savedSearch = sessionStorage.getItem('inflow_so_search_query') || '';
-    } catch(e) {}
+    const hasSearchParam = soSearchUrlParams.has('search') || soSearchUrlParams.has('q');
+    const urlSearch = (soSearchUrlParams.get('search') || soSearchUrlParams.get('q') || '').trim();
+    const currentUsername = '{{ (session.get("username", "") or "") | lower }}';
 
     let activeSearch = '';
-    if (hasSearchParam) {
-        activeSearch = urlSearch.trim();
-        if (!activeSearch) {
-            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-        }
+    if (hasSearchParam && urlSearch) {
+        activeSearch = urlSearch;
     } else {
-        activeSearch = (savedSearch || '{{ search_query or "" }}').trim();
+        // Clear stale search so orders list is never stuck filtered by previous searches
+        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
     }
 
     if (sidebarSearchInput) {
-        sidebarSearchInput.value = activeSearch;
+        const val = (sidebarSearchInput.value || '').trim().toLowerCase();
+        // Guard against browser autofill putting username ('chenda') into search input
+        if (!hasSearchParam || val === currentUsername || val === 'chenda') {
+            sidebarSearchInput.value = activeSearch;
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+        } else {
+            sidebarSearchInput.value = activeSearch;
+        }
         const clearBtn = document.getElementById('btnClearSoSearch');
         if (clearBtn) clearBtn.style.display = activeSearch ? 'flex' : 'none';
         if (activeSearch) {
-            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
             handleSoLiveSearch(activeSearch);
+        } else {
+            handleSoLiveSearch('');
         }
     }
+
+    // Secondary autofill cleaner: browsers often autofill 150-300ms after load
+    setTimeout(() => {
+        if (sidebarSearchInput && !hasSearchParam) {
+            const v = (sidebarSearchInput.value || '').trim().toLowerCase();
+            if (v === currentUsername || v === 'chenda') {
+                sidebarSearchInput.value = '';
+                try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+                handleSoLiveSearch('');
+            }
+        }
+    }, 250);
 
     // Attach item dropdown popup to body early and register scroll/resize repositioning
     const itemPopupEl = document.getElementById('itemDropdownPopup');
@@ -7037,7 +7070,7 @@ function selectSoStatusFilter(status) {
 
     // Retain search query only if input has text
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : '';
     if (liveSearch) {
         url.searchParams.set('search', liveSearch);
     } else {
@@ -7064,7 +7097,7 @@ function applySoDateFilter(val) {
 
     // Retain search query only if input has text
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : '';
     if (liveSearch) {
         url.searchParams.set('search', liveSearch);
     } else {
@@ -7097,7 +7130,7 @@ function applyCustomDateFilter() {
 
     // Retain search query only if input has text
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : (sessionStorage.getItem('inflow_so_search_query') || '');
+    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : '';
     if (liveSearch) {
         url.searchParams.set('search', liveSearch);
     } else {

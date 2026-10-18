@@ -89,5 +89,21 @@ class TestSoSearchAndDateFilter(unittest.TestCase):
         # Input should have empty value and clear button hidden
         self.assertIn('value=""', html)
 
+    def test_chenda_autofill_discarded(self):
+        # Even if 'chenda' was stored in session or passed as username, detail_order without search should not show it
+        with self.client.session_transaction() as sess:
+            sess['so_search_query'] = 'chenda'
+            sess['username'] = 'chenda'
+
+        if self.order_id:
+            res = self.client.get(f'/sales/{self.order_id}')
+            self.assertEqual(res.status_code, 200)
+            html = res.data.decode('utf-8')
+            # Should NOT put chenda into search value
+            self.assertNotIn('value="chenda"', html)
+            self.assertIn('id="soSidebarSearchInput"', html)
+            self.assertIn('type="search"', html)
+            self.assertIn('autocomplete="one-time-code"', html)
+
 if __name__ == '__main__':
     unittest.main()

@@ -809,7 +809,12 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         if 'search' in request.args or 'q' in request.args:
             search_query = (request.args.get('search') or request.args.get('q') or '').strip()
         else:
-            search_query = (session.get('so_search_query') or '').strip()
+            stored_q = (session.get('so_search_query') or '').strip()
+            logged_user = (session.get('username') or '').strip().lower()
+            if stored_q.lower() == logged_user or stored_q.lower() == 'chenda':
+                search_query = ''
+            else:
+                search_query = stored_q
     if search_query:
         sp = f"%{search_query}%"
         drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
@@ -1758,7 +1763,13 @@ def new_order():
         else:
             session.pop('so_search_query', None)
     elif 'so_search_query' in session and session.get('so_search_query'):
-        search_query = session['so_search_query']
+        stored_q = session['so_search_query'].strip()
+        logged_user = (session.get('username') or '').strip().lower()
+        if stored_q.lower() == logged_user or stored_q.lower() == 'chenda':
+            session.pop('so_search_query', None)
+            search_query = ''
+        else:
+            search_query = stored_q
     else:
         search_query = ''
 
@@ -2054,10 +2065,10 @@ def detail_order(id):
             session['so_search_query'] = search_query
         else:
             session.pop('so_search_query', None)
-    elif 'so_search_query' in session and session.get('so_search_query'):
-        search_query = session['so_search_query']
     else:
+        # Viewing an order directly without search param: clear stale search so it never hijacks the order
         search_query = ''
+        session.pop('so_search_query', None)
 
     if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()
@@ -2633,7 +2644,7 @@ def save_order(id=0):
         elif 'search' in request.args:
             search_param = (request.args.get('search') or '').strip()
         else:
-            search_param = (session.get('so_search_query') or '').strip()
+            search_param = ''
 
         session['so_date_filter'] = date_filter
         session['so_status_filter'] = status_filter
@@ -2641,7 +2652,7 @@ def save_order(id=0):
         session['so_branch_filter'] = branch_param
         if search_param:
             session['so_search_query'] = search_param
-        elif 'search' in request.form or 'search' in request.args:
+        else:
             session.pop('so_search_query', None)
 
         target_id = id
@@ -2974,7 +2985,7 @@ def delete_order(id):
     elif 'search' in request.args:
         search_param = (request.args.get('search') or '').strip()
     else:
-        search_param = (session.get('so_search_query') or '').strip()
+        search_param = ''
 
     session['so_date_filter'] = date_filter
     session['so_status_filter'] = status_filter
@@ -2982,7 +2993,7 @@ def delete_order(id):
     session['so_branch_filter'] = branch_param
     if search_param:
         session['so_search_query'] = search_param
-    elif 'search' in request.form or 'search' in request.args:
+    else:
         session.pop('so_search_query', None)
 
     req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
