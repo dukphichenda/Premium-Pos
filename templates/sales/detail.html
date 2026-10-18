@@ -206,14 +206,27 @@
     height: 100vh;
     background: rgba(15, 23, 42, 0.55);
     backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     z-index: 100004;
     cursor: pointer;
-    pointer-events: none;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: opacity 0.15s ease;
 }
 
 .inflow-so-workspace.mobile-drawer-open .so-mobile-drawer-backdrop {
     display: block !important;
-    pointer-events: auto;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.inflow-so-workspace:not(.mobile-drawer-open) .so-mobile-drawer-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 .so-mobile-drawer-header {
@@ -263,6 +276,11 @@
 }
 
 @media (max-width: 768px) {
+    .inflow-so-workspace:not(.mobile-drawer-open) .so-master-sidebar {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+    }
     .so-mobile-sidebar-bar {
         display: flex !important;
     }
@@ -1353,14 +1371,14 @@
     <aside class="inflow-search-drawer so-master-sidebar" id="soMasterSidebar">
         <!-- Mobile Drawer Top Header with Minimize Arrow (visible on mobile <= 768px) -->
         <div class="so-mobile-drawer-header" id="soMobileDrawerHeader">
-            <button type="button" class="so-mobile-drawer-minimize-btn" onclick="toggleSoSidebarCollapse()" title="Minimize Orders List / បង្រួមបញ្ជីលក់ (Ctrl+[)">
+            <button type="button" class="so-mobile-drawer-minimize-btn" onclick="closeSoMobileDrawer()" ontouchend="closeSoMobileDrawer()" title="Minimize Orders List / បង្រួមបញ្ជីលក់ (Ctrl+[)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
                 <span>Minimize / បង្រួម</span>
             </button>
             <span class="so-mobile-drawer-title">Orders List</span>
-            <button type="button" class="so-mobile-drawer-close-x" onclick="toggleSoSidebarCollapse()" title="Close">✕</button>
+            <button type="button" class="so-mobile-drawer-close-x" onclick="closeSoMobileDrawer()" ontouchend="closeSoMobileDrawer()" title="Close">✕</button>
         </div>
 
         <!-- Top Toolbar: [ 📅 ] [ Open (51) ∨ ] [ + ] -->
@@ -1598,7 +1616,8 @@
             {% endif %}
 
             <a href="javascript:void(0)" 
-               onclick="handleSelectOrder('{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)" 
+               onclick="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)" 
+               ontouchend="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)"
                class="so-sidebar-card {% if not is_new and s_ord.id == order.id %}active{% endif %}"
                data-order-id="{{ s_ord.id }}"
                data-order-num="{{ s_ord.order_number }}"
@@ -1736,7 +1755,7 @@
     </div>
 
     <!-- Mobile Drawer Backdrop Overlay (Tap to minimize sidebar on mobile) -->
-    <div class="so-mobile-drawer-backdrop" id="soMobileDrawerBackdrop" onclick="toggleSoSidebarCollapse()" title="Tap to minimize sidebar / ចុចដើម្បីបង្រួម"></div>
+    <div class="so-mobile-drawer-backdrop" id="soMobileDrawerBackdrop" onclick="closeSoMobileDrawer()" ontouchend="closeSoMobileDrawer()" title="Tap to minimize sidebar / ចុចដើម្បីបង្រួម"></div>
 
     <!-- Mobile Floating Show Orders Button (Always accessible while scrolling on mobile) -->
     <button type="button" class="so-mobile-floating-btn" id="soMobileFloatingBtn" onclick="toggleSoSidebarCollapse()" title="Show Orders List / បង្ហាញបញ្ជីលក់">
@@ -2815,11 +2834,21 @@ function toggleDrawerExpand() {
 }
 
 function closeSoMobileDrawer() {
+    window._soDrawerJustClosedAt = Date.now();
     const ws = document.querySelector('.inflow-so-workspace');
-    if (ws) ws.classList.remove('mobile-drawer-open');
+    if (ws) {
+        ws.classList.remove('mobile-drawer-open');
+    }
     document.body.classList.remove('so-drawer-backdrop-active');
+    document.documentElement.classList.remove('so-drawer-backdrop-active');
+
     const backdrop = document.getElementById('soMobileDrawerBackdrop');
-    if (backdrop) backdrop.style.display = 'none';
+    if (backdrop) {
+        backdrop.style.setProperty('display', 'none', 'important');
+        backdrop.style.setProperty('pointer-events', 'none', 'important');
+        backdrop.style.setProperty('opacity', '0', 'important');
+        backdrop.style.setProperty('visibility', 'hidden', 'important');
+    }
     const floatBtn = document.getElementById('soMobileFloatingBtn');
     if (floatBtn) floatBtn.style.display = 'flex';
     const barBtn = document.getElementById('soMobileSidebarBar');
@@ -2827,11 +2856,22 @@ function closeSoMobileDrawer() {
 }
 
 function openSoMobileDrawer() {
+    // Suppress ghost clicks/tap bleed-through from re-opening within 500ms of closing
+    if (Date.now() - (window._soDrawerJustClosedAt || 0) < 500) {
+        return;
+    }
     const ws = document.querySelector('.inflow-so-workspace');
-    if (ws) ws.classList.add('mobile-drawer-open');
+    if (ws) {
+        ws.classList.add('mobile-drawer-open');
+    }
     document.body.classList.add('so-drawer-backdrop-active');
     const backdrop = document.getElementById('soMobileDrawerBackdrop');
-    if (backdrop) backdrop.style.display = 'block';
+    if (backdrop) {
+        backdrop.style.setProperty('display', 'block', 'important');
+        backdrop.style.setProperty('pointer-events', 'auto', 'important');
+        backdrop.style.setProperty('opacity', '1', 'important');
+        backdrop.style.setProperty('visibility', 'visible', 'important');
+    }
     const floatBtn = document.getElementById('soMobileFloatingBtn');
     if (floatBtn) floatBtn.style.display = 'none';
     const barBtn = document.getElementById('soMobileSidebarBar');
@@ -2847,6 +2887,9 @@ function toggleSoSidebarCollapse(forceState) {
         const isOpen = ws.classList.contains('mobile-drawer-open');
         const willOpen = (typeof forceState === 'boolean') ? !forceState : !isOpen;
         if (willOpen) {
+            if (Date.now() - (window._soDrawerJustClosedAt || 0) < 500) {
+                return; // suppress ghost click
+            }
             openSoMobileDrawer();
         } else {
             closeSoMobileDrawer();
@@ -3205,6 +3248,17 @@ function getCurrentOrderId() {
 function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     if (!targetUrl) return;
     closeSoMobileDrawer();
+
+    // Instant top progress indicator (gives immediate visual feedback)
+    let pBar = document.getElementById('soFastNavProgressBar');
+    if (!pBar) {
+        pBar = document.createElement('div');
+        pBar.id = 'soFastNavProgressBar';
+        pBar.style.cssText = 'position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,#0D9488,#10B981);z-index:100007;transition:width 0.18s ease;width:0;pointer-events:none;';
+        document.body.appendChild(pBar);
+    }
+    pBar.style.display = 'block';
+    pBar.style.width = '35%';
     
     // Save drawer / sidebar scroll position
     const soSidebarList = document.getElementById('soSidebarListBody');
@@ -3315,6 +3369,9 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
             currCanvas.replaceWith(newCanvas);
         }
 
+        // Guarantee mobile drawer and backdrop are completely dismissed after canvas swap
+        closeSoMobileDrawer();
+
         // Synchronize hidden action forms (action URLs with new order ID)
         ['completePayForm', 'cancelOrderForm', 'deleteOrderForm', 'reopenOrderForm'].forEach(fid => {
             const newF = doc.getElementById(fid);
@@ -3421,8 +3478,18 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         if (typeof recalculateTotals === 'function') recalculateTotals();
         if (typeof initPreviewToolbar === 'function') initPreviewToolbar();
         if (typeof initDeliverySelection === 'function') initDeliverySelection();
+        closeSoMobileDrawer();
+
+        const pBar = document.getElementById('soFastNavProgressBar');
+        if (pBar) {
+            pBar.style.width = '100%';
+            setTimeout(() => { pBar.style.display = 'none'; pBar.style.width = '0'; }, 180);
+        }
     })
     .catch(err => {
+        closeSoMobileDrawer();
+        const pBar = document.getElementById('soFastNavProgressBar');
+        if (pBar) { pBar.style.display = 'none'; pBar.style.width = '0'; }
         console.warn('Fast partial swap error, falling back to full navigation:', err);
         if (window.top && window.top.inflowMdi) {
             window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
@@ -3449,7 +3516,23 @@ window.addEventListener('popstate', function(e) {
     }
 })();
 
-function handleSelectOrder(targetUrl, clickedEl) {
+function handleSelectOrder(event, targetUrl, clickedEl) {
+    if (event) {
+        try { if (typeof event.preventDefault === 'function') event.preventDefault(); } catch(e) {}
+        try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
+    }
+    // Support legacy signature handleSelectOrder(targetUrl, clickedEl)
+    if (typeof event === 'string') {
+        clickedEl = targetUrl;
+        targetUrl = event;
+    }
+    // Debounce rapid dual events (e.g. touchend followed immediately by synthesized click)
+    const now = Date.now();
+    if (window._soLastOrderSelectTime && (now - window._soLastOrderSelectTime < 350)) {
+        return;
+    }
+    window._soLastOrderSelectTime = now;
+
     closeSoMobileDrawer();
     if (isDirty) {
         openSavePromptModal(
@@ -7256,8 +7339,11 @@ function initSoOrderHoverPreview() {
     const popover = document.getElementById('soOrderItemsHoverPreview');
     if (!sidebarList || !popover) return;
 
-    // Hover on sidebar list cards (mouse over order)
+    // Hover on sidebar list cards (mouse over order - desktop only)
     sidebarList.addEventListener('mouseover', function(e) {
+        if (window.innerWidth <= 768 || document.documentElement.classList.contains('is-mobile-view')) {
+            return;
+        }
         const card = e.target.closest('.so-sidebar-card:not(.so-customer-match-card)');
         if (!card) return;
         if (currentHoveredCard === card) return;
