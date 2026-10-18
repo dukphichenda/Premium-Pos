@@ -364,6 +364,26 @@
         animation: inflowMobileSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 }
+@media (min-width: 769px) {
+    .po-mobile-sidebar-bar,
+    .po-mobile-floating-btn,
+    .po-mobile-drawer-header,
+    .po-mobile-drawer-backdrop {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
+html.is-desktop-view .po-mobile-sidebar-bar,
+html.is-desktop-view .po-mobile-floating-btn,
+html.is-desktop-view .po-mobile-drawer-header,
+html.is-desktop-view .po-mobile-drawer-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
 .po-master-topbar {
     display: flex;
     align-items: center;
@@ -3867,6 +3887,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 function openPoMobileDrawer() {
+    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
+    if (!isMobile) return;
     const ws = document.querySelector('.inflow-po-split-workspace');
     if (!ws) return;
     ws.classList.add('mobile-drawer-open');
@@ -3896,10 +3918,23 @@ function closePoMobileDrawer() {
         backdrop.style.setProperty('opacity', '0', 'important');
         backdrop.style.setProperty('visibility', 'hidden', 'important');
     }
+    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
     const floatBtn = document.getElementById('poMobileFloatingBtn');
-    if (floatBtn) floatBtn.style.display = 'flex';
+    if (floatBtn) {
+        if (isMobile) {
+            floatBtn.style.display = 'flex';
+        } else {
+            floatBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
     const barBtn = document.getElementById('poMobileSidebarBar');
-    if (barBtn) barBtn.style.display = 'flex';
+    if (barBtn) {
+        if (isMobile) {
+            barBtn.style.display = 'flex';
+        } else {
+            barBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
     window._poDrawerJustClosedAt = Date.now();
 }
 
@@ -3957,6 +3992,13 @@ document.addEventListener('keydown', (e) => {
 
 // Initialize line auto counts on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
+    const isMob = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
+    if (!isMob) {
+        const floatBtn = document.getElementById('poMobileFloatingBtn');
+        if (floatBtn) floatBtn.style.setProperty('display', 'none', 'important');
+        const barBtn = document.getElementById('poMobileSidebarBar');
+        if (barBtn) barBtn.style.setProperty('display', 'none', 'important');
+    }
     try {
         if (localStorage.getItem('inflow_po_sidebar_collapsed') === 'true') {
             togglePoSidebarCollapse(true);

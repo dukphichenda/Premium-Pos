@@ -315,6 +315,26 @@
         animation: inflowMobileSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 }
+@media (min-width: 769px) {
+    .so-mobile-sidebar-bar,
+    .so-mobile-floating-btn,
+    .so-mobile-drawer-header,
+    .so-mobile-drawer-backdrop {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
+html.is-desktop-view .so-mobile-sidebar-bar,
+html.is-desktop-view .so-mobile-floating-btn,
+html.is-desktop-view .so-mobile-drawer-header,
+html.is-desktop-view .so-mobile-drawer-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
 @keyframes inflowMobileSlideIn {
     from { transform: translateX(-100%); }
     to { transform: translateX(0); }
@@ -588,21 +608,23 @@
 }
 .so-sidebar-card:nth-child(even),
 .so-sidebar-card.so-card-shaded {
-    background: #F8F5EE; /* Soft warm cream tone */
-    border-bottom: 1px solid #EBE4D8;
+    background: #CCEFE6; /* Distinct, clear shaded inFlow teal tone to separate each SO */
+    border-bottom: 1px solid #BCE5DB;
 }
 .so-sidebar-card:hover {
-    background: #F3ECE0 !important; /* Gentle cream hover */
-    border-left: 4px solid #B88958 !important; /* Accent bar pops on hover */
-    box-shadow: 0 1px 4px rgba(139, 90, 43, 0.1);
+    background: #B6E8DB !important; /* Fresh, responsive teal hover */
+    border-left: 4px solid #1B7163 !important; /* Accent bar pops on hover */
+    box-shadow: 0 1px 4px rgba(27, 113, 99, 0.12);
 }
 .so-sidebar-card.active {
     border-left: 4px solid #8B5A2B !important; /* Rich warm saddle brown accent */
     background: #EDE0CD !important; /* Cream brown color for active or selected SO */
+    border-bottom: 1px solid #D6C2A8 !important;
     box-shadow: inset 0 0 0 1px rgba(139, 90, 43, 0.28);
 }
 .so-sidebar-card.active:hover {
     background: #E4D4BE !important;
+    border-left: 4px solid #8B5A2B !important;
 }
 
 .so-card-row-top {
@@ -644,8 +666,8 @@
 .so-sidebar-card:nth-child(even) .so-card-order-date,
 .so-sidebar-card.so-card-shaded .so-card-order-date {
     background: #FFFFFF;
-    border-color: rgba(139, 90, 43, 0.3);
-    color: #5C3A1E;
+    border-color: rgba(93, 168, 155, 0.45);
+    color: #1E463E;
 }
 
 .so-sidebar-card.active .so-card-order-date {
@@ -706,7 +728,7 @@
 .so-sidebar-card:nth-child(even) .so-card-price-pill,
 .so-sidebar-card.so-card-shaded .so-card-price-pill {
     background: #FFFFFF;
-    border-color: rgba(139, 90, 43, 0.28);
+    border-color: rgba(93, 168, 155, 0.4);
     color: #0F172A;
 }
 .so-sidebar-card.active .so-card-price-pill {
@@ -2872,13 +2894,28 @@ function closeSoMobileDrawer() {
         backdrop.style.setProperty('opacity', '0', 'important');
         backdrop.style.setProperty('visibility', 'hidden', 'important');
     }
+    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
     const floatBtn = document.getElementById('soMobileFloatingBtn');
-    if (floatBtn) floatBtn.style.display = 'flex';
+    if (floatBtn) {
+        if (isMobile) {
+            floatBtn.style.display = 'flex';
+        } else {
+            floatBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
     const barBtn = document.getElementById('soMobileSidebarBar');
-    if (barBtn) barBtn.style.display = 'flex';
+    if (barBtn) {
+        if (isMobile) {
+            barBtn.style.display = 'flex';
+        } else {
+            barBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
 }
 
 function openSoMobileDrawer() {
+    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
+    if (!isMobile) return;
     // Suppress ghost clicks/tap bleed-through from re-opening within 500ms of closing
     if (Date.now() - (window._soDrawerJustClosedAt || 0) < 500) {
         return;
@@ -2939,6 +2976,13 @@ function toggleDrawerCollapse() {
 
 // Restore SO sidebar collapse state on load
 document.addEventListener('DOMContentLoaded', function() {
+    const isMob = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
+    if (!isMob) {
+        const floatBtn = document.getElementById('soMobileFloatingBtn');
+        if (floatBtn) floatBtn.style.setProperty('display', 'none', 'important');
+        const barBtn = document.getElementById('soMobileSidebarBar');
+        if (barBtn) barBtn.style.setProperty('display', 'none', 'important');
+    }
     try {
         if (localStorage.getItem('inflow_so_sidebar_collapsed') === 'true') {
             toggleSoSidebarCollapse(true);

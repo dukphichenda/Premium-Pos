@@ -300,6 +300,26 @@
         animation: inflowMobileSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
     }
 }
+@media (min-width: 769px) {
+    .product-mobile-sidebar-bar,
+    .product-mobile-floating-btn,
+    .product-mobile-drawer-header,
+    .product-mobile-drawer-backdrop {
+        display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+}
+html.is-desktop-view .product-mobile-sidebar-bar,
+html.is-desktop-view .product-mobile-floating-btn,
+html.is-desktop-view .product-mobile-drawer-header,
+html.is-desktop-view .product-mobile-drawer-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
 </style>
 
 <div class="inflow-catalog-layout">
@@ -7039,6 +7059,8 @@ async function submitNewCombinedProduct(e) {
 }
 
 function openProductMobileDrawer() {
+    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
+    if (!isMobile) return;
     const ws = document.querySelector('.inflow-catalog-layout');
     if (!ws) return;
     ws.classList.add('mobile-drawer-open');
@@ -7068,10 +7090,23 @@ function closeProductMobileDrawer() {
         backdrop.style.setProperty('opacity', '0', 'important');
         backdrop.style.setProperty('visibility', 'hidden', 'important');
     }
+    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
     const floatBtn = document.getElementById('productMobileFloatingBtn');
-    if (floatBtn) floatBtn.style.display = 'flex';
+    if (floatBtn) {
+        if (isMobile) {
+            floatBtn.style.display = 'flex';
+        } else {
+            floatBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
     const barBtn = document.getElementById('productMobileSidebarBar');
-    if (barBtn) barBtn.style.display = 'flex';
+    if (barBtn) {
+        if (isMobile) {
+            barBtn.style.display = 'flex';
+        } else {
+            barBtn.style.setProperty('display', 'none', 'important');
+        }
+    }
     window._productDrawerJustClosedAt = Date.now();
 }
 
@@ -7117,6 +7152,13 @@ function toggleProductSidebarCollapse(forceState) {
 
 // Restore Product sidebar collapse state on load
 document.addEventListener('DOMContentLoaded', () => {
+    const isMob = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
+    if (!isMob) {
+        const floatBtn = document.getElementById('productMobileFloatingBtn');
+        if (floatBtn) floatBtn.style.setProperty('display', 'none', 'important');
+        const barBtn = document.getElementById('productMobileSidebarBar');
+        if (barBtn) barBtn.style.setProperty('display', 'none', 'important');
+    }
     try {
         if (localStorage.getItem('inflow_product_sidebar_collapsed') === 'true') {
             toggleProductSidebarCollapse(true);
