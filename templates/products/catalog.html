@@ -182,7 +182,7 @@
 }
 
 .product-mobile-drawer-backdrop {
-    display: none;
+    display: none !important;
     position: fixed;
     top: 0;
     left: 0;
@@ -190,8 +190,27 @@
     height: 100vh;
     background: rgba(15, 23, 42, 0.55);
     backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     z-index: 100004;
     cursor: pointer;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: opacity 0.15s ease;
+}
+
+.inflow-catalog-layout.mobile-drawer-open .product-mobile-drawer-backdrop {
+    display: block !important;
+    pointer-events: auto !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+}
+
+.inflow-catalog-layout:not(.mobile-drawer-open) .product-mobile-drawer-backdrop {
+    display: none !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
 }
 
 .product-mobile-drawer-header {
@@ -260,8 +279,10 @@
         display: none !important;
     }
 
-    .inflow-catalog-layout .inflow-catalog-sidebar {
+    .inflow-catalog-layout:not(.mobile-drawer-open) .inflow-catalog-sidebar {
         display: none !important;
+        pointer-events: none !important;
+        visibility: hidden !important;
     }
 
     .inflow-catalog-layout.mobile-drawer-open .inflow-catalog-sidebar {
@@ -286,14 +307,14 @@
     <aside class="inflow-catalog-sidebar">
         <!-- Mobile Drawer Top Header with Minimize Arrow (visible on mobile <= 768px) -->
         <div class="product-mobile-drawer-header" id="productMobileDrawerHeader">
-            <button type="button" class="product-mobile-drawer-minimize-btn" onclick="toggleProductSidebarCollapse()" title="Minimize Product Catalog / បង្រួមបញ្ជីទំនិញ (Ctrl+[)">
+            <button type="button" class="product-mobile-drawer-minimize-btn" onclick="closeProductMobileDrawer()" ontouchend="closeProductMobileDrawer()" title="Minimize Product Catalog / បង្រួមបញ្ជីទំនិញ (Ctrl+[)">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="15 18 9 12 15 6"></polyline>
                 </svg>
                 <span>Minimize / បង្រួម</span>
             </button>
             <span class="product-mobile-drawer-title">Products Catalog</span>
-            <button type="button" class="product-mobile-drawer-close-x" onclick="toggleProductSidebarCollapse()" title="Close">✕</button>
+            <button type="button" class="product-mobile-drawer-close-x" onclick="closeProductMobileDrawer()" ontouchend="closeProductMobileDrawer()" title="Close">✕</button>
         </div>
         <!-- Top Toolbar Buttons -->
         <div class="inflow-catalog-sidebar-toolbar">
@@ -568,7 +589,7 @@
     </div>
 
     <!-- Mobile Drawer Backdrop Overlay (Tap to minimize sidebar on mobile) -->
-    <div class="product-mobile-drawer-backdrop" id="productMobileDrawerBackdrop" onclick="toggleProductSidebarCollapse()" title="Tap to minimize sidebar / ចុចដើម្បីបង្រួម"></div>
+    <div class="product-mobile-drawer-backdrop" id="productMobileDrawerBackdrop" onclick="closeProductMobileDrawer()" ontouchend="closeProductMobileDrawer()" title="Tap to minimize sidebar / ចុចដើម្បីបង្រួម"></div>
 
     <!-- Mobile Floating Show Catalog Button (Always accessible while scrolling on mobile) -->
     <button type="button" class="product-mobile-floating-btn" id="productMobileFloatingBtn" onclick="toggleProductSidebarCollapse()" title="Show Products Catalog / បង្ហាញបញ្ជីទំនិញ">
@@ -7017,6 +7038,43 @@ async function submitNewCombinedProduct(e) {
     }
 }
 
+function openProductMobileDrawer() {
+    const ws = document.querySelector('.inflow-catalog-layout');
+    if (!ws) return;
+    ws.classList.add('mobile-drawer-open');
+    document.body.classList.add('product-drawer-backdrop-active');
+    const backdrop = document.getElementById('productMobileDrawerBackdrop');
+    if (backdrop) {
+        backdrop.style.display = 'block';
+        backdrop.style.setProperty('pointer-events', 'auto', 'important');
+        backdrop.style.setProperty('opacity', '1', 'important');
+        backdrop.style.setProperty('visibility', 'visible', 'important');
+    }
+    const floatBtn = document.getElementById('productMobileFloatingBtn');
+    if (floatBtn) floatBtn.style.display = 'none';
+    const barBtn = document.getElementById('productMobileSidebarBar');
+    if (barBtn) barBtn.style.display = 'none';
+}
+
+function closeProductMobileDrawer() {
+    const ws = document.querySelector('.inflow-catalog-layout');
+    if (!ws) return;
+    ws.classList.remove('mobile-drawer-open');
+    document.body.classList.remove('product-drawer-backdrop-active');
+    const backdrop = document.getElementById('productMobileDrawerBackdrop');
+    if (backdrop) {
+        backdrop.style.display = 'none';
+        backdrop.style.setProperty('pointer-events', 'none', 'important');
+        backdrop.style.setProperty('opacity', '0', 'important');
+        backdrop.style.setProperty('visibility', 'hidden', 'important');
+    }
+    const floatBtn = document.getElementById('productMobileFloatingBtn');
+    if (floatBtn) floatBtn.style.display = 'flex';
+    const barBtn = document.getElementById('productMobileSidebarBar');
+    if (barBtn) barBtn.style.display = 'flex';
+    window._productDrawerJustClosedAt = Date.now();
+}
+
 // Product Catalog Sidebar Minimize / Collapse Toggle (100% full-width document view)
 function toggleProductSidebarCollapse(forceState) {
     const ws = document.querySelector('.inflow-catalog-layout');
@@ -7026,18 +7084,21 @@ function toggleProductSidebarCollapse(forceState) {
         const isOpen = ws.classList.contains('mobile-drawer-open');
         const willOpen = (typeof forceState === 'boolean') ? !forceState : !isOpen;
         if (willOpen) {
-            ws.classList.add('mobile-drawer-open');
-            document.body.classList.add('product-drawer-backdrop-active');
+            if (Date.now() - (window._productDrawerJustClosedAt || 0) < 500) {
+                return; // suppress ghost click
+            }
+            openProductMobileDrawer();
         } else {
-            ws.classList.remove('mobile-drawer-open');
-            document.body.classList.remove('product-drawer-backdrop-active');
+            closeProductMobileDrawer();
         }
-        const backdrop = document.getElementById('productMobileDrawerBackdrop');
-        if (backdrop) backdrop.style.display = willOpen ? 'block' : 'none';
-        const floatBtn = document.getElementById('productMobileFloatingBtn');
-        if (floatBtn) floatBtn.style.display = willOpen ? 'none' : 'flex';
-        const barBtn = document.getElementById('productMobileSidebarBar');
-        if (barBtn) barBtn.style.display = willOpen ? 'none' : 'flex';
+        // Also sync sidebar-collapsed class so fallback view stays minimized
+        if (!willOpen) {
+            ws.classList.add('sidebar-collapsed');
+            try { localStorage.setItem('inflow_product_sidebar_collapsed', 'true'); } catch(e) {}
+        } else {
+            ws.classList.remove('sidebar-collapsed');
+            try { localStorage.setItem('inflow_product_sidebar_collapsed', 'false'); } catch(e) {}
+        }
         return;
     }
     const isCurrentlyCollapsed = ws.classList.contains('sidebar-collapsed');

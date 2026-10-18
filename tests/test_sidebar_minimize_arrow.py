@@ -74,6 +74,8 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
 
         # JS function and shortcut
         self.assertIn('function togglePoSidebarCollapse', html)
+        self.assertIn('function closePoMobileDrawer', html)
+        self.assertIn('closePoMobileDrawer()', html)
         self.assertIn('inflow_po_sidebar_collapsed', html)
 
     def test_product_catalog_sidebar_minimize(self):
@@ -104,6 +106,8 @@ class TestSidebarMinimizeArrow(unittest.TestCase):
 
         # JS function and shortcut
         self.assertIn('function toggleProductSidebarCollapse', html)
+        self.assertIn('function closeProductMobileDrawer', html)
+        self.assertIn('closeProductMobileDrawer()', html)
         self.assertIn('inflow_product_sidebar_collapsed', html)
 
     def test_customer_sidebar_minimize_and_teal_theme(self):
