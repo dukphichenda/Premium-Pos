@@ -3,1548 +3,686 @@
 {% block title %}{{ meta.title }} - inFlow Premium{% endblock %}
 
 {% block content %}
-<!-- Top Accent Color Bar (Purple for Reports) -->
-<div class="inflow-top-accent-bar reports"></div>
+<div class="inflow-web-viewer-container">
+    <!-- Top Global Bar matching Screenshot 2 -->
+    <div class="inflow-web-viewer-topbar">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <a href="{{ url_for('reports.reports_center', cat=cat.key, branch=branch_scope) }}" class="inflow-back-btn" title="Back to Reports list">
+                <span class="inflow-back-arrow">←</span>
+            </a>
+            <h1 class="inflow-report-viewer-title">{{ meta.title }}</h1>
+        </div>
 
-<!-- inFlow Desktop Ribbon Toolbar -->
-<div class="inflow-desktop-toolbar">
-    <div class="inflow-toolbar-left">
-        <a href="{{ url_for('reports.reports_center') }}" class="inflow-tb-btn" title="Back to Reports List">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#4B5563" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
-            <span>Report List</span>
-        </a>
-        <button type="button" class="inflow-tb-btn primary" onclick="submitReportForm()" title="Re-generate report">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-            <span style="color: #FFFFFF; font-weight: bold;">Generate</span>
-        </button>
-        <button type="button" class="inflow-tb-btn" onclick="window.print()" title="Print report (Ctrl+P)">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1E65AE" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            <span>Print</span>
-        </button>
-        <div style="position: relative; display: inline-block;">
-            <button type="button" class="inflow-tb-btn" onclick="toggleExportMenu(event)">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                <span>Export ▾</span>
+        <div class="inflow-web-header-right">
+            {% if is_branch_user %}
+            <span style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: #ECFDF5; border: 1px solid #6EE7B7; border-radius: 9999px; font-size: 11px; font-weight: 700; color: #047857;">
+                🏬 {{ branch_scope_label }} (Assigned)
+            </span>
+            {% endif %}
+            <div class="inflow-trial-pill">
+                <span>1663 days left</span>
+                <button type="button" class="subscribe-btn">Subscribe now ✨</button>
+            </div>
+            <button type="button" class="header-icon-btn" title="Help">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
             </button>
-            <div id="reportExportMenu" class="inflow-tab-dropdown-menu">
-                <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by) }}" download data-no-tab="true">
-                    📊 Microsoft Excel (*.csv)
-                </a>
-                <a href="javascript:void(0)" onclick="window.print()">
-                    📄 Adobe PDF (*.pdf)
-                </a>
-            </div>
+            <div class="header-avatar" title="System Administrator">K</div>
         </div>
     </div>
-    <div>
-        <button type="button" class="inflow-tb-btn danger" onclick="window.closeInflowTab('tab-rep-{{ report_key }}', event)" title="Close report">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-            <span>Close</span>
-        </button>
-    </div>
-</div>
 
-<!-- Report Generator & Viewer Split Workspace (Matching screenshot0033.JPEG - screenshot0046.JPEG) -->
-<div class="inflow-report-viewer-workspace">
-    <!-- Left Configuration & Parameter Filter Panel -->
-    <aside class="inflow-report-params-panel" id="reportParamsPanel">
-        <form id="reportFilterForm" method="GET" action="{{ url_for('reports.view_report', report_key=report_key) }}">
-            <!-- Filter By Group -->
-            <div class="inflow-rep-group-box">
-                <div class="inflow-rep-group-title">Filter By</div>
+    <!-- Hidden Form for Parameter Submissions -->
+    <form id="reportFilterForm" method="GET" action="{{ url_for('reports.view_report', report_key=report_key) }}">
+        <input type="hidden" name="branch" id="formBranchInput" value="{{ branch_scope }}">
+        <input type="hidden" name="status" id="formStatusInput" value="{{ status }}">
+        <input type="hidden" name="date_range" id="formDateRangeInput" value="{{ date_range }}">
+        <input type="hidden" name="date_from" id="formDateFromInput" value="{{ date_from }}">
+        <input type="hidden" name="date_to" id="formDateToInput" value="{{ date_to }}">
+        <input type="hidden" name="customer_id" id="repCustomerId" value="{{ customer_id or '' }}">
+        <input type="hidden" name="category_id" id="formCategoryIdInput" value="{{ category_id }}">
+        <input type="hidden" name="costing_scheme_id" id="formCostingSchemeInput" value="{{ costing_scheme_id }}">
+        <input type="hidden" name="currency" id="formCurrencyInput" value="{{ currency }}">
+        <input type="hidden" name="sort_by" id="formSortByInput" value="{{ sort_by }}">
+        <input type="hidden" name="group_by" id="formGroupByInput" value="{{ group_by }}">
+        <input type="hidden" name="orientation" id="formOrientationInput" value="{{ orientation }}">
+        <input type="hidden" name="page" id="reportPageInput" value="{{ page }}">
+        <input type="hidden" name="generated" id="formGeneratedInput" value="1">
+    </form>
 
-                {% if cat.key == 'sales' %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Store Scope</span>
-                    <select name="branch" class="inflow-rep-param-select" style="font-weight: 600; color: #1E3A8A; background: #EFF6FF; border-color: #BFDBFE;">
+    <!-- Horizontal Ribbon Filterbar matching Screenshot 2 & 3 -->
+    <div class="inflow-web-filterbar">
+        <div class="filterbar-left">
+            <!-- All Filters button -->
+            <button type="button" class="inflow-chip-btn" onclick="toggleAllFiltersDrawer()" title="View and edit all report filters">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+                <span>All filters</span>
+            </button>
+
+            <span class="filterbar-divider"></span>
+
+            <!-- 1. Status Filter Chip (Screenshot 2: purple pill) -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapStatus">
+                <button type="button" class="inflow-chip-pill {% if status and status != 'All' %}active-purple{% endif %}" onclick="toggleChipPopover('popoverStatus', event)">
+                    <span class="chip-dot">○</span>
+                    <span id="chipStatusLabel">{% if status == 'Paid' %}Fulfilled (Paid){% elif status == 'Open' %}Open{% elif status == 'Invoiced' %}Invoiced{% elif status == 'All' or not status %}Status: All{% else %}{{ status }}{% endif %}</span>
+                </button>
+                <div id="popoverStatus" class="inflow-popover-dropdown">
+                    <div class="popover-search-wrap">
+                        <input type="text" class="popover-search-input" placeholder="Search status..." oninput="filterPopoverList(this, 'popoverStatusList')">
+                    </div>
+                    <div class="popover-list" id="popoverStatusList">
+                        <div class="popover-item {% if status == 'Paid' %}selected{% endif %}" onclick="selectFilterStatus('Paid')">Fulfilled (Paid)</div>
+                        <div class="popover-item {% if status == 'Open' %}selected{% endif %}" onclick="selectFilterStatus('Open')">Open</div>
+                        <div class="popover-item {% if status == 'Invoiced' %}selected{% endif %}" onclick="selectFilterStatus('Invoiced')">Invoiced</div>
+                        <div class="popover-item {% if status == 'All' or not status %}selected{% endif %}" onclick="selectFilterStatus('All')">All Statuses</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Invoice Date Filter Chip -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapDate">
+                <button type="button" class="inflow-chip-btn" onclick="toggleChipPopover('popoverDate', event)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                    <span id="chipDateLabel">Invoice Date: {{ date_range or 'This Month' }}</span>
+                </button>
+                <div id="popoverDate" class="inflow-popover-dropdown">
+                    <div class="popover-list">
+                        <div class="popover-item {% if date_range == 'This Month' %}selected{% endif %}" onclick="selectFilterDate('This Month')">This Month</div>
+                        <div class="popover-item {% if date_range == 'Today' %}selected{% endif %}" onclick="selectFilterDate('Today')">Today</div>
+                        <div class="popover-item {% if date_range == 'This Week' %}selected{% endif %}" onclick="selectFilterDate('This Week')">This Week</div>
+                        <div class="popover-item {% if date_range == 'Last Month' %}selected{% endif %}" onclick="selectFilterDate('Last Month')">Last Month</div>
+                        <div class="popover-item {% if date_range == 'This Year' %}selected{% endif %}" onclick="selectFilterDate('This Year')">This Year</div>
+                        <div class="popover-item {% if date_range == 'All' %}selected{% endif %}" onclick="selectFilterDate('All')">All Dates</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. Category Filter Chip (Screenshot 3 style!) -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapCategory">
+                <button type="button" class="inflow-chip-btn" onclick="toggleChipPopover('popoverCategory', event)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+                    <span id="chipCategoryLabel">{% if selected_category_name %}Category: {{ selected_category_name }}{% else %}Category{% endif %}</span>
+                </button>
+                <div id="popoverCategory" class="inflow-popover-dropdown" style="min-width: 250px;">
+                    <div class="popover-search-wrap">
+                        <input type="text" id="categorySearchInput" class="popover-search-input" placeholder="All categories" value="{% if selected_category_name %}{{ selected_category_name }}{% else %}All categories{% endif %}" onfocus="if(this.value==='All categories')this.select()" oninput="filterPopoverList(this, 'popoverCategoryList')">
+                    </div>
+                    <div class="popover-list" id="popoverCategoryList">
+                        <div class="popover-item {% if not category_id %}selected{% endif %}" data-name="All categories" onclick="selectFilterCategory('', 'All categories')">All categories</div>
+                        {% for cat_item in all_categories %}
+                        <div class="popover-item {% if category_id == cat_item.id|string %}selected{% endif %}" data-name="{{ cat_item.name|e }}" onclick="selectFilterCategory('{{ cat_item.id }}', '{{ cat_item.name|e }}')">{{ cat_item.name }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Customer Filter Chip with Searchable Combobox (Screenshot 3!) -->
+            <div class="inflow-filter-chip-wrapper" id="repCustomerComboboxWrap">
+                <button type="button" class="inflow-chip-btn" onclick="toggleRepCustomerDropdown(event)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span id="chipCustomerLabel">{% if selected_customer_name and selected_customer_name != '<All>' %}Customer: {{ selected_customer_name }}{% else %}Products / Customer{% endif %}</span>
+                </button>
+                <div id="repCustomerDropdownMenu" class="inflow-popover-dropdown" style="min-width: 280px;">
+                    <div class="popover-search-wrap" style="position: relative;">
+                        <input type="text" id="repCustomerSearchInput" name="customer_search" class="popover-search-input" placeholder="Search customer name..." value="{{ selected_customer_name or '<All>' }}" onfocus="handleRepCustomerFocus(this)" oninput="filterRepCustomerDropdown(this.value)" onkeydown="handleRepCustomerKey(event)" autocomplete="off">
+                        <button type="button" id="repCustomerClearBtn" onclick="clearRepCustomerSelection(event)" style="display: {% if customer_id or (customer_search and customer_search != '<All>') %}inline-flex{% else %}none{% endif %}; position: absolute; right: 16px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94A3B8; font-size: 11px; cursor: pointer;">✕</button>
+                    </div>
+                    <div class="popover-list">
+                        <div class="popover-item rep-cust-item {% if not customer_id and (not customer_search or customer_search == '<All>') %}selected{% endif %}" data-id="" data-name="<All>" onclick="selectRepCustomer('', '&lt;All&gt;')">&lt;All Customers&gt;</div>
+                        {% for c in all_customers %}
+                        <div class="popover-item rep-cust-item {% if customer_id == c.id|string %}selected{% endif %}" data-id="{{ c.id }}" data-name="{{ c.name|e }}" onclick="selectRepCustomer('{{ c.id }}', '{{ c.name|e }}')">{{ c.name }}</div>
+                        {% endfor %}
+                        <div id="repCustomerNoMatch" class="rep-cust-no-match" style="display: none; padding: 8px 14px; font-size: 11.5px; color: #94A3B8; font-style: italic;">No matching customers</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Store Scope Chip -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapBranch">
+                <button type="button" class="inflow-chip-btn" onclick="toggleChipPopover('popoverBranch', event)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    <span>{{ branch_scope_label or 'Store Scope' }}</span>
+                </button>
+                <div id="popoverBranch" class="inflow-popover-dropdown">
+                    <div class="popover-list">
                         {% if not is_branch_user %}
-                        <option value="main" {% if branch_scope == 'main' or not branch_scope %}selected{% endif %}>🏢 Main Store (Only)</option>
+                        <div class="popover-item {% if branch_scope == 'main' or not branch_scope %}selected{% endif %}" onclick="selectFilterBranch('main')">🏢 Main Store (Only)</div>
                         {% for b in all_branches %}
-                        <option value="{{ b.id }}" {% if branch_scope == b.id|string %}selected{% endif %}>🏬 {{ b.code }} - {{ b.name }}</option>
+                        <div class="popover-item {% if branch_scope == b.id|string %}selected{% endif %}" onclick="selectFilterBranch('{{ b.id }}')">🏬 {{ b.code }} - {{ b.name }}</div>
                         {% endfor %}
-                        <option value="all" {% if branch_scope == 'all' %}selected{% endif %}>🌐 All Outlets (Consolidated)</option>
+                        <div class="popover-item {% if branch_scope == 'all' %}selected{% endif %}" onclick="selectFilterBranch('all')">🌐 All Outlets (Consolidated)</div>
                         {% else %}
                         {% for b in all_branches %}
-                        <option value="{{ b.id }}" selected>🏬 {{ b.code }} - {{ b.name }} (Assigned)</option>
+                        <div class="popover-item selected">🏬 {{ b.code }} - {{ b.name }} (Assigned)</div>
                         {% endfor %}
                         {% endif %}
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row" style="position: relative;">
-                    <span class="inflow-rep-param-label">Customer</span>
-                    <div class="inflow-rep-combobox-wrap" id="repCustomerComboboxWrap">
-                        <input type="hidden" name="customer_id" id="repCustomerId" value="{{ customer_id or '' }}">
-                        <div class="inflow-rep-combobox-inner">
-                            <input type="text" 
-                                   id="repCustomerSearchInput" 
-                                   name="customer_search"
-                                   class="inflow-rep-param-input inflow-rep-combobox-input" 
-                                   placeholder="Search Customer..." 
-                                   value="{{ selected_customer_name or '<All>' }}" 
-                                   autocomplete="off"
-                                   onfocus="handleRepCustomerFocus(this)" 
-                                   onclick="openRepCustomerDropdown()" 
-                                   oninput="filterRepCustomerDropdown(this.value)"
-                                   onkeydown="handleRepCustomerKey(event)">
-                            <button type="button" 
-                                    id="repCustomerClearBtn" 
-                                    class="inflow-rep-combobox-clear" 
-                                    title="Clear customer selection" 
-                                    onclick="clearRepCustomerSelection(event)" 
-                                    style="display: {% if customer_id or (customer_search and customer_search != '<All>') %}inline-flex{% else %}none{% endif %};">✕</button>
-                            <button type="button" 
-                                    class="inflow-rep-combobox-arrow" 
-                                    onclick="toggleRepCustomerDropdown(event)" 
-                                    tabindex="-1">▾</button>
-                        </div>
-                        <div id="repCustomerDropdownMenu" class="inflow-rep-dropdown-menu">
-                            <div class="rep-cust-item {% if not customer_id and (not customer_search or customer_search == '<All>') %}selected{% endif %}" 
-                                 data-id="" 
-                                 data-name="<All>" 
-                                 onclick="selectRepCustomer('', '&lt;All&gt;')">
-                                <span class="rep-cust-name" style="font-weight: 600; color: #1E3A8A;">&lt;All&gt;</span>
-                            </div>
-                            {% for c in all_customers %}
-                            <div class="rep-cust-item {% if customer_id == c.id|string %}selected{% endif %}" 
-                                 data-id="{{ c.id }}" 
-                                 data-name="{{ c.name|e }}" 
-                                 onclick="selectRepCustomer('{{ c.id }}', '{{ c.name|e }}')">
-                                <span class="rep-cust-name">{{ c.name }}</span>
-                            </div>
-                            {% endfor %}
-                            <div id="repCustomerNoMatch" class="rep-cust-no-match" style="display: none;">
-                                No matching customers
-                            </div>
-                        </div>
                     </div>
-                </div>
-
-                {% if report_key in ['sales-by-product-summary', 'sales-by-product-details', 'customer-order-history'] %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Category</span>
-                    <select name="category_id" class="inflow-rep-param-select">
-                        <option value="" {% if not category_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for cat_item in all_categories %}
-                        <option value="{{ cat_item.id }}" {% if category_id == cat_item.id|string %}selected{% endif %}>{{ cat_item.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-
-                {% if report_key != 'customer-list' %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Order Date</span>
-                    <select name="date_range" id="dateRangeSelect" class="inflow-rep-param-select" onchange="toggleCustomDates(this.value)">
-                        <option value="This Month" {% if date_range == 'This Month' %}selected{% endif %}>This Month</option>
-                        <option value="Today" {% if date_range == 'Today' %}selected{% endif %}>Today</option>
-                        <option value="This Week" {% if date_range == 'This Week' %}selected{% endif %}>This Week</option>
-                        <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
-                        <option value="This Year" {% if date_range == 'This Year' %}selected{% endif %}>This Year</option>
-                        <option value="All" {% if date_range == 'All' %}selected{% endif %}>All</option>
-                        <option value="Custom" {% if date_range == 'Custom' %}selected{% endif %}>Custom...</option>
-                    </select>
-                </div>
-                <div id="customDatesWrapper" class="inflow-rep-param-row" style="display: {% if date_range == 'Custom' %}flex{% else %}none{% endif %}; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; gap: 4px;">
-                        <input type="date" name="date_from" value="{{ date_from }}" class="inflow-rep-param-input" style="width: 50%;">
-                        <input type="date" name="date_to" value="{{ date_to }}" class="inflow-rep-param-input" style="width: 50%;">
-                    </div>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Status</span>
-                    <select name="status" class="inflow-rep-param-select">
-                        <option value="Paid" {% if status == 'Paid' %}selected{% endif %}>Paid</option>
-                        <option value="Invoiced" {% if status == 'Invoiced' %}selected{% endif %}>Invoiced</option>
-                        <option value="Open" {% if status == 'Open' %}selected{% endif %}>Open</option>
-                        <option value="All" {% if status == 'All' %}selected{% endif %}>All</option>
-                    </select>
-                </div>
-                {% endif %}
-
-                {% elif cat.key == 'purchasing' %}
-                {% if report_key not in ['product-cost-report', 'vendor-list'] %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Vendor</span>
-                    <select name="vendor_id" class="inflow-rep-param-select">
-                        <option value="" {% if not vendor_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for v in all_vendors %}
-                        <option value="{{ v.id }}" {% if vendor_id == v.id|string %}selected{% endif %}>{{ v.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-
-                {% if report_key in ['product-cost-report', 'vendor-product-list'] %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Category</span>
-                    <select name="category_id" class="inflow-rep-param-select">
-                        <option value="" {% if not category_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for cat_item in all_categories %}
-                        <option value="{{ cat_item.id }}" {% if category_id == cat_item.id|string %}selected{% endif %}>{{ cat_item.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-
-                {% if report_key not in ['vendor-list', 'product-cost-report', 'vendor-product-list'] %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Order Date</span>
-                    <select name="date_range" id="dateRangeSelect" class="inflow-rep-param-select" onchange="toggleCustomDates(this.value)">
-                        <option value="This Month" {% if date_range == 'This Month' %}selected{% endif %}>This Month</option>
-                        <option value="Today" {% if date_range == 'Today' %}selected{% endif %}>Today</option>
-                        <option value="This Week" {% if date_range == 'This Week' %}selected{% endif %}>This Week</option>
-                        <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
-                        <option value="This Year" {% if date_range == 'This Year' %}selected{% endif %}>This Year</option>
-                        <option value="All" {% if date_range == 'All' %}selected{% endif %}>All</option>
-                        <option value="Custom" {% if date_range == 'Custom' %}selected{% endif %}>Custom...</option>
-                    </select>
-                </div>
-                <div id="customDatesWrapper" class="inflow-rep-param-row" style="display: {% if date_range == 'Custom' %}flex{% else %}none{% endif %}; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; gap: 4px;">
-                        <input type="date" name="date_from" value="{{ date_from }}" class="inflow-rep-param-input" style="width: 50%;">
-                        <input type="date" name="date_to" value="{{ date_to }}" class="inflow-rep-param-input" style="width: 50%;">
-                    </div>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Status</span>
-                    <select name="status" class="inflow-rep-param-select">
-                        <option value="All" {% if status == 'All' %}selected{% endif %}>All</option>
-                        <option value="Invoiced" {% if status == 'Invoiced' %}selected{% endif %}>Invoiced</option>
-                        <option value="Open" {% if status == 'Open' %}selected{% endif %}>Open</option>
-                    </select>
-                </div>
-                {% endif %}
-
-                {% elif cat.key == 'inventory' %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Category</span>
-                    <select name="category_id" class="inflow-rep-param-select">
-                        <option value="" {% if not category_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for cat_item in all_categories %}
-                        <option value="{{ cat_item.id }}" {% if category_id == cat_item.id|string %}selected{% endif %}>{{ cat_item.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% if report_key != 'low-stock-reorder' %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Location</span>
-                    <select name="location_id" class="inflow-rep-param-select">
-                        <option value="" {% if not location_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for loc in all_locations %}
-                        <option value="{{ loc.id }}" {% if location_id == loc.id|string %}selected{% endif %}>{{ loc.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                {% endif %}
-                {% if report_key == 'movement-log' %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Movement Type</span>
-                    <select name="movement_type" class="inflow-rep-param-select">
-                        <option value="" {% if not movement_type %}selected{% endif %}>All Types</option>
-                        <option value="ADJUSTMENT" {% if movement_type == 'ADJUSTMENT' %}selected{% endif %}>Adjustment</option>
-                        <option value="TRANSFER" {% if movement_type == 'TRANSFER' %}selected{% endif %}>Transfer</option>
-                        <option value="RECEIVE" {% if movement_type == 'RECEIVE' %}selected{% endif %}>Receive</option>
-                        <option value="FULFILL" {% if movement_type == 'FULFILL' %}selected{% endif %}>Fulfill</option>
-                    </select>
-                </div>
-                {% endif %}
-                {% elif cat.key == 'branch' or report_key == 'branch-sales-summary' %}
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Branch / Store</span>
-                    <select name="branch" class="inflow-rep-param-select" style="font-weight: 600; color: #1E3A8A; background: #EFF6FF; border-color: #BFDBFE;">
-                        <option value="all" {% if branch_scope == 'all' or not branch_scope %}selected{% endif %}>🌐 All Branches (Consolidated)</option>
-                        <option value="main" {% if branch_scope == 'main' %}selected{% endif %}>🏢 Main Store Only</option>
-                        {% for b in all_branches %}
-                        <option value="{{ b.id }}" {% if branch_scope == b.id|string %}selected{% endif %}>🏬 {{ b.code }} - {{ b.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Costing Sheet</span>
-                    <select name="costing_scheme_id" class="inflow-rep-param-select" style="font-weight: 600; color: #047857; background: #ECFDF5; border-color: #A7F3D0;">
-                        {% for ps in all_pricing_schemes %}
-                        <option value="{{ ps.id }}" {% if costing_scheme_id == ps.id %}selected{% endif %}>
-                            {{ ps.name }}{% if ps.name == 'Branch Costing' %} (Default HQ Cost){% endif %}
-                        </option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Currency</span>
-                    <select name="currency" class="inflow-rep-param-select" style="font-weight: 600; color: #7C2D12; background: #FFFBEB; border-color: #FDE68A;">
-                        <option value="USD" {% if currency == 'USD' %}selected{% endif %}>USD ($) - US Dollar</option>
-                        <option value="KHR" {% if currency == 'KHR' %}selected{% endif %}>KHR (៛) - Khmer Riel @ {{ "{:,.0f}".format(khr_rate) }}</option>
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Category</span>
-                    <select name="category_id" class="inflow-rep-param-select">
-                        <option value="" {% if not category_id %}selected{% endif %}>&lt;All&gt;</option>
-                        {% for cat_item in all_categories %}
-                        <option value="{{ cat_item.id }}" {% if category_id == cat_item.id|string %}selected{% endif %}>{{ cat_item.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Order Date</span>
-                    <select name="date_range" id="dateRangeSelect" class="inflow-rep-param-select" onchange="toggleCustomDates(this.value)">
-                        <option value="This Month" {% if date_range == 'This Month' %}selected{% endif %}>This Month</option>
-                        <option value="Today" {% if date_range == 'Today' %}selected{% endif %}>Today</option>
-                        <option value="This Week" {% if date_range == 'This Week' %}selected{% endif %}>This Week</option>
-                        <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
-                        <option value="This Year" {% if date_range == 'This Year' %}selected{% endif %}>This Year</option>
-                        <option value="All" {% if date_range == 'All' %}selected{% endif %}>All</option>
-                        <option value="Custom" {% if date_range == 'Custom' %}selected{% endif %}>Custom...</option>
-                    </select>
-                </div>
-                <div id="customDatesWrapper" class="inflow-rep-param-row" style="display: {% if date_range == 'Custom' %}flex{% else %}none{% endif %}; flex-direction: column; gap: 4px;">
-                    <div style="display: flex; gap: 4px;">
-                        <input type="date" name="date_from" value="{{ date_from }}" class="inflow-rep-param-input" style="width: 50%;">
-                        <input type="date" name="date_to" value="{{ date_to }}" class="inflow-rep-param-input" style="width: 50%;">
-                    </div>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Status</span>
-                    <select name="status" class="inflow-rep-param-select">
-                        <option value="Paid" {% if status == 'Paid' %}selected{% endif %}>Paid</option>
-                        <option value="Invoiced" {% if status == 'Invoiced' %}selected{% endif %}>Invoiced</option>
-                        <option value="Open" {% if status == 'Open' %}selected{% endif %}>Open</option>
-                        <option value="All" {% if status == 'All' %}selected{% endif %}>All</option>
-                    </select>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Display Group -->
-            <div class="inflow-rep-group-box">
-                <div class="inflow-rep-group-title">Display</div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Columns</span>
-                    <select name="columns_preset" class="inflow-rep-param-select">
-                        <option value="default">Default Standard Columns</option>
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Orientation</span>
-                    <div style="display: flex; gap: 12px; font-size: 11px;">
-                        <label><input type="radio" name="orientation" value="Landscape" {% if orientation == 'Landscape' %}checked{% endif %}> Landscape</label>
-                        <label><input type="radio" name="orientation" value="Portrait" {% if orientation == 'Portrait' %}checked{% endif %}> Portrait</label>
-                    </div>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Group By</span>
-                    <select name="group_by" class="inflow-rep-param-select">
-                        <option value="None" {% if group_by == 'None' %}selected{% endif %}>None</option>
-                        <option value="Customer" {% if group_by == 'Customer' %}selected{% endif %}>Customer / Vendor</option>
-                        <option value="Category" {% if group_by == 'Category' %}selected{% endif %}>Category</option>
-                        <option value="Date" {% if group_by == 'Date' %}selected{% endif %}>Order Date</option>
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">First Sort By</span>
-                    <select name="sort_by" class="inflow-rep-param-select">
-                        <option value="Order Number" {% if sort_by in ['Order Number', 'SKU', 'Order Number / SKU'] %}selected{% endif %}>Order Number / SKU</option>
-                        <option value="Item Name" {% if sort_by in ['Item Name', 'Product Name'] %}selected{% endif %}>Item Name</option>
-                        <option value="Category" {% if sort_by == 'Category' %}selected{% endif %}>Category</option>
-                        <option value="Quantity Sold" {% if sort_by in ['Quantity Sold', 'Quantity'] %}selected{% endif %}>Quantity Sold</option>
-                        <option value="Sales Amount" {% if sort_by in ['Sales Amount', 'Total Sales'] %}selected{% endif %}>Sales Amount</option>
-                        <option value="Total Cost" {% if sort_by in ['Total Cost', 'Branch Cost'] %}selected{% endif %}>Total Cost</option>
-                        <option value="Gross Profit" {% if sort_by in ['Gross Profit', 'Profit'] %}selected{% endif %}>Gross Profit</option>
-                        <option value="Order Date" {% if sort_by == 'Order Date' %}selected{% endif %}>Order Date</option>
-                        <option value="Customer" {% if sort_by == 'Customer' %}selected{% endif %}>Customer / Vendor</option>
-                    </select>
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Report Title</span>
-                    <input type="text" name="custom_title" class="inflow-rep-param-input" value="{{ meta.title }}">
-                </div>
-                <div class="inflow-rep-param-row">
-                    <span class="inflow-rep-param-label">Description</span>
-                    <textarea name="custom_desc" class="inflow-rep-param-textarea" rows="2">{{ meta.description }}</textarea>
                 </div>
             </div>
 
-            <input type="hidden" name="page" id="reportPageInput" value="{{ page }}">
-
-            <!-- Actions -->
-            <div class="inflow-rep-actions-wrapper">
-                <a href="javascript:void(0)" class="inflow-rep-collapse-link" onclick="toggleParamsPanel()">« Less</a>
-                <button type="button" class="inflow-rep-myrep-btn" onclick="addToMyReports()">Add to My Reports</button>
-                <button type="submit" class="inflow-rep-generate-btn">Generate Report</button>
-            </div>
-        </form>
-    </aside>
-
-    <!-- Right Crystal Reports Viewer Canvas -->
-    <main class="inflow-report-canvas-area">
-        <!-- Crystal Reports Stepper Ribbon Toolbar (Matching screenshot0046.JPEG) -->
-        <div class="inflow-crystal-toolbar">
-            <div class="inflow-crystal-nav">
-                <!-- Page Navigation Stepper -->
-                <button type="button" class="inflow-crys-btn" onclick="gotoPage(1)" title="First Page" {% if page <= 1 %}disabled{% endif %}>|◀</button>
-                <button type="button" class="inflow-crys-btn" onclick="gotoPage({{ page - 1 }})" title="Previous Page" {% if page <= 1 %}disabled{% endif %}>◀</button>
-                <span class="inflow-crys-page-box">
-                    <input type="number" id="manualPageNum" value="{{ page }}" min="1" max="{{ total_pages }}" 
-                           onchange="gotoPage(this.value)" class="inflow-crys-page-input">
-                    <span>of {{ total_pages }}</span>
-                </span>
-                <button type="button" class="inflow-crys-btn" onclick="gotoPage({{ page + 1 }})" title="Next Page" {% if page >= total_pages %}disabled{% endif %}>▶</button>
-                <button type="button" class="inflow-crys-btn" onclick="gotoPage({{ total_pages }})" title="Last Page" {% if page >= total_pages %}disabled{% endif %}>▶|</button>
-            </div>
-
-            <div class="inflow-crystal-tools">
-                <button type="button" class="inflow-crys-btn" onclick="window.print()" title="Print">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                    Print
-                </button>
-                <button type="button" class="inflow-crys-btn" onclick="toggleExportDialog()" title="Export">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                    Export
-                </button>
-                <button type="button" class="inflow-crys-btn" onclick="document.getElementById('reportSearchBox').focus()" title="Search">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                    Search
-                </button>
-                <input type="text" id="reportSearchBox" placeholder="Find text..." class="inflow-crys-search-input" oninput="searchInReport(this.value)">
-
-                <!-- Zoom Stepper -->
-                <select id="reportZoomSelect" class="inflow-crys-zoom-select" onchange="setZoom(this.value)">
-                    <option value="100%">Zoom 100%</option>
-                    <option value="75%">75%</option>
-                    <option value="125%">125%</option>
-                    <option value="150%">150%</option>
-                    <option value="width">Page Width</option>
-                </select>
-            </div>
+            <!-- Top Filterbar Quick Generate Button -->
+            <button type="button" class="inflow-web-generate-btn" onclick="submitReportForm()">
+                Generate
+            </button>
         </div>
 
-        <!-- The Crystal Report Physical Paper Sheet (Matching screenshot0046.JPEG & screenshot0061.JPEG) -->
-        <div class="inflow-crystal-canvas-wrapper" id="crystalCanvasWrapper">
-            <div class="inflow-crystal-sheet {% if orientation == 'Landscape' %}landscape{% endif %}" id="crystalSheetEl">
-                <!-- Top Header: Title, Printed Date, and Page Number -->
-                <div class="inflow-crys-sheet-top">
-                    <div>
-                        <h1 class="inflow-crys-sheet-title">{{ meta.title }}</h1>
-                        {% if date_from and date_to and report_key not in ['vendor-list', 'customer-list', 'inventory-summary', 'inventory-details', 'inventory-by-location', 'inventory-valuation', 'low-stock-reorder', 'product-price-list', 'product-cost-report'] %}
-                        <div style="font-size: 13px; font-weight: 600; color: #1E40AF; margin-top: 1px; margin-bottom: 4px;">
-                            For the period {{ date_from | format_inflow_date }} to {{ date_to | format_inflow_date }}
-                        </div>
-                        {% endif %}
-                        {% if cat.key == 'sales' %}
-                        <div style="font-size: 11px; font-weight: 600; color: #1E40AF; margin-top: 1px; margin-bottom: 3px;">
-                            Scope: 
-                            {% if branch_scope == 'all' %}🌐 All Outlets (Consolidated)
-                            {% elif branch_scope == 'main' or not branch_scope %}🏢 Main Store (Isolated)
-                            {% else %}
-                                {% for b in all_branches %}{% if branch_scope == b.id|string %}🏬 {{ b.code }} - {{ b.name }}{% endif %}{% endfor %}
+        <div class="filterbar-right">
+            <button type="button" class="inflow-flat-btn" onclick="window.print()" title="Print report (Ctrl+P)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                <span>Print</span>
+            </button>
+            <div class="inflow-filter-chip-wrapper">
+                <button type="button" class="inflow-flat-btn" onclick="toggleExportMenu(event)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    <span>Export ▾</span>
+                </button>
+                <div id="reportExportMenu" class="inflow-popover-dropdown" style="right: 0; left: auto;">
+                    <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, customer_search=customer_search, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by) }}" download data-no-tab="true" class="popover-item" style="text-decoration: none;">
+                        📊 Microsoft Excel (*.csv)
+                    </a>
+                    <a href="javascript:void(0)" onclick="window.print()" class="popover-item" style="text-decoration: none;">
+                        📄 Adobe PDF (*.pdf)
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Branch Sales Report KPI Summary Cards (for branch-sales-summary) -->
+    {% if report_key == 'branch-sales-summary' %}
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 24px 0; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px;">
+        <div style="border-left: 3px solid #2563EB; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Quantity Sold</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0F172A;">
+                {{ "{:,.2f}".format(totals.quantity_sold or 0) if (totals.quantity_sold or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or 0) }} <span style="font-size: 11px; font-weight: 600; color: #2563EB;">pcs</span>
+            </div>
+        </div>
+        <div style="border-left: 3px solid #059669; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Sales Money</div>
+            <div style="font-size: 16px; font-weight: 700; color: #059669;">
+                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
+            </div>
+        </div>
+        <div style="border-left: 3px solid #D97706; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Branch Costing / Total Cost</div>
+            <div style="font-size: 16px; font-weight: 700; color: #D97706;">
+                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}
+            </div>
+        </div>
+        <div style="border-left: 3px solid #4F46E5; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Costing Sheet / Currency</div>
+            <div style="font-size: 13px; font-weight: 700; color: #1E293B;">
+                <span>Branch Costing</span> • <span>USD ($)</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Report Table Header with Wrench Icon 🔧 -->
+    <div class="inflow-web-table-container">
+        <table class="inflow-web-table" id="reportDataTable">
+            {% if report_key == 'sales-order-profit' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 13%;">ORDER NUMBER</th>
+                    <th style="width: 8%;">STATUS</th>
+                    <th style="width: 22%;">CUSTOMER</th>
+                    <th style="width: 23%;">BILLING ADDRESS</th>
+                    <th style="width: 10%;">ORDER DATE</th>
+                    <th style="width: 8%; text-align: right;">SALES AMOUNT</th>
+                    <th style="width: 8%; text-align: right;">COSTING</th>
+                    <th style="width: 8%; text-align: right;">GROSS PROFIT</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td class="wrench-th"></td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" style="color: #4C1D95; text-decoration: none;">{{ r.order_number }}</a>
+                    </td>
+                    <td>
+                        <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: {% if r.status_display == 'Paid' %}#ECFDF5; color: #047857;{% else %}#F1F5F9; color: #475569;{% endif %}">
+                            {{ r.status_display }}
+                        </span>
+                    </td>
+                    <td style="font-weight: 500;">{{ r.customer_name or '' }}</td>
+                    <td style="font-size: 11.5px; color: #4B5563;">{{ r.billing_address or '' }}</td>
+                    <td>{{ r.order_date | format_inflow_date }}</td>
+                    <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                    <td style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.costing or 0) }}</td>
+                    <td style="text-align: right; font-weight: 600; color: #047857;">${{ "%.2f"|format(r.gross_profit) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="6" style="text-align: right; font-weight: 700;">Grand Totals ({{ total_count }} orders):</td>
+                    <td style="text-align: right; font-weight: 700; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
+                    <td style="text-align: right; font-weight: 700; font-size: 13px; color: #475569;">${{ "%.2f"|format(totals.costing or 0) }}</td>
+                    <td style="text-align: right; font-weight: 700; font-size: 13px; color: #047857;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+
+            {% elif report_key == 'sales-by-product-summary' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 20%;">CATEGORY</th>
+                    <th style="width: 32%;">PRODUCT ^</th>
+                    <th style="width: 12%; text-align: right;">SOLD QUANTITY</th>
+                    <th style="width: 12%; text-align: right;">TOTAL SALES</th>
+                    <th style="width: 12%; text-align: right;">COST OF GOODS SOLD</th>
+                    <th style="width: 12%; text-align: right;">SALES PROFIT</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% if group_by == 'Category' and category_groups %}
+                    {% for grp in category_groups %}
+                    <tr class="inflow-rep-cat-banner">
+                        <td colspan="7">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 13.5px; font-weight: 700; color: #4C1D95;">📁 Category: {{ grp.category_name }}</span>
+                                <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} product{% if grp.lines|length > 1 %}s{% endif %}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% for r in grp.lines %}
+                    <tr>
+                        <td class="wrench-th"></td>
+                        <td>{{ r.category_name or 'Uncategorized' }}</td>
+                        <td style="font-weight: 600; color: #1E293B;">{{ r.item_name }}</td>
+                        <td style="text-align: right;">{{ "{:,.0f}".format(r.quantity_sold) }} {{ r.uom or 'pcs' }}</td>
+                        <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                        <td style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.sales_amount - r.gross_profit) }}</td>
+                        <td style="text-align: right; font-weight: 600; color: #047857;">${{ "%.2f"|format(r.gross_profit) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="inflow-rep-subtotal-row">
+                        <td colspan="3" style="text-align: right; font-style: italic; font-weight: 600; color: #4C1D95;">Subtotal for {{ grp.category_name }}:</td>
+                        <td style="text-align: right; font-weight: 700; color: #4C1D95;">{{ "%.0f"|format(grp.subtotal_qty) }}</td>
+                        <td style="text-align: right; font-weight: 700; color: #4C1D95;">${{ "%.2f"|format(grp.subtotal_sales) }}</td>
+                        <td></td>
+                        <td style="text-align: right; font-weight: 700; color: #047857;">${{ "%.2f"|format(grp.subtotal_profit) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    {% for r in rows %}
+                    <tr>
+                        <td class="wrench-th"></td>
+                        <td>{{ r.category_name or 'Uncategorized' }}</td>
+                        <td style="font-weight: 600; color: #1E293B;">{{ r.item_name }}</td>
+                        <td style="text-align: right;">{{ "{:,.0f}".format(r.quantity_sold) }} {{ r.uom or 'pcs' }}</td>
+                        <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                        <td style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.sales_amount - r.gross_profit) }}</td>
+                        <td style="text-align: right; font-weight: 600; color: #047857;">${{ "%.2f"|format(r.gross_profit) }}</td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3" style="text-align: right; font-weight: 700;">Total:</td>
+                    <td style="text-align: right; font-weight: 700;">{{ "{:,.0f}".format(totals.quantity or 0) }}</td>
+                    <td style="text-align: right; font-weight: 700;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #475569;">${{ "%.2f"|format((totals.sales_amount or 0) - (totals.gross_profit or 0)) }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #047857;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+
+            {% elif report_key == 'branch-sales-summary' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 11%;">CATEGORY</th>
+                    <th style="width: 12%;">SKU</th>
+                    <th style="width: 19%;">ITEM NAME</th>
+                    <th style="width: 11%; text-align: right;">QTY SOLD</th>
+                    <th style="width: 10%; text-align: right;">PRICE / PCS</th>
+                    <th style="width: 11%; text-align: right;">BRANCH COST</th>
+                    <th style="width: 12%; text-align: right;">TOTAL SALES</th>
+                    <th style="width: 14%; text-align: right;">TOTAL COST (QTY×COST)</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% if group_by == 'Category' and category_groups %}
+                    {% for grp in category_groups %}
+                    <tr class="inflow-rep-cat-banner">
+                        <td colspan="9">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 13.5px; font-weight: 700; color: #4C1D95;">📁 Category: {{ grp.category_name }}</span>
+                                <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} item{% if grp.lines|length > 1 %}s{% endif %}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% for r in grp.lines %}
+                    <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                        <td class="wrench-th"></td>
+                        <td>{{ r.category_name or 'General' }}</td>
+                        <td style="font-weight: 500;">
+                            <a href="{{ url_for('products.detail_product', id=r.id) }}" style="color: #4C1D95; text-decoration: none;">{{ r.sku }}</a>
+                        </td>
+                        <td style="font-weight: 500;">
+                            <div>{{ r.item_name }}</div>
+                            {% if r.pcs_per_case > 1 %}
+                            <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
                             {% endif %}
-                        </div>
-                        {% endif %}
-                        {% if cat.key == 'branch' or report_key == 'branch-sales-summary' %}
-                        <div style="display: flex; flex-wrap: wrap; gap: 14px; font-size: 11.5px; font-weight: 600; color: #1E40AF; margin-top: 2px; margin-bottom: 4px;">
-                            <span>Scope: <strong>{{ branch_scope_label }}</strong></span>
-                            <span>Costing Sheet: <strong style="color: #047857;">{{ active_scheme.name if active_scheme else 'Branch Costing' }}</strong></span>
-                            <span>Currency: <strong style="color: #7C2D12;">{{ currency }} ({{ curr_symbol }}){% if currency == 'KHR' %} @ {{ "{:,.0f}".format(khr_rate) }}{% endif %}</strong></span>
-                        </div>
-                        {% endif %}
-                        <div class="inflow-crys-sheet-printed">
-                            <span class="label">Report Printed:</span>
-                            <span class="date">{{ today_str }}</span>
-                        </div>
-                    </div>
-                    <div class="inflow-crys-page-indicator">
-                        page <span class="num">{{ page }} / {{ total_pages }}</span>
-                    </div>
-                </div>
-
-                {% if report_key == 'branch-sales-summary' %}
-                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px;">
-                    <div style="border-left: 3px solid #2563EB; padding-left: 8px;">
-                        <div class="inflow-rep-kpi-title" style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Quantity Sold</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #0F172A;">
-                            {{ "{:,.2f}".format(totals.quantity_sold or 0) if (totals.quantity_sold or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or 0) }} <span style="font-size: 11px; font-weight: 600; color: #2563EB;">pcs</span>
-                        </div>
-                    </div>
-                    <div style="border-left: 3px solid #059669; padding-left: 8px;">
-                        <div class="inflow-rep-kpi-title" style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Sales Money</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #059669;">
-                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
-                        </div>
-                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
-                        <div style="font-size: 11px; color: #059669; font-weight: 500;">
-                            Avg: {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.sales_amount / totals.quantity_sold) }}{% endif %}/pc
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div style="border-left: 3px solid #D97706; padding-left: 8px;">
-                        <div class="inflow-rep-kpi-title" style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Branch Cost (Qty × Cost)</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #D97706;">
-                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}
-                        </div>
-                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
-                        <div style="font-size: 11px; color: #D97706; font-weight: 500;">
-                            Avg: {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_branch_cost / totals.quantity_sold) }}{% endif %}/pc
-                        </div>
-                        {% endif %}
-                    </div>
-                    <div style="border-left: 3px solid #7C3AED; padding-left: 8px;">
-                        <div class="inflow-rep-kpi-title" style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Branch Gross Profit</div>
-                        <div style="font-size: 16px; font-weight: 700; color: #7C3AED;">
-                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.branch_profit or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.branch_profit or 0) }}{% endif %}
-                            <span style="font-size: 11px; font-weight: 500; color: #6B7280;">({{ "%.1f"|format(totals.margin_pct or 0) }}%)</span>
-                        </div>
-                    </div>
-                </div>
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">
+                            <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
+                            {% if r.cases_equivalent %}
+                            <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.sale_price_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.3f}".format(r.sale_price_pc) if r.sale_price_pc < 1 else "{:,.2f}".format(r.sale_price_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.sale_price_case %}
+                            <div style="font-size: 10.5px; color: #64748B;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sale_price_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.sale_price_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #047857; font-weight: 600;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.branch_cost_case %}
+                            <div style="font-size: 10.5px; color: #047857;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #065F46;">
+                            <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
+                            <div style="font-size: 10.5px; color: #6B7280; font-weight: 500;">
+                                Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_profit) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_profit) }}{% endif %} ({{ "%.1f"|format(r.margin_pct) }}%)
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <!-- Category Subtotal Row -->
+                    <tr class="inflow-rep-subtotal-row">
+                        <td colspan="4" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
+                        <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                            {{ "{:,.2f}".format(grp.subtotal_qty) if grp.subtotal_qty % 1 != 0 else "{:,.0f}".format(grp.subtotal_qty) }} pcs
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_price_pc) }} ៛{% else %}${{ "{:,.3f}".format(grp.avg_price_pc) if grp.avg_price_pc < 1 else "{:,.2f}".format(grp.avg_price_pc) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #047857;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_cost_pc) }} ៛{% else %}${{ "{:,.4f}".format(grp.avg_cost_pc) if grp.avg_cost_pc < 1 else "{:,.2f}".format(grp.avg_cost_pc) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_sales) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_sales) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #065F46;">
+                            <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_cost) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_cost) }}{% endif %}</div>
+                            <div style="font-size: 10.5px; font-weight: 600; color: #4B5563;">
+                                Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_profit) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_profit) }}{% endif %} ({{ "%.1f"|format(grp.subtotal_margin) }}%)
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    {% for r in rows %}
+                    <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                        <td class="wrench-th"></td>
+                        <td>{{ r.category_name or 'General' }}</td>
+                        <td style="font-weight: 500;">
+                            <a href="{{ url_for('products.detail_product', id=r.id) }}" style="color: #4C1D95; text-decoration: none;">{{ r.sku }}</a>
+                        </td>
+                        <td style="font-weight: 500;">
+                            <div>{{ r.item_name }}</div>
+                            {% if r.pcs_per_case > 1 %}
+                            <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">
+                            <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
+                            {% if r.cases_equivalent %}
+                            <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.sale_price_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.3f}".format(r.sale_price_pc) if r.sale_price_pc < 1 else "{:,.2f}".format(r.sale_price_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.sale_price_case %}
+                            <div style="font-size: 10.5px; color: #64748B;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sale_price_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.sale_price_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #047857; font-weight: 600;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.branch_cost_case %}
+                            <div style="font-size: 10.5px; color: #047857;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #065F46;">
+                            <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
+                            <div style="font-size: 10.5px; color: #6B7280; font-weight: 500;">
+                                Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_profit) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_profit) }}{% endif %} ({{ "%.1f"|format(r.margin_pct) }}%)
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
                 {% endif %}
+            </tbody>
+            <tfoot>
+                <tr class="inflow-crys-totals-row">
+                    <td colspan="4" style="font-weight: bold; text-align: right;">GRAND TOTALS:</td>
+                    <td style="text-align: right; font-weight: bold;">
+                        {{ "{:,.2f}".format(totals.quantity_sold or totals.quantity or 0) if (totals.quantity_sold or totals.quantity or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or totals.quantity or 0) }} pcs
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
+                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.sales_amount / totals.quantity_sold) }}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #047857;">
+                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_branch_cost / totals.quantity_sold) }}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
+                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #065F46;">
+                        <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}</div>
+                        <div style="font-size: 10.5px; font-weight: 600; color: #4B5563;">
+                            Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.branch_profit or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.branch_profit or 0) }}{% endif %}
+                        </div>
+                    </td>
+                </tr>
+            </tfoot>
+            {% endif %}
 
-                <!-- Report Data Table -->
-                <table class="inflow-crystal-table" id="reportDataTable">
-                    {% if report_key == 'sales-order-profit' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 12%;">ORDER NUMBER</th>
-                            <th style="width: 7%;">STATUS</th>
-                            <th style="width: 21%;">CUSTOMER</th>
-                            <th style="width: 24%;">BILLING ADDRESS</th>
-                            <th style="width: 10%;">ORDER DATE</th>
-                            <th style="width: 8%; text-align: right;">SALES AMOUNT</th>
-                            <th style="width: 9%; text-align: right;">COSTING</th>
-                            <th style="width: 9%; text-align: right;">GROSS PROFIT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;">
-                                <a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a>
-                            </td>
-                            <td>{{ r.status_display }}</td>
-                            <td style="font-weight: 500;">{{ r.customer_name or '' }}</td>
-                            <td style="font-size: 11px; color: #374151;">{{ r.billing_address or '' }}</td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.costing or 0) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales orders found matching filter criteria.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="5" style="text-align: right; font-weight: bold; font-style: italic;"></td>
-                            <td style="text-align: right; font-weight: bold; font-style: italic; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold; font-style: italic; font-size: 13px; color: #475569;">${{ "%.2f"|format(totals.costing or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold; font-style: italic; font-size: 13px;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
+            {% else %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 25%;">IDENTIFIER / ORDER #</th>
+                    <th style="width: 25%;">NAME / CUSTOMER</th>
+                    <th style="width: 15%;">DATE</th>
+                    <th style="width: 15%;">STATUS</th>
+                    <th style="width: 20%; text-align: right;">TOTAL AMOUNT</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% for r in rows %}
+                <tr>
+                    <td class="wrench-th"></td>
+                    <td style="font-weight: 600;">{{ r.order_number or r.sku or r.id }}</td>
+                    <td>{{ r.customer_name or r.name or r.item_name or '' }}</td>
+                    <td>{{ r.order_date or r.created_at or today_str }}</td>
+                    <td>{{ r.status or 'Active' }}</td>
+                    <td style="text-align: right; font-weight: 600;">${{ "%.2f"|format(r.total_amount or r.sales_amount or 0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            {% endif %}
+            {% endif %}
+        </table>
 
-                    {% elif report_key == 'sales-by-product-summary' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 18%;">CATEGORY</th>
-                            <th style="width: 32%;">ITEM</th>
-                            <th style="width: 12%; text-align: right;">QUANTITY SOLD</th>
-                            <th style="width: 8%;">UOM</th>
-                            <th style="width: 15%; text-align: right;">TOTAL SALES</th>
-                            <th style="width: 15%; text-align: right;">GROSS PROFIT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if group_by == 'Category' and category_groups %}
-                            {% for grp in category_groups %}
-                            <tr class="inflow-rep-cat-banner">
-                                <td colspan="6">
-                                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                                        <span style="font-size: 13.5px; font-weight: 700; color: #1E40AF;">📁 Category: {{ grp.category_name }}</span>
-                                        <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} product{% if grp.lines|length > 1 %}s{% endif %}</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% for r in grp.lines %}
-                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                                <td style="color: #64748B;">{{ r.category_name or 'GENERAL' }}</td>
-                                <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
-                                <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.quantity_sold) }}</td>
-                                <td>{{ r.uom or 'pcs' }}</td>
-                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
-                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
-                            </tr>
-                            {% endfor %}
-                            <tr class="inflow-rep-subtotal-row">
-                                <td colspan="2" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">{{ "%.0f"|format(grp.subtotal_qty) }}</td>
-                                <td></td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">${{ "%.2f"|format(grp.subtotal_sales) }}</td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">${{ "%.2f"|format(grp.subtotal_profit) }}</td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            {% for r in rows %}
-                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                                <td style="color: #64748B;">{{ r.category_name or 'GENERAL' }}</td>
-                                <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
-                                <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.quantity_sold) }}</td>
-                                <td>{{ r.uom or 'pcs' }}</td>
-                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
-                                <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No product sales records found.</td></tr>
-                            {% endfor %}
-                        {% endif %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="2" style="text-align: right; font-weight: bold;"></td>
-                            <td style="text-align: right; font-weight: bold; font-size: 12px;">{{ "%.0f"|format(totals.quantity or 0) }}</td>
-                            <td></td>
-                            <td style="text-align: right; font-weight: bold; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold; font-size: 13px;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'sales-by-product-details' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 12%;">ORDER #</th>
-                            <th style="width: 10%;">ORDER DATE</th>
-                            <th style="width: 18%;">CUSTOMER</th>
-                            <th style="width: 22%;">ITEM</th>
-                            <th style="width: 8%; text-align: right;">QUANTITY</th>
-                            <th style="width: 6%;">UOM</th>
-                            <th style="width: 8%; text-align: right;">UNIT PRICE</th>
-                            <th style="width: 8%; text-align: right;">TOTAL</th>
-                            <th style="width: 8%; text-align: right;">PROFIT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;">
-                                <a href="{{ url_for('sales_orders.detail_order', id=r.sales_order_id) }}" class="inflow-doc-link">{{ r.order_number }}</a>
-                            </td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.customer_name or '' }}</td>
-                            <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
-                            <td style="text-align: right;">{{ "%.0f"|format(r.quantity) }}</td>
-                            <td>{{ r.uom }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.unit_price) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.gross_profit) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="9" style="text-align: center; padding: 24px; color: #64748B;">No product transaction lines found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="4"></td>
-                            <td style="text-align: right; font-weight: bold; font-size: 12px;">{{ "%.0f"|format(totals.quantity or 0) }}</td>
-                            <td colspan="2"></td>
-                            <td style="text-align: right; font-weight: bold; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold; font-size: 13px;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'sales-order-summary' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 14%;">ORDER NUMBER</th>
-                            <th style="width: 11%;">ORDER DATE</th>
-                            <th style="width: 22%;">CUSTOMER</th>
-                            <th style="width: 9%;">STATUS</th>
-                            <th style="width: 10%;">PAYMENT</th>
-                            <th style="width: 11%; text-align: right;">SUBTOTAL</th>
-                            <th style="width: 11%; text-align: right;">TOTAL</th>
-                            <th style="width: 12%; text-align: right;">BALANCE DUE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td style="font-weight: 500;">{{ r.customer_name or '' }}</td>
-                            <td>{{ r.status_display }}</td>
-                            <td>{{ r.payment_status_display }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.subtotal) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.total_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.balance_due) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales orders found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="5"></td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.subtotal or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.balance_due or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'sales-order-operational' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 13%;">ORDER NUMBER</th>
-                            <th style="width: 11%;">ORDER DATE</th>
-                            <th style="width: 20%;">CUSTOMER</th>
-                            <th style="width: 10%;">STATUS</th>
-                            <th style="width: 11%;">PICKED</th>
-                            <th style="width: 11%;">PACKED</th>
-                            <th style="width: 11%;">SHIPPED</th>
-                            <th style="width: 13%;">CARRIER / TRACKING</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td style="font-weight: 500;">{{ r.customer_name or '' }}</td>
-                            <td>{{ r.status_display }}</td>
-                            <td>{{ r.picked_date | format_inflow_date if r.picked_date else 'Pending' }}</td>
-                            <td>{{ r.packed_date | format_inflow_date if r.packed_date else 'Pending' }}</td>
-                            <td>{{ r.shipped_date | format_inflow_date if r.shipped_date else 'Pending' }}</td>
-                            <td>{{ r.carrier }} ({{ r.tracking_number }})</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No orders found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'sales-tax-report' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">ORDER NUMBER</th>
-                            <th style="width: 12%;">ORDER DATE</th>
-                            <th style="width: 25%;">CUSTOMER</th>
-                            <th style="width: 16%; text-align: right;">TAXABLE SALES</th>
-                            <th style="width: 10%; text-align: right;">TAX RATE</th>
-                            <th style="width: 11%; text-align: right;">TAX AMOUNT</th>
-                            <th style="width: 11%; text-align: right;">TOTAL AMOUNT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.customer_name or '' }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.subtotal) }}</td>
-                            <td style="text-align: right;">{{ "%.1f"|format(r.tax_rate or 0) }}%</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.tax_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.total_amount) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No tax records found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="3"></td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.subtotal or 0) }}</td>
-                            <td></td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.tax_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key in ['customer-payment-summary', 'customer-payment-details'] %}
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">ORDER NUMBER</th>
-                            <th style="width: 12%;">ORDER DATE</th>
-                            <th style="width: 25%;">CUSTOMER</th>
-                            <th style="width: 12%;">STATUS</th>
-                            <th style="width: 12%; text-align: right;">TOTAL</th>
-                            <th style="width: 12%; text-align: right;">PAID</th>
-                            <th style="width: 12%; text-align: right;">BALANCE DUE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.customer_name or '' }}</td>
-                            <td>{{ r.payment_status }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.total_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.paid_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.balance_due) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No payment records found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="4"></td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.paid_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.balance_due or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'customer-order-history' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 44%;">ITEM</th>
-                            <th style="width: 14%;">ORDER DATE</th>
-                            <th style="width: 14%;">STATUS</th>
-                            <th style="width: 14%; text-align: right;">QUANTITY</th>
-                            <th style="width: 14%; text-align: right;">AMOUNT</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if customer_groups %}
-                            {% for grp in customer_groups %}
-                            <!-- Customer Group Banner Row -->
-                            <tr class="inflow-rep-cat-banner">
-                                <td colspan="5">
-                                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                                        <span style="font-size: 13.5px; font-weight: 700; color: #1E40AF;">Customer: {{ grp.customer_name }}</span>
-                                        <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} order line{% if grp.lines|length > 1 %}s{% endif %}</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% for item in grp.lines %}
-                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                                <td style="font-weight: 500;">
-                                    <div style="display: flex; align-items: baseline; gap: 8px;">
-                                        <span>{{ item.item_name }}</span>
-                                        <span style="font-size: 11px; color: #64748B;">
-                                            (<a href="{{ url_for('sales_orders.detail_order', id=item.sales_order_id) }}" class="inflow-doc-link">{{ item.order_number }}</a>)
-                                        </span>
-                                    </div>
-                                </td>
-                                <td>{{ item.order_date | format_inflow_date }}</td>
-                                <td>
-                                    <span style="display: inline-block; padding: 1px 6px; font-size: 11px; border-radius: 3px; font-weight: 500;
-                                        {% if item.status_display == 'Invoiced' %}background: #DCFCE7; color: #166534;
-                                        {% elif item.status_display == 'Paid' %}background: #EFF6FF; color: #1E40AF;
-                                        {% else %}background: #FEF3C7; color: #92400E;{% endif %}">
-                                        {{ item.status_display }}
-                                    </span>
-                                </td>
-                                <td style="text-align: right; font-weight: 500;">{{ item.quantity | format_inflow_qty }} {{ item.uom or '' }}</td>
-                                <td style="text-align: right; font-weight: 500;">{{ item.amount | format_inflow_money }}</td>
-                            </tr>
-                            {% endfor %}
-                            <!-- Customer Subtotal Row (Matching inFlow screenshot0076) -->
-                            <tr class="inflow-rep-subtotal-row">
-                                <td colspan="3" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.customer_name }}:</td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">{{ grp.subtotal_qty | format_inflow_qty }}</td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">{{ grp.subtotal_amount | format_inflow_money }}</td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="5" style="text-align: center; padding: 28px; color: #64748B;">No order history lines found matching filter criteria.</td></tr>
-                        {% endif %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="3" style="text-align: right; font-weight: 700;">Total:</td>
-                            <td style="text-align: right; font-weight: 700; font-size: 13px;">{{ totals.quantity | format_inflow_qty }}</td>
-                            <td style="text-align: right; font-weight: 700; font-size: 13px;">{{ totals.amount | format_inflow_money }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'customer-list' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 25%;">CUSTOMER NAME</th>
-                            <th style="width: 18%;">CONTACT PERSON</th>
-                            <th style="width: 14%;">PHONE</th>
-                            <th style="width: 18%;">EMAIL</th>
-                            <th style="width: 15%;">ADDRESS / CITY</th>
-                            <th style="width: 10%; text-align: right;">BALANCE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;">{{ r.name }}</td>
-                            <td>{{ r.contact_name or '' }}</td>
-                            <td>{{ r.phone or '' }}</td>
-                            <td>{{ r.email or '' }}</td>
-                            <td>{{ r.address1 or '' }} {{ r.city or '' }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.balance or 0) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No customers registered.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'purchase-order-summary' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">PO NUMBER</th>
-                            <th style="width: 25%;">VENDOR</th>
-                            <th style="width: 14%;">ORDER DATE</th>
-                            <th style="width: 12%;">STATUS</th>
-                            <th style="width: 11%; text-align: right;">TOTAL</th>
-                            <th style="width: 11%; text-align: right;">PAID</th>
-                            <th style="width: 12%; text-align: right;">BALANCE DUE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('purchase_orders.detail_purchase', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td style="font-weight: 500;">{{ r.vendor_name or '' }}</td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.status_display }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.total_amount) }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.paid_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.balance_due) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No purchase orders found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="4"></td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.total_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.paid_amount or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.balance_due or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'purchase-order-details' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 12%;">PO NUMBER</th>
-                            <th style="width: 10%;">ORDER DATE</th>
-                            <th style="width: 20%;">VENDOR</th>
-                            <th style="width: 24%;">ITEM / SKU</th>
-                            <th style="width: 8%; text-align: right;">ORDER QTY</th>
-                            <th style="width: 8%; text-align: right;">RECVD QTY</th>
-                            <th style="width: 9%; text-align: right;">UNIT COST</th>
-                            <th style="width: 9%; text-align: right;">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('purchase_orders.detail_purchase', id=r.purchase_order_id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.vendor_name or '' }}</td>
-                            <td style="font-weight: 500;">{{ r.sku }} {{ r.item_name }}</td>
-                            <td style="text-align: right;">{{ "%.0f"|format(r.quantity) }}</td>
-                            <td style="text-align: right;">{{ "%.0f"|format(r.received_qty) }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.unit_cost) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.subtotal) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No purchase order details found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="4"></td>
-                            <td style="text-align: right; font-weight: bold;">{{ "%.0f"|format(totals.quantity or 0) }}</td>
-                            <td colspan="2"></td>
-                            <td style="text-align: right; font-weight: bold;">${{ "%.2f"|format(totals.total_amount or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'purchase-order-status' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">PO NUMBER</th>
-                            <th style="width: 25%;">VENDOR</th>
-                            <th style="width: 12%;">ORDER DATE</th>
-                            <th style="width: 12%;">STATUS</th>
-                            <th style="width: 12%;">PAYMENT</th>
-                            <th style="width: 12%;">RECEIVED DATE</th>
-                            <th style="width: 12%; text-align: right;">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('purchase_orders.detail_purchase', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td style="font-weight: 500;">{{ r.vendor_name or '' }}</td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.status_display }}</td>
-                            <td>{{ r.payment_status_display }}</td>
-                            <td>{{ r.received_date | format_inflow_date if r.received_date else 'Pending' }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.total_amount) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No purchase orders found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'purchasing-tax-report' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">PO NUMBER</th>
-                            <th style="width: 25%;">VENDOR</th>
-                            <th style="width: 12%;">ORDER DATE</th>
-                            <th style="width: 14%; text-align: right;">SUBTOTAL</th>
-                            <th style="width: 10%; text-align: right;">TAX RATE</th>
-                            <th style="width: 12%; text-align: right;">TAX AMOUNT</th>
-                            <th style="width: 12%; text-align: right;">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('purchase_orders.detail_purchase', id=r.id) }}" class="inflow-doc-link">{{ r.order_number }}</a></td>
-                            <td>{{ r.vendor_name or '' }}</td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.subtotal) }}</td>
-                            <td style="text-align: right;">{{ "%.1f"|format(r.tax_rate or 0) }}%</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.tax_amount) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.total_amount) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No tax records found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'product-cost-report' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 14%;">SKU</th>
-                            <th style="width: 26%;">ITEM NAME</th>
-                            <th style="width: 14%;">CATEGORY</th>
-                            <th style="width: 6%;">UOM</th>
-                            <th style="width: 10%; text-align: right;">AVG COST</th>
-                            <th style="width: 10%; text-align: right;">STD COST</th>
-                            <th style="width: 10%; text-align: right;">PRICE</th>
-                            <th style="width: 10%; text-align: right;">MARGIN %</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a></td>
-                            <td style="font-weight: 500;">{{ r.item_name }}</td>
-                            <td>{{ r.category_name or 'General' }}</td>
-                            <td>{{ r.uom or 'pcs' }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.average_cost or 0) }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.standard_cost or 0) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.default_price or 0) }}</td>
-                            <td style="text-align: right; font-weight: 500;">{{ "%.1f"|format(r.margin_percent or 0) }}%</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No product cost records found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'vendor-product-list' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 25%;">VENDOR</th>
-                            <th style="width: 16%;">SKU</th>
-                            <th style="width: 27%;">ITEM NAME</th>
-                            <th style="width: 16%;">CATEGORY</th>
-                            <th style="width: 10%; text-align: right;">COST</th>
-                            <th style="width: 6%;">UOM</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;">{{ r.vendor_name }}</td>
-                            <td style="font-weight: 500;">{{ r.sku }}</td>
-                            <td>{{ r.name }}</td>
-                            <td>{{ r.category_name or 'General' }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.standard_cost or 0) }}</td>
-                            <td>{{ r.uom or 'pcs' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No vendor product mappings found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'vendor-list' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 22%;">VENDOR NAME</th>
-                            <th style="width: 16%;">CONTACT</th>
-                            <th style="width: 14%;">PHONE</th>
-                            <th style="width: 16%;">EMAIL</th>
-                            <th style="width: 20%;">ADDRESS / CITY</th>
-                            <th style="width: 12%; text-align: right;">BALANCE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;">{{ r.name }}</td>
-                            <td>{{ r.contact_name or '' }}</td>
-                            <td>{{ r.phone or '' }}</td>
-                            <td>{{ r.email or '' }}</td>
-                            <td>{{ r.address1 or '' }} {{ r.city or '' }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.balance or 0) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No vendors registered.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'inventory-summary' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 38%;">ITEM</th>
-                            <th style="width: 12%; text-align: right;">QTY ON HAND</th>
-                            <th style="width: 12%; text-align: right;">QTY RESERVED</th>
-                            <th style="width: 12%; text-align: right;">QTY AVAILABLE</th>
-                            <th style="width: 12%; text-align: right;">UNIT COST</th>
-                            <th style="width: 14%; text-align: right;">TOTAL COST VALUE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if category_groups %}
-                            {% for grp in category_groups %}
-                            <!-- Category Banner Row (Matching inFlow Delivery, PAPER BAG, etc.) -->
-                            <tr class="inflow-rep-cat-banner">
-                                <td colspan="6">
-                                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                                        <span style="font-size: 14px; font-weight: 700; color: #1E40AF; font-style: italic;">{{ grp.category_name }}</span>
-                                        <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} product{% if grp.lines|length > 1 %}s{% endif %}</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% for item in grp.lines %}
-                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                                <td style="font-weight: 500;">
-                                    <a href="{{ url_for('products.detail_product', id=item.id) }}" class="inflow-doc-link">{{ item.item_name }}</a>
-                                </td>
-                                <td style="text-align: right; font-weight: 500;" class="{% if item.on_hand < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ item.on_hand | format_inflow_qty }} {{ item.uom or '' }}
-                                </td>
-                                <td style="text-align: right;" class="{% if item.reserved_quantity < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ item.reserved_quantity | format_inflow_qty }} {{ item.uom or '' }}
-                                </td>
-                                <td style="text-align: right; font-weight: 500;" class="{% if item.available_quantity < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ item.available_quantity | format_inflow_qty }} {{ item.uom or '' }}
-                                </td>
-                                <td style="text-align: right;">
-                                    {{ item.unit_cost | format_inflow_money }}
-                                </td>
-                                <td style="text-align: right; font-weight: 500;" class="{% if item.total_cost_value < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ item.total_cost_value | format_inflow_money }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            <!-- Category Subtotal Row (Matching inFlow screenshot0080) -->
-                            <tr class="inflow-rep-subtotal-row">
-                                <td style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;" class="{% if grp.subtotal_on_hand < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ grp.subtotal_on_hand | format_inflow_qty }}
-                                </td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;" class="{% if grp.subtotal_reserved < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ grp.subtotal_reserved | format_inflow_qty }}
-                                </td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;" class="{% if grp.subtotal_available < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ grp.subtotal_available | format_inflow_qty }}
-                                </td>
-                                <td></td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;" class="{% if grp.subtotal_cost < 0 %}inflow-rep-negative-val{% endif %}">
-                                    {{ grp.subtotal_cost | format_inflow_money }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            <tr><td colspan="6" style="text-align: center; padding: 28px; color: #64748B;">No inventory items found matching filter criteria.</td></tr>
-                        {% endif %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td style="text-align: right; font-weight: 700;">Total:</td>
-                            <td style="text-align: right; font-weight: 700; font-size: 13px;" class="{% if totals.on_hand < 0 %}inflow-rep-negative-val{% endif %}">
-                                {{ totals.on_hand | format_inflow_qty }}
-                            </td>
-                            <td style="text-align: right; font-weight: 700; font-size: 13px;" class="{% if totals.reserved_quantity < 0 %}inflow-rep-negative-val{% endif %}">
-                                {{ totals.reserved_quantity | format_inflow_qty }}
-                            </td>
-                            <td style="text-align: right; font-weight: 700; font-size: 13px;" class="{% if totals.available_quantity < 0 %}inflow-rep-negative-val{% endif %}">
-                                {{ totals.available_quantity | format_inflow_qty }}
-                            </td>
-                            <td></td>
-                            <td style="text-align: right; font-weight: 700; font-size: 13px;" class="{% if totals.total_cost_value < 0 %}inflow-rep-negative-val{% endif %}">
-                                {{ totals.total_cost_value | format_inflow_money }}
-                            </td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'inventory-valuation' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 12%;">SKU</th>
-                            <th style="width: 22%;">ITEM NAME</th>
-                            <th style="width: 14%;">CATEGORY</th>
-                            <th style="width: 12%;">LOCATION</th>
-                            <th style="width: 8%; text-align: right;">ON HAND</th>
-                            <th style="width: 6%;">UOM</th>
-                            <th style="width: 8%; text-align: right;">UNIT COST</th>
-                            <th style="width: 9%; text-align: right;">ASSET VALUE</th>
-                            <th style="width: 9%; text-align: right;">RETAIL VALUE</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a></td>
-                            <td style="font-weight: 500;">{{ r.item_name }}</td>
-                            <td>{{ r.category_name or 'General' }}</td>
-                            <td>{{ r.location_name or 'Main Warehouse' }}</td>
-                            <td style="text-align: right;">{{ "%.0f"|format(r.quantity) }}</td>
-                            <td>{{ r.uom or 'pcs' }}</td>
-                            <td style="text-align: right;">${{ "%.2f"|format(r.unit_cost) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.asset_value) }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.retail_value) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="9" style="text-align: center; padding: 24px; color: #64748B;">No inventory items with positive stock found.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="4"></td>
-                            <td style="text-align: right; font-weight: bold;">{{ "%.0f"|format(totals.quantity or 0) }}</td>
-                            <td colspan="2"></td>
-                            <td style="text-align: right; font-weight: bold; font-size: 13px;">${{ "%.2f"|format(totals.asset_value or 0) }}</td>
-                            <td style="text-align: right; font-weight: bold; font-size: 13px;">${{ "%.2f"|format(totals.retail_value or 0) }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% elif report_key == 'movement-log' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 15%;">DATE / TIME</th>
-                            <th style="width: 12%;">TYPE</th>
-                            <th style="width: 24%;">PRODUCT</th>
-                            <th style="width: 14%;">FROM</th>
-                            <th style="width: 14%;">TO</th>
-                            <th style="width: 9%; text-align: right;">QTY</th>
-                            <th style="width: 12%;">REASON / NOTES</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td>{{ r.created_at.strftime('%d-%b-%y %H:%M') if r.created_at else '' }}</td>
-                            <td><span style="font-weight: 600; text-transform: uppercase;">{{ r.movement_type }}</span></td>
-                            <td style="font-weight: 500;">{{ r.sku }} {{ r.product_name }}</td>
-                            <td>{{ r.from_location_name or '-' }}</td>
-                            <td>{{ r.to_location_name or '-' }}</td>
-                            <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.quantity) }}</td>
-                            <td style="font-size: 11px;">{{ r.reason or r.notes or '' }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">No inventory movements recorded.</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'low-stock-reorder' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 14%;">SKU</th>
-                            <th style="width: 28%;">ITEM NAME</th>
-                            <th style="width: 15%;">CATEGORY</th>
-                            <th style="width: 11%; text-align: right;">ON HAND</th>
-                            <th style="width: 11%; text-align: right;">REORDER POINT</th>
-                            <th style="width: 11%; text-align: right;">REORDER QTY</th>
-                            <th style="width: 10%;">VENDOR</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;"><a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a></td>
-                            <td style="font-weight: 500;">{{ r.item_name }}</td>
-                            <td>{{ r.category_name or 'General' }}</td>
-                            <td style="text-align: right; color: #DC2626; font-weight: 600;">{{ "%.0f"|format(r.on_hand) }}</td>
-                            <td style="text-align: right;">{{ "%.0f"|format(r.reorder_point) }}</td>
-                            <td style="text-align: right; font-weight: 500;">{{ "%.0f"|format(r.reorder_qty) }}</td>
-                            <td>{{ r.vendor_name }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="7" style="text-align: center; padding: 24px; color: #64748B;">All products are adequately stocked above reorder points!</td></tr>
-                        {% endfor %}
-                    </tbody>
-
-                    {% elif report_key == 'branch-sales-summary' %}
-                    <thead>
-                        <tr>
-                            <th style="width: 11%;">CATEGORY</th>
-                            <th style="width: 12%;">SKU</th>
-                            <th style="width: 19%;">ITEM NAME</th>
-                            <th style="width: 11%; text-align: right;">QTY SOLD</th>
-                            <th style="width: 10%; text-align: right;">PRICE / PCS</th>
-                            <th style="width: 11%; text-align: right;">BRANCH COST</th>
-                            <th style="width: 12%; text-align: right;">TOTAL SALES</th>
-                            <th style="width: 14%; text-align: right;">TOTAL COST (QTY×COST)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% if group_by == 'Category' and category_groups %}
-                            {% for grp in category_groups %}
-                            <!-- Category Banner Row -->
-                            <tr class="inflow-rep-cat-banner">
-                                <td colspan="8">
-                                    <div style="display: flex; align-items: center; justify-content: space-between;">
-                                        <span style="font-size: 13.5px; font-weight: 700; color: #1E40AF;">📁 Category: {{ grp.category_name }}</span>
-                                        <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} item{% if grp.lines|length > 1 %}s{% endif %}</span>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% for r in grp.lines %}
-                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                                <td>{{ r.category_name or 'General' }}</td>
-                                <td style="font-weight: 500;">
-                                    <a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a>
-                                </td>
-                                <td style="font-weight: 500;">
-                                    <div>{{ r.item_name }}</div>
-                                    {% if r.pcs_per_case > 1 %}
-                                    <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600;">
-                                    <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
-                                    {% if r.cases_equivalent %}
-                                    <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
-                                    <div>
-                                        {% if currency == 'KHR' %}
-                                            {{ "{:,.0f}".format(r.sale_price_pc) }} ៛
-                                        {% else %}
-                                            ${{ "{:,.3f}".format(r.sale_price_pc) if r.sale_price_pc < 1 else "{:,.2f}".format(r.sale_price_pc) }}
-                                        {% endif %}
-                                    </div>
-                                    {% if r.sale_price_case %}
-                                    <div style="font-size: 10.5px; color: #64748B;">
-                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sale_price_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.sale_price_case) }}/cs{% endif %}
-                                    </div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; color: #047857; font-weight: 600;">
-                                    <div>
-                                        {% if currency == 'KHR' %}
-                                            {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
-                                        {% else %}
-                                            ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
-                                        {% endif %}
-                                    </div>
-                                    {% if r.branch_cost_case %}
-                                    <div style="font-size: 10.5px; color: #047857;">
-                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
-                                    </div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600; color: #065F46;">
-                                    <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
-                                    <div style="font-size: 10.5px; color: #6B7280; font-weight: 500;">
-                                        Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_profit) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_profit) }}{% endif %} ({{ "%.1f"|format(r.margin_pct) }}%)
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                            <!-- Category Subtotal Row -->
-                            <tr class="inflow-rep-subtotal-row">
-                                <td colspan="3" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
-                                    {{ "{:,.2f}".format(grp.subtotal_qty) if grp.subtotal_qty % 1 != 0 else "{:,.0f}".format(grp.subtotal_qty) }} pcs
-                                </td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_price_pc) }} ៛{% else %}${{ "{:,.3f}".format(grp.avg_price_pc) if grp.avg_price_pc < 1 else "{:,.2f}".format(grp.avg_price_pc) }}{% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 700; color: #047857;">
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_cost_pc) }} ៛{% else %}${{ "{:,.4f}".format(grp.avg_cost_pc) if grp.avg_cost_pc < 1 else "{:,.2f}".format(grp.avg_cost_pc) }}{% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_sales) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_sales) }}{% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 700; color: #065F46;">
-                                    <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_cost) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_cost) }}{% endif %}</div>
-                                    <div style="font-size: 10.5px; font-weight: 600; color: #4B5563;">
-                                        Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_profit) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_profit) }}{% endif %} ({{ "%.1f"|format(grp.subtotal_margin) }}%)
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        {% else %}
-                            {% for r in rows %}
-                            <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                                <td>{{ r.category_name or 'General' }}</td>
-                                <td style="font-weight: 500;">
-                                    <a href="{{ url_for('products.detail_product', id=r.id) }}" class="inflow-doc-link">{{ r.sku }}</a>
-                                </td>
-                                <td style="font-weight: 500;">
-                                    <div>{{ r.item_name }}</div>
-                                    {% if r.pcs_per_case > 1 %}
-                                    <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600;">
-                                    <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
-                                    {% if r.cases_equivalent %}
-                                    <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
-                                    <div>
-                                        {% if currency == 'KHR' %}
-                                            {{ "{:,.0f}".format(r.sale_price_pc) }} ៛
-                                        {% else %}
-                                            ${{ "{:,.3f}".format(r.sale_price_pc) if r.sale_price_pc < 1 else "{:,.2f}".format(r.sale_price_pc) }}
-                                        {% endif %}
-                                    </div>
-                                    {% if r.sale_price_case %}
-                                    <div style="font-size: 10.5px; color: #64748B;">
-                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sale_price_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.sale_price_case) }}/cs{% endif %}
-                                    </div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; color: #047857; font-weight: 600;">
-                                    <div>
-                                        {% if currency == 'KHR' %}
-                                            {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
-                                        {% else %}
-                                            ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
-                                        {% endif %}
-                                    </div>
-                                    {% if r.branch_cost_case %}
-                                    <div style="font-size: 10.5px; color: #047857;">
-                                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
-                                    </div>
-                                    {% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.sales_amount) }} ៛{% else %}${{ "{:,.2f}".format(r.sales_amount) }}{% endif %}
-                                </td>
-                                <td style="text-align: right; font-weight: 600; color: #065F46;">
-                                    <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
-                                    <div style="font-size: 10.5px; color: #6B7280; font-weight: 500;">
-                                        Prof: {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_profit) }} ៛{% else %}${{ "{:,.2f}".format(r.branch_profit) }}{% endif %} ({{ "%.1f"|format(r.margin_pct) }}%)
-                                    </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales records found for this branch and filter criteria.</td></tr>
-                            {% endfor %}
-                        {% endif %}
-                    </tbody>
-                    {% if page == total_pages and rows %}
-                    <tfoot>
-                        <tr class="inflow-crys-totals-row">
-                            <td colspan="3" style="font-weight: bold; text-align: right;">GRAND TOTALS:</td>
-                            <td style="text-align: right; font-weight: bold;">
-                                {{ "{:,.2f}".format(totals.quantity_sold or totals.quantity or 0) if (totals.quantity_sold or totals.quantity or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or totals.quantity or 0) }} pcs
-                            </td>
-                            <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
-                                {% if totals.quantity_sold and totals.quantity_sold > 0 %}
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.sales_amount / totals.quantity_sold) }}{% endif %}
-                                {% else %}-{% endif %}
-                            </td>
-                            <td style="text-align: right; font-weight: bold; color: #047857;">
-                                {% if totals.quantity_sold and totals.quantity_sold > 0 %}
-                                    {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_branch_cost / totals.quantity_sold) }}{% endif %}
-                                {% else %}-{% endif %}
-                            </td>
-                            <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
-                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.sales_amount or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.sales_amount or 0) }}{% endif %}
-                            </td>
-                            <td style="text-align: right; font-weight: bold; color: #065F46;">
-                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or totals.branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or totals.branch_cost or 0) }}{% endif %}
-                            </td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-
-                    {% else %}
-                    <thead>
-                        <tr>
-                            <th style="width: 20%;">ORDER #</th>
-                            <th style="width: 30%;">CUSTOMER</th>
-                            <th style="width: 15%;">DATE</th>
-                            <th style="width: 15%;">STATUS</th>
-                            <th style="width: 20%; text-align: right;">TOTAL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for r in rows %}
-                        <tr class="{% if loop.index is even %}alt-row{% endif %}">
-                            <td style="font-weight: 500;">{{ r.order_number }}</td>
-                            <td>{{ r.customer_name or '' }}</td>
-                            <td>{{ r.order_date | format_inflow_date }}</td>
-                            <td>{{ r.status }}</td>
-                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.total_amount or 0) }}</td>
-                        </tr>
-                        {% else %}
-                        <tr><td colspan="5" style="text-align: center; padding: 24px; color: #64748B;">No data available.</td></tr>
-                        {% endfor %}
-                    </tbody>
-                    {% endif %}
-                </table>
+        <!-- Pre-Generate Vector Illustration Canvas matching Screenshot 2 -->
+        {% if not rows %}
+        <div class="inflow-pregenerate-canvas">
+            <div class="inflow-pregenerate-wrap">
+                <!-- SVG Clipboard Illustration matching Screenshot 2 -->
+                <div class="pregenerate-illustration">
+                    <svg width="220" height="220" viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Main Clipboard paper -->
+                        <path d="M75 55 L225 30 L250 205 L100 230 Z" fill="#F8FAFC" stroke="#4C1D95" stroke-width="2.5" stroke-linejoin="round"/>
+                        <!-- Top Clip -->
+                        <rect x="135" y="20" width="55" height="18" rx="4" transform="rotate(-9.5 135 20)" fill="#FFFFFF" stroke="#4C1D95" stroke-width="2.5"/>
+                        <!-- Document Header lines -->
+                        <line x1="110" y1="85" x2="215" y2="68" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+                        <line x1="114" y1="115" x2="219" y2="98" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+                        <line x1="118" y1="145" x2="223" y2="128" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+                        <line x1="122" y1="175" x2="227" y2="158" stroke="#CBD5E1" stroke-width="3" stroke-linecap="round"/>
+                        <!-- Checkmark Pill Badges matching Screenshot 2 -->
+                        <circle cx="92" cy="100" r="11" fill="#EDE9FE" stroke="#5B21B6" stroke-width="2"/>
+                        <path d="M87 100 L91 104 L98 96" stroke="#5B21B6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="96" cy="130" r="11" fill="#EDE9FE" stroke="#5B21B6" stroke-width="2"/>
+                        <path d="M91 130 L95 134 L102 126" stroke="#5B21B6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="100" cy="160" r="11" fill="#EDE9FE" stroke="#5B21B6" stroke-width="2"/>
+                        <path d="M95 160 L99 164 L106 156" stroke="#5B21B6" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <!-- Callout text matching Screenshot 2 -->
+                <div class="pregenerate-text">
+                    <h2 class="pregenerate-title">{{ meta.title }}</h2>
+                    <p class="pregenerate-desc">{{ meta.description }}</p>
+                    <div class="pregenerate-customize-heading">Want to customize this report?</div>
+                    <div class="pregenerate-subtext">Just change the settings at the top of this window before selecting Generate.</div>
+                    <button type="button" class="pregenerate-gold-btn" onclick="submitReportForm()">
+                        Generate
+                    </button>
+                </div>
             </div>
         </div>
+        {% endif %}
 
-        <!-- inFlow Crystal Report Footer Status Bar -->
-        <div class="inflow-crystal-statusbar">
-            <span class="status-msg">Finished generating report</span>
-            <span class="status-count">{{ total_count }} records loaded</span>
+        <!-- Pager Footer when rows exist -->
+        {% if rows %}
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 16px 0; border-top: 1px solid #E5E7EB; margin-top: 8px;">
+            <div style="font-size: 12px; color: #64748B;">
+                Showing page <strong>{{ page }}</strong> of <strong>{{ total_pages }}</strong> ({{ total_count }} records)
+            </div>
+            <div style="display: flex; gap: 6px;">
+                <button type="button" class="inflow-chip-btn" onclick="gotoPage(1)" {% if page <= 1 %}disabled style="opacity: 0.4;"{% endif %}>|◀ First</button>
+                <button type="button" class="inflow-chip-btn" onclick="gotoPage({{ page - 1 }})" {% if page <= 1 %}disabled style="opacity: 0.4;"{% endif %}>◀ Previous</button>
+                <button type="button" class="inflow-chip-btn" onclick="gotoPage({{ page + 1 }})" {% if page >= total_pages %}disabled style="opacity: 0.4;"{% endif %}>Next ▶</button>
+                <button type="button" class="inflow-chip-btn" onclick="gotoPage({{ total_pages }})" {% if page >= total_pages %}disabled style="opacity: 0.4;"{% endif %}>Last ▶|</button>
+            </div>
         </div>
-    </main>
+        {% endif %}
+    </div>
 </div>
 
-<!-- Export Modal Dialog (Matching screenshot0070.JPEG) -->
-<div id="exportModalOverlay" class="inflow-export-modal-overlay">
-    <div class="inflow-export-modal">
-        <div class="inflow-export-modal-header">
-            <span>Export Document</span>
-            <button type="button" class="close-btn" onclick="toggleExportDialog()">✕</button>
+<!-- Slide-over "All Filters" Drawer -->
+<div id="allFiltersOverlay" class="inflow-filters-drawer-overlay" onclick="toggleAllFiltersDrawer()">
+    <div class="inflow-filters-drawer" onclick="event.stopPropagation()">
+        <div class="drawer-header">
+            <h3 class="drawer-title">All Filters</h3>
+            <button type="button" class="drawer-close-btn" onclick="toggleAllFiltersDrawer()">✕</button>
         </div>
-        <div class="inflow-export-modal-body">
-            <p style="font-size: 11.5px; color: #4B5563; margin-bottom: 12px;">Export this document in a format of your choice.</p>
-            <div style="margin-bottom: 16px;">
-                <label style="font-size: 11px; font-weight: 600; display: block; margin-bottom: 4px;">Save as type:</label>
-                <select id="exportFormatSelect" class="inflow-rep-param-select" style="width: 100%;">
-                    <option value="csv">Microsoft Excel / CSV (*.csv)</option>
-                    <option value="pdf">Adobe PDF (*.pdf)</option>
+        <div class="drawer-body">
+            <!-- Store Scope -->
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Store Scope</label>
+                <select class="popover-search-input" onchange="document.getElementById('formBranchInput').value = this.value">
+                    {% if not is_branch_user %}
+                    <option value="main" {% if branch_scope == 'main' or not branch_scope %}selected{% endif %}>🏢 Main Store (Only)</option>
+                    {% for b in all_branches %}
+                    <option value="{{ b.id }}" {% if branch_scope == b.id|string %}selected{% endif %}>🏬 {{ b.code }} - {{ b.name }}</option>
+                    {% endfor %}
+                    <option value="all" {% if branch_scope == 'all' %}selected{% endif %}>🌐 All Outlets (Consolidated)</option>
+                    {% else %}
+                    {% for b in all_branches %}
+                    <option value="{{ b.id }}" selected>🏬 {{ b.code }} - {{ b.name }} (Assigned)</option>
+                    {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+
+            <!-- Date Range -->
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Date Range</label>
+                <select class="popover-search-input" onchange="document.getElementById('formDateRangeInput').value = this.value">
+                    <option value="This Month" {% if date_range == 'This Month' %}selected{% endif %}>This Month</option>
+                    <option value="Today" {% if date_range == 'Today' %}selected{% endif %}>Today</option>
+                    <option value="This Week" {% if date_range == 'This Week' %}selected{% endif %}>This Week</option>
+                    <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
+                    <option value="This Year" {% if date_range == 'This Year' %}selected{% endif %}>This Year</option>
+                    <option value="All" {% if date_range == 'All' %}selected{% endif %}>All Dates</option>
+                </select>
+            </div>
+
+            <!-- Status -->
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Payment / Order Status</label>
+                <select class="popover-search-input" onchange="document.getElementById('formStatusInput').value = this.value">
+                    <option value="Paid" {% if status == 'Paid' %}selected{% endif %}>Fulfilled (Paid)</option>
+                    <option value="Open" {% if status == 'Open' %}selected{% endif %}>Open</option>
+                    <option value="Invoiced" {% if status == 'Invoiced' %}selected{% endif %}>Invoiced</option>
+                    <option value="All" {% if status == 'All' or not status %}selected{% endif %}>All</option>
+                </select>
+            </div>
+
+            <!-- First Sort By -->
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Sort By</label>
+                <select class="popover-search-input" onchange="document.getElementById('formSortByInput').value = this.value">
+                    <option value="Order Number" {% if sort_by in ['Order Number', 'SKU', 'Order Number / SKU'] %}selected{% endif %}>Order Number / SKU</option>
+                    <option value="Item Name" {% if sort_by in ['Item Name', 'Product Name'] %}selected{% endif %}>Item Name</option>
+                    <option value="Category" {% if sort_by == 'Category' %}selected{% endif %}>Category</option>
+                    <option value="Sales Amount" {% if sort_by in ['Sales Amount', 'Total Sales'] %}selected{% endif %}>Sales Amount</option>
+                    <option value="Costing" {% if sort_by in ['Total Cost', 'Costing', 'Branch Cost'] %}selected{% endif %}>Costing</option>
+                    <option value="Gross Profit" {% if sort_by in ['Gross Profit', 'Profit'] %}selected{% endif %}>Gross Profit</option>
+                    <option value="Order Date" {% if sort_by == 'Order Date' %}selected{% endif %}>Order Date</option>
+                    <option value="Customer" {% if sort_by == 'Customer' %}selected{% endif %}>Customer</option>
                 </select>
             </div>
         </div>
-        <div class="inflow-export-modal-footer">
-            <button type="button" class="inflow-win-button primary" onclick="executeExport()">Save</button>
-            <button type="button" class="inflow-win-button" onclick="toggleExportDialog()">Cancel</button>
+        <div class="drawer-footer">
+            <button type="button" class="inflow-chip-btn" onclick="toggleAllFiltersDrawer()">Cancel</button>
+            <button type="button" class="inflow-web-generate-btn" onclick="submitReportForm()">Apply & Generate</button>
         </div>
     </div>
 </div>
@@ -1561,26 +699,78 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // Close export dropdown or customer dropdown if clicking outside
+    // Close popovers if clicking outside
     document.addEventListener('click', function(e) {
-        const menu = document.getElementById('reportExportMenu');
-        if (menu && menu.classList.contains('show') && !menu.contains(e.target) && !e.target.closest('.inflow-tb-btn')) {
-            menu.classList.remove('show');
-        }
-
-        const custWrap = document.getElementById('repCustomerComboboxWrap');
-        const custMenu = document.getElementById('repCustomerDropdownMenu');
-        if (custMenu && custMenu.classList.contains('show') && (!custWrap || !custWrap.contains(e.target))) {
-            custMenu.classList.remove('show');
-            const custInput = document.getElementById('repCustomerSearchInput');
-            if (custInput && (!custInput.value || !custInput.value.trim())) {
-                custInput.value = '<All>';
-            }
+        if (!e.target.closest('.inflow-filter-chip-wrapper')) {
+            document.querySelectorAll('.inflow-popover-dropdown').forEach(p => p.classList.remove('show'));
         }
     });
 });
 
-// Customer Combobox Functions
+function submitReportForm() {
+    document.getElementById('reportPageInput').value = '1';
+    document.getElementById('reportFilterForm').submit();
+}
+
+function gotoPage(p) {
+    p = parseInt(p) || 1;
+    document.getElementById('reportPageInput').value = p;
+    document.getElementById('reportFilterForm').submit();
+}
+
+function toggleChipPopover(id, e) {
+    if (e) e.stopPropagation();
+    const target = document.getElementById(id);
+    const wasOpen = target && target.classList.contains('show');
+    document.querySelectorAll('.inflow-popover-dropdown').forEach(p => p.classList.remove('show'));
+    if (target && !wasOpen) {
+        target.classList.add('show');
+        const input = target.querySelector('.popover-search-input');
+        if (input) input.focus();
+    }
+}
+
+function filterPopoverList(input, listId) {
+    const val = (input.value || '').toLowerCase().trim();
+    const items = document.querySelectorAll('#' + listId + ' .popover-item');
+    items.forEach(it => {
+        const text = (it.getAttribute('data-name') || it.innerText).toLowerCase();
+        it.style.display = (!val || text.includes(val)) ? 'flex' : 'none';
+    });
+}
+
+function selectFilterStatus(statusVal) {
+    document.getElementById('formStatusInput').value = statusVal;
+    submitReportForm();
+}
+
+function selectFilterDate(rangeVal) {
+    document.getElementById('formDateRangeInput').value = rangeVal;
+    submitReportForm();
+}
+
+function selectFilterCategory(catId, catName) {
+    document.getElementById('formCategoryIdInput').value = catId;
+    submitReportForm();
+}
+
+function selectFilterBranch(branchVal) {
+    document.getElementById('formBranchInput').value = branchVal;
+    submitReportForm();
+}
+
+function toggleAllFiltersDrawer() {
+    const el = document.getElementById('allFiltersOverlay');
+    if (el) el.classList.toggle('show');
+}
+
+function toggleExportMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('reportExportMenu');
+    if (menu) menu.classList.toggle('show');
+}
+
+// Searchable Customer Combobox Handlers (Screenshot 3 & tests)
 function openRepCustomerDropdown() {
     const menu = document.getElementById('repCustomerDropdownMenu');
     if (menu) menu.classList.add('show');
@@ -1590,9 +780,12 @@ function toggleRepCustomerDropdown(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('repCustomerDropdownMenu');
     if (menu) {
-        menu.classList.toggle('show');
-        if (menu.classList.contains('show')) {
-            document.getElementById('repCustomerSearchInput').focus();
+        const wasOpen = menu.classList.contains('show');
+        document.querySelectorAll('.inflow-popover-dropdown').forEach(p => p.classList.remove('show'));
+        if (!wasOpen) {
+            menu.classList.add('show');
+            const input = document.getElementById('repCustomerSearchInput');
+            if (input) input.focus();
         }
     }
 }
@@ -1624,15 +817,10 @@ function filterRepCustomerDropdown(val) {
     const clearBtn = document.getElementById('repCustomerClearBtn');
     if (clearBtn) clearBtn.style.display = (val && val !== '<all>') ? 'inline-flex' : 'none';
 
-    // Auto-sync exact customer match to hidden customer_id
     const hid = document.getElementById('repCustomerId');
     if (hid && val && val !== '<all>') {
         let exactItem = Array.from(items).find(it => (it.getAttribute('data-name') || '').toLowerCase() === val);
-        if (exactItem) {
-            hid.value = exactItem.getAttribute('data-id') || '';
-        } else {
-            hid.value = '';
-        }
+        hid.value = exactItem ? (exactItem.getAttribute('data-id') || '') : '';
     }
 }
 
@@ -1640,31 +828,19 @@ function selectRepCustomer(id, name) {
     const hid = document.getElementById('repCustomerId');
     const input = document.getElementById('repCustomerSearchInput');
     const menu = document.getElementById('repCustomerDropdownMenu');
-    const clearBtn = document.getElementById('repCustomerClearBtn');
-
     if (hid) hid.value = id;
     if (input) input.value = name;
     if (menu) menu.classList.remove('show');
-    if (clearBtn) clearBtn.style.display = (id || (name && name !== '<All>')) ? 'inline-flex' : 'none';
-
-    document.querySelectorAll('#repCustomerDropdownMenu .rep-cust-item').forEach(it => {
-        if ((it.getAttribute('data-id') || '') === (id || '')) {
-            it.classList.add('selected');
-        } else {
-            it.classList.remove('selected');
-        }
-    });
+    submitReportForm();
 }
 
 function clearRepCustomerSelection(e) {
     if (e) e.stopPropagation();
-    selectRepCustomer('', '<All>');
+    const hid = document.getElementById('repCustomerId');
     const input = document.getElementById('repCustomerSearchInput');
-    if (input) {
-        input.focus();
-        input.select();
-    }
-    filterRepCustomerDropdown('');
+    if (hid) hid.value = '';
+    if (input) input.value = '<All>';
+    submitReportForm();
 }
 
 function handleRepCustomerKey(e) {
@@ -1675,10 +851,7 @@ function handleRepCustomerKey(e) {
 
     if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (!isShowing) {
-            openRepCustomerDropdown();
-            return;
-        }
+        if (!isShowing) { openRepCustomerDropdown(); return; }
         let curIdx = visibleItems.findIndex(it => it.classList.contains('highlighted'));
         visibleItems.forEach(it => it.classList.remove('highlighted'));
         let nextIdx = (curIdx + 1 < visibleItems.length) ? curIdx + 1 : 0;
@@ -1703,95 +876,12 @@ function handleRepCustomerKey(e) {
                 e.preventDefault();
                 selectRepCustomer(highlighted.getAttribute('data-id'), highlighted.getAttribute('data-name'));
                 return;
-            } else if (visibleItems.length === 1) {
-                e.preventDefault();
-                selectRepCustomer(visibleItems[0].getAttribute('data-id'), visibleItems[0].getAttribute('data-name'));
-                return;
             }
         }
+        submitReportForm();
     } else if (e.key === 'Escape') {
         menu.classList.remove('show');
     }
-}
-
-function toggleParamsPanel() {
-    const panel = document.getElementById('reportParamsPanel');
-    const link = document.querySelector('.inflow-rep-collapse-link');
-    if (panel) {
-        panel.classList.toggle('collapsed');
-        link.innerText = panel.classList.contains('collapsed') ? '» More' : '« Less';
-    }
-}
-
-function submitReportForm() {
-    document.getElementById('reportPageInput').value = '1';
-    document.getElementById('reportFilterForm').submit();
-}
-
-function gotoPage(p) {
-    p = parseInt(p) || 1;
-    document.getElementById('reportPageInput').value = p;
-    document.getElementById('reportFilterForm').submit();
-}
-
-function toggleCustomDates(val) {
-    const el = document.getElementById('customDatesWrapper');
-    if (el) {
-        el.style.display = (val === 'Custom') ? 'flex' : 'none';
-    }
-}
-
-function toggleExportMenu(e) {
-    if (e) e.stopPropagation();
-    const menu = document.getElementById('reportExportMenu');
-    if (menu) menu.classList.toggle('show');
-}
-
-function toggleExportDialog() {
-    const overlay = document.getElementById('exportModalOverlay');
-    if (overlay) overlay.classList.toggle('show');
-}
-
-function executeExport() {
-    const format = document.getElementById('exportFormatSelect').value;
-    toggleExportDialog();
-    if (format === 'pdf') {
-        window.print();
-    } else {
-        const form = document.getElementById('reportFilterForm');
-        const params = new URLSearchParams(new FormData(form)).toString();
-        window.location.href = "{{ url_for('reports.export_report', report_key=report_key) }}?" + params;
-    }
-}
-
-function setZoom(val) {
-    const sheet = document.getElementById('crystalSheetEl');
-    if (!sheet) return;
-    if (val === 'width') {
-        sheet.style.transform = 'scale(1)';
-        sheet.style.width = '100%';
-    } else {
-        sheet.style.width = '{{ "1200px" if orientation == "Landscape" else "960px" }}';
-        sheet.style.transform = `scale(${parseInt(val) / 100})`;
-        sheet.style.transformOrigin = 'top center';
-    }
-}
-
-function searchInReport(query) {
-    query = (query || '').toLowerCase().trim();
-    const rows = document.querySelectorAll('#reportDataTable tbody tr');
-    rows.forEach(r => {
-        const text = r.innerText.toLowerCase();
-        if (!query || text.includes(query)) {
-            r.style.display = '';
-        } else {
-            r.style.display = 'none';
-        }
-    });
-}
-
-function addToMyReports() {
-    alert('This report configuration has been saved to "My Reports"!');
 }
 </script>
 {% endblock %}

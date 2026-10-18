@@ -1846,6 +1846,13 @@ def view_report(report_key):
 
     today_str = datetime.now().strftime('%B %d, %Y')
 
+    selected_category_name = ''
+    if category_id and category_id.lower() != 'all':
+        for c_item in all_categories:
+            if str(c_item['id']) == str(category_id):
+                selected_category_name = c_item['name']
+                break
+
     return render_template('reports/viewer.html',
                            report_key=report_key,
                            meta=meta,
@@ -1859,6 +1866,7 @@ def view_report(report_key):
                            customer_id=customer_id,
                            customer_search=customer_search,
                            selected_customer_name=selected_customer_name,
+                           selected_category_name=selected_category_name,
                            vendor_id=vendor_id,
                            category_id=category_id,
                            location_id=location_id,
