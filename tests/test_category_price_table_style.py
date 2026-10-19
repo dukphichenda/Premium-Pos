@@ -136,5 +136,78 @@ class TestCategoryPriceTableStyle(unittest.TestCase):
         self.assertIn('pl-modern-specs-box', html)
         self.assertIn('pl-modern-price-banner', html)
 
+    def test_product_detail_reflects_price_table_style(self):
+        """Verify product detail page /products/<id> renders Classic & Modern card styles correctly."""
+        # Find a product in the test category or any active product
+        with get_db_cursor(commit=True) as cursor:
+            cursor.execute("SELECT id FROM products WHERE is_active = TRUE ORDER BY id ASC LIMIT 1;")
+            prod = cursor.fetchone()
+            if not prod:
+                cursor.execute("""
+                    INSERT INTO products (name, sku, category_id, is_active)
+                    VALUES ('Test Product Price Card', 'TEST-PC-1', %s, TRUE)
+                    RETURNING id;
+                """, (self.test_cat_id,))
+                prod = cursor.fetchone()
+            prod_id = prod['id']
+
+            # Set category to modern
+            cursor.execute("UPDATE categories SET price_table_style = 'modern' WHERE id = %s;", (self.test_cat_id,))
+            cursor.execute("UPDATE products SET category_id = %s, price_card_style = NULL WHERE id = %s;", (self.test_cat_id, prod_id))
+
+        # Request product catalog / detail page
+        resp = self.client.get(f'/products/{prod_id}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Check for style switcher buttons
+        self.assertIn('btnDetailStyleClassic', html)
+        self.assertIn('btnDetailStyleModern', html)
+        self.assertIn('setProductPriceCardStyle', html)
+
+        # Check for both card content containers
+        self.assertIn('id="cardContentClassic"', html)
+        self.assertIn('id="cardContentModern"', html)
+        self.assertIn('inflow-modern-header', html)
+        self.assertIn('inflow-modern-specs-box', html)
+        self.assertIn('inflow-modern-price-banner', html)
+
+    def test_product_detail_update_price_card_style_ajax(self):
+        """Verify updating a product's price_card_style via update_product_ajax persists to the database."""
+        with get_db_cursor(commit=False) as cursor:
+            cursor.execute("SELECT id FROM products WHERE is_active = TRUE ORDER BY id ASC LIMIT 1;")
+            prod_id = cursor.fetchone()['id']
+
+        # Update to modern
+        resp = self.client.post(
+            f'/products/{prod_id}/update_ajax',
+            data=json.dumps({'price_card_style': 'modern'}),
+            content_type='application/json'
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.data.decode('utf-8'))
+        self.assertTrue(data.get('success'))
+
+        # Verify DB
+        with get_db_cursor(commit=False) as cursor:
+            cursor.execute("SELECT price_card_style FROM products WHERE id = %s;", (prod_id,))
+            p = cursor.fetchone()
+            self.assertEqual(p['price_card_style'], 'modern')
+
+        # Update back to classic
+        resp = self.client.post(
+            f'/products/{prod_id}/update_ajax',
+            data=json.dumps({'price_card_style': 'classic'}),
+            content_type='application/json'
+        )
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.data.decode('utf-8'))
+        self.assertTrue(data.get('success'))
+
+        with get_db_cursor(commit=False) as cursor:
+            cursor.execute("SELECT price_card_style FROM products WHERE id = %s;", (prod_id,))
+            p = cursor.fetchone()
+            self.assertEqual(p['price_card_style'], 'classic')
+
 if __name__ == '__main__':
     unittest.main()

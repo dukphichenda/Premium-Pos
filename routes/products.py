@@ -401,11 +401,19 @@ def _get_catalog_sidebar_products():
     """)
 
 def _get_product_detail_bundle(product_id):
+    # Global default price table style setting
+    global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
+    global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
+    if global_price_table_style not in ('classic', 'modern'):
+        global_price_table_style = 'classic'
+
     product = query_one("""
         SELECT 
             p.*, 
             c.name as category_name,
             COALESCE(c.color, '#00A3E0') as category_color,
+            COALESCE(c.price_table_style, 'classic') as category_price_table_style,
+            COALESCE(p.price_card_style, c.price_table_style, %s, 'classic') as price_table_style,
             l.name as default_location_name,
             COALESCE(inv.total_qty, 0) as total_qty,
             COALESCE(inv.reserved_qty, 0) as reserved_qty
@@ -417,7 +425,7 @@ def _get_product_detail_bundle(product_id):
             FROM inventory GROUP BY product_id
         ) inv ON p.id = inv.product_id
         WHERE p.id = %s
-    """, (product_id,))
+    """, (global_price_table_style, product_id))
 
     if not product:
         return None
@@ -767,7 +775,9 @@ def _get_product_detail_bundle(product_id):
         'pricing_schemes': pricing_schemes,
         'can_view_costs': can_view_costs,
         'can_edit_prices': user_can_edit_prices(),
-        'can_adjust_stock': user_can_adjust_stock()
+        'can_adjust_stock': user_can_adjust_stock(),
+        'global_price_table_style': global_price_table_style,
+        'effective_price_table_style': (product.get('price_table_style') or global_price_table_style or 'classic').lower()
     }
 
 def _render_table_list_products():
@@ -935,7 +945,7 @@ def update_product_ajax(id):
             'tier_qty_1', 'tier_qty_2', 'tier_qty_3',
             'tier_price_1', 'tier_price_2', 'tier_price_3',
             'price_card_notes', 'price_card_color', 'price_card_font', 'price_card_unit',
-            'price_card_custom_detail', 'price_card_is_custom_detail',
+            'price_card_custom_detail', 'price_card_is_custom_detail', 'price_card_style',
             'factory_cost', 'factory_cost_formula',
             'cost_rate', 'cost_rate_formula',
             'shipping_cost', 'shipping_cost_formula',
