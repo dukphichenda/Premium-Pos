@@ -100,7 +100,7 @@ class ProductCopyExactAllInfoTestCase(unittest.TestCase):
         """, (self.vend_id, Json({'origin_batch': 'B-2026', 'grade': 'A+'})))
 
         # Add price tiers (product_prices)
-        scheme = query_one("SELECT id FROM pricing_schemes LIMIT 1")
+        scheme = query_one("SELECT id FROM pricing_schemes WHERE is_active = TRUE ORDER BY is_default DESC, id ASC LIMIT 1")
         if scheme:
             execute("INSERT INTO product_prices (product_id, pricing_scheme_id, unit_price) VALUES (%s, %s, %s) ON CONFLICT (product_id, pricing_scheme_id) DO UPDATE SET unit_price = EXCLUDED.unit_price",
                     (prod_id, scheme['id'], 23.50))
@@ -194,10 +194,13 @@ class ProductCopyExactAllInfoTestCase(unittest.TestCase):
         self.assertEqual(copied['custom5'], 'CustVal5')
 
         # 7. Child Records: Prices, Vendors, Attachments, Versions
-        if scheme:
-            c_prices = query_all("SELECT * FROM product_prices WHERE product_id = %s", (copied_id,))
-            self.assertEqual(len(c_prices), 1)
-            self.assertEqual(float(c_prices[0]['unit_price']), 23.50)
+        source_prices = query_all("SELECT pricing_scheme_id, unit_price FROM product_prices WHERE product_id = %s", (prod_id,))
+        copied_prices = query_all("SELECT pricing_scheme_id, unit_price FROM product_prices WHERE product_id = %s", (copied_id,))
+        self.assertEqual(len(copied_prices), len(source_prices))
+        for sp in source_prices:
+            matching = [cp for cp in copied_prices if cp['pricing_scheme_id'] == sp['pricing_scheme_id']]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(float(matching[0]['unit_price']), float(sp['unit_price']))
 
         c_vendors = query_all("SELECT * FROM product_vendors WHERE product_id = %s", (copied_id,))
         self.assertEqual(len(c_vendors), 1)
