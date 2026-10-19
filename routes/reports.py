@@ -341,7 +341,7 @@ def view_report(report_key):
     orientation = request.args.get('orientation', 'Landscape' if report_key in ['sales-order-operational', 'sales-by-product-details', 'inventory-valuation', 'branch-sales-summary'] else 'Portrait')
     group_by = request.args.get('group_by', 'None')
     page = max(1, int(request.args.get('page', 1)))
-    per_page = 150 if group_by == 'Category' else 36 # Rows per page matching printed sheet size
+    per_page = 150 if (group_by == 'Category' or report_key == 'customer-order-history') else 36 # Rows per page matching printed sheet size
     
     # Store Scope: Branch users strictly locked to their branch; HQ can view main, branch, or all
     user_role = session.get('role')
@@ -946,6 +946,9 @@ def view_report(report_key):
         if customer_id and customer_id != 'all' and str(customer_id).isdigit():
             base_where.append("so.customer_id = %s")
             params.append(int(customer_id))
+        elif customer_search:
+            base_where.append("c.name ILIKE %s")
+            params.append(f"%{customer_search}%")
 
         if status and status != 'All':
             if status == 'Paid':
@@ -954,6 +957,9 @@ def view_report(report_key):
                 base_where.append("so.status = 'INVOICED'")
             elif status == 'Open':
                 base_where.append("so.status IN ('OPEN', 'PICKED', 'PACKED')")
+            else:
+                base_where.append("so.status = %s")
+                params.append(status)
 
         if category_id and category_id != 'all' and str(category_id).isdigit():
             base_where.append("p.category_id = %s")
@@ -991,6 +997,15 @@ def view_report(report_key):
         }
 
         query_params = list(params) + [per_page, offset]
+
+        # Chronological sort matching inFlow screenshot: customer name ASC, order date ASC, order number ASC
+        if sort_by == 'Date Descending':
+            order_clause = "c.name ASC, so.order_date DESC, so.order_number DESC, sol.id ASC"
+        elif sort_by == 'Customer (Z-A)':
+            order_clause = "c.name DESC, so.order_date ASC, so.order_number ASC, sol.id ASC"
+        else:
+            order_clause = "c.name ASC, so.order_date ASC, so.order_number ASC, sol.id ASC"
+
         data_sql = f"""
             SELECT 
                 c.id as customer_id,
@@ -1012,35 +1027,77 @@ def view_report(report_key):
             JOIN sales_order_lines sol ON sol.sales_order_id = so.id
             LEFT JOIN products p ON sol.product_id = p.id
             WHERE {where_sql}
-            ORDER BY c.name ASC, so.order_date DESC, so.order_number DESC, sol.id ASC
+            ORDER BY {order_clause}
             LIMIT %s OFFSET %s
         """
         rows = query_all(data_sql, tuple(query_params))
 
-        # Build customer groups with subtotals matching inFlow screenshot0076.JPEG
+        # Build customer groups with order subtotals and customer totals matching inFlow screenshot0076.JPEG
         customer_groups = []
-        cur_cust = None
-        cur_items = []
+        cur_cust_id = None
+        cur_cust_name = None
+        cur_orders = []
+        cur_order_map = {}
+        cur_all_lines = []
+
         for r in rows:
-            cust = r['customer_name'] or 'Unassigned'
-            if cust != cur_cust:
-                if cur_items:
+            cust_name = r['customer_name'] or 'Unassigned'
+            cust_id = r['customer_id']
+            so_id = r['sales_order_id']
+            so_num = r['order_number']
+
+            if cust_name != cur_cust_name:
+                if cur_cust_name is not None:
+                    c_qty = sum(o['subtotal_qty'] for o in cur_orders)
+                    c_amt = sum(o['subtotal_amount'] for o in cur_orders)
                     customer_groups.append({
-                        'customer_name': cur_cust,
-                        'lines': cur_items,
-                        'subtotal_qty': sum(float(item['quantity'] or 0) for item in cur_items),
-                        'subtotal_amount': sum(float(item['amount'] or 0) for item in cur_items)
+                        'customer_id': cur_cust_id,
+                        'customer_name': cur_cust_name,
+                        'orders': cur_orders,
+                        'lines': cur_all_lines,
+                        'subtotal_qty': c_qty,
+                        'subtotal_amount': c_amt,
+                        'total_qty': c_qty,
+                        'total_amount': c_amt,
                     })
-                cur_cust = cust
-                cur_items = [r]
-            else:
-                cur_items.append(r)
-        if cur_items:
+                cur_cust_name = cust_name
+                cur_cust_id = cust_id
+                cur_orders = []
+                cur_order_map = {}
+                cur_all_lines = []
+
+            if so_id not in cur_order_map:
+                order_entry = {
+                    'sales_order_id': so_id,
+                    'order_number': so_num,
+                    'order_date': r['order_date'],
+                    'status_display': r['status_display'],
+                    'lines': [],
+                    'subtotal_qty': 0.0,
+                    'subtotal_amount': 0.0,
+                }
+                cur_order_map[so_id] = order_entry
+                cur_orders.append(order_entry)
+
+            qty = float(r['quantity'] or 0)
+            amt = float(r['amount'] or 0)
+            cur_order_map[so_id]['lines'].append(r)
+            cur_order_map[so_id]['subtotal_qty'] += qty
+            cur_order_map[so_id]['subtotal_amount'] += amt
+            cur_all_lines.append(r)
+
+        if cur_cust_name is not None:
+            c_qty = sum(o['subtotal_qty'] for o in cur_orders)
+            c_amt = sum(o['subtotal_amount'] for o in cur_orders)
             customer_groups.append({
-                'customer_name': cur_cust,
-                'lines': cur_items,
-                'subtotal_qty': sum(float(item['quantity'] or 0) for item in cur_items),
-                'subtotal_amount': sum(float(item['amount'] or 0) for item in cur_items)
+                'customer_id': cur_cust_id,
+                'customer_name': cur_cust_name,
+                'orders': cur_orders,
+                'lines': cur_all_lines,
+                'subtotal_qty': c_qty,
+                'subtotal_amount': c_amt,
+                'total_qty': c_qty,
+                'total_amount': c_amt,
             })
 
     # 9. CUSTOMER LIST
