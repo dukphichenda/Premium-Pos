@@ -2187,77 +2187,111 @@ def copy_product(id):
             flash("Original product not found.", "error")
             return redirect(url_for('products.list_products'))
 
+        # Generate unique SKU based on original SKU
         next_id = query_one("SELECT COALESCE(MAX(id), 0) + 1 as nid FROM products")['nid']
-        new_sku = f"SKU-{next_id:04d}"
+        base_sku = (source['sku'] or '').strip()
+        if base_sku:
+            candidate_sku = f"{base_sku}-Copy"
+            suffix = 2
+            while query_one("SELECT id FROM products WHERE sku = %s", (candidate_sku,)):
+                candidate_sku = f"{base_sku}-Copy-{suffix}"
+                suffix += 1
+        else:
+            candidate_sku = f"SKU-{next_id:04d}"
+            suffix = 2
+            while query_one("SELECT id FROM products WHERE sku = %s", (candidate_sku,)):
+                candidate_sku = f"SKU-{next_id:04d}-{suffix}"
+                suffix += 1
+
         new_name = f"{source['name']} - Copy"
 
-        new_id = execute_returning_id("""
-            INSERT INTO products (
-                sku, name, description, barcode, category_id, uom,
-                master_pack_qty, inner_pack_qty, default_location_id,
-                reorder_point, reorder_quantity, min_stock, max_stock,
-                standard_cost, average_cost, last_purchase_cost, default_price,
-                is_sellable, is_purchaseable, is_active,
-                item_type, tax_code, costing_method, image_url,
-                custom1, custom2, custom3, custom4, custom5,
-                combine_type
-            ) VALUES (
-                %s, %s, %s, %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
-                %s
-            ) RETURNING id;
-        """, (
-            new_sku, new_name, source['description'], None, source['category_id'], source['uom'],
-            source['master_pack_qty'], source['inner_pack_qty'], source['default_location_id'],
-            source['reorder_point'], source['reorder_quantity'], source['min_stock'], source['max_stock'],
-            source['standard_cost'], source['average_cost'], source['last_purchase_cost'], source['default_price'],
-            source['is_sellable'], source['is_purchaseable'], True,
-            source['item_type'], source['tax_code'], source['costing_method'], source['image_url'],
-            source['custom1'], source['custom2'], source['custom3'], source['custom4'], source['custom5'],
-            source.get('combine_type') or 'single'
-        ))
+        # Dynamically query all table columns to ensure 100% exact copy of all product specs,
+        # dimensions, packaging, UOMs, price card, tiers, and costing sheet formulas
+        cols_info = query_all("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'products'
+            ORDER BY ordinal_position
+        """)
+        cols_to_copy = [c['column_name'] for c in cols_info if c['column_name'] not in ('id', 'created_at', 'updated_at')]
 
-        # Copy combine options if multi product
+        from psycopg2.extras import Json
+        insert_cols = []
+        insert_placeholders = []
+        insert_vals = []
+
+        for col in cols_to_copy:
+            insert_cols.append(col)
+            insert_placeholders.append('%s')
+            if col == 'sku':
+                insert_vals.append(candidate_sku)
+            elif col == 'name':
+                insert_vals.append(new_name)
+            else:
+                val = source.get(col)
+                if isinstance(val, dict):
+                    val = Json(val)
+                insert_vals.append(val)
+
+        sql_insert = f"""
+            INSERT INTO products ({', '.join(insert_cols)})
+            VALUES ({', '.join(insert_placeholders)})
+            RETURNING id;
+        """
+        new_id = execute_returning_id(sql_insert, tuple(insert_vals))
+
+        # Copy combine options if multi product (including selling_price)
         source_options = query_all("SELECT * FROM product_combine_options WHERE product_id = %s ORDER BY sort_order ASC, id ASC", (id,))
         for so in source_options:
             execute("""
                 INSERT INTO product_combine_options (
                     product_id, option_name, component_product_id, component_quantity,
-                    price_modifier, is_default, sort_order, notes
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    price_modifier, selling_price, is_default, sort_order, notes
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (new_id, so['option_name'], so['component_product_id'], so['component_quantity'],
-                  so['price_modifier'], so['is_default'], so['sort_order'], so['notes']))
+                  so.get('price_modifier'), so.get('selling_price'), so.get('is_default', False), so.get('sort_order', 0), so.get('notes')))
 
-        # Copy price tiers
+        # Copy price tiers (product_prices)
         source_prices = query_all("SELECT pricing_scheme_id, unit_price FROM product_prices WHERE product_id = %s", (id,))
         for sp in source_prices:
             execute("""
                 INSERT INTO product_prices (product_id, pricing_scheme_id, unit_price)
                 VALUES (%s, %s, %s)
-                ON CONFLICT (product_id, pricing_scheme_id) DO NOTHING;
+                ON CONFLICT (product_id, pricing_scheme_id) DO UPDATE SET unit_price = EXCLUDED.unit_price;
             """, (new_id, sp['pricing_scheme_id'], sp['unit_price']))
 
-        # Copy vendor mappings
+        # Copy vendor mappings (product_vendors)
         source_vendors = query_all("SELECT vendor_id, vendor_item_code, cost FROM product_vendors WHERE product_id = %s", (id,))
         for sv in source_vendors:
             execute("""
                 INSERT INTO product_vendors (product_id, vendor_id, vendor_item_code, cost)
                 VALUES (%s, %s, %s, %s)
-                ON CONFLICT (product_id, vendor_id) DO NOTHING;
+                ON CONFLICT (product_id, vendor_id) DO UPDATE SET cost = EXCLUDED.cost, vendor_item_code = EXCLUDED.vendor_item_code;
             """, (new_id, sv['vendor_id'], sv['vendor_item_code'], sv['cost']))
+
+        # Copy Bill of Materials components (product_boms)
+        source_boms = query_all("SELECT component_product_id, description, quantity, cost FROM product_boms WHERE product_id = %s ORDER BY id ASC", (id,))
+        for sb in source_boms:
+            execute("""
+                INSERT INTO product_boms (product_id, component_product_id, description, quantity, cost)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (new_id, sb['component_product_id'], sb['description'], sb['quantity'], sb['cost']))
+
+        # Copy product attachments (product_attachments)
+        source_attachments = query_all("SELECT file_name, file_path, file_size FROM product_attachments WHERE product_id = %s ORDER BY id ASC", (id,))
+        for sa in source_attachments:
+            execute("""
+                INSERT INTO product_attachments (product_id, file_name, file_path, file_size)
+                VALUES (%s, %s, %s, %s)
+            """, (new_id, sa['file_name'], sa['file_path'], sa['file_size']))
 
         # Record initial version in product_versions
         execute("""
             INSERT INTO product_versions (product_id, version_number, name, sku, standard_cost, default_price, change_summary)
             VALUES (%s, 1, %s, %s, %s, %s, %s);
-        """, (new_id, new_name, new_sku, source['standard_cost'] or 0, source['default_price'] or 0, f"Duplicated from {source['sku']}"))
+        """, (new_id, new_name, candidate_sku, source['standard_cost'] or 0, source['default_price'] or 0, f"Duplicated from {source['sku'] or source['name']}"))
 
-        flash(f"Product '{new_name}' ({new_sku}) duplicated successfully!", "success")
+        flash(f"Product '{new_name}' ({candidate_sku}) duplicated successfully with all specifications and pricing!", "success")
         return redirect(url_for('products.detail_product', id=new_id))
 
     except Exception as e:
