@@ -71,14 +71,14 @@ class TestPriceList(unittest.TestCase):
         self.assertIn('id="priceTableBody"', html)
         self.assertIn('id="selectAllRowsChk"', html)
 
-        # Columns in table
+        # Columns in table (Stock and UOM removed per user request)
         self.assertIn('Picture', html)
         self.assertIn('Product Title', html)
         self.assertIn('Size / Spec', html)
         self.assertIn('Packaging Breakdown', html)
-        self.assertIn('Stock', html)
-        self.assertIn('UOM', html)
         self.assertIn('Unit Price', html)
+        self.assertNotIn('<th style="width: 110px; text-align: center;">Stock</th>', html)
+        self.assertNotIn('<th style="width: 100px; text-align: center;">UOM</th>', html)
 
         # Price Scheme Filter selector
         self.assertIn('id="priceSchemeFilter"', html)
