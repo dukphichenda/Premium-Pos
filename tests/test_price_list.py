@@ -59,5 +59,60 @@ class TestPriceList(unittest.TestCase):
             self.assertIn('(UNIT PRICE)', html)
             self.assertIn('(Product Detail)', html)
 
+    def test_price_list_table_features(self):
+        """Verify Table View generator, Scheme selector, UOM selector, and pack pcs sub-note."""
+        resp = self.client.get('/products/price-list')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Price List Table View Container & Elements
+        self.assertIn('id="priceTableWrapper"', html)
+        self.assertIn('id="priceListTable"', html)
+        self.assertIn('id="priceTableBody"', html)
+        self.assertIn('id="selectAllRowsChk"', html)
+
+        # Columns in table
+        self.assertIn('Picture', html)
+        self.assertIn('Product Title', html)
+        self.assertIn('Size / Spec', html)
+        self.assertIn('Packaging Breakdown', html)
+        self.assertIn('Stock', html)
+        self.assertIn('UOM', html)
+        self.assertIn('Unit Price', html)
+
+        # Price Scheme Filter selector
+        self.assertIn('id="priceSchemeFilter"', html)
+        self.assertIn('Scheme:', html)
+
+        # UOM Filter selector with pack option
+        self.assertIn('id="uomFilter"', html)
+        self.assertIn('value="pack"', html)
+        self.assertIn('value="case"', html)
+        self.assertIn('value="pcs"', html)
+
+        # View Mode switcher [ Table | Cards ]
+        self.assertIn('id="viewModeSwitcher"', html)
+        self.assertIn('id="btnViewTable"', html)
+        self.assertIn('id="btnViewCards"', html)
+
+        # Generate Table Button & function
+        self.assertIn('id="btnGenerateTable"', html)
+        self.assertIn('generatePriceTable()', html)
+
+        # CSV Export
+        self.assertIn('exportTableToCSV()', html)
+
+        # Pack pcs sub-detail logic and CSS
+        self.assertIn('pl-table-pcs-note', html)
+        self.assertIn('pcs / pack', html)
+
+    def test_catalog_has_price_list_button(self):
+        """Verify Products catalog sidebar has the Price List shortcut button."""
+        resp = self.client.get('/products')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        self.assertIn('/products/price-list', html)
+        self.assertIn('Price List Table (តារាងតម្លៃទំនិញ)', html)
+
 if __name__ == '__main__':
     unittest.main()

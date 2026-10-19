@@ -3135,8 +3135,8 @@ def api_bulk_merge_all():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@products_bp.route('/products/price-list')
 @products_bp.route('/inventory/price-list')
+@products_bp.route('/products/price-list')
 def price_list_view():
     if not session.get('user_id'):
         return redirect(url_for('auth.login', next=request.path))
@@ -3149,6 +3149,20 @@ def price_list_view():
         GROUP BY c.id, c.name, c.color
         ORDER BY c.name ASC
     """)
+
+    pricing_schemes = query_all("""
+        SELECT id, name, currency, is_default, is_active
+        FROM pricing_schemes
+        WHERE is_active = TRUE
+        ORDER BY is_default DESC, id ASC
+    """)
+
+    stock_rows = query_all("""
+        SELECT product_id, SUM(quantity) as total_qty
+        FROM inventory
+        GROUP BY product_id
+    """)
+    stock_map = {r['product_id']: float(r['total_qty'] or 0) for r in stock_rows}
 
     products = query_all("""
         SELECT 
@@ -3179,7 +3193,7 @@ def price_list_view():
         p_tiers = tiers_by_pid.get(prod['id'], [])
         card_data = _build_price_card_data(prod, p_tiers, can_view_costs=False)
 
-        # Extract volume/capacity badge (e.g. "2000 ml", "500 ml", "5 OZ", etc.) matching Screenshot 2
+        # Extract volume/capacity badge (e.g. "2000 ml", "500 ml", "5 OZ", etc.)
         badge = None
         if prod.get('capacity'):
             badge = str(prod['capacity']).strip()
@@ -3188,26 +3202,50 @@ def price_list_view():
             if m:
                 badge = m.group(1).strip()
 
-        # Packaging breakdown string for Carton / Case
+        # Packaging breakdown specs
         pcs_case = card_data.get('pcs_per_case') or 400
         pcs_case_formatted = f"{pcs_case:g}" if isinstance(pcs_case, (int, float)) else str(pcs_case)
+        packs_case = card_data.get('packs_per_case') or 10
+        pcs_pack = card_data.get('pcs_per_pack') or 50
+        dim_str = card_data.get('dim_str') or ''
+
+        # Map scheme prices for quick client-side switching
+        prices_by_scheme = {}
+        for t in p_tiers:
+            try:
+                prices_by_scheme[t['pricing_scheme_id']] = float(t['unit_price'] or 0)
+            except (ValueError, TypeError):
+                pass
+
+        default_price = float(prod.get('default_price') or 0)
+        stock_qty = stock_map.get(prod['id'], 0)
 
         items.append({
             'id': prod['id'],
             'sku': prod.get('sku') or '',
             'name': prod.get('name') or '',
+            'khmer_name': card_data.get('khmer_name') or prod.get('name') or '',
+            'english_name': card_data.get('english_name') or '',
             'uom': prod.get('uom') or 'កេស',
             'category_id': prod.get('category_id') or 0,
             'category_name': prod.get('category_name') or 'General',
             'category_color': prod.get('category_color') or '#00A3E0',
             'image_url': prod.get('image_url') or '',
             'badge': badge,
+            'dim_str': dim_str,
+            'pcs_case': pcs_case,
             'pcs_case_formatted': pcs_case_formatted,
+            'packs_per_case': packs_case,
+            'pcs_per_pack': pcs_pack,
+            'stock_qty': stock_qty,
+            'default_price': default_price,
+            'prices_by_scheme': prices_by_scheme,
             'card': card_data
         })
 
     return render_template('products/price_list.html',
                            categories=categories,
+                           pricing_schemes=pricing_schemes,
                            items=items,
                            total_products=len(items))
 
