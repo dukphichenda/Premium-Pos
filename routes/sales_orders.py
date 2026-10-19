@@ -3394,7 +3394,8 @@ def print_invoice(id):
                       'show_sku', 'show_tax', 'enable_khr_total', 'khr_exchange_rate',
                       'primary_color', 'secondary_color', 'font_family', 'paper_size',
                       'qr_size', 'qr_position', 'bank_info_size', 'bank_info_position',
-                      'qr_offset_x', 'qr_offset_y', 'bank_offset_x', 'bank_offset_y']:
+                      'qr_offset_x', 'qr_offset_y', 'bank_offset_x', 'bank_offset_y',
+                      'unit_price_decimals']:
                 if k in b_settings and b_settings[k] not in (None, ''):
                     inv_settings[k] = b_settings[k]
 

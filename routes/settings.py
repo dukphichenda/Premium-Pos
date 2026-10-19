@@ -27,7 +27,7 @@ def get_invoice_settings():
                 show_signature, show_sku, show_tax,
                 qr_size, qr_position, bank_info_size, bank_info_position,
                 qr_offset_x, qr_offset_y, bank_offset_x, bank_offset_y,
-                seller_signature_url, seller_name
+                seller_signature_url, seller_name, unit_price_decimals
             ) VALUES (
                 'Kantumruy Pro', '#0284C7', '#0F172A',
                 'ក្រុមហ៊ុន អ៊ិនហ្វ្លូ ត្រេឌីង (ខេមបូឌា)', 'inFlow Premium Trading Co., Ltd.',
@@ -43,7 +43,7 @@ def get_invoice_settings():
                 TRUE, TRUE, TRUE,
                 180, 'left', '8.5', 'below_qr',
                 0, 0, 0, 0,
-                NULL, NULL
+                NULL, NULL, 3
             );
         """)
         inv = query_one("SELECT * FROM invoice_settings LIMIT 1")
@@ -500,6 +500,7 @@ def update_invoice_settings():
         show_signature = (request.form.get('show_signature') == '1' or request.form.get('show_signature') == 'on')
         show_sku = (request.form.get('show_sku') == '1' or request.form.get('show_sku') == 'on')
         show_tax = (request.form.get('show_tax') == '1' or request.form.get('show_tax') == 'on')
+        unit_price_decimals = int(request.form.get('unit_price_decimals', 3) or 3)
 
         qr_size = int(request.form.get('qr_size', 180) or 180)
         qr_position = request.form.get('qr_position', 'left').strip()
@@ -603,6 +604,7 @@ def update_invoice_settings():
                 bank_offset_y = %s,
                 seller_signature_url = %s,
                 seller_name = %s,
+                unit_price_decimals = %s,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (
@@ -617,6 +619,7 @@ def update_invoice_settings():
             qr_size, qr_position, bank_info_size, bank_info_position,
             qr_offset_x, qr_offset_y, bank_offset_x, bank_offset_y,
             seller_signature_url, seller_name,
+            unit_price_decimals,
             inv['id']
         ))
 

@@ -72,7 +72,8 @@ DEFAULT_BRANCH_SETTINGS = {
     'qr_offset_x': 0,
     'qr_offset_y': 0,
     'bank_offset_x': 0,
-    'bank_offset_y': 0
+    'bank_offset_y': 0,
+    'unit_price_decimals': 3
 }
 
 def _get_branch_permissions(branch_or_raw):
@@ -156,6 +157,8 @@ def _get_branch_settings(branch_or_raw):
                 settings['account_number'] = inv_set['account_number']
             if not raw.get('khr_exchange_rate') and inv_set.get('khr_exchange_rate'):
                 settings['khr_exchange_rate'] = float(inv_set['khr_exchange_rate'])
+            if not raw.get('unit_price_decimals') and inv_set.get('unit_price_decimals'):
+                settings['unit_price_decimals'] = int(inv_set['unit_price_decimals'])
     except Exception:
         pass
 
@@ -1789,6 +1792,11 @@ def branch_save_settings(id):
         if 'bank_offset_y' in data:
             try:
                 cur_settings['bank_offset_y'] = int(data.get('bank_offset_y'))
+            except (ValueError, TypeError):
+                pass
+        if 'unit_price_decimals' in data:
+            try:
+                cur_settings['unit_price_decimals'] = int(data.get('unit_price_decimals', 3) or 3)
             except (ValueError, TypeError):
                 pass
 

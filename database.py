@@ -519,6 +519,7 @@ def init_db():
                 cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_signature_url TEXT;")
                 cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS seller_name VARCHAR(150);")
                 cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;")
+                cur.execute("ALTER TABLE invoice_settings ADD COLUMN IF NOT EXISTS unit_price_decimals INTEGER DEFAULT 2;")
                 cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;")
                 cur.execute("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS custom_fields_json TEXT;")
                 cur.execute("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS created_by VARCHAR(100);")

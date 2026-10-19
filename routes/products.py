@@ -101,6 +101,37 @@ def _derive_card_colors(hex_color):
         'color_dark': dark
     }
 
+def _parse_specs_to_rows(text):
+    """
+    Parses specification text (auto-generated or custom written) into structured rows
+    with semantic modern icon assignments (size, carton, layers, package) and subtitle grouping.
+    """
+    if not text:
+        return []
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
+    items = []
+    for line in lines:
+        if line.startswith('(') and line.endswith(')') and items:
+            items[-1]['sub'] = line
+        else:
+            items.append({'main': line, 'sub': ''})
+    
+    for idx, item in enumerate(items):
+        lower = item['main'].lower()
+        if any(k in lower for k in ['ទំហំ', 'ប្រវែង', 'size', 'cm', 'mm', 'length', 'width', 'height', 'dim']):
+            item['icon'] = 'size'
+        elif '1 ដុំ' in lower or ('ដុំ' in lower and 'កេស' not in lower) or any(k in lower for k in ['pack', 'layer', 'pcs/pack']):
+            item['icon'] = 'layers'
+        elif idx == len(items) - 1 and any(k in lower for k in ['/1កេស', '/កេស', 'carton', 'case']):
+            item['icon'] = 'package'
+        elif any(k in lower for k in ['កេស', 'carton', 'case']):
+            item['icon'] = 'carton'
+        else:
+            default_icons = ['size', 'carton', 'layers', 'package']
+            item['icon'] = default_icons[idx % len(default_icons)]
+            
+    return items
+
 from routes.auth import user_can_edit_prices, user_can_view_costs, user_can_adjust_stock
 
 def _build_price_card_data(product, price_tiers, can_view_costs=None):
@@ -312,6 +343,7 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'is_custom_detail': is_custom_detail,
         'custom_detail': custom_detail,
         'auto_detail_text': auto_detail_text,
+        'modern_specs_rows': _parse_specs_to_rows(custom_detail if (is_custom_detail and custom_detail) else auto_detail_text),
         'notes': product.get('price_card_notes') or '',
         'price_table_style': product.get('price_table_style') or product.get('price_card_style') or 'classic',
         'can_view_costs': can_view_costs

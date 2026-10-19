@@ -948,20 +948,29 @@ input:checked + .slider:before {
                             </div>
                         </div>
 
-                        <!-- Toggles -->
-                        <div style="display: flex; gap: 24px; flex-wrap: wrap;">
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
-                                <input type="checkbox" name="show_signature" id="invShowSig" value="1" {% if inv_settings.show_signature %}checked{% endif %} onchange="updateInvoicePreview()">
-                                <span>បង្ហាញប្រអប់ហត្ថលេខា / Show Signatures</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
-                                <input type="checkbox" name="show_tax" id="invShowTax" value="1" {% if inv_settings.show_tax %}checked{% endif %} onchange="updateInvoicePreview()">
-                                <span>បង្ហាញពន្ធអាករ / Show VAT (10%)</span>
-                            </label>
-                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
-                                <input type="checkbox" name="show_sku" id="invShowSku" value="1" {% if inv_settings.show_sku %}checked{% endif %} onchange="updateInvoicePreview()">
-                                <span>បង្ហាញកូដទំនិញ / Show SKU</span>
-                            </label>
+                        <!-- Toggles & Price Decimals -->
+                        <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; gap: 20px; flex-wrap: wrap; align-items: center;">
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" name="show_signature" id="invShowSig" value="1" {% if inv_settings.show_signature %}checked{% endif %} onchange="updateInvoicePreview()">
+                                    <span>បង្ហាញប្រអប់ហត្ថលេខា / Show Signatures</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" name="show_tax" id="invShowTax" value="1" {% if inv_settings.show_tax %}checked{% endif %} onchange="updateInvoicePreview()">
+                                    <span>បង្ហាញពន្ធអាករ / Show VAT (10%)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 600; color: #334155; cursor: pointer;">
+                                    <input type="checkbox" name="show_sku" id="invShowSku" value="1" {% if inv_settings.show_sku %}checked{% endif %} onchange="updateInvoicePreview()">
+                                    <span>បង្ហាញកូដទំនិញ / Show SKU</span>
+                                </label>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 8px; background: #F1F5F9; padding: 4px 10px; border-radius: 6px; border: 1px solid #CBD5E1;">
+                                <label style="font-size: 0.82rem; font-weight: 700; color: #1E293B; white-space: nowrap;">ខ្ទង់តម្លៃរាយ / Unit Price:</label>
+                                <select name="unit_price_decimals" id="invUnitPriceDecimals" class="form-input" style="width: 145px; height: 28px; padding: 2px 6px; font-size: 0.82rem; font-weight: 600;" onchange="updateInvoicePreview()">
+                                    <option value="2" {% if inv_settings.unit_price_decimals == 2 %}selected{% endif %}>2 Digits ($35.00)</option>
+                                    <option value="3" {% if inv_settings.unit_price_decimals == 3 or not inv_settings.unit_price_decimals %}selected{% endif %}>3 Digits ($35.000)</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
 
@@ -1085,7 +1094,7 @@ input:checked + .slider:before {
                                         <th style="padding: 5px 5px; text-align: center; width: 24px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">#</th>
                                         <th style="padding: 5px 5px; text-align: left; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">បរិយាយមុខទំនិញ / Description</th>
                                         <th style="padding: 5px 5px; text-align: center; width: 34px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Qty</th>
-                                        <th style="padding: 5px 5px; text-align: right; width: 50px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Price</th>
+                                        <th style="padding: 5px 5px; text-align: right; width: 62px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Price</th>
                                         <th style="padding: 5px 5px; text-align: right; width: 60px; color: var(--preview-primary, {{ branch.color or '#FF5A5F' }}); font-weight: 700;">Amount</th>
                                     </tr>
                                 </thead>
@@ -1096,7 +1105,7 @@ input:checked + .slider:before {
                                             <div style="font-weight: 600; color: #0F172A;"><span style="font-weight: 700; margin-right: 4px;">PB-500K</span>ចានក្រដាស Kraft Bowl 500ML (50 Pcs)</div>
                                         </td>
                                         <td style="padding: 4px 5px; text-align: center; font-weight: 600;">20</td>
-                                        <td style="padding: 4px 5px; text-align: right;">$35.00</td>
+                                        <td class="prev-mock-price" data-price="35" style="padding: 4px 5px; text-align: right;">${{ "{:,.3f}".format(35.0) if (inv_settings.unit_price_decimals == 3 or not inv_settings.unit_price_decimals) else "{:,.2f}".format(35.0) }}</td>
                                         <td style="padding: 4px 5px; text-align: right; font-weight: 600;">$700.00</td>
                                     </tr>
                                     <tr style="border-bottom: 1px solid #F1F5F9; background: #F8FAFC;">
@@ -1105,7 +1114,7 @@ input:checked + .slider:before {
                                             <div style="font-weight: 600; color: #0F172A;"><span style="font-weight: 700; margin-right: 4px;">AL-750B</span>ប្រអប់អាលុយមីញ៉ូម Bento Box 750ML</div>
                                         </td>
                                         <td style="padding: 4px 5px; text-align: center; font-weight: 600;">10</td>
-                                        <td style="padding: 4px 5px; text-align: right;">$45.00</td>
+                                        <td class="prev-mock-price" data-price="45" style="padding: 4px 5px; text-align: right;">${{ "{:,.3f}".format(45.0) if (inv_settings.unit_price_decimals == 3 or not inv_settings.unit_price_decimals) else "{:,.2f}".format(45.0) }}</td>
                                         <td style="padding: 4px 5px; text-align: right; font-weight: 600;">$450.00</td>
                                     </tr>
                                     <tr style="border-bottom: 1px solid #F1F5F9;">
@@ -1114,7 +1123,7 @@ input:checked + .slider:before {
                                             <div style="font-weight: 600; color: #0F172A;"><span style="font-weight: 700; margin-right: 4px;">STR-PLA8</span>ទុយោធម្មជាតិ PLA Eco Straw 8mm (100 Pcs)</div>
                                         </td>
                                         <td style="padding: 4px 5px; text-align: center; font-weight: 600;">5</td>
-                                        <td style="padding: 4px 5px; text-align: right;">$44.50</td>
+                                        <td class="prev-mock-price" data-price="44.5" style="padding: 4px 5px; text-align: right;">${{ "{:,.3f}".format(44.5) if (inv_settings.unit_price_decimals == 3 or not inv_settings.unit_price_decimals) else "{:,.2f}".format(44.5) }}</td>
                                         <td style="padding: 4px 5px; text-align: right; font-weight: 600;">$222.50</td>
                                     </tr>
                                 </tbody>
@@ -1891,6 +1900,13 @@ function updateInvoicePreview() {
     const showSig = document.getElementById('invShowSig')?.checked;
     const sigBox = document.getElementById('prevMockSigBox');
     if (sigBox) sigBox.style.display = showSig ? 'flex' : 'none';
+
+    // Unit Price Decimals in Mock Table
+    const priceDec = parseInt(document.getElementById('invUnitPriceDecimals')?.value || '3', 10);
+    document.querySelectorAll('.prev-mock-price').forEach(el => {
+        const rawP = parseFloat(el.getAttribute('data-price') || '0');
+        el.innerText = '$' + rawP.toFixed(priceDec);
+    });
 
     // Render layout positions and sizes
     renderInvoiceLayout();
