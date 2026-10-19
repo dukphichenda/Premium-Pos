@@ -29,6 +29,11 @@
     color: #FFFFFF;
     box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
 }
+.btn-global-style.active-cute {
+    background: #DE7851;
+    color: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(222, 120, 81, 0.35);
+}
 
 /* Category Table Style Pills */
 .cat-style-pill-btn {
@@ -57,6 +62,11 @@
     background: #0284C7;
     color: #FFFFFF;
     box-shadow: 0 1px 3px rgba(2, 132, 199, 0.25);
+}
+.cat-style-pill-btn.active-cute {
+    background: #DE7851;
+    color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(222, 120, 81, 0.3);
 }
 
 /* Toast alert notification */
@@ -118,7 +128,7 @@
                 </div>
                 <div style="display: inline-flex; background: #F1F5F9; border-radius: 6px; padding: 2px; gap: 2px; border: 1px solid #E2E8F0;">
                     <button type="button" id="globalBtnClassic" onclick="applyGlobalPriceTableStyle('classic')"
-                            class="btn-global-style {% if global_price_table_style != 'modern' %}active-classic{% endif %}"
+                            class="btn-global-style {% if global_price_table_style == 'classic' or not global_price_table_style %}active-classic{% endif %}"
                             title="Set all categories to Classic price table (Image 1)">
                         Classic
                     </button>
@@ -126,6 +136,11 @@
                             class="btn-global-style {% if global_price_table_style == 'modern' %}active-modern{% endif %}"
                             title="Set all categories to Modern price table (Image 2)">
                         ✨ Modern
+                    </button>
+                    <button type="button" id="globalBtnCute" onclick="applyGlobalPriceTableStyle('cute')"
+                            class="btn-global-style {% if global_price_table_style == 'cute' %}active-cute{% endif %}"
+                            title="Set all categories to Cute Look price table (Image 3)">
+                        🌸 Cute Look
                     </button>
                 </div>
             </div>
@@ -308,7 +323,7 @@
                             <div class="category-style-toggle" data-cat-id="{{ c.id }}" style="display: inline-flex; background: #F1F5F9; border-radius: 20px; padding: 2px; border: 1px solid #CBD5E1; box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);">
                                 <button type="button" 
                                         onclick="setCategoryStyleDirect({{ c.id }}, 'classic', this)"
-                                        class="cat-style-pill-btn cat-btn-classic-{{ c.id }} {% if c.price_table_style != 'modern' %}active-classic{% endif %}"
+                                        class="cat-style-pill-btn cat-btn-classic-{{ c.id }} {% if (c.price_table_style or 'classic') == 'classic' %}active-classic{% endif %}"
                                         title="Switch to Classic price table (Image 1)">
                                     Classic
                                 </button>
@@ -317,6 +332,12 @@
                                         class="cat-style-pill-btn cat-btn-modern-{{ c.id }} {% if c.price_table_style == 'modern' %}active-modern{% endif %}"
                                         title="Switch to Modern price table (Image 2)">
                                     ✨ Modern
+                                </button>
+                                <button type="button" 
+                                        onclick="setCategoryStyleDirect({{ c.id }}, 'cute', this)"
+                                        class="cat-style-pill-btn cat-btn-cute-{{ c.id }} {% if c.price_table_style == 'cute' %}active-cute{% endif %}"
+                                        title="Switch to Cute Look price table (Image 3)">
+                                    🌸 Cute
                                 </button>
                             </div>
                         </td>
@@ -443,19 +464,26 @@
                 <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 6px;">
                     Price Table Style (ទម្រង់តារាងតម្លៃ)
                 </label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <label id="newStyleCardClassic" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid {% if global_price_table_style != 'modern' %}#0284C7{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style != 'modern' %}#F0F9FF{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
-                        <input type="radio" name="price_table_style" id="newStyleRadioClassic" value="classic" {% if global_price_table_style != 'modern' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+                    <label id="newStyleCardClassic" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid {% if global_price_table_style == 'classic' or not global_price_table_style %}#0284C7{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style == 'classic' or not global_price_table_style %}#F0F9FF{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioClassic" value="classic" {% if global_price_table_style == 'classic' or not global_price_table_style %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #0284C7; width: 15px; height: 15px;">
                         <div>
-                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">Classic Style</div>
-                            <div style="font-size: 11px; color: #64748B;">Solid header (Image 1)</div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">Classic Style</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Solid header (Image 1)</div>
                         </div>
                     </label>
-                    <label id="newStyleCardModern" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid {% if global_price_table_style == 'modern' %}#0284C7{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style == 'modern' %}#F0F9FF{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
-                        <input type="radio" name="price_table_style" id="newStyleRadioModern" value="modern" {% if global_price_table_style == 'modern' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                    <label id="newStyleCardModern" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid {% if global_price_table_style == 'modern' %}#0284C7{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style == 'modern' %}#F0F9FF{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioModern" value="modern" {% if global_price_table_style == 'modern' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #0284C7; width: 15px; height: 15px;">
                         <div>
-                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">✨ Modern Style</div>
-                            <div style="font-size: 11px; color: #64748B;">Card-in-card with icons (Image 2)</div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">✨ Modern</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Icons (Image 2)</div>
+                        </div>
+                    </label>
+                    <label id="newStyleCardCute" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid {% if global_price_table_style == 'cute' %}#DE7851{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style == 'cute' %}#FFF7ED{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioCute" value="cute" {% if global_price_table_style == 'cute' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #DE7851; width: 15px; height: 15px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">🌸 Cute Look</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Pastel pills (Image 3)</div>
                         </div>
                     </label>
                 </div>
@@ -538,19 +566,26 @@
                 <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 6px;">
                     Price Table Style (ទម្រង់តារាងតម្លៃ)
                 </label>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                    <label id="editStyleCardClassic" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
-                        <input type="radio" name="price_table_style" id="editStyleRadioClassic" value="classic" checked onchange="updateStyleCardSelection('edit')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+                    <label id="editStyleCardClassic" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="editStyleRadioClassic" value="classic" checked onchange="updateStyleCardSelection('edit')" style="accent-color: #0284C7; width: 15px; height: 15px;">
                         <div>
-                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">Classic Style</div>
-                            <div style="font-size: 11px; color: #64748B;">Solid header (Image 1)</div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">Classic Style</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Solid header (Image 1)</div>
                         </div>
                     </label>
-                    <label id="editStyleCardModern" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
-                        <input type="radio" name="price_table_style" id="editStyleRadioModern" value="modern" onchange="updateStyleCardSelection('edit')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                    <label id="editStyleCardModern" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="editStyleRadioModern" value="modern" onchange="updateStyleCardSelection('edit')" style="accent-color: #0284C7; width: 15px; height: 15px;">
                         <div>
-                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">✨ Modern Style</div>
-                            <div style="font-size: 11px; color: #64748B;">Card-in-card with icons (Image 2)</div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">✨ Modern</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Icons (Image 2)</div>
+                        </div>
+                    </label>
+                    <label id="editStyleCardCute" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="editStyleRadioCute" value="cute" onchange="updateStyleCardSelection('edit')" style="accent-color: #DE7851; width: 15px; height: 15px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">🌸 Cute Look</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Pastel pills (Image 3)</div>
                         </div>
                     </label>
                 </div>
@@ -665,7 +700,10 @@ function openNewCategoryModal() {
     document.getElementById('newColorPicker').value = '#00A3E0';
     document.getElementById('newColorPreview').style.backgroundColor = '#00A3E0';
     const isGlobalModern = document.getElementById('globalBtnModern') && document.getElementById('globalBtnModern').classList.contains('active-modern');
-    if (isGlobalModern) {
+    const isGlobalCute = document.getElementById('globalBtnCute') && document.getElementById('globalBtnCute').classList.contains('active-cute');
+    if (isGlobalCute) {
+        document.getElementById('newStyleRadioCute').checked = true;
+    } else if (isGlobalModern) {
         document.getElementById('newStyleRadioModern').checked = true;
     } else {
         document.getElementById('newStyleRadioClassic').checked = true;
@@ -695,7 +733,10 @@ function openEditCategoryModalFromRow(row) {
     document.getElementById('editCategoryDescription').value = catDesc;
     document.getElementById('editCategoryActive').checked = catActive;
 
-    if (catStyle === 'modern') {
+    if (catStyle === 'cute') {
+        const rCute = document.getElementById('editStyleRadioCute');
+        if (rCute) rCute.checked = true;
+    } else if (catStyle === 'modern') {
         document.getElementById('editStyleRadioModern').checked = true;
     } else {
         document.getElementById('editStyleRadioClassic').checked = true;
@@ -712,8 +753,10 @@ function openEditCategoryModalFromRow(row) {
 function updateStyleCardSelection(prefix) {
     const classicRadio = document.getElementById(prefix + 'StyleRadioClassic');
     const modernRadio = document.getElementById(prefix + 'StyleRadioModern');
+    const cuteRadio = document.getElementById(prefix + 'StyleRadioCute');
     const classicCard = document.getElementById(prefix + 'StyleCardClassic');
     const modernCard = document.getElementById(prefix + 'StyleCardModern');
+    const cuteCard = document.getElementById(prefix + 'StyleCardCute');
 
     if (classicRadio && classicCard) {
         if (classicRadio.checked) {
@@ -733,6 +776,15 @@ function updateStyleCardSelection(prefix) {
             modernCard.style.backgroundColor = '#FFFFFF';
         }
     }
+    if (cuteRadio && cuteCard) {
+        if (cuteRadio.checked) {
+            cuteCard.style.borderColor = '#DE7851';
+            cuteCard.style.backgroundColor = '#FFF7ED';
+        } else {
+            cuteCard.style.borderColor = '#CBD5E1';
+            cuteCard.style.backgroundColor = '#FFFFFF';
+        }
+    }
 }
 
 /* Individual Category Style Switcher (AJAX) */
@@ -740,6 +792,7 @@ function setCategoryStyleDirect(catId, style, btn) {
     const row = document.querySelector(`.category-row[data-id="${catId}"]`);
     const classicBtn = document.querySelector(`.cat-btn-classic-${catId}`);
     const modernBtn = document.querySelector(`.cat-btn-modern-${catId}`);
+    const cuteBtn = document.querySelector(`.cat-btn-cute-${catId}`);
 
     if (btn) btn.style.opacity = '0.5';
 
@@ -753,13 +806,9 @@ function setCategoryStyleDirect(catId, style, btn) {
         if (btn) btn.style.opacity = '1';
         if (res.success) {
             if (row) row.setAttribute('data-style', style);
-            if (style === 'modern') {
-                if (classicBtn) classicBtn.classList.remove('active-classic');
-                if (modernBtn) modernBtn.classList.add('active-modern');
-            } else {
-                if (modernBtn) modernBtn.classList.remove('active-modern');
-                if (classicBtn) classicBtn.classList.add('active-classic');
-            }
+            if (classicBtn) classicBtn.classList.toggle('active-classic', style === 'classic');
+            if (modernBtn) modernBtn.classList.toggle('active-modern', style === 'modern');
+            if (cuteBtn) cuteBtn.classList.toggle('active-cute', style === 'cute');
             showCategoryToast(`Category "${res.category_name}" price table set to ${style.toUpperCase()}`);
         } else {
             alert(res.message || 'Failed to update category style.');
@@ -774,15 +823,17 @@ function setCategoryStyleDirect(catId, style, btn) {
 
 /* Global Price Table Style Switcher (All Categories & Products) */
 function applyGlobalPriceTableStyle(style) {
-    const styleLabel = style === 'modern' ? 'Modern ✨' : 'Classic';
+    const styleLabel = style === 'cute' ? 'Cute Look 🌸' : (style === 'modern' ? 'Modern ✨' : 'Classic');
     if (!confirm(`Switch Price Table Style for ALL products and categories to ${styleLabel}?`)) {
         return;
     }
 
     const btnClassic = document.getElementById('globalBtnClassic');
     const btnModern = document.getElementById('globalBtnModern');
+    const btnCute = document.getElementById('globalBtnCute');
     if (btnClassic) btnClassic.style.opacity = '0.5';
     if (btnModern) btnModern.style.opacity = '0.5';
+    if (btnCute) btnCute.style.opacity = '0.5';
 
     fetch('/api/categories/set-all-style', {
         method: 'POST',
@@ -793,16 +844,13 @@ function applyGlobalPriceTableStyle(style) {
     .then(res => {
         if (btnClassic) btnClassic.style.opacity = '1';
         if (btnModern) btnModern.style.opacity = '1';
+        if (btnCute) btnCute.style.opacity = '1';
 
         if (res.success) {
             // Update global toggle buttons
-            if (style === 'modern') {
-                if (btnClassic) btnClassic.classList.remove('active-classic');
-                if (btnModern) btnModern.classList.add('active-modern');
-            } else {
-                if (btnModern) btnModern.classList.remove('active-modern');
-                if (btnClassic) btnClassic.classList.add('active-classic');
-            }
+            if (btnClassic) btnClassic.classList.toggle('active-classic', style === 'classic');
+            if (btnModern) btnModern.classList.toggle('active-modern', style === 'modern');
+            if (btnCute) btnCute.classList.toggle('active-cute', style === 'cute');
 
             // Update all category row buttons in the table
             document.querySelectorAll('.category-row').forEach(row => {
@@ -810,13 +858,10 @@ function applyGlobalPriceTableStyle(style) {
                 row.setAttribute('data-style', style);
                 const cBtn = document.querySelector(`.cat-btn-classic-${catId}`);
                 const mBtn = document.querySelector(`.cat-btn-modern-${catId}`);
-                if (style === 'modern') {
-                    if (cBtn) cBtn.classList.remove('active-classic');
-                    if (mBtn) mBtn.classList.add('active-modern');
-                } else {
-                    if (mBtn) mBtn.classList.remove('active-modern');
-                    if (cBtn) cBtn.classList.add('active-classic');
-                }
+                const cuteB = document.querySelector(`.cat-btn-cute-${catId}`);
+                if (cBtn) cBtn.classList.toggle('active-classic', style === 'classic');
+                if (mBtn) mBtn.classList.toggle('active-modern', style === 'modern');
+                if (cuteB) cuteB.classList.toggle('active-cute', style === 'cute');
             });
 
             showCategoryToast(`All products & categories updated to ${style.toUpperCase()} style!`);
@@ -827,6 +872,7 @@ function applyGlobalPriceTableStyle(style) {
     .catch(err => {
         if (btnClassic) btnClassic.style.opacity = '1';
         if (btnModern) btnModern.style.opacity = '1';
+        if (btnCute) btnCute.style.opacity = '1';
         console.error('Error setting all style:', err);
         alert('Network error while updating global style.');
     });

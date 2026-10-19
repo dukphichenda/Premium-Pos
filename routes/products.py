@@ -475,7 +475,7 @@ def _get_product_detail_bundle(product_id):
     # Global default price table style setting
     global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
     global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
-    if global_price_table_style not in ('classic', 'modern'):
+    if global_price_table_style not in ('classic', 'modern', 'cute'):
         global_price_table_style = 'classic'
 
     product = query_one("""
@@ -2472,7 +2472,7 @@ def list_categories():
     # Global price table style setting
     global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
     global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
-    if global_price_table_style not in ('classic', 'modern'):
+    if global_price_table_style not in ('classic', 'modern', 'cute'):
         global_price_table_style = 'classic'
 
     return render_template(
@@ -2493,7 +2493,7 @@ def create_category():
     color = request.form.get('color', '#00A3E0').strip()
     description = request.form.get('description', '').strip()
     price_table_style = (request.form.get('price_table_style') or 'classic').strip().lower()
-    if price_table_style not in ('classic', 'modern'):
+    if price_table_style not in ('classic', 'modern', 'cute'):
         price_table_style = 'classic'
     is_active = request.form.get('is_active') in ('1', 'true', 'on', 'yes') if 'is_active' in request.form else True
 
@@ -2539,7 +2539,7 @@ def edit_category(id):
     color = request.form.get('color', '#00A3E0').strip()
     description = request.form.get('description', '').strip()
     price_table_style = (request.form.get('price_table_style') or 'classic').strip().lower()
-    if price_table_style not in ('classic', 'modern'):
+    if price_table_style not in ('classic', 'modern', 'cute'):
         price_table_style = 'classic'
     is_active = request.form.get('is_active') in ('1', 'true', 'on', 'yes') if 'is_active' in request.form else True
 
@@ -2602,12 +2602,12 @@ def toggle_active_category(id):
 @products_bp.route('/api/categories/<int:id>/set-style', methods=['POST'])
 def api_set_category_style(id):
     """
-    Sets price table style ('classic' or 'modern') for a single category.
+    Sets price table style ('classic', 'modern', or 'cute') for a single category.
     """
     data = request.get_json(silent=True) or request.form
     style = (data.get('style') or 'classic').strip().lower()
-    if style not in ('classic', 'modern'):
-        return jsonify({'success': False, 'message': 'Style must be either "classic" or "modern".'}), 400
+    if style not in ('classic', 'modern', 'cute'):
+        return jsonify({'success': False, 'message': 'Style must be "classic", "modern", or "cute".'}), 400
 
     cat = query_one("SELECT id, name FROM categories WHERE id = %s", (id,))
     if not cat:
@@ -2625,17 +2625,17 @@ def api_set_category_style(id):
 @products_bp.route('/api/categories/set-all-style', methods=['POST'])
 def api_set_all_categories_style():
     """
-    Sets price table style ('classic' or 'modern') for ALL categories and updates default_price_table_style.
+    Sets price table style ('classic', 'modern', or 'cute') for ALL categories and updates default_price_table_style.
     """
     data = request.get_json(silent=True) or request.form
     style = (data.get('style') or 'classic').strip().lower()
-    if style not in ('classic', 'modern'):
-        return jsonify({'success': False, 'message': 'Style must be either "classic" or "modern".'}), 400
+    if style not in ('classic', 'modern', 'cute'):
+        return jsonify({'success': False, 'message': 'Style must be "classic", "modern", or "cute".'}), 400
 
     count = execute("UPDATE categories SET price_table_style = %s, updated_at = CURRENT_TIMESTAMP", (style,))
     execute("""
         INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
-        VALUES ('default_price_table_style', %s, 'Default style for product price cards (classic or modern)', CURRENT_TIMESTAMP)
+        VALUES ('default_price_table_style', %s, 'Default style for product price cards (classic, modern, or cute)', CURRENT_TIMESTAMP)
         ON CONFLICT (setting_key)
         DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP;
     """, (style,))
@@ -2774,7 +2774,9 @@ def api_get_price_cards_data():
             SELECT 
                 p.*,
                 COALESCE(c.name, 'General') as category_name,
-                COALESCE(c.color, '#00A3E0') as category_color
+                COALESCE(c.color, '#00A3E0') as category_color,
+                COALESCE(c.price_table_style, 'classic') as category_price_table_style,
+                COALESCE(p.price_card_style, c.price_table_style, 'classic') as price_table_style
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.is_active = TRUE
@@ -3340,7 +3342,7 @@ def price_list_view():
     # Global price table style setting
     global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
     global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
-    if global_price_table_style not in ('classic', 'modern'):
+    if global_price_table_style not in ('classic', 'modern', 'cute'):
         global_price_table_style = 'classic'
 
     stock_rows = query_all("""

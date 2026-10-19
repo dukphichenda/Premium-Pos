@@ -2053,15 +2053,17 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             </label>
                         </div>
 
-                        <!-- Price Table Style Switcher (Classic / Modern) -->
+                        <!-- Price Table Style Switcher (Classic / Modern / Cute Look) -->
                         {% set active_style = (price_card.price_table_style if price_card else (product.price_table_style or 'classic'))|lower %}
-                        {% set is_card_modern = (active_style == 'modern') %}
-                        <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic ឬ Modern)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
-                            <button type="button" id="btnDetailStyleClassic" class="btn-detail-style {{ 'active-classic' if not is_card_modern else '' }}" onclick="setProductPriceCardStyle('classic')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                        <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic, Modern, ឬ Cute Look)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
+                            <button type="button" id="btnDetailStyleClassic" class="btn-detail-style {{ 'active-classic' if active_style == 'classic' else '' }}" onclick="setProductPriceCardStyle('classic')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
                                 Classic
                             </button>
-                            <button type="button" id="btnDetailStyleModern" class="btn-detail-style {{ 'active-modern' if is_card_modern else '' }}" onclick="setProductPriceCardStyle('modern')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                            <button type="button" id="btnDetailStyleModern" class="btn-detail-style {{ 'active-modern' if active_style == 'modern' else '' }}" onclick="setProductPriceCardStyle('modern')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
                                 ✨ Modern
+                            </button>
+                            <button type="button" id="btnDetailStyleCute" class="btn-detail-style {{ 'active-cute' if active_style == 'cute' else '' }}" onclick="setProductPriceCardStyle('cute')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                                🌸 Cute Look
                             </button>
                         </div>
 
@@ -2116,8 +2118,8 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                     </div>
                 </div>
 
-                <!-- The Printable Customer Price Card (Screenshot 1 Authentic Design & Image 2 Modern Design) -->
-                <div class="inflow-spec-card {{ 'modern' if is_card_modern else '' }}" id="printablePriceCard" 
+                <!-- The Printable Customer Price Card (Screenshot 1 Authentic Design, Image 2 Modern Design, Image 3 Cute Look) -->
+                <div class="inflow-spec-card {{ active_style }}" id="printablePriceCard" 
                      style="--price-card-color: {{ price_card.card_color if price_card else (product.price_card_color or '#00A3E0') }}; 
                             --price-card-light: {{ price_card.card_color_light if price_card and price_card.card_color_light else 'rgba(0, 163, 224, 0.08)' }}; 
                             --price-card-badge-bg: {{ price_card.card_color_badge_bg if price_card and price_card.card_color_badge_bg else 'rgba(0, 163, 224, 0.12)' }}; 
@@ -2126,7 +2128,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             --price-card-font: {{ price_card.card_font if price_card else (product.price_card_font or 'Kantumruy Pro') }}, 'Siemreap', sans-serif;">
                     
                     <!-- CLASSIC CARD CONTENT (Screenshot 1 Authentic Design) -->
-                    <div id="cardContentClassic" style="display: {{ 'none' if is_card_modern else 'block' }};">
+                    <div id="cardContentClassic" style="display: {{ 'block' if active_style == 'classic' else 'none' }};">
                         <!-- Top Header Grid -->
                         <div class="inflow-spec-header-grid">
                             <div class="inflow-spec-header-cell">
@@ -2245,7 +2247,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                     </div>
 
                     <!-- MODERN CARD CONTENT (Image 2 Authentic Design) -->
-                    <div id="cardContentModern" style="display: {{ 'block' if is_card_modern else 'none' }};">
+                    <div id="cardContentModern" style="display: {{ 'block' if active_style == 'modern' else 'none' }};">
                         <!-- Modern Header with 3D Cube Icon -->
                         <div class="inflow-modern-header">
                             <div>
@@ -2413,6 +2415,180 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                             ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/PCS)
                                         </span>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CUTE LOOK CARD CONTENT (Image 3 Authentic Soft Pastel & Capsule Match) -->
+                    <div id="cardContentCute" style="display: {{ 'block' if active_style == 'cute' else 'none' }};">
+                        <!-- Top Sage Green Header with Cute Sunburst Doodles -->
+                        <div class="inflow-cute-header">
+                            <div>
+                                <div class="inflow-cute-title font-khmer">
+                                    <span id="cardCuteSku">{{ product.sku or '' }}</span>
+                                    <span id="cardCuteKhmerTitle">{{ price_card.khmer_name if price_card else product.name }}</span>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DE7851" stroke-width="2.5" stroke-linecap="round" style="display: inline-block; vertical-align: middle; margin-left: 3px;">
+                                        <line x1="12" y1="2" x2="12" y2="7"></line>
+                                        <line x1="4.93" y1="4.93" x2="8.46" y2="8.46"></line>
+                                        <line x1="19.07" y1="4.93" x2="15.54" y2="8.46"></line>
+                                    </svg>
+                                </div>
+                                <div class="inflow-cute-sub-wrap">
+                                    <span class="inflow-cute-sub-qty font-khmer"><span id="specCutePcsCaseHdrVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</span><span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></span>
+                                    <span class="inflow-cute-pill-badge font-khmer">កេស</span>
+                                </div>
+                                <div class="inflow-cute-sub-desc font-khmer">កេស</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="inflow-cute-detail-title font-khmer">ព័ត៌មានលម្អិត</div>
+                                <div class="inflow-cute-detail-sub">(Product Detail)</div>
+                            </div>
+                        </div>
+
+                        <!-- Middle Grid: Product Photo with Doodles on Left, Specs on Right -->
+                        <div class="inflow-cute-middle-grid">
+                            <div class="inflow-cute-image-wrap">
+                                <span class="inflow-cute-doodle-star" title="✦">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#DE7851"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z"/></svg>
+                                </span>
+                                <span class="inflow-cute-doodle-rays-tr">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D3748" stroke-width="2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="7"></line><line x1="4.93" y1="4.93" x2="8.46" y2="8.46"></line><line x1="19.07" y1="4.93" x2="15.54" y2="8.46"></line></svg>
+                                </span>
+                                <span class="inflow-cute-doodle-rays-bl">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D3748" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="9" y2="12"></line><line x1="5.5" y1="18.5" x2="9.5" y2="15"></line><line x1="10" y1="22" x2="12" y2="17"></line></svg>
+                                </span>
+                                <span class="inflow-cute-doodle-rays-br">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DE7851" stroke-width="2" stroke-linecap="round"><line x1="20" y1="12" x2="15" y2="12"></line><line x1="18.5" y1="18.5" x2="14.5" y2="15"></line><line x1="14" y1="22" x2="12" y2="17"></line></svg>
+                                </span>
+
+                                <div class="inflow-cute-image-frame">
+                                    {% if product.image_url %}
+                                    <img id="cardCuteImageEl" src="{{ product.image_url }}" alt="{{ product.name }}">
+                                    {% else %}
+                                    <div id="cardCuteImagePlaceholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                        <span style="font-size: 11px; margin-top: 6px;">No Image</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if product.capacity %}
+                                    <div class="inflow-cute-capacity-overlay font-khmer" id="cardCuteCapVal">{{ product.capacity }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="inflow-cute-specs-box">
+                                <div id="specCuteSpecsDisplay" style="display: flex; flex-direction: column; gap: 10px;">
+                                    {% if price_card and price_card.modern_specs_rows %}
+                                        {% for row in price_card.modern_specs_rows %}
+                                        <div class="inflow-cute-spec-line font-khmer">
+                                            {% if row.icon == 'size' %}
+                                            <span class="inflow-cute-star-icon">★</span>
+                                            {% elif row.icon == 'carton' %}
+                                            <span class="inflow-cute-dot-coral">●</span>
+                                            {% elif row.icon == 'layers' %}
+                                            <span class="inflow-cute-dot-mint">●</span>
+                                            {% else %}
+                                            <span class="inflow-cute-dot-navy">●</span>
+                                            {% endif %}
+                                            <div>
+                                                <div>{{ row.main }}</div>
+                                                {% if row.sub %}<div class="inflow-cute-spec-sub">{{ row.sub }}</div>{% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="inflow-cute-spec-line font-khmer">
+                                            <span class="inflow-cute-star-icon">★</span>
+                                            <span>ទំហំ: <strong id="specCuteDimVal">{{ price_card.dim_str if price_card else '14cm x 13cm x 8.5cm' }}</strong></span>
+                                        </div>
+                                        <div class="inflow-cute-spec-line font-khmer" id="specCutePacksRow">
+                                            <span class="inflow-cute-dot-coral">●</span>
+                                            <span>1 កេស មាន <strong id="specCutePacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 8)) }}</strong> ដុំ</span>
+                                        </div>
+                                        <div class="inflow-cute-spec-line font-khmer" id="specCutePcsPackRow">
+                                            <span class="inflow-cute-dot-mint">●</span>
+                                            <span>1 ដុំ មាន <strong id="specCutePcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</strong> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></span>
+                                        </div>
+                                        <div class="inflow-cute-spec-line font-khmer">
+                                            <span class="inflow-cute-dot-navy">●</span>
+                                            <span><strong id="specCutePcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</strong> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span>/1កេស</span>
+                                        </div>
+                                        <div class="inflow-cute-spec-sub font-khmer">
+                                            (<span id="specCutePcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</span> PCS/ Carton)
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div id="specCuteCustomEditorBox" class="no-print" data-html2canvas-ignore="true" style="display: {% if price_card and price_card.is_custom_detail %}block{% else %}none{% endif %}; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #CBD5E1;">
+                                    <textarea id="specCuteCustomTextarea" class="font-khmer" rows="4" 
+                                              style="width: 100%; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.5; color: #0F172A; resize: vertical; box-sizing: border-box; outline: none; background: #FFFFFF;"
+                                              placeholder="កែប្រែព័ត៌មានលម្អិត...&#10;ទំហំ: 14cm x 13cm x 8.5cm&#10;1 កេស មាន 8 ដុំ"
+                                              oninput="onCuteCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Peach Price Table with Dual White Capsule Pills -->
+                        <div class="inflow-cute-price-wrap">
+                            <div class="inflow-cute-table-header">
+                                <div>
+                                    <div class="inflow-cute-th-km font-khmer">តម្លៃ</div>
+                                    <div class="inflow-cute-th-en">(Price)</div>
+                                </div>
+                                <div>
+                                    <div class="inflow-cute-th-km font-khmer">តម្លៃក្នុង១<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></div>
+                                    <div class="inflow-cute-th-en">(UNIT PRICE)</div>
+                                </div>
+                            </div>
+
+                            <!-- Row 1: Coral Total Price -->
+                            <div class="inflow-cute-tier-row">
+                                <div class="inflow-cute-left-pill">
+                                    <span class="inflow-cute-tier-qty font-khmer">
+                                        <input type="number" id="cardCuteTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(1)" onchange="onCuteTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS) =
+                                    </span>
+                                    <span class="inflow-cute-tier-tot-coral font-khmer">
+                                        <input type="text" id="cardCuteTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 7.50) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(1)" onchange="onCuteTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
+                                    </span>
+                                </div>
+                                <div class="inflow-cute-right-pill">
+                                    <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay1">
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Green Total Price -->
+                            <div class="inflow-cute-tier-row">
+                                <div class="inflow-cute-left-pill">
+                                    <span class="inflow-cute-tier-qty font-khmer">
+                                        <input type="number" id="cardCuteTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(2)" onchange="onCuteTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS) =
+                                    </span>
+                                    <span class="inflow-cute-tier-tot-green font-khmer">
+                                        <input type="text" id="cardCuteTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 28.00) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #16A34A; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(2)" onchange="onCuteTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
+                                    </span>
+                                </div>
+                                <div class="inflow-cute-right-pill">
+                                    <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay2">
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Row 3: Green Total Price -->
+                            <div class="inflow-cute-tier-row">
+                                <div class="inflow-cute-left-pill">
+                                    <span class="inflow-cute-tier-qty font-khmer">
+                                        <input type="number" id="cardCuteTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(3)" onchange="onCuteTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS) =
+                                    </span>
+                                    <span class="inflow-cute-tier-tot-green font-khmer">
+                                        <input type="text" id="cardCuteTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 52.00) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #16A34A; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(3)" onchange="onCuteTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
+                                    </span>
+                                </div>
+                                <div class="inflow-cute-right-pill">
+                                    <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay3">
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -5703,26 +5879,36 @@ function toggleCustomPriceCardDetail(isCustom) {
     const customBox = document.getElementById('specInfoCustomContent');
     const mEditorBox = document.getElementById('specModernCustomEditorBox');
     const mSpecsDisp = document.getElementById('specModernSpecsDisplay');
+    const cuteEditorBox = document.getElementById('specCuteCustomEditorBox');
+    const cuteSpecsDisp = document.getElementById('specCuteSpecsDisplay');
     const ta = document.getElementById('specCustomDetailTextarea');
     const mTa = document.getElementById('specModernCustomTextarea');
+    const cuteTa = document.getElementById('specCuteCustomTextarea');
     const disp = document.getElementById('specCustomDetailDisplay');
 
     if (isCustom) {
         if (autoBox) autoBox.style.display = 'none';
         if (customBox) customBox.style.display = 'block';
         if (mEditorBox) mEditorBox.style.display = 'block';
+        if (cuteEditorBox) cuteEditorBox.style.display = 'block';
         
-        let textVal = (mTa && mTa.value.trim()) || (ta && ta.value.trim());
+        let textVal = (cuteTa && cuteTa.value.trim()) || (mTa && mTa.value.trim()) || (ta && ta.value.trim());
         if (!textVal) {
             textVal = generateCurrentAutoDetailText();
             if (ta) ta.value = textVal;
             if (mTa) mTa.value = textVal;
+            if (cuteTa) cuteTa.value = textVal;
         }
         if (disp) disp.innerText = textVal;
         if (mSpecsDisp) mSpecsDisp.innerHTML = renderModernSpecsHtml(textVal);
+        if (cuteSpecsDisp) cuteSpecsDisp.innerHTML = renderCuteSpecsHtml(textVal);
         
-        const isModern = document.getElementById('printablePriceCard')?.classList.contains('modern');
-        if (isModern && mTa) {
+        const cardEl = document.getElementById('printablePriceCard');
+        const isCute = cardEl?.classList.contains('cute');
+        const isModern = cardEl?.classList.contains('modern');
+        if (isCute && cuteTa) {
+            cuteTa.focus();
+        } else if (isModern && mTa) {
             mTa.focus();
         } else if (ta) {
             ta.focus();
@@ -5731,17 +5917,64 @@ function toggleCustomPriceCardDetail(isCustom) {
         if (autoBox) autoBox.style.display = 'flex';
         if (customBox) customBox.style.display = 'none';
         if (mEditorBox) mEditorBox.style.display = 'none';
+        if (cuteEditorBox) cuteEditorBox.style.display = 'none';
         
         const autoText = generateCurrentAutoDetailText();
         if (mSpecsDisp) mSpecsDisp.innerHTML = renderModernSpecsHtml(autoText);
+        if (cuteSpecsDisp) cuteSpecsDisp.innerHTML = renderCuteSpecsHtml(autoText);
     }
 
     markFieldDirty('price_card_is_custom_detail', isCustom);
-    const activeText = (mTa && mTa.value) || (ta && ta.value);
+    const activeText = (cuteTa && cuteTa.value) || (mTa && mTa.value) || (ta && ta.value);
     if (activeText) {
         markFieldDirty('price_card_custom_detail', activeText.trim());
     }
     saveProductChanges();
+}
+
+function renderCuteSpecsHtml(text) {
+    if (!text) return '';
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const items = [];
+    for (const line of lines) {
+        if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
+            items[items.length - 1].sub = line;
+        } else {
+            items.push({ main: line, sub: '' });
+        }
+    }
+    
+    return items.map((item, idx) => {
+        const lower = item.main.toLowerCase();
+        let bullet = '<span class="inflow-cute-star-icon">★</span>';
+        if (lower.includes('ទំហំ') || lower.includes('size') || lower.includes('cm') || lower.includes('mm') || lower.includes('dim')) {
+            bullet = '<span class="inflow-cute-star-icon">★</span>';
+        } else if (lower.includes('1 ដុំ') || (lower.includes('ដុំ') && !lower.includes('កេស')) || lower.includes('pack')) {
+            bullet = '<span class="inflow-cute-dot-mint">●</span>';
+        } else if (idx === items.length - 1 && (lower.includes('/1កេស') || lower.includes('carton') || lower.includes('case'))) {
+            bullet = '<span class="inflow-cute-dot-navy">●</span>';
+        } else if (lower.includes('កេស') || lower.includes('carton') || lower.includes('case')) {
+            bullet = '<span class="inflow-cute-dot-coral">●</span>';
+        } else {
+            const bullets = [
+                '<span class="inflow-cute-star-icon">★</span>',
+                '<span class="inflow-cute-dot-coral">●</span>',
+                '<span class="inflow-cute-dot-mint">●</span>',
+                '<span class="inflow-cute-dot-navy">●</span>'
+            ];
+            bullet = bullets[idx % bullets.length];
+        }
+        
+        return `
+            <div class="inflow-cute-spec-line font-khmer">
+                ${bullet}
+                <div>
+                    <div>${escapeHtml(item.main)}</div>
+                    ${item.sub ? `<div class="inflow-cute-spec-sub font-khmer">${escapeHtml(item.sub)}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 function onCustomDetailInput(val) {
@@ -5749,8 +5982,12 @@ function onCustomDetailInput(val) {
     if (disp) disp.innerText = val;
     const mDisp = document.getElementById('specModernSpecsDisplay');
     if (mDisp) mDisp.innerHTML = renderModernSpecsHtml(val);
+    const cuteDisp = document.getElementById('specCuteSpecsDisplay');
+    if (cuteDisp) cuteDisp.innerHTML = renderCuteSpecsHtml(val);
     const mTa = document.getElementById('specModernCustomTextarea');
     if (mTa) mTa.value = val;
+    const cuteTa = document.getElementById('specCuteCustomTextarea');
+    if (cuteTa) cuteTa.value = val;
     
     markFieldDirty('price_card_custom_detail', val);
     markFieldDirty('price_card_is_custom_detail', true);
@@ -5765,8 +6002,34 @@ function onCustomDetailInput(val) {
 function onModernCustomDetailInput(val) {
     const mDisp = document.getElementById('specModernSpecsDisplay');
     if (mDisp) mDisp.innerHTML = renderModernSpecsHtml(val);
+    const cuteDisp = document.getElementById('specCuteSpecsDisplay');
+    if (cuteDisp) cuteDisp.innerHTML = renderCuteSpecsHtml(val);
     const ta = document.getElementById('specCustomDetailTextarea');
     if (ta) ta.value = val;
+    const cuteTa = document.getElementById('specCuteCustomTextarea');
+    if (cuteTa) cuteTa.value = val;
+    const disp = document.getElementById('specCustomDetailDisplay');
+    if (disp) disp.innerText = val;
+    
+    markFieldDirty('price_card_custom_detail', val);
+    markFieldDirty('price_card_is_custom_detail', true);
+    setDirtyState(true);
+
+    clearTimeout(window._customDetailTimer);
+    window._customDetailTimer = setTimeout(() => {
+        saveProductChanges();
+    }, 1200);
+}
+
+function onCuteCustomDetailInput(val) {
+    const cuteDisp = document.getElementById('specCuteSpecsDisplay');
+    if (cuteDisp) cuteDisp.innerHTML = renderCuteSpecsHtml(val);
+    const mDisp = document.getElementById('specModernSpecsDisplay');
+    if (mDisp) mDisp.innerHTML = renderModernSpecsHtml(val);
+    const ta = document.getElementById('specCustomDetailTextarea');
+    if (ta) ta.value = val;
+    const mTa = document.getElementById('specModernCustomTextarea');
+    if (mTa) mTa.value = val;
     const disp = document.getElementById('specCustomDetailDisplay');
     if (disp) disp.innerText = val;
     
@@ -5931,6 +6194,8 @@ function onDimensionChange() {
     if (specDim) specDim.innerText = summary;
     const specModernDim = document.getElementById('specModernDimVal');
     if (specModernDim) specModernDim.innerText = summary;
+    const specCuteDim = document.getElementById('specCuteDimVal');
+    if (specCuteDim) specCuteDim.innerText = summary;
 }
 
 function recalcPacksPerCase(source) {
@@ -5964,27 +6229,37 @@ function recalcPacksPerCase(source) {
         }
     }
     
-    // Live update packaging summary in specs card (Classic & Modern)
+    // Live update packaging summary in specs card (Classic, Modern, Cute)
     const specPacks = document.getElementById('specPacksVal');
     if (specPacks && packs > 0) specPacks.innerText = packs;
     const specModernPacks = document.getElementById('specModernPacksVal');
     if (specModernPacks && packs > 0) specModernPacks.innerText = packs;
+    const specCutePacks = document.getElementById('specCutePacksVal');
+    if (specCutePacks && packs > 0) specCutePacks.innerText = packs;
 
     const specPcsPack = document.getElementById('specPcsPackVal');
     if (specPcsPack && pcsPack > 0) specPcsPack.innerText = pcsPack;
     const specModernPcsPack = document.getElementById('specModernPcsPackVal');
     if (specModernPcsPack && pcsPack > 0) specModernPcsPack.innerText = pcsPack;
+    const specCutePcsPack = document.getElementById('specCutePcsPackVal');
+    if (specCutePcsPack && pcsPack > 0) specCutePcsPack.innerText = pcsPack;
     
     const displayPcsCase = pcsPerCase > 0 ? pcsPerCase : ((packs > 0 && pcsPack > 0) ? (packs * pcsPack) : 400);
     const specPcsCase = document.getElementById('specPcsCaseVal');
     if (specPcsCase) specPcsCase.innerText = displayPcsCase;
     const specModernPcsCase = document.getElementById('specModernPcsCaseVal');
     if (specModernPcsCase) specModernPcsCase.innerText = displayPcsCase;
+    const specCutePcsCase = document.getElementById('specCutePcsCaseVal');
+    if (specCutePcsCase) specCutePcsCase.innerText = displayPcsCase;
+    const specCutePcsCaseHdr = document.getElementById('specCutePcsCaseHdrVal');
+    if (specCutePcsCaseHdr) specCutePcsCaseHdr.innerText = displayPcsCase;
 
     const specPcsCaseEn = document.getElementById('specPcsCaseEnVal');
     if (specPcsCaseEn) specPcsCaseEn.innerText = displayPcsCase;
     const specModernPcsCaseEn = document.getElementById('specModernPcsCaseEnVal');
     if (specModernPcsCaseEn) specModernPcsCaseEn.innerText = displayPcsCase;
+    const specCutePcsCaseEn = document.getElementById('specCutePcsCaseEnVal');
+    if (specCutePcsCaseEn) specCutePcsCaseEn.innerText = displayPcsCase;
     
     // Default tier amounts: 100 pcs, 1 case in pcs, 2 cases in pcs
     const q2Inp = document.getElementById('cardTierQtyInput2');
@@ -6020,28 +6295,30 @@ function onPackagingChange(source) {
 }
 
 // ==========================================================================
-// PRICE SHOWCASE STYLE TOGGLE (CLASSIC VS MODERN)
+// PRICE SHOWCASE STYLE TOGGLE (CLASSIC VS MODERN VS CUTE LOOK)
 // ==========================================================================
 function setProductPriceCardStyle(style) {
     const card = document.getElementById('printablePriceCard');
     const classicContent = document.getElementById('cardContentClassic');
     const modernContent = document.getElementById('cardContentModern');
+    const cuteContent = document.getElementById('cardContentCute');
     const btnClassic = document.getElementById('btnDetailStyleClassic');
     const btnModern = document.getElementById('btnDetailStyleModern');
+    const btnCute = document.getElementById('btnDetailStyleCute');
     
-    if (style === 'modern') {
-        if (card) card.classList.add('modern');
-        if (classicContent) classicContent.style.display = 'none';
-        if (modernContent) modernContent.style.display = 'block';
-        if (btnClassic) btnClassic.classList.remove('active-classic');
-        if (btnModern) btnModern.classList.add('active-modern');
-    } else {
-        if (card) card.classList.remove('modern');
-        if (classicContent) classicContent.style.display = 'block';
-        if (modernContent) modernContent.style.display = 'none';
-        if (btnClassic) btnClassic.classList.add('active-classic');
-        if (btnModern) btnModern.classList.remove('active-modern');
+    if (card) {
+        card.classList.remove('modern', 'cute');
+        if (style === 'modern') card.classList.add('modern');
+        else if (style === 'cute') card.classList.add('cute');
     }
+
+    if (classicContent) classicContent.style.display = (style === 'classic') ? 'block' : 'none';
+    if (modernContent) modernContent.style.display = (style === 'modern') ? 'block' : 'none';
+    if (cuteContent) cuteContent.style.display = (style === 'cute') ? 'block' : 'none';
+
+    if (btnClassic) btnClassic.classList.toggle('active-classic', style === 'classic');
+    if (btnModern) btnModern.classList.toggle('active-modern', style === 'modern');
+    if (btnCute) btnCute.classList.toggle('active-cute', style === 'cute');
     
     if (typeof markFieldDirty === 'function') {
         markFieldDirty('price_card_style', style);
@@ -6056,20 +6333,34 @@ function syncCardTierInputs() {
     [1, 2, 3].forEach(idx => {
         const cQty = document.getElementById('cardTierQtyInput' + idx);
         const mQty = document.getElementById('cardModernTierQtyInput' + idx);
-        if (cQty && mQty && document.activeElement !== mQty) {
-            mQty.value = cQty.value;
+        const cuteQty = document.getElementById('cardCuteTierQtyInput' + idx);
+        const valQty = (cQty && cQty.value) || (mQty && mQty.value) || (cuteQty && cuteQty.value);
+        if (valQty) {
+            if (cQty && document.activeElement !== cQty) cQty.value = valQty;
+            if (mQty && document.activeElement !== mQty) mQty.value = valQty;
+            if (cuteQty && document.activeElement !== cuteQty) cuteQty.value = valQty;
         }
         
         const cTot = document.getElementById('cardTierTotInput' + idx);
         const mTot = document.getElementById('cardModernTierTotInput' + idx);
-        if (cTot && mTot && document.activeElement !== mTot) {
-            mTot.value = cTot.value;
+        const cuteTot = document.getElementById('cardCuteTierTotInput' + idx);
+        const valTot = (cTot && cTot.value) || (mTot && mTot.value) || (cuteTot && cuteTot.value);
+        if (valTot) {
+            if (cTot && document.activeElement !== cTot) cTot.value = valTot;
+            if (mTot && document.activeElement !== mTot) mTot.value = valTot;
+            if (cuteTot && document.activeElement !== cuteTot) cuteTot.value = valTot;
         }
         
         const cUnit = document.getElementById('cardTierUnitDisplay' + idx);
         const mUnit = document.getElementById('cardModernTierUnitDisplay' + idx);
+        const cuteUnit = document.getElementById('cardCuteTierUnitDisplay' + idx);
         if (cUnit && mUnit) {
             mUnit.innerText = cUnit.innerText;
+        }
+        if (cuteUnit && cUnit) {
+            const m = cUnit.innerText.match(/([\d.]+)/);
+            const num = m ? m[1] : '0.000';
+            cuteUnit.innerHTML = `(<span class="inflow-cute-uprice-val">${num}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)`;
         }
     });
 }
@@ -6089,6 +6380,26 @@ function onModernTierTotChange(idx) {
     const cInput = document.getElementById('cardTierTotInput' + idx);
     if (mInput && cInput) {
         cInput.value = mInput.value;
+    }
+    onCardTierTotChange(idx);
+    syncCardTierInputs();
+}
+
+function onCuteTierQtyChange(idx) {
+    const cuteInput = document.getElementById('cardCuteTierQtyInput' + idx);
+    const cInput = document.getElementById('cardTierQtyInput' + idx);
+    if (cuteInput && cInput) {
+        cInput.value = cuteInput.value;
+    }
+    onCardTierQtyChange(idx);
+    syncCardTierInputs();
+}
+
+function onCuteTierTotChange(idx) {
+    const cuteInput = document.getElementById('cardCuteTierTotInput' + idx);
+    const cInput = document.getElementById('cardTierTotInput' + idx);
+    if (cuteInput && cInput) {
+        cInput.value = cuteInput.value;
     }
     onCardTierTotChange(idx);
     syncCardTierInputs();
@@ -6331,10 +6642,10 @@ function exportCurrentCardAsJpg() {
                     span.style.outline = 'none';
                     span.style.overflow = 'visible';
                     
-                    if (inp.classList.contains('inflow-modern-inline-input') || inp.classList.contains('inflow-spec-inline-input')) {
+                    if (inp.classList.contains('inflow-cute-inline-input') || inp.classList.contains('inflow-modern-inline-input') || inp.classList.contains('inflow-spec-inline-input')) {
                         span.style.minWidth = '24px';
                         span.style.marginRight = '2px';
-                    } else if (inp.classList.contains('inflow-modern-inline-price-input') || inp.classList.contains('inflow-spec-inline-price-input')) {
+                    } else if (inp.classList.contains('inflow-cute-inline-price-input') || inp.classList.contains('inflow-modern-inline-price-input') || inp.classList.contains('inflow-spec-inline-price-input')) {
                         span.style.minWidth = '36px';
                         span.style.marginRight = '2px';
                     }
@@ -6533,7 +6844,7 @@ function renderOffscreenCard(stage, item) {
     const c = item.card;
     const cardColor = c.card_color || '#00A3E0';
     const cardFont = c.card_font || 'Kantumruy Pro';
-    const isModern = (c.price_table_style || item.price_table_style) === 'modern';
+    const activeStyle = ((c.price_table_style || item.price_table_style) || 'classic').toLowerCase();
     const unitWord = c.card_unit || 'ប្រអប់';
     
     updateCardColorProperties(stage, cardColor);
@@ -6549,7 +6860,100 @@ function renderOffscreenCard(stage, item) {
         </div>`;
     }
     
-    if (isModern) {
+    if (activeStyle === 'cute') {
+        stage.classList.remove('modern');
+        stage.classList.add('cute');
+        const detailText = (c.is_custom_detail && c.custom_detail) ? c.custom_detail : (c.auto_detail_text || `ទំហំ: ${c.dim_str || '14cm x 13cm x 8.5cm'}\n1 កេស មាន ${c.packs_per_case || 8} ដុំ\n1 ដុំ មាន ${c.pcs_per_pack || 50} ${unitWord}\n${c.pcs_per_case || 400} ${unitWord}/1កេស\n(${c.pcs_per_case || 400} PCS/ Carton)`);
+        const cuteDetailHtml = `<div style="display: flex; flex-direction: column; gap: 10px;">${renderCuteSpecsHtml(detailText)}</div>`;
+        
+        stage.innerHTML = `
+            <div class="inflow-cute-header">
+                <div>
+                    <div class="inflow-cute-title font-khmer">
+                        <span>${item.sku || ''}</span>
+                        <span>${c.khmer_name || item.name}</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DE7851" stroke-width="2.5" stroke-linecap="round" style="display: inline-block; vertical-align: middle; margin-left: 3px;">
+                            <line x1="12" y1="2" x2="12" y2="7"></line>
+                            <line x1="4.93" y1="4.93" x2="8.46" y2="8.46"></line>
+                            <line x1="19.07" y1="4.93" x2="15.54" y2="8.46"></line>
+                        </svg>
+                    </div>
+                    <div class="inflow-cute-sub-wrap">
+                        <span class="inflow-cute-sub-qty font-khmer">${c.pcs_per_case || 400}${unitWord}</span>
+                        <span class="inflow-cute-pill-badge font-khmer">កេស</span>
+                    </div>
+                    <div class="inflow-cute-sub-desc font-khmer">កេស</div>
+                </div>
+                <div style="text-align: right;">
+                    <div class="inflow-cute-detail-title font-khmer">ព័ត៌មានលម្អិត</div>
+                    <div class="inflow-cute-detail-sub">(Product Detail)</div>
+                </div>
+            </div>
+            <div class="inflow-cute-middle-grid">
+                <div class="inflow-cute-image-wrap">
+                    <span class="inflow-cute-doodle-star">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#DE7851"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z"/></svg>
+                    </span>
+                    <span class="inflow-cute-doodle-rays-tr">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D3748" stroke-width="2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="7"></line><line x1="4.93" y1="4.93" x2="8.46" y2="8.46"></line><line x1="19.07" y1="4.93" x2="15.54" y2="8.46"></line></svg>
+                    </span>
+                    <span class="inflow-cute-doodle-rays-bl">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D3748" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="9" y2="12"></line><line x1="5.5" y1="18.5" x2="9.5" y2="15"></line><line x1="10" y1="22" x2="12" y2="17"></line></svg>
+                    </span>
+                    <span class="inflow-cute-doodle-rays-br">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DE7851" stroke-width="2" stroke-linecap="round"><line x1="20" y1="12" x2="15" y2="12"></line><line x1="18.5" y1="18.5" x2="14.5" y2="15"></line><line x1="14" y1="22" x2="12" y2="17"></line></svg>
+                    </span>
+                    <div class="inflow-cute-image-frame">
+                        ${imgHtml}
+                        ${item.capacity ? `<div class="inflow-cute-capacity-overlay font-khmer">${item.capacity}</div>` : ''}
+                    </div>
+                </div>
+                <div class="inflow-cute-specs-box">
+                    ${cuteDetailHtml}
+                </div>
+            </div>
+            <div class="inflow-cute-price-wrap">
+                <div class="inflow-cute-table-header">
+                    <div>
+                        <div class="inflow-cute-th-km font-khmer">តម្លៃ</div>
+                        <div class="inflow-cute-th-en">(Price)</div>
+                    </div>
+                    <div>
+                        <div class="inflow-cute-th-km font-khmer">តម្លៃក្នុង១${unitWord}</div>
+                        <div class="inflow-cute-th-en">(UNIT PRICE)</div>
+                    </div>
+                </div>
+                <div class="inflow-cute-tier-row">
+                    <div class="inflow-cute-left-pill">
+                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_1}</span> ${unitWord} (PCS) =</span>
+                        <span class="inflow-cute-tier-tot-coral font-khmer">${Number(c.tot_price_1).toFixed(2)} $</span>
+                    </div>
+                    <div class="inflow-cute-right-pill">
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_1).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                    </div>
+                </div>
+                <div class="inflow-cute-tier-row">
+                    <div class="inflow-cute-left-pill">
+                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_2}</span> ${unitWord} (PCS) =</span>
+                        <span class="inflow-cute-tier-tot-green font-khmer">${Number(c.tot_price_2).toFixed(2)} $</span>
+                    </div>
+                    <div class="inflow-cute-right-pill">
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_2).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                    </div>
+                </div>
+                <div class="inflow-cute-tier-row">
+                    <div class="inflow-cute-left-pill">
+                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_3}</span> ${unitWord} (PCS) =</span>
+                        <span class="inflow-cute-tier-tot-green font-khmer">${Number(c.tot_price_3).toFixed(2)} $</span>
+                    </div>
+                    <div class="inflow-cute-right-pill">
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_3).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (activeStyle === 'modern') {
+        stage.classList.remove('cute');
         stage.classList.add('modern');
         const detailText = (c.is_custom_detail && c.custom_detail) ? c.custom_detail : (c.auto_detail_text || `ទំហំ: ${c.dim_str || '21cm x 21cm x 4cm'}\n1 កេស មាន ${c.packs_per_case} ដុំ\n1 ដុំ មាន ${c.pcs_per_pack} ${unitWord}\n${c.pcs_per_case} ${unitWord}/1កេស\n(${c.pcs_per_case} PCS/ Carton)`);
         const modernDetailHtml = `<div style="display: flex; flex-direction: column; gap: 9px;">${renderModernSpecsHtml(detailText)}</div>`;
@@ -6629,7 +7033,7 @@ function renderOffscreenCard(stage, item) {
             </div>
         `;
     } else {
-        stage.classList.remove('modern');
+        stage.classList.remove('modern', 'cute');
         let detailBoxHtml = '';
         if (c.is_custom_detail && c.custom_detail) {
             detailBoxHtml = `<div class="inflow-spec-custom-display font-khmer" style="display: block !important; font-size: 15px; font-weight: 700; font-style: italic; color: ${cardColor}; line-height: 1.4; white-space: pre-line; text-align: center;">${c.custom_detail}</div>`;
