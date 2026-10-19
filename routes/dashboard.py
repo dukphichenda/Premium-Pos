@@ -1,6 +1,7 @@
 from flask import Blueprint, render_template, jsonify, session, redirect, url_for, request
 from database import query_one, query_all
 from datetime import datetime
+from routes.reports import _get_line_cogs_sql_expr
 
 dashboard_bp = Blueprint('dashboard', __name__)
 
@@ -278,24 +279,16 @@ def chart_data():
         branch_filter = "AND (so.branch_id IS NULL OR so.branch_id = 0)"
         params = ()
 
-    # 1. Monthly Financial Breakdown (Last 12 months) - Scoped to selected store
+    # 1. Monthly Financial Breakdown (Last 12 months) - Scoped to selected store using canonical COGS
+    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
     monthly_sales = query_all(f"""
-        WITH line_costs AS (
+        WITH order_costs AS (
             SELECT 
                 sol.sales_order_id,
-                sol.subtotal,
-                CASE 
-                    WHEN (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), NULLIF(p.average_cost, 0), p.standard_cost, 0)) > sol.subtotal
-                        THEN sol.subtotal * 0.78
-                    ELSE (sol.quantity * COALESCE(NULLIF(sol.cost_price, 0), NULLIF(p.average_cost, 0), p.standard_cost, 0))
-                END as line_cogs
+                COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
             FROM sales_order_lines sol
             LEFT JOIN products p ON sol.product_id = p.id
-        ),
-        order_costs AS (
-            SELECT sales_order_id, SUM(line_cogs) as total_cogs
-            FROM line_costs
-            GROUP BY sales_order_id
+            GROUP BY sol.sales_order_id
         )
         SELECT 
             TO_CHAR(so.order_date, 'Mon YYYY') as month_label,
@@ -303,7 +296,8 @@ def chart_data():
             COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN so.total_amount ELSE 0 END), 0) as paid_sales,
             COALESCE(SUM(CASE WHEN so.status = 'OPEN' OR so.balance_due > 0 THEN so.balance_due ELSE 0 END), 0) as open_sales,
             COALESCE(SUM(so.total_amount), 0) as revenue,
-            COALESCE(SUM(so.total_amount - COALESCE(oc.total_cogs, 0)), 0) as profit,
+            COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN (so.total_amount - COALESCE(oc.total_cogs, 0)) ELSE 0 END), 0) as paid_profit,
+            COALESCE(SUM(so.total_amount - COALESCE(oc.total_cogs, 0)), 0) as total_profit,
             COUNT(*) as order_count
         FROM sales_orders so
         LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
@@ -333,7 +327,8 @@ def chart_data():
         'monthly_labels': [r['month_label'] for r in monthly_sales],
         'monthly_paid': [round(float(r['paid_sales']), 2) for r in monthly_sales],
         'monthly_open': [round(float(r['open_sales']), 2) for r in monthly_sales],
-        'monthly_profit': [round(float(r['profit']), 2) for r in monthly_sales],
+        'monthly_profit': [round(float(r['paid_profit']), 2) for r in monthly_sales],
+        'monthly_total_profit': [round(float(r['total_profit']), 2) for r in monthly_sales],
         'monthly_revenue': [round(float(r['revenue']), 2) for r in monthly_sales],
         'monthly_orders': [int(r['order_count']) for r in monthly_sales],
         'category_labels': [r['category_name'] for r in category_distribution],
