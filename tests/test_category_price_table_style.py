@@ -209,5 +209,50 @@ class TestCategoryPriceTableStyle(unittest.TestCase):
             p = cursor.fetchone()
             self.assertEqual(p['price_card_style'], 'classic')
 
+    def test_price_card_derived_colors(self):
+        """Verify _derive_card_colors accurately derives rgba tints, borders, and dark tone."""
+        from routes.products import _derive_card_colors
+        
+        # Test default cyan
+        d1 = _derive_card_colors('#00A3E0')
+        self.assertEqual(d1['color'], '#00A3E0')
+        self.assertIn('rgba(0, 163, 224, 0.08)', d1['color_light'])
+        self.assertIn('rgba(0, 163, 224, 0.12)', d1['color_badge_bg'])
+        self.assertIn('rgba(0, 163, 224, 0.22)', d1['color_border'])
+        self.assertTrue(d1['color_dark'].startswith('rgb('))
+
+        # Test green
+        d2 = _derive_card_colors('#059669')
+        self.assertEqual(d2['color'], '#059669')
+        self.assertIn('rgba(5, 150, 105, 0.08)', d2['color_light'])
+
+    def test_modern_card_color_and_export_handlers(self):
+        """Verify templates include dynamic CSS variables and onclone input replacements for crisp JPG export."""
+        with get_db_cursor(commit=False) as cursor:
+            cursor.execute("SELECT id FROM products WHERE is_active = TRUE ORDER BY id ASC LIMIT 1;")
+            prod_id = cursor.fetchone()['id']
+
+        resp = self.client.get(f'/products/{prod_id}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        
+        # Ensure CSS variables exist on printablePriceCard
+        self.assertIn('--price-card-light:', html)
+        self.assertIn('--price-card-badge-bg:', html)
+        self.assertIn('--price-card-border:', html)
+        self.assertIn('--price-card-dark:', html)
+        
+        # Ensure exportCurrentCardAsJpg includes onclone sanitization
+        self.assertIn('onclone: (clonedDoc)', html)
+        self.assertIn('updateCardColorProperties', html)
+
+        # Test detail page
+        resp_detail = self.client.get(f'/products/{prod_id}?legacy=1')
+        self.assertEqual(resp_detail.status_code, 200)
+        detail_html = resp_detail.data.decode('utf-8')
+        self.assertIn('--price-card-light:', detail_html)
+        self.assertIn('onclone: (clonedDoc)', detail_html)
+        self.assertIn('changePriceCardColorDetail', detail_html)
+
 if __name__ == '__main__':
     unittest.main()

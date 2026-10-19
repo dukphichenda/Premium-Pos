@@ -68,6 +68,39 @@ CATEGORY_COLOR_MAP = {
     'pans': '#6D28D9'              # Deep Violet
 }
 
+def _derive_card_colors(hex_color):
+    """
+    Derives soft light tint, border, badge background, and darker readable text tone
+    from any base hex color for modern price card styling.
+    Uses standard rgb/rgba which is 100% compatible with html2canvas and CSS rendering.
+    """
+    hex_clean = (hex_color or '#00A3E0').lstrip('#').strip()
+    if len(hex_clean) == 3:
+        hex_clean = ''.join(c * 2 for c in hex_clean)
+    try:
+        r = int(hex_clean[0:2], 16)
+        g = int(hex_clean[2:4], 16)
+        b = int(hex_clean[4:6], 16)
+    except Exception:
+        r, g, b = 0, 163, 224
+        hex_clean = '00A3E0'
+    
+    light = f"rgba({r}, {g}, {b}, 0.08)"
+    badge_bg = f"rgba({r}, {g}, {b}, 0.12)"
+    border = f"rgba({r}, {g}, {b}, 0.22)"
+    dark_r = max(0, min(255, int(r * 0.55)))
+    dark_g = max(0, min(255, int(g * 0.55)))
+    dark_b = max(0, min(255, int(b * 0.55)))
+    dark = f"rgb({dark_r}, {dark_g}, {dark_b})"
+    
+    return {
+        'color': f"#{hex_clean}",
+        'color_light': light,
+        'color_badge_bg': badge_bg,
+        'color_border': border,
+        'color_dark': dark
+    }
+
 from routes.auth import user_can_edit_prices, user_can_view_costs, user_can_adjust_stock
 
 def _build_price_card_data(product, price_tiers, can_view_costs=None):
@@ -237,6 +270,8 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
     else:
         final_color = saved_color
     
+    derived_colors = _derive_card_colors(final_color)
+    
     return {
         'khmer_name': names['khmer'],
         'english_name': names['english'],
@@ -267,7 +302,11 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'profit_pct_1': int(profit_pct_1 + 0.5),
         'profit_pct_2': int(profit_pct_2 + 0.5),
         'profit_pct_3': int(profit_pct_3 + 0.5),
-        'card_color': final_color,
+        'card_color': derived_colors['color'],
+        'card_color_light': derived_colors['color_light'],
+        'card_color_badge_bg': derived_colors['color_badge_bg'],
+        'card_color_border': derived_colors['color_border'],
+        'card_color_dark': derived_colors['color_dark'],
         'card_font': product.get('price_card_font') or 'Kantumruy Pro',
         'card_unit': card_unit,
         'is_custom_detail': is_custom_detail,
