@@ -409,6 +409,8 @@ def view_report(report_key):
     else:
         all_customers = query_all("SELECT id, name FROM customers WHERE is_active = TRUE ORDER BY name")
 
+    all_customers = [{'id': c['id'], 'name': c['name'] or ''} for c in all_customers]
+
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name")
     all_categories = query_all("SELECT id, name FROM categories WHERE is_active = TRUE ORDER BY name")
     all_locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")

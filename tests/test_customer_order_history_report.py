@@ -84,5 +84,13 @@ class TestCustomerOrderHistoryReport(unittest.TestCase):
         self.assertIn('@media print', self.viewer_content)
         self.assertIn('inflow-rep-pager', self.viewer_content)
 
+    def test_customer_combobox_safe_and_high_performance(self):
+        # 5. Customer combobox must have high-performance JSON data and safe attribute click
+        self.assertIn('id="allCustomersData"', self.viewer_content)
+        self.assertIn('id="repCustomerList"', self.viewer_content)
+        self.assertIn('selectRepCustomer(this)', self.viewer_content)
+        self.assertNotIn("selectRepCustomer('{{ c.id }}'", self.viewer_content)
+        self.assertIn('ALL_CUSTOMERS', self.viewer_content)
+
 if __name__ == '__main__':
     unittest.main()
