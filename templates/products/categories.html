@@ -2,6 +2,88 @@
 
 {% block title %}Product Categories (ប្រភេទទំនិញ) - inFlow Premium{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Price Table Style Switcher Controls */
+.btn-global-style {
+    background: transparent;
+    color: #64748B;
+    border: none;
+    border-radius: 5px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.btn-global-style:hover {
+    color: #0F172A;
+}
+.btn-global-style.active-classic {
+    background: #0D6970;
+    color: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(13, 105, 112, 0.3);
+}
+.btn-global-style.active-modern {
+    background: #0284C7;
+    color: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(2, 132, 199, 0.3);
+}
+
+/* Category Table Style Pills */
+.cat-style-pill-btn {
+    padding: 3px 11px;
+    border-radius: 14px;
+    border: none;
+    background: transparent;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.cat-style-pill-btn:hover {
+    color: #0F172A;
+}
+.cat-style-pill-btn.active-classic {
+    background: #0D6970;
+    color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(13, 105, 112, 0.25);
+}
+.cat-style-pill-btn.active-modern {
+    background: #0284C7;
+    color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.25);
+}
+
+/* Toast alert notification */
+#categoryToast {
+    position: fixed;
+    bottom: 24px;
+    right: 28px;
+    background: #0F172A;
+    color: #FFFFFF;
+    padding: 12px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    z-index: 100000;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    animation: fadeInToast 0.2s ease;
+}
+@keyframes fadeInToast {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="inflow-categories-page" style="padding: 24px 32px; max-width: 1400px; margin: 0 auto;">
 
@@ -22,12 +104,32 @@
                     <span class="font-khmer" style="font-size: 1.15rem; font-weight: 700; color: #64748B;">(ប្រភេទទំនិញ)</span>
                 </div>
                 <p style="color: #64748B; font-size: 0.85rem; margin: 4px 0 0 0;">
-                    Manage catalog classification, color tags, and organize products across POS and inventory.
+                    Manage catalog classification, color tags, price table styles (Classic / Modern), and organize products across POS and inventory.
                 </p>
             </div>
         </div>
 
-        <div style="display: flex; gap: 10px; align-items: center;">
+        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+            <!-- Global Price Table Style Switcher (All Products) -->
+            <div style="display: flex; align-items: center; gap: 8px; background: #FFFFFF; padding: 5px 10px; border-radius: 8px; border: 1.5px solid #CBD5E1; box-shadow: 0 1px 3px rgba(0,0,0,0.05);" title="Change price table card style for ALL products and categories">
+                <div style="display: flex; align-items: center; gap: 5px;">
+                    <span style="font-size: 13px;">🎛️</span>
+                    <span style="font-size: 11.5px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.03em;">All Products Style:</span>
+                </div>
+                <div style="display: inline-flex; background: #F1F5F9; border-radius: 6px; padding: 2px; gap: 2px; border: 1px solid #E2E8F0;">
+                    <button type="button" id="globalBtnClassic" onclick="applyGlobalPriceTableStyle('classic')"
+                            class="btn-global-style {% if global_price_table_style != 'modern' %}active-classic{% endif %}"
+                            title="Set all categories to Classic price table (Image 1)">
+                        Classic
+                    </button>
+                    <button type="button" id="globalBtnModern" onclick="applyGlobalPriceTableStyle('modern')"
+                            class="btn-global-style {% if global_price_table_style == 'modern' %}active-modern{% endif %}"
+                            title="Set all categories to Modern price table (Image 2)">
+                        ✨ Modern
+                    </button>
+                </div>
+            </div>
+
             <a href="{{ url_for('products.list_products') }}" class="btn btn-secondary" style="display: flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 13px; font-weight: 600; text-decoration: none;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="19" y1="12" x2="5" y2="12"></line>
@@ -145,11 +247,12 @@
             <table class="data-table" id="categoriesTable" style="width: 100%; border-collapse: collapse;">
                 <thead>
                     <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
-                        <th style="padding: 12px 18px; text-align: left; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 320px;">Category Name</th>
+                        <th style="padding: 12px 18px; text-align: left; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 280px;">Category Name</th>
                         <th style="padding: 12px 16px; text-align: left; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em;">Description</th>
-                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 150px;">Products</th>
-                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 120px;">Status</th>
-                        <th style="padding: 12px 20px; text-align: right; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 200px;">Actions</th>
+                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 130px;">Products</th>
+                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 175px;">Price Table Style</th>
+                        <th style="padding: 12px 16px; text-align: center; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 110px;">Status</th>
+                        <th style="padding: 12px 20px; text-align: right; font-weight: 700; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; width: 190px;">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="categoriesTableBody">
@@ -159,6 +262,7 @@
                         data-name="{{ c.name|escape }}"
                         data-color="{{ c.color }}"
                         data-description="{{ (c.description or '')|escape }}"
+                        data-style="{{ c.price_table_style or 'classic' }}"
                         data-active="{{ '1' if c.is_active else '0' }}"
                         data-count="{{ c.product_count }}"
                         style="border-bottom: 1px solid #F1F5F9; transition: background 0.15s ease; {% if not c.is_active %}opacity: 0.7; background: #FAFAFA;{% endif %}"
@@ -199,7 +303,25 @@
                             </a>
                         </td>
 
-                        <!-- Column 4: Status -->
+                        <!-- Column 4: Price Table Style Switch (Classic vs Modern) -->
+                        <td style="padding: 10px 16px; text-align: center;" onclick="event.stopPropagation();">
+                            <div class="category-style-toggle" data-cat-id="{{ c.id }}" style="display: inline-flex; background: #F1F5F9; border-radius: 20px; padding: 2px; border: 1px solid #CBD5E1; box-shadow: inset 0 1px 2px rgba(0,0,0,0.04);">
+                                <button type="button" 
+                                        onclick="setCategoryStyleDirect({{ c.id }}, 'classic', this)"
+                                        class="cat-style-pill-btn cat-btn-classic-{{ c.id }} {% if c.price_table_style != 'modern' %}active-classic{% endif %}"
+                                        title="Switch to Classic price table (Image 1)">
+                                    Classic
+                                </button>
+                                <button type="button" 
+                                        onclick="setCategoryStyleDirect({{ c.id }}, 'modern', this)"
+                                        class="cat-style-pill-btn cat-btn-modern-{{ c.id }} {% if c.price_table_style == 'modern' %}active-modern{% endif %}"
+                                        title="Switch to Modern price table (Image 2)">
+                                    ✨ Modern
+                                </button>
+                            </div>
+                        </td>
+
+                        <!-- Column 5: Status -->
                         <td style="padding: 12px 16px; text-align: center;">
                             {% if c.is_active %}
                             <span class="badge badge-success" style="background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0; font-size: 11px; padding: 3px 9px; border-radius: 12px; font-weight: 700;">
@@ -212,7 +334,7 @@
                             {% endif %}
                         </td>
 
-                        <!-- Column 5: Actions -->
+                        <!-- Column 6: Actions -->
                         <td style="padding: 12px 20px; text-align: right; white-space: nowrap;">
                             <div style="display: inline-flex; align-items: center; gap: 6px;">
                                 <!-- Edit Button -->
@@ -248,7 +370,7 @@
                     </tr>
                     {% else %}
                     <tr id="noCategoriesRow">
-                        <td colspan="5" style="text-align: center; padding: 48px 20px; color: #64748B;">
+                        <td colspan="6" style="text-align: center; padding: 48px 20px; color: #64748B;">
                             <div style="font-size: 32px; margin-bottom: 8px;">📂</div>
                             <div style="font-size: 14px; font-weight: 600; color: #334155;">No categories found</div>
                             <div style="font-size: 12.5px; color: #94A3B8; margin-top: 4px;">Click "+ Add Category" to create your first product category.</div>
@@ -314,6 +436,29 @@
                 </label>
                 <textarea name="description" rows="2" placeholder="Optional category description or notes..."
                           class="form-textarea" style="width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Price Table Style Selector -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                    Price Table Style (ទម្រង់តារាងតម្លៃ)
+                </label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <label id="newStyleCardClassic" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid {% if global_price_table_style != 'modern' %}#0284C7{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style != 'modern' %}#F0F9FF{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioClassic" value="classic" {% if global_price_table_style != 'modern' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">Classic Style</div>
+                            <div style="font-size: 11px; color: #64748B;">Solid header (Image 1)</div>
+                        </div>
+                    </label>
+                    <label id="newStyleCardModern" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid {% if global_price_table_style == 'modern' %}#0284C7{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style == 'modern' %}#F0F9FF{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioModern" value="modern" {% if global_price_table_style == 'modern' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">✨ Modern Style</div>
+                            <div style="font-size: 11px; color: #64748B;">Card-in-card with icons (Image 2)</div>
+                        </div>
+                    </label>
+                </div>
             </div>
 
             <!-- Active Checkbox -->
@@ -386,6 +531,29 @@
                 </label>
                 <textarea name="description" id="editCategoryDescription" rows="2" placeholder="Optional category description or notes..."
                           class="form-textarea" style="width: 100%; padding: 8px 12px; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 13px; resize: vertical;"></textarea>
+            </div>
+
+            <!-- Price Table Style Selector -->
+            <div class="form-group" style="margin-bottom: 16px;">
+                <label class="form-label" style="display: block; font-size: 12.5px; font-weight: 700; color: #334155; margin-bottom: 6px;">
+                    Price Table Style (ទម្រង់តារាងតម្លៃ)
+                </label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                    <label id="editStyleCardClassic" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="editStyleRadioClassic" value="classic" checked onchange="updateStyleCardSelection('edit')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">Classic Style</div>
+                            <div style="font-size: 11px; color: #64748B;">Solid header (Image 1)</div>
+                        </div>
+                    </label>
+                    <label id="editStyleCardModern" style="display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="editStyleRadioModern" value="modern" onchange="updateStyleCardSelection('edit')" style="accent-color: #0284C7; width: 16px; height: 16px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 13px; color: #0F172A;">✨ Modern Style</div>
+                            <div style="font-size: 11px; color: #64748B;">Card-in-card with icons (Image 2)</div>
+                        </div>
+                    </label>
+                </div>
             </div>
 
             <!-- Active Checkbox -->
@@ -496,6 +664,13 @@ function openNewCategoryModal() {
     document.getElementById('newColorHex').value = '#00A3E0';
     document.getElementById('newColorPicker').value = '#00A3E0';
     document.getElementById('newColorPreview').style.backgroundColor = '#00A3E0';
+    const isGlobalModern = document.getElementById('globalBtnModern') && document.getElementById('globalBtnModern').classList.contains('active-modern');
+    if (isGlobalModern) {
+        document.getElementById('newStyleRadioModern').checked = true;
+    } else {
+        document.getElementById('newStyleRadioClassic').checked = true;
+    }
+    updateStyleCardSelection('new');
     openModal('newCategoryModal');
 }
 
@@ -506,6 +681,7 @@ function openEditCategoryModalFromRow(row) {
     const catName = row.getAttribute('data-name') || '';
     const catColor = row.getAttribute('data-color') || '#00A3E0';
     const catDesc = row.getAttribute('data-description') || '';
+    const catStyle = (row.getAttribute('data-style') || 'classic').toLowerCase();
     const catActive = row.getAttribute('data-active') === '1';
     const catCount = row.getAttribute('data-count') || '0';
 
@@ -519,10 +695,157 @@ function openEditCategoryModalFromRow(row) {
     document.getElementById('editCategoryDescription').value = catDesc;
     document.getElementById('editCategoryActive').checked = catActive;
 
+    if (catStyle === 'modern') {
+        document.getElementById('editStyleRadioModern').checked = true;
+    } else {
+        document.getElementById('editStyleRadioClassic').checked = true;
+    }
+    updateStyleCardSelection('edit');
+
     document.getElementById('editCategoryProductCountText').innerText = 
         `Currently linked to ${catCount} product(s). Updates will reflect in catalog immediately.`;
 
     openModal('editCategoryModal');
+}
+
+/* Update Style Card Visual Selection in Modals */
+function updateStyleCardSelection(prefix) {
+    const classicRadio = document.getElementById(prefix + 'StyleRadioClassic');
+    const modernRadio = document.getElementById(prefix + 'StyleRadioModern');
+    const classicCard = document.getElementById(prefix + 'StyleCardClassic');
+    const modernCard = document.getElementById(prefix + 'StyleCardModern');
+
+    if (classicRadio && classicCard) {
+        if (classicRadio.checked) {
+            classicCard.style.borderColor = '#0284C7';
+            classicCard.style.backgroundColor = '#F0F9FF';
+        } else {
+            classicCard.style.borderColor = '#CBD5E1';
+            classicCard.style.backgroundColor = '#FFFFFF';
+        }
+    }
+    if (modernRadio && modernCard) {
+        if (modernRadio.checked) {
+            modernCard.style.borderColor = '#0284C7';
+            modernCard.style.backgroundColor = '#F0F9FF';
+        } else {
+            modernCard.style.borderColor = '#CBD5E1';
+            modernCard.style.backgroundColor = '#FFFFFF';
+        }
+    }
+}
+
+/* Individual Category Style Switcher (AJAX) */
+function setCategoryStyleDirect(catId, style, btn) {
+    const row = document.querySelector(`.category-row[data-id="${catId}"]`);
+    const classicBtn = document.querySelector(`.cat-btn-classic-${catId}`);
+    const modernBtn = document.querySelector(`.cat-btn-modern-${catId}`);
+
+    if (btn) btn.style.opacity = '0.5';
+
+    fetch(`/api/categories/${catId}/set-style`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: style })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (btn) btn.style.opacity = '1';
+        if (res.success) {
+            if (row) row.setAttribute('data-style', style);
+            if (style === 'modern') {
+                if (classicBtn) classicBtn.classList.remove('active-classic');
+                if (modernBtn) modernBtn.classList.add('active-modern');
+            } else {
+                if (modernBtn) modernBtn.classList.remove('active-modern');
+                if (classicBtn) classicBtn.classList.add('active-classic');
+            }
+            showCategoryToast(`Category "${res.category_name}" price table set to ${style.toUpperCase()}`);
+        } else {
+            alert(res.message || 'Failed to update category style.');
+        }
+    })
+    .catch(err => {
+        if (btn) btn.style.opacity = '1';
+        console.error('Error updating category style:', err);
+        alert('Network error while updating category style.');
+    });
+}
+
+/* Global Price Table Style Switcher (All Categories & Products) */
+function applyGlobalPriceTableStyle(style) {
+    const styleLabel = style === 'modern' ? 'Modern ✨' : 'Classic';
+    if (!confirm(`Switch Price Table Style for ALL products and categories to ${styleLabel}?`)) {
+        return;
+    }
+
+    const btnClassic = document.getElementById('globalBtnClassic');
+    const btnModern = document.getElementById('globalBtnModern');
+    if (btnClassic) btnClassic.style.opacity = '0.5';
+    if (btnModern) btnModern.style.opacity = '0.5';
+
+    fetch('/api/categories/set-all-style', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: style })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (btnClassic) btnClassic.style.opacity = '1';
+        if (btnModern) btnModern.style.opacity = '1';
+
+        if (res.success) {
+            // Update global toggle buttons
+            if (style === 'modern') {
+                if (btnClassic) btnClassic.classList.remove('active-classic');
+                if (btnModern) btnModern.classList.add('active-modern');
+            } else {
+                if (btnModern) btnModern.classList.remove('active-modern');
+                if (btnClassic) btnClassic.classList.add('active-classic');
+            }
+
+            // Update all category row buttons in the table
+            document.querySelectorAll('.category-row').forEach(row => {
+                const catId = row.getAttribute('data-id');
+                row.setAttribute('data-style', style);
+                const cBtn = document.querySelector(`.cat-btn-classic-${catId}`);
+                const mBtn = document.querySelector(`.cat-btn-modern-${catId}`);
+                if (style === 'modern') {
+                    if (cBtn) cBtn.classList.remove('active-classic');
+                    if (mBtn) mBtn.classList.add('active-modern');
+                } else {
+                    if (mBtn) mBtn.classList.remove('active-modern');
+                    if (cBtn) cBtn.classList.add('active-classic');
+                }
+            });
+
+            showCategoryToast(`All products & categories updated to ${style.toUpperCase()} style!`);
+        } else {
+            alert(res.message || 'Failed to update all categories.');
+        }
+    })
+    .catch(err => {
+        if (btnClassic) btnClassic.style.opacity = '1';
+        if (btnModern) btnModern.style.opacity = '1';
+        console.error('Error setting all style:', err);
+        alert('Network error while updating global style.');
+    });
+}
+
+/* Toast Notification Utility */
+function showCategoryToast(msg) {
+    let toast = document.getElementById('categoryToast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'categoryToast';
+        document.body.appendChild(toast);
+    }
+    toast.innerHTML = `<span style="font-size: 16px;">✨</span><span>${msg}</span>`;
+    toast.style.display = 'flex';
+    clearTimeout(window._toastTimeout);
+    window._toastTimeout = setTimeout(() => {
+        toast.style.display = 'none';
+    }, 3200);
 }
 
 /* Open Delete Modal */
@@ -610,7 +933,7 @@ if (searchInput) {
             if (!emptyRow) {
                 emptyRow = document.createElement('tr');
                 emptyRow.id = 'noLiveSearchResultsRow';
-                emptyRow.innerHTML = `<td colspan="5" style="text-align: center; padding: 36px 20px; color: #64748B;">No categories match "${query}"</td>`;
+                emptyRow.innerHTML = `<td colspan="6" style="text-align: center; padding: 36px 20px; color: #64748B;">No categories match "${query}"</td>`;
                 document.getElementById('categoriesTableBody').appendChild(emptyRow);
             } else {
                 emptyRow.style.display = '';
@@ -648,4 +971,5 @@ function clearCategorySearch() {
     }
 }
 </script>
+<div id="categoryToast"></div>
 {% endblock %}

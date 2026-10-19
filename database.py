@@ -526,6 +526,13 @@ def init_db():
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_1 DROP DEFAULT;")
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_2 DROP DEFAULT;")
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_3 DROP DEFAULT;")
+                cur.execute("ALTER TABLE categories ADD COLUMN IF NOT EXISTS price_table_style VARCHAR(20) DEFAULT 'classic';")
+                cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_style VARCHAR(20) DEFAULT NULL;")
+                cur.execute("""
+                    INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
+                    VALUES ('default_price_table_style', 'classic', 'Default style for product price cards (classic or modern)', CURRENT_TIMESTAMP)
+                    ON CONFLICT (setting_key) DO NOTHING;
+                """)
             except Exception as mig_err:
                 logger.warning(f"Customer/Invoice/Adjustment columns migration notice: {mig_err}")
 

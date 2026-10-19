@@ -274,6 +274,7 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'custom_detail': custom_detail,
         'auto_detail_text': auto_detail_text,
         'notes': product.get('price_card_notes') or '',
+        'price_table_style': product.get('price_table_style') or product.get('price_card_style') or 'classic',
         'can_view_costs': can_view_costs
     }
 
@@ -2370,12 +2371,13 @@ def list_categories():
     query = f"""
         SELECT 
             c.id, c.name, c.description, COALESCE(c.color, '#00A3E0') as color,
+            COALESCE(c.price_table_style, 'classic') as price_table_style,
             c.is_active, c.created_at,
             COUNT(p.id) as product_count
         FROM categories c
         LEFT JOIN products p ON c.id = p.category_id AND p.is_active = TRUE
         {where_sql}
-        GROUP BY c.id, c.name, c.description, c.color, c.is_active, c.created_at
+        GROUP BY c.id, c.name, c.description, c.color, c.price_table_style, c.is_active, c.created_at
         ORDER BY c.name ASC
     """
     categories = query_all(query, tuple(params))
@@ -2386,6 +2388,12 @@ def list_categories():
     categorized_products = query_one("SELECT COUNT(*) as cnt FROM products WHERE category_id IS NOT NULL AND is_active = TRUE")['cnt']
     uncategorized_products = query_one("SELECT COUNT(*) as cnt FROM products WHERE category_id IS NULL AND is_active = TRUE")['cnt']
 
+    # Global price table style setting
+    global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
+    global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
+    if global_price_table_style not in ('classic', 'modern'):
+        global_price_table_style = 'classic'
+
     return render_template(
         'products/categories.html',
         categories=categories,
@@ -2394,7 +2402,8 @@ def list_categories():
         total_categories=total_categories,
         active_categories=active_categories,
         categorized_products=categorized_products,
-        uncategorized_products=uncategorized_products
+        uncategorized_products=uncategorized_products,
+        global_price_table_style=global_price_table_style
     )
 
 @products_bp.route('/categories/create', methods=['POST'])
@@ -2402,6 +2411,9 @@ def create_category():
     name = request.form.get('name', '').strip()
     color = request.form.get('color', '#00A3E0').strip()
     description = request.form.get('description', '').strip()
+    price_table_style = (request.form.get('price_table_style') or 'classic').strip().lower()
+    if price_table_style not in ('classic', 'modern'):
+        price_table_style = 'classic'
     is_active = request.form.get('is_active') in ('1', 'true', 'on', 'yes') if 'is_active' in request.form else True
 
     if not name:
@@ -2421,16 +2433,16 @@ def create_category():
 
     try:
         cat_id = execute_returning_id("""
-            INSERT INTO categories (name, color, description, is_active)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO categories (name, color, description, is_active, price_table_style)
+            VALUES (%s, %s, %s, %s, %s)
             RETURNING id;
-        """, (name, color, description, is_active))
+        """, (name, color, description, is_active, price_table_style))
 
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json:
             return jsonify({
                 'success': True,
                 'message': f"Category '{name}' created successfully!",
-                'category': {'id': cat_id, 'name': name, 'color': color}
+                'category': {'id': cat_id, 'name': name, 'color': color, 'price_table_style': price_table_style}
             })
         flash(f"Category '{name}' created successfully!", "success")
     except Exception as e:
@@ -2445,6 +2457,9 @@ def edit_category(id):
     name = request.form.get('name', '').strip()
     color = request.form.get('color', '#00A3E0').strip()
     description = request.form.get('description', '').strip()
+    price_table_style = (request.form.get('price_table_style') or 'classic').strip().lower()
+    if price_table_style not in ('classic', 'modern'):
+        price_table_style = 'classic'
     is_active = request.form.get('is_active') in ('1', 'true', 'on', 'yes') if 'is_active' in request.form else True
 
     if not name:
@@ -2459,9 +2474,9 @@ def edit_category(id):
     try:
         execute("""
             UPDATE categories 
-            SET name = %s, color = %s, description = %s, is_active = %s, updated_at = CURRENT_TIMESTAMP
+            SET name = %s, color = %s, description = %s, is_active = %s, price_table_style = %s, updated_at = CURRENT_TIMESTAMP
             WHERE id = %s;
-        """, (name, color, description, is_active, id))
+        """, (name, color, description, is_active, price_table_style, id))
         flash(f"Category '{name}' updated successfully!", "success")
     except Exception as e:
         flash(f"Error updating category: {e}", "error")
@@ -2503,9 +2518,57 @@ def toggle_active_category(id):
     flash(f"Category '{cat['name']}' {action_text} successfully!", "success")
     return redirect(url_for('products.list_categories'))
 
+@products_bp.route('/api/categories/<int:id>/set-style', methods=['POST'])
+def api_set_category_style(id):
+    """
+    Sets price table style ('classic' or 'modern') for a single category.
+    """
+    data = request.get_json(silent=True) or request.form
+    style = (data.get('style') or 'classic').strip().lower()
+    if style not in ('classic', 'modern'):
+        return jsonify({'success': False, 'message': 'Style must be either "classic" or "modern".'}), 400
+
+    cat = query_one("SELECT id, name FROM categories WHERE id = %s", (id,))
+    if not cat:
+        return jsonify({'success': False, 'message': 'Category not found.'}), 404
+
+    execute("UPDATE categories SET price_table_style = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (style, id))
+    return jsonify({
+        'success': True,
+        'category_id': id,
+        'category_name': cat['name'],
+        'style': style,
+        'message': f"Category '{cat['name']}' price table style set to {style.capitalize()}."
+    })
+
+@products_bp.route('/api/categories/set-all-style', methods=['POST'])
+def api_set_all_categories_style():
+    """
+    Sets price table style ('classic' or 'modern') for ALL categories and updates default_price_table_style.
+    """
+    data = request.get_json(silent=True) or request.form
+    style = (data.get('style') or 'classic').strip().lower()
+    if style not in ('classic', 'modern'):
+        return jsonify({'success': False, 'message': 'Style must be either "classic" or "modern".'}), 400
+
+    count = execute("UPDATE categories SET price_table_style = %s, updated_at = CURRENT_TIMESTAMP", (style,))
+    execute("""
+        INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
+        VALUES ('default_price_table_style', %s, 'Default style for product price cards (classic or modern)', CURRENT_TIMESTAMP)
+        ON CONFLICT (setting_key)
+        DO UPDATE SET setting_value = EXCLUDED.setting_value, updated_at = CURRENT_TIMESTAMP;
+    """, (style,))
+
+    return jsonify({
+        'success': True,
+        'style': style,
+        'updated_count': count,
+        'message': f"All {count} categories and products set to {style.capitalize()} style."
+    })
+
 @products_bp.route('/api/categories', methods=['GET'])
 def api_get_categories():
-    cats = query_all("SELECT id, name, COALESCE(color, '#00A3E0') as color, description, is_active FROM categories WHERE is_active = TRUE ORDER BY name ASC")
+    cats = query_all("SELECT id, name, COALESCE(color, '#00A3E0') as color, COALESCE(price_table_style, 'classic') as price_table_style, description, is_active FROM categories WHERE is_active = TRUE ORDER BY name ASC")
     return jsonify([dict(c) for c in cats])
 
 @products_bp.route('/api/products/search')
@@ -3176,11 +3239,13 @@ def price_list_view():
         return redirect(url_for('auth.login', next=request.path))
 
     categories = query_all("""
-        SELECT c.id, c.name, COALESCE(c.color, '#00A3E0') as color, COUNT(p.id) as product_count
+        SELECT c.id, c.name, COALESCE(c.color, '#00A3E0') as color,
+               COALESCE(c.price_table_style, 'classic') as price_table_style,
+               COUNT(p.id) as product_count
         FROM categories c
         LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
         WHERE c.is_active = TRUE
-        GROUP BY c.id, c.name, c.color
+        GROUP BY c.id, c.name, c.color, c.price_table_style
         ORDER BY c.name ASC
     """)
 
@@ -3190,6 +3255,12 @@ def price_list_view():
         WHERE is_active = TRUE
         ORDER BY is_default DESC, id ASC
     """)
+
+    # Global price table style setting
+    global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
+    global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
+    if global_price_table_style not in ('classic', 'modern'):
+        global_price_table_style = 'classic'
 
     stock_rows = query_all("""
         SELECT product_id, SUM(quantity) as total_qty
@@ -3202,12 +3273,13 @@ def price_list_view():
         SELECT 
             p.*,
             COALESCE(c.name, 'General') as category_name,
-            COALESCE(c.color, '#00A3E0') as category_color
+            COALESCE(c.color, '#00A3E0') as category_color,
+            COALESCE(p.price_card_style, c.price_table_style, %s, 'classic') as price_table_style
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.is_active = TRUE
         ORDER BY c.name ASC, p.name ASC, p.id ASC
-    """)
+    """, (global_price_table_style,))
 
     p_ids = [p['id'] for p in products]
     tiers_by_pid = {}
@@ -3264,6 +3336,7 @@ def price_list_view():
             'category_id': prod.get('category_id') or 0,
             'category_name': prod.get('category_name') or 'General',
             'category_color': prod.get('category_color') or '#00A3E0',
+            'price_table_style': prod.get('price_table_style') or global_price_table_style or 'classic',
             'image_url': prod.get('image_url') or '',
             'badge': badge,
             'dim_str': dim_str,
@@ -3281,7 +3354,8 @@ def price_list_view():
                            categories=categories,
                            pricing_schemes=pricing_schemes,
                            items=items,
-                           total_products=len(items))
+                           total_products=len(items),
+                           global_price_table_style=global_price_table_style)
 
 DEFAULT_PRICE_CARD_UNITS = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម']
 
