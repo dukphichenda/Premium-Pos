@@ -11,7 +11,258 @@
 {% set item_qty_dec = p_qty_dec if p_qty_dec is not none else (company.decimal_places_qty if (company and company.decimal_places_qty is defined and company.decimal_places_qty is not none) else 0) %}
 {% set cost_step = '0.' ~ ('0' * (item_cost_dec - 1)) ~ '1' if item_cost_dec > 0 else '1' %}
 {% set price_step = '0.' ~ ('0' * (item_price_dec - 1)) ~ '1' if item_price_dec > 0 else '1' %}
-{% set qty_step = '0.' ~ ('0' * (item_qty_dec - 1)) ~ '1' if item_qty_dec > 0 else '1' %}
+<style>
+/* ==========================================================================
+   MODERN PRICE CARD IN PRODUCT DETAIL & CATALOG (Exact Image 2 Replication)
+   ========================================================================== */
+#printablePriceCardDetail.modern {
+    border: 1.5px solid #E2E8F0 !important;
+    border-radius: 18px !important;
+    padding: 16px !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
+    max-width: 680px !important;
+    margin: 16px auto !important;
+    font-family: 'Kantumruy Pro', 'Siemreap', sans-serif !important;
+    box-sizing: border-box !important;
+}
+#printablePriceCardDetail.modern:hover {
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.1) !important;
+}
+#printablePriceCardDetail.modern.is-exporting {
+    border: 1.5px solid #E2E8F0 !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+}
+#printablePriceCardDetail.modern.is-exporting .inflow-modern-inline-input,
+#printablePriceCardDetail.modern.is-exporting .inflow-modern-inline-price-input {
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+}
+
+.inflow-modern-header {
+    background: #F0FDF4 !important;
+    border: 1px solid #DCFCE7 !important;
+    border-radius: 12px !important;
+    padding: 12px 18px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-sku {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: #064E3B !important;
+    letter-spacing: -0.01em !important;
+    line-height: 1.25 !important;
+}
+.inflow-modern-km-title {
+    font-size: 14px !important;
+    font-weight: 700 !important;
+    color: #065F46 !important;
+    margin-top: 2px !important;
+}
+.inflow-modern-subtag {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: #64748B !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.05em !important;
+    margin-top: 2px !important;
+}
+.inflow-modern-detail-title {
+    font-size: 14.5px !important;
+    font-weight: 800 !important;
+    color: #064E3B !important;
+    line-height: 1.25 !important;
+}
+.inflow-modern-detail-sub {
+    font-size: 11.5px !important;
+    font-weight: 600 !important;
+    color: #059669 !important;
+    opacity: 0.85 !important;
+}
+.inflow-modern-middle-grid {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 12px !important;
+    margin-top: 12px !important;
+    min-height: 220px !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-image-box {
+    border-radius: 12px !important;
+    background: #F8FAFC !important;
+    border: 1.5px solid #F1F5F9 !important;
+    padding: 10px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+    overflow: hidden !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-capacity-pill {
+    position: absolute !important;
+    bottom: 8px !important;
+    right: 8px !important;
+    background: #E6F4F1 !important;
+    color: #0D6970 !important;
+    font-size: 13.5px !important;
+    font-weight: 800 !important;
+    padding: 3px 10px !important;
+    border-radius: 6px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+    pointer-events: none !important;
+    z-index: 2 !important;
+}
+.inflow-modern-specs-box {
+    border-radius: 12px !important;
+    background: #F8FAFC !important;
+    border: 1.5px solid #F1F5F9 !important;
+    padding: 12px 14px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    gap: 9px !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-spec-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 9px !important;
+}
+.inflow-modern-spec-icon {
+    width: 28px !important;
+    height: 28px !important;
+    border-radius: 50% !important;
+    background: #E6F4F1 !important;
+    color: #0D6970 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+.inflow-modern-spec-text {
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    color: #0F172A !important;
+    line-height: 1.3 !important;
+}
+.inflow-modern-price-wrap {
+    margin-top: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-price-banner {
+    background: #0D6970 !important;
+    border-radius: 10px 10px 0 0 !important;
+    color: #FFFFFF !important;
+    padding: 9px 16px !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    align-items: center !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-price-table-card {
+    border: 1.5px solid #E2E8F0 !important;
+    border-top: none !important;
+    border-radius: 0 0 10px 10px !important;
+    overflow: hidden !important;
+    background: #FFFFFF !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-tier-row {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    border-bottom: 1px solid #F1F5F9 !important;
+    min-height: 44px !important;
+    align-items: center !important;
+    padding: 0 16px !important;
+    box-sizing: border-box !important;
+}
+.inflow-modern-tier-row:last-child {
+    border-bottom: none !important;
+}
+.inflow-modern-qty-badge {
+    background: #E6F4F1 !important;
+    color: #0D6970 !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    padding: 3px 8px !important;
+    border-radius: 6px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+}
+.inflow-modern-inline-input {
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    font-family: inherit !important;
+    font-size: 13px !important;
+    font-weight: 800 !important;
+    color: #0D6970 !important;
+    padding: 0 !important;
+    width: 48px !important;
+    text-align: center !important;
+    outline: none !important;
+}
+.inflow-modern-inline-input:hover, .inflow-modern-inline-input:focus {
+    background: #FFFFFF !important;
+    border-radius: 3px !important;
+    border: 1px solid #CBD5E1 !important;
+}
+.inflow-modern-inline-price-input {
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    font-family: inherit !important;
+    font-size: 15.5px !important;
+    font-weight: 800 !important;
+    color: #059669 !important;
+    padding: 0 2px !important;
+    width: 65px !important;
+    text-align: right !important;
+    outline: none !important;
+}
+.inflow-modern-inline-price-input:hover, .inflow-modern-inline-price-input:focus {
+    background: #FFFFFF !important;
+    border-radius: 3px !important;
+    border: 1px solid #CBD5E1 !important;
+}
+.inflow-modern-tier-tot {
+    font-size: 15.5px !important;
+    font-weight: 800 !important;
+    color: #059669 !important;
+    white-space: nowrap !important;
+}
+.inflow-modern-tier-unit {
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: #0F172A !important;
+}
+
+/* Style Switcher in Toolbar */
+.btn-detail-style {
+    background: transparent !important;
+    color: #64748B !important;
+    border: none !important;
+    cursor: pointer !important;
+}
+.btn-detail-style.active-classic {
+    background: #0D6970 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 1px 3px rgba(13, 105, 112, 0.25) !important;
+}
+.btn-detail-style.active-modern {
+    background: #0284C7 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 1px 3px rgba(2, 132, 199, 0.25) !important;
+}
+</style>
+
 <div class="inflow-window-canvas">
     <form id="productMainForm" method="POST" action="{% if is_new %}{{ url_for('products.create_product') }}{% else %}{{ url_for('products.edit_product', id=product.id) }}{% endif %}" enctype="multipart/form-data">
         <input type="hidden" name="clear_picture" id="clearPictureFlag" value="0">
@@ -545,9 +796,9 @@
                                     <span style="font-size: 11px; margin-top: 6px;">No Image</span>
                                 </div>
                                 {% endif %}
-                                {% if product.capacity or product.sku %}
+                                {% if product.capacity %}
                                 <div class="inflow-modern-capacity-pill font-khmer">
-                                    {{ product.capacity or product.sku }}
+                                    {{ product.capacity }}
                                 </div>
                                 {% endif %}
                             </div>
