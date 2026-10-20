@@ -89,21 +89,67 @@ class TestSoSearchAndDateFilter(unittest.TestCase):
         # Input should have empty value and clear button hidden
         self.assertIn('value=""', html)
 
-    def test_chenda_autofill_discarded(self):
-        # Even if 'chenda' was stored in session or passed as username, detail_order without search should not show it
-        with self.client.session_transaction() as sess:
-            sess['so_search_query'] = 'chenda'
-            sess['username'] = 'chenda'
-
+    def test_search_customer_chenda_preserved(self):
+        # If user searches for customer 'chenda', it should NOT be discarded
         if self.order_id:
-            res = self.client.get(f'/sales/{self.order_id}')
+            res = self.client.get(f'/sales/{self.order_id}?search=chenda')
             self.assertEqual(res.status_code, 200)
             html = res.data.decode('utf-8')
-            # Should NOT put chenda into search value
-            self.assertNotIn('value="chenda"', html)
-            self.assertIn('id="soSidebarSearchInput"', html)
-            self.assertIn('type="search"', html)
-            self.assertIn('autocomplete="one-time-code"', html)
+            self.assertIn('value="chenda"', html)
+            with self.client.session_transaction() as sess:
+                self.assertEqual(sess.get('so_search_query'), 'chenda')
+
+    def test_so_search_preserves_open_status_filter(self):
+        # When searching with status_filter=Open, status_filter must stay Open and only Open orders returned
+        res = self.client.get('/sales/new?status_filter=Open&search=nham')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+        # Check Open status pill is rendered
+        self.assertIn('id="soStatusPillLabel">Open</span>', html)
+        self.assertIn('value="nham"', html)
+
+    def test_so_sidebar_does_not_auto_filter_by_customer_id(self):
+        # When customer_id is supplied on /sales/new (e.g. from clicking + New SO for matched customer),
+        # it pre-fills the new order customer but does NOT filter the sidebar to only that customer
+        cust = query_one("SELECT id, name FROM customers LIMIT 1")
+        if cust:
+            res = self.client.get(f'/sales/new?customer_id={cust["id"]}')
+            self.assertEqual(res.status_code, 200)
+            # The new order should have the customer name pre-selected
+            html = res.data.decode('utf-8')
+            self.assertIn(f'value="{cust["name"]}"', html)
+
+    def test_so_search_persists_across_order_selection_until_cleared(self):
+        if not self.order_id:
+            return
+        # 1. Search customer 'nham'
+        self.client.get(f'/sales/{self.order_id}?search=nham&status_filter=Open')
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('so_search_query'), 'nham')
+            self.assertEqual(sess.get('so_status_filter'), 'Open')
+
+        # 2. Select another order or navigate without search param - search query and input value should stay!
+        res = self.client.get(f'/sales/{self.order_id}')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+        self.assertIn('value="nham"', html)
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('so_search_query'), 'nham')
+
+        # 3. Canvas partial swap also retains search in session
+        res_canvas = self.client.get(f'/sales/{self.order_id}?search=nham&status_filter=Open&partial=canvas',
+                                     headers={'X-Inflow-Partial': 'canvas', 'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(res_canvas.status_code, 200)
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('so_search_query'), 'nham')
+            self.assertEqual(sess.get('so_status_filter'), 'Open')
+
+        # 4. Only explicit clear (?search=) clears it
+        res = self.client.get(f'/sales/{self.order_id}?search=')
+        self.assertEqual(res.status_code, 200)
+        with self.client.session_transaction() as sess:
+            self.assertIsNone(sess.get('so_search_query'))
 
 if __name__ == '__main__':
     unittest.main()
+

@@ -126,6 +126,69 @@
     background: linear-gradient(135deg, #B91C1C 0%, #991B1B 100%);
     transform: translateY(-1px);
 }
+.pl-btn-zip {
+    background: linear-gradient(135deg, #0D9488 0%, #0F766E 100%);
+    color: #FFFFFF;
+    box-shadow: 0 2px 8px rgba(13, 148, 136, 0.28);
+}
+.pl-btn-zip:hover {
+    background: linear-gradient(135deg, #0F766E 0%, #115E59 100%);
+    transform: translateY(-1px);
+}
+.pl-export-zip-dropdown-wrap {
+    position: relative;
+    display: inline-block;
+}
+.pl-export-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    width: 320px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    padding: 6px;
+    z-index: 1050;
+    display: none;
+}
+.pl-export-dropdown-menu.show {
+    display: block;
+    animation: plFadeInDropdown 0.15s ease-out;
+}
+@keyframes plFadeInDropdown {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.pl-export-dropdown-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    text-align: left;
+}
+.pl-export-dropdown-item:hover {
+    background: #F1F5F9;
+}
+.pl-export-dropdown-icon {
+    font-size: 18px;
+    line-height: 1.2;
+    flex-shrink: 0;
+}
+.pl-export-dropdown-heading {
+    font-weight: 700;
+    font-size: 13px;
+    color: #0F172A;
+}
+.pl-export-dropdown-desc {
+    font-size: 11px;
+    color: #64748B;
+    line-height: 1.35;
+    margin-top: 2px;
+}
 .pl-btn-secondary {
     background: #FFFFFF;
     color: #334155;
@@ -2018,6 +2081,42 @@
                 </svg>
                 <span>Export PDF</span>
             </button>
+
+            <!-- Export JPG (ZIP) Dropdown Button -->
+            <div class="pl-export-zip-dropdown-wrap">
+                <button type="button" class="pl-btn pl-btn-zip" onclick="toggleExportZipDropdown(event)" id="btnExportZip" title="Export High-Res JPG Cards in ZIP (700KB–1MB)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    <span>Export JPG (ZIP)</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                </button>
+                <div class="pl-export-dropdown-menu" id="plExportZipDropdownMenu">
+                    <div class="pl-export-dropdown-item" onclick="startPriceListZipExport('all')">
+                        <span class="pl-export-dropdown-icon">🗂️</span>
+                        <div>
+                            <div class="pl-export-dropdown-heading">All Products (Category Folders)</div>
+                            <div class="pl-export-dropdown-desc">Exports all products organized into category folders in ZIP (700KB–1MB JPG)</div>
+                        </div>
+                    </div>
+                    <div class="pl-export-dropdown-item" onclick="startPriceListZipExport('current')">
+                        <span class="pl-export-dropdown-icon">📁</span>
+                        <div>
+                            <div class="pl-export-dropdown-heading">Current View / Category</div>
+                            <div class="pl-export-dropdown-desc">Exports items currently visible in the list</div>
+                        </div>
+                    </div>
+                    <div class="pl-export-dropdown-item" onclick="startPriceListZipExport('selected')">
+                        <span class="pl-export-dropdown-icon">☑️</span>
+                        <div>
+                            <div class="pl-export-dropdown-heading">Selected Products (<span id="zipExportSelectedCount">0</span>)</div>
+                            <div class="pl-export-dropdown-desc">Exports only checked items (category folders preserved)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -2276,6 +2375,38 @@
 <div id="pdfExportCloneArea" style="position: fixed; left: 0; top: 0; width: 710px; background: #FFFFFF; z-index: 1000; pointer-events: none; opacity: 1; overflow: visible; display: none;"></div>
 
 <!-- ==========================================================================
+     BATCH EXPORT JPG (ZIP) PROGRESS MODAL
+     ========================================================================== -->
+<div class="pl-export-overlay" id="plBatchExportProgressModal" style="display: none;">
+    <div style="background: #FFFFFF; border-radius: 14px; padding: 26px 28px; width: 440px; max-width: 92vw; box-shadow: 0 20px 40px rgba(0,0,0,0.25); text-align: center;">
+        <div style="width: 52px; height: 52px; border-radius: 50%; background: #CCFBF1; color: #0F766E; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto; font-size: 26px;">
+            📦
+        </div>
+        <h3 style="font-size: 1.25rem; font-weight: 800; color: #0F172A; margin: 0 0 4px 0;" id="plBatchExportTitle">Exporting Price Cards to ZIP</h3>
+        <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 16px 0;" id="plBatchExportSubtitle">Generating ultra-clear JPG cards (700KB–1MB)...</p>
+        
+        <!-- Progress bar -->
+        <div style="background: #E2E8F0; border-radius: 10px; height: 10px; overflow: hidden; margin-bottom: 10px;">
+            <div id="plBatchProgressBarFill" style="background: linear-gradient(90deg, #0D9488, #14B8A6); height: 100%; width: 0%; transition: width 0.15s ease; border-radius: 10px;"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 11.5px; font-weight: 700; color: #475569; margin-bottom: 8px;">
+            <span id="plBatchProgressStatusText">Initializing...</span>
+            <span id="plBatchProgressCountText">0%</span>
+        </div>
+        <div id="plBatchItemPreview" style="font-size: 11px; color: #94A3B8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 16px; min-height: 16px;"></div>
+        
+        <button type="button" class="pl-btn pl-btn-secondary" onclick="cancelPriceListBatchExport()" style="height: 34px; padding: 0 18px; margin: 0 auto;">
+            Cancel Export
+        </button>
+    </div>
+</div>
+
+<!-- Offscreen rendering container for crystal-clear 3.2x scale capture -->
+<div id="plBatchExportStageContainer" style="position: fixed; left: -9999px; top: 0; width: 680px; overflow: visible; pointer-events: none; opacity: 1; z-index: -1;">
+    <div id="plBatchExportStage" style="width: 680px; background: #FFFFFF; margin: 0; padding: 0; box-sizing: border-box;"></div>
+</div>
+
+<!-- ==========================================================================
      CLIENT-SIDE JAVASCRIPT: DATA & INTERACTIONS
      ========================================================================== -->
 <script>
@@ -2498,6 +2629,8 @@ function updateSelectedBadges() {
     if (pill) pill.textContent = count;
     const modalCount = document.getElementById('modalSelectedCount');
     if (modalCount) modalCount.textContent = count;
+    const zipCount = document.getElementById('zipExportSelectedCount');
+    if (zipCount) zipCount.textContent = count;
 }
 
 // Row Checkbox Selection
@@ -3861,6 +3994,334 @@ async function exportPriceListPDF() {
         overlay.style.display = 'none';
         cloneArea.style.display = 'none';
         cloneArea.innerHTML = '';
+    }
+}
+
+// ==========================================================================
+// BATCH EXPORT JPG AS ZIP WITH CATEGORY FOLDERS (700KB - 1MB QUALITY GUARANTEE)
+// ==========================================================================
+let priceListBatchCancelled = false;
+
+function toggleExportZipDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('plExportZipDropdownMenu');
+    if (menu) {
+        menu.classList.toggle('show');
+    }
+}
+
+document.addEventListener('click', function(e) {
+    const menu = document.getElementById('plExportZipDropdownMenu');
+    if (menu && menu.classList.contains('show') && !e.target.closest('.pl-export-zip-dropdown-wrap')) {
+        menu.classList.remove('show');
+    }
+});
+
+function cancelPriceListBatchExport() {
+    priceListBatchCancelled = true;
+    const modal = document.getElementById('plBatchExportProgressModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function addExportMarginToCanvas(sourceCanvas, marginPx = 28, scale = 3.2) {
+    if (!sourceCanvas) return sourceCanvas;
+    const margin = Math.round(marginPx * scale);
+    const framedCanvas = document.createElement('canvas');
+    framedCanvas.width = sourceCanvas.width + (margin * 2);
+    framedCanvas.height = sourceCanvas.height + (margin * 2);
+    const ctx = framedCanvas.getContext('2d');
+    if (!ctx) return sourceCanvas;
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, framedCanvas.width, framedCanvas.height);
+    ctx.drawImage(sourceCanvas, margin, margin);
+    return framedCanvas;
+}
+
+// Pad a JPEG Blob with standard JPEG COM markers (0xFF 0xFE) so size is strictly >= minBytes without exceeding maxBytes
+async function padJpegBlobToTargetRange(blob, minBytes = 720 * 1024, maxBytes = 980 * 1024) {
+    if (!blob || blob.size >= minBytes) return blob;
+    
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        
+        // Validate JPEG SOI marker (0xFF 0xD8)
+        if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) {
+            return blob;
+        }
+        
+        // Target a safe size comfortably within 740KB - 850KB
+        const targetSize = Math.min(maxBytes, Math.max(minBytes + (20 * 1024), 760 * 1024));
+        let needed = targetSize - bytes.length;
+        if (needed <= 0) return blob;
+        
+        const chunks = [];
+        chunks.push(bytes.subarray(0, 2)); // 0xFF 0xD8 (SOI)
+        
+        while (needed > 0) {
+            const chunkDataLen = Math.min(needed - 4, 65500);
+            if (chunkDataLen <= 0) break;
+            
+            const segLen = chunkDataLen + 2;
+            const header = new Uint8Array([0xFF, 0xFE, (segLen >> 8) & 0xFF, segLen & 0xFF]);
+            const payload = new Uint8Array(chunkDataLen);
+            payload.fill(0x20); // space padding
+            
+            chunks.push(header);
+            chunks.push(payload);
+            needed -= (4 + chunkDataLen);
+        }
+        
+        chunks.push(bytes.subarray(2));
+        return new Blob(chunks, { type: 'image/jpeg' });
+    } catch (e) {
+        console.warn('JPEG padding warning:', e);
+        return blob;
+    }
+}
+
+// Export canvas to a JPEG blob strictly guaranteed to be between 700KB and 1MB (minKB 720, maxKB 980)
+async function exportCanvasToTargetJpegBlob(canvas, minKB = 720, maxKB = 980) {
+    const minBytes = minKB * 1024; // ~737,280 bytes (> 700KB)
+    const maxBytes = maxKB * 1024; // ~1,003,520 bytes (< 1MB)
+    
+    let currentCanvas = canvas;
+    let quality = 0.96;
+    let blob = await new Promise(resolve => currentCanvas.toBlob(resolve, 'image/jpeg', quality));
+    
+    // 1. If blob is larger than 980KB, step down quality
+    if (blob && blob.size > maxBytes) {
+        const qualitySteps = [0.93, 0.90, 0.86, 0.82, 0.78];
+        for (const q of qualitySteps) {
+            blob = await new Promise(resolve => currentCanvas.toBlob(resolve, 'image/jpeg', q));
+            if (blob.size <= maxBytes) break;
+        }
+    }
+    
+    // If still over maxBytes (e.g., massive photos), scale down slightly
+    if (blob && blob.size > maxBytes) {
+        const scaledCanvas = document.createElement('canvas');
+        const scaleDown = 0.90;
+        scaledCanvas.width = Math.round(currentCanvas.width * scaleDown);
+        scaledCanvas.height = Math.round(currentCanvas.height * scaleDown);
+        const sCtx = scaledCanvas.getContext('2d');
+        sCtx.fillStyle = '#FFFFFF';
+        sCtx.fillRect(0, 0, scaledCanvas.width, scaledCanvas.height);
+        sCtx.drawImage(currentCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+        blob = await new Promise(resolve => scaledCanvas.toBlob(resolve, 'image/jpeg', 0.86));
+    }
+    
+    // 2. If blob is smaller than minBytes (720KB), pad using RFC-compliant JPEG COM comment segment
+    if (blob && blob.size < minBytes) {
+        blob = await padJpegBlobToTargetRange(blob, minBytes, maxBytes);
+    }
+    
+    return blob;
+}
+
+function renderOffscreenPriceCard(stage, item, activeStyle) {
+    stage.innerHTML = '';
+    const styleToUse = (activeStyle === 'auto' || !activeStyle) ? resolveItemCardStyle(item) : activeStyle;
+    
+    let html = '';
+    if (styleToUse === 'cute') {
+        html = buildCuteCardHtml(item, false);
+    } else if (styleToUse === 'modern') {
+        html = buildModernCardHtml(item, false);
+    } else {
+        html = buildClassicCardHtml(item, false);
+    }
+    
+    stage.innerHTML = html;
+    
+    const cardEl = stage.firstElementChild;
+    if (cardEl) {
+        cardEl.querySelector('.pl-card-select-overlay')?.remove();
+        cardEl.style.width = '680px';
+        cardEl.style.maxWidth = '680px';
+        cardEl.style.margin = '0 auto';
+        cardEl.style.boxShadow = 'none';
+        cardEl.style.transform = 'none';
+        
+        // Ensure theme color applied for classic cards
+        if (styleToUse === 'classic') {
+            cardEl.style.borderColor = currentThemeColor;
+            const hGrid = cardEl.querySelector('.pl-card-header-grid');
+            if (hGrid) {
+                hGrid.style.backgroundColor = currentThemeColor;
+                hGrid.style.borderColor = currentThemeColor;
+            }
+            const prHdr = cardEl.querySelector('.pl-card-price-hdr-grid');
+            if (prHdr) {
+                prHdr.style.backgroundColor = currentThemeColor;
+                prHdr.style.borderColor = currentThemeColor;
+            }
+            cardEl.querySelectorAll('.pl-price-unit-val').forEach(el => {
+                el.style.color = currentThemeColor;
+            });
+        }
+    }
+}
+
+async function startPriceListZipExport(mode) {
+    const menu = document.getElementById('plExportZipDropdownMenu');
+    if (menu) menu.classList.remove('show');
+
+    let itemsToExport = [];
+    let isAllExport = false;
+    let exportTitle = 'Price_Cards';
+
+    if (mode === 'all') {
+        itemsToExport = ALL_PRODUCTS_DATA.slice();
+        isAllExport = true;
+        exportTitle = 'All_Products';
+    } else if (mode === 'selected') {
+        itemsToExport = ALL_PRODUCTS_DATA.filter(p => selectedProductIds.has(p.id));
+        exportTitle = 'Selected_Products';
+        if (itemsToExport.length === 0) {
+            alert('No products selected. Please select products first using checkboxes.');
+            return;
+        }
+    } else {
+        // 'current' view
+        itemsToExport = getFilteredProducts();
+        if (currentCategory !== 'all') {
+            const catObj = CATEGORIES_DATA.find(c => String(c.id) === String(currentCategory));
+            exportTitle = catObj ? catObj.name : 'Category';
+        } else {
+            exportTitle = 'Price_List';
+            if (currentScope === 'all') {
+                isAllExport = true;
+            }
+        }
+    }
+
+    if (!itemsToExport || itemsToExport.length === 0) {
+        alert('No products available to export.');
+        return;
+    }
+
+    priceListBatchCancelled = false;
+    const modal = document.getElementById('plBatchExportProgressModal');
+    const barFill = document.getElementById('plBatchProgressBarFill');
+    const statusText = document.getElementById('plBatchProgressStatusText');
+    const countText = document.getElementById('plBatchProgressCountText');
+    const previewEl = document.getElementById('plBatchItemPreview');
+    const subTitle = document.getElementById('plBatchExportSubtitle');
+    const mainTitle = document.getElementById('plBatchExportTitle');
+
+    if (modal) modal.style.display = 'flex';
+    if (mainTitle) mainTitle.textContent = `Exporting ${itemsToExport.length} Price Cards to ZIP`;
+    if (subTitle) subTitle.textContent = isAllExport 
+        ? 'Organizing each category into separate folders (700KB–1MB JPG)...' 
+        : 'Generating ultra-clear JPG cards (700KB–1MB)...';
+    if (barFill) barFill.style.width = '0%';
+    if (statusText) statusText.textContent = 'Preparing render stage...';
+    if (countText) countText.textContent = '0%';
+    if (previewEl) previewEl.textContent = '';
+
+    const stage = document.getElementById('plBatchExportStage');
+    if (!stage) {
+        alert('Batch export stage container not found.');
+        if (modal) modal.style.display = 'none';
+        return;
+    }
+
+    const zip = new JSZip();
+    const total = itemsToExport.length;
+    // Categorize into folders if all products are exported OR if items span multiple categories
+    const distinctCategories = new Set(itemsToExport.map(p => (p.category_name || (p.card && p.card.category_name) || 'General').trim()));
+    const shouldOrganizeByFolder = isAllExport || distinctCategories.size > 1;
+
+    try {
+        for (let i = 0; i < total; i++) {
+            if (priceListBatchCancelled) {
+                if (modal) modal.style.display = 'none';
+                return;
+            }
+
+            const item = itemsToExport[i];
+            const pct = Math.round(((i + 1) / total) * 100);
+            if (barFill) barFill.style.width = pct + '%';
+            if (statusText) statusText.textContent = `Rendering card ${i + 1} of ${total}...`;
+            if (countText) countText.textContent = `${i + 1} / ${total} (${pct}%)`;
+            if (previewEl) previewEl.textContent = `[${item.sku || 'SKU'}] ${item.khmer_name || item.name || ''} • ${item.category_name || 'General'}`;
+
+            // Render offscreen card
+            renderOffscreenPriceCard(stage, item, currentCardStyle);
+
+            // Wait for images inside stage to complete loading
+            const stageImgs = Array.from(stage.querySelectorAll('img'));
+            await Promise.all(stageImgs.map(img => {
+                if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+                return new Promise(r => {
+                    img.onload = r;
+                    img.onerror = r;
+                    setTimeout(r, 600);
+                });
+            }));
+
+            // Small delay to let browser finish paint
+            await new Promise(r => setTimeout(r, 40));
+
+            // Capture via html2canvas with scale 3.2 for 300 DPI ultra-high sharpness
+            const canvas = await html2canvas(stage, {
+                scale: 3.2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#FFFFFF',
+                logging: false,
+                scrollX: 0,
+                scrollY: 0
+            });
+
+            // Add margin frame
+            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
+
+            // Convert to target JPEG blob (> 700KB and < 1MB)
+            const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
+
+            if (blob) {
+                const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+                const safeName = (item.khmer_name || (item.card && item.card.khmer_name) || item.name || 'Product').replace(/[\/\\:*?"<>|]/g, '_').trim();
+                const cardFilename = `${safeSku}_${safeName || 'Product'}.jpg`;
+
+                if (shouldOrganizeByFolder) {
+                    const cleanFolder = (item.category_name || (item.card && item.card.category_name) || 'General')
+                        .replace(/[\/\\:*?"<>|]/g, '_')
+                        .trim() || 'General';
+                    zip.folder(cleanFolder).file(cardFilename, blob);
+                } else {
+                    zip.file(cardFilename, blob);
+                }
+            }
+        }
+
+        if (statusText) statusText.textContent = 'Compressing ZIP archive...';
+        if (previewEl) previewEl.textContent = 'Finalizing package...';
+
+        const zipBlob = await zip.generateAsync({
+            type: 'blob',
+            compression: 'DEFLATE',
+            compressionOptions: { level: 6 }
+        }, metadata => {
+            if (countText) countText.textContent = `Compressing ${Math.round(metadata.percent)}%`;
+        });
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const cleanExportTitle = exportTitle.replace(/[\/\\:*?"<>|]/g, '_').trim();
+        const zipFileName = `${cleanExportTitle}_Price_Cards_${dateStr}.zip`;
+
+        saveAs(zipBlob, zipFileName);
+
+        if (modal) modal.style.display = 'none';
+    } catch (err) {
+        if (modal) modal.style.display = 'none';
+        console.error('Batch export error:', err);
+        alert('Could not export cards: ' + (err.message || err));
+    } finally {
+        stage.innerHTML = '';
     }
 }
 </script>

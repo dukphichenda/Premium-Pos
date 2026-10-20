@@ -1603,7 +1603,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 <input type="search" id="soSidebarSearchInput" class="so-search-input" 
                        name="so_filter_search_field"
                        placeholder="Search order #, customer, $..." 
-                       value="{% if request.args.get('search') or request.args.get('q') %}{{ search_query or '' }}{% endif %}"
+                       value="{{ search_query or session.get('so_search_query') or '' }}"
                        autocomplete="one-time-code" 
                        autocorrect="off"
                        autocapitalize="off"
@@ -1613,7 +1613,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                        style="height: 33px; padding-left: 31px; padding-right: 30px; font-size: 12px;"
                        oninput="handleSoLiveSearch(this.value)"
                        onkeydown="handleSoSearchKey(event)">
-                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if request.args.get('search') or request.args.get('q') %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
+                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query or session.get('so_search_query') or request.args.get('search') or request.args.get('q') %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
             </div>
         </div>
 
@@ -1662,7 +1662,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
             {% endif %}
 
             <a href="javascript:void(0)" 
-               onclick="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=branch_scope) }}', this)" 
+               onclick="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=(branch_scope or None), search=((search_query or session.get('so_search_query')) or None)) }}', this)" 
                class="so-sidebar-card {% if not is_new and s_ord.id == order.id %}active{% endif %}"
                data-order-id="{{ s_ord.id }}"
                data-order-num="{{ s_ord.order_number }}"
@@ -3361,32 +3361,43 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
 
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
 
-    // When clicking a specific sales order card from sidebar, strip search param from URL
-    // so the order detail view is NEVER hijacked or filtered by stale search
-    if (targetOrderId) {
-        url.searchParams.delete('search');
+    // Maintain search query in SO sidebar across selections until user clicks cross (✕) or clears it
+    let liveSearchVal = '';
+    if (liveSearchInput) {
+        liveSearchVal = liveSearchInput.value.trim();
+    } else {
+        liveSearchVal = (sessionStorage.getItem('inflow_so_search_query') || url.searchParams.get('search') || '').trim();
+    }
+
+    if (liveSearchVal) {
+        const qTrim = liveSearchVal;
+        url.searchParams.set('search', qTrim);
+        try { sessionStorage.setItem('inflow_so_search_query', qTrim); } catch(e) {}
+        if (liveSearchInput && liveSearchInput.value !== qTrim) {
+            liveSearchInput.value = qTrim;
+        }
+        const clearBtn = document.getElementById('btnClearSoSearch');
+        if (clearBtn) clearBtn.style.display = 'flex';
+        // Keep cards and customer matches filtered by the active search query - stay still
+        handleSoLiveSearch(qTrim);
+    } else {
+        url.searchParams.set('search', '');
         url.searchParams.delete('q');
         try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-        if (liveSearchInput) {
-            liveSearchInput.value = '';
-            const clearBtn = document.getElementById('btnClearSoSearch');
-            if (clearBtn) clearBtn.style.display = 'none';
-        }
-        const allCards = document.querySelectorAll('.so-sidebar-card:not(.so-customer-match-card)');
-        allCards.forEach(c => c.style.display = 'block');
-        const custWrap = document.getElementById('soSidebarCustomerMatches');
-        if (custWrap) { custWrap.innerHTML = ''; custWrap.style.display = 'none'; }
-        const noMatch = document.getElementById('soSidebarNoSearchMatch');
-        if (noMatch) noMatch.style.display = 'none';
-    } else {
-        const isSearchEmpty = liveSearchInput && !liveSearchInput.value.trim();
-        if (isSearchEmpty) {
-            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-            url.searchParams.set('search', '');
-            url.searchParams.delete('q');
-        } else if (liveSearchInput && liveSearchInput.value.trim()) {
-            url.searchParams.set('search', liveSearchInput.value.trim());
-        }
+        if (liveSearchInput) liveSearchInput.value = '';
+        const clearBtn = document.getElementById('btnClearSoSearch');
+        if (clearBtn) clearBtn.style.display = 'none';
+        handleSoLiveSearch('');
+    }
+
+    // Do NOT auto-filter sidebar orders to only the customer of the selected bill
+    url.searchParams.delete('customer_id');
+    url.searchParams.delete('customer_search');
+
+    // Preserve sale status (e.g. Open sale stays Open)
+    if (!url.searchParams.has('status_filter')) {
+        const curStatus = sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}';
+        if (curStatus) url.searchParams.set('status_filter', curStatus);
     }
 
     const finalUrl = url.pathname + url.search;
@@ -3558,6 +3569,19 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         if (typeof initPreviewToolbar === 'function') initPreviewToolbar();
         if (typeof initDeliverySelection === 'function') initDeliverySelection();
         closeSoMobileDrawer();
+
+        // Ensure sidebar search text and filtered cards remain strictly intact (stay still)
+        const curSearchInput = document.getElementById('soSidebarSearchInput');
+        const activeSearchQuery = (curSearchInput ? curSearchInput.value : '') || sessionStorage.getItem('inflow_so_search_query') || '';
+        if (activeSearchQuery && activeSearchQuery.trim()) {
+            const qStr = activeSearchQuery.trim();
+            if (curSearchInput && curSearchInput.value !== qStr) {
+                curSearchInput.value = qStr;
+            }
+            const clearBtn = document.getElementById('btnClearSoSearch');
+            if (clearBtn) clearBtn.style.display = 'flex';
+            handleSoLiveSearch(qStr);
+        }
 
         const pBar = document.getElementById('soFastNavProgressBar');
         if (pBar) {
@@ -3904,50 +3928,44 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
-    // Restore and fix sidebar customer/order search query
+    // Restore and preserve sidebar customer/order search query
     const sidebarSearchInput = document.getElementById('soSidebarSearchInput');
     const soSearchUrlParams = new URLSearchParams(window.location.search);
     const hasSearchParam = soSearchUrlParams.has('search') || soSearchUrlParams.has('q');
     const urlSearch = (soSearchUrlParams.get('search') || soSearchUrlParams.get('q') || '').trim();
-    const currentUsername = '{{ (session.get("username", "") or "") | lower }}';
 
     let activeSearch = '';
-    if (hasSearchParam && urlSearch) {
+    if (hasSearchParam) {
         activeSearch = urlSearch;
+        if (activeSearch) {
+            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+        } else {
+            // Explicitly empty search parameter in URL indicates user cleared search
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+        }
     } else {
-        // Clear stale search so orders list is never stuck filtered by previous searches
-        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+        // No search query in URL: check sessionStorage or template server render
+        let savedSearch = '';
+        try { savedSearch = (sessionStorage.getItem('inflow_so_search_query') || '{{ search_query or "" }}').trim(); } catch(e) {}
+        activeSearch = savedSearch;
+        if (activeSearch) {
+            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+        }
     }
 
     if (sidebarSearchInput) {
-        const val = (sidebarSearchInput.value || '').trim().toLowerCase();
-        // Guard against browser autofill putting username ('chenda') into search input
-        if (!hasSearchParam || val === currentUsername || val === 'chenda') {
+        if (activeSearch) {
             sidebarSearchInput.value = activeSearch;
-            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-        } else {
-            sidebarSearchInput.value = activeSearch;
+        } else if (sidebarSearchInput.value && sidebarSearchInput.value.trim()) {
+            activeSearch = sidebarSearchInput.value.trim();
+            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
         }
         const clearBtn = document.getElementById('btnClearSoSearch');
         if (clearBtn) clearBtn.style.display = activeSearch ? 'flex' : 'none';
         if (activeSearch) {
             handleSoLiveSearch(activeSearch);
-        } else {
-            handleSoLiveSearch('');
         }
     }
-
-    // Secondary autofill cleaner: browsers often autofill 150-300ms after load
-    setTimeout(() => {
-        if (sidebarSearchInput && !hasSearchParam) {
-            const v = (sidebarSearchInput.value || '').trim().toLowerCase();
-            if (v === currentUsername || v === 'chenda') {
-                sidebarSearchInput.value = '';
-                try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-                handleSoLiveSearch('');
-            }
-        }
-    }, 250);
 
     // Attach item dropdown popup to body early and register scroll/resize repositioning
     const itemPopupEl = document.getElementById('itemDropdownPopup');
@@ -7054,7 +7072,17 @@ function startNewOrderForCustomer(customerId, customerName) {
     }
     closeSoMobileDrawer();
     const branchScope = '{{ branch_scope or "" }}';
-    const targetUrl = '/sales/new?customer_id=' + encodeURIComponent(customerId) + (branchScope ? '&branch=' + encodeURIComponent(branchScope) : '');
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const liveSearchVal = (liveSearchInput ? liveSearchInput.value : '') || sessionStorage.getItem('inflow_so_search_query') || '';
+    const curStatus = sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}';
+    const curDate = sessionStorage.getItem('inflow_so_date_filter') || '{{ date_filter or "All" }}';
+
+    let targetUrl = '/sales/new?customer_id=' + encodeURIComponent(customerId);
+    if (branchScope) targetUrl += '&branch=' + encodeURIComponent(branchScope);
+    if (liveSearchVal && liveSearchVal.trim()) targetUrl += '&search=' + encodeURIComponent(liveSearchVal.trim());
+    if (curStatus) targetUrl += '&status_filter=' + encodeURIComponent(curStatus);
+    if (curDate) targetUrl += '&date_filter=' + encodeURIComponent(curDate);
+
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
@@ -7095,7 +7123,27 @@ function clearSoLiveSearch() {
     const hasSearchInUrl = url.searchParams.has('search') || url.searchParams.has('q');
     const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
 
-    if (hasSearchInUrl || hadServerSearch) {
+    if (hasSearchInUrl) {
+        url.searchParams.delete('search');
+        url.searchParams.delete('q');
+        try {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, document.title, url.pathname + url.search);
+            }
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                window.top.inflowMdi.updateActiveTabMeta(url.pathname + url.search, document.title);
+            }
+        } catch(e) {}
+    }
+
+    // Sync search clear to server session
+    try {
+        fetch(url.pathname + '?search=&partial=canvas', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).catch(function() {});
+    } catch(e) {}
+
+    if (hadServerSearch) {
         url.searchParams.set('search', '');
         url.searchParams.delete('q');
         if (window.top && window.top.inflowMdi) {

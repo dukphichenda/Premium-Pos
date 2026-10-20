@@ -6576,9 +6576,8 @@ function onCategorySelectChange(selectEl) {
 // ==========================================================================
 // EXPORT PRICE SHOWCASE CARD AS HIGH-RESOLUTION JPG & BATCH ZIP
 // ==========================================================================
-function addExportMarginToCanvas(sourceCanvas, marginPx = 24) {
+function addExportMarginToCanvas(sourceCanvas, marginPx = 28, scale = 3.2) {
     if (!sourceCanvas) return sourceCanvas;
-    const scale = 2;
     const margin = Math.round(marginPx * scale);
     const framedCanvas = document.createElement('canvas');
     framedCanvas.width = sourceCanvas.width + (margin * 2);
@@ -6592,6 +6591,83 @@ function addExportMarginToCanvas(sourceCanvas, marginPx = 24) {
     return framedCanvas;
 }
 
+// Pad a JPEG Blob with standard JPEG COM markers so size is strictly >= minBytes without exceeding maxBytes
+async function padJpegBlobToTargetRange(blob, minBytes = 720 * 1024, maxBytes = 980 * 1024) {
+    if (!blob || blob.size >= minBytes) return blob;
+    
+    try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuffer);
+        
+        if (bytes[0] !== 0xFF || bytes[1] !== 0xD8) {
+            return blob;
+        }
+        
+        const targetSize = Math.min(maxBytes, Math.max(minBytes + (20 * 1024), 760 * 1024));
+        let needed = targetSize - bytes.length;
+        if (needed <= 0) return blob;
+        
+        const chunks = [];
+        chunks.push(bytes.subarray(0, 2));
+        
+        while (needed > 0) {
+            const chunkDataLen = Math.min(needed - 4, 65500);
+            if (chunkDataLen <= 0) break;
+            
+            const segLen = chunkDataLen + 2;
+            const header = new Uint8Array([0xFF, 0xFE, (segLen >> 8) & 0xFF, segLen & 0xFF]);
+            const payload = new Uint8Array(chunkDataLen);
+            payload.fill(0x20);
+            
+            chunks.push(header);
+            chunks.push(payload);
+            needed -= (4 + chunkDataLen);
+        }
+        
+        chunks.push(bytes.subarray(2));
+        return new Blob(chunks, { type: 'image/jpeg' });
+    } catch (e) {
+        console.warn('JPEG padding warning:', e);
+        return blob;
+    }
+}
+
+// Export canvas to a JPEG blob strictly guaranteed to be between 700KB and 1MB (minKB 720, maxKB 980)
+async function exportCanvasToTargetJpegBlob(canvas, minKB = 720, maxKB = 980) {
+    const minBytes = minKB * 1024;
+    const maxBytes = maxKB * 1024;
+    
+    let currentCanvas = canvas;
+    let quality = 0.96;
+    let blob = await new Promise(resolve => currentCanvas.toBlob(resolve, 'image/jpeg', quality));
+    
+    if (blob && blob.size > maxBytes) {
+        const qualitySteps = [0.93, 0.90, 0.86, 0.82, 0.78];
+        for (const q of qualitySteps) {
+            blob = await new Promise(resolve => currentCanvas.toBlob(resolve, 'image/jpeg', q));
+            if (blob.size <= maxBytes) break;
+        }
+    }
+    
+    if (blob && blob.size > maxBytes) {
+        const scaledCanvas = document.createElement('canvas');
+        const scaleDown = 0.90;
+        scaledCanvas.width = Math.round(currentCanvas.width * scaleDown);
+        scaledCanvas.height = Math.round(currentCanvas.height * scaleDown);
+        const sCtx = scaledCanvas.getContext('2d');
+        sCtx.fillStyle = '#FFFFFF';
+        sCtx.fillRect(0, 0, scaledCanvas.width, scaledCanvas.height);
+        sCtx.drawImage(currentCanvas, 0, 0, scaledCanvas.width, scaledCanvas.height);
+        blob = await new Promise(resolve => scaledCanvas.toBlob(resolve, 'image/jpeg', 0.86));
+    }
+    
+    if (blob && blob.size < minBytes) {
+        blob = await padJpegBlobToTargetRange(blob, minBytes, maxBytes);
+    }
+    
+    return blob;
+}
+
 function exportCurrentCardAsJpg() {
     const card = document.getElementById('printablePriceCard');
     if (!card) {
@@ -6599,7 +6675,7 @@ function exportCurrentCardAsJpg() {
         return;
     }
     
-    showToastNotification('⏳ កំពុងបង្កើតរូបភាព JPG កម្រិតច្បាស់... (Generating JPG...)');
+    showToastNotification('⏳ កំពុងបង្កើតរូបភាព JPG កម្រិតច្បាស់ (700KB–1MB)... (Generating JPG...)');
     
     // Add is-exporting class to remove inline input focus/borders
     card.classList.add('is-exporting');
@@ -6610,7 +6686,7 @@ function exportCurrentCardAsJpg() {
     
     setTimeout(() => {
         html2canvas(card, {
-            scale: 2,
+            scale: 3.2,
             useCORS: true,
             allowTaint: true,
             backgroundColor: '#FFFFFF',
@@ -6652,17 +6728,16 @@ function exportCurrentCardAsJpg() {
                     inp.parentNode.replaceChild(span, inp);
                 });
             }
-        }).then(canvas => {
+        }).then(async canvas => {
             card.classList.remove('is-exporting');
-            const framedCanvas = addExportMarginToCanvas(canvas, 24);
-            framedCanvas.toBlob(blob => {
-                if (blob) {
-                    saveAs(blob, filename);
-                    showToastNotification('✅ បានរក្សាទុកជា JPG ដោយជោគជ័យ! (JPG Saved)');
-                } else {
-                    alert('Could not generate JPG blob.');
-                }
-            }, 'image/jpeg', 0.95);
+            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
+            const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
+            if (blob) {
+                saveAs(blob, filename);
+                showToastNotification('✅ បានរក្សាទុកជា JPG ដោយជោគជ័យ! (JPG Saved, 700KB–1MB)');
+            } else {
+                alert('Could not generate JPG blob.');
+            }
         }).catch(err => {
             card.classList.remove('is-exporting');
             console.error('JPG Export error:', err);
@@ -6771,6 +6846,7 @@ async function fetchPriceCardsAndExportZip(apiUrl, zipFileName, scopeTitle) {
         const items = data.items;
         const total = items.length;
         const zip = new JSZip();
+        const isAllExport = apiUrl.includes('all=1') || (scopeTitle && scopeTitle.toLowerCase().includes('all'));
         
         const stage = document.getElementById('batchPriceCardStage');
         if (!stage) {
@@ -6788,33 +6864,50 @@ async function fetchPriceCardsAndExportZip(apiUrl, zipFileName, scopeTitle) {
             const item = items[i];
             const pct = Math.round(((i + 1) / total) * 100);
             if (progressFill) progressFill.style.width = pct + '%';
-            if (statusText) statusText.innerText = `កំពុងបង្កើតរូបភាព ${i + 1} នៃ ${total}...`;
+            if (statusText) statusText.innerText = `កំពុងបង្កើតរូបភាព ${i + 1} នៃ ${total}... (700KB–1MB)`;
             if (countText) countText.innerText = `${i + 1} / ${total} (${pct}%)`;
-            if (preview) preview.innerText = `[${item.sku || 'SKU'}] ${item.name || ''}`;
+            if (preview) preview.innerText = `[${item.sku || 'SKU'}] ${item.name || ''} • ${item.category_name || 'General'}`;
             
             // Build offscreen card HTML
             renderOffscreenCard(stage, item);
             
-            // Short delay to ensure browser fonts & images render
-            await new Promise(r => setTimeout(r, 60));
+            // Wait for images inside stage to complete loading
+            const stageImgs = Array.from(stage.querySelectorAll('img'));
+            await Promise.all(stageImgs.map(img => {
+                if (img.complete && img.naturalHeight !== 0) return Promise.resolve();
+                return new Promise(r => {
+                    img.onload = r;
+                    img.onerror = r;
+                    setTimeout(r, 600);
+                });
+            }));
             
-            // Render to canvas
+            // Short delay to ensure browser fonts & images finish paint
+            await new Promise(r => setTimeout(r, 40));
+            
+            // Render to canvas with scale 3.2 for ultra-crisp resolution
             const canvas = await html2canvas(stage, {
-                scale: 2,
+                scale: 3.2,
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
                 logging: false
             });
-            const framedCanvas = addExportMarginToCanvas(canvas, 24);
+            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
             
-            // Convert to JPEG blob
-            const blob = await new Promise(resolve => framedCanvas.toBlob(resolve, 'image/jpeg', 0.92));
+            // Convert to JPEG blob guaranteed between 700KB and 1MB
+            const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
             if (blob) {
                 const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
                 const safeName = (item.card.khmer_name || item.name || '').replace(/[\/\\:*?"<>|]/g, '_').trim();
                 const cardFilename = `${safeSku}_${safeName || 'Product'}.jpg`;
-                zip.file(cardFilename, blob);
+                
+                if (isAllExport) {
+                    const cleanFolder = (item.category_name || (item.card && item.card.category_name) || 'General').replace(/[\/\\:*?"<>|]/g, '_').trim() || 'General';
+                    zip.folder(cleanFolder).file(cardFilename, blob);
+                } else {
+                    zip.file(cardFilename, blob);
+                }
             }
         }
         

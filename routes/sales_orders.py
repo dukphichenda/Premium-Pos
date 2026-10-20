@@ -809,20 +809,15 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         if 'search' in request.args or 'q' in request.args:
             search_query = (request.args.get('search') or request.args.get('q') or '').strip()
         else:
-            stored_q = (session.get('so_search_query') or '').strip()
-            logged_user = (session.get('username') or '').strip().lower()
-            if stored_q.lower() == logged_user or stored_q.lower() == 'chenda':
-                search_query = ''
-            else:
-                search_query = stored_q
+            search_query = (session.get('so_search_query') or '').strip()
     if search_query:
         sp = f"%{search_query}%"
         drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
         drawer_params.extend([sp, sp, sp, sp])
 
     # Status filter (supports multi-select comma separated statuses, e.g. Open, Unfulfilled, Fulfilled, Paid, All)
-    # When user enters a specific search_query, search across all statuses so matching orders are found
-    if not search_query and status_filter and status_filter.strip() and status_filter.strip().lower() != 'all':
+    # Respect status_filter so sale status (e.g. Open sale) stays as selected
+    if status_filter and status_filter.strip() and status_filter.strip().lower() != 'all':
         tokens = [t.strip().lower() for t in status_filter.split(',') if t.strip()]
         status_clauses = []
         for token in tokens:
@@ -1763,13 +1758,7 @@ def new_order():
         else:
             session.pop('so_search_query', None)
     elif 'so_search_query' in session and session.get('so_search_query'):
-        stored_q = session['so_search_query'].strip()
-        logged_user = (session.get('username') or '').strip().lower()
-        if stored_q.lower() == logged_user or stored_q.lower() == 'chenda':
-            session.pop('so_search_query', None)
-            search_query = ''
-        else:
-            search_query = stored_q
+        search_query = session['so_search_query'].strip()
     else:
         search_query = ''
 
@@ -1779,7 +1768,8 @@ def new_order():
         customer_search = ''
         session.pop('so_customer_search', None)
 
-    customer_filter = request.args.get('customer_id')
+    # customer_id is used above to pre-fill order customer; do NOT filter sidebar orders list
+    customer_filter = None
 
     if not is_main:
         req_branch = str(user_bid or -1)
@@ -1935,7 +1925,46 @@ def detail_order(id):
         user_bid = _get_user_branch_id()
         if user_bid:
             return redirect(url_for('branches.branch_orders', id=user_bid))
-        return redirect(url_for('sales_orders.list_orders'))
+    if 'date_filter' in request.args:
+        date_filter = request.args.get('date_filter') or 'All'
+        session['so_date_filter'] = date_filter
+    elif 'so_date_filter' in session and session.get('so_date_filter'):
+        date_filter = session['so_date_filter']
+    else:
+        date_filter = 'All'
+
+    if 'status_filter' in request.args:
+        status_filter = request.args.get('status_filter', 'Open').strip()
+        session['so_status_filter'] = status_filter
+    elif 'so_status_filter' in session and session.get('so_status_filter'):
+        status_filter = session['so_status_filter']
+    else:
+        status_filter = 'Open'
+
+    if 'search' in request.args:
+        search_query = request.args.get('search', '').strip()
+        if search_query:
+            session['so_search_query'] = search_query
+        else:
+            session.pop('so_search_query', None)
+    elif 'q' in request.args:
+        search_query = request.args.get('q', '').strip()
+        if search_query:
+            session['so_search_query'] = search_query
+        else:
+            session.pop('so_search_query', None)
+    else:
+        # Check session search query if previously set
+        search_query = (session.get('so_search_query') or '').strip()
+
+    if 'customer_search' in request.args and request.args.get('customer_search'):
+        customer_search = request.args.get('customer_search', '').strip()
+    else:
+        customer_search = ''
+        session.pop('so_customer_search', None)
+
+    # Do not auto filter sidebar orders to only customer of selected bill
+    customer_filter = None
 
     lines = query_all("""
         SELECT 
@@ -2026,48 +2055,10 @@ def detail_order(id):
                                is_branch_order=bool(branch_obj),
                                order_payment_method=order_payment_method,
                                is_paid=is_paid,
+                               status_filter=status_filter,
+                               date_filter=date_filter,
+                               search_query=search_query,
                                is_new=False)
-
-    if 'date_filter' in request.args:
-        date_filter = request.args.get('date_filter') or 'All'
-        session['so_date_filter'] = date_filter
-    elif 'so_date_filter' in session and session.get('so_date_filter'):
-        date_filter = session['so_date_filter']
-    else:
-        date_filter = 'All'
-
-    if 'status_filter' in request.args:
-        status_filter = request.args.get('status_filter', 'Open').strip()
-        session['so_status_filter'] = status_filter
-    elif 'so_status_filter' in session and session.get('so_status_filter'):
-        status_filter = session['so_status_filter']
-    else:
-        status_filter = 'Open'
-
-    if 'search' in request.args:
-        search_query = request.args.get('search', '').strip()
-        if search_query:
-            session['so_search_query'] = search_query
-        else:
-            session.pop('so_search_query', None)
-    elif 'q' in request.args:
-        search_query = request.args.get('q', '').strip()
-        if search_query:
-            session['so_search_query'] = search_query
-        else:
-            session.pop('so_search_query', None)
-    else:
-        # Viewing an order directly without search param: clear stale search so it never hijacks the order
-        search_query = ''
-        session.pop('so_search_query', None)
-
-    if 'customer_search' in request.args and request.args.get('customer_search'):
-        customer_search = request.args.get('customer_search', '').strip()
-    else:
-        customer_search = ''
-        session.pop('so_customer_search', None)
-
-    customer_filter = request.args.get('customer_id')
 
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
@@ -2624,6 +2615,8 @@ def save_order(id=0):
             search_param = (request.form.get('search') or '').strip()
         elif 'search' in request.args:
             search_param = (request.args.get('search') or '').strip()
+        elif 'so_search_query' in session and session.get('so_search_query'):
+            search_param = session.get('so_search_query').strip()
         else:
             search_param = ''
 
@@ -2633,7 +2626,7 @@ def save_order(id=0):
         session['so_branch_filter'] = branch_param
         if search_param:
             session['so_search_query'] = search_param
-        else:
+        elif 'search' in request.form or 'search' in request.args:
             session.pop('so_search_query', None)
 
         target_id = id
@@ -2965,6 +2958,8 @@ def delete_order(id):
         search_param = (request.form.get('search') or '').strip()
     elif 'search' in request.args:
         search_param = (request.args.get('search') or '').strip()
+    elif 'so_search_query' in session and session.get('so_search_query'):
+        search_param = session.get('so_search_query').strip()
     else:
         search_param = ''
 
@@ -2974,7 +2969,7 @@ def delete_order(id):
     session['so_branch_filter'] = branch_param
     if search_param:
         session['so_search_query'] = search_param
-    else:
+    elif 'search' in request.form or 'search' in request.args:
         session.pop('so_search_query', None)
 
     req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
