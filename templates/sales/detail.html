@@ -1724,20 +1724,25 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                     <circle cx="11" cy="11" r="8"></circle>
                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                 </svg>
+                {% set clean_search_val = (search_query or session.get('so_search_query') or '') %}
+                {% if clean_search_val|lower == (session.get('username') or '')|lower %}{% set clean_search_val = '' %}{% endif %}
                 <input type="search" id="soSidebarSearchInput" class="so-search-input" 
                        name="so_filter_search_field"
                        placeholder="Search order #, customer, $..." 
-                       value="{{ search_query or session.get('so_search_query') or '' }}"
+                       value="{{ clean_search_val }}"
                        autocomplete="off" 
                        autocorrect="off"
                        autocapitalize="off"
                        spellcheck="false"
                        data-lpignore="true"
+                       data-1p-ignore="true"
                        data-form-type="other"
+                       readonly
+                       onfocus="this.removeAttribute('readonly');"
                        style="height: 33px; padding-left: 31px; padding-right: 30px; font-size: 12px;"
-                       oninput="handleSoLiveSearch(this.value)"
+                       oninput="handleSoLiveSearch(this.value, true)"
                        onkeydown="handleSoSearchKey(event)">
-                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query or session.get('so_search_query') or request.args.get('search') or request.args.get('q') %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
+                <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if clean_search_val %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
             </div>
 
             <!-- Floating inFlow Customer Suggestion Dropdown (Matches Screenshot) -->
@@ -2213,7 +2218,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
             </div>
             <div>
                 <label style="display: block; font-weight: 700; color: #1E293B; margin-bottom: 4px;">Gemini API Key (Google AI Studio):</label>
-                <input type="password" id="inputAiKeyConfig" class="inflow-field-input" placeholder="AIzaSy..." style="width: 100%; height: 30px; font-size: 12px; padding: 4px 8px; border: 1px solid #94A3B8; border-radius: 4px;">
+                <input type="text" id="inputAiKeyConfig" class="inflow-field-input" placeholder="AIzaSy..." autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other" style="width: 100%; height: 30px; font-size: 12px; padding: 4px 8px; border: 1px solid #94A3B8; border-radius: 4px; -webkit-text-security: disc; text-security: disc;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px; font-size: 11px;">
                     <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #2563EB; text-decoration: underline; font-weight: 600;">Get a free Gemini API Key ↗</a>
                     <span id="aiKeyCurrentStatus" style="color: #64748B;">Checking status...</span>
@@ -3569,8 +3574,10 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
 
     // Clear stale customer search in storage so it never wipes out the orders list
     sessionStorage.removeItem('inflow_so_drawer_customer_search');
+    closeSoCustSuggestPopup();
 
     const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const loggedInUser = ("{{ session.get('username') or '' }}").toLowerCase().trim();
 
     // Maintain search query in SO sidebar across selections until user clicks cross (✕) or clears it
     let liveSearchVal = '';
@@ -3578,6 +3585,11 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         liveSearchVal = liveSearchInput.value.trim();
     } else {
         liveSearchVal = (sessionStorage.getItem('inflow_so_search_query') || url.searchParams.get('search') || '').trim();
+    }
+
+    if (loggedInUser && liveSearchVal.toLowerCase() === loggedInUser) {
+        liveSearchVal = '';
+        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
     }
 
     if (liveSearchVal) {
@@ -3589,8 +3601,9 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         }
         const clearBtn = document.getElementById('btnClearSoSearch');
         if (clearBtn) clearBtn.style.display = 'flex';
-        // Keep cards and customer matches filtered by the active search query - stay still
-        handleSoLiveSearch(qTrim);
+        // Keep cards and customer matches filtered by the active search query - stay still, do not pop out suggestions
+        handleSoLiveSearch(qTrim, false);
+        closeSoCustSuggestPopup();
     } else {
         url.searchParams.set('search', '');
         url.searchParams.delete('q');
@@ -3598,7 +3611,8 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         if (liveSearchInput) liveSearchInput.value = '';
         const clearBtn = document.getElementById('btnClearSoSearch');
         if (clearBtn) clearBtn.style.display = 'none';
-        handleSoLiveSearch('');
+        handleSoLiveSearch('', false);
+        closeSoCustSuggestPopup();
     }
 
     // Do NOT auto-filter sidebar orders to only the customer of the selected bill
@@ -3796,9 +3810,15 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         }
         closeSoMobileDrawer();
 
-        // Ensure sidebar search text and filtered cards remain strictly intact (stay still)
+        // Ensure sidebar search text and filtered cards remain strictly intact (stay still, do NOT open suggest popup)
         const curSearchInput = document.getElementById('soSidebarSearchInput');
-        const activeSearchQuery = (curSearchInput ? curSearchInput.value : '') || sessionStorage.getItem('inflow_so_search_query') || '';
+        const loggedInUserPost = ("{{ session.get('username') or '' }}").toLowerCase().trim();
+        let activeSearchQuery = (curSearchInput ? curSearchInput.value : '') || sessionStorage.getItem('inflow_so_search_query') || '';
+        if (loggedInUserPost && activeSearchQuery.toLowerCase().trim() === loggedInUserPost) {
+            activeSearchQuery = '';
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+            if (curSearchInput) curSearchInput.value = '';
+        }
         if (activeSearchQuery && activeSearchQuery.trim()) {
             const qStr = activeSearchQuery.trim();
             if (curSearchInput && curSearchInput.value !== qStr) {
@@ -3806,7 +3826,11 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
             }
             const clearBtn = document.getElementById('btnClearSoSearch');
             if (clearBtn) clearBtn.style.display = 'flex';
-            handleSoLiveSearch(qStr);
+            handleSoLiveSearch(qStr, false);
+            closeSoCustSuggestPopup();
+        } else {
+            handleSoLiveSearch('', false);
+            closeSoCustSuggestPopup();
         }
 
         const pBar = document.getElementById('soFastNavProgressBar');
@@ -3904,6 +3928,7 @@ function handleSelectOrder(event, targetUrl, clickedEl) {
     window._soLastOrderSelectTime = now;
 
     closeSoMobileDrawer();
+    closeSoCustSuggestPopup();
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
@@ -4173,37 +4198,43 @@ document.addEventListener('DOMContentLoaded', function () {
     const hasSearchParam = soSearchUrlParams.has('search') || soSearchUrlParams.has('q');
     const urlSearch = (soSearchUrlParams.get('search') || soSearchUrlParams.get('q') || '').trim();
 
+    const loggedInUserInit = ("{{ session.get('username') or '' }}").toLowerCase().trim();
     let activeSearch = '';
     if (hasSearchParam) {
         activeSearch = urlSearch;
-        if (activeSearch) {
+        if (activeSearch && (!loggedInUserInit || activeSearch.toLowerCase() !== loggedInUserInit)) {
             try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
         } else {
-            // Explicitly empty search parameter in URL indicates user cleared search
+            activeSearch = '';
             try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
         }
     } else {
         // No search query in URL: check sessionStorage or template server render
         let savedSearch = '';
-        try { savedSearch = (sessionStorage.getItem('inflow_so_search_query') || '{{ search_query or "" }}').trim(); } catch(e) {}
-        activeSearch = savedSearch;
-        if (activeSearch) {
+        try { savedSearch = (sessionStorage.getItem('inflow_so_search_query') || '{{ clean_search_val or "" }}').trim(); } catch(e) {}
+        if (savedSearch && (!loggedInUserInit || savedSearch.toLowerCase() !== loggedInUserInit)) {
+            activeSearch = savedSearch;
             try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+        } else {
+            activeSearch = '';
+            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
         }
     }
 
     if (sidebarSearchInput) {
         if (activeSearch) {
             sidebarSearchInput.value = activeSearch;
-        } else if (sidebarSearchInput.value && sidebarSearchInput.value.trim()) {
-            activeSearch = sidebarSearchInput.value.trim();
-            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+        } else {
+            sidebarSearchInput.value = '';
         }
         const clearBtn = document.getElementById('btnClearSoSearch');
         if (clearBtn) clearBtn.style.display = activeSearch ? 'flex' : 'none';
         if (activeSearch) {
-            handleSoLiveSearch(activeSearch);
+            handleSoLiveSearch(activeSearch, false);
+        } else {
+            handleSoLiveSearch('', false);
         }
+        closeSoCustSuggestPopup();
     }
 
     // Attach item dropdown popup to body early and register scroll/resize repositioning
@@ -7276,7 +7307,7 @@ function toggleSoSidebarSearch() {
     }
 }
 
-function handleSoLiveSearch(val) {
+function handleSoLiveSearch(val, isUserTyping) {
     const rawVal = val !== undefined && val !== null ? String(val) : '';
     const q = rawVal.toLowerCase().trim();
 
@@ -7318,13 +7349,13 @@ function handleSoLiveSearch(val) {
         }
     });
 
-    // Customer Suggestions Popup: "when searching add suggetion customers like this but no need change interface"
+    // Customer Suggestions Popup: only pop out when user is actively searching/typing (isUserTyping = true)
     const suggestPopup = document.getElementById('soSidebarCustSuggestPopup');
     const suggestTbody = document.getElementById('soSidebarCustSuggestTbody');
     const addNewInput = document.getElementById('soSuggestAddNewInput');
 
     if (suggestPopup && suggestTbody) {
-        if (q && q.length >= 1 && window.allCustomersList && window.allCustomersList.length > 0) {
+        if (isUserTyping && q && q.length >= 1 && window.allCustomersList && window.allCustomersList.length > 0) {
             const matchedCustomers = window.allCustomersList.filter(c => {
                 const cName = (c.name || '').toLowerCase();
                 const cContact = (c.contact || '').toLowerCase();
@@ -7446,7 +7477,7 @@ function selectSoCustomerSuggestion(id, name) {
         input.value = name;
     }
     closeSoCustSuggestPopup();
-    handleSoLiveSearch(name);
+    handleSoLiveSearch(name, false);
     if (input) input.focus();
 }
 

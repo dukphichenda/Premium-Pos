@@ -862,11 +862,18 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             drawer_params.append(delivery_man_filter)
 
     # General search query (order #, customer name, delivery man, or total amount)
+    curr_user = (session.get('username') or '').strip().lower()
     if search_query is None:
         if 'search' in request.args or 'q' in request.args:
             search_query = (request.args.get('search') or request.args.get('q') or '').strip()
         else:
             search_query = (session.get('so_search_query') or '').strip()
+
+    # Never auto-search the current user's login username (e.g. 'chenda' or 'admin')
+    if search_query and curr_user and search_query.lower() == curr_user:
+        search_query = ''
+        session.pop('so_search_query', None)
+
     if search_query:
         sp = f"%{search_query}%"
         drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
@@ -1861,20 +1868,26 @@ def new_order():
     else:
         status_filter = 'Open'
 
+    curr_user = (session.get('username') or '').strip().lower()
     if 'search' in request.args:
         search_query = request.args.get('search', '').strip()
-        if search_query:
+        if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
         else:
             session.pop('so_search_query', None)
+            search_query = ''
     elif 'q' in request.args:
         search_query = request.args.get('q', '').strip()
-        if search_query:
+        if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
         else:
             session.pop('so_search_query', None)
+            search_query = ''
     elif 'so_search_query' in session and session.get('so_search_query'):
         search_query = session['so_search_query'].strip()
+        if curr_user and search_query.lower() == curr_user:
+            session.pop('so_search_query', None)
+            search_query = ''
     else:
         search_query = ''
 
@@ -2059,21 +2072,27 @@ def detail_order(id):
     else:
         status_filter = 'Open'
 
+    curr_user = (session.get('username') or '').strip().lower()
     if 'search' in request.args:
         search_query = request.args.get('search', '').strip()
-        if search_query:
+        if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
         else:
             session.pop('so_search_query', None)
+            search_query = ''
     elif 'q' in request.args:
         search_query = request.args.get('q', '').strip()
-        if search_query:
+        if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
         else:
             session.pop('so_search_query', None)
+            search_query = ''
     else:
         # Check session search query if previously set
         search_query = (session.get('so_search_query') or '').strip()
+        if curr_user and search_query.lower() == curr_user:
+            session.pop('so_search_query', None)
+            search_query = ''
 
     if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()
