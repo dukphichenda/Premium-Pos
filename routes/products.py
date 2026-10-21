@@ -3462,42 +3462,6 @@ def price_list_view():
                            total_products=len(items),
                            global_price_table_style=global_price_table_style)
 
-@products_bp.route('/inventory/product-catalog')
-@products_bp.route('/products/product-catalog')
-def product_catalog_view():
-    if not session.get('user_id'):
-        return redirect(url_for('auth.login', next=request.path))
-
-    # Active categories with count of active products
-    categories = query_all("""
-        SELECT c.id, c.name, COALESCE(c.color, '#149e9e') as color,
-               c.description,
-               COUNT(p.id) as product_count
-        FROM categories c
-        LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
-        WHERE c.is_active = TRUE
-        GROUP BY c.id, c.name, c.color, c.description
-        ORDER BY c.name ASC
-    """)
-
-    # Active products only (Image, SKU, Name, Detail - NO PRICE)
-    products = query_all("""
-        SELECT 
-            p.id, p.sku, p.name, p.description, p.barcode, p.category_id,
-            p.uom, p.sales_uom, p.sales_uom_ratio_std, p.packs_per_case, p.pcs_per_pack,
-            p.length, p.width, p.height, p.weight, p.remarks,
-            p.price_card_unit, p.price_card_custom_detail, p.price_card_is_custom_detail,
-            p.image_url, p.is_active,
-            p.brand, p.color, p.material, p.capacity,
-            COALESCE(c.name, 'General') as category_name,
-            COALESCE(c.color, '#149e9e') as category_color,
-            c.description as category_description
-        FROM products p
-        LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.is_active = TRUE
-        ORDER BY COALESCE(c.name, 'General') ASC, p.name ASC, p.id ASC
-    """)
-
 CATEGORY_KHMER_MAP = {
     'aluminium box': 'ប្រអប់អាលុយមីញ៉ូម',
     'aluminum box': 'ប្រអប់អាលុយមីញ៉ូម',
@@ -3670,6 +3634,42 @@ def _extract_product_clean_detail(prod, size_str='', pkg_str=''):
         return " • ".join(extra_parts)
 
     return ''
+
+@products_bp.route('/inventory/product-catalog')
+@products_bp.route('/products/product-catalog')
+def product_catalog_view():
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login', next=request.path))
+
+    # Active categories with count of active products
+    categories = query_all("""
+        SELECT c.id, c.name, COALESCE(c.color, '#149e9e') as color,
+               c.description,
+               COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
+        WHERE c.is_active = TRUE
+        GROUP BY c.id, c.name, c.color, c.description
+        ORDER BY c.name ASC
+    """)
+
+    # Active products only (Image, SKU, Name, Detail - NO PRICE)
+    products = query_all("""
+        SELECT 
+            p.id, p.sku, p.name, p.description, p.barcode, p.category_id,
+            p.uom, p.sales_uom, p.sales_uom_ratio_std, p.packs_per_case, p.pcs_per_pack,
+            p.length, p.width, p.height, p.weight, p.remarks,
+            p.price_card_unit, p.price_card_custom_detail, p.price_card_is_custom_detail,
+            p.image_url, p.is_active,
+            p.brand, p.color, p.material, p.capacity,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(c.color, '#149e9e') as category_color,
+            c.description as category_description
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.is_active = TRUE
+        ORDER BY COALESCE(c.name, 'General') ASC, p.name ASC, p.id ASC
+    """)
 
     category_groups = {}
     for c in categories:
