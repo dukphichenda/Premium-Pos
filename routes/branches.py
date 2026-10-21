@@ -730,10 +730,36 @@ def branch_chart_data(id):
         GROUP BY payment_status
     """, (id,))
 
+    # 4. Monthly Sales Breakdown (Last 12 Months) - Isolated strictly to this branch (Open Sale & Paid Sale ONLY, No Profit)
+    monthly_sales = query_all("""
+        SELECT 
+            TO_CHAR(m.month_date, 'Mon YYYY') as month_label,
+            COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN so.total_amount ELSE 0 END), 0) as paid_sales,
+            COALESCE(SUM(CASE WHEN so.status = 'OPEN' OR so.balance_due > 0 THEN so.balance_due ELSE 0 END), 0) as open_sales,
+            COALESCE(SUM(so.total_amount), 0) as revenue,
+            COUNT(so.id) as order_count
+        FROM generate_series(
+            date_trunc('month', CURRENT_DATE - INTERVAL '11 months'),
+            date_trunc('month', CURRENT_DATE),
+            '1 month'::interval
+        ) m(month_date)
+        LEFT JOIN sales_orders so 
+            ON date_trunc('month', so.order_date) = m.month_date
+           AND so.branch_id = %s
+           AND so.status NOT IN ('CANCELLED')
+        GROUP BY m.month_date
+        ORDER BY m.month_date ASC
+    """, (id,))
+
     return jsonify({
         'daily_labels': [r['label'] for r in daily_sales],
         'daily_revenue': [float(r['revenue']) for r in daily_sales],
         'daily_orders': [int(r['order_count']) for r in daily_sales],
+        'monthly_labels': [r['month_label'] for r in monthly_sales],
+        'monthly_paid': [round(float(r['paid_sales']), 2) for r in monthly_sales],
+        'monthly_open': [round(float(r['open_sales']), 2) for r in monthly_sales],
+        'monthly_revenue': [round(float(r['revenue']), 2) for r in monthly_sales],
+        'monthly_orders': [int(r['order_count']) for r in monthly_sales],
         'category_labels': [r['category_name'] for r in category_sales],
         'category_values': [float(r['total_revenue']) for r in category_sales],
         'payment_labels': [r['status_label'] for r in payment_stats],

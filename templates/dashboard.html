@@ -689,42 +689,47 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             // 3-Column Monthly Financial Breakdown Chart (Total Paid Sale, Open Sale, Profit)
             const ctxTrend = document.getElementById('revenueTrendChart').getContext('2d');
+            const trendDatasets = [
+                {
+                    label: 'Total Paid Sale',
+                    data: data.monthly_paid || data.monthly_revenue,
+                    backgroundColor: '#0284C7',
+                    borderColor: '#0284C7',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.85,
+                    categoryPercentage: 0.82
+                },
+                {
+                    label: 'Open Sale',
+                    data: data.monthly_open || [],
+                    backgroundColor: '#F59E0B',
+                    borderColor: '#F59E0B',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.85,
+                    categoryPercentage: 0.82
+                }
+            ];
+
+            if (data.monthly_profit && data.monthly_profit.length > 0) {
+                trendDatasets.push({
+                    label: 'Profit',
+                    data: data.monthly_profit,
+                    backgroundColor: '#10B981',
+                    borderColor: '#10B981',
+                    borderWidth: 1,
+                    borderRadius: 4,
+                    barPercentage: 0.85,
+                    categoryPercentage: 0.82
+                });
+            }
+
             new Chart(ctxTrend, {
                 type: 'bar',
                 data: {
                     labels: data.monthly_labels,
-                    datasets: [
-                        {
-                            label: 'Total Paid Sale',
-                            data: data.monthly_paid || data.monthly_revenue,
-                            backgroundColor: '#0284C7',
-                            borderColor: '#0284C7',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.85,
-                            categoryPercentage: 0.82
-                        },
-                        {
-                            label: 'Open Sale',
-                            data: data.monthly_open || [],
-                            backgroundColor: '#F59E0B',
-                            borderColor: '#F59E0B',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.85,
-                            categoryPercentage: 0.82
-                        },
-                        {
-                            label: 'Profit',
-                            data: data.monthly_profit || [],
-                            backgroundColor: '#10B981',
-                            borderColor: '#10B981',
-                            borderWidth: 1,
-                            borderRadius: 4,
-                            barPercentage: 0.85,
-                            categoryPercentage: 0.82
-                        }
-                    ]
+                    datasets: trendDatasets
                 },
                 options: {
                     responsive: true,

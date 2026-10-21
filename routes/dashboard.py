@@ -268,7 +268,13 @@ def index():
 
 @dashboard_bp.route('/api/dashboard/charts')
 def chart_data():
-    branch_scope = request.args.get('branch', 'main').strip().lower()
+    user_role = session.get('role', 'main_admin')
+    user_bid = session.get('branch_id')
+    if user_role in ('branch_admin', 'branch_cashier') and user_bid:
+        branch_scope = str(user_bid)
+    else:
+        branch_scope = request.args.get('branch', 'main').strip().lower()
+
     if branch_scope == 'all':
         branch_filter = ""
         params = ()
@@ -323,12 +329,15 @@ def chart_data():
         LIMIT 7
     """)
 
+    profit_data = [round(float(r['paid_profit']), 2) for r in monthly_sales] if user_role not in ('branch_admin', 'branch_cashier') else []
+    total_profit_data = [round(float(r['total_profit']), 2) for r in monthly_sales] if user_role not in ('branch_admin', 'branch_cashier') else []
+
     return jsonify({
         'monthly_labels': [r['month_label'] for r in monthly_sales],
         'monthly_paid': [round(float(r['paid_sales']), 2) for r in monthly_sales],
         'monthly_open': [round(float(r['open_sales']), 2) for r in monthly_sales],
-        'monthly_profit': [round(float(r['paid_profit']), 2) for r in monthly_sales],
-        'monthly_total_profit': [round(float(r['total_profit']), 2) for r in monthly_sales],
+        'monthly_profit': profit_data,
+        'monthly_total_profit': total_profit_data,
         'monthly_revenue': [round(float(r['revenue']), 2) for r in monthly_sales],
         'monthly_orders': [int(r['order_count']) for r in monthly_sales],
         'category_labels': [r['category_name'] for r in category_distribution],
