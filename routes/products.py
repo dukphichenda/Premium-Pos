@@ -3457,6 +3457,163 @@ def price_list_view():
                            total_products=len(items),
                            global_price_table_style=global_price_table_style)
 
+@products_bp.route('/inventory/product-catalog')
+@products_bp.route('/products/product-catalog')
+def product_catalog_view():
+    if not session.get('user_id'):
+        return redirect(url_for('auth.login', next=request.path))
+
+    # Active categories with count of active products
+    categories = query_all("""
+        SELECT c.id, c.name, COALESCE(c.color, '#149e9e') as color,
+               c.description,
+               COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
+        WHERE c.is_active = TRUE
+        GROUP BY c.id, c.name, c.color, c.description
+        ORDER BY c.name ASC
+    """)
+
+    # Active products only (Image, SKU, Name, Detail - NO PRICE)
+    products = query_all("""
+        SELECT 
+            p.id, p.sku, p.name, p.description, p.barcode, p.category_id,
+            p.uom, p.sales_uom, p.sales_uom_ratio_std, p.packs_per_case, p.pcs_per_pack,
+            p.length, p.width, p.height, p.weight, p.remarks,
+            p.price_card_unit, p.price_card_custom_detail, p.price_card_is_custom_detail,
+            p.image_url, p.is_active,
+            p.brand, p.color, p.material, p.capacity,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(c.color, '#149e9e') as category_color,
+            c.description as category_description
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.is_active = TRUE
+        ORDER BY COALESCE(c.name, 'General') ASC, p.name ASC, p.id ASC
+    """)
+
+    category_groups = {}
+    for c in categories:
+        category_groups[c['id']] = {
+            'id': c['id'],
+            'name': c['name'],
+            'color': c['color'] or '#149e9e',
+            'description': c['description'] or '',
+            'products': []
+        }
+
+    general_group = {
+        'id': 0,
+        'name': 'General',
+        'color': '#149e9e',
+        'description': '',
+        'products': []
+    }
+
+    all_items = []
+    for prod in products:
+        names = _split_khmer_english(prod.get('name'), prod.get('sku'))
+
+        detail_lines = []
+        custom_detail = ''
+        if prod.get('price_card_is_custom_detail') and prod.get('price_card_custom_detail'):
+            custom_detail = str(prod['price_card_custom_detail']).strip()
+
+        desc = (prod.get('description') or '').strip()
+
+        # Dimensions
+        l_val = prod.get('length')
+        w_val = prod.get('width')
+        h_val = prod.get('height')
+        dim_str = ''
+        if (l_val and float(l_val) > 0) or (w_val and float(w_val) > 0) or (h_val and float(h_val) > 0):
+            dim_str = f"{float(l_val or 0):g}cm x {float(w_val or 0):g}cm x {float(h_val or 0):g}cm"
+            detail_lines.append(f"ទំហំ: {dim_str}")
+
+        # Packaging specs
+        packs = float(prod.get('packs_per_case') or 0)
+        pcs_pack = float(prod.get('pcs_per_pack') or 0)
+        ratio_std = float(prod.get('sales_uom_ratio_std') or 0)
+        card_unit = prod.get('price_card_unit') or prod.get('uom') or 'pcs'
+
+        if ratio_std > 1:
+            pcs_case = ratio_std
+            if pcs_pack > 0:
+                pk_cnt = round(pcs_case / pcs_pack, 1)
+                detail_lines.append(f"ការវេចខ្ចប់: {pcs_case:g} {card_unit}/កេស ({pk_cnt:g} ដុំ x {pcs_pack:g})")
+            else:
+                detail_lines.append(f"ការវេចខ្ចប់: {pcs_case:g} {card_unit}/កេស")
+        elif packs > 0 and pcs_pack > 0:
+            pcs_case = packs * pcs_pack
+            detail_lines.append(f"ការវេចខ្ចប់: {pcs_case:g} {card_unit}/កេស ({packs:g} ដុំ x {pcs_pack:g})")
+        elif prod.get('uom'):
+            detail_lines.append(f"ខ្នាត: {prod.get('uom')}")
+
+        if prod.get('capacity'):
+            detail_lines.append(f"ចំណុះ: {prod['capacity']}")
+        if prod.get('material'):
+            detail_lines.append(f"សម្ភារៈ: {prod['material']}")
+        if prod.get('brand'):
+            detail_lines.append(f"ម៉ាក: {prod['brand']}")
+
+        remarks = (prod.get('remarks') or '').strip()
+        if remarks and remarks != desc:
+            detail_lines.append(f"ចំណាំ: {remarks}")
+
+        primary_detail = custom_detail if custom_detail else (desc if desc else (" • ".join(detail_lines) if detail_lines else "ផលិតផលស្តង់ដារគុណភាពខ្ពស់"))
+
+        item = {
+            'id': prod['id'],
+            'sku': (prod.get('sku') or '').strip(),
+            'name': (prod.get('name') or '').strip(),
+            'khmer_name': names.get('khmer') or prod.get('name') or '',
+            'english_name': names.get('english') or '',
+            'image_url': (prod.get('image_url') or '').strip(),
+            'category_id': prod.get('category_id') or 0,
+            'category_name': prod.get('category_name') or 'General',
+            'category_color': prod.get('category_color') or '#149e9e',
+            'dim_str': dim_str,
+            'detail_lines': detail_lines,
+            'description': desc,
+            'primary_detail': primary_detail,
+            'uom': prod.get('uom') or '',
+            'barcode': prod.get('barcode') or ''
+        }
+        all_items.append(item)
+
+        cat_id = prod.get('category_id')
+        if cat_id in category_groups:
+            category_groups[cat_id]['products'].append(item)
+        else:
+            general_group['products'].append(item)
+
+    arranged_categories = [grp for grp in category_groups.values() if len(grp['products']) > 0]
+    if len(general_group['products']) > 0:
+        arranged_categories.append(general_group)
+
+    # Chunk products into spreads of up to 10 products per spread
+    for cat in arranged_categories:
+        prods = cat['products']
+        spreads = []
+        chunk_size = 10
+        for i in range(0, len(prods), chunk_size):
+            chunk = prods[i:i + chunk_size]
+            left_page_items = chunk[:4]
+            right_page_items = chunk[4:]
+            spreads.append({
+                'spread_index': len(spreads) + 1,
+                'left_page_items': left_page_items,
+                'right_page_items': right_page_items,
+                'all_spread_items': chunk
+            })
+        cat['spreads'] = spreads
+
+    return render_template('products/product_catalog.html',
+                           categories=arranged_categories,
+                           all_items=all_items,
+                           total_products=len(all_items))
+
 DEFAULT_PRICE_CARD_UNITS = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម']
 
 @products_bp.route('/api/products/price-card-units', methods=['GET', 'POST'])
