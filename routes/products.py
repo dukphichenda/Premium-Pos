@@ -3741,36 +3741,28 @@ def product_catalog_view():
     if len(general_group['products']) > 0:
         arranged_categories.append(general_group)
 
-    # Arrange products into A4 Sheets: 1 Big Hero item on top + up to 6 sub-items below (total 7 items per A4 sheet)
+    # Arrange products into A4 Sheets: exactly 5 products per page (1 column, 1 row per product)
     for cat in arranged_categories:
         prods = cat['products']
         a4_pages = []
-        chunk_size = 7
+        chunk_size = 5
         total_pages = (len(prods) + chunk_size - 1) // chunk_size if prods else 1
 
         for i in range(0, len(prods), chunk_size):
             chunk = prods[i:i + chunk_size]
-
-            # Prioritize an item with an image as hero_item for stunning visual appearance
-            hero_idx = 0
-            for idx, itm in enumerate(chunk):
-                if itm.get('image_url'):
-                    hero_idx = idx
-                    break
-            hero_item = chunk[hero_idx]
-            sub_items = [itm for idx, itm in enumerate(chunk) if idx != hero_idx]
 
             page_index = len(a4_pages) + 1
             a4_pages.append({
                 'spread_index': page_index,
                 'page_number': page_index,
                 'total_pages': total_pages,
-                'hero_item': hero_item,
-                'sub_items': sub_items,
+                'page_items': chunk,
                 'all_page_items': chunk,
-                # Compatibility fields for any existing templates or tests:
-                'left_page_items': [hero_item] + sub_items[:3],
-                'right_page_items': sub_items[3:],
+                # For backwards compatibility with any template variables:
+                'hero_item': chunk[0],
+                'sub_items': chunk[1:],
+                'left_page_items': chunk[:3],
+                'right_page_items': chunk[3:],
                 'all_spread_items': chunk,
             })
         cat['a4_pages'] = a4_pages
