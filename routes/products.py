@@ -3498,11 +3498,185 @@ def product_catalog_view():
         ORDER BY COALESCE(c.name, 'General') ASC, p.name ASC, p.id ASC
     """)
 
+CATEGORY_KHMER_MAP = {
+    'aluminium box': 'ប្រអប់អាលុយមីញ៉ូម',
+    'aluminum box': 'ប្រអប់អាលុយមីញ៉ូម',
+    'rice box': 'ប្រអប់បាយ',
+    'rec. box': 'ប្រអប់ជ្រុង',
+    'rec box': 'ប្រអប់ជ្រុង',
+    'plastic': 'ផ្លាស្ទិក',
+    'bowl': 'ចានស៊ុប',
+    'bottle': 'ដបទឹក',
+    'small cup': 'កូនកែវ',
+    'folk/spoon': 'ស្លាបព្រា និង សម',
+    'spoon & fork': 'ស្លាបព្រា និង សម',
+    'cup': 'កែវភេសជ្ជៈ',
+    'cake box': 'ប្រអប់នំខេក',
+    'paper fodo box': 'ប្រអប់ក្រដាសអាហារ',
+    'bagasse': 'ប្រអប់ត្រចៀកកាំ / ក្រដាសអំពៅ',
+    'paper bag': 'ថង់ក្រដាស',
+    'paper cake box': 'ប្រអប់ក្រដាសនំខេក',
+    'paper bowl': 'ចានក្រដាស',
+    'paper cup': 'កែវក្រដាស',
+    'delivery': 'ដឹកជញ្ជូន',
+    'printing': 'ការបោះពុម្ព',
+    'eco': 'អេកូឡូស៊ី',
+    'food box': 'ប្រអប់អាហារ',
+    'bag': 'ថង់ច្រក',
+    'straw': 'ទុយោ',
+    'tape': 'ស្កុត',
+    'paper': 'ក្រដាស',
+    'sauce cup': 'កូនកែវទឹកជ្រលក់',
+    'gloves': 'ស្រោមដៃ',
+    'food container': 'ប្រអប់ដាក់អាហារ',
+    'foil': 'ក្រដាសអាលុយមីញ៉ូម (Foil)',
+    'other': 'ផ្សេងៗ',
+    'general': 'ទូទៅ',
+}
+
+def _get_category_khmer(cat_name):
+    if not cat_name:
+        return 'ទូទៅ'
+    key = str(cat_name).strip().lower()
+    return CATEGORY_KHMER_MAP.get(key, cat_name)
+
+def _extract_product_size(prod):
+    """
+    Extract clean product size/dimension string.
+    Prioritizes dimensions (LxWxH), capacity (ml, oz), caliber (mm), or custom fields.
+    """
+    l_val = prod.get('length')
+    w_val = prod.get('width')
+    h_val = prod.get('height')
+    try:
+        l = float(l_val or 0)
+    except Exception:
+        l = 0.0
+    try:
+        w = float(w_val or 0)
+    except Exception:
+        w = 0.0
+    try:
+        h = float(h_val or 0)
+    except Exception:
+        h = 0.0
+
+    if l > 0 and w > 0 and h > 0:
+        return f"{l:g}cm x {w:g}cm x {h:g}cm"
+    elif l > 0 and w > 0:
+        return f"{l:g}cm x {w:g}cm"
+
+    cap = (prod.get('capacity') or '').strip()
+    if cap:
+        return cap
+
+    custom = (prod.get('price_card_custom_detail') or '').strip()
+    if custom:
+        for line in custom.splitlines():
+            line_str = line.strip()
+            if line_str.startswith(('ទំហំ:', 'ទំហំ :', 'Size:', 'Size :')):
+                val = re.sub(r'^(?:ទំហំ|Size)\s*:\s*', '', line_str, flags=re.I).strip()
+                if val:
+                    return val
+
+    # Search in product name, description, and custom text
+    search_text = f"{prod.get('name') or ''} {prod.get('description') or ''} {custom}"
+
+    # Volume (e.g. 2500 ml, 3000 ml, 500ml, 16 oz, 750 ml)
+    vol_match = re.search(r'\b(\d+(?:\.\d+)?\s*(?:ml|l|oz|cc|g|kg))\b', search_text, re.IGNORECASE)
+    if vol_match:
+        return vol_match.group(1).strip()
+
+    # Dimensions in text (e.g. 22cm x 14cm x 3cm, 25cm x 21cm, 80mm x 80mm)
+    dim_match = re.search(r'(\d+(?:\.\d+)?\s*(?:cm|mm)\s*[xX*×]\s*\d+(?:\.\d+)?\s*(?:cm|mm)?(?:\s*[xX*×]\s*\d+(?:\.\d+)?\s*(?:cm|mm)?)?)', search_text)
+    if dim_match:
+        return dim_match.group(1).strip()
+
+    # Caliber/diameter (e.g. 80mm, 90mm, 95mm, 115mm)
+    cal_match = re.search(r'\b(\d{2,3}\s*mm)\b', search_text, re.IGNORECASE)
+    if cal_match:
+        return cal_match.group(1).strip()
+
+    if l > 0:
+        return f"{l:g}cm"
+
+    return ''
+
+def _extract_product_packaging(prod):
+    """Extract packaging specification string (e.g. 400 ប្រអប់/កេស (8 ដុំ x 50))."""
+    try:
+        packs = float(prod.get('packs_per_case') or 0)
+    except Exception:
+        packs = 0.0
+    try:
+        pcs_pack = float(prod.get('pcs_per_pack') or 0)
+    except Exception:
+        pcs_pack = 0.0
+    try:
+        ratio_std = float(prod.get('sales_uom_ratio_std') or 0)
+    except Exception:
+        ratio_std = 0.0
+    card_unit = prod.get('price_card_unit') or prod.get('uom') or 'pcs'
+
+    if ratio_std > 1:
+        pcs_case = ratio_std
+        if pcs_pack > 0:
+            pk_cnt = round(pcs_case / pcs_pack, 1)
+            return f"{pcs_case:g} {card_unit}/កេស ({pk_cnt:g} ដុំ x {pcs_pack:g})"
+        else:
+            return f"{pcs_case:g} {card_unit}/កេស"
+    elif packs > 0 and pcs_pack > 0:
+        pcs_case = packs * pcs_pack
+        return f"{pcs_case:g} {card_unit}/កេស ({packs:g} ដុំ x {pcs_pack:g})"
+    elif prod.get('uom'):
+        return f"ខ្នាត: {prod.get('uom')}"
+    return ''
+
+def _extract_product_clean_detail(prod, size_str='', pkg_str=''):
+    """Extract extra remarks or details without repeating size or packaging."""
+    custom = (prod.get('price_card_custom_detail') or '').strip()
+    if prod.get('price_card_is_custom_detail') and custom:
+        remaining_lines = []
+        for line in custom.splitlines():
+            l_str = line.strip()
+            if not l_str:
+                continue
+            if re.match(r'^(?:ទំហំ|Size)\s*:', l_str, re.IGNORECASE):
+                continue
+            if re.match(r'^(?:ការវេចខ្ចប់|វេចខ្ចប់|Packaging)\s*:', l_str, re.IGNORECASE):
+                continue
+            if pkg_str and pkg_str in l_str:
+                continue
+            if size_str and size_str in l_str:
+                continue
+            remaining_lines.append(l_str)
+        if remaining_lines:
+            return " • ".join(remaining_lines)
+
+    desc = (prod.get('description') or '').strip()
+    if desc and desc != pkg_str and desc != size_str:
+        return desc
+
+    remarks = (prod.get('remarks') or '').strip()
+    if remarks and remarks != desc:
+        return remarks
+
+    extra_parts = []
+    if prod.get('material'):
+        extra_parts.append(f"សម្ភារៈ: {prod['material']}")
+    if prod.get('brand'):
+        extra_parts.append(f"ម៉ាក: {prod['brand']}")
+    if extra_parts:
+        return " • ".join(extra_parts)
+
+    return ''
+
     category_groups = {}
     for c in categories:
         category_groups[c['id']] = {
             'id': c['id'],
             'name': c['name'],
+            'khmer_name': _get_category_khmer(c['name']),
             'color': c['color'] or '#149e9e',
             'description': c['description'] or '',
             'products': []
@@ -3511,6 +3685,7 @@ def product_catalog_view():
     general_group = {
         'id': 0,
         'name': 'General',
+        'khmer_name': 'ទូទៅ',
         'color': '#149e9e',
         'description': '',
         'products': []
@@ -3520,53 +3695,19 @@ def product_catalog_view():
     for prod in products:
         names = _split_khmer_english(prod.get('name'), prod.get('sku'))
 
+        size_display = _extract_product_size(prod)
+        packaging_display = _extract_product_packaging(prod)
+        clean_detail = _extract_product_clean_detail(prod, size_str=size_display, pkg_str=packaging_display)
+
         detail_lines = []
-        custom_detail = ''
-        if prod.get('price_card_is_custom_detail') and prod.get('price_card_custom_detail'):
-            custom_detail = str(prod['price_card_custom_detail']).strip()
+        if size_display:
+            detail_lines.append(f"ទំហំ: {size_display}")
+        if packaging_display:
+            detail_lines.append(f"ការវេចខ្ចប់: {packaging_display}")
+        if clean_detail:
+            detail_lines.append(clean_detail)
 
-        desc = (prod.get('description') or '').strip()
-
-        # Dimensions
-        l_val = prod.get('length')
-        w_val = prod.get('width')
-        h_val = prod.get('height')
-        dim_str = ''
-        if (l_val and float(l_val) > 0) or (w_val and float(w_val) > 0) or (h_val and float(h_val) > 0):
-            dim_str = f"{float(l_val or 0):g}cm x {float(w_val or 0):g}cm x {float(h_val or 0):g}cm"
-            detail_lines.append(f"ទំហំ: {dim_str}")
-
-        # Packaging specs
-        packs = float(prod.get('packs_per_case') or 0)
-        pcs_pack = float(prod.get('pcs_per_pack') or 0)
-        ratio_std = float(prod.get('sales_uom_ratio_std') or 0)
-        card_unit = prod.get('price_card_unit') or prod.get('uom') or 'pcs'
-
-        if ratio_std > 1:
-            pcs_case = ratio_std
-            if pcs_pack > 0:
-                pk_cnt = round(pcs_case / pcs_pack, 1)
-                detail_lines.append(f"ការវេចខ្ចប់: {pcs_case:g} {card_unit}/កេស ({pk_cnt:g} ដុំ x {pcs_pack:g})")
-            else:
-                detail_lines.append(f"ការវេចខ្ចប់: {pcs_case:g} {card_unit}/កេស")
-        elif packs > 0 and pcs_pack > 0:
-            pcs_case = packs * pcs_pack
-            detail_lines.append(f"ការវេចខ្ចប់: {pcs_case:g} {card_unit}/កេស ({packs:g} ដុំ x {pcs_pack:g})")
-        elif prod.get('uom'):
-            detail_lines.append(f"ខ្នាត: {prod.get('uom')}")
-
-        if prod.get('capacity'):
-            detail_lines.append(f"ចំណុះ: {prod['capacity']}")
-        if prod.get('material'):
-            detail_lines.append(f"សម្ភារៈ: {prod['material']}")
-        if prod.get('brand'):
-            detail_lines.append(f"ម៉ាក: {prod['brand']}")
-
-        remarks = (prod.get('remarks') or '').strip()
-        if remarks and remarks != desc:
-            detail_lines.append(f"ចំណាំ: {remarks}")
-
-        primary_detail = custom_detail if custom_detail else (desc if desc else (" • ".join(detail_lines) if detail_lines else "ផលិតផលស្តង់ដារគុណភាពខ្ពស់"))
+        primary_detail = clean_detail if clean_detail else (packaging_display if packaging_display else (size_display if size_display else "ផលិតផលស្តង់ដារគុណភាពខ្ពស់"))
 
         item = {
             'id': prod['id'],
@@ -3578,9 +3719,12 @@ def product_catalog_view():
             'category_id': prod.get('category_id') or 0,
             'category_name': prod.get('category_name') or 'General',
             'category_color': prod.get('category_color') or '#149e9e',
-            'dim_str': dim_str,
+            'size_display': size_display,
+            'packaging_display': packaging_display,
+            'clean_detail': clean_detail,
+            'dim_str': size_display,
             'detail_lines': detail_lines,
-            'description': desc,
+            'description': (prod.get('description') or '').strip(),
             'primary_detail': primary_detail,
             'uom': prod.get('uom') or '',
             'barcode': prod.get('barcode') or ''
@@ -3597,22 +3741,40 @@ def product_catalog_view():
     if len(general_group['products']) > 0:
         arranged_categories.append(general_group)
 
-    # Chunk products into spreads of up to 10 products per spread
+    # Arrange products into A4 Sheets: 1 Big Hero item on top + up to 6 sub-items below (total 7 items per A4 sheet)
     for cat in arranged_categories:
         prods = cat['products']
-        spreads = []
-        chunk_size = 10
+        a4_pages = []
+        chunk_size = 7
+        total_pages = (len(prods) + chunk_size - 1) // chunk_size if prods else 1
+
         for i in range(0, len(prods), chunk_size):
             chunk = prods[i:i + chunk_size]
-            left_page_items = chunk[:4]
-            right_page_items = chunk[4:]
-            spreads.append({
-                'spread_index': len(spreads) + 1,
-                'left_page_items': left_page_items,
-                'right_page_items': right_page_items,
-                'all_spread_items': chunk
+
+            # Prioritize an item with an image as hero_item for stunning visual appearance
+            hero_idx = 0
+            for idx, itm in enumerate(chunk):
+                if itm.get('image_url'):
+                    hero_idx = idx
+                    break
+            hero_item = chunk[hero_idx]
+            sub_items = [itm for idx, itm in enumerate(chunk) if idx != hero_idx]
+
+            page_index = len(a4_pages) + 1
+            a4_pages.append({
+                'spread_index': page_index,
+                'page_number': page_index,
+                'total_pages': total_pages,
+                'hero_item': hero_item,
+                'sub_items': sub_items,
+                'all_page_items': chunk,
+                # Compatibility fields for any existing templates or tests:
+                'left_page_items': [hero_item] + sub_items[:3],
+                'right_page_items': sub_items[3:],
+                'all_spread_items': chunk,
             })
-        cat['spreads'] = spreads
+        cat['a4_pages'] = a4_pages
+        cat['spreads'] = a4_pages  # maintain backwards compatibility
 
     return render_template('products/product_catalog.html',
                            categories=arranged_categories,

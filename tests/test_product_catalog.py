@@ -90,5 +90,47 @@ class TestProductCatalog(unittest.TestCase):
         self.assertIn('switchCatalogView', self.catalog_html)
         self.assertIn('window.print()', self.catalog_html)
 
+    def test_khmer_category_and_collection_title(self):
+        """Verify Khmer category mapping and collection title banner."""
+        # Routes check
+        self.assertIn('CATEGORY_KHMER_MAP', self.routes_code)
+        self.assertIn('_get_category_khmer', self.routes_code)
+        self.assertIn('cat.khmer_name', self.catalog_html)
+        # Banner check
+        self.assertIn('បណ្តុំផលិតផល {{ cat.khmer_name }}', self.catalog_html)
+        self.assertIn('Collection Of {{ cat.name }}', self.catalog_html)
+        # Category pills check
+        self.assertIn('{{ cat.khmer_name }}', self.catalog_html)
+
+    def test_a4_paper_layout_and_7_item_chunking(self):
+        """Verify A4 Paper layout: 1 big hero on top and 6 items below (7 items per A4 page)."""
+        # Routes 7-item chunking
+        self.assertIn('chunk_size = 7', self.routes_code)
+        self.assertIn('hero_item', self.routes_code)
+        self.assertIn('sub_items', self.routes_code)
+        self.assertIn('a4_pages', self.routes_code)
+
+        # Template A4 structure
+        self.assertIn('class="a4-sheet booklet-spread"', self.catalog_html)
+        self.assertIn('class="a4-hero-card', self.catalog_html)
+        self.assertIn('class="a4-subgrid-6"', self.catalog_html)
+        self.assertIn('page.hero_item', self.catalog_html)
+        self.assertIn('page.sub_items', self.catalog_html)
+
+        # Print CSS A4 Portrait
+        self.assertIn('size: A4 portrait;', self.catalog_html)
+        self.assertIn('page-break-after: always', self.catalog_html)
+
+    def test_product_size_extraction_and_display(self):
+        """Verify product size is extracted and displayed in product details."""
+        # Route extractors
+        self.assertIn('_extract_product_size', self.routes_code)
+        self.assertIn('_extract_product_packaging', self.routes_code)
+        self.assertIn('size_display', self.routes_code)
+
+        # Template size display
+        self.assertIn('size_display', self.catalog_html)
+        self.assertIn('ទំហំ', self.catalog_html)
+
 if __name__ == '__main__':
     unittest.main()
