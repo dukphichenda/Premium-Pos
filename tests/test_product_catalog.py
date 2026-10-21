@@ -130,5 +130,65 @@ class TestProductCatalog(unittest.TestCase):
         self.assertIn('size_display', self.catalog_html)
         self.assertIn('ទំហំ', self.catalog_html)
 
+    def test_fit_blank_paper_5_products_height_and_expansion(self):
+        """Verify 5 products expand to fill the full A4 portrait blank paper."""
+        # CSS checks for sheet height & vertical flex space distribution
+        self.assertIn('height: 1140px;', self.catalog_html)
+        self.assertIn('justify-content: space-between;', self.catalog_html)
+        self.assertIn('width: 145px;', self.catalog_html)
+        self.assertIn('height: 125px;', self.catalog_html)
+
+    def test_multi_category_and_product_selection(self):
+        """Verify multi-category selection and multi-product checkbox selection logic."""
+        # Multi-category pills & JavaScript handlers
+        self.assertIn('toggleCategoryFilter', self.catalog_html)
+        self.assertIn('selectAllCategories', self.catalog_html)
+        self.assertIn('selectedCategories = new Set', self.catalog_html)
+
+        # Multi-product selection checkboxes and buttons
+        self.assertIn('class="cat-prod-check"', self.catalog_html)
+        self.assertIn('onProductCheckChange', self.catalog_html)
+        self.assertIn('selectedProducts = new Set', self.catalog_html)
+        self.assertIn('id="btnSelectedOnly"', self.catalog_html)
+        self.assertIn('id="btnSelectAll"', self.catalog_html)
+        self.assertIn('toggleSelectedOnlyView', self.catalog_html)
+        self.assertIn('toggleSelectAllVisible', self.catalog_html)
+
+    def test_grid_view_working_toggle(self):
+        """Verify Grid view toggle switches views cleanly without CSS display conflicts."""
+        self.assertIn('switchCatalogView', self.catalog_html)
+        self.assertIn('id="catalogGridView"', self.catalog_html)
+        self.assertIn('id="catalogSpreadView"', self.catalog_html)
+        self.assertIn("spreadContainer.style.setProperty('display'", self.catalog_html)
+        self.assertIn("gridContainer.style.setProperty('display'", self.catalog_html)
+        self.assertIn('.catalog-spreads-container.active-view', self.catalog_html)
+        self.assertIn('.catalog-grid-view.active-view', self.catalog_html)
+
+    def test_configurable_columns_and_rows_layout(self):
+        """Verify configurable number of columns and rows to fit products per page."""
+        # Route query parameters & chunk calculation
+        self.assertIn("request.args.get('cols'", self.routes_code)
+        self.assertIn("request.args.get('rows'", self.routes_code)
+        self.assertIn("chunk_size = cols * rows", self.routes_code)
+
+        # Template UI controls for Cols & Rows
+        self.assertIn('id="catalogColsSelect"', self.catalog_html)
+        self.assertIn('id="catalogRowsSelect"', self.catalog_html)
+        self.assertIn('id="catalogPerPageBadge"', self.catalog_html)
+        self.assertIn('id="headerLayoutSummary"', self.catalog_html)
+        self.assertIn('cat-layout-control', self.catalog_html)
+
+        # Multi-column grid CSS definitions
+        self.assertIn('.a4-products-list.cols-1', self.catalog_html)
+        self.assertIn('.a4-products-list.cols-2', self.catalog_html)
+        self.assertIn('.a4-products-list.cols-3', self.catalog_html)
+        self.assertIn('.a4-products-list.cols-4', self.catalog_html)
+
+        # Dynamic JavaScript re-chunking logic
+        self.assertIn('onLayoutConfigChange', self.catalog_html)
+        self.assertIn('rechunkCatalogPages', self.catalog_html)
+        self.assertIn('categoryCardsStore', self.catalog_html)
+
 if __name__ == '__main__':
     unittest.main()
+

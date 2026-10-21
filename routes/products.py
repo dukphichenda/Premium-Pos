@@ -3741,11 +3741,18 @@ def product_catalog_view():
     if len(general_group['products']) > 0:
         arranged_categories.append(general_group)
 
-    # Arrange products into A4 Sheets: exactly 5 products per page (1 column, 1 row per product)
+    cols = request.args.get('cols', default=1, type=int)
+    rows = request.args.get('rows', default=5, type=int)
+    cols = max(1, min(4, cols))
+    rows = max(1, min(10, rows))
+    chunk_size = 5
+    if 'cols' in request.args or 'rows' in request.args:
+        chunk_size = cols * rows
+
+    # Arrange products into A4 Sheets: configurable columns and rows (default 1 column x 5 rows)
     for cat in arranged_categories:
         prods = cat['products']
         a4_pages = []
-        chunk_size = 5
         total_pages = (len(prods) + chunk_size - 1) // chunk_size if prods else 1
 
         for i in range(0, len(prods), chunk_size):
@@ -3771,7 +3778,10 @@ def product_catalog_view():
     return render_template('products/product_catalog.html',
                            categories=arranged_categories,
                            all_items=all_items,
-                           total_products=len(all_items))
+                           total_products=len(all_items),
+                           cols=cols,
+                           rows=rows,
+                           chunk_size=chunk_size)
 
 DEFAULT_PRICE_CARD_UNITS = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម']
 
