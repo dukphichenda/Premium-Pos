@@ -2055,6 +2055,8 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
 
                         <!-- Price Table Style Switcher (Classic / Modern / Cute Look) -->
                         {% set active_style = (price_card.price_table_style if price_card else (product.price_table_style or 'classic'))|lower %}
+                        {% set std_uom_name = (price_card.standard_uom if price_card and price_card.standard_uom else (product.uom or 'pcs.')) %}
+                        {% set std_uom_badge = (price_card.standard_uom_display if price_card and price_card.standard_uom_display else (std_uom_name|replace('.', '')|upper)) %}
                         <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic, Modern, ឬ Cute Look)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
                             <button type="button" id="btnDetailStyleClassic" class="btn-detail-style {{ 'active-classic' if active_style == 'classic' else '' }}" onclick="setProductPriceCardStyle('classic')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
                                 Classic
@@ -2203,7 +2205,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                         <div class="inflow-spec-price-row">
                             <div class="inflow-spec-price-left-cell">
                                 <span class="inflow-spec-qty-label">
-                                    <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" onchange="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS) =
+                                    <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" onchange="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
                                 </span>
                                 <span class="inflow-spec-total-price">
                                     <input type="text" id="cardTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(1)" onchange="onCardTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
@@ -2211,7 +2213,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             </div>
                             <div class="inflow-spec-price-right-cell">
                                 <span class="inflow-spec-unit-price" id="cardTierUnitDisplay1">
-                                    ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/PCS)
+                                    ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                 </span>
                             </div>
                         </div>
@@ -2219,7 +2221,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                         <div class="inflow-spec-price-row">
                             <div class="inflow-spec-price-left-cell">
                                 <span class="inflow-spec-qty-label">
-                                    <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" onchange="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS) =
+                                    <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" onchange="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
                                 </span>
                                 <span class="inflow-spec-total-price">
                                     <input type="text" id="cardTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(2)" onchange="onCardTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
@@ -2227,7 +2229,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             </div>
                             <div class="inflow-spec-price-right-cell">
                                 <span class="inflow-spec-unit-price" id="cardTierUnitDisplay2">
-                                    ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/PCS)
+                                    ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                 </span>
                             </div>
                         </div>
@@ -2235,7 +2237,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                         <div class="inflow-spec-price-row">
                             <div class="inflow-spec-price-left-cell">
                                 <span class="inflow-spec-qty-label">
-                                    <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" onchange="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS) =
+                                    <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" onchange="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
                                 </span>
                                 <span class="inflow-spec-total-price">
                                     <input type="text" id="cardTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(3)" onchange="onCardTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
@@ -2243,7 +2245,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             </div>
                             <div class="inflow-spec-price-right-cell">
                                 <span class="inflow-spec-unit-price" id="cardTierUnitDisplay3">
-                                    ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/PCS)
+                                    ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                 </span>
                             </div>
                         </div>
@@ -2372,7 +2374,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 <div class="inflow-modern-tier-row">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <span class="inflow-modern-qty-badge font-khmer">
-                                            <input type="number" id="cardModernTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(1)" onchange="onModernTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS)
+                                            <input type="number" id="cardModernTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(1)" onchange="onModernTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                         </span>
                                         <span style="font-weight: 800; color: #64748B;">=</span>
                                         <span class="inflow-modern-tier-tot">
@@ -2381,7 +2383,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                     </div>
                                     <div style="text-align: right;">
                                         <span class="inflow-modern-tier-unit" id="cardModernTierUnitDisplay1">
-                                            ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/PCS)
+                                            ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                         </span>
                                     </div>
                                 </div>
@@ -2389,7 +2391,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 <div class="inflow-modern-tier-row">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <span class="inflow-modern-qty-badge font-khmer">
-                                            <input type="number" id="cardModernTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(2)" onchange="onModernTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS)
+                                            <input type="number" id="cardModernTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(2)" onchange="onModernTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                         </span>
                                         <span style="font-weight: 800; color: #64748B;">=</span>
                                         <span class="inflow-modern-tier-tot">
@@ -2398,7 +2400,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                     </div>
                                     <div style="text-align: right;">
                                         <span class="inflow-modern-tier-unit" id="cardModernTierUnitDisplay2">
-                                            ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/PCS)
+                                            ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                         </span>
                                     </div>
                                 </div>
@@ -2406,7 +2408,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 <div class="inflow-modern-tier-row">
                                     <div style="display: flex; align-items: center; gap: 8px;">
                                         <span class="inflow-modern-qty-badge font-khmer">
-                                            <input type="number" id="cardModernTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(3)" onchange="onModernTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (PCS)
+                                            <input type="number" id="cardModernTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(3)" onchange="onModernTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                         </span>
                                         <span style="font-weight: 800; color: #64748B;">=</span>
                                         <span class="inflow-modern-tier-tot">
@@ -2415,7 +2417,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                     </div>
                                     <div style="text-align: right;">
                                         <span class="inflow-modern-tier-unit" id="cardModernTierUnitDisplay3">
-                                            ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/PCS)
+                                            ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                         </span>
                                     </div>
                                 </div>
@@ -2542,7 +2544,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             <div class="inflow-cute-tier-row">
                                 <div class="inflow-cute-left-pill">
                                     <span class="inflow-cute-tier-qty font-khmer">
-                                        <input type="number" id="cardCuteTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(1)" onchange="onCuteTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS) =
+                                        <input type="number" id="cardCuteTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(1)" onchange="onCuteTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
                                     </span>
                                     <span class="inflow-cute-tier-tot-coral font-khmer">
                                         <input type="text" id="cardCuteTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 7.50) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(1)" onchange="onCuteTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
@@ -2550,7 +2552,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 </div>
                                 <div class="inflow-cute-right-pill">
                                     <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay1">
-                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                 </div>
                             </div>
@@ -2559,7 +2561,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             <div class="inflow-cute-tier-row">
                                 <div class="inflow-cute-left-pill">
                                     <span class="inflow-cute-tier-qty font-khmer">
-                                        <input type="number" id="cardCuteTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(2)" onchange="onCuteTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS) =
+                                        <input type="number" id="cardCuteTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(2)" onchange="onCuteTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
                                     </span>
                                     <span class="inflow-cute-tier-tot-coral font-khmer">
                                         <input type="text" id="cardCuteTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 28.00) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(2)" onchange="onCuteTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
@@ -2567,7 +2569,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 </div>
                                 <div class="inflow-cute-right-pill">
                                     <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay2">
-                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                 </div>
                             </div>
@@ -2576,7 +2578,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             <div class="inflow-cute-tier-row">
                                 <div class="inflow-cute-left-pill">
                                     <span class="inflow-cute-tier-qty font-khmer">
-                                        <input type="number" id="cardCuteTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(3)" onchange="onCuteTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS) =
+                                        <input type="number" id="cardCuteTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(3)" onchange="onCuteTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
                                     </span>
                                     <span class="inflow-cute-tier-tot-coral font-khmer">
                                         <input type="text" id="cardCuteTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 52.00) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(3)" onchange="onCuteTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
@@ -2584,7 +2586,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 </div>
                                 <div class="inflow-cute-right-pill">
                                     <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay3">
-                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                 </div>
                             </div>
@@ -2749,7 +2751,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             <div class="inflow-genz-tier-row">
                                 <div class="inflow-genz-left-cell">
                                     <span class="inflow-genz-tier-qty font-khmer">
-                                        <input type="number" id="cardGenZTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(1)" onchange="onGenZTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS)
+                                        <input type="number" id="cardGenZTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(1)" onchange="onGenZTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                     <span class="inflow-genz-price-pill font-khmer">
                                         $<input type="text" id="cardGenZTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 7.50) }}" class="inflow-genz-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #166534; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onGenZTierTotChange(1)" onchange="onGenZTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}>
@@ -2757,7 +2759,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 </div>
                                 <div class="inflow-genz-right-cell">
                                     <span class="inflow-genz-tier-unit" id="cardGenZTierUnitDisplay1">
-                                        ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }} $/PCS)
+                                        ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                 </div>
                             </div>
@@ -2766,7 +2768,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             <div class="inflow-genz-tier-row">
                                 <div class="inflow-genz-left-cell">
                                     <span class="inflow-genz-tier-qty font-khmer">
-                                        <input type="number" id="cardGenZTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(2)" onchange="onGenZTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS)
+                                        <input type="number" id="cardGenZTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(2)" onchange="onGenZTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                     <span class="inflow-genz-price-pill font-khmer">
                                         $<input type="text" id="cardGenZTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 28.00) }}" class="inflow-genz-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #166534; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onGenZTierTotChange(2)" onchange="onGenZTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}>
@@ -2774,7 +2776,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 </div>
                                 <div class="inflow-genz-right-cell">
                                     <span class="inflow-genz-tier-unit" id="cardGenZTierUnitDisplay2">
-                                        ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }} $/PCS)
+                                        ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                 </div>
                             </div>
@@ -2783,7 +2785,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             <div class="inflow-genz-tier-row">
                                 <div class="inflow-genz-left-cell">
                                     <span class="inflow-genz-tier-qty font-khmer">
-                                        <input type="number" id="cardGenZTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(3)" onchange="onGenZTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (PCS)
+                                        <input type="number" id="cardGenZTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(3)" onchange="onGenZTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                     <span class="inflow-genz-price-pill font-khmer">
                                         $<input type="text" id="cardGenZTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 52.00) }}" class="inflow-genz-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #166534; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onGenZTierTotChange(3)" onchange="onGenZTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}>
@@ -2791,7 +2793,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 </div>
                                 <div class="inflow-genz-right-cell">
                                     <span class="inflow-genz-tier-unit" id="cardGenZTierUnitDisplay3">
-                                        ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }} $/PCS)
+                                        ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                     </span>
                                 </div>
                             </div>
@@ -2831,7 +2833,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                         <tbody>
                             <tr>
                                 <td style="text-align: left; font-weight: 700; color: #0284C7;">
-                                    <span id="profitTierQty1">{{ price_card.tier_qty_1 if price_card else 100 }}</span> ប្រអប់ (PCS)
+                                    <span id="profitTierQty1">{{ price_card.tier_qty_1 if price_card else 100 }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                 </td>
                                 <td style="text-align: right;" id="profitCost1">
                                     {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
@@ -2845,7 +2847,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             </tr>
                             <tr>
                                 <td style="text-align: left; font-weight: 700; color: #0284C7;">
-                                    <span id="profitTierQty2">{{ price_card.tier_qty_2 if price_card else 400 }}</span> ប្រអប់ (PCS)
+                                    <span id="profitTierQty2">{{ price_card.tier_qty_2 if price_card else 400 }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                 </td>
                                 <td style="text-align: right;" id="profitCost2">
                                     {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
@@ -2859,7 +2861,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                             </tr>
                             <tr>
                                 <td style="text-align: left; font-weight: 700; color: #0284C7;">
-                                    <span id="profitTierQty3">{{ price_card.tier_qty_3 if price_card else 800 }}</span> ប្រអប់ (PCS)
+                                    <span id="profitTierQty3">{{ price_card.tier_qty_3 if price_card else 800 }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
                                 </td>
                                 <td style="text-align: right;" id="profitCost3">
                                     {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
@@ -3675,15 +3677,25 @@ function saveProductChanges(callback) {
         pendingChanges['price_card_unit'] = unitEl.value.trim();
         isDirty = true;
     }
-    const chkCustomEl = document.getElementById('chkCustomDetail') || document.getElementById('chkCustomDetailToolbar');
-    if (chkCustomEl && (pendingChanges['price_card_is_custom_detail'] !== undefined || chkCustomEl.checked !== chkCustomEl.defaultChecked)) {
-        pendingChanges['price_card_is_custom_detail'] = chkCustomEl.checked;
+    const cuteCustomEl = document.getElementById('specCuteCustomTextarea');
+    const modernCustomEl = document.getElementById('specModernCustomTextarea');
+    const classicCustomEl = document.getElementById('specCustomDetailTextarea');
+    const chkCustomEl = document.getElementById('chkCustomDetailToolbar') || document.getElementById('chkCustomDetail');
+    
+    let currentCustomVal = '';
+    if (cuteCustomEl && cuteCustomEl.value.trim()) currentCustomVal = cuteCustomEl.value.trim();
+    else if (modernCustomEl && modernCustomEl.value.trim()) currentCustomVal = modernCustomEl.value.trim();
+    else if (classicCustomEl && classicCustomEl.value.trim()) currentCustomVal = classicCustomEl.value.trim();
+
+    if (chkCustomEl && (pendingChanges['price_card_is_custom_detail'] !== undefined || chkCustomEl.checked !== chkCustomEl.defaultChecked || (currentCustomVal.length > 0 && !chkCustomEl.defaultChecked))) {
+        pendingChanges['price_card_is_custom_detail'] = chkCustomEl.checked || (currentCustomVal.length > 0);
         isDirty = true;
     }
-    const customDetailEl = document.getElementById('specCustomDetailTextarea');
-    if (customDetailEl && (pendingChanges['price_card_custom_detail'] !== undefined || String(customDetailEl.value).trim() !== String(customDetailEl.defaultValue || '').trim())) {
-        pendingChanges['price_card_custom_detail'] = customDetailEl.value.trim();
-        isDirty = true;
+    if (currentCustomVal.length > 0 || classicCustomEl || cuteCustomEl || modernCustomEl) {
+        if (pendingChanges['price_card_custom_detail'] !== undefined || currentCustomVal !== (classicCustomEl?.defaultValue || cuteCustomEl?.defaultValue || modernCustomEl?.defaultValue || '').trim()) {
+            pendingChanges['price_card_custom_detail'] = currentCustomVal;
+            isDirty = true;
+        }
     }
 
     if (!isDirty && Object.keys(pendingChanges).length === 0 && Object.keys(pendingPrices).length === 0 && !stagedProductImageFile) {
@@ -3795,7 +3807,7 @@ function saveProductChanges(callback) {
                         }
                         const uDisp = document.getElementById('cardTierUnitDisplay' + idx);
                         if (uDisp && c['u_price_' + idx] !== undefined) {
-                            uDisp.innerText = `(${Number(c['u_price_' + idx]).toFixed(3)} $/PCS)`;
+                            uDisp.innerText = `(${Number(c['u_price_' + idx]).toFixed(3)} $/${getActiveStdUomBadge()})`;
                         }
                         const pQty = document.getElementById('profitTierQty' + idx);
                         if (pQty && c['tier_qty_' + idx] !== undefined) {
@@ -4953,6 +4965,18 @@ function submitSetCost(prodId) {
     });
 }
 
+function getActiveStdUomBadge() {
+    const sel = document.getElementById('standardUomSelect');
+    if (sel && sel.value) {
+        return sel.value.replace(/\./g, '').trim().toUpperCase() || 'PCS';
+    }
+    const firstLbl = document.querySelector('.card-std-uom-label');
+    if (firstLbl && firstLbl.innerText.trim()) {
+        return firstLbl.innerText.trim().toUpperCase();
+    }
+    return 'PCS';
+}
+
 /* Unit of Measure & Storage Info Change Handlers */
 function onStandardUomChange(newUom) {
     newUom = (newUom || 'pcs.').trim();
@@ -4962,6 +4986,13 @@ function onStandardUomChange(newUom) {
     if (stdTag) stdTag.innerText = newUom;
     const purchStdTag = document.getElementById('lblPurchasingStdUom');
     if (purchStdTag) purchStdTag.innerText = newUom;
+    
+    const badgeText = newUom.replace(/\./g, '').toUpperCase() || 'PCS';
+    document.querySelectorAll('.card-std-uom-label, .inflow-cute-pcs-badge').forEach(el => {
+        el.innerText = badgeText;
+    });
+    
+    syncCardTierInputs();
     markFieldDirty('uom', newUom);
     onConversionRatioChange();
 }
@@ -6029,20 +6060,31 @@ const MODERN_ICON_SVGS = {
     package: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>`
 };
 
-function renderModernSpecsHtml(rawText) {
-    if (!rawText) return '';
+function parseSpecsTextToItems(rawText) {
+    if (!rawText) return [];
     const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    if (lines.length === 0) return '';
-    
     const items = [];
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i];
+    for (const rawLine of lines) {
+        let line = rawLine.replace(/^[★•●\-\*]\s*/, '').trim();
+        if (!line) continue;
+        
         if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
             items[items.length - 1].sub = line;
         } else {
-            items.push({ main: line, sub: '' });
+            const subMatch = line.match(/^(.*?)\s*(\([^)]+\))$/);
+            if (subMatch && subMatch[1].trim()) {
+                items.push({ main: subMatch[1].trim(), sub: subMatch[2].trim() });
+            } else {
+                items.push({ main: line, sub: '' });
+            }
         }
     }
+    return items;
+}
+
+function renderModernSpecsHtml(rawText) {
+    const items = parseSpecsTextToItems(rawText);
+    if (items.length === 0) return '';
     
     const defaultIcons = ['size', 'carton', 'layers', 'package'];
     return items.map((item, idx) => {
@@ -6147,16 +6189,8 @@ function toggleCustomPriceCardDetail(isCustom) {
 }
 
 function renderCuteSpecsHtml(text) {
-    if (!text) return '';
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    const items = [];
-    for (const line of lines) {
-        if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
-            items[items.length - 1].sub = line;
-        } else {
-            items.push({ main: line, sub: '' });
-        }
-    }
+    const items = parseSpecsTextToItems(text);
+    if (items.length === 0) return '';
     
     return items.map((item, idx) => {
         const lower = item.main.toLowerCase();
@@ -6189,16 +6223,8 @@ function renderCuteSpecsHtml(text) {
 }
 
 function renderGenZSpecsHtml(text) {
-    if (!text) return '';
-    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
-    const items = [];
-    for (const line of lines) {
-        if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
-            items[items.length - 1].sub = line;
-        } else {
-            items.push({ main: line, sub: '' });
-        }
-    }
+    const items = parseSpecsTextToItems(text);
+    if (items.length === 0) return '';
     
     return items.map((item, idx) => {
         const lower = item.main.toLowerCase();
@@ -6229,6 +6255,11 @@ function renderGenZSpecsHtml(text) {
 }
 
 function onCustomDetailInput(val) {
+    const c1 = document.getElementById('chkCustomDetail');
+    const c2 = document.getElementById('chkCustomDetailToolbar');
+    if (c1) c1.checked = true;
+    if (c2) c2.checked = true;
+
     const disp = document.getElementById('specCustomDetailDisplay');
     if (disp) disp.innerText = val;
     const mDisp = document.getElementById('specModernSpecsDisplay');
@@ -6253,10 +6284,17 @@ function onCustomDetailInput(val) {
 }
 
 function onModernCustomDetailInput(val) {
+    const c1 = document.getElementById('chkCustomDetail');
+    const c2 = document.getElementById('chkCustomDetailToolbar');
+    if (c1) c1.checked = true;
+    if (c2) c2.checked = true;
+
     const mDisp = document.getElementById('specModernSpecsDisplay');
     if (mDisp) mDisp.innerHTML = renderModernSpecsHtml(val);
     const cuteDisp = document.getElementById('specCuteSpecsDisplay');
     if (cuteDisp) cuteDisp.innerHTML = renderCuteSpecsHtml(val);
+    const genZDisp = document.getElementById('specGenZSpecsDisplay');
+    if (genZDisp) genZDisp.innerHTML = renderGenZSpecsHtml(val);
     const ta = document.getElementById('specCustomDetailTextarea');
     if (ta) ta.value = val;
     const cuteTa = document.getElementById('specCuteCustomTextarea');
@@ -6275,10 +6313,17 @@ function onModernCustomDetailInput(val) {
 }
 
 function onCuteCustomDetailInput(val) {
+    const c1 = document.getElementById('chkCustomDetail');
+    const c2 = document.getElementById('chkCustomDetailToolbar');
+    if (c1) c1.checked = true;
+    if (c2) c2.checked = true;
+
     const cuteDisp = document.getElementById('specCuteSpecsDisplay');
     if (cuteDisp) cuteDisp.innerHTML = renderCuteSpecsHtml(val);
     const mDisp = document.getElementById('specModernSpecsDisplay');
     if (mDisp) mDisp.innerHTML = renderModernSpecsHtml(val);
+    const genZDisp = document.getElementById('specGenZSpecsDisplay');
+    if (genZDisp) genZDisp.innerHTML = renderGenZSpecsHtml(val);
     const ta = document.getElementById('specCustomDetailTextarea');
     if (ta) ta.value = val;
     const mTa = document.getElementById('specModernCustomTextarea');
@@ -6425,7 +6470,7 @@ function syncTiersFromScheme(schemeId, casePrice, pcsPrice) {
         if (totInp) totInp.value = tot.toFixed(2);
         
         const uDisplay = document.getElementById('cardTierUnitDisplay' + tierIdx);
-        if (uDisplay) uDisplay.innerText = '(' + pcsPrice.toFixed(3) + ' $/PCS)';
+        if (uDisplay) uDisplay.innerText = '(' + pcsPrice.toFixed(3) + ' $/' + getActiveStdUomBadge() + ')';
         
         recalcProfitTable();
     }
@@ -6623,12 +6668,12 @@ function syncCardTierInputs() {
         if (cuteUnit && cUnit) {
             const m = cUnit.innerText.match(/([\d.]+)/);
             const num = m ? m[1] : '0.000';
-            cuteUnit.innerHTML = `(<span class="inflow-cute-uprice-val">${num}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)`;
+            cuteUnit.innerHTML = `(<span class="inflow-cute-uprice-val">${num}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">${getActiveStdUomBadge()}</span>)`;
         }
         if (genZUnit && cUnit) {
             const m = cUnit.innerText.match(/([\d.]+)/);
             const num = m ? m[1] : '0.000';
-            genZUnit.innerText = `(${num} $/PCS)`;
+            genZUnit.innerText = `(${num} $/${getActiveStdUomBadge()})`;
         }
     });
 }
@@ -6729,7 +6774,7 @@ function onCardTierTotChange(idx) {
     
     const unitPrice = qty > 0 ? (tot / qty) : 0;
     const unitDisp = document.getElementById('cardTierUnitDisplay' + idx);
-    if (unitDisp) unitDisp.innerText = `(${unitPrice.toFixed(3)} $/PCS)`;
+    if (unitDisp) unitDisp.innerText = `(${unitPrice.toFixed(3)} $/${getActiveStdUomBadge()})`;
     
     markFieldDirty('tier_price_' + idx, tot);
     
@@ -6746,7 +6791,7 @@ function recalcCardTiers() {
         const unit = qty > 0 ? (tot / qty) : 0;
         
         const unitDisp = document.getElementById('cardTierUnitDisplay' + idx);
-        if (unitDisp) unitDisp.innerText = `(${unit.toFixed(3)} $/PCS)`;
+        if (unitDisp) unitDisp.innerText = `(${unit.toFixed(3)} $/${getActiveStdUomBadge()})`;
         
         const pQty = document.getElementById('profitTierQty' + idx);
         if (pQty) pQty.innerText = qty;
@@ -6804,23 +6849,24 @@ function copyPriceCardText() {
     const packs = document.getElementById('specPacksVal')?.innerText || '';
     const pcsPack = document.getElementById('specPcsPackVal')?.innerText || '';
     const pcsCase = document.getElementById('specPcsCaseVal')?.innerText || '';
+    const stdBadge = getActiveStdUomBadge();
     
     const q1 = document.getElementById('cardTierQtyInput1')?.value || '100';
     const p1 = document.getElementById('cardTierTotInput1')?.value || '15.00';
-    const u1 = document.getElementById('cardTierUnitDisplay1')?.innerText || '(0.150 $/PCS)';
+    const u1 = document.getElementById('cardTierUnitDisplay1')?.innerText || `(0.150 $/${stdBadge})`;
     
     const q2 = document.getElementById('cardTierQtyInput2')?.value || '300';
     const p2 = document.getElementById('cardTierTotInput2')?.value || '42.00';
-    const u2 = document.getElementById('cardTierUnitDisplay2')?.innerText || '(0.140 $/PCS)';
+    const u2 = document.getElementById('cardTierUnitDisplay2')?.innerText || `(0.140 $/${stdBadge})`;
     
     const q3 = document.getElementById('cardTierQtyInput3')?.value || '600';
     const p3 = document.getElementById('cardTierTotInput3')?.value || '81.00';
-    const u3 = document.getElementById('cardTierUnitDisplay3')?.innerText || '(0.135 $/PCS)';
+    const u3 = document.getElementById('cardTierUnitDisplay3')?.innerText || `(0.135 $/${stdBadge})`;
     
     const note = document.getElementById('cardNotesInput')?.value || '';
     const unitWord = document.getElementById('priceCardUnitSelectToolbar')?.value || 'ប្រអប់';
     const isCustom = document.getElementById('chkCustomDetail')?.checked || document.getElementById('chkCustomDetailToolbar')?.checked;
-    const customText = document.getElementById('specCustomDetailTextarea')?.value.trim();
+    const customText = (document.getElementById('specCuteCustomTextarea')?.value || document.getElementById('specModernCustomTextarea')?.value || document.getElementById('specCustomDetailTextarea')?.value || '').trim();
     
     let text = `📦 ${kmTitle} / ${enTitle}\n`;
     text += `🔹 ព័ត៌មានលម្អិត:\n`;
@@ -6832,9 +6878,9 @@ function copyPriceCardText() {
         text += `• ${pcsCase} ${unitWord}/1កេស (${pcsCase} PCS/ Carton)\n\n`;
     }
     text += `💰 តារាងតម្លៃ (PRICE LIST):\n`;
-    text += `• ${q1} ${unitWord} (PCS) = $${p1} ${u1}\n`;
-    text += `• ${q2} ${unitWord} (PCS) = $${p2} ${u2}\n`;
-    text += `• ${q3} ${unitWord} (PCS) = $${p3} ${u3}\n`;
+    text += `• ${q1} ${unitWord} (${stdBadge}) = $${p1} ${u1}\n`;
+    text += `• ${q2} ${unitWord} (${stdBadge}) = $${p2} ${u2}\n`;
+    text += `• ${q3} ${unitWord} (${stdBadge}) = $${p3} ${u3}\n`;
     if (note) text += `\n📌 ចំណាំ: ${note}\n`;
     
     navigator.clipboard.writeText(text).then(() => {
@@ -7227,6 +7273,7 @@ function renderOffscreenCard(stage, item) {
     const cardFont = c.card_font || 'Kantumruy Pro';
     const activeStyle = ((c.price_table_style || item.price_table_style) || 'classic').toLowerCase();
     const unitWord = c.card_unit || 'ប្រអប់';
+    const stdBadge = (c.standard_uom_display || (c.standard_uom ? c.standard_uom.replace(/\./g, '').toUpperCase() : (item.standard_uom_display || (item.uom ? item.uom.replace(/\./g, '').toUpperCase() : 'PCS'))));
     
     updateCardColorProperties(stage, cardColor);
     stage.style.setProperty('--price-card-font', `'${cardFont}', 'Siemreap', sans-serif`);
@@ -7306,29 +7353,29 @@ function renderOffscreenCard(stage, item) {
                 </div>
                 <div class="inflow-cute-tier-row">
                     <div class="inflow-cute-left-pill">
-                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_1}</span> ${unitWord} (PCS) =</span>
+                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_1}</span> ${unitWord} (${stdBadge}) =</span>
                         <span class="inflow-cute-tier-tot-coral font-khmer">${Number(c.tot_price_1).toFixed(2)} $</span>
                     </div>
                     <div class="inflow-cute-right-pill">
-                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_1).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_1).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">${stdBadge}</span>)</span>
                     </div>
                 </div>
                 <div class="inflow-cute-tier-row">
                     <div class="inflow-cute-left-pill">
-                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_2}</span> ${unitWord} (PCS) =</span>
+                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_2}</span> ${unitWord} (${stdBadge}) =</span>
                         <span class="inflow-cute-tier-tot-coral font-khmer">${Number(c.tot_price_2).toFixed(2)} $</span>
                     </div>
                     <div class="inflow-cute-right-pill">
-                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_2).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_2).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">${stdBadge}</span>)</span>
                     </div>
                 </div>
                 <div class="inflow-cute-tier-row">
                     <div class="inflow-cute-left-pill">
-                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_3}</span> ${unitWord} (PCS) =</span>
+                        <span class="inflow-cute-tier-qty font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_3}</span> ${unitWord} (${stdBadge}) =</span>
                         <span class="inflow-cute-tier-tot-coral font-khmer">${Number(c.tot_price_3).toFixed(2)} $</span>
                     </div>
                     <div class="inflow-cute-right-pill">
-                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_3).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${Number(c.u_price_3).toFixed(3)}</span> $/ <span class="inflow-cute-pcs-badge">${stdBadge}</span>)</span>
                     </div>
                 </div>
             </div>
@@ -7382,32 +7429,32 @@ function renderOffscreenCard(stage, item) {
                 <div class="inflow-modern-price-table-card">
                     <div class="inflow-modern-tier-row">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="inflow-modern-qty-badge font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_1}</span> ${unitWord} (PCS)</span>
+                            <span class="inflow-modern-qty-badge font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_1}</span> ${unitWord} (${stdBadge})</span>
                             <span style="font-weight: 800; color: #64748B;">=</span>
                             <span class="inflow-modern-tier-tot">${Number(c.tot_price_1).toFixed(2)} $</span>
                         </div>
                         <div style="text-align: right;">
-                            <span class="inflow-modern-tier-unit">(${Number(c.u_price_1).toFixed(3)} $/PCS)</span>
+                            <span class="inflow-modern-tier-unit">(${Number(c.u_price_1).toFixed(3)} $/${stdBadge})</span>
                         </div>
                     </div>
                     <div class="inflow-modern-tier-row">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="inflow-modern-qty-badge font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_2}</span> ${unitWord} (PCS)</span>
+                            <span class="inflow-modern-qty-badge font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_2}</span> ${unitWord} (${stdBadge})</span>
                             <span style="font-weight: 800; color: #64748B;">=</span>
                             <span class="inflow-modern-tier-tot">${Number(c.tot_price_2).toFixed(2)} $</span>
                         </div>
                         <div style="text-align: right;">
-                            <span class="inflow-modern-tier-unit">(${Number(c.u_price_2).toFixed(3)} $/PCS)</span>
+                            <span class="inflow-modern-tier-unit">(${Number(c.u_price_2).toFixed(3)} $/${stdBadge})</span>
                         </div>
                     </div>
                     <div class="inflow-modern-tier-row">
                         <div style="display: flex; align-items: center; gap: 8px;">
-                            <span class="inflow-modern-qty-badge font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_3}</span> ${unitWord} (PCS)</span>
+                            <span class="inflow-modern-qty-badge font-khmer"><span style="min-width: 24px; text-align: center; font-weight: 800; margin-right: 2px;">${c.tier_qty_3}</span> ${unitWord} (${stdBadge})</span>
                             <span style="font-weight: 800; color: #64748B;">=</span>
                             <span class="inflow-modern-tier-tot">${Number(c.tot_price_3).toFixed(2)} $</span>
                         </div>
                         <div style="text-align: right;">
-                            <span class="inflow-modern-tier-unit">(${Number(c.u_price_3).toFixed(3)} $/PCS)</span>
+                            <span class="inflow-modern-tier-unit">(${Number(c.u_price_3).toFixed(3)} $/${stdBadge})</span>
                         </div>
                     </div>
                 </div>
@@ -7523,29 +7570,29 @@ function renderOffscreenCard(stage, item) {
                 </div>
                 <div class="inflow-genz-tier-row">
                     <div class="inflow-genz-tier-left">
-                        <span class="inflow-genz-qty-label font-khmer"><span>${c.tier_qty_1}</span> ${unitWord} (PCS)</span>
+                        <span class="inflow-genz-qty-label font-khmer"><span>${c.tier_qty_1}</span> ${unitWord} (${stdBadge})</span>
                         <span class="inflow-genz-tot-capsule font-khmer">$${Number(c.tot_price_1).toFixed(2)}</span>
                     </div>
                     <div class="inflow-genz-tier-right">
-                        <span class="inflow-genz-uprice-txt">(${Number(c.u_price_1).toFixed(3)} $/PCS)</span>
+                        <span class="inflow-genz-uprice-txt">(${Number(c.u_price_1).toFixed(3)} $/${stdBadge})</span>
                     </div>
                 </div>
                 <div class="inflow-genz-tier-row">
                     <div class="inflow-genz-tier-left">
-                        <span class="inflow-genz-qty-label font-khmer"><span>${c.tier_qty_2}</span> ${unitWord} (PCS)</span>
+                        <span class="inflow-genz-qty-label font-khmer"><span>${c.tier_qty_2}</span> ${unitWord} (${stdBadge})</span>
                         <span class="inflow-genz-tot-capsule font-khmer">$${Number(c.tot_price_2).toFixed(2)}</span>
                     </div>
                     <div class="inflow-genz-tier-right">
-                        <span class="inflow-genz-uprice-txt">(${Number(c.u_price_2).toFixed(3)} $/PCS)</span>
+                        <span class="inflow-genz-uprice-txt">(${Number(c.u_price_2).toFixed(3)} $/${stdBadge})</span>
                     </div>
                 </div>
                 <div class="inflow-genz-tier-row">
                     <div class="inflow-genz-tier-left">
-                        <span class="inflow-genz-qty-label font-khmer"><span>${c.tier_qty_3}</span> ${unitWord} (PCS)</span>
+                        <span class="inflow-genz-qty-label font-khmer"><span>${c.tier_qty_3}</span> ${unitWord} (${stdBadge})</span>
                         <span class="inflow-genz-tot-capsule font-khmer">$${Number(c.tot_price_3).toFixed(2)}</span>
                     </div>
                     <div class="inflow-genz-tier-right">
-                        <span class="inflow-genz-uprice-txt">(${Number(c.u_price_3).toFixed(3)} $/PCS)</span>
+                        <span class="inflow-genz-uprice-txt">(${Number(c.u_price_3).toFixed(3)} $/${stdBadge})</span>
                     </div>
                 </div>
                 <div class="inflow-genz-best-choice-sticker">
@@ -7603,29 +7650,29 @@ function renderOffscreenCard(stage, item) {
             </div>
             <div class="inflow-spec-price-row">
                 <div class="inflow-spec-price-left-cell">
-                    <span class="inflow-spec-qty-label">${c.tier_qty_1} ${unitWord} (PCS) =</span>
+                    <span class="inflow-spec-qty-label">${c.tier_qty_1} ${unitWord} (${stdBadge}) =</span>
                     <span class="inflow-spec-total-price">${Number(c.tot_price_1).toFixed(2)} $</span>
                 </div>
                 <div class="inflow-spec-price-right-cell">
-                    <span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_1).toFixed(3)} $/PCS)</span>
+                    <span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_1).toFixed(3)} $/${stdBadge})</span>
                 </div>
             </div>
             <div class="inflow-spec-price-row">
                 <div class="inflow-spec-price-left-cell">
-                    <span class="inflow-spec-qty-label">${c.tier_qty_2} ${unitWord} (PCS) =</span>
+                    <span class="inflow-spec-qty-label">${c.tier_qty_2} ${unitWord} (${stdBadge}) =</span>
                     <span class="inflow-spec-total-price">${Number(c.tot_price_2).toFixed(2)} $</span>
                 </div>
                 <div class="inflow-spec-price-right-cell">
-                    <span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_2).toFixed(3)} $/PCS)</span>
+                    <span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_2).toFixed(3)} $/${stdBadge})</span>
                 </div>
             </div>
             <div class="inflow-spec-price-row">
                 <div class="inflow-spec-price-left-cell">
-                    <span class="inflow-spec-qty-label">${c.tier_qty_3} ${unitWord} (PCS) =</span>
+                    <span class="inflow-spec-qty-label">${c.tier_qty_3} ${unitWord} (${stdBadge}) =</span>
                     <span class="inflow-spec-total-price">${Number(c.tot_price_3).toFixed(2)} $</span>
                 </div>
                 <div class="inflow-spec-price-right-cell">
-                    <span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_3).toFixed(3)} $/PCS)</span>
+                    <span class="inflow-spec-unit-price" style="color: ${cardColor};">(${Number(c.u_price_3).toFixed(3)} $/${stdBadge})</span>
                 </div>
             </div>
         `;

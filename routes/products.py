@@ -108,13 +108,21 @@ def _parse_specs_to_rows(text):
     """
     if not text:
         return []
+    import re
     lines = [l.strip() for l in text.split('\n') if l.strip()]
     items = []
     for line in lines:
+        line = re.sub(r'^[★•●\-\*]\s*', '', line).strip()
+        if not line:
+            continue
         if line.startswith('(') and line.endswith(')') and items:
             items[-1]['sub'] = line
         else:
-            items.append({'main': line, 'sub': ''})
+            m = re.match(r'^(.*?)\s*(\([^)]+\))$', line)
+            if m and m.group(1):
+                items.append({'main': m.group(1).strip(), 'sub': m.group(2).strip()})
+            else:
+                items.append({'main': line, 'sub': ''})
     
     for idx, item in enumerate(items):
         lower = item['main'].lower()
@@ -122,9 +130,9 @@ def _parse_specs_to_rows(text):
             item['icon'] = 'size'
         elif '1 ដុំ' in lower or ('ដុំ' in lower and 'កេស' not in lower) or any(k in lower for k in ['pack', 'layer', 'pcs/pack']):
             item['icon'] = 'layers'
-        elif idx == len(items) - 1 and any(k in lower for k in ['/1កេស', '/កេស', 'carton', 'case']):
+        elif idx == len(items) - 1 and any(k in lower for k in ['/1កេស', '/កេស', '/បេ', 'carton', 'case', 'pack']):
             item['icon'] = 'package'
-        elif any(k in lower for k in ['កេស', 'carton', 'case']):
+        elif any(k in lower for k in ['កេស', 'បេ', 'carton', 'case']):
             item['icon'] = 'carton'
         else:
             default_icons = ['size', 'carton', 'layers', 'package']
@@ -303,9 +311,14 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
     
     derived_colors = _derive_card_colors(final_color)
     
+    std_uom = (product.get('uom') or 'pcs.').strip()
+    std_uom_display = std_uom[:-1].upper() if std_uom.endswith('.') else (std_uom.upper() if std_uom.isascii() else std_uom)
+
     return {
         'khmer_name': names['khmer'],
         'english_name': names['english'],
+        'standard_uom': std_uom,
+        'standard_uom_display': std_uom_display,
         'length': length,
         'width': width,
         'height': height,
@@ -2819,6 +2832,8 @@ def api_get_price_cards_data():
                 'category_id': prod.get('category_id'),
                 'category_name': prod.get('category_name') or 'General',
                 'image_url': prod.get('image_url') or '',
+                'standard_uom': card_data.get('standard_uom'),
+                'standard_uom_display': card_data.get('standard_uom_display'),
                 'card': card_data
             })
             
@@ -3416,6 +3431,8 @@ def price_list_view():
             'khmer_name': card_data.get('khmer_name') or prod.get('name') or '',
             'english_name': card_data.get('english_name') or '',
             'uom': prod.get('uom') or 'កេស',
+            'standard_uom': card_data.get('standard_uom') or (prod.get('uom') or 'pcs.').strip(),
+            'standard_uom_display': card_data.get('standard_uom_display') or 'PCS',
             'category_id': prod.get('category_id') or 0,
             'category_name': prod.get('category_name') or 'General',
             'category_color': prod.get('category_color') or '#00A3E0',

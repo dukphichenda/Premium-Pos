@@ -3392,10 +3392,134 @@ function resolveItemCardStyle(item) {
     return (s === 'gen_z' || s === 'genz' || s === 'cute' || s === 'modern') ? (s === 'genz' ? 'gen_z' : s) : 'classic';
 }
 
+function getCardStdUomBadge(c, item) {
+    const raw = (c && c.standard_uom) || (item && (item.standard_uom || item.uom)) || 'pcs.';
+    let s = String(raw).trim();
+    if (s.endsWith('.')) s = s.slice(0, -1).trim();
+    return s.toUpperCase();
+}
+
+function renderCuteSpecsHtml(text) {
+    if (!text) return '';
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const items = [];
+    for (let line of lines) {
+        line = line.replace(/^[★•●\-\*]\s*/, '').trim();
+        if (!line) continue;
+        if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
+            items[items.length - 1].sub = line;
+        } else {
+            const m = line.match(/^(.*?)\s*(\([^)]+\))$/);
+            if (m && m[1]) {
+                items.push({ main: m[1].trim(), sub: m[2].trim() });
+            } else {
+                items.push({ main: line, sub: '' });
+            }
+        }
+    }
+    
+    return items.map((item, idx) => {
+        const lower = item.main.toLowerCase();
+        let bullet = '<span class="inflow-cute-star-icon">★</span>';
+        if (lower.includes('ទំហំ') || lower.includes('size') || lower.includes('cm') || lower.includes('mm') || lower.includes('dim')) {
+            bullet = '<span class="inflow-cute-star-icon">★</span>';
+        } else if (lower.includes('1 ដុំ') || (lower.includes('ដុំ') && !lower.includes('កេស')) || lower.includes('pack')) {
+            bullet = '<span class="inflow-cute-dot-mint">●</span>';
+        } else if (idx === items.length - 1 && (lower.includes('/1កេស') || lower.includes('/កេស') || lower.includes('/បេ') || lower.includes('carton') || lower.includes('case') || lower.includes('pack'))) {
+            bullet = '<span class="inflow-cute-dot-navy">●</span>';
+        } else if (lower.includes('កេស') || lower.includes('បេ') || lower.includes('carton') || lower.includes('case')) {
+            bullet = '<span class="inflow-cute-dot-coral">●</span>';
+        } else {
+            const bullets = [
+                '<span class="inflow-cute-star-icon">★</span>',
+                '<span class="inflow-cute-dot-coral">●</span>',
+                '<span class="inflow-cute-dot-mint">●</span>',
+                '<span class="inflow-cute-dot-navy">●</span>'
+            ];
+            bullet = bullets[idx % bullets.length];
+        }
+        
+        return `
+            <div class="inflow-cute-spec-line font-khmer">
+                ${bullet}
+                <span>${escapeHtml(item.main)}${item.sub ? ` <span class="inflow-cute-spec-sub font-khmer">${escapeHtml(item.sub)}</span>` : ''}</span>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderModernSpecsHtml(text) {
+    if (!text) return '';
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const items = [];
+    for (let line of lines) {
+        line = line.replace(/^[★•●\-\*]\s*/, '').trim();
+        if (!line) continue;
+        if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
+            items[items.length - 1].sub = line;
+        } else {
+            const m = line.match(/^(.*?)\s*(\([^)]+\))$/);
+            if (m && m[1]) {
+                items.push({ main: m[1].trim(), sub: m[2].trim() });
+            } else {
+                items.push({ main: line, sub: '' });
+            }
+        }
+    }
+    
+    return items.map((item, idx) => {
+        let iconSvg;
+        const lower = item.main.toLowerCase();
+        if (lower.includes('ទំហំ') || lower.includes('size') || lower.includes('cm') || lower.includes('mm') || lower.includes('dim')) {
+            iconSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+        } else if (lower.includes('1 ដុំ') || (lower.includes('ដុំ') && !lower.includes('កេស')) || lower.includes('pack')) {
+            iconSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
+        } else if (idx === items.length - 1 && (lower.includes('/1កេស') || lower.includes('/កេស') || lower.includes('/បេ') || lower.includes('carton') || lower.includes('case'))) {
+            iconSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>';
+        } else {
+            iconSvg = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>';
+        }
+        return `
+            <div class="pl-modern-spec-row">
+                <div class="pl-modern-spec-icon">${iconSvg}</div>
+                <div class="pl-modern-spec-text font-khmer">
+                    <div>${escapeHtml(item.main)}</div>
+                    ${item.sub ? `<div style="font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 1px;">${escapeHtml(item.sub)}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderClassicSpecsHtml(text) {
+    if (!text) return '';
+    const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+    const items = [];
+    for (let line of lines) {
+        line = line.replace(/^[★•●\-\*]\s*/, '').trim();
+        if (!line) continue;
+        if (line.startsWith('(') && line.endsWith(')') && items.length > 0) {
+            items[items.length - 1].sub = line;
+        } else {
+            const m = line.match(/^(.*?)\s*(\([^)]+\))$/);
+            if (m && m[1]) {
+                items.push({ main: m[1].trim(), sub: m[2].trim() });
+            } else {
+                items.push({ main: line, sub: '' });
+            }
+        }
+    }
+    return items.map(item => `
+        <div class="pl-card-spec-line font-khmer">${escapeHtml(item.main)}</div>
+        ${item.sub ? `<div class="pl-card-spec-carton">${escapeHtml(item.sub)}</div>` : ''}
+    `).join('');
+}
+
 // Build Classic Card HTML (Exact Match with Screenshot 1)
 function buildClassicCardHtml(item, isSelected) {
     const c = item.card || {};
     const badgeHtml = item.badge ? `<div class="pl-card-size-badge">${escapeHtml(item.badge)}</div>` : '';
+    const stdUomBadge = getCardStdUomBadge(c, item);
 
     const imgHtml = item.image_url 
         ? `<img src="${escapeHtml(item.image_url)}" class="pl-card-img" style="max-height: 204px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto;" alt="${escapeHtml(item.name)}" loading="lazy">`
@@ -3403,6 +3527,16 @@ function buildClassicCardHtml(item, isSelected) {
              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
              <span style="font-size: 11px; margin-top: 4px; color: #94A3B8;">No Image</span>
            </div>`;
+
+    const specsHtml = (c.custom_detail && c.custom_detail.trim())
+        ? renderClassicSpecsHtml(c.custom_detail)
+        : `
+            <div class="pl-card-spec-line">ទំហំ: ${escapeHtml(c.dim_str || '21cm x 21cm x 4cm')}</div>
+            <div class="pl-card-spec-line font-khmer">1 កេស មាន ${Number(c.packs_per_case || 10)} ដុំ</div>
+            <div class="pl-card-spec-line font-khmer">1 ដុំ មាន ${Number(c.pcs_per_pack || 50)} ${c.card_unit || 'ប្រអប់'}</div>
+            <div class="pl-card-spec-line font-khmer">${item.pcs_case_formatted} ${c.card_unit || 'ប្រអប់'}/1កេស</div>
+            <div class="pl-card-spec-carton">(${item.pcs_case_formatted} PCS/ Carton)</div>
+        `;
 
     return `
         <div class="pl-price-card" id="card-${item.id}" data-id="${item.id}">
@@ -3431,11 +3565,7 @@ function buildClassicCardHtml(item, isSelected) {
                     ${imgHtml}
                 </div>
                 <div class="pl-card-specs-box" style="height: 220px; max-height: 220px; overflow: hidden; display: flex; flex-direction: column; justify-content: center; align-items: center;">
-                    <div class="pl-card-spec-line">ទំហំ: ${escapeHtml(c.dim_str || '21cm x 21cm x 4cm')}</div>
-                    <div class="pl-card-spec-line font-khmer">1 កេស មាន ${Number(c.packs_per_case || 10)} ដុំ</div>
-                    <div class="pl-card-spec-line font-khmer">1 ដុំ មាន ${Number(c.pcs_per_pack || 50)} ${c.card_unit || 'ប្រអប់'}</div>
-                    <div class="pl-card-spec-line font-khmer">${item.pcs_case_formatted} ${c.card_unit || 'ប្រអប់'}/1កេស</div>
-                    <div class="pl-card-spec-carton">(${item.pcs_case_formatted} PCS/ Carton)</div>
+                    ${specsHtml}
                 </div>
             </div>
 
@@ -3457,12 +3587,12 @@ function buildClassicCardHtml(item, isSelected) {
                 <div class="pl-card-price-row">
                     <div class="pl-price-left-col">
                         <span class="pl-price-qty-lbl font-khmer">
-                            <span class="pl-price-qty-num">${c.tier_qty_1 || 100}</span> ${c.card_unit || 'ប្រអប់'} (PCS) =
+                            <span class="pl-price-qty-num">${c.tier_qty_1 || 100}</span> ${c.card_unit || 'ប្រអប់'} (${escapeHtml(stdUomBadge)}) =
                         </span>
                         <span class="pl-price-tot-val">${formatMoney(c.tot_price_1)} $</span>
                     </div>
                     <div class="pl-price-right-col">
-                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_1)} $/PCS)</span>
+                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_1)} $/${escapeHtml(stdUomBadge)})</span>
                     </div>
                 </div>
 
@@ -3470,12 +3600,12 @@ function buildClassicCardHtml(item, isSelected) {
                 <div class="pl-card-price-row">
                     <div class="pl-price-left-col">
                         <span class="pl-price-qty-lbl font-khmer">
-                            <span class="pl-price-qty-num">${c.tier_qty_2 || 500}</span> ${c.card_unit || 'ប្រអប់'} (PCS) =
+                            <span class="pl-price-qty-num">${c.tier_qty_2 || 500}</span> ${c.card_unit || 'ប្រអប់'} (${escapeHtml(stdUomBadge)}) =
                         </span>
                         <span class="pl-price-tot-val">${formatMoney(c.tot_price_2)} $</span>
                     </div>
                     <div class="pl-price-right-col">
-                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_2)} $/PCS)</span>
+                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_2)} $/${escapeHtml(stdUomBadge)})</span>
                     </div>
                 </div>
 
@@ -3483,12 +3613,12 @@ function buildClassicCardHtml(item, isSelected) {
                 <div class="pl-card-price-row">
                     <div class="pl-price-left-col">
                         <span class="pl-price-qty-lbl font-khmer">
-                            <span class="pl-price-qty-num">${c.tier_qty_3 || 1000}</span> ${c.card_unit || 'ប្រអប់'} (PCS) =
+                            <span class="pl-price-qty-num">${c.tier_qty_3 || 1000}</span> ${c.card_unit || 'ប្រអប់'} (${escapeHtml(stdUomBadge)}) =
                         </span>
                         <span class="pl-price-tot-val">${formatMoney(c.tot_price_3)} $</span>
                     </div>
                     <div class="pl-price-right-col">
-                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_3)} $/PCS)</span>
+                        <span class="pl-price-unit-val">(${formatUnitMoney(c.u_price_3)} $/${escapeHtml(stdUomBadge)})</span>
                     </div>
                 </div>
             </div>
@@ -3501,6 +3631,7 @@ function buildModernCardHtml(item, isSelected) {
     const c = item.card || {};
     const capBadgeText = item.badge || c.capacity || '';
     const capBadgeHtml = capBadgeText ? `<div class="pl-modern-capacity-pill font-khmer">${escapeHtml(capBadgeText)}</div>` : '';
+    const stdUomBadge = getCardStdUomBadge(c, item);
 
     const imgHtml = item.image_url 
         ? `<img src="${escapeHtml(item.image_url)}" class="pl-card-img" style="max-height: 185px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto;" alt="${escapeHtml(item.name)}" loading="lazy">`
@@ -3508,6 +3639,35 @@ function buildModernCardHtml(item, isSelected) {
              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
              <span style="font-size: 11px; margin-top: 4px; color: #94A3B8;">No Image</span>
            </div>`;
+
+    const specsHtml = (c.custom_detail && c.custom_detail.trim())
+        ? renderModernSpecsHtml(c.custom_detail)
+        : `
+            <div class="pl-modern-spec-row">
+                <div class="pl-modern-spec-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </div>
+                <div class="pl-modern-spec-text">Size: ${escapeHtml(c.dim_str || '14cm x 13cm x 8.5cm')}</div>
+            </div>
+            <div class="pl-modern-spec-row">
+                <div class="pl-modern-spec-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                </div>
+                <div class="pl-modern-spec-text font-khmer">1 កេស មាន ${Number(c.packs_per_case || 10)} ដុំ</div>
+            </div>
+            <div class="pl-modern-spec-row">
+                <div class="pl-modern-spec-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                </div>
+                <div class="pl-modern-spec-text font-khmer">1 ដុំ មាន ${Number(c.pcs_per_pack || 50)} ${c.card_unit || 'ចាន'}</div>
+            </div>
+            <div class="pl-modern-spec-row">
+                <div class="pl-modern-spec-icon">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                </div>
+                <div class="pl-modern-spec-text font-khmer">${item.pcs_case_formatted} ${c.card_unit || 'ចាន'}/កេស <span style="font-size: 11.5px; color: #64748B; font-weight: 600;">(${item.pcs_case_formatted} PCS/ Carton)</span></div>
+            </div>
+        `;
 
     return `
         <div class="pl-price-card modern" id="card-${item.id}" data-id="${item.id}">
@@ -3544,30 +3704,7 @@ function buildModernCardHtml(item, isSelected) {
                     ${imgHtml}
                 </div>
                 <div class="pl-modern-specs-box">
-                    <div class="pl-modern-spec-row">
-                        <div class="pl-modern-spec-icon">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
-                        </div>
-                        <div class="pl-modern-spec-text">Size: ${escapeHtml(c.dim_str || '14cm x 13cm x 8.5cm')}</div>
-                    </div>
-                    <div class="pl-modern-spec-row">
-                        <div class="pl-modern-spec-icon">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                        </div>
-                        <div class="pl-modern-spec-text font-khmer">1 កេស មាន ${Number(c.packs_per_case || 10)} ដុំ</div>
-                    </div>
-                    <div class="pl-modern-spec-row">
-                        <div class="pl-modern-spec-icon">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-                        </div>
-                        <div class="pl-modern-spec-text font-khmer">1 ដុំ មាន ${Number(c.pcs_per_pack || 50)} ${c.card_unit || 'ចាន'}</div>
-                    </div>
-                    <div class="pl-modern-spec-row">
-                        <div class="pl-modern-spec-icon">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
-                        </div>
-                        <div class="pl-modern-spec-text font-khmer">${item.pcs_case_formatted} ${c.card_unit || 'ចាន'}/កេស <span style="font-size: 11.5px; color: #64748B; font-weight: 600;">(${item.pcs_case_formatted} PCS/ Carton)</span></div>
-                    </div>
+                    ${specsHtml}
                 </div>
             </div>
 
@@ -3594,33 +3731,33 @@ function buildModernCardHtml(item, isSelected) {
                     <div class="pl-modern-tier-row">
                         <div style="display: flex; align-items: center; gap: 10px; padding: 0 16px;">
                             <span class="pl-modern-qty-badge font-khmer">${c.tier_qty_1 || 100}</span>
-                            <span class="font-khmer" style="font-size: 13.5px; font-weight: 700; color: #334155;">${c.card_unit || 'ចាន'} (PCS) =</span>
+                            <span class="font-khmer" style="font-size: 13.5px; font-weight: 700; color: #334155;">${c.card_unit || 'ចាន'} (${escapeHtml(stdUomBadge)}) =</span>
                             <span class="pl-modern-tier-tot" style="margin-left: auto;">${formatMoney(c.tot_price_1)} $</span>
                         </div>
                         <div style="text-align: right; padding: 0 16px;">
-                            <span class="pl-modern-tier-unit">(${formatUnitMoney(c.u_price_1)} $/PCS)</span>
+                            <span class="pl-modern-tier-unit">(${formatUnitMoney(c.u_price_1)} $/${escapeHtml(stdUomBadge)})</span>
                         </div>
                     </div>
                     <!-- Tier 2 -->
                     <div class="pl-modern-tier-row">
                         <div style="display: flex; align-items: center; gap: 10px; padding: 0 16px;">
                             <span class="pl-modern-qty-badge font-khmer">${c.tier_qty_2 || 400}</span>
-                            <span class="font-khmer" style="font-size: 13.5px; font-weight: 700; color: #334155;">${c.card_unit || 'ចាន'} (PCS) =</span>
+                            <span class="font-khmer" style="font-size: 13.5px; font-weight: 700; color: #334155;">${c.card_unit || 'ចាន'} (${escapeHtml(stdUomBadge)}) =</span>
                             <span class="pl-modern-tier-tot" style="margin-left: auto;">${formatMoney(c.tot_price_2)} $</span>
                         </div>
                         <div style="text-align: right; padding: 0 16px;">
-                            <span class="pl-modern-tier-unit">(${formatUnitMoney(c.u_price_2)} $/PCS)</span>
+                            <span class="pl-modern-tier-unit">(${formatUnitMoney(c.u_price_2)} $/${escapeHtml(stdUomBadge)})</span>
                         </div>
                     </div>
                     <!-- Tier 3 -->
                     <div class="pl-modern-tier-row">
                         <div style="display: flex; align-items: center; gap: 10px; padding: 0 16px;">
                             <span class="pl-modern-qty-badge font-khmer">${c.tier_qty_3 || 800}</span>
-                            <span class="font-khmer" style="font-size: 13.5px; font-weight: 700; color: #334155;">${c.card_unit || 'ចាន'} (PCS) =</span>
+                            <span class="font-khmer" style="font-size: 13.5px; font-weight: 700; color: #334155;">${c.card_unit || 'ចាន'} (${escapeHtml(stdUomBadge)}) =</span>
                             <span class="pl-modern-tier-tot" style="margin-left: auto;">${formatMoney(c.tot_price_3)} $</span>
                         </div>
                         <div style="text-align: right; padding: 0 16px;">
-                            <span class="pl-modern-tier-unit">(${formatUnitMoney(c.u_price_3)} $/PCS)</span>
+                            <span class="pl-modern-tier-unit">(${formatUnitMoney(c.u_price_3)} $/${escapeHtml(stdUomBadge)})</span>
                         </div>
                     </div>
                 </div>
@@ -3634,6 +3771,7 @@ function buildCuteCardHtml(item, isSelected) {
     const c = item.card || {};
     const unitWord = c.card_unit || 'ចាន';
     const capBadgeHtml = item.capacity ? `<div class="inflow-cute-capacity-overlay font-khmer">${escapeHtml(item.capacity)}</div>` : '';
+    const stdUomBadge = getCardStdUomBadge(c, item);
 
     const imgHtml = item.image_url 
         ? `<img src="${escapeHtml(item.image_url)}" style="max-height: 200px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto;" alt="${escapeHtml(item.name)}" loading="lazy">`
@@ -3641,6 +3779,27 @@ function buildCuteCardHtml(item, isSelected) {
              <svg width="42" height="42" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
              <span style="font-size: 11px; margin-top: 4px; color: #94A3B8;">No Image</span>
            </div>`;
+
+    const specsHtml = (c.custom_detail && c.custom_detail.trim())
+        ? renderCuteSpecsHtml(c.custom_detail)
+        : `
+            <div class="inflow-cute-spec-line font-khmer">
+                <span class="inflow-cute-star-icon">★</span>
+                <span>ទំហំ: <strong>${escapeHtml(c.dim_str || '14cm x 13cm x 8.5cm')}</strong></span>
+            </div>
+            <div class="inflow-cute-spec-line font-khmer">
+                <span class="inflow-cute-dot-coral">●</span>
+                <span>1 កេស មាន <strong>${Number(c.packs_per_case || 8)}</strong> ដុំ</span>
+            </div>
+            <div class="inflow-cute-spec-line font-khmer">
+                <span class="inflow-cute-dot-mint">●</span>
+                <span>1 ដុំ មាន <strong>${Number(c.pcs_per_pack || 50)}</strong> ${escapeHtml(unitWord)}</span>
+            </div>
+            <div class="inflow-cute-spec-line font-khmer">
+                <span class="inflow-cute-dot-navy">●</span>
+                <span><strong>${Number(c.pcs_per_case || 400)}</strong> ${escapeHtml(unitWord)}/1កេស <span class="inflow-cute-spec-sub font-khmer">(${Number(c.pcs_per_case || 400)} PCS/ Carton)</span></span>
+            </div>
+        `;
 
     return `
         <div class="inflow-spec-card cute" id="card-${item.id}" data-id="${item.id}" style="margin: 0; box-shadow: 0 4px 18px rgba(0,0,0,0.06); position: relative;">
@@ -3696,22 +3855,7 @@ function buildCuteCardHtml(item, isSelected) {
                 </div>
                 <div class="inflow-cute-specs-box">
                     <div style="display: flex; flex-direction: column; gap: 10px;">
-                        <div class="inflow-cute-spec-line font-khmer">
-                            <span class="inflow-cute-star-icon">★</span>
-                            <span>ទំហំ: <strong>${escapeHtml(c.dim_str || '14cm x 13cm x 8.5cm')}</strong></span>
-                        </div>
-                        <div class="inflow-cute-spec-line font-khmer">
-                            <span class="inflow-cute-dot-coral">●</span>
-                            <span>1 កេស មាន <strong>${Number(c.packs_per_case || 8)}</strong> ដុំ</span>
-                        </div>
-                        <div class="inflow-cute-spec-line font-khmer">
-                            <span class="inflow-cute-dot-mint">●</span>
-                            <span>1 ដុំ មាន <strong>${Number(c.pcs_per_pack || 50)}</strong> ${escapeHtml(unitWord)}</span>
-                        </div>
-                        <div class="inflow-cute-spec-line font-khmer">
-                            <span class="inflow-cute-dot-navy">●</span>
-                            <span><strong>${Number(c.pcs_per_case || 400)}</strong> ${escapeHtml(unitWord)}/1កេស <span class="inflow-cute-spec-sub font-khmer">(${Number(c.pcs_per_case || 400)} PCS/ Carton)</span></span>
-                        </div>
+                        ${specsHtml}
                     </div>
                 </div>
             </div>
@@ -3730,29 +3874,29 @@ function buildCuteCardHtml(item, isSelected) {
                 </div>
                 <div class="inflow-cute-tier-row">
                     <div class="inflow-cute-left-pill">
-                        <span class="inflow-cute-tier-qty font-khmer">${c.tier_qty_1 || 100} ${escapeHtml(unitWord)} (PCS) =</span>
+                        <span class="inflow-cute-tier-qty font-khmer">${c.tier_qty_1 || 100} ${escapeHtml(unitWord)} (${escapeHtml(stdUomBadge)}) =</span>
                         <span class="inflow-cute-tier-tot-coral font-khmer">${formatMoney(c.tot_price_1 || 7.50)} $</span>
                     </div>
                     <div class="inflow-cute-right-pill">
-                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${formatUnitMoney(c.u_price_1 || 0.075)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${formatUnitMoney(c.u_price_1 || 0.075)}</span> $/ <span class="inflow-cute-pcs-badge">${escapeHtml(stdUomBadge)}</span>)</span>
                     </div>
                 </div>
                 <div class="inflow-cute-tier-row">
                     <div class="inflow-cute-left-pill">
-                        <span class="inflow-cute-tier-qty font-khmer">${c.tier_qty_2 || 400} ${escapeHtml(unitWord)} (PCS) =</span>
+                        <span class="inflow-cute-tier-qty font-khmer">${c.tier_qty_2 || 400} ${escapeHtml(unitWord)} (${escapeHtml(stdUomBadge)}) =</span>
                         <span class="inflow-cute-tier-tot-coral font-khmer">${formatMoney(c.tot_price_2 || 28.00)} $</span>
                     </div>
                     <div class="inflow-cute-right-pill">
-                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${formatUnitMoney(c.u_price_2 || 0.070)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${formatUnitMoney(c.u_price_2 || 0.070)}</span> $/ <span class="inflow-cute-pcs-badge">${escapeHtml(stdUomBadge)}</span>)</span>
                     </div>
                 </div>
                 <div class="inflow-cute-tier-row">
                     <div class="inflow-cute-left-pill">
-                        <span class="inflow-cute-tier-qty font-khmer">${c.tier_qty_3 || 800} ${escapeHtml(unitWord)} (PCS) =</span>
+                        <span class="inflow-cute-tier-qty font-khmer">${c.tier_qty_3 || 800} ${escapeHtml(unitWord)} (${escapeHtml(stdUomBadge)}) =</span>
                         <span class="inflow-cute-tier-tot-coral font-khmer">${formatMoney(c.tot_price_3 || 52.00)} $</span>
                     </div>
                     <div class="inflow-cute-right-pill">
-                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${formatUnitMoney(c.u_price_3 || 0.065)}</span> $/ <span class="inflow-cute-pcs-badge">PCS</span>)</span>
+                        <span class="inflow-cute-tier-unit">(<span class="inflow-cute-uprice-val">${formatUnitMoney(c.u_price_3 || 0.065)}</span> $/ <span class="inflow-cute-pcs-badge">${escapeHtml(stdUomBadge)}</span>)</span>
                     </div>
                 </div>
             </div>
@@ -3765,6 +3909,7 @@ function buildGenZCardHtml(item, isSelected) {
     const c = item.card || {};
     const unitWord = c.card_unit || 'ប្រអប់';
     const capBadgeHtml = item.capacity ? `<div class="inflow-genz-capacity-badge font-khmer">${escapeHtml(item.capacity)}</div>` : '';
+    const stdUomBadge = getCardStdUomBadge(c, item);
 
     const imgHtml = item.image_url 
         ? `<img src="${escapeHtml(item.image_url)}" style="max-height: 200px; max-width: 100%; width: auto; height: auto; object-fit: contain; display: block; margin: 0 auto;" alt="${escapeHtml(item.name)}" loading="lazy">`
@@ -3780,7 +3925,9 @@ function buildGenZCardHtml(item, isSelected) {
     const hgt = parts[2] || '';
 
     let specsHtml = '';
-    if (c.modern_specs_rows && c.modern_specs_rows.length > 0) {
+    if (c.custom_detail && c.custom_detail.trim()) {
+        specsHtml = renderCuteSpecsHtml(c.custom_detail);
+    } else if (c.modern_specs_rows && c.modern_specs_rows.length > 0) {
         specsHtml = c.modern_specs_rows.map(row => {
             const isSize = (row.icon === 'size');
             const iconSvg = isSize
@@ -3950,29 +4097,29 @@ function buildGenZCardHtml(item, isSelected) {
 
                 <div class="inflow-genz-tier-row">
                     <div class="inflow-genz-tier-left">
-                        <span class="inflow-genz-qty-label font-khmer">${c.tier_qty_1 || 100} ${escapeHtml(unitWord)} (PCS)</span>
+                        <span class="inflow-genz-qty-label font-khmer">${c.tier_qty_1 || 100} ${escapeHtml(unitWord)} (${escapeHtml(stdUomBadge)})</span>
                         <span class="inflow-genz-tot-capsule font-khmer">$${formatMoney(c.tot_price_1 || 16.00)}</span>
                     </div>
                     <div class="inflow-genz-tier-right">
-                        <span class="inflow-genz-uprice-txt">(${formatUnitMoney(c.u_price_1 || 0.160)} $/PCS)</span>
+                        <span class="inflow-genz-uprice-txt">(${formatUnitMoney(c.u_price_1 || 0.160)} $/${escapeHtml(stdUomBadge)})</span>
                     </div>
                 </div>
                 <div class="inflow-genz-tier-row">
                     <div class="inflow-genz-tier-left">
-                        <span class="inflow-genz-qty-label font-khmer">${c.tier_qty_2 || 400} ${escapeHtml(unitWord)} (PCS)</span>
+                        <span class="inflow-genz-qty-label font-khmer">${c.tier_qty_2 || 400} ${escapeHtml(unitWord)} (${escapeHtml(stdUomBadge)})</span>
                         <span class="inflow-genz-tot-capsule font-khmer">$${formatMoney(c.tot_price_2 || 60.00)}</span>
                     </div>
                     <div class="inflow-genz-tier-right">
-                        <span class="inflow-genz-uprice-txt">(${formatUnitMoney(c.u_price_2 || 0.150)} $/PCS)</span>
+                        <span class="inflow-genz-uprice-txt">(${formatUnitMoney(c.u_price_2 || 0.150)} $/${escapeHtml(stdUomBadge)})</span>
                     </div>
                 </div>
                 <div class="inflow-genz-tier-row">
                     <div class="inflow-genz-tier-left">
-                        <span class="inflow-genz-qty-label font-khmer">${c.tier_qty_3 || 800} ${escapeHtml(unitWord)} (PCS)</span>
+                        <span class="inflow-genz-qty-label font-khmer">${c.tier_qty_3 || 800} ${escapeHtml(unitWord)} (${escapeHtml(stdUomBadge)})</span>
                         <span class="inflow-genz-tot-capsule font-khmer">$${formatMoney(c.tot_price_3 || 116.00)}</span>
                     </div>
                     <div class="inflow-genz-tier-right">
-                        <span class="inflow-genz-uprice-txt">(${formatUnitMoney(c.u_price_3 || 0.145)} $/PCS)</span>
+                        <span class="inflow-genz-uprice-txt">(${formatUnitMoney(c.u_price_3 || 0.145)} $/${escapeHtml(stdUomBadge)})</span>
                     </div>
                 </div>
 

@@ -166,9 +166,9 @@ def generate_po_excel(order, raw_lines, company=None):
     # 4. Table Header
     curr_row = 10
     if has_case:
-        headers = ["#", "Product Item", "SKU", "Vendor Code", "Quantity", "UOM", "Total in Pcs"]
+        headers = ["#", "Product Item", "SKU", "Quantity", "UOM", "Total in Pcs"]
     else:
-        headers = ["#", "Product Item", "SKU", "Vendor Code", "Quantity", "UOM"]
+        headers = ["#", "Product Item", "SKU", "Quantity", "UOM"]
 
     for col_idx, h in enumerate(headers, 1):
         cell = ws.cell(row=curr_row, column=col_idx, value=h)
@@ -183,7 +183,7 @@ def generate_po_excel(order, raw_lines, company=None):
             cell.alignment = align_left
     ws.row_dimensions[curr_row].height = 24
 
-    # 5. Table Data Rows (NO PRICES)
+    # 5. Table Data Rows (NO PRICES, NO VENDOR CODE)
     for idx, l in enumerate(lines, 1):
         curr_row += 1
         ws.row_dimensions[curr_row].height = 20
@@ -198,24 +198,21 @@ def generate_po_excel(order, raw_lines, company=None):
         c3 = ws.cell(row=curr_row, column=3, value=l['sku'])
         c3.alignment = align_left
 
-        c4 = ws.cell(row=curr_row, column=4, value=l['vendor_code'] or '-')
-        c4.alignment = align_left
+        c4 = ws.cell(row=curr_row, column=4, value=l['quantity'])
+        c4.alignment = align_right
+        c4.number_format = '#,##0.00' if (l['quantity'] % 1 != 0) else '#,##0'
 
-        c5 = ws.cell(row=curr_row, column=5, value=l['quantity'])
-        c5.alignment = align_right
-        c5.number_format = '#,##0.00' if (l['quantity'] % 1 != 0) else '#,##0'
+        c5 = ws.cell(row=curr_row, column=5, value=l['uom'])
+        c5.alignment = align_center
 
-        c6 = ws.cell(row=curr_row, column=6, value=l['uom'])
-        c6.alignment = align_center
-
-        row_cells = [c1, c2, c3, c4, c5, c6]
+        row_cells = [c1, c2, c3, c4, c5]
 
         if has_case:
-            c7 = ws.cell(row=curr_row, column=7, value=l['total_pcs'])
-            c7.alignment = align_right
-            c7.font = font_data_bold
-            c7.number_format = '#,##0.00' if (l['total_pcs'] % 1 != 0) else '#,##0'
-            row_cells.append(c7)
+            c6 = ws.cell(row=curr_row, column=6, value=l['total_pcs'])
+            c6.alignment = align_right
+            c6.font = font_data_bold
+            c6.number_format = '#,##0.00' if (l['total_pcs'] % 1 != 0) else '#,##0'
+            row_cells.append(c6)
 
         for cell in row_cells:
             cell.border = border_cell
@@ -229,21 +226,21 @@ def generate_po_excel(order, raw_lines, company=None):
     num_cols = len(headers)
 
     if has_case:
-        ws.merge_cells(start_row=curr_row, start_column=1, end_row=curr_row, end_column=4)
+        ws.merge_cells(start_row=curr_row, start_column=1, end_row=curr_row, end_column=3)
         c_lbl = ws.cell(row=curr_row, column=1, value="TOTAL SUMMARY (សរុបចំនួនកេស និងចំនួនគ្រាប់):")
         c_lbl.font = font_total_lbl
         c_lbl.alignment = Alignment(horizontal='right', vertical='center')
 
         # Total Cases
-        c_cases = ws.cell(row=curr_row, column=5, value=f"{total_cases:,.0f} cases" if total_cases % 1 == 0 else f"{total_cases:,.2f} cases")
+        c_cases = ws.cell(row=curr_row, column=4, value=f"{total_cases:,.0f} cases" if total_cases % 1 == 0 else f"{total_cases:,.2f} cases")
         c_cases.font = font_total_val
         c_cases.alignment = align_right
 
         # Blank UOM column cell
-        c_uom_space = ws.cell(row=curr_row, column=6, value="")
+        c_uom_space = ws.cell(row=curr_row, column=5, value="")
 
         # Total Pcs
-        c_pcs = ws.cell(row=curr_row, column=7, value=f"{total_pcs:,.0f} pcs" if total_pcs % 1 == 0 else f"{total_pcs:,.2f} pcs")
+        c_pcs = ws.cell(row=curr_row, column=6, value=f"{total_pcs:,.0f} pcs" if total_pcs % 1 == 0 else f"{total_pcs:,.2f} pcs")
         c_pcs.font = font_total_val
         c_pcs.alignment = align_right
 
@@ -252,12 +249,12 @@ def generate_po_excel(order, raw_lines, company=None):
             cell.fill = fill_total
             cell.border = border_total
     else:
-        ws.merge_cells(start_row=curr_row, start_column=1, end_row=curr_row, end_column=4)
+        ws.merge_cells(start_row=curr_row, start_column=1, end_row=curr_row, end_column=3)
         c_lbl = ws.cell(row=curr_row, column=1, value="TOTAL PIECES (ចំនួនសរុប):")
         c_lbl.font = font_total_lbl
         c_lbl.alignment = Alignment(horizontal='right', vertical='center')
 
-        c_pcs = ws.cell(row=curr_row, column=5, value=f"{total_pcs:,.0f} pcs" if total_pcs % 1 == 0 else f"{total_pcs:,.2f} pcs")
+        c_pcs = ws.cell(row=curr_row, column=4, value=f"{total_pcs:,.0f} pcs" if total_pcs % 1 == 0 else f"{total_pcs:,.2f} pcs")
         c_pcs.font = font_total_val
         c_pcs.alignment = align_right
 
@@ -266,15 +263,14 @@ def generate_po_excel(order, raw_lines, company=None):
             cell.fill = fill_total
             cell.border = border_total
 
-    # Column Widths
+    # Column Widths (Wider Product Item column)
     col_widths = {
         1: 6,
-        2: 44,
-        3: 18,
-        4: 16,
-        5: 14,
-        6: 12,
-        7: 16
+        2: 60,
+        3: 20,
+        4: 15,
+        5: 12,
+        6: 18
     }
     for c_idx, w in col_widths.items():
         if c_idx <= num_cols:
