@@ -1633,16 +1633,16 @@ def new_order():
     user_bid = _get_user_branch_id()
 
     # Resolve active branch context
+    branch_param = request.args.get('branch') or session.get('active_branch_id')
     if not is_main:
         branch_id = user_bid
+        if not branch_param and user_bid:
+            branch_param = str(user_bid)
     else:
-        branch_param = request.args.get('branch') or session.get('active_branch_id')
         branch_id = None
         if branch_param:
             if str(branch_param).lower() not in ('main', 'all', 'none', '', 'hq', '0') and str(branch_param).isdigit():
                 branch_id = int(branch_param)
-
-    print(f"DEBUG NEW_ORDER: is_main={is_main}, session_active_bid={session.get('active_branch_id')}, branch_param={branch_param}, resolved branch_id={branch_id}")
 
     branch = query_one("SELECT * FROM branches WHERE id = %s", (branch_id,)) if branch_id else None
 
