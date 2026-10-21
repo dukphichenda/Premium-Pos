@@ -1,9 +1,10 @@
-from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
+from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file
 from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number
 from datetime import datetime, date
 import os
 import time
 from werkzeug.utils import secure_filename
+from services.po_exporter import generate_po_excel, process_po_lines_for_export
 
 def _match_uom(uom1, uom2):
     """Checks whether two UOM strings refer to the same unit (case vs cases, pack vs packs, pcs vs pcs.)."""
@@ -1499,6 +1500,115 @@ def print_po(id):
     company = query_one("SELECT * FROM companies LIMIT 1")
 
     return render_template('purchases/po_print.html', order=order, lines=lines, company=company, doc_type=doc_type)
+
+@purchase_orders_bp.route('/purchases/<int:id>/export/excel')
+def export_po_excel(id):
+    order = query_one("""
+        SELECT 
+            po.*,
+            v.name as vendor_name,
+            COALESCE(po.contact, v.contact_name, '') as contact,
+            COALESCE(po.phone, v.phone, '') as phone,
+            COALESCE(po.vendor_address, v.address1, '') as vendor_address,
+            l.name as location_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN locations l ON po.location_id = l.id
+        WHERE po.id = %s
+    """, (id,))
+    if not order:
+        flash("Purchase order not found.", "error")
+        return redirect(url_for('purchase_orders.list_purchases'))
+
+    lines = query_all("""
+        SELECT 
+            pol.*,
+            COALESCE(pol.uom, p.purchasing_uom, p.uom, 'pcs.') as line_uom,
+            p.name as product_name,
+            p.sku as product_sku,
+            p.barcode as product_barcode,
+            COALESCE(p.uom, 'pcs.') as base_uom,
+            COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
+            COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
+            COALESCE(p.packs_per_case, 0) as packs_per_case,
+            COALESCE(p.pcs_per_pack, 0) as pcs_per_pack
+        FROM purchase_order_lines pol
+        JOIN products p ON pol.product_id = p.id
+        WHERE pol.purchase_order_id = %s
+        ORDER BY pol.line_num ASC
+    """, (id,))
+
+    company = query_one("SELECT * FROM companies LIMIT 1")
+    buf = generate_po_excel(order, lines, company)
+    order_num = order.get('order_number') or f"PO-{id}"
+    filename = f"{order_num}_packing_list.xlsx"
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+@purchase_orders_bp.route('/purchases/<int:id>/export/pdf')
+def export_po_pdf(id):
+    order = query_one("""
+        SELECT 
+            po.*,
+            v.name as vendor_name,
+            COALESCE(po.contact, v.contact_name, '') as contact,
+            COALESCE(po.phone, v.phone, '') as phone,
+            COALESCE(po.vendor_address, v.address1, '') as vendor_address,
+            l.name as location_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN locations l ON po.location_id = l.id
+        WHERE po.id = %s
+    """, (id,))
+    if not order:
+        flash("Purchase order not found.", "error")
+        return redirect(url_for('purchase_orders.list_purchases'))
+
+    raw_lines = query_all("""
+        SELECT 
+            pol.*,
+            COALESCE(pol.uom, p.purchasing_uom, p.uom, 'pcs.') as line_uom,
+            p.name as product_name,
+            p.sku as product_sku,
+            p.barcode as product_barcode,
+            COALESCE(p.uom, 'pcs.') as base_uom,
+            COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
+            COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
+            COALESCE(p.packs_per_case, 0) as packs_per_case,
+            COALESCE(p.pcs_per_pack, 0) as pcs_per_pack
+        FROM purchase_order_lines pol
+        JOIN products p ON pol.product_id = p.id
+        WHERE pol.purchase_order_id = %s
+        ORDER BY pol.line_num ASC
+    """, (id,))
+
+    lines, has_case, total_cases, total_pcs = process_po_lines_for_export(raw_lines)
+    company = query_one("SELECT * FROM companies LIMIT 1")
+
+    return render_template(
+        'purchases/po_export_pdf.html',
+        order=order,
+        lines=lines,
+        company=company,
+        has_case=has_case,
+        total_cases=total_cases,
+        total_pcs=total_pcs
+    )
+
+@purchase_orders_bp.route('/purchases/<int:id>/export')
+def export_po(id):
+    fmt = request.args.get('format', 'pdf').lower()
+    if fmt in ('excel', 'xlsx'):
+        return export_po_excel(id)
+    return export_po_pdf(id)
 
 @purchase_orders_bp.route('/purchases/<int:id>/cancel', methods=['POST'])
 def cancel_purchase(id):

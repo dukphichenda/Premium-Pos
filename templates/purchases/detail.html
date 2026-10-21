@@ -1819,6 +1819,25 @@ input:checked + .po-toggle-slider:before {
                             <div class="po-menu-item" onclick="selectPoDocAndPrint('receive')">
                                 <span>📦 Receiving Voucher</span>
                             </div>
+                            <div class="po-menu-separator"></div>
+                            <div class="po-menu-item" onclick="executePoExport('pdf')">
+                                <span>📋 Packing List (No Price)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Export Dropdown (PDF & Excel) -->
+                    <div class="po-split-dropdown-wrap" id="poExportSplitWrap">
+                        <button type="button" class="po-top-action-btn" onclick="togglePoExportMenu(event)" title="Export Purchase Order (PDF & Excel)">
+                            📥 Export ▾
+                        </button>
+                        <div class="po-menu-dropdown right-aligned" id="poExportDropdownMenu" style="display: none;">
+                            <div class="po-menu-item" onclick="executePoExport('pdf')">
+                                <span>📄 Export as PDF</span>
+                            </div>
+                            <div class="po-menu-item" onclick="executePoExport('excel')">
+                                <span>📊 Export as Excel (.xlsx)</span>
+                            </div>
                         </div>
                     </div>
 
@@ -1833,6 +1852,13 @@ input:checked + .po-toggle-slider:before {
                             ··· More ▾
                         </button>
                         <div class="po-menu-dropdown right-aligned" id="poMoreDropdownMenu" style="display: none;">
+                            <div class="po-menu-item" onclick="executePoExport('pdf')">
+                                <span>📄 Export as PDF</span>
+                            </div>
+                            <div class="po-menu-item" onclick="executePoExport('excel')">
+                                <span>📊 Export as Excel</span>
+                            </div>
+                            <div class="po-menu-separator"></div>
                             <div class="po-menu-item" onclick="openReorderModal()">
                                 <span>⚡ Reorder Suggestions</span>
                             </div>
@@ -3375,6 +3401,41 @@ function executePoPreviewAction() {
     }
 }
 
+// Export Actions (PDF & Excel without prices)
+function togglePoExportMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('poExportDropdownMenu');
+    if (!menu) return;
+    const isShown = menu.style.display === 'block';
+    // Close other menus first
+    const printMenu = document.getElementById('poPrintDropdownMenu');
+    if (printMenu) printMenu.style.display = 'none';
+    const moreMenu = document.getElementById('poMoreDropdownMenu');
+    if (moreMenu) moreMenu.style.display = 'none';
+    menu.style.display = isShown ? 'none' : 'block';
+}
+
+function executePoExport(fmt) {
+    const exportMenu = document.getElementById('poExportDropdownMenu');
+    if (exportMenu) exportMenu.style.display = 'none';
+    const moreMenu = document.getElementById('poMoreDropdownMenu');
+    if (moreMenu) moreMenu.style.display = 'none';
+    const printMenu = document.getElementById('poPrintDropdownMenu');
+    if (printMenu) printMenu.style.display = 'none';
+
+    const id = document.getElementById('poIdHidden').value;
+    if (!id || id == '0') {
+        alert('Please save the purchase order before exporting.');
+        return;
+    }
+
+    if (fmt === 'excel') {
+        window.location.href = `/purchases/${id}/export/excel`;
+    } else {
+        window.open(`/purchases/${id}/export/pdf?download=1`, '_blank');
+    }
+}
+
 // Receive Goods Modal & Actions
 function openReceiveModal() {
     const poId = document.getElementById('poIdHidden').value;
@@ -3880,6 +3941,10 @@ document.addEventListener('click', (e) => {
     }
     if (!e.target.closest('#poPrintSplitWrap')) {
         const m = document.getElementById('poPrintDropdownMenu');
+        if (m) m.style.display = 'none';
+    }
+    if (!e.target.closest('#poExportSplitWrap')) {
+        const m = document.getElementById('poExportDropdownMenu');
         if (m) m.style.display = 'none';
     }
     if (!e.target.closest('#poMoreSplitWrap')) {

@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ order.order_number }} - Packing & Receiving List</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Kantumruy+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', 'Kantumruy Pro', sans-serif;
+            margin: 0;
+            padding: 24px;
+            color: #1E293B;
+            background-color: #F8FAFC;
+            -webkit-font-smoothing: antialiased;
+        }
+        .action-banner {
+            max-width: 860px;
+            margin: 0 auto 18px auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .btn-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.15s ease, transform 0.1s ease;
+            border: 1px solid transparent;
+        }
+        .btn-primary {
+            background-color: #7A5531;
+            color: #FFFFFF;
+        }
+        .btn-primary:hover {
+            background-color: #654425;
+        }
+        .btn-secondary {
+            background-color: #FFFFFF;
+            color: #334155;
+            border-color: #CBD5E1;
+        }
+        .btn-secondary:hover {
+            background-color: #F1F5F9;
+        }
+        .invoice-sheet {
+            max-width: 860px;
+            margin: 0 auto;
+            background: #FFFFFF;
+            padding: 40px 44px;
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+            border: 1px solid #E2E8F0;
+            box-sizing: border-box;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            border-bottom: 2px solid #E2E8F0;
+            padding-bottom: 20px;
+            margin-bottom: 22px;
+        }
+        .company-name {
+            font-size: 1.45rem;
+            font-weight: 800;
+            color: #7A5531;
+            letter-spacing: -0.02em;
+        }
+        .doc-title {
+            font-size: 1.55rem;
+            font-weight: 800;
+            text-align: right;
+            color: #0F172A;
+            letter-spacing: -0.02em;
+        }
+        .doc-subtitle {
+            font-size: 0.82rem;
+            font-weight: 700;
+            text-align: right;
+            color: #64748B;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 2px;
+        }
+        .order-badge-no {
+            font-family: monospace;
+            font-size: 1.2rem;
+            font-weight: 800;
+            color: #7A5531;
+            text-align: right;
+            margin-top: 4px;
+        }
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 28px;
+            margin-bottom: 26px;
+            font-size: 0.88rem;
+        }
+        .meta-card {
+            background: #FDFBF7;
+            border: 1px solid #F1ECE5;
+            border-radius: 6px;
+            padding: 14px 18px;
+        }
+        .meta-card-title {
+            font-weight: 700;
+            font-size: 0.76rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: #7A5531;
+            margin-bottom: 6px;
+        }
+        .po-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 24px;
+            font-size: 0.88rem;
+        }
+        .po-table th {
+            background-color: #7A5531;
+            color: #FFFFFF;
+            padding: 10px 12px;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            font-weight: 700;
+            border: 1px solid #7A5531;
+        }
+        .po-table td {
+            padding: 10px 12px;
+            border: 1px solid #E2E8F0;
+            vertical-align: middle;
+        }
+        .po-table tbody tr:nth-child(even) {
+            background-color: #FAF7F2;
+        }
+        .summary-card {
+            background: #F5EFEB;
+            border: 1.5px solid #E5D7CA;
+            border-radius: 6px;
+            padding: 16px 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .summary-title {
+            font-size: 0.95rem;
+            font-weight: 800;
+            color: #52361C;
+        }
+        .summary-metrics {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+        }
+        .summary-pill {
+            background: #FFFFFF;
+            border: 1px solid #D5C2B1;
+            padding: 8px 16px;
+            border-radius: 6px;
+            text-align: right;
+        }
+        .summary-pill-label {
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: #7A5531;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .summary-pill-val {
+            font-size: 1.25rem;
+            font-weight: 800;
+            color: #1E293B;
+            margin-top: 2px;
+        }
+        .signature-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 40px;
+            margin-top: 40px;
+            padding-top: 10px;
+        }
+        .sig-line {
+            border-top: 1px dashed #94A3B8;
+            margin-top: 55px;
+            text-align: center;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #64748B;
+            padding-top: 6px;
+        }
+        @media print {
+            body { background: #FFFFFF; padding: 0; }
+            .action-banner { display: none !important; }
+            .invoice-sheet { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Action Banner for Preview, Download and Print -->
+    <div class="action-banner">
+        <a href="javascript:window.close()" class="btn-action btn-secondary">
+            <span>← Back / Close</span>
+        </a>
+        <div style="display: flex; gap: 8px; align-items: center;">
+            <button onclick="downloadPdf()" class="btn-action btn-primary" id="btnDownloadPdf">
+                <span>📥 Download PDF</span>
+            </button>
+            <a href="{{ url_for('purchase_orders.export_po_excel', id=order.id) }}" class="btn-action btn-secondary" title="Export clean Excel file without prices">
+                <span>📊 Export Excel (.xlsx)</span>
+            </a>
+            <button onclick="window.print()" class="btn-action btn-secondary">
+                <span>🖨️ Print</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Printable & Exportable Sheet -->
+    <div class="invoice-sheet" id="poExportSheet">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <div class="company-name">{{ company.name or 'inFlow Premium Store' }}</div>
+                <div style="font-size: 0.85rem; color: #64748B; margin-top: 4px;">{{ company.address1 or 'Phnom Penh, Cambodia' }}</div>
+                <div style="font-size: 0.85rem; color: #64748B;">Phone: {{ company.phone or '+855 23 888 999' }}</div>
+            </div>
+            <div>
+                <div class="doc-title">PURCHASE ORDER</div>
+                <div class="doc-subtitle">PACKING & RECEIVING LIST (បញ្ជីទំនិញ)</div>
+                <div class="order-badge-no">{{ order.order_number }}</div>
+                <div style="text-align: right; font-size: 0.84rem; color: #64748B; margin-top: 2px;">
+                    Date: {{ order.order_date | format_date if order.order_date else '-' }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Supplier & Delivery Meta Cards -->
+        <div class="details-grid">
+            <div class="meta-card">
+                <div class="meta-card-title">Vendor / Supplier (អ្នកផ្គត់ផ្គង់)</div>
+                <div style="font-weight: 800; font-size: 1.05rem; color: #0F172A;">{{ order.vendor_name or 'Queen Pack' }}</div>
+                <div style="color: #64748B; margin-top: 4px; font-size: 0.85rem;">Phone: <b>{{ order.phone or order.vendor_phone or '-' }}</b></div>
+                <div style="color: #64748B; font-size: 0.85rem;">Address: {{ order.vendor_address or '-' }}</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-card-title">Destination & Logistics (ទីតាំងទទួល)</div>
+                <div style="font-size: 0.88rem; color: #1E293B;">Warehouse: <b>{{ order.location_name or 'Main Warehouse' }}</b></div>
+                <div style="font-size: 0.88rem; color: #1E293B; margin-top: 4px;">Carrier / Method: <b>{{ order.carrier or 'Standard Freight' }}</b></div>
+                <div style="font-size: 0.88rem; color: #1E293B; margin-top: 4px;">Expected Arrival: <b>{{ order.expected_date | format_date if order.expected_date else 'Standard' }}</b></div>
+            </div>
+        </div>
+
+        <!-- Items Table (NO PRICES) -->
+        <table class="po-table">
+            <thead>
+                <tr>
+                    <th style="width: 35px; text-align: center;">#</th>
+                    <th style="text-align: left;">Product Item (ឈ្មោះទំនិញ)</th>
+                    <th style="width: 120px; text-align: left;">SKU</th>
+                    <th style="width: 110px; text-align: left;">Vendor Code</th>
+                    <th style="width: 90px; text-align: right;">Quantity</th>
+                    <th style="width: 80px; text-align: center;">UOM</th>
+                    {% if has_case %}
+                    <th style="width: 115px; text-align: right;">Total in Pcs</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for line in lines %}
+                <tr>
+                    <td style="text-align: center; color: #64748B; font-weight: 600;">{{ line.line_num }}</td>
+                    <td>
+                        <div style="font-weight: 700; color: #0F172A; line-height: 1.35;">{{ line.product_name }}</div>
+                    </td>
+                    <td style="color: #475569; font-family: monospace; font-size: 0.82rem;">{{ line.sku or '-' }}</td>
+                    <td style="color: #64748B; font-size: 0.82rem;">{{ line.vendor_code or '-' }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A; font-size: 0.95rem;">
+                        {{ "{:,.0f}".format(line.quantity) if line.quantity % 1 == 0 else "{:,.2f}".format(line.quantity) }}
+                    </td>
+                    <td style="text-align: center; font-weight: 600; color: #475569;">{{ line.uom }}</td>
+                    {% if has_case %}
+                    <td style="text-align: right; font-weight: 800; color: #0F172A; font-size: 0.95rem;">
+                        {{ "{:,.0f}".format(line.total_pcs) if line.total_pcs % 1 == 0 else "{:,.2f}".format(line.total_pcs) }} pcs
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <!-- Bottom Totals Summary Card -->
+        <div class="summary-card">
+            <div class="summary-title">
+                <span>TOTAL SUMMARY (សរុបបរិមាណទំនិញ)</span>
+            </div>
+            <div class="summary-metrics">
+                {% if has_case %}
+                <div class="summary-pill">
+                    <div class="summary-pill-label">Total Number of Cases (កេសសរុប)</div>
+                    <div class="summary-pill-val" style="color: #7A5531;">
+                        {{ "{:,.0f}".format(total_cases) if total_cases % 1 == 0 else "{:,.2f}".format(total_cases) }} <span style="font-size: 0.85rem; font-weight: 600;">cases</span>
+                    </div>
+                </div>
+                {% endif %}
+                <div class="summary-pill">
+                    <div class="summary-pill-label">Total Number of Pieces (គ្រាប់សរុប)</div>
+                    <div class="summary-pill-val" style="color: #0F172A;">
+                        {{ "{:,.0f}".format(total_pcs) if total_pcs % 1 == 0 else "{:,.2f}".format(total_pcs) }} <span style="font-size: 0.85rem; font-weight: 600;">pcs</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification Signatures -->
+        <div class="signature-grid">
+            <div>
+                <div class="sig-line">Prepared & Verified By (អ្នករៀបចំ)</div>
+            </div>
+            <div>
+                <div class="sig-line">Warehouse Received By (អ្នកទទួលទំនិញ)</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function downloadPdf() {
+            const btn = document.getElementById('btnDownloadPdf');
+            const origText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.disabled = true;
+                btn.innerHTML = '<span>⏳ Generating PDF...</span>';
+            }
+            try {
+                const element = document.getElementById('poExportSheet');
+                const opt = {
+                    margin: [8, 8, 8, 8],
+                    filename: '{{ order.order_number }}_packing_list.pdf',
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true, logging: false },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+                await html2pdf().set(opt).from(element).save();
+            } catch (err) {
+                console.error('PDF generation error:', err);
+                alert('Could not download PDF directly: ' + (err.message || err));
+            } finally {
+                if (btn) {
+                    btn.disabled = false;
+                    btn.innerHTML = origText;
+                }
+            }
+        }
+
+        // Auto trigger download if URL has ?download=1
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('download') === '1') {
+                setTimeout(downloadPdf, 800);
+            }
+        });
+    </script>
+</body>
+</html>
