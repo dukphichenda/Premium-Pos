@@ -354,7 +354,7 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'card_font': product.get('price_card_font') or 'Kantumruy Pro',
         'card_unit': card_unit,
         'is_custom_detail': is_custom_detail,
-        'custom_detail': custom_detail,
+        'custom_detail': custom_detail if is_custom_detail else '',
         'auto_detail_text': auto_detail_text,
         'modern_specs_rows': _parse_specs_to_rows(custom_detail if (is_custom_detail and custom_detail) else auto_detail_text),
         'notes': product.get('price_card_notes') or '',
@@ -1074,6 +1074,11 @@ def update_product_ajax(id):
             if calc_std > 0 and calc_pack > 0:
                 data['packs_per_case'] = round(calc_std / calc_pack, 2)
 
+        if 'price_card_is_custom_detail' in data:
+            data['price_card_is_custom_detail'] = bool(data['price_card_is_custom_detail'])
+            if not data['price_card_is_custom_detail']:
+                data['price_card_custom_detail'] = None
+
         updates = []
         params = []
         for field in allowed_fields:
@@ -1086,7 +1091,7 @@ def update_product_ajax(id):
                 elif field == 'price_card_is_custom_detail':
                     val = bool(val) if val is not None else False
                 elif field == 'price_card_custom_detail':
-                    val = str(val).strip() if val is not None else None
+                    val = str(val).strip() if (val is not None and str(val).strip() != '' and data.get('price_card_is_custom_detail')) else None
                 elif field in ('tier_qty_1', 'tier_qty_2', 'tier_qty_3'):
                     val = int(safe_eval_math(val)) if val is not None and str(val).strip() not in ('', 'None', 'null') and int(safe_eval_math(val)) > 0 else None
                 elif field in ('length', 'width', 'height', 'weight', 'reorder_point', 'reorder_quantity',

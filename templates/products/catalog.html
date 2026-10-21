@@ -2186,8 +2186,8 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                 <div id="specInfoCustomContent" style="display: {% if price_card and price_card.is_custom_detail %}block{% else %}none{% endif %}; width: 100%;">
                                     <textarea id="specCustomDetailTextarea" class="inflow-spec-custom-textarea font-khmer no-print" data-html2canvas-ignore="true" 
                                               rows="5" placeholder="សរសេរព័ត៌មានលម្អិតនៅទីនេះ...&#10;ទំហំ: 15cm x 21cm x 4cm&#10;1 កេស មាន 8 ដុំ&#10;1 ដុំ មាន 50 បេ&#10;400 បេ/1កេស&#10;(400 PCS/ Carton)" 
-                                              oninput="onCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</textarea>
-                                    <div id="specCustomDetailDisplay" class="inflow-spec-custom-display font-khmer">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</div>
+                                              oninput="onCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else '' }}</textarea>
+                                    <div id="specCustomDetailDisplay" class="inflow-spec-custom-display font-khmer">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</div>
                                 </div>
                             </div>
                         </div>
@@ -2356,7 +2356,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                     <textarea id="specModernCustomTextarea" class="font-khmer" rows="4" 
                                               style="width: 100%; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.5; color: #0F172A; resize: vertical; box-sizing: border-box; outline: none; background: #FFFFFF;"
                                               placeholder="កែប្រែព័ត៌មានលម្អិត...&#10;ប្រវែង៖ (20cm)&#10;1 កេស មាន 1000 គូរ"
-                                              oninput="onModernCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</textarea>
+                                              oninput="onModernCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else '' }}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -2525,7 +2525,7 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
                                     <textarea id="specCuteCustomTextarea" class="font-khmer" rows="4" 
                                               style="width: 100%; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.5; color: #0F172A; resize: vertical; box-sizing: border-box; outline: none; background: #FFFFFF;"
                                               placeholder="កែប្រែព័ត៌មានលម្អិត...&#10;ទំហំ: 14cm x 13cm x 8.5cm&#10;1 កេស មាន 8 ដុំ"
-                                              oninput="onCuteCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</textarea>
+                                              oninput="onCuteCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else '' }}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -3690,14 +3690,23 @@ function saveProductChanges(callback) {
     else if (modernCustomEl && modernCustomEl.value.trim()) currentCustomVal = modernCustomEl.value.trim();
     else if (classicCustomEl && classicCustomEl.value.trim()) currentCustomVal = classicCustomEl.value.trim();
 
-    if (chkCustomEl && (pendingChanges['price_card_is_custom_detail'] !== undefined || chkCustomEl.checked !== chkCustomEl.defaultChecked || (currentCustomVal.length > 0 && !chkCustomEl.defaultChecked))) {
-        pendingChanges['price_card_is_custom_detail'] = chkCustomEl.checked || (currentCustomVal.length > 0);
-        isDirty = true;
-    }
-    if (currentCustomVal.length > 0 || classicCustomEl || cuteCustomEl || modernCustomEl) {
-        if (pendingChanges['price_card_custom_detail'] !== undefined || currentCustomVal !== (classicCustomEl?.defaultValue || cuteCustomEl?.defaultValue || modernCustomEl?.defaultValue || '').trim()) {
-            pendingChanges['price_card_custom_detail'] = currentCustomVal;
+    if (chkCustomEl) {
+        const isCustomChecked = !!chkCustomEl.checked;
+        if (pendingChanges['price_card_is_custom_detail'] !== undefined || isCustomChecked !== Boolean(chkCustomEl.defaultChecked)) {
+            pendingChanges['price_card_is_custom_detail'] = isCustomChecked;
             isDirty = true;
+        }
+        if (!isCustomChecked) {
+            pendingChanges['price_card_is_custom_detail'] = false;
+            pendingChanges['price_card_custom_detail'] = '';
+            if (Boolean(chkCustomEl.defaultChecked)) {
+                isDirty = true;
+            }
+        } else {
+            if (pendingChanges['price_card_custom_detail'] !== undefined || currentCustomVal !== (classicCustomEl?.defaultValue || cuteCustomEl?.defaultValue || modernCustomEl?.defaultValue || '').trim()) {
+                pendingChanges['price_card_custom_detail'] = currentCustomVal;
+                isDirty = true;
+            }
         }
     }
 
@@ -3797,6 +3806,49 @@ function saveProductChanges(callback) {
 
                 if (data.price_card) {
                     const c = data.price_card;
+                    const isCustom = !!c.is_custom_detail;
+                    const c1 = document.getElementById('chkCustomDetail');
+                    const c2 = document.getElementById('chkCustomDetailToolbar');
+                    if (c1) { c1.checked = isCustom; c1.defaultChecked = isCustom; }
+                    if (c2) { c2.checked = isCustom; c2.defaultChecked = isCustom; }
+
+                    const cuteCustomEl = document.getElementById('specCuteCustomTextarea');
+                    const modernCustomEl = document.getElementById('specModernCustomTextarea');
+                    const classicCustomEl = document.getElementById('specCustomDetailTextarea');
+                    const textVal = isCustom ? (c.custom_detail || '') : '';
+                    if (cuteCustomEl) {
+                        cuteCustomEl.value = textVal;
+                        cuteCustomEl.defaultValue = textVal;
+                    }
+                    if (modernCustomEl) {
+                        modernCustomEl.value = textVal;
+                        modernCustomEl.defaultValue = textVal;
+                    }
+                    if (classicCustomEl) {
+                        classicCustomEl.value = textVal;
+                        classicCustomEl.defaultValue = textVal;
+                    }
+
+                    const autoBox = document.getElementById('specInfoAutoContent');
+                    const customBox = document.getElementById('specInfoCustomContent');
+                    const mEditorBox = document.getElementById('specModernCustomEditorBox');
+                    const cuteEditorBox = document.getElementById('specCuteCustomEditorBox');
+                    if (autoBox) autoBox.style.display = isCustom ? 'none' : 'flex';
+                    if (customBox) customBox.style.display = isCustom ? 'block' : 'none';
+                    if (mEditorBox) mEditorBox.style.display = isCustom ? 'block' : 'none';
+                    if (cuteEditorBox) cuteEditorBox.style.display = isCustom ? 'block' : 'none';
+
+                    const cuteDisp = document.getElementById('specCuteSpecsDisplay');
+                    const mDisp = document.getElementById('specModernSpecsDisplay');
+                    const genZDisp = document.getElementById('specGenZSpecsDisplay');
+                    const classicDisp = document.getElementById('specCustomDetailDisplay');
+
+                    const textToDisplay = isCustom ? (c.custom_detail || '') : (c.auto_detail_text || generateCurrentAutoDetailText());
+                    if (cuteDisp) cuteDisp.innerHTML = renderCuteSpecsHtml(textToDisplay);
+                    if (mDisp) mDisp.innerHTML = renderModernSpecsHtml(textToDisplay);
+                    if (genZDisp) genZDisp.innerHTML = renderGenZSpecsHtml(textToDisplay);
+                    if (classicDisp) classicDisp.innerText = textToDisplay;
+
                     [1, 2, 3].forEach(idx => {
                         const qInp = document.getElementById('cardTierQtyInput' + idx);
                         if (qInp && c['tier_qty_' + idx] !== undefined) {
@@ -6131,8 +6183,8 @@ function generateCurrentAutoDetailText() {
 function toggleCustomPriceCardDetail(isCustom) {
     const c1 = document.getElementById('chkCustomDetail');
     const c2 = document.getElementById('chkCustomDetailToolbar');
-    if (c1) c1.checked = isCustom;
-    if (c2) c2.checked = isCustom;
+    if (c1) { c1.checked = isCustom; c1.defaultChecked = isCustom; }
+    if (c2) { c2.checked = isCustom; c2.defaultChecked = isCustom; }
 
     const autoBox = document.getElementById('specInfoAutoContent');
     const customBox = document.getElementById('specInfoCustomContent');
@@ -6140,6 +6192,7 @@ function toggleCustomPriceCardDetail(isCustom) {
     const mSpecsDisp = document.getElementById('specModernSpecsDisplay');
     const cuteEditorBox = document.getElementById('specCuteCustomEditorBox');
     const cuteSpecsDisp = document.getElementById('specCuteSpecsDisplay');
+    const genZSpecsDisp = document.getElementById('specGenZSpecsDisplay');
     const ta = document.getElementById('specCustomDetailTextarea');
     const mTa = document.getElementById('specModernCustomTextarea');
     const cuteTa = document.getElementById('specCuteCustomTextarea');
@@ -6161,6 +6214,7 @@ function toggleCustomPriceCardDetail(isCustom) {
         if (disp) disp.innerText = textVal;
         if (mSpecsDisp) mSpecsDisp.innerHTML = renderModernSpecsHtml(textVal);
         if (cuteSpecsDisp) cuteSpecsDisp.innerHTML = renderCuteSpecsHtml(textVal);
+        if (genZSpecsDisp) genZSpecsDisp.innerHTML = renderGenZSpecsHtml(textVal);
         
         const cardEl = document.getElementById('printablePriceCard');
         const isCute = cardEl?.classList.contains('cute');
@@ -6172,6 +6226,9 @@ function toggleCustomPriceCardDetail(isCustom) {
         } else if (ta) {
             ta.focus();
         }
+
+        markFieldDirty('price_card_is_custom_detail', true);
+        markFieldDirty('price_card_custom_detail', textVal.trim());
     } else {
         if (autoBox) autoBox.style.display = 'flex';
         if (customBox) customBox.style.display = 'none';
@@ -6179,15 +6236,19 @@ function toggleCustomPriceCardDetail(isCustom) {
         if (cuteEditorBox) cuteEditorBox.style.display = 'none';
         
         const autoText = generateCurrentAutoDetailText();
+        if (disp) disp.innerText = autoText;
         if (mSpecsDisp) mSpecsDisp.innerHTML = renderModernSpecsHtml(autoText);
         if (cuteSpecsDisp) cuteSpecsDisp.innerHTML = renderCuteSpecsHtml(autoText);
+        if (genZSpecsDisp) genZSpecsDisp.innerHTML = renderGenZSpecsHtml(autoText);
+
+        if (ta) { ta.value = ''; ta.defaultValue = ''; }
+        if (mTa) { mTa.value = ''; mTa.defaultValue = ''; }
+        if (cuteTa) { cuteTa.value = ''; cuteTa.defaultValue = ''; }
+
+        markFieldDirty('price_card_is_custom_detail', false);
+        markFieldDirty('price_card_custom_detail', '');
     }
 
-    markFieldDirty('price_card_is_custom_detail', isCustom);
-    const activeText = (cuteTa && cuteTa.value) || (mTa && mTa.value) || (ta && ta.value);
-    if (activeText) {
-        markFieldDirty('price_card_custom_detail', activeText.trim());
-    }
     saveProductChanges();
 }
 
