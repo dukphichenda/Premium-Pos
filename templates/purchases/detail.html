@@ -696,6 +696,23 @@ html.is-desktop-view .po-mobile-drawer-backdrop {
 .po-top-action-btn.danger:hover {
     background: #FEF2F2;
 }
+.po-top-action-btn.po-top-save-btn {
+    background: #7A5531;
+    color: #FFFFFF;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 4px;
+    box-shadow: 0 1px 3px rgba(122, 85, 49, 0.25);
+    transition: background 0.12s ease, transform 0.1s ease;
+}
+.po-top-action-btn.po-top-save-btn:hover {
+    background: #654425;
+    color: #FFFFFF;
+}
+.po-top-action-btn.po-top-save-btn:active {
+    background: #52361c;
+}
 .po-split-dropdown-wrap {
     position: relative;
 }
@@ -1775,6 +1792,9 @@ input:checked + .po-toggle-slider:before {
                     <span id="poDirtyBadge" class="po-dirty-tag" style="display: none;">● Unsaved changes</span>
                 </div>
                 <div class="po-canvas-topbar-right">
+                    <button type="submit" class="po-top-action-btn po-top-save-btn" id="poSaveBtn" title="Save Purchase Order (Ctrl+S)">
+                        <span>💾</span> Save
+                    </button>
                     <button type="button" class="po-top-action-btn danger" onclick="cancelPoOrderAction()" title="Cancel this purchase order">
                         <span style="color: #DC2626;">🚫</span> Cancel order
                     </button>
@@ -2284,12 +2304,6 @@ input:checked + .po-toggle-slider:before {
                 </div>
             </div>
 
-            <!-- Floating Save Bar (Lights up when unsaved or in new order mode) -->
-            <div class="po-floating-save-bar" id="poFloatingSaveBar">
-                <button type="submit" class="po-save-submit-btn" id="poSaveBtn">
-                    💾 Save Purchase Order (Ctrl+S)
-                </button>
-            </div>
         </form>
     </main>
 </div>
@@ -3882,7 +3896,16 @@ document.addEventListener('click', (e) => {
 document.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
         e.preventDefault();
-        document.getElementById('poMainForm').submit();
+        const saveBtn = document.getElementById('poSaveBtn');
+        if (saveBtn) {
+            saveBtn.click();
+        } else {
+            const form = document.getElementById('poMainForm');
+            if (form) {
+                if (form.requestSubmit) form.requestSubmit();
+                else form.submit();
+            }
+        }
     }
 });
 
