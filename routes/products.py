@@ -475,7 +475,7 @@ def _get_product_detail_bundle(product_id):
     # Global default price table style setting
     global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
     global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
-    if global_price_table_style not in ('classic', 'modern', 'cute'):
+    if global_price_table_style not in ('classic', 'modern', 'cute', 'gen_z'):
         global_price_table_style = 'classic'
 
     product = query_one("""
@@ -2472,7 +2472,7 @@ def list_categories():
     # Global price table style setting
     global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
     global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
-    if global_price_table_style not in ('classic', 'modern', 'cute'):
+    if global_price_table_style not in ('classic', 'modern', 'cute', 'gen_z'):
         global_price_table_style = 'classic'
 
     return render_template(
@@ -2493,7 +2493,7 @@ def create_category():
     color = request.form.get('color', '#00A3E0').strip()
     description = request.form.get('description', '').strip()
     price_table_style = (request.form.get('price_table_style') or 'classic').strip().lower()
-    if price_table_style not in ('classic', 'modern', 'cute'):
+    if price_table_style not in ('classic', 'modern', 'cute', 'gen_z'):
         price_table_style = 'classic'
     is_active = request.form.get('is_active') in ('1', 'true', 'on', 'yes') if 'is_active' in request.form else True
 
@@ -2539,7 +2539,7 @@ def edit_category(id):
     color = request.form.get('color', '#00A3E0').strip()
     description = request.form.get('description', '').strip()
     price_table_style = (request.form.get('price_table_style') or 'classic').strip().lower()
-    if price_table_style not in ('classic', 'modern', 'cute'):
+    if price_table_style not in ('classic', 'modern', 'cute', 'gen_z'):
         price_table_style = 'classic'
     is_active = request.form.get('is_active') in ('1', 'true', 'on', 'yes') if 'is_active' in request.form else True
 
@@ -2606,8 +2606,8 @@ def api_set_category_style(id):
     """
     data = request.get_json(silent=True) or request.form
     style = (data.get('style') or 'classic').strip().lower()
-    if style not in ('classic', 'modern', 'cute'):
-        return jsonify({'success': False, 'message': 'Style must be "classic", "modern", or "cute".'}), 400
+    if style not in ('classic', 'modern', 'cute', 'gen_z'):
+        return jsonify({'success': False, 'message': 'Style must be "classic", "modern", "cute", or "gen_z".'}), 400
 
     cat = query_one("SELECT id, name FROM categories WHERE id = %s", (id,))
     if not cat:
@@ -2629,8 +2629,8 @@ def api_set_all_categories_style():
     """
     data = request.get_json(silent=True) or request.form
     style = (data.get('style') or 'classic').strip().lower()
-    if style not in ('classic', 'modern', 'cute'):
-        return jsonify({'success': False, 'message': 'Style must be "classic", "modern", or "cute".'}), 400
+    if style not in ('classic', 'modern', 'cute', 'gen_z'):
+        return jsonify({'success': False, 'message': 'Style must be "classic", "modern", "cute", or "gen_z".'}), 400
 
     count = execute("UPDATE categories SET price_table_style = %s, updated_at = CURRENT_TIMESTAMP", (style,))
     execute("""

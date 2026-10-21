@@ -553,6 +553,65 @@ def list_orders():
                            is_branch_user=(not is_main),
                            current_branch=current_branch)
 
+def _parse_order_date(raw_date, default_date=None):
+    from datetime import datetime as dt_parser, date, timedelta
+    if not raw_date:
+        return default_date or date.today()
+    if isinstance(raw_date, date):
+        return raw_date
+    if isinstance(raw_date, dt_parser):
+        return raw_date.date()
+
+    val = str(raw_date).strip()
+    if not val:
+        return default_date or date.today()
+
+    val_lower = val.lower()
+    today = date.today()
+    if val_lower in ('today', 't'):
+        return today
+    if val_lower in ('yesterday', 'y'):
+        return today - timedelta(days=1)
+    if val_lower in ('tomorrow',):
+        return today + timedelta(days=1)
+
+    formats = (
+        '%d-%b-%y', '%d-%b-%Y', '%d-%B-%y', '%d-%B-%Y',
+        '%d %b %y', '%d %b %Y', '%d %B %y', '%d %B %Y',
+        '%Y-%m-%d', '%Y/%m/%d', '%Y.%m.%d',
+        '%d/%m/%Y', '%d/%m/%y',
+        '%d-%m-%Y', '%d-%m-%y',
+        '%d.%m.%Y', '%d.%m.%y',
+        '%m/%d/%Y', '%m/%d/%y',
+        '%m-%d-%Y', '%m-%d-%y'
+    )
+    for fmt in formats:
+        try:
+            return dt_parser.strptime(val, fmt).date()
+        except (ValueError, TypeError):
+            pass
+
+    current_year = today.year
+    for short_fmt, append_str in (
+        ('%d-%b-%Y', f'-{current_year}'),
+        ('%d %b %Y', f' {current_year}'),
+        ('%d/%m/%Y', f'/{current_year}'),
+        ('%d-%m-%Y', f'-{current_year}'),
+        ('%d.%m.%Y', f'.{current_year}'),
+    ):
+        try:
+            return dt_parser.strptime(val + append_str, short_fmt).date()
+        except (ValueError, TypeError):
+            pass
+
+    try:
+        from dateutil import parser as du_parser
+        return du_parser.parse(val).date()
+    except Exception:
+        pass
+
+    return default_date or today
+
 @sales_orders_bp.route('/sales/create', methods=['GET', 'POST'])
 def create_order():
     is_main = _is_main_admin()
@@ -566,22 +625,20 @@ def create_order():
             else:
                 customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE AND branch_id IS NULL ORDER BY name LIMIT 500")
         else:
-            customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE ORDER BY name LIMIT 500")
+            customers = query_all("SELECT id, name, phone, discount_percent FROM customers WHERE is_active = TRUE AND branch_id IS NULL ORDER BY name LIMIT 500")
         locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
         return render_template('sales/create.html', customers=customers, locations=locations)
 
     try:
-        customer_id = int(request.form.get('customer_id'))
+        customer_id = int(request.form.get('customer_id')) if request.form.get('customer_id') else None
+        if customer_id:
+            cust_check = query_one("SELECT branch_id FROM customers WHERE id = %s", (customer_id,))
+            if cust_check and cust_check.get('branch_id') != branch_id:
+                flash("Access denied: Selected customer belongs to another branch or HQ. Customers of HQ and Branch are kept independently.", "error")
+                return redirect(url_for('sales_orders.create_order'))
         location_id = int(request.form.get('location_id'))
         raw_order_date = request.form.get('order_date')
-        order_date = datetime.now().date()
-        if raw_order_date:
-            for fmt in ('%Y-%m-%d', '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d'):
-                try:
-                    order_date = datetime.strptime(str(raw_order_date).strip(), fmt).date()
-                    break
-                except (ValueError, TypeError):
-                    pass
+        order_date = _parse_order_date(raw_order_date)
         notes = request.form.get('notes', '').strip()
         sales_rep = request.form.get('sales_rep', '').strip()
         discount_amount = max(0.0, float(request.form.get('discount_amount', 0) or 0))
@@ -983,9 +1040,29 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
 
     cust_where = ["is_active = TRUE"]
     cust_params = []
-    if not is_main and user_bid:
-        cust_where.append("(branch_id = %s OR branch_id IS NULL)")
-        cust_params.append(user_bid)
+    effective_bid = None
+    if not is_main:
+        effective_bid = user_bid
+    elif branch_id and str(branch_id).lower() not in ('all', ''):
+        if str(branch_id).lower() == 'main':
+            effective_bid = 'main'
+        elif str(branch_id).isdigit():
+            effective_bid = int(branch_id)
+    elif session.get('active_branch_id'):
+        effective_bid = int(session.get('active_branch_id'))
+
+    if effective_bid is not None:
+        if effective_bid == 'main':
+            cust_where.append("branch_id IS NULL")
+        else:
+            cust_where.append("branch_id = %s")
+            cust_params.append(effective_bid)
+    elif is_main and branch_id == 'all':
+        # Viewing all branches
+        pass
+    else:
+        # Default to Main Store (HQ)
+        cust_where.append("branch_id IS NULL")
 
     all_customers = query_all(f"""
         SELECT 
@@ -997,6 +1074,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         WHERE {' AND '.join(cust_where)}
         ORDER BY name ASC
     """, tuple(cust_params))
+    print(f"DEBUG DRAWER: is_main={is_main}, branch_id={branch_id}, effective_bid={effective_bid}, len_custs={len(all_customers)}")
     all_locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY id")
     pricing_schemes = query_all("SELECT id, name, is_active FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
     if not pricing_schemes:
@@ -1097,7 +1175,40 @@ def _find_upper_or_adjacent_order(current_id, date_filter='All', status_filter='
             if len(order_ids) > 1:
                 return order_ids[1]
         elif order_ids:
-            # Current id wasn't in list (e.g., status filter already excluded it), pick the first order
+            # Current id wasn't in list (e.g., status filter already excluded it, such as completing an Open order)
+            # Find the nearest order immediately above current_id instead of defaulting to top order
+            current_order = query_one("SELECT id, order_date, order_number FROM sales_orders WHERE id = %s", (current_id,))
+            if current_order:
+                cur_date = current_order.get('order_date')
+                # sidebar_orders is sorted by (order_date DESC, id DESC)
+                # Find the nearest order above current_order:
+                # order_date > cur_date OR (order_date == cur_date and id > current_id)
+                nearest_above = None
+                nearest_below = None
+                for ord_item in sidebar_orders:
+                    oid = ord_item['id']
+                    odate = ord_item.get('order_date')
+                    is_above = False
+                    if odate and cur_date:
+                        if odate > cur_date:
+                            is_above = True
+                        elif odate == cur_date and oid > current_id:
+                            is_above = True
+                    elif oid > current_id:
+                        is_above = True
+
+                    if is_above:
+                        # In DESC sorted list, the last matching item is nearest above
+                        nearest_above = oid
+                    elif not is_above and nearest_below is None:
+                        # The first non-matching item is nearest below
+                        nearest_below = oid
+
+                if nearest_above:
+                    return nearest_above
+                if nearest_below:
+                    return nearest_below
+
             for oid in order_ids:
                 if oid != current_id:
                     return oid
@@ -1525,11 +1636,13 @@ def new_order():
     if not is_main:
         branch_id = user_bid
     else:
-        branch_param = request.args.get('branch')
+        branch_param = request.args.get('branch') or session.get('active_branch_id')
         branch_id = None
         if branch_param:
             if str(branch_param).lower() not in ('main', 'all', 'none', '', 'hq', '0') and str(branch_param).isdigit():
                 branch_id = int(branch_param)
+
+    print(f"DEBUG NEW_ORDER: is_main={is_main}, session_active_bid={session.get('active_branch_id')}, branch_param={branch_param}, resolved branch_id={branch_id}")
 
     branch = query_one("SELECT * FROM branches WHERE id = %s", (branch_id,)) if branch_id else None
 
@@ -1717,17 +1830,20 @@ def new_order():
             FROM customers WHERE id = %s
         """, (int(target_cust_id),))
         if cust_row:
-            order['customer_id'] = cust_row['id']
-            order['customer_name'] = cust_row['name']
-            order['customer_contact'] = cust_row.get('contact_name') or ''
-            order['customer_phone'] = cust_row.get('phone') or ''
-            order['customer_email'] = cust_row.get('email') or ''
-            order['customer_address'] = cust_row.get('display_address') or ''
-            order['customer_city'] = cust_row.get('city') or ''
-            order['customer_balance'] = float(cust_row.get('balance') or 0.0)
-            order['customer_payment_terms'] = cust_row.get('payment_terms') or 'Due on Receipt'
-            if cust_row.get('default_pricing_scheme_id'):
-                order['pricing_scheme_id'] = cust_row['default_pricing_scheme_id']
+            cust_bid = cust_row.get('branch_id')
+            order_bid = order.get('branch_id')
+            if cust_bid == order_bid:
+                order['customer_id'] = cust_row['id']
+                order['customer_name'] = cust_row['name']
+                order['customer_contact'] = cust_row.get('contact_name') or ''
+                order['customer_phone'] = cust_row.get('phone') or ''
+                order['customer_email'] = cust_row.get('email') or ''
+                order['customer_address'] = cust_row.get('display_address') or ''
+                order['customer_city'] = cust_row.get('city') or ''
+                order['customer_balance'] = float(cust_row.get('balance') or 0.0)
+                order['customer_payment_terms'] = cust_row.get('payment_terms') or 'Due on Receipt'
+                if cust_row.get('default_pricing_scheme_id'):
+                    order['pricing_scheme_id'] = cust_row['default_pricing_scheme_id']
 
     if 'date_filter' in request.args:
         date_filter = request.args.get('date_filter') or 'All'
@@ -1775,6 +1891,8 @@ def new_order():
         req_branch = str(user_bid or -1)
     elif branch:
         req_branch = str(branch['id'])
+    elif session.get('active_branch_id'):
+        req_branch = str(session.get('active_branch_id'))
     elif 'branch' in request.args and request.args.get('branch'):
         b_arg = request.args.get('branch').strip().lower()
         if b_arg in ('all', 'main') or b_arg.isdigit():
@@ -2037,6 +2155,28 @@ def detail_order(id):
         attachments, versions = _get_order_attachments_and_versions(id)
         branch_scope = request.args.get('branch') or (str(order['branch_id']) if order.get('branch_id') else 'main')
 
+        ord_bid = order.get('branch_id')
+        if ord_bid:
+            partial_custs = query_all("""
+                SELECT id, name, contact_name, phone, branch_id,
+                       COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as customer_address,
+                       COALESCE(NULLIF(address1, ''), NULLIF(shipping_address, ''), '') as address1,
+                       balance 
+                FROM customers 
+                WHERE is_active = TRUE AND branch_id = %s
+                ORDER BY name ASC
+            """, (ord_bid,))
+        else:
+            partial_custs = query_all("""
+                SELECT id, name, contact_name, phone, branch_id,
+                       COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as customer_address,
+                       COALESCE(NULLIF(address1, ''), NULLIF(shipping_address, ''), '') as address1,
+                       balance 
+                FROM customers 
+                WHERE is_active = TRUE AND branch_id IS NULL
+                ORDER BY name ASC
+            """)
+
         return render_template('sales/_detail_canvas.html',
                                order=order,
                                lines=lines,
@@ -2044,7 +2184,7 @@ def detail_order(id):
                                all_locations=all_locations,
                                pricing_schemes=pricing_schemes,
                                all_delivery_men=all_delivery_men,
-                               all_customers=[],
+                               all_customers=partial_custs,
                                all_products=[],
                                company=company,
                                payments=payments,
@@ -2235,15 +2375,9 @@ def save_order(id=0):
         location_id = int(data.get('location_id') or (order['location_id'] if order else 0) or 0) or None
         
         raw_date = data.get('order_date')
-        from datetime import datetime as dt_parser, date
-        order_date = (order['order_date'] if order else date.today())
-        if raw_date:
-            for fmt in ('%Y-%m-%d', '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d'):
-                try:
-                    order_date = dt_parser.strptime(str(raw_date).strip(), fmt).date()
-                    break
-                except (ValueError, TypeError):
-                    pass
+        from datetime import date
+        fallback_date = (order['order_date'] if order and order.get('order_date') else date.today())
+        order_date = _parse_order_date(raw_date, default_date=fallback_date)
 
         sales_rep = (data.get('sales_rep') or (order['sales_rep'] if order else '') or '').strip()
         
@@ -2404,17 +2538,23 @@ def save_order(id=0):
                 raw_b = data.get('branch_id') or request.form.get('branch_id') or data.get('branch') or request.form.get('branch')
                 if raw_b and str(raw_b).lower() not in ('main', 'all', 'none', '', 'hq', '0', 'null') and str(raw_b).isdigit():
                     branch_id = int(raw_b)
+                elif session.get('active_branch_id'):
+                    branch_id = int(session.get('active_branch_id'))
                 else:
                     branch_id = None
 
         # Verify customer belongs to the target branch (prevent cross-branch customer assignment)
-        if customer_id and not is_main:
+        # Keep HQ and Branch customers strictly independent!
+        if customer_id:
             cust_check = query_one("SELECT branch_id FROM customers WHERE id = %s", (customer_id,))
-            if cust_check and cust_check.get('branch_id') != branch_id:
-                if request.is_json:
-                    return jsonify({'success': False, 'message': 'Access denied: Customer does not belong to your branch.'}), 403
-                flash("Access denied: Selected customer belongs to another branch.", "error")
-                return redirect(url_for('sales_orders.list_orders'))
+            if cust_check:
+                cust_bid = cust_check.get('branch_id')
+                if cust_bid != branch_id:
+                    msg = "Access denied: Selected customer belongs to another branch or HQ. Customers of HQ and Branch are kept independently."
+                    if request.is_json:
+                        return jsonify({'success': False, 'message': msg}), 403
+                    flash(msg, "error")
+                    return redirect(url_for('sales_orders.list_orders'))
 
         with get_db_cursor(commit=True) as cur:
             # Auto-save delivery personnel into delivery_men table so they are permanently saved in the list
@@ -2739,14 +2879,19 @@ def complete_pay(id):
             """, (id, rem, payment_method, f"Completed by {user_login_name}"))
 
     date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
-    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'
+    status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open'
     cust_search = request.form.get('customer_search') or request.args.get('customer_search') or session.get('so_customer_search') or ''
     branch_param = request.form.get('branch') or request.args.get('branch') or session.get('so_branch_filter') or (str(order.get('branch_id')) if order.get('branch_id') else 'main')
+    search_param = request.form.get('search') or request.args.get('search') or session.get('so_search_query') or ''
 
     session['so_date_filter'] = date_filter
     session['so_status_filter'] = status_filter
     session['so_customer_search'] = cust_search
     session['so_branch_filter'] = branch_param
+    if search_param:
+        session['so_search_query'] = search_param
+    elif 'search' in request.form or 'search' in request.args:
+        session.pop('so_search_query', None)
 
     req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
     target_id = _find_upper_or_adjacent_order(
@@ -2755,7 +2900,8 @@ def complete_pay(id):
         status_filter=status_filter,
         customer_search=cust_search,
         branch_id=branch_param,
-        requested_upper_id=req_upper_id
+        requested_upper_id=req_upper_id,
+        search_query=search_param
     )
     if not target_id:
         target_id = id
@@ -2768,6 +2914,8 @@ def complete_pay(id):
     }
     if cust_search:
         redirect_kwargs['customer_search'] = cust_search
+    if search_param:
+        redirect_kwargs['search'] = search_param
     redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
 
     try:

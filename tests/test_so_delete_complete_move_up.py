@@ -85,6 +85,35 @@ class TestSoDeleteCompleteMoveUp(unittest.TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertIn(f'/sales/{target_upper}', resp.headers['Location'])
 
+    def test_complete_so_middle_shifts_to_nearest_open_order_not_top(self):
+        """When completing an open order in the middle, it shifts up to the nearest open order, not the top order."""
+        cust = query_one("SELECT id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+
+        import time
+        ts = str(int(time.time() * 1000))
+        o1 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-NR-1-{ts}', %s, 10, 'OPEN', 'UNPAID', '2026-10-18') RETURNING id", (cust_id,))
+        o2 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-NR-2-{ts}', %s, 20, 'OPEN', 'UNPAID', '2026-10-19') RETURNING id", (cust_id,))
+        o3 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-NR-3-{ts}', %s, 30, 'OPEN', 'UNPAID', '2026-10-20') RETURNING id", (cust_id,))
+        self.addCleanup(execute, "DELETE FROM sales_orders WHERE id IN (%s, %s, %s)", (o1, o2, o3))
+
+        # DESC order: o3 (top), o2 (middle/nearest upper to o1), o1 (bottom)
+        # Completing o1 without explicit upper_id should shift to o2 (the nearest order), NOT o3!
+        resp = self.client.post(
+            f'/sales/{o1}/complete_pay',
+            data={
+                'payment_method': 'Cash',
+                'date_filter': 'All',
+                'status_filter': 'Open',
+                'branch': 'main',
+                'search': ts
+            },
+            follow_redirects=False
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(f'/sales/{o2}', resp.headers['Location'])
+        self.assertNotIn(f'/sales/{o3}', resp.headers['Location'])
+
     def test_delete_so_moves_up_to_upper_order(self):
         """When deleting an SO, it stays on the detail page and moves up to the upper order instead of going to list."""
         cust = query_one("SELECT id FROM customers LIMIT 1")

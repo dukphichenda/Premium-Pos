@@ -1261,7 +1261,7 @@ def search_customers_json():
         else:
             where_clauses.append("branch_id IS NULL")
     else:
-        req_b = request.args.get('branch_id') or request.args.get('branch') or 'main'
+        req_b = request.args.get('branch_id') or request.args.get('branch') or session.get('active_branch_id') or 'main'
         if req_b and str(req_b).strip().lower() == 'main':
             where_clauses.append("branch_id IS NULL")
         elif req_b and str(req_b).strip().isdigit():
@@ -1311,6 +1311,8 @@ def quick_add_customer_ajax():
             branch_id = user_bid
         else:
             raw_b = data.get('branch_id')
+            if (raw_b is None or str(raw_b).strip() == '') and session.get('active_branch_id'):
+                raw_b = session.get('active_branch_id')
             if raw_b and str(raw_b).lower() not in ('main', 'none', '', 'all', '0', 'null') and str(raw_b).isdigit():
                 branch_id = int(raw_b)
             else:

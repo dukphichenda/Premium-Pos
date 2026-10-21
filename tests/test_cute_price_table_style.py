@@ -131,6 +131,10 @@ class TestCutePriceTableStyle(unittest.TestCase):
         self.assertIn('inflow-cute-price-wrap', html)
         self.assertIn('inflow-cute-left-pill', html)
         self.assertIn('inflow-cute-right-pill', html)
+        # Verify all tier rows use coral (orange) total price and not green
+        self.assertIn('inflow-cute-tier-tot-coral', html)
+        self.assertNotIn('inflow-cute-tier-tot-green font-khmer', html)
+        self.assertIn('PCS/ Carton)', html)
 
         # Legacy detail page
         resp_leg = self.client.get(f'/products/{prod_id}?legacy=1')
@@ -138,6 +142,9 @@ class TestCutePriceTableStyle(unittest.TestCase):
         leg_html = resp_leg.data.decode('utf-8')
         self.assertIn('btnDetailStyleCuteDetail', leg_html)
         self.assertIn('id="cardContentCuteDetail"', leg_html)
+        self.assertIn('inflow-cute-tier-tot-coral', leg_html)
+        self.assertNotIn('inflow-cute-tier-tot-green font-khmer', leg_html)
+        self.assertIn('PCS/ Carton)', leg_html)
 
     def test_product_price_card_style_persistence(self):
         """Verify updating a product's price_card_style to 'cute' via update_ajax persists."""
@@ -177,6 +184,9 @@ class TestCutePriceTableStyle(unittest.TestCase):
         self.assertIn('.inflow-spec-card.cute', html)
         self.assertIn('inflow-cute-header', html)
         self.assertIn('inflow-cute-price-wrap', html)
+        # Verify coral total price class is used across tier rows
+        self.assertIn('inflow-cute-tier-tot-coral', html)
+        self.assertNotIn('inflow-cute-tier-tot-green font-khmer', html)
 
 if __name__ == '__main__':
     unittest.main()

@@ -15,10 +15,11 @@
         </div>
 
         <form id="salesOrderForm" method="POST" action="{% if is_new %}{{ url_for('sales_orders.save_order', id=0) }}{% else %}{{ url_for('sales_orders.save_order', id=order.id) }}{% endif %}">
+            {% set effective_order_branch = order.branch_id if order.branch_id is not none else (current_branch.id if (is_branch_mode and current_branch) else (branch_scope if branch_scope not in ('main', 'all', None, '') else '')) %}
             <input type="hidden" name="lines_json" id="linesJsonInput" value="">
             <input type="hidden" name="mark_complete_pay" id="markCompletePayInput" value="0">
-            <input type="hidden" name="branch_id" id="orderBranchIdInput" value="{{ order.branch_id or (branch_scope if (branch_scope and branch_scope != 'main') else '') }}">
-            <input type="hidden" name="branch" value="{{ branch_scope or (order.branch_id|string if order.branch_id else 'main') }}">
+            <input type="hidden" name="branch_id" id="orderBranchIdInput" value="{{ effective_order_branch }}">
+            <input type="hidden" name="branch" value="{{ effective_order_branch or 'main' }}">
             <input type="hidden" name="payment_method" id="orderPaymentMethodHidden" value="{{ order_payment_method or '' }}">
             <input type="hidden" name="carrier" id="hiddenFormCarrier" value="{{ order.carrier or '' }}">
             <input type="hidden" name="package_count" id="hiddenFormPackageCount" value="{{ (order.get('package_count') if order else 1) or 1 }}">
@@ -55,11 +56,12 @@
                                                 <th style="width: 15%; text-align: center;">Details</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="customerDropdownBody">
+                                        <tbody id="customerDropdownBody" data-loaded-branch="{{ effective_order_branch }}">
                                             {% if all_customers %}
                                             {% for c in all_customers %}
                                             <tr class="main-cust-row"
                                                 data-id="{{ c.id }}"
+                                                data-branch-id="{{ c.branch_id if c.branch_id is not none else '' }}"
                                                 data-cname="{{ c.name|e }}"
                                                 data-name="{{ (c.name or '')|lower|e }}" 
                                                 data-contact="{{ (c.contact_name or '')|lower|e }}" 
@@ -67,7 +69,8 @@
                                                 data-phone="{{ (c.phone or '')|lower|e }}"
                                                 data-cphone="{{ (c.phone or '')|e }}"
                                                 data-caddress="{{ (c.customer_address or c.address1 or '')|e }}"
-                                                onclick="selectCustomerFromRow(this)">
+                                                onclick="selectCustomerFromRow(this)"
+                                                style="{% if (effective_order_branch and c.branch_id|string != effective_order_branch|string) or (not effective_order_branch and c.branch_id is not none) %}display: none;{% endif %}">
                                                 <td style="font-weight: 500;">{{ c.name }}</td>
                                                 <td style="color: #4B5563;">{{ c.contact_name or '' }}</td>
                                                 <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
@@ -106,15 +109,25 @@
                 <!-- Middle Column: Location & Delivery -->
                 <div class="inflow-so-col inflow-so-col-delivery">
                     <input type="hidden" name="sales_rep" id="salesRepInput" value="{{ order.sales_rep or '' }}">
-                    {% if session.get('role') == 'main_admin' %}
+                    {% if session.get('role') == 'main_admin' and not (is_branch_mode and current_branch) %}
                     <div class="inflow-field-row" style="margin-bottom: 4px;">
                         <span class="inflow-field-label">Store/Branch</span>
-                        <select name="branch_id" id="soBranchSelect" class="inflow-field-select" onchange="handleSoBranchChange(this.value);" {% if is_paid %}disabled{% endif %}>
-                            <option value="" {% if not order.branch_id and (not branch_scope or branch_scope in ('main', 'all')) %}selected{% endif %}>🏢 Main Store (HQ)</option>
+                        <select id="soBranchSelect" class="inflow-field-select" onchange="handleSoBranchChange(this.value);" {% if is_paid %}disabled{% endif %}>
+                            <option value="" {% if not effective_order_branch %}selected{% endif %}>🏢 Main Store (HQ)</option>
                             {% for br in all_branches %}
-                            <option value="{{ br.id }}" {% if (order.branch_id|string == br.id|string) or (not order.branch_id and branch_scope == br.id|string) %}selected{% endif %}>🏬 {{ br.name }} ({{ br.code }})</option>
+                            <option value="{{ br.id }}" {% if effective_order_branch|string == br.id|string %}selected{% endif %}>🏬 {{ br.name }} ({{ br.code }})</option>
                             {% endfor %}
                         </select>
+                    </div>
+                    {% elif (is_branch_mode and current_branch) or order.branch_id %}
+                    {% set display_branch_name = current_branch.name if (is_branch_mode and current_branch) else (order.branch_name or 'Branch') %}
+                    {% set display_branch_code = current_branch.code if (is_branch_mode and current_branch) else (order.branch_code or '') %}
+                    <div class="inflow-field-row" style="margin-bottom: 4px;">
+                        <span class="inflow-field-label">Store/Branch</span>
+                        <div style="font-size: 12px; font-weight: 600; color: #1E293B; display: flex; align-items: center; gap: 6px; padding: 2px 0;">
+                            <span>🏬 {{ display_branch_name }} {% if display_branch_code %}({{ display_branch_code }}){% endif %}</span>
+                            <span style="font-size: 10px; color: #059669; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 3px; padding: 1px 4px; font-weight: 600;">Isolated Branch</span>
+                        </div>
                     </div>
                     {% endif %}
                     <div class="inflow-field-row">
@@ -258,8 +271,8 @@
                     <div class="inflow-field-row inflow-orderinfo-row inflow-orderinfo-date" style="justify-content: flex-end;">
                         <span class="inflow-orderinfo-label" style="color: #4B5563; font-size: 11.5px; margin-right: 12px;">Date</span>
                         <div class="gs-datepicker-wrapper inflow-orderinfo-datepicker" style="width: 110px;">
-                            <input type="text" name="order_date" id="orderDateInput" class="inflow-field-input gs-datepicker-input" style="width: 100%; padding-right: 22px; cursor: pointer;" value="{{ order.order_date | format_inflow_date }}" data-original-date="{{ order.order_date | format_inflow_date }}" onchange="handleBillDateChange(this)">
-                            <span class="gs-datepicker-icon" title="Select date">
+                            <input type="text" name="order_date" id="orderDateInput" class="inflow-field-input gs-datepicker-input" style="width: 100%; padding-right: 22px; cursor: pointer;" value="{{ order.order_date | format_inflow_date }}" data-original-date="{{ order.order_date | format_inflow_date }}" onchange="handleBillDateChange(this)" onclick="(window.GoogleSheetDatePicker || (window.parent && window.parent.GoogleSheetDatePicker))?.open(this); event.stopPropagation();" ondblclick="(window.GoogleSheetDatePicker || (window.parent && window.parent.GoogleSheetDatePicker))?.open(this); event.stopPropagation();">
+                            <span class="gs-datepicker-icon" title="Select date" onclick="(window.GoogleSheetDatePicker || (window.parent && window.parent.GoogleSheetDatePicker))?.open(document.getElementById('orderDateInput')); event.stopPropagation();">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                                     <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
                                     <line x1="16" y1="2" x2="16" y2="6"></line>
@@ -627,7 +640,7 @@
          data-status="{{ order.status if order else '' }}"
          data-is-paid="{{ '1' if is_paid else '0' }}"
          data-is-new="{{ '1' if is_new else '0' }}"
-         data-branch-id="{{ order.branch_id or '' }}"
+         data-branch-id="{{ effective_order_branch }}"
          data-customer-name="{{ (order.customer_name or '')|e }}"
          data-customer-contact="{{ (order.customer_contact or '')|e }}"
          data-customer-phone="{{ (order.customer_phone or '')|e }}"

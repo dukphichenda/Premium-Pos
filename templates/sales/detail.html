@@ -22,6 +22,130 @@
 .inflow-spin { display: inline-block; animation: spin 1s linear infinite; }
 
 /* ========================================================================= */
+/* Floating inFlow Customer Suggestion Dropdown (Matching Screenshot) */
+.so-sidebar-cust-suggest-popup {
+    display: none;
+    position: fixed;
+    width: 390px;
+    background: #FFFFFF;
+    border: 1px solid #7F9DB9;
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.25), 0 4px 10px -2px rgba(0, 0, 0, 0.12);
+    z-index: 999999;
+    border-radius: 3px;
+    overflow: hidden;
+    font-family: inherit;
+}
+.so-suggest-header-table-wrap {
+    max-height: 220px;
+    overflow-y: auto;
+    background: #FFFFFF;
+}
+.so-suggest-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11.5px;
+    table-layout: fixed;
+}
+.so-suggest-table thead th {
+    background: linear-gradient(180deg, #F8FAFC 0%, #E2E8F0 100%);
+    border-bottom: 1px solid #CBD5E1;
+    border-right: 1px solid #E2E8F0;
+    padding: 5px 8px;
+    font-weight: 600;
+    color: #334155;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    user-select: none;
+}
+.so-suggest-table thead th:last-child {
+    border-right: none;
+}
+.so-suggest-table tbody tr {
+    cursor: pointer;
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.05s ease;
+}
+.so-suggest-table tbody td {
+    padding: 5px 8px;
+    color: #1E293B;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    border-right: 1px solid #F8FAFC;
+}
+.so-suggest-table tbody td:last-child {
+    border-right: none;
+}
+.so-suggest-table tbody tr.highlighted,
+.so-suggest-table tbody tr:hover {
+    background: #0078D7 !important;
+    color: #FFFFFF !important;
+}
+.so-suggest-table tbody tr.highlighted td,
+.so-suggest-table tbody tr:hover td {
+    color: #FFFFFF !important;
+}
+.so-suggest-table tbody tr.highlighted .so-suggest-view-link,
+.so-suggest-table tbody tr:hover .so-suggest-view-link {
+    color: #FFFFFF !important;
+    text-decoration: underline !important;
+}
+.so-suggest-view-link {
+    color: #0078D7;
+    text-decoration: underline;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 500;
+}
+.so-suggest-footer {
+    background: #F8FAFC;
+    border-top: 1px solid #CBD5E1;
+    padding: 6px 10px;
+}
+.so-suggest-add-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+}
+.so-suggest-add-label {
+    font-weight: 700;
+    color: #475569;
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+}
+.so-suggest-add-input {
+    flex: 1;
+    height: 24px;
+    border: 1px solid #CBD5E1;
+    border-radius: 2px;
+    padding: 0 6px;
+    font-size: 11px;
+    background: #FFFFFF;
+    color: #1E293B;
+}
+.so-suggest-add-input:focus {
+    outline: none;
+    border-color: #0078D7;
+    box-shadow: 0 0 0 1px #0078D7;
+}
+.so-suggest-add-btn {
+    height: 24px;
+    padding: 0 12px;
+    background: #F1F5F9;
+    border: 1px solid #94A3B8;
+    border-radius: 2px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    color: #1E293B;
+}
+.so-suggest-add-btn:hover {
+    background: #E2E8F0;
+    border-color: #64748B;
+}
+
 /* Modern Sales Order Master Sidebar (Matching UI Screenshot)               */
 /* ========================================================================= */
 .so-master-sidebar {
@@ -1594,7 +1718,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
         </div>
 
         <!-- Wider Search Input Box (Directly visible) -->
-        <div class="so-search-box-wrap" id="soSearchBoxWrap" style="display: block; padding: 6px 12px 4px;">
+        <div class="so-search-box-wrap" id="soSearchBoxWrap" style="display: block; padding: 6px 12px 4px; position: relative;">
             <div style="position: relative; display: flex; align-items: center; width: 100%;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2.2" style="position: absolute; left: 10px; pointer-events: none;">
                     <circle cx="11" cy="11" r="8"></circle>
@@ -1604,7 +1728,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                        name="so_filter_search_field"
                        placeholder="Search order #, customer, $..." 
                        value="{{ search_query or session.get('so_search_query') or '' }}"
-                       autocomplete="one-time-code" 
+                       autocomplete="off" 
                        autocorrect="off"
                        autocapitalize="off"
                        spellcheck="false"
@@ -1614,6 +1738,31 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                        oninput="handleSoLiveSearch(this.value)"
                        onkeydown="handleSoSearchKey(event)">
                 <button type="button" class="so-clear-search-btn" id="btnClearSoSearch" onclick="clearSoLiveSearch()" style="{% if search_query or session.get('so_search_query') or request.args.get('search') or request.args.get('q') %}display: flex;{% else %}display: none;{% endif %}" title="Clear search">✕</button>
+            </div>
+
+            <!-- Floating inFlow Customer Suggestion Dropdown (Matches Screenshot) -->
+            <div id="soSidebarCustSuggestPopup" class="so-sidebar-cust-suggest-popup" style="display: none;">
+                <div class="so-suggest-header-table-wrap">
+                    <table class="so-suggest-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 52%; text-align: left;">Name ▲</th>
+                                <th style="width: 33%; text-align: left;">Contact</th>
+                                <th style="width: 15%; text-align: center;">Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="soSidebarCustSuggestTbody">
+                        </tbody>
+                    </table>
+                </div>
+                <div class="so-suggest-footer">
+                    <div class="so-suggest-add-row">
+                        <span class="so-suggest-add-label">ADD NEW:</span>
+                        <span style="font-size: 11px; color: #475569; font-weight: 500;">Name</span>
+                        <input type="text" id="soSuggestAddNewInput" class="so-suggest-add-input" placeholder="Customer name..." onkeydown="if(event.key==='Enter'){event.preventDefault();handleSoSuggestAddNew();}">
+                        <button type="button" class="so-suggest-add-btn" onclick="handleSoSuggestAddNew()">Add</button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1708,7 +1857,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 No orders match criteria
             </div>
             {% endfor %}
-            <div id="soSidebarCustomerMatches" style="display: none; padding: 4px 6px 10px;"></div>
+            
             <div id="soSidebarNoSearchMatch" style="display: none; padding: 32px 16px; font-size: 12px; color: #94A3B8; text-align: center;">
                 No orders match your search
             </div>
@@ -1948,6 +2097,12 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
             <button type="button" onclick="closeQuickAddCustomerModal()" style="color: #DBEAFE; font-size: 16px; background: none; border: none; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
         </div>
         <div class="inflow-modal-body" style="padding: 16px 18px; background: #FFFFFF; display: flex; flex-direction: column; gap: 10px;">
+            <!-- Active Branch Target Indicator -->
+            <div id="quickAddBranchNotice" style="background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; padding: 6px 12px; font-size: 11.5px; color: #1E3A8A; display: flex; align-items: center; justify-content: space-between;">
+                <span style="font-weight: 500;">Adding customer to:</span>
+                <strong style="color: #1E40AF;">🏢 Main Store (HQ)</strong>
+            </div>
+
             <!-- AI Customer Auto-Fill / Image Upload Card -->
             <div id="quickAddAiUploadCard" style="background: linear-gradient(135deg, #EFF6FF 0%, #F0FDF4 100%); border: 1.5px dashed #3B82F6; border-radius: 6px; padding: 10px 12px; position: relative; transition: all 0.2s ease;">
                 <input type="file" id="quickAddCustImageInput" accept="image/*" style="display: none;" onchange="handleQuickAddCustomerImageUpload(this)">
@@ -3182,6 +3337,34 @@ function syncDrawerFiltersToStorage() {
 function handleSoBranchChange(val) {
     const hidden = document.getElementById('orderBranchIdInput');
     if (hidden) hidden.value = val || '';
+    const meta = document.getElementById('soPartialMeta');
+    if (meta) meta.setAttribute('data-branch-id', val || '');
+
+    // Check if currently selected customer belongs to a different branch
+    const selectedCustId = document.getElementById('customerIdHidden')?.value;
+    if (selectedCustId) {
+        const activeBranchId = (val || '').trim();
+        const selectedRow = document.querySelector(`#customerDropdownBody tr.main-cust-row[data-id="${selectedCustId}"]`);
+        if (selectedRow) {
+            const custBranchId = (selectedRow.getAttribute('data-branch-id') || '').trim();
+            if (custBranchId !== activeBranchId) {
+                // Clear customer to prevent branch mismatch rejection
+                selectCustomer('', '', '', '', '');
+            }
+        }
+    }
+
+    // Re-filter customer dropdown list immediately
+    if (typeof filterCustomerDropdown === 'function') {
+        const curInputVal = document.getElementById('customerSearchInput')?.value || '';
+        filterCustomerDropdown(curInputVal);
+        const popup = document.getElementById('customerDropdownPopup');
+        if (popup) popup.classList.remove('show');
+    }
+    if (typeof markDirty === 'function') {
+        markDirty();
+    }
+
     {% if is_new %}
     fetch('/api/sales/preview-order-number?branch_id=' + encodeURIComponent(val || ''))
         .then(r => r.json())
@@ -3230,30 +3413,58 @@ function buildUrlWithFilters(baseUrl, extraParams = {}) {
 }
 
 function getUpperOrAdjacentOrderId() {
-    // 1. Try compact drawer list
-    const compactRows = Array.from(document.querySelectorAll('#drawerOrdersListBody .inflow-drawer-row'));
-    let activeIdx = compactRows.findIndex(r => r.classList.contains('active'));
-    if (activeIdx !== -1) {
-        // Move up to upper order if one exists above
-        if (activeIdx > 0) {
-            return compactRows[activeIdx - 1].getAttribute('data-order-id');
-        }
-        // If current is top-most order, move down to next order below
-        if (compactRows.length > 1) {
-            return compactRows[1].getAttribute('data-order-id');
+    // 1. Try modern sidebar order cards list (#soSidebarListBody .so-sidebar-card)
+    const visibleCards = Array.from(document.querySelectorAll('#soSidebarListBody .so-sidebar-card'))
+        .filter(c => c.style.display !== 'none');
+    
+    if (visibleCards.length > 0) {
+        const activeCard = visibleCards.find(c => c.classList.contains('active')) ||
+                           visibleCards.find(c => c.getAttribute('data-order-id') == window.currentActiveOrderId);
+        const activeIdx = activeCard ? visibleCards.indexOf(activeCard) : -1;
+        
+        if (activeIdx !== -1) {
+            // Shift up to the nearest upper order if one exists above
+            if (activeIdx > 0) {
+                return visibleCards[activeIdx - 1].getAttribute('data-order-id');
+            }
+            // If current is top-most order, shift down to the nearest order below
+            if (visibleCards.length > 1) {
+                return visibleCards[1].getAttribute('data-order-id');
+            }
+        } else {
+            // If activeCard wasn't found directly, find nearest card by data-order-id relative to current order
+            const curId = parseInt(window.currentActiveOrderId || 0, 10);
+            let nearestAbove = null;
+            let nearestBelow = null;
+            for (const c of visibleCards) {
+                const oid = parseInt(c.getAttribute('data-order-id'), 10);
+                if (oid > curId) {
+                    nearestAbove = c;
+                } else if (oid < curId && !nearestBelow) {
+                    nearestBelow = c;
+                }
+            }
+            const candidate = nearestAbove || nearestBelow || visibleCards[0];
+            if (candidate) return candidate.getAttribute('data-order-id');
         }
     }
 
-    // 2. Try expanded drawer table
-    const expandedRows = Array.from(document.querySelectorAll('.inflow-expanded-table tbody tr.inflow-expanded-row'));
+    // 2. Legacy compact drawer fallback
+    const compactRows = Array.from(document.querySelectorAll('#drawerOrdersListBody .inflow-drawer-row'))
+        .filter(r => r.style.display !== 'none');
+    let activeIdx = compactRows.findIndex(r => r.classList.contains('active'));
+    if (activeIdx !== -1) {
+        if (activeIdx > 0) return compactRows[activeIdx - 1].getAttribute('data-order-id');
+        if (compactRows.length > 1) return compactRows[1].getAttribute('data-order-id');
+    }
+
+    // 3. Legacy expanded drawer table fallback
+    const expandedRows = Array.from(document.querySelectorAll('.inflow-expanded-table tbody tr.inflow-expanded-row'))
+        .filter(r => r.style.display !== 'none');
     activeIdx = expandedRows.findIndex(r => r.classList.contains('active'));
     if (activeIdx !== -1) {
-        if (activeIdx > 0) {
-            return expandedRows[activeIdx - 1].getAttribute('data-order-id');
-        }
-        if (expandedRows.length > 1) {
-            return expandedRows[1].getAttribute('data-order-id');
-        }
+        if (activeIdx > 0) return expandedRows[activeIdx - 1].getAttribute('data-order-id');
+        if (expandedRows.length > 1) return expandedRows[1].getAttribute('data-order-id');
     }
 
     return null;
@@ -3446,7 +3657,14 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         const cachedItemBody = document.getElementById('itemDropdownBody');
         if (cachedCustBody && cachedCustBody.children.length > 0) {
             const incomingCustBody = newCanvas.querySelector('#customerDropdownBody');
-            if (incomingCustBody) incomingCustBody.replaceWith(cachedCustBody);
+            const cachedBranch = (cachedCustBody.getAttribute('data-loaded-branch') || '').trim();
+            const newBranch = (newCanvas.querySelector('#orderBranchIdInput')?.value || newCanvas.querySelector('#soPartialMeta')?.getAttribute('data-branch-id') || '').trim();
+            if (incomingCustBody && incomingCustBody.children.length > 0) {
+                // Incoming canvas already has its own branch-filtered rows; use incoming rows!
+            } else if (cachedBranch === newBranch) {
+                // Only reuse cached body if both match the exact same branch context
+                if (incomingCustBody) incomingCustBody.replaceWith(cachedCustBody);
+            }
         }
         if (cachedItemBody && cachedItemBody.children.length > 0) {
             const incomingItemBody = newCanvas.querySelector('#itemDropdownBody');
@@ -3568,6 +3786,14 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         if (typeof recalculateTotals === 'function') recalculateTotals();
         if (typeof initPreviewToolbar === 'function') initPreviewToolbar();
         if (typeof initDeliverySelection === 'function') initDeliverySelection();
+        if (window.GoogleSheetDatePicker && typeof window.GoogleSheetDatePicker.initAll === 'function') {
+            window.GoogleSheetDatePicker.initAll();
+        }
+        if (typeof filterCustomerDropdown === 'function') {
+            filterCustomerDropdown(document.getElementById('customerSearchInput')?.value || '');
+            const popup = document.getElementById('customerDropdownPopup');
+            if (popup) popup.classList.remove('show');
+        }
         closeSoMobileDrawer();
 
         // Ensure sidebar search text and filtered cards remain strictly intact (stay still)
@@ -3785,6 +4011,11 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize status filter checkboxes
     initStatusCheckboxes();
 
+    // Initialize Google Sheets Style DatePicker
+    if (window.GoogleSheetDatePicker && typeof window.GoogleSheetDatePicker.initAll === 'function') {
+        window.GoogleSheetDatePicker.initAll();
+    }
+
     // Form submit listener to always capture current drawer filters
     const drawerForm = document.getElementById('drawerFilterForm');
     if (drawerForm) {
@@ -3896,6 +4127,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Close popups when clicking outside
     document.addEventListener('click', function(e) {
+        const suggestPopup = document.getElementById('soSidebarCustSuggestPopup');
+        const searchInput = document.getElementById('soSidebarSearchInput');
+        if (suggestPopup && suggestPopup.style.display !== 'none') {
+            if (!suggestPopup.contains(e.target) && e.target !== searchInput) {
+                suggestPopup.style.display = 'none';
+            }
+        }
+
         const custPopup = document.getElementById('customerDropdownPopup');
         const custWrapper = document.getElementById('customerSearchInput')?.closest('.inflow-combobox-wrapper');
         if (custPopup && custWrapper && !custWrapper.contains(e.target)) {
@@ -4117,9 +4356,33 @@ function handleDrawerCustomerKey(e) {
 /* ==========================================================================
    Customer Typing Combobox Search (Matching screenshot0042.JPEG)
    ========================================================================== */
+function getActiveOrderBranchId() {
+    const hidden = document.getElementById('orderBranchIdInput');
+    if (hidden && hidden.value !== undefined && hidden.value !== null) {
+        const hv = String(hidden.value).trim().toLowerCase();
+        if (hv && hv !== 'main' && hv !== 'none' && hv !== 'all' && hv !== '0' && hv !== 'null') return hv;
+        if (hv === 'main' || hv === 'none' || hv === 'all' || hv === '0' || hv === 'null') return '';
+    }
+    const meta = document.getElementById('soPartialMeta');
+    if (meta && meta.hasAttribute('data-branch-id')) {
+        const mv = (meta.getAttribute('data-branch-id') || '').trim().toLowerCase();
+        if (mv && mv !== 'main' && mv !== 'none' && mv !== 'all' && mv !== '0' && mv !== 'null') return mv;
+        if (mv === 'main' || mv === 'none' || mv === 'all' || mv === '0' || mv === 'null') return '';
+    }
+    const soBranchSel = document.getElementById('soBranchSelect');
+    if (soBranchSel && soBranchSel.value !== undefined && soBranchSel.value !== null) {
+        const sv = String(soBranchSel.value).trim().toLowerCase();
+        if (sv && sv !== 'main' && sv !== 'none' && sv !== 'all' && sv !== '0' && sv !== 'null') return sv;
+        return '';
+    }
+    return '';
+}
+
 function openCustomerDropdown() {
     const popup = document.getElementById('customerDropdownPopup');
     if (popup) {
+        const inputVal = document.getElementById('customerSearchInput')?.value || '';
+        filterCustomerDropdown(inputVal);
         popup.classList.add('show');
         highlightFirstVisibleCustomer();
     }
@@ -4137,12 +4400,24 @@ function toggleCustomerDropdown() {
 }
 
 function filterCustomerDropdown(val) {
-    openCustomerDropdown();
+    const popup = document.getElementById('customerDropdownPopup');
+    if (popup && !popup.classList.contains('show')) {
+        popup.classList.add('show');
+    }
     const query = (val || '').toLowerCase().trim();
+    const activeBranchId = getActiveOrderBranchId();
     const rows = document.querySelectorAll('#customerDropdownBody tr.main-cust-row');
     let firstVisible = null;
     let matchCount = 0;
     rows.forEach(r => {
+        const rowBranchId = (r.getAttribute('data-branch-id') || '').trim();
+        // Strict branch isolation: row branch must match active order branch
+        if (rowBranchId !== activeBranchId) {
+            r.style.display = 'none';
+            r.classList.remove('highlighted');
+            return;
+        }
+
         const name = r.getAttribute('data-name') || '';
         const contact = r.getAttribute('data-contact') || '';
         const phone = r.getAttribute('data-phone') || '';
@@ -6161,7 +6436,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-function openQuickAddCustomerModal() {
+function openQuickAddCustomerModal(presetName) {
     clearQuickAddAiPreview();
     checkAiKeyStatus();
 
@@ -6171,7 +6446,9 @@ function openQuickAddCustomerModal() {
     const addrIn = document.getElementById('quickAddCustAddressInput');
     const errBox = document.getElementById('quickAddCustomerError');
 
-    const currentTyped = (document.getElementById('customerSearchInput')?.value || '').trim();
+    const currentTyped = presetName !== undefined && presetName !== null && String(presetName).trim()
+        ? String(presetName).trim()
+        : (document.getElementById('customerSearchInput')?.value || document.getElementById('soSidebarSearchInput')?.value || '').trim();
     if (nameIn) nameIn.value = currentTyped;
     if (contactIn) contactIn.value = '';
     if (phoneIn) phoneIn.value = '';
@@ -6179,6 +6456,24 @@ function openQuickAddCustomerModal() {
     if (errBox) {
         errBox.innerText = '';
         errBox.style.display = 'none';
+    }
+
+    // Display active branch notice
+    const activeBranchId = getActiveOrderBranchId();
+    const noticeEl = document.getElementById('quickAddBranchNotice');
+    if (noticeEl) {
+        let bName = '🏢 Main Store (HQ)';
+        const soBranchSel = document.getElementById('soBranchSelect');
+        if (soBranchSel && soBranchSel.selectedIndex >= 0 && soBranchSel.value) {
+            bName = soBranchSel.options[soBranchSel.selectedIndex].text;
+        } else if (activeBranchId) {
+            {% if is_branch_mode and current_branch %}
+            bName = '🏬 {{ current_branch.name }} ({{ current_branch.code }})';
+            {% else %}
+            bName = `🏬 Branch #${activeBranchId}`;
+            {% endif %}
+        }
+        noticeEl.innerHTML = `<span style="font-weight: 500;">Adding customer to:</span> <strong style="color: #1E40AF;">${bName}</strong>`;
     }
 
     const modal = document.getElementById('modalQuickAddCustomer');
@@ -6216,7 +6511,8 @@ function submitQuickAddCustomerAjax() {
         return;
     }
 
-    const activeBranch = document.getElementById('drawerBranchSelect')?.value || '';
+    // Always use the active order branch ID (never drawer branch filter!)
+    const activeBranch = getActiveOrderBranchId();
 
     fetch('{{ url_for("contacts.quick_add_customer_ajax") }}', {
         method: 'POST',
@@ -6248,12 +6544,15 @@ function submitQuickAddCustomerAjax() {
             if (phoneInput) phoneInput.value = cust.phone || '';
             if (addressInput) addressInput.value = cAddr;
 
+            const custBranchAttr = (cust.branch_id !== null && cust.branch_id !== undefined) ? String(cust.branch_id) : '';
+
             // 2. Add row to main customer dropdown table
             const tbody = document.getElementById('customerDropdownBody');
             if (tbody) {
                 const tr = document.createElement('tr');
                 tr.className = 'main-cust-row';
                 tr.setAttribute('data-id', cust.id);
+                tr.setAttribute('data-branch-id', custBranchAttr);
                 tr.setAttribute('data-cname', cust.name);
                 tr.setAttribute('data-name', cust.name.toLowerCase());
                 tr.setAttribute('data-contact', (cust.contact_name || '').toLowerCase());
@@ -6275,6 +6574,8 @@ function submitQuickAddCustomerAjax() {
             if (drawerTbody) {
                 const dtr = document.createElement('tr');
                 dtr.className = 'drawer-cust-row';
+                dtr.setAttribute('data-id', cust.id);
+                dtr.setAttribute('data-branch-id', custBranchAttr);
                 dtr.setAttribute('data-cname', cust.name);
                 dtr.setAttribute('data-name', cust.name.toLowerCase());
                 dtr.setAttribute('data-contact', (cust.contact_name || '').toLowerCase());
@@ -6291,6 +6592,13 @@ function submitQuickAddCustomerAjax() {
             closeCustomerDropdown();
             closeQuickAddCustomerModal();
             markDirty();
+
+            // Re-filter dropdown to keep strict branch isolation
+            if (typeof filterCustomerDropdown === 'function') {
+                filterCustomerDropdown(cust.name);
+                const popup = document.getElementById('customerDropdownPopup');
+                if (popup) popup.classList.remove('show');
+            }
 
             // Flash visual feedback
             if (custInput) {
@@ -7010,55 +7318,62 @@ function handleSoLiveSearch(val) {
         }
     });
 
-    // Customer matches: "when searching name even no any order availble it should allow to show"
-    const custMatchesWrap = document.getElementById('soSidebarCustomerMatches');
-    let custMatchesCount = 0;
-    if (custMatchesWrap) {
+    // Customer Suggestions Popup: "when searching add suggetion customers like this but no need change interface"
+    const suggestPopup = document.getElementById('soSidebarCustSuggestPopup');
+    const suggestTbody = document.getElementById('soSidebarCustSuggestTbody');
+    const addNewInput = document.getElementById('soSuggestAddNewInput');
+
+    if (suggestPopup && suggestTbody) {
         if (q && q.length >= 1 && window.allCustomersList && window.allCustomersList.length > 0) {
             const matchedCustomers = window.allCustomersList.filter(c => {
                 const cName = (c.name || '').toLowerCase();
                 const cContact = (c.contact || '').toLowerCase();
                 const cPhone = (c.phone || '').toLowerCase();
                 return cName.includes(q) || cContact.includes(q) || cPhone.includes(q);
-            }).slice(0, 15);
+            }).slice(0, 30);
 
             if (matchedCustomers.length > 0) {
-                let html = `<div style="font-size: 11px; font-weight: 700; color: #475569; padding: 6px 4px 4px; text-transform: uppercase; letter-spacing: 0.04em;">Customers (${matchedCustomers.length})</div>`;
-                matchedCustomers.forEach(c => {
+                let html = '';
+                matchedCustomers.forEach((c, idx) => {
                     const escName = (c.name || '').replace(/"/g, '&quot;');
+                    const escContact = (c.phone || c.contact || '').replace(/"/g, '&quot;');
                     html += `
-                        <div class="so-sidebar-card so-customer-match-card" 
-                             style="cursor: pointer; background: #F8FAFC; border: 1px dashed #93C5FD; margin-bottom: 6px; padding: 7px 10px; border-radius: 6px; display: block;"
-                             onclick="startNewOrderForCustomer(${c.id}, '${escName}')"
-                             title="Click to start new sales order for ${escName}">
-                            <div class="so-card-row-top" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px;">
-                                <span class="so-card-order-num" style="color: #1D4ED8; font-weight: 700; font-size: 12px;">👤 ${c.name}</span>
-                                <span class="so-status-pill badge-open" style="font-size: 10px; padding: 1px 6px; background: #DBEAFE; color: #1E40AF; border: 1px solid #93C5FD;">+ New SO</span>
-                            </div>
-                            <div class="so-card-row-bottom" style="display: flex; justify-content: space-between; font-size: 11px; color: #64748B;">
-                                <span>${c.phone || c.contact || 'Customer'}</span>
-                                <span style="color: #2563EB; font-weight: 600;">Create order ➔</span>
-                            </div>
-                        </div>
+                        <tr class="so-suggest-row ${idx === 0 ? 'highlighted' : ''}" 
+                            data-id="${c.id}" 
+                            data-name="${escName}"
+                            onclick="selectSoCustomerSuggestion(${c.id}, '${escName}')"
+                            title="Click to search / filter orders for ${escName}">
+                            <td style="font-weight: 500;">${c.name || ''}</td>
+                            <td style="color: #64748B;">${c.phone || c.contact || ''}</td>
+                            <td style="text-align: center;">
+                                <span class="so-suggest-view-link" onclick="event.stopPropagation();viewSoCustomerDetails(${c.id}, '${escName}')" title="View customer details">View</span>
+                            </td>
+                        </tr>
                     `;
                 });
-                custMatchesWrap.innerHTML = html;
-                custMatchesWrap.style.display = 'block';
-                custMatchesCount = matchedCustomers.length;
+                suggestTbody.innerHTML = html;
+                if (addNewInput) addNewInput.value = rawVal.trim();
+                positionSoCustSuggestPopup();
+                suggestPopup.style.display = 'block';
             } else {
-                custMatchesWrap.innerHTML = '';
-                custMatchesWrap.style.display = 'none';
+                suggestTbody.innerHTML = `
+                    <tr>
+                        <td colspan="3" style="text-align: center; color: #94A3B8; padding: 12px; font-size: 11px;">No customers match "${rawVal.trim()}"</td>
+                    </tr>
+                `;
+                if (addNewInput) addNewInput.value = rawVal.trim();
+                positionSoCustSuggestPopup();
+                suggestPopup.style.display = 'block';
             }
         } else {
-            custMatchesWrap.innerHTML = '';
-            custMatchesWrap.style.display = 'none';
+            suggestPopup.style.display = 'none';
+            suggestTbody.innerHTML = '';
         }
     }
 
-    const totalVisible = visibleOrders + custMatchesCount;
     const noMatch = document.getElementById('soSidebarNoSearchMatch');
     if (noMatch) {
-        noMatch.style.display = (totalVisible === 0 && q) ? 'block' : 'none';
+        noMatch.style.display = (visibleOrders === 0 && q) ? 'block' : 'none';
     }
     const countDisplay = document.getElementById('soVisibleCountDisplay');
     if (countDisplay) {
@@ -7105,7 +7420,54 @@ function startNewOrderForCustomer(customerId, customerName) {
     }
 }
 
+function positionSoCustSuggestPopup() {
+    const popup = document.getElementById('soSidebarCustSuggestPopup');
+    const input = document.getElementById('soSidebarSearchInput');
+    if (!popup || !input) return;
+
+    const rect = input.getBoundingClientRect();
+    popup.style.position = 'fixed';
+    popup.style.top = (rect.bottom + 3) + 'px';
+    popup.style.left = Math.max(8, rect.left) + 'px';
+
+    const width = Math.min(390, window.innerWidth - 16);
+    popup.style.width = width + 'px';
+    popup.style.zIndex = '999999';
+}
+
+function closeSoCustSuggestPopup() {
+    const popup = document.getElementById('soSidebarCustSuggestPopup');
+    if (popup) popup.style.display = 'none';
+}
+
+function selectSoCustomerSuggestion(id, name) {
+    const input = document.getElementById('soSidebarSearchInput');
+    if (input) {
+        input.value = name;
+    }
+    closeSoCustSuggestPopup();
+    handleSoLiveSearch(name);
+    if (input) input.focus();
+}
+
+function viewSoCustomerDetails(id, name) {
+    closeSoCustSuggestPopup();
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.openTab('/customers/' + id, 'Customer: ' + name, 'customers');
+    } else {
+        window.open('/customers/' + id, '_blank');
+    }
+}
+
+function handleSoSuggestAddNew() {
+    const addNewInput = document.getElementById('soSuggestAddNewInput');
+    const val = (addNewInput ? addNewInput.value : '') || (document.getElementById('soSidebarSearchInput')?.value || '');
+    closeSoCustSuggestPopup();
+    openQuickAddCustomerModal(val.trim());
+}
+
 function clearSoLiveSearch() {
+    closeSoCustSuggestPopup();
     const inp = document.getElementById('soSidebarSearchInput');
     if (inp) {
         inp.value = '';
@@ -7157,7 +7519,48 @@ function clearSoLiveSearch() {
 }
 
 function handleSoSearchKey(e) {
+    const popup = document.getElementById('soSidebarCustSuggestPopup');
+    const isShowing = popup && popup.style.display !== 'none';
+    const rows = Array.from(document.querySelectorAll('#soSidebarCustSuggestTbody tr.so-suggest-row'));
+
+    if (isShowing && rows.length > 0) {
+        let activeIdx = rows.findIndex(r => r.classList.contains('highlighted'));
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            rows.forEach(r => r.classList.remove('highlighted'));
+            const nextIdx = (activeIdx + 1 < rows.length) ? activeIdx + 1 : 0;
+            rows[nextIdx].classList.add('highlighted');
+            rows[nextIdx].scrollIntoView({ block: 'nearest' });
+            return;
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            rows.forEach(r => r.classList.remove('highlighted'));
+            const prevIdx = (activeIdx - 1 >= 0) ? activeIdx - 1 : rows.length - 1;
+            rows[prevIdx].classList.add('highlighted');
+            rows[prevIdx].scrollIntoView({ block: 'nearest' });
+            return;
+        } else if (e.key === 'Enter') {
+            if (activeIdx !== -1) {
+                e.preventDefault();
+                const activeRow = rows[activeIdx];
+                const custId = activeRow.getAttribute('data-id');
+                const custName = activeRow.getAttribute('data-name');
+                selectSoCustomerSuggestion(custId, custName);
+                return;
+            }
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            closeSoCustSuggestPopup();
+            return;
+        }
+    } else if (e.key === 'Escape') {
+        closeSoCustSuggestPopup();
+        return;
+    }
+
     if (e.key === 'Enter') {
+        closeSoCustSuggestPopup();
         e.preventDefault();
         const val = (e.target.value || '').trim();
         const url = new URL(window.location.href);

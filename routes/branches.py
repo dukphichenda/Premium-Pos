@@ -947,7 +947,7 @@ def branch_pos(id):
     customers = query_all("""
         SELECT id, name, phone, balance, default_pricing_scheme_id 
         FROM customers 
-        WHERE is_active = TRUE AND (branch_id = %s OR branch_id IS NULL) 
+        WHERE is_active = TRUE AND branch_id = %s 
         ORDER BY name ASC
     """, (id,))
 
@@ -987,6 +987,10 @@ def branch_checkout(id):
             return jsonify({'success': False, 'message': 'No items selected.'}), 400
 
         customer_id = data.get('customer_id') or None
+        if customer_id:
+            cust_chk = query_one("SELECT branch_id FROM customers WHERE id = %s", (int(customer_id),))
+            if cust_chk and cust_chk.get('branch_id') != id:
+                return jsonify({'success': False, 'message': 'Selected customer does not belong to this branch. Customer of HQ and Branch are kept independently.'}), 400
         discount_amount = max(0.0, float(data.get('discount_amount') or 0.0))
         force_checkout = bool(data.get('force_checkout') or data.get('accept_out_of_stock'))
 
@@ -2042,7 +2046,7 @@ def branch_export_csv(id, export_type):
         rows = query_all("""
             SELECT name, contact_name, phone, email, address1, city, balance, payment_terms, remarks
             FROM customers
-            WHERE is_active = TRUE AND (branch_id = %s OR branch_id IS NULL)
+            WHERE is_active = TRUE AND branch_id = %s
             ORDER BY name ASC
         """, (id,))
         for c in rows:
