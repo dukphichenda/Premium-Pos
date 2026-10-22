@@ -588,7 +588,7 @@
              * 2. If staying in same category -> Transform / navigate current tab (NO new tab).
              * 3. Only create new tab when stepping to another category (e.g. Product -> Order History -> Sales Order).
              */
-            navigateOrOpenTab: function (url, title, type, forceNew = false) {
+            navigateOrOpenTab: function (url, title, type, forceNew = false, forceReload = false) {
                 if (!url) url = '/';
                 const cleanUrl = url.replace(/[?&]embed=1/, '');
 
@@ -624,13 +624,13 @@
 
                 // Rule A: On Homepage tab -> transform tab to selected category below
                 if (currentCategory === 'home') {
-                    this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory);
+                    this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
 
                 // Rule B: Staying in same category -> navigate/transform within current tab
                 if (currentCategory === targetCategory) {
-                    this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory);
+                    this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
 
@@ -654,19 +654,21 @@
              * Transforms an existing tab in-place (URL, Category, Icon, Accent Color).
              * Used when staying in same category or when selecting from Homepage.
              */
-            transformTab: function (tabId, url, title, newType) {
+            transformTab: function (tabId, url, title, newType, forceReload = false) {
                 const tab = this.tabs.find(t => t.id === tabId);
                 if (!tab) return;
 
                 const cleanUrl = url.replace(/[?&]embed=1/, '');
-                if (tab.url === cleanUrl) return;
+                if (!forceReload && tab.url === cleanUrl) return;
 
-                const vpCheck = document.getElementById(`viewport-${tabId}`);
-                if (vpCheck) {
-                    const ifr = vpCheck.querySelector('iframe');
-                    if (ifr && ifr.contentWindow && typeof ifr.contentWindow.handleTabCloseAttempt === 'function') {
-                        const canProceed = ifr.contentWindow.handleTabCloseAttempt(cleanUrl);
-                        if (!canProceed) return;
+                if (!forceReload) {
+                    const vpCheck = document.getElementById(`viewport-${tabId}`);
+                    if (vpCheck) {
+                        const ifr = vpCheck.querySelector('iframe');
+                        if (ifr && ifr.contentWindow && typeof ifr.contentWindow.handleTabCloseAttempt === 'function') {
+                            const canProceed = ifr.contentWindow.handleTabCloseAttempt(cleanUrl);
+                            if (!canProceed) return;
+                        }
                     }
                 }
 
@@ -1338,9 +1340,9 @@
                     window.location.href = url;
                 }
             },
-            transformTab: function (tabId, url, title, type) {
+            transformTab: function (tabId, url, title, type, forceReload) {
                 if (window.top && window.top.inflowMdi) {
-                    window.top.inflowMdi.transformTab(tabId, url, title, type);
+                    window.top.inflowMdi.transformTab(tabId, url, title, type, forceReload);
                 }
             },
             updateActiveTabMeta: function (url, title) {
