@@ -919,6 +919,30 @@ def resolve_csv_order_address(row, get_val_fn):
     return resolved_addr, resolved_prov
 
 
+def normalize_order_status_for_comparison(st):
+    """Normalize order status string for consistent comparisons (OPEN, PAID, QUOTE, etc.)"""
+    if not st:
+        return 'OPEN'
+    s = str(st).strip().upper().replace('_', ' ')
+    if s in ('FULLY PAID', 'PAID'):
+        return 'PAID'
+    if s in ('OPEN', 'UNINVOICED'):
+        return 'OPEN'
+    if s in ('QUOTE', 'QUOTED'):
+        return 'QUOTE'
+    if s in ('FULLY SHIPPED', 'SHIPPED'):
+        return 'SHIPPED'
+    if s in ('CANCELLED', 'CANCELED'):
+        return 'CANCELLED'
+    if s in ('DRAFT',):
+        return 'DRAFT'
+    if s in ('INVOICED',):
+        return 'INVOICED'
+    if s in ('PARTIAL', 'PARTIALLY PAID'):
+        return 'PARTIAL'
+    return s
+
+
 def preview_import_data(data_type, file_content, has_headers=True, import_mode='keep', branch_id=None):
     key, meta = get_meta(data_type)
     headers, data_rows = parse_csv_content(file_content, has_headers=has_headers)
@@ -961,21 +985,29 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                             return val
             return default
 
+        existing_orders_map = {}
         existing_order_nums = set()
         try:
             if key == 'sales_order':
                 if bid is not None:
-                    rows = query_all("SELECT order_number FROM sales_orders WHERE branch_id = %s AND order_number IS NOT NULL;", (bid,))
+                    rows = query_all("SELECT order_number, status, payment_status FROM sales_orders WHERE branch_id = %s AND order_number IS NOT NULL;", (bid,))
                 else:
-                    rows = query_all("SELECT order_number FROM sales_orders WHERE branch_id IS NULL AND order_number IS NOT NULL;")
+                    rows = query_all("SELECT order_number, status, payment_status FROM sales_orders WHERE branch_id IS NULL AND order_number IS NOT NULL;")
             else:
                 if bid is not None:
-                    rows = query_all("SELECT order_number FROM purchase_orders WHERE branch_id = %s AND order_number IS NOT NULL;", (bid,))
+                    rows = query_all("SELECT order_number, status FROM purchase_orders WHERE branch_id = %s AND order_number IS NOT NULL;", (bid,))
                 else:
-                    rows = query_all("SELECT order_number FROM purchase_orders WHERE branch_id IS NULL AND order_number IS NOT NULL;")
+                    rows = query_all("SELECT order_number, status FROM purchase_orders WHERE branch_id IS NULL AND order_number IS NOT NULL;")
             for r in (rows or []):
-                if r.get('order_number'):
-                    existing_order_nums.add(str(r['order_number']).strip().lower())
+                onum = r.get('order_number')
+                if onum:
+                    norm_num = str(onum).strip().lower()
+                    existing_order_nums.add(norm_num)
+                    existing_orders_map[norm_num] = {
+                        'order_number': onum,
+                        'status': (r.get('status') or '').strip().upper(),
+                        'payment_status': (r.get('payment_status') or '').strip().upper()
+                    }
         except Exception as e:
             logger.warning(f"Could not load existing {key} numbers for preview: {e}")
 
@@ -1004,6 +1036,16 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 clean_cname = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', raw_cname).strip() or 'Walk-in Customer'
                 row_phone = get_val_preview(r, ['Phone', 'Phone Number', 'PhoneNumber', 'Telephone', 'Mobile', 'Mobile Number', 'Customer Phone', 'CustomerPhone', 'Contact Phone', 'ContactPhone', 'Tel', 'Phone 1', 'Phone1', 'MobilePhone', 'Customer Mobile', 'លេខទូរស័ព្ទ', 'ទូរស័ព្ទ'])
                 row_contact = get_val_preview(r, ['ContactName', 'Contact Name', 'Contact', 'CustomerContact', 'Customer Contact', 'Attn', 'Attention', 'អ្នកទំនាក់ទំនង', 'ឈ្មោះទំនាក់ទំនង', 'អ្នកទទួល'])
+                
+                raw_st = get_val_preview(r, ['OrderStatus', 'Order Status', 'Status', 'State'], '').strip()
+                raw_pay_st = get_val_preview(r, ['PaymentStatus', 'Payment Status', 'Payment state'], '').strip()
+                if not raw_st:
+                    order_st = 'PAID' if raw_pay_st.upper() in ('PAID', 'FULLY PAID') else 'OPEN'
+                else:
+                    order_st = raw_st.upper()
+                    if order_st in ('OPEN', 'UNINVOICED') and raw_pay_st.upper() in ('PAID', 'FULLY PAID'):
+                        order_st = 'PAID'
+
                 if ord_num not in orders_grouped:
                     orders_grouped[ord_num] = {
                         'order_number': ord_num,
@@ -1012,13 +1054,15 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                         'phone': row_phone,
                         'contact_name': row_contact,
                         'order_date': get_val_preview(r, ['OrderDate', 'Order Date', 'Date'], ''),
-                        'status': get_val_preview(r, ['OrderStatus', 'Order Status', 'Status', 'State'], 'OPEN').upper(),
+                        'status': order_st,
                         'freight': clean_num_val(get_val_preview(r, ['Freight', 'Shipping Fee', 'OrderFreight', 'Shipping']), 0.0),
                         'line_subtotals': 0.0,
                         'total_line_count': 0,
                         'items': []
                     }
                 else:
+                    if order_st == 'PAID' and orders_grouped[ord_num]['status'] != 'PAID':
+                        orders_grouped[ord_num]['status'] = 'PAID'
                     if not orders_grouped[ord_num].get('address') and row_addr:
                         orders_grouped[ord_num]['address'] = row_addr
                     if not orders_grouped[ord_num].get('phone') and row_phone:
@@ -1119,24 +1163,80 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
         orders_summary = []
         for ord_num, odata in orders_grouped.items():
             total = round(odata['line_subtotals'] + odata['freight'], 2)
-            is_exist = (str(ord_num).strip().lower() in existing_order_nums)
+            db_rec = existing_orders_map.get(str(ord_num).strip().lower())
+            is_exist = (db_rec is not None)
+            db_status = db_rec.get('status') if is_exist else None
+            db_payment_status = db_rec.get('payment_status') if is_exist else None
+
+            incoming_status = (odata.get('status') or 'OPEN').strip().upper()
+            norm_incoming = normalize_order_status_for_comparison(incoming_status)
+            norm_db = normalize_order_status_for_comparison(db_status) if is_exist else None
+
+            if is_exist:
+                status_changed = bool(norm_db and norm_incoming and norm_incoming != norm_db)
+                involves_open_or_paid = (
+                    norm_incoming in ('OPEN', 'PAID') or
+                    (norm_db and norm_db in ('OPEN', 'PAID'))
+                )
+                if status_changed and involves_open_or_paid:
+                    status_change_type = 'open_or_paid_change'
+                elif status_changed:
+                    status_change_type = 'other_status_change'
+                else:
+                    status_change_type = 'unchanged'
+            else:
+                status_changed = False
+                status_change_type = 'new'
+
+            # Auto-selection logic:
+            # When import_mode == 'keep':
+            #   - Auto-select only new sales orders (not is_exist)
+            #   - OR any order that changes status to/from OPEN or PAID (status_change_type == 'open_or_paid_change')
+            #   - Unchanged existing orders are deselected (is_auto_selected = False)
+            # When import_mode == 'erase':
+            #   - Select all orders (is_auto_selected = True)
+            if import_mode == 'keep':
+                if not is_exist:
+                    is_auto_selected = True
+                elif status_change_type == 'open_or_paid_change':
+                    is_auto_selected = True
+                else:
+                    is_auto_selected = False
+            else:
+                is_auto_selected = True
+
             items_str = ", ".join(odata['items'])
             if odata['total_line_count'] > len(odata['items']):
                 items_str += f", +{odata['total_line_count'] - len(odata['items'])} more"
+
             orders_summary.append({
                 'order_number': ord_num,
                 'party_name': odata['party_name'],
                 'address': odata.get('address') or '',
                 'order_date': odata['order_date'] or '-',
-                'status': odata['status'],
+                'status': incoming_status,
+                'db_status': db_status or '',
+                'db_payment_status': db_payment_status or '',
+                'status_changed': status_changed,
+                'status_change_type': status_change_type,
                 'item_count': odata['total_line_count'],
                 'total_amount': total,
                 'is_existing': is_exist,
+                'is_auto_selected': is_auto_selected,
                 'items_summary': items_str
             })
 
+        new_cnt = sum(1 for o in orders_summary if not o['is_existing'])
+        changed_cnt = sum(1 for o in orders_summary if o['is_existing'] and o.get('status_change_type') == 'open_or_paid_change')
+        unchanged_cnt = sum(1 for o in orders_summary if o['is_existing'] and not o.get('is_auto_selected'))
+        auto_selected_cnt = sum(1 for o in orders_summary if o.get('is_auto_selected'))
+
         result['orders_summary'] = orders_summary
         result['total_orders'] = len(orders_summary)
+        result['new_orders_count'] = new_cnt
+        result['status_changed_count'] = changed_cnt
+        result['unchanged_orders_count'] = unchanged_cnt
+        result['auto_selected_count'] = auto_selected_cnt
         result['unmatched_products'] = list(unmatched_map.values())
         result['catalog_products'] = [
             {

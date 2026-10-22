@@ -1,0 +1,1989 @@
+    <!-- RIGHT MAIN WORKSPACE: Product Details -->
+    <main class="inflow-catalog-main" id="catalogMainWorkspace">
+        <!-- Mobile Show Sidebar Bar with Arrow (visible on mobile screens <= 768px when sidebar is hidden) -->
+        <div class="product-mobile-sidebar-bar" id="productMobileSidebarBar" onclick="toggleProductSidebarCollapse()" title="Show Products Catalog / បង្ហាញបញ្ជីទំនិញ">
+            <div class="product-mobile-bar-left">
+                <span style="font-size: 16px;">📦</span>
+                <span>Products Catalog / បញ្ជីទំនិញ</span>
+                <span class="product-mobile-bar-count">{{ catalog_products|length if catalog_products else (products|length if products else 0) }}</span>
+            </div>
+            <div class="product-mobile-bar-right">
+                <span>Show</span>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Top Action Bar -->
+        <div class="inflow-cat-top-bar">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="inflow-cat-close-btn" onclick="closeCatalogView()" title="Close document">✕</button>
+                <!-- Expand Button (shown when collapsed) -->
+                <button type="button" class="cat-expand-tb-btn" id="productExpandTbBtn" onclick="toggleProductSidebarCollapse()" title="Expand Products Catalog List (Ctrl+[)" style="display: none; align-items: center; gap: 5px; height: 28px; padding: 0 10px; border-radius: 5px; background: #F8FAFC; border: 1px solid #CBD5E1; color: #0284C7; font-size: 12px; font-weight: 700; cursor: pointer;">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                    <span>Catalog List</span>
+                </button>
+            </div>
+            
+            <div class="inflow-cat-top-actions">
+                <!-- Save Button -->
+                <button type="button" class="inflow-cat-save-btn" id="btnSaveProduct" onclick="saveProductChanges()" title="Save changes (Ctrl+S)">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <span id="btnSaveText">Save</span>
+                    <span id="btnSaveDot" class="inflow-unsaved-dot" style="display: none;"></span>
+                </button>
+
+                <!-- Deactivate / Activate -->
+                <button type="button" class="inflow-cat-action-link {% if product.is_active %}danger{% endif %}" onclick="toggleProductActive({{ product.id }})" id="btnToggleActive">
+                    {% if product.is_active %}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                    <span>Deactivate</span>
+                    {% else %}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><polyline points="9 12 11 14 15 10"/></svg>
+                    <span style="color: #10B981;">Activate</span>
+                    {% endif %}
+                </button>
+
+                <!-- Attachments -->
+                <button type="button" class="inflow-cat-action-link" onclick="openAttachmentsModal()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                    <span>Attachments</span>
+                </button>
+
+                <!-- Copy -->
+                <a href="{{ url_for('products.copy_product', id=product.id) }}" class="inflow-cat-action-link" onclick="return handleNavClick(event, this.href);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    <span>Copy</span>
+                </a>
+
+                <!-- Sell -->
+                <a href="{{ url_for('sales_orders.create_order', product_id=product.id) }}" class="inflow-cat-action-link" onclick="return handleNavClick(event, this.href);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span>Sell</span>
+                </a>
+
+                <!-- New Combined Kit Button -->
+                <button type="button" class="inflow-cat-action-link" onclick="openNewCombinedModal()" title="Create New Combined / Bundle Product" style="color: #0284C7; font-weight: 600;">
+                    <span style="font-size: 13px;">🧩</span>
+                    <span>+ Combined Kit</span>
+                </button>
+
+                <!-- Merge Duplicate Button -->
+                <a href="{{ url_for('products.merge_duplicates_view', id=product.id) }}" class="inflow-cat-action-link" style="color: #6366F1; font-weight: 600; text-decoration: none;" title="Merge this product with duplicate products (បញ្ចូលទំនិញស្ទួន)">
+                    <span style="font-size: 13px;">🔀</span>
+                    <span>Merge Duplicate</span>
+                </a>
+
+                <!-- Print labels -->
+                <button type="button" class="inflow-cat-action-link" onclick="window.print()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                    <span>Print labels</span>
+                </button>
+
+                <!-- Delete -->
+                <button type="button" class="inflow-cat-action-link danger" onclick="deleteCurrentProduct({{ product.id }})" title="Delete Product">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                    <span>Delete</span>
+                </button>
+
+                <!-- More ▾ -->
+                <div style="position: relative; display: inline-block;">
+                    <button type="button" class="inflow-cat-action-link" onclick="toggleMoreMenu(event)">
+                        <span>More ▾</span>
+                    </button>
+                    <div id="catMoreMenu" class="inflow-tab-dropdown-menu" style="right: 0; min-width: 170px;">
+                        <a href="{{ url_for('purchase_orders.create_purchase', product_id=product.id) }}" onclick="return handleNavClick(event, this.href);">+ Create Purchase Order</a>
+                        <a href="javascript:void(0)" onclick="openModal('versionHistoryModal')">Version History</a>
+                        <a href="javascript:void(0)" onclick="deleteCurrentProduct({{ product.id }})" style="color: #DC2626;">🗑 Delete Product</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Product Workspace Content -->
+        <div class="inflow-cat-content">
+            <!-- Product Header Area -->
+            <div class="inflow-cat-header-block">
+                <!-- Large Image Box -->
+                <div class="inflow-cat-img-card" id="catImgCardContainer" onclick="document.getElementById('catImageUploadInput').click()" title="Click to upload, or Paste (Ctrl+V) / Drop image directly" tabindex="0">
+                    <input type="file" id="catImageUploadInput" style="display: none;" accept="image/*" onchange="uploadProductImage(this, {{ product.id }})">
+                    {% if product.image_url %}
+                    <img src="{{ product.image_url }}" alt="{{ product.name }}" id="catProductMainImg" class="inflow-cat-main-img">
+                    {% else %}
+                    <div class="inflow-cat-main-img-placeholder" id="catProductPlaceholder">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#A5B4FC" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    </div>
+                    {% endif %}
+                    <div class="inflow-cat-img-badge">1</div>
+                    <div class="inflow-cat-paste-hint">📋 Paste (Ctrl+V) / Drop Photo</div>
+                    <div class="inflow-cat-upload-spinner" id="catImgUploadSpinner">
+                        <div class="inflow-spinner" style="width: 24px; height: 24px; border: 3px solid #CBD5E1; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
+                        <span>Uploading photo...</span>
+                    </div>
+                </div>
+
+                <!-- Product Information & Meta Details -->
+                <div class="inflow-cat-header-info">
+                    <!-- Title -->
+                    <h1 class="inflow-cat-main-title" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" oninput="markFieldDirty('name', this.innerText.trim())">
+                        {{ product.name }}
+                    </h1>
+
+                    <!-- Upper Meta Row: SKU, Category, Barcode & Description -->
+                    <div class="inflow-cat-upper-row">
+                        <!-- Left Fields -->
+                        <div class="inflow-cat-upper-left">
+                            <div class="inflow-cat-meta-field">
+                                <span class="lbl">SKU</span>
+                                <span class="val" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" oninput="markFieldDirty('sku', this.innerText.trim())">{{ product.sku }}</span>
+                            </div>
+
+                            <div class="inflow-cat-meta-field">
+                                <span class="lbl-icon">
+                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                                </span>
+                                <select class="inflow-cat-select" id="productCategorySelect" onchange="onCategorySelectChange(this)">
+                                    <option value="" data-color="#00A3E0">(None)</option>
+                                    {% for c in categories %}
+                                    <option value="{{ c.id }}" data-color="{{ c.color }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                        </div>
+                        <!-- Right Description Block -->
+                        <div class="inflow-cat-upper-right">
+                            <textarea class="inflow-cat-desc-textarea" placeholder="Enter product description..." oninput="markFieldDirty('description', this.value)">{{ product.description or '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <!-- Storage Info & Unit of Measure (Authentic inFlow Matching Screenshot 1) -->
+                    <div class="inflow-cat-storage-uom-row">
+                        <!-- Left Panel: Storage Info -->
+                        <div class="inflow-cat-info-col">
+                            <h3 class="inflow-cat-subhdr-blue">Storage Info</h3>
+                            
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Barcode</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <input type="text" id="storageBarcode" value="{{ product.barcode or '' }}" class="inflow-txt-input" placeholder="" oninput="markFieldDirty('barcode', this.value)">
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Reorder Point</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <div class="inflow-input-suffix-wrapper">
+                                        <input type="number" step="any" min="0" id="reorderPointInput" value="{{ '{:g}'.format(product.reorder_point or 0) }}" class="inflow-txt-input" oninput="markFieldDirty('reorder_point', this.value)">
+                                        <span class="suffix-tag" id="reorderPointSuffix">{{ product.uom or 'pcs.' }}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Reorder Quantity</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <input type="number" step="any" min="0" id="reorderQtyInput" value="{{ '{:g}'.format(product.reorder_quantity or 0) if product.reorder_quantity else '' }}" class="inflow-txt-input" placeholder="" oninput="markFieldDirty('reorder_quantity', this.value)">
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Default Location</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <select id="defaultLocationSelect" class="inflow-combo" onchange="markFieldDirty('default_location_id', this.value)">
+                                        <option value="">(None)</option>
+                                        {% for loc in locations %}
+                                        <option value="{{ loc.id }}" {% if product.default_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Default Sublocation</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <input type="text" id="defaultSublocationInput" list="sublocationSuggestions" value="{{ product.default_sublocation or '' }}" class="inflow-txt-input" placeholder="" oninput="markFieldDirty('default_sublocation', this.value)">
+                                    <datalist id="sublocationSuggestions">
+                                        <option value="Aisle 1">
+                                        <option value="Aisle 2">
+                                        <option value="Bin 1">
+                                        <option value="Bin 2">
+                                        <option value="Floor">
+                                        <option value="Shelf A">
+                                    </datalist>
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Last Vendor</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <select id="lastVendorSelect" class="inflow-combo" onchange="markFieldDirty('last_vendor_id', this.value)">
+                                        <option value="">(None)</option>
+                                        {% for v in all_vendors %}
+                                        <option value="{{ v.id }}" {% if product.last_vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Unit of Measure -->
+                        <div class="inflow-cat-info-col">
+                            <h3 class="inflow-cat-subhdr-blue">Unit of Measure</h3>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Standard UoM</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <select id="stdUomSelect" class="inflow-combo inflow-combo-sm" onchange="onStandardUomChange(this.value)">
+                                        {% set uom_options = ['pcs.', 'ea', 'box', 'case', 'kg', 'g', 'm', 'carton', 'pack', 'set', 'roll', 'bag'] %}
+                                        {% if product.uom and product.uom not in uom_options %}
+                                        <option value="{{ product.uom }}" selected>{{ product.uom }}</option>
+                                        {% endif %}
+                                        {% for opt in uom_options %}
+                                        <option value="{{ opt }}" {% if product.uom == opt or (not product.uom and opt == 'pcs.') %}selected{% endif %}>{{ opt }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Sales UoM</span>
+                                <div class="inflow-cat-field-ctrl">
+                                    <select id="salesUomSelect" class="inflow-combo inflow-combo-sm" onchange="onSalesUomChange(this.value)">
+                                        {% set sales_options = ['cases', 'pcs.', 'box', 'ea', 'carton', 'pack', 'set', 'roll', 'bag', 'kg'] %}
+                                        {% if product.sales_uom and product.sales_uom not in sales_options %}
+                                        <option value="{{ product.sales_uom }}" selected>{{ product.sales_uom }}</option>
+                                        {% endif %}
+                                        {% for opt in sales_options %}
+                                        <option value="{{ opt }}" {% if product.sales_uom == opt or (not product.sales_uom and opt == 'cases') %}selected{% endif %}>{{ opt }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Conversion Row for Sales UoM -->
+                            <div class="inflow-uom-conv-row" id="salesConvRow">
+                                <span class="inflow-uom-conv-lbl">Conversion</span>
+                                <div class="inflow-uom-conv-formula">
+                                    <input type="number" step="any" min="0.0001" id="salesConvRatio" class="inflow-conv-input" value="{{ '{:g}'.format(product.sales_uom_ratio or 1) }}" oninput="onConversionRatioChange(); markFieldDirty('sales_uom_ratio', this.value);">
+                                    <span class="inflow-conv-unit" id="lblSalesUom">{{ product.sales_uom or 'cases' }}</span>
+                                    <span class="inflow-conv-equal">=</span>
+                                    <input type="number" step="any" min="0.0001" id="salesConvStd" class="inflow-conv-input wider" value="{{ '{:g}'.format(product.sales_uom_ratio_std or 1000) }}" oninput="onConversionRatioChange(); markFieldDirty('sales_uom_ratio_std', this.value);">
+                                    <span class="inflow-conv-unit" id="lblSalesStdUom">{{ product.uom or 'pcs.' }}</span>
+                                </div>
+                            </div>
+
+                            <div class="inflow-cat-field-row">
+                                <span class="inflow-cat-field-lbl">Purchasing UoM</span>
+                                <div class="inflow-cat-field-ctrl" style="display: flex; align-items: center; gap: 6px;">
+                                    <select id="purchasingUomSelect" class="inflow-combo inflow-combo-sm" disabled style="background: #F1F5F9; color: #475569; cursor: not-allowed; opacity: 0.9;" title="Purchasing UoM automatically equals Sales UoM">
+                                        <option value="{{ product.sales_uom or product.purchasing_uom or 'cases' }}" selected>{{ product.sales_uom or product.purchasing_uom or 'cases' }}</option>
+                                    </select>
+                                    <span style="font-size: 11px; color: #0284C7; font-weight: 600; white-space: nowrap;"><i class="fa fa-lock" style="font-size: 10px; margin-right: 2px;"></i>= Sales UoM</span>
+                                </div>
+                            </div>
+
+                            <!-- Conversion Row for Purchasing UoM (Hidden: Purchases UOM always equals Sales UOM) -->
+                            <div class="inflow-uom-conv-row" id="purchasingConvRow" style="display: none;">
+                                <span class="inflow-uom-conv-lbl">Conversion</span>
+                                <div class="inflow-uom-conv-formula">
+                                    <input type="number" step="any" min="0.0001" id="purchasingConvRatio" class="inflow-conv-input" value="{{ '{:g}'.format(product.sales_uom_ratio or product.purchasing_uom_ratio or 1) }}" oninput="markFieldDirty('purchasing_uom_ratio', this.value);">
+                                    <span class="inflow-conv-unit" id="lblPurchasingUom">{{ product.sales_uom or product.purchasing_uom or 'cases' }}</span>
+                                    <span class="inflow-conv-equal">=</span>
+                                    <input type="number" step="any" min="0.0001" id="purchasingConvStd" class="inflow-conv-input wider" value="{{ '{:g}'.format(product.sales_uom_ratio_std or product.purchasing_uom_ratio_std or 1) }}" oninput="markFieldDirty('purchasing_uom_ratio_std', this.value);">
+                                    <span class="inflow-conv-unit" id="lblPurchasingStdUom">{{ product.uom or 'pcs.' }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Product Dimensions & Packaging Breakdown (Near Unit of Measure) -->
+                            <div class="inflow-cat-dim-box">
+                                <div class="inflow-cat-dim-title">
+                                    <span class="font-khmer">ទំហំ & ការវេចខ្ចប់ (Dimensions & Packaging)</span>
+                                    <span id="uomDimSummaryTag" style="font-size: 11px; color: #0284C7; font-weight: 700;">{{ '{:g}'.format(product.length or 21) }}cm x {{ '{:g}'.format(product.width or 21) }}cm x {{ '{:g}'.format(product.height or 4) }}cm</span>
+                                </div>
+                                
+                                <!-- Dimension Inputs in cm -->
+                                <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+                                    <div style="display: flex; align-items: center; gap: 3px;">
+                                        <label style="font-size: 11px; color: #475569; font-weight: 700;">L:</label>
+                                        <input type="number" step="0.01" id="dimLengthInput" value="{{ '{:g}'.format(product.length or 21) }}" class="inflow-dim-mini-input" placeholder="L cm" oninput="onDimensionChange(); markFieldDirty('length', this.value);" title="Length in cm">
+                                        <span style="font-size: 10px; color: #64748B;">cm</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 3px;">
+                                        <label style="font-size: 11px; color: #475569; font-weight: 700;">W:</label>
+                                        <input type="number" step="0.01" id="dimWidthInput" value="{{ '{:g}'.format(product.width or 21) }}" class="inflow-dim-mini-input" placeholder="W cm" oninput="onDimensionChange(); markFieldDirty('width', this.value);" title="Width in cm">
+                                        <span style="font-size: 10px; color: #64748B;">cm</span>
+                                    </div>
+                                    <div style="display: flex; align-items: center; gap: 3px;">
+                                        <label style="font-size: 11px; color: #475569; font-weight: 700;">H:</label>
+                                        <input type="number" step="0.01" id="dimHeightInput" value="{{ '{:g}'.format(product.height or 4) }}" class="inflow-dim-mini-input" placeholder="H cm" oninput="onDimensionChange(); markFieldDirty('height', this.value);" title="Height in cm">
+                                        <span style="font-size: 10px; color: #64748B;">cm</span>
+                                    </div>
+                                </div>
+
+                                <!-- Packaging Breakdown: Packs per Case & Pcs per Pack -->
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border-top: 1px dashed #CBD5E1; padding-top: 6px;">
+                                    <div>
+                                        <label style="font-size: 10.5px; color: #334155; display: block; font-weight: 600;" class="font-khmer">1 កេស មាន (Packs/Case):</label>
+                                        <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+                                            <input type="number" step="any" id="packsPerCaseInput" value="{{ '{:g}'.format(product.packs_per_case or 10) }}" class="inflow-dim-mini-input" style="width: 58px;" oninput="onPackagingChange('packs'); markFieldDirty('packs_per_case', this.value);" title="Automatically calculated: (pcs per case) / (pcs per pack)">
+                                            <span style="font-size: 10.5px; color: #64748B;" class="font-khmer">ដុំ</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label style="font-size: 10.5px; color: #334155; display: block; font-weight: 600;" class="font-khmer">1 ដុំ មាន (Pcs/Pack):</label>
+                                        <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
+                                            <input type="number" step="any" id="pcsPerPackInput" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-dim-mini-input" style="width: 58px;" oninput="onPackagingChange('pcs_pack'); markFieldDirty('pcs_per_pack', this.value);">
+                                            <span style="font-size: 10.5px; color: #64748B;" class="font-khmer">ប្រអប់</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Centered Navigation Pills -->
+            <div class="inflow-cat-pill-nav">
+                <button type="button" class="inflow-cat-pill active" onclick="switchCatalogTab('tabOverview', this)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                    <span>Overview</span>
+                </button>
+                <button type="button" class="inflow-cat-pill" id="pillCombinedTab" onclick="switchCatalogTab('tabCombined', this)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                    <span>Combined / Kit (សមាសភាគផ្សំ)</span>
+                    <span id="badgeCombinedCount" style="background: {% if boms and boms|length > 0 %}#0284C7{% else %}#94A3B8{% endif %}; color: #fff; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; margin-left: 2px;">{{ boms|length if boms else 0 }}</span>
+                </button>
+                <button type="button" class="inflow-cat-pill" onclick="switchCatalogTab('tabVendors', this)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span>Product vendors</span>
+                </button>
+                <button type="button" class="inflow-cat-pill" onclick="switchCatalogTab('tabOrders', this)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                    <span>Order history</span>
+                </button>
+                <button type="button" class="inflow-cat-pill" onclick="switchCatalogTab('tabPurchases', this)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+                    <span>Purchase history</span>
+                </button>
+                <button type="button" class="inflow-cat-pill" onclick="switchCatalogTab('tabMovements', this)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                    <span>Movement history</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: OVERVIEW (Matching Screenshot Cards) -->
+            <div id="tabOverview" class="inflow-cat-tab-content">
+                <div class="inflow-cat-cards-grid">
+                    <!-- CARD 1: QUANTITY -->
+                    <div class="inflow-cat-card">
+                        <!-- Header -->
+                        <div class="inflow-cat-card-header">
+                            <div>
+                                <span class="card-title">Quantity</span>
+                                <span class="inflow-cat-onhand-pill">on hand ⇄</span>
+                                <span class="card-sub">for all locations</span>
+                            </div>
+                            <button type="button" class="inflow-cat-play-btn" onclick="openStockAdjustModal()" title="Adjust / Count Stock">
+                                ▶
+                            </button>
+                        </div>
+
+                        <!-- Big Total -->
+                        <div class="inflow-cat-qty-display">
+                            <div class="inflow-cat-big-num" id="catTotalStockDisplay" onclick="openStockAdjustModal()" title="Click to adjust stock" style="cursor: pointer;">
+                                <span id="catTotalStockNum">{{ "{:,.0f}".format(product.total_qty) }}</span> <span class="unit" id="catTotalStockUom">{{ product.uom or 'ea' }}</span>
+                            </div>
+                            <a href="javascript:void(0)" onclick="openBreakdownModal()" class="inflow-cat-breakdown-link">
+                                ≡ View breakdown
+                            </a>
+                        </div>
+
+                        {% if boms and boms|length > 0 %}
+                        <div class="inflow-cat-bundle-avail-banner" style="background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 6px; padding: 6px 10px; margin-top: 6px; margin-bottom: 6px; font-size: 11.5px; color: #0369A1; display: flex; align-items: center; justify-content: space-between; cursor: pointer;" onclick="switchCatalogTab('tabCombined', document.getElementById('pillCombinedTab'))" title="Click to view kit components">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <span style="font-size: 14px;">🧩</span>
+                                <div>
+                                    <span style="font-weight: 700;">Combined Kit:</span>
+                                    <span style="font-weight: 700; color: #0284C7;" id="ovwAvailableKits">{{ available_bundle_qty|int }}</span> kits available to sell
+                                </div>
+                            </div>
+                            <span style="font-size: 10.5px; color: #0284C7; font-weight: 600;">View components →</span>
+                        </div>
+                        {% endif %}
+
+                        <!-- Location Search Input -->
+                        <div class="inflow-cat-loc-search-box">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="locSearchInput" placeholder="Search locations" oninput="filterLocations(this.value)">
+                        </div>
+
+                        <!-- Location Bars -->
+                        <div class="inflow-cat-loc-list" id="locationStockBars">
+                            {% set total_q = product.total_qty if product.total_qty > 0 else 1 %}
+                            {% for ls in location_stocks %}
+                            {% set pct = (ls.quantity / total_q * 100) | round(1) %}
+                            <div class="inflow-cat-loc-row" data-name="{{ ls.location_name | lower }}" data-loc-id="{{ ls.location_id }}">
+                                <div class="inflow-cat-loc-meta">
+                                    <div class="inflow-cat-loc-meta-left">
+                                        <span class="num loc-qty-val" id="locQtyText_{{ ls.location_id }}" 
+                                              onclick="openStockAdjustModal({{ ls.location_id }}, '{{ ls.location_name|escape }}', {{ ls.quantity }})"
+                                              title="Click to adjust stock" style="cursor: pointer;">
+                                            {{ "{:,.0f}".format(ls.quantity) }}
+                                        </span>
+                                        <span class="loc-name">{{ ls.location_name }}</span>
+                                    </div>
+                                    <button type="button" class="inflow-loc-quick-adj-btn" 
+                                            onclick="openStockAdjustModal({{ ls.location_id }}, '{{ ls.location_name|escape }}', {{ ls.quantity }})"
+                                            title="Quick adjust {{ ls.location_name }}">
+                                        ⚡ Adjust
+                                    </button>
+                                </div>
+                                <div class="inflow-cat-progress-track" id="locTrack_{{ ls.location_id }}">
+                                    <div class="inflow-cat-progress-fill {% if loop.first %}bar-bronze{% else %}bar-blue{% endif %}" 
+                                         id="locFill_{{ ls.location_id }}" 
+                                         style="width: {% if ls.quantity > 0 %}{{ [pct, 5]|max }}%{% else %}0%{% endif %};"></div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="inflow-cat-card-footer">
+                            <a href="javascript:void(0)" class="inflow-cat-showmore-link" onclick="toggleMoreLocations()">Show more locations ▾</a>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: PRICING & COST -->
+                    <div class="inflow-cat-card">
+                        <!-- Header -->
+                        <div class="inflow-cat-card-header">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="card-title">Pricing & Cost</span>
+                                {% if can_edit_prices %}
+                                <button type="button" class="inflow-btn-add-price" onclick="openAddPriceModal()" title="Add Pricing Scheme / Price Tier">+ Add Price</button>
+                                {% endif %}
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <!-- Decimal Precision Settings for Pricing & Cost -->
+                                <div class="inflow-cat-decimals-group" style="display: flex; align-items: center; gap: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 2px 8px; border-radius: 6px;" title="Set decimal places for selling prices and costs">
+                                    <div style="display: flex; align-items: center; gap: 4px;">
+                                        <span style="font-size: 10.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Price Decimals:</span>
+                                        <select id="catPriceDecimalsSelect" onchange="updateProductDecimalsAjax()" style="font-size: 11px; height: 21px; font-weight: 600; color: #0284C7; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: pointer;">
+                                            <option value="" {% if product.price_decimals is none %}selected{% endif %}>Default ({{ company.decimal_places_price or 2 }})</option>
+                                            <option value="0" {% if product.price_decimals == 0 %}selected{% endif %}>0 ($39)</option>
+                                            <option value="1" {% if product.price_decimals == 1 %}selected{% endif %}>1 ($39.0)</option>
+                                            <option value="2" {% if product.price_decimals == 2 %}selected{% endif %}>2 ($39.00)</option>
+                                            <option value="3" {% if product.price_decimals == 3 %}selected{% endif %}>3 ($39.000)</option>
+                                            <option value="4" {% if product.price_decimals == 4 %}selected{% endif %}>4 ($39.0000)</option>
+                                            <option value="5" {% if product.price_decimals == 5 %}selected{% endif %}>5 ($39.00000)</option>
+                                            <option value="6" {% if product.price_decimals == 6 %}selected{% endif %}>6 ($39.000000)</option>
+                                        </select>
+                                    </div>
+                                    {% if can_view_costs %}
+                                    <div style="width: 1px; height: 14px; background: #CBD5E1;"></div>
+                                    <div style="display: flex; align-items: center; gap: 4px;">
+                                        <span style="font-size: 10.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Cost Decimals:</span>
+                                        <select id="catCostDecimalsSelect" onchange="updateProductDecimalsAjax()" style="font-size: 11px; height: 21px; font-weight: 600; color: #0284C7; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: pointer;">
+                                            <option value="" {% if product.cost_decimals is none %}selected{% endif %}>Default ({{ company.decimal_places_cost or 3 }})</option>
+                                            <option value="0" {% if product.cost_decimals == 0 %}selected{% endif %}>0 ($0)</option>
+                                            <option value="1" {% if product.cost_decimals == 1 %}selected{% endif %}>1 ($0.1)</option>
+                                            <option value="2" {% if product.cost_decimals == 2 %}selected{% endif %}>2 ($0.11)</option>
+                                            <option value="3" {% if product.cost_decimals == 3 %}selected{% endif %}>3 ($0.107)</option>
+                                            <option value="4" {% if product.cost_decimals == 4 %}selected{% endif %}>4 ($0.1070)</option>
+                                            <option value="5" {% if product.cost_decimals == 5 %}selected{% endif %}>5 ($0.10700)</option>
+                                            <option value="6" {% if product.cost_decimals == 6 %}selected{% endif %}>6 ($0.107000)</option>
+                                        </select>
+                                    </div>
+                                    {% endif %}
+                                    <span id="decimalSaveStatus" style="display: none; font-size: 10px; font-weight: 700; color: #16A34A; margin-left: 2px;">✓</span>
+                                </div>
+                                <div class="inflow-cat-adv-toggle" onclick="toggleAdvancedPricing(this)">
+                                    <div class="toggle-pill active">
+                                        <div class="toggle-knob"></div>
+                                    </div>
+                                    <span>Advanced</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Schemes Table -->
+                        <table class="inflow-cat-pricing-table" id="catPricingTable">
+                            <thead>
+                                <tr>
+                                    <th style="width: 28%; text-align: left;">PRICING SCHEME</th>
+                                    {% if can_view_costs %}
+                                    <th style="width: 16%; text-align: right;">MARKUP</th>
+                                    {% endif %}
+                                    <th style="{% if can_view_costs %}width: 25%;{% else %}width: 33%;{% endif %} text-align: right;" title="Price per Case ($/case)">PRICE / CASE</th>
+                                    <th style="{% if can_view_costs %}width: 24%;{% else %}width: 32%;{% endif %} text-align: right;" title="Price per Pcs ($/pcs)">PRICE / PCS</th>
+                                    <th style="width: 7%; text-align: center;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="catPricingTableBody">
+                                {% set pcs_in_case = price_card.pcs_per_case if (price_card and price_card.pcs_per_case > 0) else (product.sales_uom_ratio_std if product.sales_uom_ratio_std > 0 else 300) %}
+                                {% for pt in price_tiers %}
+                                <tr id="price_row_{{ pt.pricing_scheme_id }}" data-scheme-id="{{ pt.pricing_scheme_id }}">
+                                    <td class="scheme-name">{{ pt.scheme_name }}</td>
+                                    {% if can_view_costs %}
+                                    <td style="text-align: right;">
+                                        <span class="markup-val" id="markup_text_{{ pt.pricing_scheme_id }}">{{ pt.markup }}%</span>
+                                    </td>
+                                    {% endif %}
+                                    <td style="text-align: right;">
+                                        <div class="inflow-cat-price-cell">
+                                            <input type="text" 
+                                                   value="{{ ('{:.' ~ item_price_dec ~ 'f}').format(pt.unit_price) }}" 
+                                                   class="inflow-cat-price-input" 
+                                                   id="case_price_{{ pt.pricing_scheme_id }}"
+                                                   data-scheme-id="{{ pt.pricing_scheme_id }}"
+                                                   placeholder="0.00"
+                                                   title="Sales Price per Case ($/case) - e.g. 45.00"
+                                                   {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Selling price editing is restricted by administrator / ការកែប្រែតម្លៃលក់ត្រូវបានបិទ"{% else %}
+                                                   oninput="onCasePriceInput(this, {{ pt.pricing_scheme_id }})"
+                                                   onblur="onCasePriceBlur(this, {{ pt.pricing_scheme_id }})"
+                                                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"{% endif %}>
+                                        </div>
+                                    </td>
+                                    <td style="text-align: right;">
+                                        <div class="inflow-cat-price-cell">
+                                            <input type="text" 
+                                                   value="{{ ('{:.' ~ (item_price_dec if item_price_dec > 2 else 3) ~ 'f}').format((pt.unit_price|float) / (pcs_in_case|float) if (pcs_in_case|float) > 0 else (pt.unit_price|float)) }}" 
+                                                   class="inflow-cat-pcs-price-input" 
+                                                   id="pcs_price_{{ pt.pricing_scheme_id }}"
+                                                   data-scheme-id="{{ pt.pricing_scheme_id }}"
+                                                   placeholder="0.000"
+                                                   title="Sales Price per Pcs ($/pcs) - e.g. 0.150"
+                                                   {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Selling price editing is restricted by administrator / ការកែប្រែតម្លៃលក់ត្រូវបានបិទ"{% else %}
+                                                   oninput="onPcsPriceInput(this, {{ pt.pricing_scheme_id }})"
+                                                   onblur="onPcsPriceBlur(this, {{ pt.pricing_scheme_id }})"
+                                                   onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"{% endif %}>
+                                        </div>
+                                    </td>
+                                    <td style="text-align: center;">
+                                        {% if can_edit_prices %}
+                                        <button type="button" class="inflow-btn-del-price" onclick="deleteProductPrice({{ product.id }}, {{ pt.pricing_scheme_id }}, '{{ pt.scheme_name|escape }}')" title="Delete this price tier">
+                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        </button>
+                                        {% else %}
+                                        <span title="Locked by administrator" style="font-size: 11px; color: #94A3B8;">🔒</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                                <tr id="emptyPriceRow" {% if price_tiers|length > 0 %}style="display: none;"{% endif %}>
+                                    <td colspan="{% if can_view_costs %}5{% else %}4{% endif %}" style="text-align: center; color: #94A3B8; padding: 14px 8px; font-size: 12px;">
+                                        No prices set. Click <strong>+ Add Price</strong> to add a pricing tier.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding: 0 4px;">
+                            <button type="button" class="inflow-cat-add-price-link" onclick="openAddPriceModal()">+ Add Price</button>
+                            <a href="javascript:void(0)" onclick="openPricingSchemeModal()" class="inflow-cat-showmore-link">Show all ▾</a>
+                        </div>
+
+                        {% if can_view_costs %}
+                        <!-- Cost Box Footer with Google Sheets Formula Evaluation -->
+                        <div class="inflow-cat-cost-footer" style="align-items: flex-start;">
+                            <div class="inflow-cat-cost-label" style="padding-top: 4px;" title="Product Cost. Supports Google Sheets formulas e.g. =5592+3764100/4000, 10+2.5">
+                                <span>Cost</span>
+                                <span class="help-circle" title="Type formula like Google Sheets (e.g. =5592+3764100/4000, 10+2.5).&#10;Press Enter to evaluate. Formula stays saved for later editing.">🛈</span>
+                            </div>
+                            <div style="display: flex; align-items: flex-start; gap: 6px; position: relative;">
+                                <div style="display: flex; flex-direction: column; align-items: flex-end;">
+                                    <div style="position: relative; display: inline-flex; align-items: center;">
+                                        {% set is_comb = (boms and boms|length > 0) or product.combine_type == 'multi' %}
+                                        {% set raw_cost = (total_bom_cost if (total_bom_cost is defined and total_bom_cost > 0) else (product.standard_cost or product.average_cost or 0))|float if is_comb else (product.standard_cost or product.average_cost or 0)|float %}
+                                        {% set formula_val = '' if is_comb else (product.cost_formula if (product.cost_formula and product.cost_formula not in ('None', 'null', 'undefined', '')) else '') %}
+                                        <input type="text" id="productCostInput" 
+                                               data-formula="{{ formula_val }}"
+                                               value="{{ ('{:.' ~ item_cost_dec ~ 'f}').format(raw_cost) if raw_cost > 0 else ('{:.' ~ item_cost_dec ~ 'f}').format(0) }}" 
+                                               class="inflow-cat-cost-input"
+                                               placeholder="0.00"
+                                               autocomplete="off"
+                                               title="Click to edit calculation (e.g. =9.66+100)"
+                                               onfocus="onCostInputFocus(this)"
+                                               oninput="onCostFormulaInput(this)"
+                                               onblur="onCostFormulaBlur(this)"
+                                               onkeydown="onCostFormulaKeydown(event, this)">
+                                        <!-- Live result tooltip while typing -->
+                                        <span id="costFormulaBadge" class="formula-preview-badge" style="display: none; position: absolute; right: 4px; top: -22px; z-index: 10; font-size: 11px; background: #1E3A5F; color: #fff; padding: 2px 6px; border-radius: 4px; white-space: nowrap; font-family: monospace;"></span>
+                                    </div>
+                                    <!-- Monospace Google Sheets Formula Preview Below Cell (Screenshot 2 Match) -->
+                                    <div class="inflow-fx-display-row" id="costFormulaDisplayRow" onclick="focusCostInput()" 
+                                         style="display: {{ 'inline-flex' if formula_val else 'none' }};"
+                                         title="Click to edit calculation">
+                                        <span class="inflow-fx-prefix">fx:</span>
+                                        <span class="inflow-fx-expr" id="costFormulaExprText">{{ formula_val }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Helpful Cost Formula Note (Below Costing Box) -->
+                        <div class="inflow-cost-note-box" style="margin-top: 8px; margin-bottom: 4px; padding: 6px 10px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 4px; font-size: 11px; color: #64748B; display: flex; align-items: flex-start; gap: 6px;">
+                            <span style="color: #0284C7; font-weight: bold; flex-shrink: 0;">ℹ️ ចំណាំ (Note):</span>
+                            <span style="line-height: 1.4;">
+                                ប្រអប់ថ្លៃដើម (Cost) នេះអាចគណនារូបមន្តដោយផ្ទាល់បាន (ឧ. <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">=9.66+100</code>, <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">=(100/7.2)+3.5</code>, <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">15/12</code>) ហើយរក្សារូបមន្តទុកកែប្រែពេលក្រោយបានគ្រប់ពេល។<br>
+                                <span style="font-size: 10.5px; color: #94A3B8;">(Direct formula calculation supported. Formulations are retained automatically for editing later.)</span>
+                            </span>
+                        </div>
+                        {% else %}
+                        <div style="margin-top: 10px; padding: 10px 14px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 16px;">🔒</span>
+                                <div>
+                                    <div style="font-size: 12px; font-weight: 700; color: #475569;">Product Costing & Margins (ថ្លៃដើមផលិតផល)</div>
+                                    <div style="font-size: 11px; color: #94A3B8;">Costing and internal profit margins are protected by Main Store HQ.</div>
+                                </div>
+                            </div>
+                            <span style="background: #F1F5F9; color: #64748B; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;">HIDDEN</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- TAB 2: PRODUCT VENDORS -->
+            <div id="tabVendors" class="inflow-cat-tab-content" style="display: none;">
+                <div class="inflow-cat-panel-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <h2 style="font-size: 15px; font-weight: 700; color: #0F172A;">Preferred Vendors & Supplier Pricing</h2>
+                        <button type="button" class="inflow-tb-btn primary" onclick="openAddVendorModal()">+ Add Vendor</button>
+                    </div>
+                    <table class="inflow-win-grid">
+                        <thead>
+                            <tr>
+                                <th>Vendor Name</th>
+                                <th>Contact</th>
+                                <th>Phone</th>
+                                <th>Vendor Item Code</th>
+                                {% if can_view_costs %}
+                                <th style="text-align: right;">Unit Cost</th>
+                                {% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for v in product_vendors %}
+                            <tr>
+                                <td style="font-weight: 600;">{{ v.vendor_name }}</td>
+                                <td>{{ v.contact_name or '' }}</td>
+                                <td>{{ v.vendor_phone or '' }}</td>
+                                <td>{{ v.vendor_item_code or '-' }}</td>
+                                {% if can_view_costs %}
+                                <td style="text-align: right; font-weight: 600;">${{ "{:.2f}".format(v.last_cost or 0) }}</td>
+                                {% endif %}
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="{% if can_view_costs %}5{% else %}4{% endif %}" style="text-align: center; padding: 24px; color: #64748B;">No vendors assigned yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 3: ORDER HISTORY (Sales Orders) -->
+            <div id="tabOrders" class="inflow-cat-tab-content" style="display: none;">
+                <div class="inflow-cat-panel-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Sales Order History</h2>
+                            <span style="font-size: 12px; color: #64748B;">Customer sales records for this product</span>
+                        </div>
+                        <a href="{{ url_for('sales_orders.create_order', product_id=product.id) }}" class="inflow-tb-btn primary" onclick="return handleNavClick(event, this.href);">+ Create Sales Order</a>
+                    </div>
+                    <table class="inflow-win-grid">
+                        <thead>
+                            <tr>
+                                <th>Order #</th>
+                                <th>Date</th>
+                                <th>Customer</th>
+                                <th style="text-align: right;">Quantity</th>
+                                <th style="text-align: left; width: 75px;">UOM</th>
+                                <th style="text-align: right;">Unit Price</th>
+                                <th style="text-align: right;">Total Amount</th>
+                                <th style="text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ord in sales_history %}
+                            <tr>
+                                <td style="font-weight: 600;">
+                                    <a href="{{ url_for('sales_orders.detail_order', id=ord.order_id) }}" onclick="return handleNavClick(event, this.href);">{{ ord.order_number }}</a>
+                                </td>
+                                <td>{{ ord.order_date | format_inflow_date }}</td>
+                                <td>{{ ord.customer_name or ord.party_name or '-' }}</td>
+                                <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(ord.quantity|float) if ord.quantity is not none else '0' }}</td>
+                                <td>
+                                    <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ ord.uom or product.sales_uom or product.uom or 'pcs' }}</span>
+                                </td>
+                                <td style="text-align: right;">${{ "{:,.2f}".format(ord.unit_price|float) }}</td>
+                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(ord.total_amount|float) }}</td>
+                                <td style="text-align: center;">
+                                    <span class="badge {% if ord.status == 'Fulfilled' or ord.status == 'Invoiced' %}badge-success{% elif ord.status == 'Canceled' %}badge-danger{% else %}badge-info{% endif %}">
+                                        {{ ord.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales order history found for this product.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 3B: PURCHASE HISTORY (Adjacent to Order History) -->
+            <div id="tabPurchases" class="inflow-cat-tab-content" style="display: none;">
+                <div class="inflow-cat-panel-box">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                        <div>
+                            <h2 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Purchase Order History</h2>
+                            <span style="font-size: 12px; color: #64748B;">Supplier purchase history and receiving status</span>
+                        </div>
+                        <a href="{{ url_for('purchase_orders.create_purchase', product_id=product.id) }}" class="inflow-tb-btn primary" onclick="return handleNavClick(event, this.href);">+ Create Purchase Order</a>
+                    </div>
+                    <table class="inflow-win-grid">
+                        <thead>
+                            <tr>
+                                <th>PO #</th>
+                                <th>Date</th>
+                                <th>Vendor</th>
+                                <th style="text-align: right;">Ordered Qty</th>
+                                <th style="text-align: left; width: 75px;">UOM</th>
+                                <th style="text-align: right;">Received Qty</th>
+                                {% if can_view_costs %}
+                                <th style="text-align: right;">Unit Cost</th>
+                                <th style="text-align: right;">Total Amount</th>
+                                {% endif %}
+                                <th style="text-align: center;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for po in purchase_history %}
+                            <tr>
+                                <td style="font-weight: 600;">
+                                    <a href="{{ url_for('purchase_orders.detail_purchase', id=po.order_id) }}" onclick="return handleNavClick(event, this.href);">{{ po.order_number }}</a>
+                                </td>
+                                <td>{{ po.order_date | format_inflow_date }}</td>
+                                <td>{{ po.vendor_name or po.party_name or '-' }}</td>
+                                <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(po.quantity|float) if po.quantity is not none else '0' }}</td>
+                                <td>
+                                    <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ po.uom or product.purchasing_uom or product.uom or 'pcs' }}</span>
+                                </td>
+                                <td style="text-align: right; color: #0F766E; font-weight: 600;">{{ "{:g}".format(po.received_qty|float) if po.received_qty is not none else '0' }}</td>
+                                {% if can_view_costs %}
+                                <td style="text-align: right;">${{ "{:,.2f}".format(po.unit_cost|float) }}</td>
+                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(po.total_amount|float) }}</td>
+                                {% endif %}
+                                <td style="text-align: center;">
+                                    <span class="badge {% if po.status == 'Fulfilled' or po.status == 'Received' %}badge-success{% elif po.status == 'Canceled' %}badge-danger{% else %}badge-info{% endif %}">
+                                        {{ po.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="{% if can_view_costs %}9{% else %}7{% endif %}" style="text-align: center; padding: 24px; color: #64748B;">No purchase order history found for this product.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 4: MOVEMENT HISTORY -->
+            <div id="tabMovements" class="inflow-cat-tab-content" style="display: none;">
+                <div class="inflow-cat-panel-box">
+                    <h2 style="font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 16px;">Inventory Audit Trail</h2>
+                    <table class="inflow-win-grid">
+                        <thead>
+                            <tr>
+                                <th>Date/Time</th>
+                                <th>Type</th>
+                                <th>From</th>
+                                <th>To</th>
+                                <th style="text-align: right;">Quantity</th>
+                                <th>Reason / Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in recent_movements %}
+                            <tr>
+                                <td>{{ m.created_at.strftime('%d-%b-%y %H:%M') if m.created_at else '' }}</td>
+                                <td><span style="font-weight: 600; text-transform: uppercase;">{{ m.movement_type }}</span></td>
+                                <td>{{ m.from_location_name or '-' }}</td>
+                                <td>{{ m.to_location_name or '-' }}</td>
+                                <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(m.quantity) }}</td>
+                                <td>{{ m.reason or m.notes or '' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" style="text-align: center; padding: 24px; color: #64748B;">No stock movements recorded.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 6: COMBINED / BOM KIT (សមាសភាគផ្សំ) -->
+            <div id="tabCombined" class="inflow-cat-tab-content" style="display: none;">
+                <div class="inflow-cat-panel-box" style="padding: 20px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px;">
+                    <!-- Top Banner -->
+                    <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 20px;">🧩</span>
+                                <h2 style="font-size: 16px; font-weight: 700; color: #0F172A; margin: 0;">
+                                    Combined / Kit Product (ទំនិញផ្សំបញ្ចូលគ្នា និងកាត់ស្តុកស្វ័យប្រវត្តិ)
+                                </h2>
+                                {% if boms and boms|length > 0 %}
+                                <span style="background: #E0F2FE; color: #0284C7; border: 1px solid #BAE6FD; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 12px;" id="badgeKitStatus">
+                                    Active Kit ({{ boms|length }} Components)
+                                </span>
+                                {% else %}
+                                <span style="background: #F1F5F9; color: #64748B; border: 1px solid #E2E8F0; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 12px;" id="badgeKitStatus">
+                                    Single Product (ទំនិញទោល)
+                                </span>
+                                {% endif %}
+                            </div>
+                            <p style="font-size: 12px; color: #64748B; margin: 4px 0 0 0;">
+                                Combine multiple items into this product. Costing calculates automatically from component standard costs. When sold, required quantities of each component are automatically deducted from stock.
+                            </p>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" class="inflow-btn-secondary" onclick="syncBomCost()" title="Recalculate cost from current component prices" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; cursor: pointer;">
+                                <span>🔄</span>
+                                <span>Recalculate Cost</span>
+                            </button>
+                            <button type="button" class="inflow-btn-primary" onclick="openNewCombinedModal()" style="display: flex; align-items: center; gap: 6px; padding: 6px 14px; font-size: 12px; font-weight: 600; border-radius: 6px; background: #0284C7; color: #FFFFFF; border: none; cursor: pointer;">
+                                <span>+</span>
+                                <span>New Combined Product</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Metric Cards Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                        <!-- Metric Card 1: Combined Cost -->
+                        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                            <div style="font-size: 11.5px; font-weight: 600; color: #64748B; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between;">
+                                <span>Combined Cost (ថ្លៃដើមផ្សំសរុប)</span>
+                                <span style="font-size: 14px;">💰</span>
+                            </div>
+                            <div style="font-size: 22px; font-weight: 800; color: #0F172A; margin: 6px 0 2px 0;" id="bomTotalCostDisplay">
+                                ${{ '{:.4f}'.format(total_bom_cost) }}
+                            </div>
+                            <div style="font-size: 11.5px; color: #64748B;">
+                                Sum of <span id="bomComponentCountDisplay" style="font-weight: 700; color: #0284C7;">{{ boms|length if boms else 0 }}</span> components
+                                {% set p_sell_price = (product.default_price|float) if product.default_price else 0.0 %}
+                                {% if p_sell_price > 0 %}
+                                • Margin: <strong style="color: #059669;">${{ '{:.2f}'.format(p_sell_price - total_bom_cost) }} ({{ '{:.1f}'.format(((p_sell_price - total_bom_cost) / total_bom_cost * 100) if total_bom_cost > 0 else 0) }}%)</strong>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Metric Card 2: Assembleable Stock -->
+                        <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 14px 16px;">
+                            <div style="font-size: 11.5px; font-weight: 600; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between;">
+                                <span>Assembled Stock (ចំនួនដែលអាចផ្គុំលក់បាន)</span>
+                                <span style="font-size: 14px;">📦</span>
+                            </div>
+                            <div style="font-size: 22px; font-weight: 800; color: #15803D; margin: 6px 0 2px 0;" id="bomAvailableKitsDisplay">
+                                {{ available_bundle_qty|int }} kits
+                            </div>
+                            <div style="font-size: 11.5px; color: #166534;" id="bomBottleneckDisplay">
+                                {% if bottleneck_component %}
+                                Limited by: <strong>{{ bottleneck_component.component_name }}</strong> ({{ '{:g}'.format(bottleneck_component.component_stock) }} on hand / {{ '{:g}'.format(bottleneck_component.quantity) }} req)
+                                {% elif boms and boms|length > 0 %}
+                                All components in stock
+                                {% else %}
+                                Add components below to calculate
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <!-- Metric Card 3: Auto-Deduct Rule -->
+                        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px 16px;">
+                            <div style="font-size: 11.5px; font-weight: 600; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; justify-content: space-between;">
+                                <span>Auto-Deduct Stock (កាត់ស្តុកស្វ័យប្រវត្តិ)</span>
+                                <span style="font-size: 14px;">⚡</span>
+                            </div>
+                            <div style="font-size: 13px; font-weight: 700; color: #0284C7; margin: 6px 0 2px 0;">
+                                Enabled on Sales Order &amp; Invoicing
+                            </div>
+                            <div style="font-size: 11.5px; color: #64748B;">
+                                Stock of each component is deducted automatically when this kit is sold.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Component Items Section -->
+                    <div style="margin-bottom: 24px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                            <h3 style="font-size: 13.5px; font-weight: 700; color: #1E293B; margin: 0;">
+                                Component Items (មុខទំនិញសមាសភាគក្នុងឈុត)
+                            </h3>
+                            <span style="font-size: 12px; color: #64748B;">
+                                Total: <strong id="bomItemsTotalCount">{{ boms|length if boms else 0 }}</strong> components
+                            </span>
+                        </div>
+
+                        <!-- Components Table -->
+                        <div style="border: 1px solid #E2E8F0; border-radius: 6px; overflow: hidden; background: #FFFFFF;">
+                            <table class="inflow-win-grid" style="width: 100%; border-collapse: collapse;" id="bomComponentsTable">
+                                <thead>
+                                    <tr style="background: #F8FAFC; border-bottom: 1px solid #E2E8F0;">
+                                        <th style="width: 38px; text-align: center; padding: 8px 6px;">#</th>
+                                        <th style="text-align: left; padding: 8px 10px;">Component Product</th>
+                                        <th style="width: 110px; text-align: right; padding: 8px 10px;">Required Qty</th>
+                                        <th style="width: 120px; text-align: right; padding: 8px 10px;">Stock on Hand</th>
+                                        <th style="width: 110px; text-align: right; padding: 8px 10px;">Unit Cost</th>
+                                        <th style="width: 120px; text-align: right; padding: 8px 10px;">Subtotal Cost</th>
+                                        <th style="width: 65px; text-align: center; padding: 8px 6px;">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="bomTableBody">
+                                    {% if boms and boms|length > 0 %}
+                                    {% for b in boms %}
+                                    <tr class="inflow-grid-row" id="bomRow_{{ b.id }}" style="border-bottom: 1px solid #F1F5F9;">
+                                        <td style="text-align: center; font-size: 11px; color: #94A3B8;">{{ loop.index }}</td>
+                                        <td style="padding: 6px 10px;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                {% if b.component_image_url %}
+                                                <img src="{{ b.component_image_url }}" alt="{{ b.component_name }}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid #E2E8F0;">
+                                                {% else %}
+                                                <div style="width: 28px; height: 28px; background: #F1F5F9; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #94A3B8;">📦</div>
+                                                {% endif %}
+                                                <div>
+                                                    <div style="font-weight: 600; font-size: 12px; color: #0F172A;">{{ b.component_name }}</div>
+                                                    <div style="font-size: 10.5px; color: #64748B;">{{ b.component_sku }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td style="text-align: right; padding: 6px 10px;">
+                                            <input type="number" step="any" min="0.001" value="{{ '{:g}'.format(b.quantity) }}" class="inflow-dim-mini-input" style="width: 65px; text-align: right; font-weight: 600;" onchange="updateBomQty({{ b.id }}, this.value)">
+                                        </td>
+                                        <td style="text-align: right; padding: 6px 10px; font-size: 12px; color: {% if b.component_stock <= 0 %}#DC2626; font-weight: 700;{% else %}#334155;{% endif %}">
+                                            {{ "{:,.0f}".format(b.component_stock) }}
+                                        </td>
+                                        <td style="text-align: right; padding: 6px 10px; font-size: 12px; color: #475569;">
+                                            ${{ '{:.4f}'.format(b.cost) }}
+                                        </td>
+                                        <td style="text-align: right; padding: 6px 10px; font-size: 12px; font-weight: 700; color: #0F172A;">
+                                            ${{ '{:.4f}'.format(b.subtotal_cost) }}
+                                        </td>
+                                        <td style="text-align: center; padding: 6px;">
+                                            <button type="button" onclick="deleteBomComponent({{ b.id }})" style="background: none; border: none; color: #EF4444; cursor: pointer; padding: 2px 4px; font-size: 13px;" title="Remove component">🗑️</button>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% else %}
+                                    <tr id="bomEmptyRow">
+                                        <td colspan="7" style="text-align: center; padding: 24px; color: #64748B; font-size: 12.5px;">
+                                            No components added yet. Use the form below to add products that make up this kit.
+                                        </td>
+                                    </tr>
+                                    {% endif %}
+                                </tbody>
+                                <tfoot>
+                                    <tr style="background: #F8FAFC; border-top: 2px solid #CBD5E1; font-weight: 700;">
+                                        <td colspan="5" style="text-align: right; padding: 8px 10px; font-size: 12px; color: #334155;">
+                                            Total Combined Cost (ថ្លៃដើមផ្សំសរុប):
+                                        </td>
+                                        <td style="text-align: right; padding: 8px 10px; font-size: 13px; color: #0284C7;" id="bomTableFooterTotal">
+                                            ${{ '{:.4f}'.format(total_bom_cost) }}
+                                        </td>
+                                        <td></td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Add Component Form Bar -->
+                    <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 8px; padding: 14px 16px;">
+                        <h4 style="font-size: 12.5px; font-weight: 700; color: #334155; margin: 0 0 10px 0;">
+                            + Add Component to this Product Kit (+ បន្ថែមមុខទំនិញទៅក្នុងឈុត)
+                        </h4>
+                        <div style="display: flex; align-items: flex-end; gap: 10px; flex-wrap: wrap;">
+                            <div style="flex: 2; min-width: 240px; position: relative;">
+                                <label style="display: block; font-size: 10.5px; font-weight: 600; color: #64748B; margin-bottom: 3px;">Select Product (ជ្រើសរើសទំនិញ):</label>
+                                <input type="hidden" id="selNewBomComponent" value="">
+                                <div style="position: relative;">
+                                    <input type="text" id="tabBomSearchInput" 
+                                           class="form-input" 
+                                           autocomplete="off"
+                                           placeholder="🔍 Type product name or SKU to search..." 
+                                           style="width: 100%; height: 32px; font-size: 12px; padding-left: 28px; padding-right: 24px;"
+                                           onfocus="openTabBomSearchDropdown()"
+                                           oninput="filterTabBomSearchDropdown(this.value)"
+                                           onkeydown="handleTabBomSearchKey(event)">
+                                    <span style="position: absolute; left: 8px; top: 8px; font-size: 13px; color: #94A3B8; pointer-events: none;">🔍</span>
+                                    <button type="button" id="tabBomClearBtn" onclick="clearTabBomSearchSelection()" 
+                                            style="display: none; position: absolute; right: 8px; top: 7px; background: none; border: none; font-size: 12px; color: #94A3B8; cursor: pointer;" title="Clear">✕</button>
+                                </div>
+                                <div id="tabBomSearchPopup" style="display: none; position: absolute; top: 58px; left: 0; width: 100%; min-width: 300px; max-height: 220px; overflow-y: auto; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 6px; box-shadow: 0 8px 20px rgba(0,0,0,0.15); z-index: 1050; font-size: 12px;">
+                                    <div id="tabBomSearchResultsList">
+                                        {% for ap in all_products %}
+                                        <div class="tab-bom-item"
+                                             data-id="{{ ap.id }}"
+                                             data-sku="{{ ap.sku }}"
+                                             data-name="{{ ap.name }}"
+                                             data-cost="{{ '{:.4f}'.format(ap.standard_cost or 0) }}"
+                                             data-search="{{ (ap.sku ~ ' ' ~ ap.name ~ ' ' ~ (ap.description or ''))|lower }}"
+                                             onclick="selectTabBomComponentFromSearch(this)"
+                                             style="padding: 7px 10px; cursor: pointer; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: space-between;"
+                                             onmouseover="this.style.background='#F0F9FF'"
+                                             onmouseout="this.style.background='transparent'">
+                                            <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                                <span style="font-weight: 700; color: #0284C7;">{{ ap.sku }}</span>
+                                                <span style="color: #1E293B; margin-left: 6px;">{{ ap.name }}</span>
+                                            </div>
+                                            <span style="font-weight: 600; color: #059669; font-size: 11.5px; margin-left: 8px; white-space: nowrap;">${{ '{:.2f}'.format(ap.standard_cost or 0) }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <div id="tabBomNoMatch" style="display: none; padding: 12px; text-align: center; color: #94A3B8; font-size: 12px;">No matching products found</div>
+                                </div>
+                            </div>
+                            <div style="width: 90px;">
+                                <label style="display: block; font-size: 10.5px; font-weight: 600; color: #64748B; margin-bottom: 3px;">Quantity:</label>
+                                <input type="number" step="any" min="0.001" id="inputNewBomQty" value="1" class="form-input" style="width: 100%; height: 32px; font-size: 12px; text-align: right;" oninput="onNewBomQtyInput()" onkeydown="if(event.key==='Enter'){event.preventDefault();submitAddBomComponent();}">
+                            </div>
+                            <div style="width: 110px;">
+                                <label style="display: block; font-size: 10.5px; font-weight: 600; color: #64748B; margin-bottom: 3px;">Unit Cost:</label>
+                                <div id="lblNewBomUnitCost" style="height: 32px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: #475569; padding: 0 4px;">$0.0000</div>
+                            </div>
+                            <div style="width: 120px;">
+                                <label style="display: block; font-size: 10.5px; font-weight: 600; color: #64748B; margin-bottom: 3px;">Subtotal:</label>
+                                <div id="lblNewBomSubtotal" style="height: 32px; display: flex; align-items: center; font-size: 13px; font-weight: 700; color: #0284C7; padding: 0 4px;">$0.0000</div>
+                            </div>
+                            <div>
+                                <button type="button" id="btnAddBomComponentBtn" onclick="submitAddBomComponent()" class="btn btn-primary" style="height: 32px; padding: 0 16px; font-size: 12px; font-weight: 600; border-radius: 6px; background: #0284C7; color: #FFFFFF; border: none; cursor: pointer; display: flex; align-items: center; gap: 4px;">
+                                    <span>+ Add Component</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==========================================================================
+                 PRODUCT PRICE TABLE SHOWCASE & PROFIT ANALYSIS (Khmer Primary / English Secondary)
+                 Replicating Screenshot 1 (Customer Price Card) & Screenshot 2 (Internal Profit Drawer)
+                 ========================================================================== -->
+            <div class="inflow-price-showcase-container" id="productPriceCardSection">
+                <!-- Toolbar -->
+                <div class="inflow-price-showcase-toolbar no-print">
+                    <div class="inflow-price-showcase-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00A3E0" stroke-width="2.2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        <span class="font-khmer">តារាងតម្លៃផលិតផល & ការវិភាគចំណេញ</span>
+                        <span style="font-size: 11px; color: #64748B; font-weight: 500;">(Product Price Showcase)</span>
+                    </div>
+                    <div class="inflow-price-showcase-actions" style="flex-wrap: wrap; gap: 8px;">
+                        <!-- Color Fill Swatches & Custom Picker -->
+                        <div class="inflow-style-control-group" title="Change header and accent color fill of the price card">
+                            <span class="inflow-style-control-lbl">🎨 Color:</span>
+                            <div class="inflow-color-picker-swatches">
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#00A3E0' or not (price_card.card_color if price_card else product.price_card_color) %}active{% endif %}" data-color="#00A3E0" style="background-color: #00A3E0;" onclick="changePriceCardColor('#00A3E0')" title="Cyan (Default)"></button>
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#0F172A' %}active{% endif %}" data-color="#0F172A" style="background-color: #0F172A;" onclick="changePriceCardColor('#0F172A')" title="Navy Slate"></button>
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#1D4ED8' %}active{% endif %}" data-color="#1D4ED8" style="background-color: #1D4ED8;" onclick="changePriceCardColor('#1D4ED8')" title="Royal Blue"></button>
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#059669' %}active{% endif %}" data-color="#059669" style="background-color: #059669;" onclick="changePriceCardColor('#059669')" title="Emerald Green"></button>
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#DC2626' %}active{% endif %}" data-color="#DC2626" style="background-color: #DC2626;" onclick="changePriceCardColor('#DC2626')" title="Ruby Red"></button>
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#D97706' %}active{% endif %}" data-color="#D97706" style="background-color: #D97706;" onclick="changePriceCardColor('#D97706')" title="Amber Orange"></button>
+                                <button type="button" class="inflow-color-swatch-btn {% if (price_card.card_color if price_card else product.price_card_color) == '#7C3AED' %}active{% endif %}" data-color="#7C3AED" style="background-color: #7C3AED;" onclick="changePriceCardColor('#7C3AED')" title="Purple"></button>
+                                <label class="inflow-color-custom-btn" title="Pick custom color">
+                                    <input type="color" id="priceCardColorInput" value="{{ price_card.card_color if price_card else (product.price_card_color or '#00A3E0') }}" onchange="changePriceCardColor(this.value)">
+                                    <span>+</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Font Family Dropdown -->
+                        <div class="inflow-style-control-group" title="Change typography font of the price card">
+                            <span class="inflow-style-control-lbl">🔤 Font:</span>
+                            <select id="priceCardFontSelect" class="inflow-style-select" onchange="changePriceCardFont(this.value)">
+                                <option value="Kantumruy Pro" {% if (price_card.card_font if price_card else product.price_card_font) == 'Kantumruy Pro' or not (price_card.card_font if price_card else product.price_card_font) %}selected{% endif %}>Kantumruy Pro (Modern)</option>
+                                <option value="Battambang" {% if (price_card.card_font if price_card else product.price_card_font) == 'Battambang' %}selected{% endif %}>Battambang (Classic)</option>
+                                <option value="Siemreap" {% if (price_card.card_font if price_card else product.price_card_font) == 'Siemreap' %}selected{% endif %}>Siemreap (Clean)</option>
+                                <option value="Koulen" {% if (price_card.card_font if price_card else product.price_card_font) == 'Koulen' %}selected{% endif %}>Koulen (Bold Display)</option>
+                                <option value="Preahvihear" {% if (price_card.card_font if price_card else product.price_card_font) == 'Preahvihear' %}selected{% endif %}>Preahvihear (Formal)</option>
+                                <option value="Moul" {% if (price_card.card_font if price_card else product.price_card_font) == 'Moul' %}selected{% endif %}>Moul (Traditional)</option>
+                                <option value="Plus Jakarta Sans" {% if (price_card.card_font if price_card else product.price_card_font) == 'Plus Jakarta Sans' %}selected{% endif %}>Plus Jakarta Sans (Sans)</option>
+                            </select>
+                        </div>
+
+                        <!-- Khmer Unit Selector in Toolbar -->
+                        <div class="inflow-style-control-group" title="Change Khmer unit word (ប្រអប់, គូរ, បេ, ឈុត, កែវ, សម, etc.) for price table">
+                            <span class="inflow-style-control-lbl font-khmer">📦 ខ្នាត / Unit:</span>
+                            <select id="priceCardUnitSelectToolbar" class="inflow-style-select font-khmer" onchange="changePriceCardUnit(this.value)">
+                                <option value="ប្រអប់">ប្រអប់</option>
+                                <option value="គូរ">គូរ</option>
+                                <option value="បេ">បេ</option>
+                                <option value="ឈុត">ឈុត</option>
+                                <option value="កែវ">កែវ</option>
+                                <option value="សម">សម</option>
+                            </select>
+                            <button type="button" class="inflow-spec-add-unit-mini-btn font-khmer" onclick="promptAddNewPriceCardUnit()" title="បន្ថែមពាក្យខ្នាតថ្មី (Add new unit word)">+ បន្ថែមពាក្យ</button>
+                        </div>
+
+                        <!-- Custom Product Detail Checkbox in Toolbar (Above Table) -->
+                        <div class="inflow-style-control-group" title="Tick to edit custom details manually / ដោះធីកដើម្បីទាញស្វ័យប្រវត្តិតាមផលិតផល">
+                            <label style="display: inline-flex; align-items: center; gap: 6px; cursor: pointer; user-select: none; margin: 0; background: #FFFFFF; border: 1.5px solid #CBD5E1; padding: 4px 10px; border-radius: 6px; font-size: 12.5px; font-weight: 700; color: #1E293B; box-shadow: 0 1px 2px rgba(0,0,0,0.04);">
+                                <input type="checkbox" id="chkCustomDetailToolbar" onchange="toggleCustomPriceCardDetail(this.checked)" {% if price_card and price_card.is_custom_detail %}checked{% endif %} style="cursor: pointer; width: 15px; height: 15px; accent-color: #0284C7; margin: 0;">
+                                <span class="font-khmer">✏️ Custom Writing</span>
+                            </label>
+                        </div>
+
+                        <!-- Price Table Style Switcher (Classic / Modern / Cute Look) -->
+                        {% set active_style = (price_card.price_table_style if price_card else (product.price_table_style or 'classic'))|lower %}
+                        {% set std_uom_name = (price_card.standard_uom if price_card and price_card.standard_uom else (product.uom or 'pcs.')) %}
+                        {% set std_uom_badge = (price_card.standard_uom_display if price_card and price_card.standard_uom_display else (std_uom_name|replace('.', '')|upper)) %}
+                        <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic, Modern, ឬ Cute Look)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
+                            <button type="button" id="btnDetailStyleClassic" class="btn-detail-style {{ 'active-classic' if active_style == 'classic' else '' }}" onclick="setProductPriceCardStyle('classic')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                                Classic
+                            </button>
+                            <button type="button" id="btnDetailStyleModern" class="btn-detail-style {{ 'active-modern' if active_style == 'modern' else '' }}" onclick="setProductPriceCardStyle('modern')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                                ✨ Modern
+                            </button>
+                            <button type="button" id="btnDetailStyleCute" class="btn-detail-style {{ 'active-cute' if active_style == 'cute' else '' }}" onclick="setProductPriceCardStyle('cute')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                                🌸 Cute Look
+                            </button>
+                            <button type="button" id="btnDetailStyleGenZ" class="btn-detail-style {{ 'active-gen_z' if active_style in ('gen_z', 'genz') else '' }}" onclick="setProductPriceCardStyle('gen_z')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
+                                ⚡ Gen Z
+                            </button>
+                        </div>
+
+                        {% if can_view_costs %}
+                        <button type="button" class="inflow-btn-showcase-action" id="btnToggleProfit" onclick="toggleInternalProfitDrawer()" title="Click to view internal cost & profit analysis (Screenshot 2)">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                            <span id="toggleProfitBtnLabel" class="font-khmer">👁️ ការវិភាគចំណេញ</span>
+                        </button>
+                        {% endif %}
+                        <button type="button" class="inflow-btn-showcase-action" onclick="copyPriceCardText()" title="Copy formatted price list for Telegram / Messenger">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            <span class="font-khmer">📋 ចម្លង</span>
+                        </button>
+                        <button type="button" class="inflow-btn-showcase-action" onclick="printPriceCard()" title="Print or save as PDF (Customer view only)">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            <span class="font-khmer">🖨️ បោះពុម្ព</span>
+                        </button>
+                        <button type="button" class="inflow-btn-showcase-action" onclick="exportCurrentCardAsJpg()" title="Save this Price Table as High-Quality JPG image">
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                            <span class="font-khmer">📷 រក្សាទុក JPG</span>
+                        </button>
+                        <div class="inflow-export-dropdown">
+                            <button type="button" class="inflow-btn-showcase-action" onclick="toggleExportMenu(event)" title="Export options: Save Category or All Products as JPG ZIP file">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                <span class="font-khmer">📦 នាំចេញ ZIP ▾</span>
+                            </button>
+                            <div id="exportPriceCardMenu" class="inflow-export-menu">
+                                <a href="javascript:void(0)" onclick="exportCategoryZip()" class="inflow-export-item">
+                                    <span style="font-size: 16px;">📦</span>
+                                    <div>
+                                        <div style="font-weight: 600;">រក្សាទុកតាមក្រុម (Category ZIP)</div>
+                                        <div style="font-size: 11px; color: #64748B;">ទាញយកគ្រប់ផលិតផលក្នុងក្រុមបច្ចុប្បន្នជា JPG ZIP</div>
+                                    </div>
+                                </a>
+                                <a href="javascript:void(0)" onclick="openBatchExportCategoryModal()" class="inflow-export-item">
+                                    <span style="font-size: 16px;">🗂️</span>
+                                    <div>
+                                        <div style="font-weight: 600;">ជ្រើសរើសក្រុមជាក់លាក់...</div>
+                                        <div style="font-size: 11px; color: #64748B;">ជ្រើសរើសក្រុមណាមួយដើម្បីទាញយក</div>
+                                    </div>
+                                </a>
+                                <div class="inflow-export-divider"></div>
+                                <a href="javascript:void(0)" onclick="exportAllProductsZip()" class="inflow-export-item" style="color: #0284C7;">
+                                    <span style="font-size: 16px;">🌐</span>
+                                    <div>
+                                        <div style="font-weight: 700; color: #0284C7;">រក្សាទុកទាំងអស់ (All Products ZIP)</div>
+                                        <div style="font-size: 11px; color: #64748B;">ទាញយកគ្រប់ផលិតផលទាំងអស់ជា JPG ZIP</div>
+                                    </div>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- The Printable Customer Price Card (Screenshot 1 Authentic Design, Image 2 Modern Design, Image 3 Cute Look) -->
+                <div class="inflow-spec-card {{ active_style }}" id="printablePriceCard" 
+                     style="--price-card-color: {{ price_card.card_color if price_card else (product.price_card_color or '#00A3E0') }}; 
+                            --price-card-light: {{ price_card.card_color_light if price_card and price_card.card_color_light else 'rgba(0, 163, 224, 0.08)' }}; 
+                            --price-card-badge-bg: {{ price_card.card_color_badge_bg if price_card and price_card.card_color_badge_bg else 'rgba(0, 163, 224, 0.12)' }}; 
+                            --price-card-border: {{ price_card.card_color_border if price_card and price_card.card_color_border else 'rgba(0, 163, 224, 0.22)' }}; 
+                            --price-card-dark: {{ price_card.card_color_dark if price_card and price_card.card_color_dark else '#025239' }}; 
+                            --price-card-font: {{ price_card.card_font if price_card else (product.price_card_font or 'Kantumruy Pro') }}, 'Siemreap', sans-serif;">
+                    
+                    <!-- CLASSIC CARD CONTENT (Screenshot 1 Authentic Design) -->
+                    <div id="cardContentClassic" style="display: {{ 'block' if active_style == 'classic' else 'none' }};">
+                        <!-- Top Header Grid -->
+                        <div class="inflow-spec-header-grid">
+                            <div class="inflow-spec-header-cell">
+                                <div class="inflow-spec-hdr-km font-khmer" id="cardKhmerTitle">{{ price_card.khmer_name if price_card else product.name }}</div>
+                                <div class="inflow-spec-hdr-en" id="cardEnglishTitle">{{ price_card.english_name if price_card else (product.sku or '') }}</div>
+                            </div>
+                            <div class="inflow-spec-header-cell">
+                                <div class="inflow-spec-hdr-km font-khmer">ព័ត៌មានលម្អិត</div>
+                                <div class="inflow-spec-hdr-en">(Product Detail)</div>
+                            </div>
+                        </div>
+
+                        <!-- Upper Body: Picture & Product Specs -->
+                        <div class="inflow-spec-upper-grid">
+                            <div class="inflow-spec-image-box">
+                                {% if product.image_url %}
+                                <img id="cardImageEl" src="{{ product.image_url }}" class="inflow-spec-img" alt="{{ product.name }}">
+                                {% else %}
+                                <div id="cardImagePlaceholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                    <span style="font-size: 11px; margin-top: 6px;">No Image</span>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="inflow-spec-info-box">
+                                <!-- Auto Details (generated automatically from product) -->
+                                <div id="specInfoAutoContent" style="display: {% if price_card and price_card.is_custom_detail %}none{% else %}flex{% endif %}; flex-direction: column; gap: 10px; width: 100%; align-items: center;">
+                                    <div class="inflow-spec-info-line">
+                                        ទំហំ: <span id="specDimVal">{{ price_card.dim_str if price_card else '21cm x 21cm x 4cm' }}</span>
+                                    </div>
+                                    <div class="inflow-spec-info-line" id="specPacksValLine">
+                                        1 កេស មាន <span id="specPacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 3)) }}</span> ដុំ
+                                    </div>
+                                    <div class="inflow-spec-info-line" id="specPcsPackValLine">
+                                        1 ដុំ មាន <span id="specPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>
+                                    </div>
+                                    <div class="inflow-spec-info-line">
+                                        <span id="specPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>/1កេស
+                                    </div>
+                                    <div class="inflow-spec-info-sub">
+                                        (<span id="specPcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> PCS/ Carton)
+                                    </div>
+                                </div>
+
+                                <!-- Custom Details (user written text) -->
+                                <div id="specInfoCustomContent" style="display: {% if price_card and price_card.is_custom_detail %}block{% else %}none{% endif %}; width: 100%;">
+                                    <textarea id="specCustomDetailTextarea" class="inflow-spec-custom-textarea font-khmer no-print" data-html2canvas-ignore="true" 
+                                              rows="5" placeholder="សរសេរព័ត៌មានលម្អិតនៅទីនេះ...&#10;ទំហំ: 15cm x 21cm x 4cm&#10;1 កេស មាន 8 ដុំ&#10;1 ដុំ មាន 50 បេ&#10;400 បេ/1កេស&#10;(400 PCS/ Carton)" 
+                                              oninput="onCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else '' }}</textarea>
+                                    <div id="specCustomDetailDisplay" class="inflow-spec-custom-display font-khmer">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else (price_card.auto_detail_text if price_card else '') }}</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Lower Body: Price Table Header -->
+                        <div class="inflow-spec-price-header-grid">
+                            <div class="inflow-spec-price-hdr-cell">
+                                <div class="inflow-spec-hdr-km font-khmer">តម្លៃ</div>
+                                <div class="inflow-spec-hdr-en">(Price)</div>
+                            </div>
+                            <div class="inflow-spec-price-hdr-cell">
+                                <div class="inflow-spec-hdr-km font-khmer">តម្លៃក្នុង1<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span></div>
+                                <div class="inflow-spec-hdr-en">(UNIT PRICE)</div>
+                            </div>
+                        </div>
+
+                        <!-- Pricing Rows (3 Tiers - Editable Quantities & Prices) -->
+                        <div class="inflow-spec-price-row">
+                            <div class="inflow-spec-price-left-cell">
+                                <span class="inflow-spec-qty-label">
+                                    <input type="number" id="cardTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(1)" onchange="onCardTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
+                                </span>
+                                <span class="inflow-spec-total-price">
+                                    <input type="text" id="cardTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(1)" onchange="onCardTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
+                                </span>
+                            </div>
+                            <div class="inflow-spec-price-right-cell">
+                                <span class="inflow-spec-unit-price" id="cardTierUnitDisplay1">
+                                    ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="inflow-spec-price-row">
+                            <div class="inflow-spec-price-left-cell">
+                                <span class="inflow-spec-qty-label">
+                                    <input type="number" id="cardTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(2)" onchange="onCardTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
+                                </span>
+                                <span class="inflow-spec-total-price">
+                                    <input type="text" id="cardTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(2)" onchange="onCardTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
+                                </span>
+                            </div>
+                            <div class="inflow-spec-price-right-cell">
+                                <span class="inflow-spec-unit-price" id="cardTierUnitDisplay2">
+                                    ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                </span>
+                            </div>
+                        </div>
+
+                        <div class="inflow-spec-price-row">
+                            <div class="inflow-spec-price-left-cell">
+                                <span class="inflow-spec-qty-label">
+                                    <input type="number" id="cardTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-spec-inline-input" oninput="onCardTierQtyChange(3)" onchange="onCardTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
+                                </span>
+                                <span class="inflow-spec-total-price">
+                                    <input type="text" id="cardTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-spec-inline-price-input" {% if not can_edit_prices %}readonly style="background: #F1F5F9; color: #64748B; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCardTierTotChange(3)" onchange="onCardTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
+                                </span>
+                            </div>
+                            <div class="inflow-spec-price-right-cell">
+                                <span class="inflow-spec-unit-price" id="cardTierUnitDisplay3">
+                                    ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- MODERN CARD CONTENT (Image 2 Authentic Design) -->
+                    <div id="cardContentModern" style="display: {{ 'block' if active_style == 'modern' else 'none' }};">
+                        <!-- Modern Header with 3D Cube Icon -->
+                        <div class="inflow-modern-header">
+                            <div>
+                                <div class="inflow-modern-sku" id="cardModernSku">{{ product.sku or '' }}</div>
+                                <div class="inflow-modern-km-title font-khmer" id="cardModernKhmerTitle">{{ price_card.khmer_name if price_card else product.name }}</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div style="text-align: right;">
+                                    <div class="inflow-modern-detail-title font-khmer">ព័ត៌មានលម្អិត</div>
+                                    <div class="inflow-modern-detail-sub">(Product Detail)</div>
+                                </div>
+                                <div class="inflow-modern-cube-box">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Modern Middle Grid: Image on left, Specs on right -->
+                        <div class="inflow-modern-middle-grid">
+                            <div class="inflow-modern-image-box">
+                                {% if product.image_url %}
+                                <img id="cardModernImageEl" src="{{ product.image_url }}" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 12px;" alt="{{ product.name }}">
+                                {% else %}
+                                <div id="cardModernImagePlaceholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                    <span style="font-size: 11px; margin-top: 6px;">No Image</span>
+                                </div>
+                                {% endif %}
+                                {% if product.capacity %}
+                                <div class="inflow-modern-capacity-pill font-khmer">
+                                    <span id="cardModernCapVal">{{ product.capacity }}</span>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            <div class="inflow-modern-specs-box">
+                                <div id="specModernSpecsDisplay" style="display: flex; flex-direction: column; gap: 9px;">
+                                    {% if price_card and price_card.modern_specs_rows %}
+                                        {% for row in price_card.modern_specs_rows %}
+                                        <div class="inflow-modern-spec-row">
+                                            <div class="inflow-modern-spec-icon">
+                                                {% if row.icon == 'size' %}
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                                                {% elif row.icon == 'carton' %}
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                                {% elif row.icon == 'layers' %}
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                                                {% else %}
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                                {% endif %}
+                                            </div>
+                                            <div class="inflow-modern-spec-text font-khmer">
+                                                <div>{{ row.main }}</div>
+                                                {% if row.sub %}<div style="font-size: 11.5px; color: #64748B; font-weight: 600; margin-top: 1px;">{{ row.sub }}</div>{% endif %}
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="inflow-modern-spec-row">
+                                            <div class="inflow-modern-spec-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+                                            </div>
+                                            <div class="inflow-modern-spec-text font-khmer">
+                                                ទំហំ: <span id="specModernDimVal">{{ price_card.dim_str if price_card else '21cm x 21cm x 4cm' }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="inflow-modern-spec-row" id="specModernPacksRow">
+                                            <div class="inflow-modern-spec-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                            </div>
+                                            <div class="inflow-modern-spec-text font-khmer">
+                                                1 កេស មាន <span id="specModernPacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 3)) }}</span> ដុំ
+                                            </div>
+                                        </div>
+                                        <div class="inflow-modern-spec-row" id="specModernPcsPackRow">
+                                            <div class="inflow-modern-spec-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+                                            </div>
+                                            <div class="inflow-modern-spec-text font-khmer">
+                                                1 ដុំ មាន <span id="specModernPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="inflow-modern-spec-row">
+                                            <div class="inflow-modern-spec-icon">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"></line><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                                            </div>
+                                            <div class="inflow-modern-spec-text font-khmer">
+                                                <span id="specModernPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span>/1កេស (<span id="specModernPcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 300) }}</span> PCS/ Carton)
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div id="specModernCustomEditorBox" class="no-print" data-html2canvas-ignore="true" style="display: {% if price_card and price_card.is_custom_detail %}block{% else %}none{% endif %}; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #CBD5E1;">
+                                    <textarea id="specModernCustomTextarea" class="font-khmer" rows="4" 
+                                              style="width: 100%; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.5; color: #0F172A; resize: vertical; box-sizing: border-box; outline: none; background: #FFFFFF;"
+                                              placeholder="កែប្រែព័ត៌មានលម្អិត...&#10;ប្រវែង៖ (20cm)&#10;1 កេស មាន 1000 គូរ"
+                                              oninput="onModernCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Modern Lower Body: Deep Teal Banner & Pricing Rows -->
+                        <div class="inflow-modern-price-wrap">
+                            <div class="inflow-modern-price-banner">
+                                <div style="font-weight: 800; font-size: 13.5px;" class="font-khmer">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: -2px; margin-right: 6px;"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                    តម្លៃ (Price)
+                                </div>
+                                <div style="font-weight: 800; font-size: 13.5px; text-align: right;" class="font-khmer">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display: inline-block; vertical-align: -2px; margin-right: 6px;"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+                                    តម្លៃក្នុង1<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (UNIT PRICE)
+                                </div>
+                            </div>
+                            <div class="inflow-modern-price-table-card">
+                                <div class="inflow-modern-tier-row">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="inflow-modern-qty-badge font-khmer">
+                                            <input type="number" id="cardModernTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(1)" onchange="onModernTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                        </span>
+                                        <span style="font-weight: 800; color: #64748B;">=</span>
+                                        <span class="inflow-modern-tier-tot">
+                                            <input type="text" id="cardModernTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 15.0) }}" class="inflow-modern-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: var(--price-card-color, #059669); cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onModernTierTotChange(1)" onchange="onModernTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
+                                        </span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span class="inflow-modern-tier-unit" id="cardModernTierUnitDisplay1">
+                                            ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.150) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="inflow-modern-tier-row">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="inflow-modern-qty-badge font-khmer">
+                                            <input type="number" id="cardModernTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(2)" onchange="onModernTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                        </span>
+                                        <span style="font-weight: 800; color: #64748B;">=</span>
+                                        <span class="inflow-modern-tier-tot">
+                                            <input type="text" id="cardModernTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 56.0) }}" class="inflow-modern-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: var(--price-card-color, #059669); cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onModernTierTotChange(2)" onchange="onModernTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
+                                        </span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span class="inflow-modern-tier-unit" id="cardModernTierUnitDisplay2">
+                                            ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.140) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div class="inflow-modern-tier-row">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <span class="inflow-modern-qty-badge font-khmer">
+                                            <input type="number" id="cardModernTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-modern-inline-input" oninput="onModernTierQtyChange(3)" onchange="onModernTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                        </span>
+                                        <span style="font-weight: 800; color: #64748B;">=</span>
+                                        <span class="inflow-modern-tier-tot">
+                                            <input type="text" id="cardModernTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 108.0) }}" class="inflow-modern-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: var(--price-card-color, #059669); cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onModernTierTotChange(3)" onchange="onModernTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
+                                        </span>
+                                    </div>
+                                    <div style="text-align: right;">
+                                        <span class="inflow-modern-tier-unit" id="cardModernTierUnitDisplay3">
+                                            ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.135) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CUTE LOOK CARD CONTENT (Image 3 Authentic Soft Pastel & Capsule Match) -->
+                    <div id="cardContentCute" style="display: {{ 'block' if active_style == 'cute' else 'none' }};">
+                        <!-- Top Sage Green Header with Cute Sunburst Doodles -->
+                        <div class="inflow-cute-header">
+                            <div>
+                                <div class="inflow-cute-title font-khmer">
+                                    <span id="cardCuteSku">{{ product.sku or '' }}</span>
+                                    <span id="cardCuteKhmerTitle">{{ price_card.khmer_name if price_card else product.name }}</span>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DE7851" stroke-width="2.5" stroke-linecap="round" style="display: inline-block; vertical-align: middle; margin-left: 3px;">
+                                        <line x1="12" y1="2" x2="12" y2="7"></line>
+                                        <line x1="4.93" y1="4.93" x2="8.46" y2="8.46"></line>
+                                        <line x1="19.07" y1="4.93" x2="15.54" y2="8.46"></line>
+                                    </svg>
+                                </div>
+                                <div class="inflow-cute-sub-wrap">
+                                    <span class="inflow-cute-sub-qty font-khmer"><span id="specCutePcsCaseHdrVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</span><span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></span>
+                                    <span class="inflow-cute-pill-badge font-khmer">កេស</span>
+                                </div>
+                                <div class="inflow-cute-sub-desc font-khmer">កេស</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div class="inflow-cute-detail-title font-khmer">ព័ត៌មានលម្អិត</div>
+                                <div class="inflow-cute-detail-sub">(Product Detail)</div>
+                            </div>
+                        </div>
+
+                        <!-- Middle Grid: Product Photo with Doodles on Left, Specs on Right -->
+                        <div class="inflow-cute-middle-grid">
+                            <div class="inflow-cute-image-wrap">
+                                <span class="inflow-cute-doodle-star" title="✦">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="#DE7851"><path d="M12 0L14.5 9.5L24 12L14.5 14.5L12 24L9.5 14.5L0 12L9.5 9.5L12 0Z"/></svg>
+                                </span>
+                                <span class="inflow-cute-doodle-rays-tr">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2D3748" stroke-width="2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="7"></line><line x1="4.93" y1="4.93" x2="8.46" y2="8.46"></line><line x1="19.07" y1="4.93" x2="15.54" y2="8.46"></line></svg>
+                                </span>
+                                <span class="inflow-cute-doodle-rays-bl">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#2D3748" stroke-width="2" stroke-linecap="round"><line x1="4" y1="12" x2="9" y2="12"></line><line x1="5.5" y1="18.5" x2="9.5" y2="15"></line><line x1="10" y1="22" x2="12" y2="17"></line></svg>
+                                </span>
+                                <span class="inflow-cute-doodle-rays-br">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#DE7851" stroke-width="2" stroke-linecap="round"><line x1="20" y1="12" x2="15" y2="12"></line><line x1="18.5" y1="18.5" x2="14.5" y2="15"></line><line x1="14" y1="22" x2="12" y2="17"></line></svg>
+                                </span>
+
+                                <div class="inflow-cute-image-frame">
+                                    {% if product.image_url %}
+                                    <img id="cardCuteImageEl" src="{{ product.image_url }}" alt="{{ product.name }}">
+                                    {% else %}
+                                    <div id="cardCuteImagePlaceholder" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                        <span style="font-size: 11px; margin-top: 6px;">No Image</span>
+                                    </div>
+                                    {% endif %}
+                                    {% if product.capacity %}
+                                    <div class="inflow-cute-capacity-overlay font-khmer" id="cardCuteCapVal">{{ product.capacity }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="inflow-cute-specs-box">
+                                <div id="specCuteSpecsDisplay" style="display: flex; flex-direction: column; gap: 10px;">
+                                    {% if price_card and price_card.modern_specs_rows %}
+                                        {% for row in price_card.modern_specs_rows %}
+                                        <div class="inflow-cute-spec-line font-khmer">
+                                            {% if row.icon == 'size' %}
+                                            <span class="inflow-cute-star-icon">★</span>
+                                            {% elif row.icon == 'carton' %}
+                                            <span class="inflow-cute-dot-coral">●</span>
+                                            {% elif row.icon == 'layers' %}
+                                            <span class="inflow-cute-dot-mint">●</span>
+                                            {% else %}
+                                            <span class="inflow-cute-dot-navy">●</span>
+                                            {% endif %}
+                                            <div>{{ row.main }}{% if row.sub %} <span class="inflow-cute-spec-sub">{{ row.sub }}</span>{% endif %}</div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="inflow-cute-spec-line font-khmer">
+                                            <span class="inflow-cute-star-icon">★</span>
+                                            <span>ទំហំ: <strong id="specCuteDimVal">{{ price_card.dim_str if price_card else '14cm x 13cm x 8.5cm' }}</strong></span>
+                                        </div>
+                                        <div class="inflow-cute-spec-line font-khmer" id="specCutePacksRow">
+                                            <span class="inflow-cute-dot-coral">●</span>
+                                            <span>1 កេស មាន <strong id="specCutePacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 8)) }}</strong> ដុំ</span>
+                                        </div>
+                                        <div class="inflow-cute-spec-line font-khmer" id="specCutePcsPackRow">
+                                            <span class="inflow-cute-dot-mint">●</span>
+                                            <span>1 ដុំ មាន <strong id="specCutePcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</strong> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></span>
+                                        </div>
+                                        <div class="inflow-cute-spec-line font-khmer">
+                                            <span class="inflow-cute-dot-navy">●</span>
+                                            <span><strong id="specCutePcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</strong> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span>/1កេស <span class="inflow-cute-spec-sub font-khmer">(<span id="specCutePcsCaseEnVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</span> PCS/ Carton)</span></span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                                <div id="specCuteCustomEditorBox" class="no-print" data-html2canvas-ignore="true" style="display: {% if price_card and price_card.is_custom_detail %}block{% else %}none{% endif %}; margin-top: 10px; padding-top: 8px; border-top: 1px dashed #CBD5E1;">
+                                    <textarea id="specCuteCustomTextarea" class="font-khmer" rows="4" 
+                                              style="width: 100%; border: 1.5px solid #CBD5E1; border-radius: 8px; padding: 6px 8px; font-size: 12px; line-height: 1.5; color: #0F172A; resize: vertical; box-sizing: border-box; outline: none; background: #FFFFFF;"
+                                              placeholder="កែប្រែព័ត៌មានលម្អិត...&#10;ទំហំ: 14cm x 13cm x 8.5cm&#10;1 កេស មាន 8 ដុំ"
+                                              oninput="onCuteCustomDetailInput(this.value)">{{ price_card.custom_detail if (price_card and price_card.is_custom_detail and price_card.custom_detail) else '' }}</textarea>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Peach Price Table with Dual White Capsule Pills -->
+                        <div class="inflow-cute-price-wrap">
+                            <div class="inflow-cute-table-header">
+                                <div>
+                                    <div class="inflow-cute-th-km font-khmer">តម្លៃ</div>
+                                    <div class="inflow-cute-th-en">(Price)</div>
+                                </div>
+                                <div>
+                                    <div class="inflow-cute-th-km font-khmer">តម្លៃក្នុង១<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></div>
+                                    <div class="inflow-cute-th-en">(UNIT PRICE)</div>
+                                </div>
+                            </div>
+
+                            <!-- Row 1: Coral Total Price -->
+                            <div class="inflow-cute-tier-row">
+                                <div class="inflow-cute-left-pill">
+                                    <span class="inflow-cute-tier-qty font-khmer">
+                                        <input type="number" id="cardCuteTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(1)" onchange="onCuteTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
+                                    </span>
+                                    <span class="inflow-cute-tier-tot-coral font-khmer">
+                                        <input type="text" id="cardCuteTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 7.50) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(1)" onchange="onCuteTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}> $
+                                    </span>
+                                </div>
+                                <div class="inflow-cute-right-pill">
+                                    <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay1">
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Row 2: Green Total Price -->
+                            <div class="inflow-cute-tier-row">
+                                <div class="inflow-cute-left-pill">
+                                    <span class="inflow-cute-tier-qty font-khmer">
+                                        <input type="number" id="cardCuteTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(2)" onchange="onCuteTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
+                                    </span>
+                                    <span class="inflow-cute-tier-tot-coral font-khmer">
+                                        <input type="text" id="cardCuteTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 28.00) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(2)" onchange="onCuteTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}> $
+                                    </span>
+                                </div>
+                                <div class="inflow-cute-right-pill">
+                                    <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay2">
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Row 3: Green Total Price -->
+                            <div class="inflow-cute-tier-row">
+                                <div class="inflow-cute-left-pill">
+                                    <span class="inflow-cute-tier-qty font-khmer">
+                                        <input type="number" id="cardCuteTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-cute-inline-input" oninput="onCuteTierQtyChange(3)" onchange="onCuteTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>) =
+                                    </span>
+                                    <span class="inflow-cute-tier-tot-coral font-khmer">
+                                        <input type="text" id="cardCuteTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 52.00) }}" class="inflow-cute-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #DE7851; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onCuteTierTotChange(3)" onchange="onCuteTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}> $
+                                    </span>
+                                </div>
+                                <div class="inflow-cute-right-pill">
+                                    <span class="inflow-cute-tier-unit" id="cardCuteTierUnitDisplay3">
+                                        (<span class="inflow-cute-uprice-val">{{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }}</span> $/ <span class="inflow-cute-pcs-badge card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    <!-- GEN Z CARD CONTENT (Trendy Playful Gen Z Look) -->
+                    <div id="cardContentGenZ" style="display: {{ 'block' if active_style in ('gen_z', 'genz') else 'none' }};">
+                        <!-- Top Header with Crown Doodle, Tilted Title, Subtitle Mint Badge, and Mood Doodle -->
+                        <div class="inflow-genz-header">
+                            <div class="inflow-genz-title-wrap">
+                                <span class="inflow-genz-crown">
+                                    <svg width="28" height="22" viewBox="0 0 32 26" fill="none" stroke="#111827" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 21h26l-3-15-7 8-5-11-5 11-7-8-3 15z" fill="#FFF9D2"/>
+                                        <circle cx="3" cy="6" r="1.5" fill="#111827"/>
+                                        <circle cx="16" cy="3" r="1.5" fill="#111827"/>
+                                        <circle cx="29" cy="6" r="1.5" fill="#111827"/>
+                                    </svg>
+                                </span>
+                                <div class="inflow-genz-title">
+                                    <span id="cardGenZTitle">{{ product.sku or (price_card.khmer_name if price_card else product.name) }}</span>
+                                </div>
+                                <div class="inflow-genz-subtitle-pill font-khmer">
+                                    <span id="cardGenZSubTitle">{{ price_card.khmer_name if price_card else product.name }}</span>
+                                    <span><span id="cardGenZPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</span>pcs/កេស</span>
+                                </div>
+                            </div>
+                            <div class="inflow-genz-mood-doodle">
+                                <span>Good</span>
+                                <span>Food</span>
+                                <span>Good</span>
+                                <span>Mood</span>
+                                <span class="inflow-genz-smiley">:)</span>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" style="position: absolute; right: -8px; top: -4px;">
+                                    <line x1="4" y1="12" x2="1" y2="10"></line>
+                                    <line x1="6" y1="6" x2="3" y2="3"></line>
+                                    <line x1="12" y1="4" x2="11" y2="1"></line>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Middle Grid: Photo Frame on Left, Floating Specs Card on Right -->
+                        <div class="inflow-genz-middle-grid">
+                            <div class="inflow-genz-photo-frame">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#94C9A9" stroke-width="2.5" stroke-linecap="round" style="position: absolute; top: 10px; right: 12px; transform: rotate(15deg);">
+                                    <line x1="8" y1="4" x2="12" y2="20"></line>
+                                    <line x1="14" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94C9A9" stroke-width="2.5" stroke-linecap="round" style="position: absolute; bottom: 12px; left: 10px; transform: rotate(-30deg);">
+                                    <path d="M4 12c4-4 8 4 12-2"></path>
+                                </svg>
+                                {% if product.image_url %}
+                                <img src="{{ product.image_url }}" alt="{{ product.name }}" id="cardGenZImage">
+                                {% else %}
+                                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                    <span style="font-size: 11px; margin-top: 6px;">No Image</span>
+                                </div>
+                                {% endif %}
+                                {% if product.capacity %}
+                                <div class="inflow-genz-capacity-pill font-khmer">{{ product.capacity }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="inflow-genz-specs-card">
+                                <div>
+                                    <div class="inflow-genz-specs-hdr">
+                                        <div>
+                                            <div class="inflow-genz-specs-km-title font-khmer">លក្ខណៈផលិតផល</div>
+                                            <div class="inflow-genz-specs-en-title">Product Detail</div>
+                                        </div>
+                                        <div class="inflow-genz-badge-wrap">
+                                            <span class="inflow-genz-specs-badge">Product Detail</span>
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2" stroke-linecap="round" style="position: absolute; top: -8px; right: -4px;">
+                                                <line x1="4" y1="12" x2="1" y2="8"></line>
+                                                <line x1="8" y1="4" x2="6" y2="1"></line>
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <div class="inflow-genz-specs-divider"></div>
+                                    <div class="inflow-genz-specs-list" id="specGenZSpecsDisplay">
+                                        <!-- Row 1: Dimension (Expand Icon) -->
+                                        <div class="inflow-genz-spec-row">
+                                            <div class="inflow-genz-icon-circle">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                                    <polyline points="15 3 21 3 21 9"></polyline>
+                                                    <polyline points="9 21 3 21 3 15"></polyline>
+                                                    <line x1="21" y1="3" x2="14" y2="10"></line>
+                                                    <line x1="3" y1="21" x2="10" y2="14"></line>
+                                                </svg>
+                                            </div>
+                                            <div class="inflow-genz-spec-text">
+                                                <div class="inflow-genz-spec-main font-khmer">ទំហំ: <strong id="specGenZDimVal">{{ price_card.dim_str if price_card else '14cm x 13cm x 8.5cm' }}</strong></div>
+                                                <div class="inflow-genz-spec-sub">Size: {{ price_card.dim_str if price_card else '14cm x 13cm x 8.5cm' }}</div>
+                                            </div>
+                                        </div>
+                                        <!-- Row 2: Packs per case (3D Box Icon) -->
+                                        <div class="inflow-genz-spec-row">
+                                            <div class="inflow-genz-icon-circle">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                                </svg>
+                                            </div>
+                                            <div class="inflow-genz-spec-text">
+                                                <div class="inflow-genz-spec-main font-khmer">1 កេស មាន <strong id="specGenZPacksVal">{{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 8)) }}</strong> ដុំ</div>
+                                                <div class="inflow-genz-spec-sub">1 Box = {{ '{:g}'.format(price_card.packs_per_case if price_card else (product.packs_per_case or 8)) }} pcs</div>
+                                            </div>
+                                        </div>
+                                        <!-- Row 3: Pcs per pack (3D Box Icon) -->
+                                        <div class="inflow-genz-spec-row">
+                                            <div class="inflow-genz-icon-circle">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                                </svg>
+                                            </div>
+                                            <div class="inflow-genz-spec-text">
+                                                <div class="inflow-genz-spec-main font-khmer">1 ដុំ មាន <strong id="specGenZPcsPackVal">{{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }}</strong> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></div>
+                                                <div class="inflow-genz-spec-sub">1 pc = {{ '{:g}'.format(price_card.pcs_per_pack if price_card else (product.pcs_per_pack or 50)) }} pcs</div>
+                                            </div>
+                                        </div>
+                                        <!-- Row 4: Pcs per case (3D Box Icon) -->
+                                        <div class="inflow-genz-spec-row">
+                                            <div class="inflow-genz-icon-circle">
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                                                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                                                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                                                </svg>
+                                            </div>
+                                            <div class="inflow-genz-spec-text">
+                                                <div class="inflow-genz-spec-main font-khmer"><strong id="specGenZPcsCaseVal">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }}</strong> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span>/កេស</div>
+                                                <div class="inflow-genz-spec-sub">{{ '{:g}'.format(price_card.pcs_per_case if price_card else 400) }} PCS/Carton</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Dual Slate Price Table -->
+                        <div class="inflow-genz-price-wrap">
+                            <div class="inflow-genz-table-header">
+                                <div class="inflow-genz-th-left">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                                    <div>
+                                        <div class="inflow-genz-th-km font-khmer">តម្លៃ</div>
+                                        <div class="inflow-genz-th-en">Price</div>
+                                    </div>
+                                </div>
+                                <div class="inflow-genz-th-right">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                                    <div>
+                                        <div class="inflow-genz-th-km font-khmer">តម្លៃក្នុងមួយ<span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span></div>
+                                        <div class="inflow-genz-th-en">Unit Price</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Row 1 -->
+                            <div class="inflow-genz-tier-row">
+                                <div class="inflow-genz-left-cell">
+                                    <span class="inflow-genz-tier-qty font-khmer">
+                                        <input type="number" id="cardGenZTierQtyInput1" value="{{ price_card.tier_qty_1 if price_card else 100 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(1)" onchange="onGenZTierQtyChange(1)" title="Click to edit tier 1 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                    <span class="inflow-genz-price-pill font-khmer">
+                                        $<input type="text" id="cardGenZTierTotInput1" value="{{ '{:.2f}'.format(price_card.tot_price_1 if price_card else 7.50) }}" class="inflow-genz-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #166534; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onGenZTierTotChange(1)" onchange="onGenZTierTotChange(1)" title="Click to edit tier 1 total price"{% endif %}>
+                                    </span>
+                                </div>
+                                <div class="inflow-genz-right-cell">
+                                    <span class="inflow-genz-tier-unit" id="cardGenZTierUnitDisplay1">
+                                        ({{ '{:.3f}'.format(price_card.u_price_1 if price_card else 0.075) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Row 2 -->
+                            <div class="inflow-genz-tier-row">
+                                <div class="inflow-genz-left-cell">
+                                    <span class="inflow-genz-tier-qty font-khmer">
+                                        <input type="number" id="cardGenZTierQtyInput2" value="{{ price_card.tier_qty_2 if price_card else 400 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(2)" onchange="onGenZTierQtyChange(2)" title="Click to edit tier 2 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                    <span class="inflow-genz-price-pill font-khmer">
+                                        $<input type="text" id="cardGenZTierTotInput2" value="{{ '{:.2f}'.format(price_card.tot_price_2 if price_card else 28.00) }}" class="inflow-genz-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #166534; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onGenZTierTotChange(2)" onchange="onGenZTierTotChange(2)" title="Click to edit tier 2 total price"{% endif %}>
+                                    </span>
+                                </div>
+                                <div class="inflow-genz-right-cell">
+                                    <span class="inflow-genz-tier-unit" id="cardGenZTierUnitDisplay2">
+                                        ({{ '{:.3f}'.format(price_card.u_price_2 if price_card else 0.070) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Row 3 -->
+                            <div class="inflow-genz-tier-row">
+                                <div class="inflow-genz-left-cell">
+                                    <span class="inflow-genz-tier-qty font-khmer">
+                                        <input type="number" id="cardGenZTierQtyInput3" value="{{ price_card.tier_qty_3 if price_card else 800 }}" class="inflow-genz-inline-input" oninput="onGenZTierQtyChange(3)" onchange="onGenZTierQtyChange(3)" title="Click to edit tier 3 quantity"> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ចាន') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                    <span class="inflow-genz-price-pill font-khmer">
+                                        $<input type="text" id="cardGenZTierTotInput3" value="{{ '{:.2f}'.format(price_card.tot_price_3 if price_card else 52.00) }}" class="inflow-genz-inline-price-input" {% if not can_edit_prices %}readonly style="background: transparent; color: #166534; cursor: not-allowed;" title="Price editing restricted by administrator"{% else %}oninput="onGenZTierTotChange(3)" onchange="onGenZTierTotChange(3)" title="Click to edit tier 3 total price"{% endif %}>
+                                    </span>
+                                </div>
+                                <div class="inflow-genz-right-cell">
+                                    <span class="inflow-genz-tier-unit" id="cardGenZTierUnitDisplay3">
+                                        ({{ '{:.3f}'.format(price_card.u_price_3 if price_card else 0.065) }} $/<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Bottom Right "Best Choice!" Sticker Stamp with Rays -->
+                        <div class="inflow-genz-best-choice">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#111827" stroke-width="2.2" stroke-linecap="round">
+                                <line x1="3" y1="12" x2="8" y2="12"></line>
+                                <line x1="4" y1="7" x2="9" y2="9"></line>
+                                <line x1="4" y1="17" x2="9" y2="15"></line>
+                            </svg>
+                            <span>Best Choice!</span>
+                        </div>
+                    </div>
+                </div>
+
+                {% if can_view_costs %}
+                <!-- Internal Cost & Profit Analysis Drawer (Screenshot 2 Authentic Replication) -->
+                <div class="inflow-internal-profit-section" id="internalProfitDrawer" style="display: none;">
+                    <div class="inflow-internal-profit-banner">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span>🔐</span>
+                            <span class="font-khmer">ការវិភាគថ្លៃដើម និងប្រាក់ចំណេញ (ទិន្នន័យផ្ទៃក្នុង មិនបង្ហាញជូនអតិថិជន)</span>
+                        </div>
+                        <span style="background: #334155; padding: 2px 8px; border-radius: 3px; font-size: 11px;">ADMIN CONFIDENTIAL</span>
+                    </div>
+                    <table class="inflow-internal-profit-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align: left; width: 22%;">កម្រិតបរិមាណ<span class="en-sub">Tier Qty</span></th>
+                                <th style="width: 26%;">តម្លៃដើម<span class="en-sub">Costing</span></th>
+                                <th style="width: 26%;">ចំណេញ<span class="en-sub">Profit $</span></th>
+                                <th style="width: 26%;">ចំណេញ<span class="en-sub">Profit %</span></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="text-align: left; font-weight: 700; color: #0284C7;">
+                                    <span id="profitTierQty1">{{ price_card.tier_qty_1 if price_card else 100 }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                </td>
+                                <td style="text-align: right;" id="profitCost1">
+                                    {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #16A34A;" id="profitDlr1">
+                                    {{ '{:.0f}'.format(price_card.profit_dlr_1 if price_card else 3) if price_card and price_card.profit_dlr_1 == price_card.profit_dlr_1|int else '{:.2f}'.format(price_card.profit_dlr_1 if price_card else 3.0) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #2563EB;" id="profitPct1">
+                                    {{ price_card.profit_pct_1 if price_card else 25 }}%
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: left; font-weight: 700; color: #0284C7;">
+                                    <span id="profitTierQty2">{{ price_card.tier_qty_2 if price_card else 400 }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                </td>
+                                <td style="text-align: right;" id="profitCost2">
+                                    {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #16A34A;" id="profitDlr2">
+                                    {{ '{:.0f}'.format(price_card.profit_dlr_2 if price_card else 8) if price_card and price_card.profit_dlr_2 == price_card.profit_dlr_2|int else '{:.2f}'.format(price_card.profit_dlr_2 if price_card else 8.0) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #2563EB;" id="profitPct2">
+                                    {{ price_card.profit_pct_2 if price_card else 17 }}%
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="text-align: left; font-weight: 700; color: #0284C7;">
+                                    <span id="profitTierQty3">{{ price_card.tier_qty_3 if price_card else 800 }}</span> <span class="card-unit-label">{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}</span> (<span class="card-std-uom-label">{{ std_uom_badge }}</span>)
+                                </td>
+                                <td style="text-align: right;" id="profitCost3">
+                                    {{ '{:.2f}'.format(price_card.unit_cost if price_card else 0.12) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #16A34A;" id="profitDlr3">
+                                    {{ '{:.0f}'.format(price_card.profit_dlr_3 if price_card else 12) if price_card and price_card.profit_dlr_3 == price_card.profit_dlr_3|int else '{:.2f}'.format(price_card.profit_dlr_3 if price_card else 12.0) }}
+                                </td>
+                                <td style="text-align: right; font-weight: 700; color: #2563EB;" id="profitPct3">
+                                    {{ price_card.profit_pct_3 if price_card else 13 }}%
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Bottom Remarks Section -->
+            <div class="inflow-cat-remarks-section">
+                <div class="inflow-cat-remarks-title">Remarks</div>
+                <div id="remarksDisplayArea">
+                    {% if product.remarks %}
+                    <div class="inflow-cat-remarks-text" onclick="editRemarks()">{{ product.remarks }}</div>
+                    {% else %}
+                    <a href="javascript:void(0)" onclick="editRemarks()" class="inflow-cat-add-remarks-link">+ Add remarks</a>
+                    {% endif %}
+                </div>
+                <div id="remarksEditArea" style="display: none; margin-top: 6px;">
+                    <textarea id="remarksInput" class="inflow-cat-remarks-textarea" placeholder="Enter remarks..." oninput="markFieldDirty('remarks', this.value)">{{ product.remarks or '' }}</textarea>
+                    <div style="margin-top: 6px; display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-primary btn-sm" onclick="saveRemarks()">Save Remarks</button>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="cancelRemarks()">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>

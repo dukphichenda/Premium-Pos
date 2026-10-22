@@ -523,6 +523,8 @@ def init_db():
                 cur.execute("ALTER TABLE companies ADD COLUMN IF NOT EXISTS gemini_api_key TEXT;")
                 cur.execute("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS custom_fields_json TEXT;")
                 cur.execute("ALTER TABLE stock_adjustments ADD COLUMN IF NOT EXISTS created_by VARCHAR(100);")
+                cur.execute("ALTER TABLE expenses ADD COLUMN IF NOT EXISTS recorded_by VARCHAR(100);")
+                cur.execute("UPDATE expenses SET recorded_by = COALESCE(NULLIF(TRIM(paid_by), ''), 'admin') WHERE recorded_by IS NULL OR recorded_by = '';")
                 cur.execute("ALTER TABLE stock_adjustment_lines ADD COLUMN IF NOT EXISTS sublocation VARCHAR(100) DEFAULT '';")
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_1 DROP DEFAULT;")
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_2 DROP DEFAULT;")

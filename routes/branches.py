@@ -981,10 +981,12 @@ def branch_pos(id):
 
     from database import preview_order_number
     pos_preview_number = preview_order_number('POS', branch_id=id) or f"SO-{(branch.get('code') or 'STM').strip().upper()}-P-00001"
+    cashier_name = session.get('username') or session.get('display_name') or branch.get('manager_name') or 'Cashier'
 
     return render_template('branches/pos.html',
                            branch=branch,
                            branch_settings=branch_settings,
+                           cashier_name=cashier_name,
                            pos_preview_number=pos_preview_number,
                            perms=perms,
                            warehouses=warehouses,
@@ -1104,21 +1106,24 @@ def branch_checkout(id):
             balance_due = max(0.0, total_amount - paid_amount)
             pay_status = 'PAID' if balance_due <= 0 else ('PARTIAL' if paid_amount > 0 else 'UNPAID')
 
+            cashier_login_name = session.get('username') or session.get('display_name') or branch.get('manager_name') or 'Cashier'
             note_suffix = " (Stock Override / Out of Stock Accepted)" if insufficient_items else ""
             cur.execute("""
                 INSERT INTO sales_orders (
                     order_number, customer_id, branch_id, location_id, order_date,
                     status, payment_status, subtotal, discount_amount,
-                    total_amount, paid_amount, balance_due, notes
+                    total_amount, paid_amount, balance_due, notes, completed_by, sales_rep
                 ) VALUES (
                     %s, %s, %s, %s, CURRENT_DATE,
                     'INVOICED', %s, %s, %s,
-                    %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s
                 ) RETURNING id;
             """, (
                 order_number, customer_id, id, target_loc_id,
                 pay_status, subtotal, discount_amount,
-                total_amount, paid_amount, balance_due, f"POS Sale via {payment_method} from {branch['name']} ({target_loc_name}){note_suffix}"
+                total_amount, paid_amount, balance_due,
+                f"POS Sale via {payment_method} from {branch['name']} ({target_loc_name}){note_suffix}",
+                cashier_login_name, cashier_login_name
             ))
             so_id = cur.fetchone()['id']
 
@@ -1200,6 +1205,7 @@ def branch_checkout(id):
             'message': f"Sale completed successfully! Stock deducted from {target_loc_name}.",
             'sales_order_id': so_id,
             'order_number': order_number,
+            'cashier_name': cashier_login_name,
             'payment_status': pay_status,
             'payment_method': payment_method,
             'subtotal': subtotal,

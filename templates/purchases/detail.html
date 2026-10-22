@@ -1109,6 +1109,102 @@ html.is-desktop-view .po-mobile-drawer-backdrop {
     color: #64748B;
     font-family: var(--font-mono);
 }
+/* Selector column & row controls matching SO Page */
+.po-table th.inflow-grid-selector-col,
+.po-table td.inflow-grid-selector-col {
+    width: 60px !important;
+    min-width: 60px !important;
+    max-width: 65px !important;
+    text-align: center;
+    vertical-align: middle;
+    padding: 0 4px !important;
+    box-sizing: border-box;
+}
+.po-table th.inflow-grid-selector-col {
+    background: #F8FAFC;
+    border-right: 1px solid #CBD5E1;
+}
+.po-table td.inflow-grid-selector-col {
+    background: #F8FAFC;
+    border-right: 1px solid #E2E8F0;
+}
+.po-selector-cell-content,
+.inflow-selector-cell-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    width: 100%;
+    height: 100%;
+}
+.po-selector-header-content,
+.inflow-selector-header-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+}
+.line-delete-cross-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: #94A3B8;
+    font-size: 11px;
+    font-weight: 700;
+    line-height: 1;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+.line-delete-cross-btn:hover {
+    background-color: #FEE2E2;
+    color: #DC2626;
+    transform: scale(1.15);
+}
+.po-line-move-stack {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 1px;
+    align-items: center;
+    justify-content: center;
+}
+.po-line-move-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 15px;
+    height: 10px;
+    padding: 0;
+    border: 1px solid #CBD5E1;
+    border-radius: 2px;
+    background: #FFFFFF;
+    color: #64748B;
+    font-size: 7px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.15s ease-in-out;
+}
+.po-line-move-btn:hover {
+    background-color: #CCFBF1;
+    border-color: #0F766E;
+    color: #0F766E;
+    transform: scale(1.15);
+}
+.po-table tr.is-selected-row td {
+    background-color: #FEF3C7 !important;
+}
+.po-table tr.is-active-row td {
+    background-color: #F0FDFA !important;
+}
+.po-table tr.is-active-row td.inflow-grid-selector-col {
+    border-left: 3px solid #0F766E !important;
+    background-color: #CCFBF1 !important;
+}
 .po-line-delete-btn {
     background: none;
     border: none;
@@ -1408,9 +1504,31 @@ input:checked + .po-toggle-slider:before {
     cursor: pointer;
     transition: all 0.15s ease;
 }
-.po-dropzone:hover, .po-dropzone.dragover {
+.po-dropzone:hover, .po-dropzone.dragover, .po-dropzone:focus {
     border-color: #7A5531;
     background: #FDFBF7;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(122, 85, 49, 0.12);
+}
+.po-paste-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #7A5531;
+    background: #FFFFFF;
+    border: 1px solid #D7C4B0;
+    border-radius: 4px;
+    cursor: pointer;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: all 0.15s ease;
+}
+.po-paste-btn:hover {
+    background: #F5EFEB;
+    border-color: #7A5531;
+    color: #4A331E;
 }
 .po-attachments-grid {
     display: grid;
@@ -2159,11 +2277,16 @@ input:checked + .po-toggle-slider:before {
                 <table class="po-table" id="poProductsTable">
                     <thead>
                         <tr>
-                            <th style="width: 44%;">Product</th>
-                            <th style="width: 16%;">Vendor code</th>
-                            <th style="width: 12%; text-align: right;">Quantity</th>
-                            <th style="width: 14%; text-align: right;">Vendor price</th>
-                            <th style="width: 14%; text-align: right;">Subtotal</th>
+                            <th class="inflow-grid-selector-col" style="width: 58px; text-align: center; vertical-align: middle;">
+                                <div class="inflow-selector-header-content">
+                                    <input type="checkbox" id="masterSelectAllPoLines" class="inflow-master-chk" title="Select all items" onchange="toggleSelectAllPoLines(this.checked)" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                                </div>
+                            </th>
+                            <th style="width: 40%;">Product</th>
+                            <th style="width: 15%;">Vendor code</th>
+                            <th style="width: 13%; text-align: right;">Quantity</th>
+                            <th style="width: 15%; text-align: right;">Vendor price</th>
+                            <th style="width: 17%; text-align: right;">Subtotal</th>
                         </tr>
                     </thead>
                     <tbody id="poLineItemsBody">
@@ -2177,7 +2300,18 @@ input:checked + .po-toggle-slider:before {
                             data-sales-uom="{{ l.sales_uom or '' }}"
                             data-sales-ratio="{{ l.sales_ratio or 1.0 }}"
                             data-base-cost="{{ l.cost_price or (l.unit_cost / (l.purchasing_ratio if l.purchasing_ratio and l.purchasing_ratio > 0 else 1.0)) }}"
+                            onclick="selectPoGridRow(this)"
                             class="po-line-row">
+                            <td class="inflow-grid-selector-col">
+                                <div class="inflow-selector-cell-content">
+                                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onPoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificPoLine(this, event)" title="Delete this line">✕</button>
+                                    <div class="po-line-move-stack">
+                                        <button type="button" class="po-line-move-btn" onclick="movePoLineUp(this, event)" title="Move up (↑)">▲</button>
+                                        <button type="button" class="po-line-move-btn" onclick="movePoLineDown(this, event)" title="Move down (↓)">▼</button>
+                                    </div>
+                                </div>
+                            </td>
                             <!-- Product Column: Thumbnail + Bold Name + SKU -->
                             <td>
                                 <div class="po-line-product-cell">
@@ -2198,7 +2332,6 @@ input:checked + .po-toggle-slider:before {
                                         <div class="po-line-name">{{ l.product_name }}</div>
                                         <div class="po-line-sku">{{ l.product_sku }}</div>
                                     </div>
-                                    <button type="button" class="po-line-delete-btn" onclick="deletePoLine(this, event)" title="Remove item">✕</button>
                                 </div>
                             </td>
 
@@ -2232,7 +2365,7 @@ input:checked + .po-toggle-slider:before {
                                         {% endif %}
                                         {% for std_u in ['case', 'pcs.', 'box', 'pack', 'carton', 'kg', 'bottle', 'can'] %}
                                             {% if std_u|lower not in [purch_u|lower, base_u|lower, sales_u|lower] %}
-                                            <option value="{{ std_u }}" {% if curr_u|lower == std_u|lower %}selected{% endif %}>{{ std_u }}</option>
+                                             <option value="{{ std_u }}" {% if curr_u|lower == std_u|lower %}selected{% endif %}>{{ std_u }}</option>
                                             {% endif %}
                                         {% endfor %}
                                     </select>
@@ -2258,6 +2391,14 @@ input:checked + .po-toggle-slider:before {
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Grid Action Buttons (+, —, ↑, ↓ matching SO Page) -->
+            <div class="inflow-grid-actions-bar" style="margin: 6px 0 10px 0;">
+                <button type="button" class="inflow-grid-btn" onclick="openPoProductPickerModal()" title="Add products (+)">+</button>
+                <button type="button" class="inflow-grid-btn" onclick="deleteSelectedPoLine()" title="Delete selected row (&minus;)">&minus;</button>
+                <button type="button" class="inflow-grid-btn" onclick="moveSelectedPoLineUp()" title="Move selected row up (&uarr;)">&uarr;</button>
+                <button type="button" class="inflow-grid-btn" onclick="moveSelectedPoLineDown()" title="Move selected row down (&darr;)">&darr;</button>
             </div>
 
             <!-- Table Bottom Controls: [+ Add products] [🛒 Scan to add] & [Balance $0.00] -->
@@ -2460,7 +2601,7 @@ input:checked + .po-toggle-slider:before {
         </div>
         <div style="padding: 18px 20px;">
             <!-- Dropzone / File input -->
-            <div class="po-dropzone" id="poDropzone" onclick="document.getElementById('poFileInput').click()">
+            <div class="po-dropzone" id="poDropzone" tabindex="0" onclick="document.getElementById('poFileInput').click()" title="Click to browse, drag & drop files, or press Ctrl+V to paste copied image">
                 <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#7A5531" stroke-width="1.8">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
                     <polyline points="17 8 12 3 7 8"></polyline>
@@ -2470,7 +2611,12 @@ input:checked + .po-toggle-slider:before {
                     Drop pictures, invoices, receipts, or click to upload
                 </div>
                 <div style="font-size: 12px; color: #64748B; margin-top: 2px;">
-                    Supports PNG, JPG, JPEG, WEBP, GIF, PDF (Max 15MB)
+                    Supports PNG, JPG, JPEG, WEBP, GIF, PDF (Max 15MB) • <strong>Direct paste with Ctrl+V supported</strong>
+                </div>
+                <div style="margin-top: 10px; display: flex; justify-content: center; gap: 8px;">
+                    <button type="button" class="po-paste-btn" onclick="event.stopPropagation(); pastePoImageFromClipboard();" title="Paste screenshot or copied image from clipboard">
+                        📋 Paste Image (Ctrl+V)
+                    </button>
                 </div>
                 <input type="file" id="poFileInput" multiple accept="image/*,.pdf" style="display: none;" onchange="handlePoFileSelect(this.files)">
             </div>
@@ -3052,7 +3198,19 @@ function renderPoLinesTable(lines) {
         tr.dataset.salesRatio = salesRatio;
         tr.dataset.baseCost = baseCost;
 
+        tr.onclick = function() { selectPoGridRow(this); };
+
         tr.innerHTML = `
+            <td class="inflow-grid-selector-col">
+                <div class="inflow-selector-cell-content">
+                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onPoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificPoLine(this, event)" title="Delete this line">✕</button>
+                    <div class="po-line-move-stack">
+                        <button type="button" class="po-line-move-btn" onclick="movePoLineUp(this, event)" title="Move up (↑)">▲</button>
+                        <button type="button" class="po-line-move-btn" onclick="movePoLineDown(this, event)" title="Move down (↓)">▼</button>
+                    </div>
+                </div>
+            </td>
             <td>
                 <div class="po-line-product-cell">
                     <div class="po-line-thumb">
@@ -3069,7 +3227,6 @@ function renderPoLinesTable(lines) {
                         <div class="po-line-name">${l.product_name}</div>
                         <div class="po-line-sku">${l.product_sku}</div>
                     </div>
-                    <button type="button" class="po-line-delete-btn" onclick="deletePoLine(this, event)" title="Remove item">✕</button>
                 </div>
             </td>
             <td>
@@ -3095,6 +3252,9 @@ function renderPoLinesTable(lines) {
         tbody.appendChild(tr);
         updateLineAutoCountAndSubtotal(tr);
     });
+    syncPoSelectAllCheckbox();
+    const firstRow = tbody.querySelector('tr.po-line-row');
+    if (firstRow) selectPoGridRow(firstRow);
 }
 
 function startNewPurchaseOrder() {
@@ -3267,7 +3427,19 @@ function appendPoLineRow(params) {
     tr.dataset.salesRatio = params.salesRatio || 1.0;
     tr.dataset.baseCost = params.baseCost || (params.cost / (params.purchasingRatio || 1.0));
 
+    tr.onclick = function() { selectPoGridRow(this); };
+
     tr.innerHTML = `
+        <td class="inflow-grid-selector-col">
+            <div class="inflow-selector-cell-content">
+                <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onPoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0F766E;">
+                <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificPoLine(this, event)" title="Delete this line">✕</button>
+                <div class="po-line-move-stack">
+                    <button type="button" class="po-line-move-btn" onclick="movePoLineUp(this, event)" title="Move up (↑)">▲</button>
+                    <button type="button" class="po-line-move-btn" onclick="movePoLineDown(this, event)" title="Move down (↓)">▼</button>
+                </div>
+            </div>
+        </td>
         <td>
             <div class="po-line-product-cell">
                 <div class="po-line-thumb">
@@ -3284,7 +3456,6 @@ function appendPoLineRow(params) {
                     <div class="po-line-name">${params.name}</div>
                     <div class="po-line-sku">${params.sku}</div>
                 </div>
-                <button type="button" class="po-line-delete-btn" onclick="deletePoLine(this, event)" title="Remove item">✕</button>
             </div>
         </td>
         <td>
@@ -3310,18 +3481,191 @@ function appendPoLineRow(params) {
     tbody.appendChild(tr);
     updateLineAutoCountAndSubtotal(tr);
     recalculatePoTotals();
+    selectPoGridRow(tr);
+    syncPoSelectAllCheckbox();
     document.getElementById('poStepProductCount').innerText = tbody.querySelectorAll('tr').length;
 }
 
-function deletePoLine(btn, e) {
-    if (e) e.stopPropagation();
+let activePoRow = null;
+
+function selectPoGridRow(row) {
+    if (!row) return;
+    document.querySelectorAll('#poLineItemsBody tr').forEach(r => {
+        r.classList.remove('is-active-row');
+    });
+    activePoRow = row;
+    row.classList.add('is-active-row');
+}
+
+function resequencePoLineIndices() {
+    const rows = document.querySelectorAll('#poLineItemsBody tr[data-line-index]');
+    rows.forEach((r, idx) => {
+        r.setAttribute('data-line-index', idx);
+        r.dataset.lineIndex = idx;
+        r.querySelectorAll('input, select').forEach(el => {
+            if (el.name && el.name.startsWith('lines[')) {
+                el.name = el.name.replace(/lines\[\d+\]/, `lines[${idx}]`);
+            }
+        });
+    });
+}
+
+function deleteSpecificPoLine(btn, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
     const row = btn.closest('tr');
-    if (row) {
-        row.remove();
+    if (!row) return;
+
+    if (activePoRow === row) {
+        activePoRow = null;
+    }
+    row.remove();
+    resequencePoLineIndices();
+    recalculatePoTotals();
+    markPoDirty();
+    syncPoSelectAllCheckbox();
+    const countEl = document.getElementById('poStepProductCount');
+    if (countEl) countEl.innerText = document.querySelectorAll('#poLineItemsBody tr').length;
+}
+
+function deletePoLine(btn, e) {
+    deleteSpecificPoLine(btn, e);
+}
+
+function deleteSelectedPoLine() {
+    // 1. If any row checkboxes are checked, delete all checked rows
+    const checkedBoxes = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk:checked');
+    if (checkedBoxes.length > 0) {
+        checkedBoxes.forEach(chk => {
+            const row = chk.closest('tr');
+            if (row) {
+                if (activePoRow === row) activePoRow = null;
+                row.remove();
+            }
+        });
+        resequencePoLineIndices();
         recalculatePoTotals();
         markPoDirty();
-        document.getElementById('poStepProductCount').innerText = document.querySelectorAll('#poLineItemsBody tr').length;
+        syncPoSelectAllCheckbox();
+        const countEl = document.getElementById('poStepProductCount');
+        if (countEl) countEl.innerText = document.querySelectorAll('#poLineItemsBody tr').length;
+        return;
     }
+
+    // 2. Otherwise find the active or highlighted row
+    let targetRow = activePoRow;
+    if (!targetRow || !targetRow.hasAttribute('data-line-index')) {
+        targetRow = document.querySelector('#poLineItemsBody tr.is-active-row[data-line-index]') ||
+                    document.querySelector('#poLineItemsBody tr.is-selected-row[data-line-index]');
+    }
+
+    if (targetRow && targetRow.hasAttribute('data-line-index')) {
+        const nextTarget = (targetRow.nextElementSibling && targetRow.nextElementSibling.hasAttribute('data-line-index')) 
+                           ? targetRow.nextElementSibling 
+                           : (targetRow.previousElementSibling && targetRow.previousElementSibling.hasAttribute('data-line-index') ? targetRow.previousElementSibling : null);
+        targetRow.remove();
+        activePoRow = nextTarget;
+        if (activePoRow) selectPoGridRow(activePoRow);
+        resequencePoLineIndices();
+        recalculatePoTotals();
+        markPoDirty();
+        syncPoSelectAllCheckbox();
+        const countEl = document.getElementById('poStepProductCount');
+        if (countEl) countEl.innerText = document.querySelectorAll('#poLineItemsBody tr').length;
+    }
+}
+
+function toggleSelectAllPoLines(checked) {
+    const rows = document.querySelectorAll('#poLineItemsBody tr[data-line-index]');
+    rows.forEach(r => {
+        const chk = r.querySelector('.line-select-chk');
+        if (chk && !chk.disabled) {
+            chk.checked = checked;
+            r.classList.toggle('is-selected-row', checked);
+        }
+    });
+}
+
+function onPoLineCheckboxChange(chk, event) {
+    if (event) event.stopPropagation();
+    const row = chk.closest('tr');
+    if (row) {
+        row.classList.toggle('is-selected-row', chk.checked);
+        if (chk.checked) {
+            selectPoGridRow(row);
+        }
+    }
+    syncPoSelectAllCheckbox();
+}
+
+function syncPoSelectAllCheckbox() {
+    const masterChk = document.getElementById('masterSelectAllPoLines');
+    if (!masterChk) return;
+    const allRowChks = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk');
+    if (allRowChks.length === 0) {
+        masterChk.checked = false;
+        masterChk.indeterminate = false;
+        return;
+    }
+    const checkedCount = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk:checked').length;
+    masterChk.checked = (checkedCount === allRowChks.length);
+    masterChk.indeterminate = (checkedCount > 0 && checkedCount < allRowChks.length);
+}
+
+function movePoLineUp(btnOrRow, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const row = btnOrRow.tagName === 'TR' ? btnOrRow : btnOrRow.closest('tr');
+    if (!row) return;
+    const prev = row.previousElementSibling;
+    if (prev && prev.hasAttribute('data-line-index')) {
+        row.parentNode.insertBefore(row, prev);
+        selectPoGridRow(row);
+        resequencePoLineIndices();
+        markPoDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function movePoLineDown(btnOrRow, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const row = btnOrRow.tagName === 'TR' ? btnOrRow : btnOrRow.closest('tr');
+    if (!row) return;
+    const next = row.nextElementSibling;
+    if (next && next.hasAttribute('data-line-index')) {
+        row.parentNode.insertBefore(next, row);
+        selectPoGridRow(row);
+        resequencePoLineIndices();
+        markPoDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function getTargetPoRowForShift() {
+    if (activePoRow && activePoRow.hasAttribute('data-line-index')) {
+        return activePoRow;
+    }
+    const checked = document.querySelector('#poLineItemsBody tr[data-line-index] .line-select-chk:checked');
+    if (checked) return checked.closest('tr');
+    return document.querySelector('#poLineItemsBody tr.is-active-row[data-line-index]') ||
+           document.querySelector('#poLineItemsBody tr.is-selected-row[data-line-index]');
+}
+
+function moveSelectedPoLineUp() {
+    const row = getTargetPoRowForShift();
+    if (row) movePoLineUp(row);
+}
+
+function moveSelectedPoLineDown() {
+    const row = getTargetPoRowForShift();
+    if (row) movePoLineDown(row);
 }
 
 // Totals Math & Popover
@@ -3654,6 +3998,10 @@ function openAttachmentsModal() {
     document.getElementById('poAttachOrderNumDisplay').innerText = orderNum;
     loadPoAttachments(poId);
     document.getElementById('poAttachmentsModal').style.display = 'flex';
+    setTimeout(() => {
+        const dz = document.getElementById('poDropzone');
+        if (dz) dz.focus();
+    }, 50);
 }
 
 function closeAttachmentsModal() {
@@ -3798,6 +4146,105 @@ if (poDropzoneEl) {
             handlePoFileSelect(e.dataTransfer.files);
         }
     });
+}
+
+// Clipboard paste helper for direct image attachments
+function extractImagesFromClipboard(clipboardData) {
+    if (!clipboardData) return [];
+    const filesToUpload = [];
+
+    // 1. Check clipboardData.files (e.g. copied image file from desktop/explorer)
+    if (clipboardData.files && clipboardData.files.length > 0) {
+        for (let i = 0; i < clipboardData.files.length; i++) {
+            const f = clipboardData.files[i];
+            if (f.type && (f.type.startsWith('image/') || f.type === 'application/pdf')) {
+                filesToUpload.push(f);
+            }
+        }
+    }
+
+    // 2. Check clipboardData.items (e.g. screenshot, snipping tool, browser image)
+    if (filesToUpload.length === 0 && clipboardData.items) {
+        for (let i = 0; i < clipboardData.items.length; i++) {
+            const item = clipboardData.items[i];
+            if (item.kind === 'file' || (item.type && item.type.startsWith('image/'))) {
+                const blob = item.getAsFile();
+                if (blob) {
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                    let ext = 'png';
+                    if (item.type.includes('jpeg') || item.type.includes('jpg')) ext = 'jpg';
+                    else if (item.type.includes('webp')) ext = 'webp';
+                    else if (item.type.includes('gif')) ext = 'gif';
+
+                    const filename = `photo_${ts}.${ext}`;
+                    const pastedFile = new File([blob], filename, { type: item.type || 'image/png' });
+                    filesToUpload.push(pastedFile);
+                }
+            }
+        }
+    }
+    return filesToUpload;
+}
+
+// Window paste event listener for PO attachments
+window.addEventListener('paste', function(e) {
+    const modal = document.getElementById('poAttachmentsModal');
+    if (!modal || modal.style.display === 'none') return;
+
+    const files = extractImagesFromClipboard(e.clipboardData || window.clipboardData);
+    if (files.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const dz = document.getElementById('poDropzone');
+        if (dz) {
+            dz.classList.add('dragover');
+            setTimeout(() => dz.classList.remove('dragover'), 600);
+        }
+        showPoToast(`📋 Pasted ${files.length} image(s) from clipboard. Uploading...`);
+        handlePoFileSelect(files);
+    }
+});
+
+async function pastePoImageFromClipboard() {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+        const dz = document.getElementById('poDropzone');
+        if (dz) dz.focus();
+        showPoToast('💡 Press Ctrl + V on your keyboard to paste the copied image.');
+        return;
+    }
+    try {
+        const clipboardItems = await navigator.clipboard.read();
+        const filesToUpload = [];
+        for (const item of clipboardItems) {
+            for (const type of item.types) {
+                if (type.startsWith('image/')) {
+                    const blob = await item.getType(type);
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                    let ext = 'png';
+                    if (type.includes('jpeg') || type.includes('jpg')) ext = 'jpg';
+                    else if (type.includes('webp')) ext = 'webp';
+                    else if (type.includes('gif')) ext = 'gif';
+                    const filename = `photo_${ts}.${ext}`;
+                    filesToUpload.push(new File([blob], filename, { type }));
+                }
+            }
+        }
+        if (filesToUpload.length > 0) {
+            showPoToast(`📋 Pasted ${filesToUpload.length} image(s) from clipboard. Uploading...`);
+            handlePoFileSelect(filesToUpload);
+        } else {
+            showPoToast('ℹ️ No image found in clipboard. Take a screenshot or copy an image first.');
+        }
+    } catch (err) {
+        const dz = document.getElementById('poDropzone');
+        if (dz) dz.focus();
+        showPoToast('💡 Please press Ctrl + V on your keyboard to paste.');
+    }
 }
 
 // Toast notification helper
@@ -3957,9 +4404,9 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Ctrl+S
+// Keyboard shortcuts: Ctrl+S to save, Delete to remove rows, Alt+Up/Down to reorder
 document.addEventListener('keydown', (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
         e.preventDefault();
         const saveBtn = document.getElementById('poSaveBtn');
         if (saveBtn) {
@@ -3971,6 +4418,27 @@ document.addEventListener('keydown', (e) => {
                 else form.submit();
             }
         }
+    } else if (e.key === 'Delete') {
+        const activeEl = document.activeElement;
+        const isTextInput = activeEl && (
+            (activeEl.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(activeEl.type)) ||
+            activeEl.tagName === 'TEXTAREA' ||
+            activeEl.isContentEditable
+        );
+        if (!isTextInput) {
+            const hasChecked = document.querySelectorAll('#poLineItemsBody tr[data-line-index] .line-select-chk:checked').length > 0;
+            const hasActive = activePoRow && activePoRow.hasAttribute('data-line-index');
+            if (hasChecked || hasActive) {
+                e.preventDefault();
+                deleteSelectedPoLine();
+            }
+        }
+    } else if (e.altKey && e.key === 'ArrowUp') {
+        e.preventDefault();
+        moveSelectedPoLineUp();
+    } else if (e.altKey && e.key === 'ArrowDown') {
+        e.preventDefault();
+        moveSelectedPoLineDown();
     }
 });
 
@@ -4096,6 +4564,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('#poLineItemsBody tr.po-line-row').forEach(row => {
         updateLineAutoCountAndSubtotal(row);
     });
+
+    const firstRow = document.querySelector('#poLineItemsBody tr.po-line-row');
+    if (firstRow) selectPoGridRow(firstRow);
+    syncPoSelectAllCheckbox();
 });
 </script>
 {% endblock %}

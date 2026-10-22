@@ -105,6 +105,8 @@ SO-99901,2026-10-14,Test Cust,OPEN,Nonexistent Item 123,1,10.00
                     inserted_lines.append(params)
             def fetchone(self):
                 return {'id': 999}
+            def fetchall(self):
+                return []
             @property
             def connection(self):
                 class DummyConn:
@@ -123,12 +125,12 @@ SO-99901,2026-10-14,Test Cust,OPEN,Nonexistent Item 123,1,10.00
 
         # CRITICAL ASSERTION 2: Matched product line must have description = None
         self.assertEqual(len(inserted_lines), 2)
-        so_id1, line_num1, prod_id1, desc1, std_qty1, unit_price1, discount1, subtotal1, cost_price1, uom1, disp_qty1 = inserted_lines[0]
+        so_id1, line_num1, prod_id1, desc1, std_qty1, unit_price1, discount1, subtotal1, cost_price1, uom1, disp_qty1, *extra1 = inserted_lines[0]
         self.assertEqual(prod_id1, 101, "Matched product should have prod_id = 101")
         self.assertIsNone(desc1, "Matched product line should have description = None (no need description)")
 
         # Unmatched line has prod_id = None
-        so_id2, line_num2, prod_id2, desc2, std_qty2, unit_price2, discount2, subtotal2, cost_price2, uom2, disp_qty2 = inserted_lines[1]
+        so_id2, line_num2, prod_id2, desc2, std_qty2, unit_price2, discount2, subtotal2, cost_price2, uom2, disp_qty2, *extra2 = inserted_lines[1]
         self.assertIsNone(prod_id2, "Unmatched item should have prod_id = None")
         self.assertEqual(desc2, "Nonexistent Item 123")
 

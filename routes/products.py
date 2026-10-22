@@ -985,14 +985,27 @@ def detail_product(id):
                                is_new=False,
                                **bundle)
 
-    catalog_products = _get_catalog_sidebar_products()
+    is_partial = (
+        request.headers.get('X-Inflow-Partial') == 'workspace' or
+        request.args.get('partial') in ('workspace', '1', 'true')
+    )
+
     bundle = _get_product_detail_bundle(id)
     if not bundle:
+        if is_partial:
+            return ("<div class='inflow-error-banner' style='padding:20px;color:#DC2626;'>Product not found.</div>", 404)
         flash("Product not found.", "error")
         return redirect(url_for('products.list_products'))
 
+    if is_partial:
+        return render_template('products/_catalog_workspace.html',
+                               is_partial=True,
+                               **bundle)
+
+    catalog_products = _get_catalog_sidebar_products()
     return render_template('products/catalog.html',
                            catalog_products=catalog_products,
+                           is_partial=False,
                            **bundle)
 
 @products_bp.route('/products/<int:id>/update_ajax', methods=['POST'])

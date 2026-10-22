@@ -235,23 +235,50 @@
                                     Tick the orders you wish to import. Unchecked orders will remain untouched in your database.
                                 </div>
                             </div>
-                            <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
                                 <span style="font-size: 12px; font-weight: 600; color: #1E293B;">
                                     Selected: <span id="selectedOrdersCount" style="color: #2563EB;">0</span> / <span id="totalOrdersCount">0</span>
                                 </span>
+                                <button type="button" class="inflow-win-btn-sm" id="btnAutoSelectRecommended" onclick="selectAutoRecommendedOrders()" title="Select only new orders and orders with status change to Open / Paid" style="background: #EFF6FF; border-color: #3B82F6; color: #1D4ED8; font-weight: 600;">✨ Auto-Select (New & Open/Paid)</button>
                                 <button type="button" class="inflow-win-btn-sm" onclick="selectAllOrders(true)">Select All</button>
                                 <button type="button" class="inflow-win-btn-sm" onclick="selectAllOrders(false)">Deselect All</button>
                             </div>
                         </div>
 
+                        <!-- NOTICE BANNER FOR AUTO-SELECTION -->
+                        <div id="orderSelectionNotice" class="order-selection-notice" style="display: none; margin-top: 10px; margin-bottom: 4px;">
+                            <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: center; width: 22px; height: 22px;">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0284C7" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                            </div>
+                            <div style="flex: 1;">
+                                <div id="orderNoticeTitle" style="font-weight: 700; color: #0369A1; font-size: 12px;">Keep Existing Data Mode Notice:</div>
+                                <div id="orderNoticeBody" style="font-size: 11.5px; color: #1E293B; margin-top: 2px; line-height: 1.45;">
+                                    Auto-selected <strong id="noticeAutoCnt" style="color: #0284C7;">0</strong> of <span id="noticeTotalCnt">0</span> orders: 
+                                    <strong id="noticeNewCnt" style="color: #059669;">0 new orders</strong> and 
+                                    <strong id="noticeChangedCnt" style="color: #D97706;">0 orders with status change to Open or Paid</strong>.
+                                    <span id="noticeUnchangedMsg"> <strong id="noticeUnchangedCnt" style="color: #64748B;">0</strong> existing unchanged orders were unchecked to protect existing data.</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Search and Quick Filter Bar -->
-                        <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center;">
-                            <div style="position: relative; flex: 1;">
+                        <div style="margin-top: 10px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                            <div style="position: relative; flex: 1; min-width: 220px;">
                                 <input type="text" id="orderSearchInput" class="inflow-win-textbox" placeholder="Search by Order #, Customer/Vendor, or Status..." oninput="onFilterOrders(this.value)" style="width: 100%; padding-left: 28px; font-size: 12px;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" style="position: absolute; left: 8px; top: 6px; pointer-events: none;">
                                     <circle cx="11" cy="11" r="8"></circle>
                                     <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                                 </svg>
+                            </div>
+                            <div style="display: flex; gap: 4px; align-items: center;">
+                                <button type="button" class="order-filter-chip active" id="chipFilterAll" onclick="filterBySelectionCategory('all')">All (<span id="chipCntAll">0</span>)</button>
+                                <button type="button" class="order-filter-chip" id="chipFilterNew" onclick="filterBySelectionCategory('new')">➕ New (<span id="chipCntNew">0</span>)</button>
+                                <button type="button" class="order-filter-chip" id="chipFilterChanged" onclick="filterBySelectionCategory('changed')">🔄 Status Changed (<span id="chipCntChanged">0</span>)</button>
+                                <button type="button" class="order-filter-chip" id="chipFilterUnchanged" onclick="filterBySelectionCategory('unchanged')">⏹ Unchanged (<span id="chipCntUnchanged">0</span>)</button>
                             </div>
                             <span id="orderFilteredNotice" style="display: none; font-size: 11px; color: #64748B;"></span>
                         </div>
@@ -701,6 +728,58 @@
     color: #047857;
     border: 1px solid #A7F3D0;
 }
+.badge-status-changed {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid #FCD34D;
+    font-weight: 700;
+}
+.badge-unchanged {
+    background: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #CBD5E1;
+}
+
+.order-selection-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    background: linear-gradient(180deg, #F0F9FF 0%, #E0F2FE 100%);
+    border: 1px solid #BAE6FD;
+    border-left: 4px solid #0284C7;
+    border-radius: 4px;
+    padding: 8px 12px;
+}
+.order-selection-notice.erase-mode {
+    background: linear-gradient(180deg, #FFFBEB 0%, #FEF3C7 100%);
+    border-color: #FDE68A;
+    border-left: 4px solid #D97706;
+}
+
+.order-filter-chip {
+    height: 22px;
+    padding: 0 8px;
+    font-size: 11px;
+    border-radius: 11px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #475569;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+.order-filter-chip:hover {
+    background: #F8FAFC;
+    border-color: #94A3B8;
+}
+.order-filter-chip.active {
+    background: #2563EB;
+    color: #FFFFFF;
+    border-color: #2563EB;
+    font-weight: 600;
+}
 
 .status-tag {
     display: inline-block;
@@ -897,7 +976,7 @@ async function onNextStep() {
             document.getElementById('orderSelectionTypeBadge').textContent = isPO ? 'Purchase Orders' : 'Sales Orders';
             document.getElementById('colPartyHeader').textContent = isPO ? 'Vendor' : 'Customer';
 
-            renderOrderSelectionTable(res.orders_summary);
+            renderOrderSelectionTable(res.orders_summary, res);
 
             // Collapse raw preview by default when order list is present
             document.getElementById('btnToggleRawPreview').style.display = 'inline-flex';
@@ -932,9 +1011,51 @@ async function onNextStep() {
     }
 }
 
-function renderOrderSelectionTable(orders) {
+function renderOrderSelectionTable(orders, res) {
     const tbody = document.getElementById('orderSelectionTableBody');
     let html = '';
+
+    const isKeep = (currentImportMode === 'keep');
+    const autoCnt = (res && res.auto_selected_count !== undefined) ? res.auto_selected_count : orders.filter(o => o.is_auto_selected).length;
+    const newCnt = (res && res.new_orders_count !== undefined) ? res.new_orders_count : orders.filter(o => !o.is_existing).length;
+    const changedCnt = (res && res.status_changed_count !== undefined) ? res.status_changed_count : orders.filter(o => o.is_existing && o.status_change_type === 'open_or_paid_change').length;
+    const unchCnt = (res && res.unchanged_orders_count !== undefined) ? res.unchanged_orders_count : orders.filter(o => o.is_existing && !o.is_auto_selected).length;
+
+    // Populate Notice Banner
+    const noticeEl = document.getElementById('orderSelectionNotice');
+    if (noticeEl) {
+        noticeEl.style.display = 'flex';
+        if (isKeep) {
+            noticeEl.classList.remove('erase-mode');
+            document.getElementById('orderNoticeTitle').textContent = 'Keep Existing Data Auto-Selection Notice:';
+            document.getElementById('noticeAutoCnt').textContent = autoCnt;
+            document.getElementById('noticeTotalCnt').textContent = orders.length;
+            document.getElementById('noticeNewCnt').textContent = `${newCnt} new order${newCnt === 1 ? '' : 's'}`;
+            document.getElementById('noticeChangedCnt').textContent = `${changedCnt} order${changedCnt === 1 ? '' : 's'} with status change to Open or Paid`;
+            const unchMsg = document.getElementById('noticeUnchangedMsg');
+            if (unchMsg) {
+                if (unchCnt > 0) {
+                    unchMsg.style.display = 'inline';
+                    document.getElementById('noticeUnchangedCnt').textContent = unchCnt;
+                } else {
+                    unchMsg.style.display = 'none';
+                }
+            }
+        } else {
+            noticeEl.classList.add('erase-mode');
+            document.getElementById('orderNoticeTitle').textContent = '⚠️ Erase Old Data Mode Notice:';
+            document.getElementById('orderNoticeBody').innerHTML = `All <strong>${orders.length} orders</strong> in this file will be imported and will replace all existing records in your database.`;
+        }
+    }
+
+    // Populate category filter chip numbers
+    const totalNew = orders.filter(o => !o.is_existing).length;
+    const totalChanged = orders.filter(o => o.is_existing && o.status_changed).length;
+    const totalUnchanged = orders.filter(o => o.is_existing && !o.status_changed).length;
+    if (document.getElementById('chipCntAll')) document.getElementById('chipCntAll').textContent = orders.length;
+    if (document.getElementById('chipCntNew')) document.getElementById('chipCntNew').textContent = totalNew;
+    if (document.getElementById('chipCntChanged')) document.getElementById('chipCntChanged').textContent = totalChanged;
+    if (document.getElementById('chipCntUnchanged')) document.getElementById('chipCntUnchanged').textContent = totalUnchanged;
 
     orders.forEach((ord, index) => {
         const st = (ord.status || 'OPEN').toUpperCase();
@@ -944,16 +1065,28 @@ function renderOrderSelectionTable(orders) {
         else if (['CANCELLED', 'CANCELED'].includes(st)) stClass = 'cancelled';
         else if (['PARTIAL', 'IN_PROGRESS', 'PICKED'].includes(st)) stClass = 'partial';
 
-        const dbBadge = ord.is_existing 
-            ? `<span class="order-status-badge badge-update" title="Already exists in database. It will be updated.">🔄 Existing (Will Update)</span>`
-            : `<span class="order-status-badge badge-new" title="New order not found in database. It will be added.">➕ New Order (Will Add)</span>`;
+        let catType = 'new';
+        let dbBadge = '';
+        if (!ord.is_existing) {
+            catType = 'new';
+            dbBadge = `<span class="order-status-badge badge-new" title="New order not found in database. Will be added.">➕ New Order</span>`;
+        } else if (ord.status_changed) {
+            catType = 'changed';
+            const dbSt = ord.db_status || 'OPEN';
+            dbBadge = `<span class="order-status-badge badge-status-changed" title="Status change detected: ${escapeHtml(dbSt)} ➔ ${escapeHtml(ord.status)}. Will update.">🔄 ${escapeHtml(dbSt)} ➔ ${escapeHtml(ord.status)}</span>`;
+        } else {
+            catType = 'unchanged';
+            dbBadge = `<span class="order-status-badge badge-unchanged" title="Already exists in database with status ${escapeHtml(ord.status)}. Unchecked by default.">⏹ Existing (${escapeHtml(ord.status)})</span>`;
+        }
 
         const fmtTotal = '$' + (Number(ord.total_amount) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const isChecked = Boolean(ord.is_auto_selected);
+        const rowClass = isChecked ? 'order-row selected' : 'order-row';
 
         html += `
-            <tr class="order-row selected" data-idx="${index}" onclick="onOrderRowClick(event, this)">
+            <tr class="${rowClass}" data-idx="${index}" data-category="${catType}" data-auto-select="${isChecked ? 'true' : 'false'}" onclick="onOrderRowClick(event, this)">
                 <td style="text-align: center;" onclick="event.stopPropagation()">
-                    <input type="checkbox" class="order-chk" data-order="${escapeHtml(ord.order_number)}" checked onchange="onOrderCheckboxChange(this)">
+                    <input type="checkbox" class="order-chk" data-order="${escapeHtml(ord.order_number)}" ${isChecked ? 'checked' : ''} onchange="onOrderCheckboxChange(this)">
                 </td>
                 <td><strong>${escapeHtml(ord.order_number)}</strong></td>
                 <td>${escapeHtml(ord.party_name)}</td>
@@ -969,77 +1102,53 @@ function renderOrderSelectionTable(orders) {
 
     tbody.innerHTML = html;
     document.getElementById('totalOrdersCount').textContent = orders.length;
-    document.getElementById('masterOrderCheckbox').checked = true;
     document.getElementById('orderSearchInput').value = '';
-    document.getElementById('orderFilteredNotice').style.display = 'none';
+    filterBySelectionCategory('all');
     updateSelectedOrdersCounter();
 }
 
-function onOrderRowClick(event, row) {
-    if (event.target.tagName === 'INPUT' || event.target.tagName === 'BUTTON') return;
-    const chk = row.querySelector('.order-chk');
-    if (chk) {
-        chk.checked = !chk.checked;
-        onOrderCheckboxChange(chk);
-    }
-}
-
-function onOrderCheckboxChange(chk) {
-    const row = chk.closest('tr');
-    if (row) {
-        if (chk.checked) row.classList.add('selected');
-        else row.classList.remove('selected');
-    }
-    updateSelectedOrdersCounter();
-}
-
-function updateSelectedOrdersCounter() {
-    const allChks = document.querySelectorAll('.order-chk');
-    const checkedChks = document.querySelectorAll('.order-chk:checked');
-    const countEl = document.getElementById('selectedOrdersCount');
-    if (countEl) countEl.textContent = checkedChks.length;
-
-    const masterChk = document.getElementById('masterOrderCheckbox');
-    if (masterChk) {
-        if (checkedChks.length === 0) {
-            masterChk.checked = false;
-            masterChk.indeterminate = false;
-        } else if (checkedChks.length === allChks.length) {
-            masterChk.checked = true;
-            masterChk.indeterminate = false;
-        } else {
-            masterChk.checked = false;
-            masterChk.indeterminate = true;
-        }
-    }
-}
-
-function selectAllOrders(state) {
+function selectAutoRecommendedOrders() {
     const rows = document.querySelectorAll('#orderSelectionTableBody tr');
     rows.forEach(r => {
-        if (r.style.display !== 'none') {
-            const chk = r.querySelector('.order-chk');
-            if (chk) {
-                chk.checked = state;
-                if (state) r.classList.add('selected');
-                else r.classList.remove('selected');
-            }
+        const isAuto = (r.getAttribute('data-auto-select') === 'true');
+        const chk = r.querySelector('.order-chk');
+        if (chk) {
+            chk.checked = isAuto;
+            if (isAuto) r.classList.add('selected');
+            else r.classList.remove('selected');
         }
     });
     updateSelectedOrdersCounter();
 }
 
-function toggleMasterOrderCheckbox(state) {
-    selectAllOrders(state);
+let currentCategoryFilter = 'all';
+function filterBySelectionCategory(cat) {
+    currentCategoryFilter = cat;
+    ['all', 'new', 'changed', 'unchanged'].forEach(c => {
+        const chip = document.getElementById('chipFilter' + c.charAt(0).toUpperCase() + c.slice(1));
+        if (chip) {
+            if (c === cat) chip.classList.add('active');
+            else chip.classList.remove('active');
+        }
+    });
+    applyOrderFilters();
 }
 
 function onFilterOrders(query) {
-    const q = (query || '').toLowerCase().trim();
+    applyOrderFilters();
+}
+
+function applyOrderFilters() {
+    const query = (document.getElementById('orderSearchInput').value || '').toLowerCase().trim();
     const rows = document.querySelectorAll('#orderSelectionTableBody tr');
     let visibleCnt = 0;
     rows.forEach(r => {
+        const cat = r.getAttribute('data-category');
         const text = r.textContent.toLowerCase();
-        if (!q || text.includes(q)) {
+        const matchesCat = (currentCategoryFilter === 'all' || cat === currentCategoryFilter);
+        const matchesQuery = (!query || text.includes(query));
+
+        if (matchesCat && matchesQuery) {
             r.style.display = '';
             visibleCnt++;
         } else {
@@ -1047,11 +1156,13 @@ function onFilterOrders(query) {
         }
     });
     const notice = document.getElementById('orderFilteredNotice');
-    if (q) {
-        notice.style.display = 'inline';
-        notice.textContent = `Showing ${visibleCnt} of ${rows.length}`;
-    } else {
-        notice.style.display = 'none';
+    if (notice) {
+        if (query || currentCategoryFilter !== 'all') {
+            notice.style.display = 'inline';
+            notice.textContent = `Showing ${visibleCnt} of ${rows.length}`;
+        } else {
+            notice.style.display = 'none';
+        }
     }
 }
 

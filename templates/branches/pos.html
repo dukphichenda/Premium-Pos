@@ -5,6 +5,7 @@
 {% block body_class %}pos-modern-body{% endblock %}
 
 {% block content %}
+{% set current_cashier = cashier_name or session.get('username') or session.get('display_name') or branch.manager_name or 'Cashier' %}
 <style>
 /* Modern POS Layout & Typography matching reference design */
 .pos-modern-body {
@@ -1402,13 +1403,31 @@
 .pos-receipt-paper {
     font-family: 'Kantumruy Pro', 'Battambang', 'Segoe UI', -apple-system, sans-serif;
     font-size: 11px;
-    color: #0F172A;
+    color: #000000 !important;
     line-height: 1.35;
     background: #FFFFFF;
-    border: 1px dashed #CBD5E1;
+    border: 1px dashed #000000;
     border-radius: 8px;
     padding: 14px 12px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+}
+
+.pos-receipt-paper,
+.pos-receipt-paper div,
+.pos-receipt-paper span,
+.pos-receipt-paper strong,
+.pos-receipt-paper p,
+.pos-receipt-paper b {
+    color: #000000;
+}
+
+.pos-rec-title-pill {
+    background: #000000 !important;
+    color: #FFFFFF !important;
+}
+
+.pos-rec-title-pill * {
+    color: #FFFFFF !important;
 }
 
 .pos-rec-logo {
@@ -1422,12 +1441,12 @@
 }
 
 .pos-rec-divider-dashed {
-    border-top: 1px dashed #64748B;
+    border-top: 1px dashed #000000 !important;
     margin: 7px 0;
 }
 
 .pos-rec-divider-double {
-    border-top: 2px double #0F172A;
+    border-top: 2px double #000000 !important;
     margin: 7px 0;
 }
 
@@ -1523,6 +1542,21 @@
         box-shadow: none !important;
         padding: 0 !important;
     }
+    .pos-receipt-paper,
+    .pos-receipt-paper div,
+    .pos-receipt-paper span,
+    .pos-receipt-paper strong,
+    .pos-receipt-paper p,
+    .pos-receipt-paper b {
+        color: #000000 !important;
+    }
+    .pos-rec-title-pill {
+        background: #000000 !important;
+        color: #FFFFFF !important;
+    }
+    .pos-rec-title-pill * {
+        color: #FFFFFF !important;
+    }
     .pos-rec-khqr-box {
         border-color: #000000 !important;
         background: #FFFFFF !important;
@@ -1591,10 +1625,10 @@
                 <!-- Cashier Profile Pill -->
                 <div class="pos-cashier-card">
                     <div class="pos-cashier-avatar">
-                        {{ (branch.manager_name or 'Cashier')[0]|upper }}
+                        {{ current_cashier[0]|upper }}
                     </div>
                     <div class="pos-cashier-meta">
-                        <div class="pos-cashier-name">{{ branch.manager_name or 'Lauren Smith' }}</div>
+                        <div class="pos-cashier-name">{{ current_cashier }}</div>
                         <div class="pos-cashier-role">Branch Cashier ▾</div>
                     </div>
                 </div>
@@ -2035,147 +2069,141 @@
         </div>
 
         <!-- The Printable Receipt Paper Content -->
-        <div id="receiptContent" class="pos-receipt-paper">
+        <div id="receiptContent" class="pos-receipt-paper" style="color: #000000;">
             
             <!-- Header Section -->
-            <div style="text-align: center; margin-bottom: 8px;">
+            <div style="text-align: center; margin-bottom: 8px; color: #000000;">
                 <!-- Shop Name in Khmer & English -->
-                <div style="font-size: 15px; font-weight: 800; color: #0F172A; line-height: 1.25;" class="font-khmer">
+                <div style="font-size: 15px; font-weight: 800; color: #000000; line-height: 1.25;" class="font-khmer">
                     {{ (branch_settings.shop_name_kh if branch_settings else '') or branch.name }}
                 </div>
                 {% if branch_settings and branch_settings.shop_name_en and branch_settings.shop_name_en != (branch_settings.shop_name_kh or branch.name) %}
-                <div style="font-size: 11px; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px;">
+                <div style="font-size: 11px; font-weight: 800; color: #000000; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 1px;">
                     {{ branch_settings.shop_name_en }}
                 </div>
                 {% endif %}
 
                 <!-- Address & Contact -->
-                <div style="font-size: 10px; color: #475569; margin-top: 3px; line-height: 1.35;" class="font-khmer">
+                <div style="font-size: 10px; color: #000000; margin-top: 3px; line-height: 1.35;" class="font-khmer">
                     {{ (branch_settings.shop_address_kh if branch_settings else '') or (branch_settings.shop_address_en if branch_settings else '') or branch.address or 'Phnom Penh, Cambodia' }}
                 </div>
-                <div style="font-size: 10.5px; font-weight: 600; color: #1E293B; margin-top: 2px;">
-                    ទូរស័ព្ទ / Tel: <strong>{{ branch.phone or (branch_settings.phone if branch_settings else '') or '+855 96 529 8098' }}</strong>
+                <div style="font-size: 10.5px; font-weight: 600; color: #000000; margin-top: 2px;">
+                    ទូរស័ព្ទ / Tel: <strong style="color: #000000;">{{ branch.phone or (branch_settings.phone if branch_settings else '') or '+855 96 529 8098' }}</strong>
                 </div>
-
-                {% if branch_settings and branch_settings.vat_tin %}
-                <div style="font-size: 9.5px; color: #64748B; margin-top: 1px;">
-                    VATTIN / លេខអត្តសញ្ញាណ: <strong>{{ branch_settings.vat_tin }}</strong>
-                </div>
-                {% endif %}
 
                 <!-- Receipt Title Pill -->
-                <div style="margin: 7px auto 3px auto; padding: 3px 10px; background: #0F172A; color: #FFFFFF; font-size: 11px; font-weight: 800; border-radius: 4px; display: inline-block; letter-spacing: 0.5px;" class="font-khmer">
+                <div style="margin: 7px auto 3px auto; padding: 3px 10px; background: #000000; color: #FFFFFF !important; font-size: 11px; font-weight: 800; border-radius: 4px; display: inline-block; letter-spacing: 0.5px;" class="font-khmer pos-rec-title-pill">
                     វិក្កយបត្របង់ប្រាក់ / CASH RECEIPT
                 </div>
-                <div style="font-size: 9.5px; color: #64748B; margin-top: 2px;">
-                    ឃ្លាំងទំនិញ / Warehouse: <strong id="recWhName" style="color: #0F172A;">STM Warehouse</strong>
+                <div style="font-size: 9.5px; color: #000000; margin-top: 2px;">
+                    ឃ្លាំងទំនិញ / Warehouse: <strong id="recWhName" style="color: #000000;">STM Warehouse</strong>
                 </div>
             </div>
 
             <div class="pos-rec-divider-dashed"></div>
 
             <!-- Receipt Meta (2-Column Grid) -->
-            <div style="font-size: 10px; line-height: 1.45; margin-bottom: 5px;">
-                <div class="pos-rec-row" style="white-space: nowrap;">
-                    <span style="white-space: nowrap;">លេខវិក្កយបត្រ / Inv #: <strong id="recOrderNum" style="color: #0F172A; font-family: monospace; font-size: 11px; white-space: nowrap;">SO-STM-P-00001</strong></span>
-                    <span style="white-space: nowrap;">កាលបរិច្ឆេទ / Date: <strong id="recDate">17/10/2026</strong></span>
+            <div style="font-size: 10px; line-height: 1.45; margin-bottom: 5px; color: #000000;">
+                <div class="pos-rec-row" style="white-space: nowrap; color: #000000;">
+                    <span style="white-space: nowrap; color: #000000;">លេខវិក្កយបត្រ / Inv #: <strong id="recOrderNum" style="color: #000000; font-family: monospace; font-size: 11px; white-space: nowrap;">SO-STM-P-00001</strong></span>
+                    <span style="white-space: nowrap; color: #000000;">កាលបរិច្ឆេទ / Date: <strong id="recDate" style="color: #000000;">17/10/2026</strong></span>
                 </div>
-                <div class="pos-rec-row">
-                    <span>អតិថិជន / Cust: <strong id="recCustName" class="font-khmer">Walk-in Customer</strong></span>
-                    <span>បេឡាករ / Cashier: <strong id="recCashierName">{{ branch.manager_name or 'Cashier' }}</strong></span>
+                <div class="pos-rec-row" style="color: #000000;">
+                    <span style="color: #000000;">អតិថិជន / Cust: <strong id="recCustName" class="font-khmer" style="color: #000000;">Walk-in Customer</strong></span>
+                    <span style="color: #000000;">បេឡាករ / Cashier: <strong id="recCashierName" style="color: #000000;">{{ current_cashier }}</strong></span>
                 </div>
             </div>
 
             <div class="pos-rec-divider-dashed"></div>
 
             <!-- Table Header -->
-            <div style="font-size: 9.5px; font-weight: 800; color: #1E293B; display: flex; justify-content: space-between; padding-bottom: 3px; border-bottom: 1.5px solid #0F172A; margin-bottom: 5px;">
-                <span style="flex: 1;">បរិយាយទំនិញ / ITEM</span>
-                <span style="width: 50px; text-align: center;">ចំនួន / QTY</span>
-                <span style="width: 55px; text-align: right;">តម្លៃ / PRICE</span>
-                <span style="width: 60px; text-align: right;">សរុប / TOTAL</span>
+            <div style="font-size: 9.5px; font-weight: 800; color: #000000; display: flex; justify-content: space-between; padding-bottom: 3px; border-bottom: 1.5px solid #000000; margin-bottom: 5px;">
+                <span style="flex: 1; color: #000000;">បរិយាយទំនិញ / ITEM</span>
+                <span style="width: 50px; text-align: center; color: #000000;">ចំនួន / QTY</span>
+                <span style="width: 55px; text-align: right; color: #000000;">តម្លៃ / PRICE</span>
+                <span style="width: 60px; text-align: right; color: #000000;">សរុប / TOTAL</span>
             </div>
 
             <!-- Items List -->
-            <div id="recItemsList" style="font-size: 10.5px; margin-bottom: 5px;"></div>
+            <div id="recItemsList" style="font-size: 10.5px; margin-bottom: 5px; color: #000000;"></div>
 
             <div class="pos-rec-divider-dashed"></div>
 
             <!-- Calculations Breakdown -->
-            <div style="font-size: 10.5px; line-height: 1.45;">
-                <div class="pos-rec-row" style="color: #64748B;">
-                    <span>ចំនួនមុខទំនិញ / Items Count:</span>
-                    <strong id="recItemsCount" style="color: #0F172A;">0 មុខ (0 pcs)</strong>
+            <div style="font-size: 10.5px; line-height: 1.45; color: #000000;">
+                <div class="pos-rec-row" style="color: #000000;">
+                    <span style="color: #000000;">ចំនួនមុខទំនិញ / Items Count:</span>
+                    <strong id="recItemsCount" style="color: #000000;">0 មុខ (0 pcs)</strong>
                 </div>
-                <div class="pos-rec-row">
-                    <span>សរុបរង / Subtotal:</span>
-                    <strong id="recSubtotal" style="font-family: monospace;">$0.00</strong>
+                <div class="pos-rec-row" style="color: #000000;">
+                    <span style="color: #000000;">សរុបរង / Subtotal:</span>
+                    <strong id="recSubtotal" style="font-family: monospace; color: #000000;">$0.00</strong>
                 </div>
-                <div class="pos-rec-row" id="recDiscountRow" style="display: none; color: #DC2626;">
-                    <span>បញ្ចុះតម្លៃ / Discount:</span>
-                    <strong id="recDiscount" style="font-family: monospace;">-$0.00</strong>
+                <div class="pos-rec-row" id="recDiscountRow" style="display: none; color: #000000;">
+                    <span style="color: #000000;">បញ្ចុះតម្លៃ / Discount:</span>
+                    <strong id="recDiscount" style="font-family: monospace; color: #000000;">-$0.00</strong>
                 </div>
 
                 <div class="pos-rec-divider-double"></div>
 
                 <!-- Grand Totals: USD and KHR (Prominent & Official with Kantumruy Pro) -->
-                <div class="pos-rec-row" style="font-size: 14.5px; font-weight: 900; color: #0F172A; padding: 2px 0;">
-                    <span class="font-khmer">សរុបជាដុល្លារ / TOTAL (USD):</span>
-                    <span id="recTotal" style="font-size: 15.5px; font-family: monospace; color: #0F172A;">$0.00</span>
+                <div class="pos-rec-row" style="font-size: 14.5px; font-weight: 900; color: #000000; padding: 2px 0;">
+                    <span class="font-khmer" style="color: #000000;">សរុបជាដុល្លារ / TOTAL (USD):</span>
+                    <span id="recTotal" style="font-size: 15.5px; font-family: monospace; color: #000000;">$0.00</span>
                 </div>
-                <div class="pos-rec-row" style="font-size: 13px; font-weight: 800; color: #059669; padding-bottom: 2px;">
-                    <span class="font-khmer">សរុបជារៀល / TOTAL (KHR):</span>
-                    <span id="recTotalKhr" class="font-khmer" style="font-weight: 800;">0 ៛</span>
+                <div class="pos-rec-row" style="font-size: 13px; font-weight: 800; color: #000000; padding-bottom: 2px;">
+                    <span class="font-khmer" style="color: #000000;">សរុបជារៀល / TOTAL (KHR):</span>
+                    <span id="recTotalKhr" class="font-khmer" style="font-weight: 800; color: #000000;">0 ៛</span>
                 </div>
 
                 <div class="pos-rec-divider-dashed"></div>
 
                 <!-- Payment Details & Change in USD & KHR -->
-                <div class="pos-rec-row" style="font-size: 10px; color: #475569;">
-                    <span>អត្រាប្តូរប្រាក់ / Rate:</span>
-                    <span id="recExchangeRate">1 USD = 4,100 ៛</span>
+                <div class="pos-rec-row" style="font-size: 10px; color: #000000;">
+                    <span style="color: #000000;">អត្រាប្តូរប្រាក់ / Rate:</span>
+                    <span id="recExchangeRate" style="color: #000000;">1 USD = 4,100 ៛</span>
                 </div>
-                <div class="pos-rec-row">
-                    <span>វិធីទូទាត់ / Payment Method:</span>
-                    <strong id="recMethod" style="color: #0F172A;">Cash</strong>
+                <div class="pos-rec-row" style="color: #000000;">
+                    <span style="color: #000000;">វិធីទូទាត់ / Payment Method:</span>
+                    <strong id="recMethod" style="color: #000000;">Cash</strong>
                 </div>
-                <div class="pos-rec-row" id="recPaidRow">
-                    <span>ប្រាក់ទទួលបាន / Received:</span>
-                    <span id="recPaidAmount" style="font-family: monospace; font-weight: 700;">$0.00</span>
+                <div class="pos-rec-row" id="recPaidRow" style="color: #000000;">
+                    <span style="color: #000000;">ប្រាក់ទទួលបាន / Received:</span>
+                    <span id="recPaidAmount" style="font-family: monospace; font-weight: 700; color: #000000;">$0.00</span>
                 </div>
-                <div class="pos-rec-row" id="recChangeRow" style="color: #059669; font-weight: 700;">
-                    <span>ប្រាក់អាប់ / Change Returned:</span>
-                    <span id="recChangeAmount">$0.00 (0 ៛)</span>
+                <div class="pos-rec-row" id="recChangeRow" style="color: #000000; font-weight: 700;">
+                    <span style="color: #000000;">ប្រាក់អាប់ / Change Returned:</span>
+                    <span id="recChangeAmount" style="color: #000000;">$0.00 (0 ៛)</span>
                 </div>
-                <div class="pos-rec-row" id="recBalanceRow" style="display: none; color: #DC2626; font-weight: 800; background: #FEF2F2; padding: 2px 5px; border-radius: 4px;">
-                    <span>ប្រាក់នៅខ្វះ / Balance Due:</span>
-                    <span id="recBalanceDue">$0.00</span>
+                <div class="pos-rec-row" id="recBalanceRow" style="display: none; color: #000000; font-weight: 800; border: 1px solid #000000; padding: 2px 5px; border-radius: 4px;">
+                    <span style="color: #000000;">ប្រាក់នៅខ្វះ / Balance Due:</span>
+                    <span id="recBalanceDue" style="color: #000000;">$0.00</span>
                 </div>
             </div>
 
             <div class="pos-rec-divider-dashed"></div>
 
             <!-- Footer Greetings & Return Policy -->
-            <div style="text-align: center; font-size: 9.5px; line-height: 1.4; color: #475569;">
-                <div style="font-weight: 700; color: #0F172A;" class="font-khmer">
+            <div style="text-align: center; font-size: 9.5px; line-height: 1.4; color: #000000;">
+                <div style="font-weight: 700; color: #000000;" class="font-khmer">
                     * សូមពិនិត្យទំនិញ និងប្រាក់អាប់មុនពេលចាកចេញ *
                 </div>
-                <div style="font-size: 9px; color: #64748B;">
+                <div style="font-size: 9px; color: #000000;">
                     (Please check your items & change before leaving)
                 </div>
-                <div style="margin-top: 2px; font-weight: 600; color: #334155;" class="font-khmer">
+                <div style="margin-top: 2px; font-weight: 600; color: #000000;" class="font-khmer">
                     {{ (branch_settings.footer_notes_kh if branch_settings else '') or 'ទំនិញដែលបានទិញរួចមិនអាចប្តូរវិញបានទេ!' }}
                 </div>
-                <div style="font-size: 9px; color: #64748B;">
+                <div style="font-size: 9px; color: #000000;">
                     {{ (branch_settings.footer_notes_en if branch_settings else '') or 'Goods sold are not returnable. Thank you for your business!' }}
                 </div>
-                <div style="margin-top: 5px; font-size: 11px; font-weight: 800; color: #059669;" class="font-khmer">
+                <div style="margin-top: 5px; font-size: 11px; font-weight: 800; color: #000000;" class="font-khmer">
                     🙏 សូមអរគុណ! សូមអញ្ជើញមកវិញ! 🙏
                 </div>
-                <div style="font-size: 8.5px; color: #94A3B8; margin-top: 4px;">
-                    Wi-Fi: <strong>{{ branch.code or 'STM' }}-Store</strong> | Hotline: <strong>{{ branch.phone or '+855 96 529 8098' }}</strong>
+                <div style="font-size: 8.5px; color: #000000; margin-top: 4px;">
+                    Wi-Fi: <strong style="color: #000000;">{{ branch.code or 'STM' }}-Store</strong> | Hotline: <strong style="color: #000000;">{{ branch.phone or '+855 96 529 8098' }}</strong>
                 </div>
-                <div style="font-size: 8px; color: #CBD5E1; margin-top: 1px;">
+                <div style="font-size: 8px; color: #000000; margin-top: 1px;">
                     Powered by inFlow Premium POS • Phnom Penh, Cambodia
                 </div>
             </div>
@@ -2996,7 +3024,7 @@ function submitPosCheckout(forceCheckout = false) {
                 date: new Date().toLocaleString('en-US', { hour12: false }),
                 whName: whName,
                 customerName: custName,
-                cashierName: {{ (branch.manager_name or 'Cashier')|tojson }},
+                cashierName: (data && data.cashier_name) ? data.cashier_name : {{ current_cashier|tojson }},
                 cartItems: Object.values(cart),
                 subtotal: subtotal,
                 discount: discount,
@@ -3186,7 +3214,7 @@ function populateThermalReceipt(info) {
     if (custEl) custEl.textContent = info.customerName || 'Walk-in Customer';
     
     const cashEl = document.getElementById('recCashierName');
-    if (cashEl) cashEl.textContent = info.cashierName || 'Cashier';
+    if (cashEl) cashEl.textContent = info.cashierName || {{ current_cashier|tojson }};
 
     // Subtotal & Discount
     const subtotalEl = document.getElementById('recSubtotal');
@@ -3249,14 +3277,14 @@ function populateThermalReceipt(info) {
         const calc = calculateItemDetails(it);
         totalPieces += calc.totalPcs;
         itemsHtml += `
-        <div style="margin-bottom: 5px; line-height: 1.35; border-bottom: 1px dotted #E2E8F0; padding-bottom: 4px;">
-            <div style="font-weight: 700; color: #0F172A; display: flex; justify-content: space-between;" class="font-khmer">
-                <span style="flex: 1; padding-right: 4px;">${idx + 1}. ${escapeHtml(it.name)}</span>
-                <span style="font-weight: 800; color: #0F172A; font-family: monospace;">$${calc.lineTotal.toFixed(2)}</span>
+        <div style="margin-bottom: 5px; line-height: 1.35; border-bottom: 1px dotted #000000; padding-bottom: 4px; color: #000000;">
+            <div style="font-weight: 700; color: #000000; display: flex; justify-content: space-between;" class="font-khmer">
+                <span style="flex: 1; padding-right: 4px; color: #000000;">${idx + 1}. ${escapeHtml(it.name)}</span>
+                <span style="font-weight: 800; color: #000000; font-family: monospace;">$${calc.lineTotal.toFixed(2)}</span>
             </div>
-            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #475569; padding-left: 12px; margin-top: 1px;">
-                <span>${it.qty} ${it.uom} × $${((calc.unitPrice * 100) % 1 !== 0 || {{ (branch_settings.unit_price_decimals if branch_settings and branch_settings.unit_price_decimals else 2)|tojson }} >= 3) ? calc.unitPrice.toFixed(3) : calc.unitPrice.toFixed(2)}</span>
-                <span style="color: #059669; font-weight: 600;">(${calc.totalPcs.toLocaleString()} pcs)</span>
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #000000; padding-left: 12px; margin-top: 1px;">
+                <span style="color: #000000;">${it.qty} ${it.uom} × $${((calc.unitPrice * 100) % 1 !== 0 || {{ (branch_settings.unit_price_decimals if branch_settings and branch_settings.unit_price_decimals else 2)|tojson }} >= 3) ? calc.unitPrice.toFixed(3) : calc.unitPrice.toFixed(2)}</span>
+                <span style="color: #000000; font-weight: 700;">(${calc.totalPcs.toLocaleString()} pcs)</span>
             </div>
         </div>`;
     });
@@ -3320,7 +3348,7 @@ function previewCurrentReceipt() {
         date: new Date().toLocaleString('en-US', { hour12: false }),
         whName: whName,
         customerName: custName,
-        cashierName: {{ (branch.manager_name or 'Cashier')|tojson }},
+        cashierName: {{ current_cashier|tojson }},
         cartItems: Object.values(cart),
         subtotal: subtotal,
         discount: discount,

@@ -2514,12 +2514,15 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                     Upload Photos or Document Attachments
                 </div>
                 <div style="font-size: 11.5px; color: #64748B; margin-bottom: 12px;">
-                    Take a photo with mobile camera or drag & drop images (JPG, PNG, WebP) / PDF files here
+                    Take a photo with mobile camera, drag & drop files, or <strong>paste image with Ctrl+V</strong>
                 </div>
 
                 <div style="display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 6px;">
                     <button type="button" class="inflow-dlg-btn" onclick="document.getElementById('soAttachmentFileInput').click()" style="background: #2563EB; color: #FFFFFF; font-weight: 600; padding: 6px 16px; border-radius: 5px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
                         <span>📷 Browse Photos / Files</span>
+                    </button>
+                    <button type="button" class="inflow-dlg-btn" onclick="pasteSoImageFromClipboard()" style="background: #FFFFFF; color: #2563EB; border: 1px solid #93C5FD; font-weight: 600; padding: 6px 14px; border-radius: 5px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;" title="Paste screenshot or copied image from clipboard">
+                        <span>📋 Paste Image (Ctrl+V)</span>
                     </button>
                 </div>
 
@@ -6897,6 +6900,88 @@ function closeOrderAttachmentModal() {
     const modal = document.getElementById('orderAttachmentModal');
     if (modal) modal.style.display = 'none';
     clearSoStagedFiles();
+}
+
+// Window paste event listener for SO attachments
+window.addEventListener('paste', function(e) {
+    const modal = document.getElementById('orderAttachmentModal');
+    if (!modal || modal.style.display === 'none') return;
+
+    const clipboardData = e.clipboardData || window.clipboardData;
+    if (!clipboardData) return;
+
+    const filesToUpload = [];
+    if (clipboardData.files && clipboardData.files.length > 0) {
+        for (let i = 0; i < clipboardData.files.length; i++) {
+            const f = clipboardData.files[i];
+            if (f.type && (f.type.startsWith('image/') || f.type === 'application/pdf')) {
+                filesToUpload.push(f);
+            }
+        }
+    }
+    if (filesToUpload.length === 0 && clipboardData.items) {
+        for (let i = 0; i < clipboardData.items.length; i++) {
+            const item = clipboardData.items[i];
+            if (item.kind === 'file' || (item.type && item.type.startsWith('image/'))) {
+                const blob = item.getAsFile();
+                if (blob) {
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                    let ext = 'png';
+                    if (item.type.includes('jpeg') || item.type.includes('jpg')) ext = 'jpg';
+                    else if (item.type.includes('webp')) ext = 'webp';
+                    else if (item.type.includes('gif')) ext = 'gif';
+
+                    const filename = `photo_${ts}.${ext}`;
+                    const pastedFile = new File([blob], filename, { type: item.type || 'image/png' });
+                    filesToUpload.push(pastedFile);
+                }
+            }
+        }
+    }
+
+    if (filesToUpload.length > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        filesToUpload.forEach(f => stagedSoFiles.push(f));
+        renderSoStagedFiles();
+    }
+});
+
+async function pasteSoImageFromClipboard() {
+    if (!navigator.clipboard || !navigator.clipboard.read) {
+        alert('Please press Ctrl + V on your keyboard to paste the copied image.');
+        return;
+    }
+    try {
+        const clipboardItems = await navigator.clipboard.read();
+        const filesToUpload = [];
+        for (const item of clipboardItems) {
+            for (const type of item.types) {
+                if (type.startsWith('image/')) {
+                    const blob = await item.getType(type);
+                    const now = new Date();
+                    const pad = n => String(n).padStart(2, '0');
+                    const ts = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+                    let ext = 'png';
+                    if (type.includes('jpeg') || type.includes('jpg')) ext = 'jpg';
+                    else if (type.includes('webp')) ext = 'webp';
+                    else if (type.includes('gif')) ext = 'gif';
+                    const filename = `photo_${ts}.${ext}`;
+                    filesToUpload.push(new File([blob], filename, { type }));
+                }
+            }
+        }
+        if (filesToUpload.length > 0) {
+            filesToUpload.forEach(f => stagedSoFiles.push(f));
+            renderSoStagedFiles();
+        } else {
+            alert('No image found in clipboard. Take a screenshot or copy an image first.');
+        }
+    } catch (err) {
+        alert('Please press Ctrl + V on your keyboard to paste.');
+    }
 }
 
 function handleSoFileSelection(input) {
