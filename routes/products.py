@@ -484,7 +484,7 @@ def _get_catalog_sidebar_products():
         ORDER BY p.name ASC, p.id ASC
     """)
 
-def _get_product_detail_bundle(product_id):
+def _get_product_detail_bundle(product_id, is_partial=False):
     # Global default price table style setting
     global_setting = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'default_price_table_style'")
     global_price_table_style = (global_setting['setting_value'] if global_setting and global_setting.get('setting_value') else 'classic').lower()
@@ -785,8 +785,10 @@ def _get_product_detail_bundle(product_id):
     locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name ASC")
 
-
-    all_products = query_all("SELECT id, name, sku, description, standard_cost, image_url FROM products WHERE is_active = TRUE AND id != %s ORDER BY name ASC", (product_id,))
+    if is_partial:
+        all_products = []
+    else:
+        all_products = query_all("SELECT id, name, sku, description, standard_cost, image_url FROM products WHERE is_active = TRUE AND id != %s ORDER BY name ASC", (product_id,))
     pricing_schemes = query_all("SELECT id, name, COALESCE(currency, 'US Dollar ($)') as currency, is_active FROM pricing_schemes WHERE is_active = TRUE ORDER BY id ASC")
 
     can_view_costs = user_can_view_costs()
@@ -990,7 +992,7 @@ def detail_product(id):
         request.args.get('partial') in ('workspace', '1', 'true')
     )
 
-    bundle = _get_product_detail_bundle(id)
+    bundle = _get_product_detail_bundle(id, is_partial=is_partial)
     if not bundle:
         if is_partial:
             return ("<div class='inflow-error-banner' style='padding:20px;color:#DC2626;'>Product not found.</div>", 404)
