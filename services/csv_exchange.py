@@ -336,6 +336,30 @@ def export_data_to_csv(data_type, branch_id=None):
     return csv_bytes, meta['default_filename']
 
 
+def is_likely_header_row(row):
+    """Detect if row 0 contains common header keywords rather than pure data."""
+    if not row:
+        return False
+    known_header_words = {
+        'ordernumber', 'order_number', 'order', 'orderno', 'sonumber', 'ponumber', 'orderstatus', 'order_status',
+        'customer', 'customername', 'customer_name', 'vendor', 'vendorname', 'vendor_name', 'supplier',
+        'itemcode', 'item_code', 'itemname', 'item_name', 'product', 'productname', 'product_name',
+        'sku', 'description', 'itemdescription', 'item_description', 'quantity', 'qty', 'itemquantity',
+        'unitprice', 'unit_price', 'price', 'itemunitprice', 'subtotal', 'itemsubtotal', 'total',
+        'discount', 'tax', 'date', 'orderdate', 'order_date', 'phone', 'email', 'contactname',
+        'contact_name', 'address', 'billingaddress', 'billingaddress1', 'billingaddress2',
+        'shippingaddress', 'shippingaddress1', 'shippingaddress2', 'uom', 'unit', 'city', 'state',
+        'barcode', 'category', 'cost', 'standardcost', 'amountpaid', 'paymentstatus', 'payment_status',
+        'freight', 'shipping', 'remarks', 'notes', 'terms', 'sublocation', 'location'
+    }
+    match_count = 0
+    for cell in row:
+        norm = normalize_header(cell)
+        if norm in known_header_words or any(k in norm for k in ('ordernumber', 'itemcode', 'itemname', 'customer', 'unitprice', 'subtotal', 'orderstatus', 'contactname')):
+            match_count += 1
+    return match_count >= 2
+
+
 def parse_csv_content(csv_text_or_bytes, has_headers=True):
     if isinstance(csv_text_or_bytes, bytes):
         text = csv_text_or_bytes.decode('utf-8-sig', errors='replace')
@@ -357,7 +381,11 @@ def parse_csv_content(csv_text_or_bytes, has_headers=True):
     if not cleaned_rows:
         return [], []
 
-    if has_headers:
+    # Smart header auto-detection: if row 0 clearly contains known column header names,
+    # treat it as a header row even if has_headers was passed as False.
+    is_header_detected = is_likely_header_row(cleaned_rows[0])
+
+    if has_headers or is_header_detected:
         headers = cleaned_rows[0]
         data_rows = cleaned_rows[1:]
     else:
@@ -983,6 +1011,22 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                         val = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', val).strip()
                         if val != '':
                             return val
+            if norm_headers and norm_headers[0].startswith('column'):
+                pos_map = {
+                    'ordernumber': 0, 'orderstatus': 1, 'customer': 2, 'contactname': 3,
+                    'phone': 4, 'email': 5, 'billingaddress1': 6, 'billingaddress2': 7,
+                    'billingcity': 8, 'orderdate': 9, 'itemcode': 10, 'itemname': 11,
+                    'itemquantity': 12, 'itemunitprice': 13, 'itemsubtotal': 14
+                } if key == 'sales_order' else {
+                    'ordernumber': 0, 'orderstatus': 1, 'vendor': 2, 'orderdate': 3,
+                    'itemcode': 4, 'itemdescription': 5, 'itemquantity': 6, 'itemunitcost': 7,
+                    'itemsubtotal': 8
+                }
+                for target in norm_aliases:
+                    if target in pos_map and pos_map[target] < len(row):
+                        val = row[pos_map[target]].strip()
+                        if val != '':
+                            return val
             return default
 
         existing_orders_map = {}
@@ -1343,6 +1387,22 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 if idx < len(row):
                     val = row[idx].strip()
                     val = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', val).strip()
+                    if val != '':
+                        return val
+        if norm_headers and norm_headers[0].startswith('column'):
+            pos_map = {
+                'ordernumber': 0, 'orderstatus': 1, 'customer': 2, 'contactname': 3,
+                'phone': 4, 'email': 5, 'billingaddress1': 6, 'billingaddress2': 7,
+                'billingcity': 8, 'orderdate': 9, 'itemcode': 10, 'itemname': 11,
+                'itemquantity': 12, 'itemunitprice': 13, 'itemsubtotal': 14
+            } if key == 'sales_order' else {
+                'ordernumber': 0, 'orderstatus': 1, 'vendor': 2, 'orderdate': 3,
+                'itemcode': 4, 'itemdescription': 5, 'itemquantity': 6, 'itemunitcost': 7,
+                'itemsubtotal': 8
+            }
+            for target in norm_aliases:
+                if target in pos_map and pos_map[target] < len(row):
+                    val = row[pos_map[target]].strip()
                     if val != '':
                         return val
         return default

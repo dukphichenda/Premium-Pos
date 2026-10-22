@@ -129,6 +129,12 @@ SO-303,2026-10-14,Cust C,OPEN,Item 3,1,30.00
         self.assertIn('badge-status-changed', html)
         self.assertIn('badge-unchanged', html)
         self.assertIn('btnToggleRawPreview', html)
+        self.assertIn('id="unmatchedProductsAlertModal"', html)
+        self.assertIn('showUnmatchedProductsAlertModal', html)
+        self.assertIn('id="orderPaginationBar"', html)
+        self.assertIn('notice-pill', html)
+        self.assertIn('closeUnmatchedAlertAndFocusTable', html)
+        self.assertIn('closeUnmatchedAlertAndKeepCustom', html)
 
     def test_keep_existing_auto_selects_new_and_status_changed_open_or_paid(self):
         """Verify preview_import_data in keep mode only auto-selects new orders or orders changing status to/from Open/Paid"""
@@ -220,6 +226,45 @@ SO-EXIST-2,2026-10-22,Client 2,PAID,Item 2,1,20.00,20.00
         self.assertEqual(res['auto_selected_count'], 2)
         for o in res['orders_summary']:
             self.assertTrue(o['is_auto_selected'])
+
+    def test_smart_header_autodetection_when_has_headers_false(self):
+        """Verify preview_import_data auto-detects header row and generates orders_summary even when has_headers=False"""
+        csv_data = """OrderNumber,OrderStatus,Customer,ContactName,Phone,Email,BillingAddress1,BillingAddress2,BillingCity,ItemCode,ItemName,ItemQuantity,ItemUnitPrice,ItemSubtotal
+SO-99001,Paid,John Doe,John Doe,012345678,john@example.com,Phnom Penh,,Phnom Penh,SKU-001,Product 1,2,10.00,20.00
+SO-99002,Open,Jane Smith,Jane Smith,098765432,jane@example.com,Siem Reap,,Siem Reap,SKU-002,Product 2,1,15.00,15.00
+"""
+        with patch('services.csv_exchange.query_all', return_value=[]):
+            # Explicitly pass has_headers=False as might happen if checkbox is unticked
+            res = preview_import_data('sales_order', csv_data.encode('utf-8'), has_headers=False, import_mode='keep')
+
+        self.assertEqual(res['data_type'], 'sales_order')
+        self.assertIn('orders_summary', res)
+        self.assertEqual(len(res['orders_summary']), 2)
+        ord_nums = [o['order_number'] for o in res['orders_summary']]
+        self.assertIn('SO-99001', ord_nums)
+        self.assertIn('SO-99002', ord_nums)
+        # Verify first row headers were properly recognized and not treated as an order
+        self.assertNotIn('OrderNumber', ord_nums)
+
+    def test_unmatched_products_detected_for_unknown_items(self):
+        """Verify preview_import_data detects unmatched products when CSV items do not exist in catalog"""
+        csv_data = """Order Number,Order Date,Customer,OrderStatus,Item Code,Item Name,Quantity,Unit Price,Subtotal
+SO-801,2026-10-23,Client X,PAID,UNKNOWN-01,Rare Gadget,3,25.00,75.00
+SO-802,2026-10-23,Client Y,OPEN,KNOWN-01,Standard Widget,1,10.00,10.00
+"""
+        mock_catalog_products = [
+            {'id': 10, 'sku': 'KNOWN-01', 'name': 'Standard Widget', 'uom': 'pcs.', 'default_price': 10.0}
+        ]
+        with patch('services.csv_exchange.query_all', side_effect=[[], mock_catalog_products]):
+            res = preview_import_data('sales_order', csv_data.encode('utf-8'), has_headers=True, import_mode='keep')
+
+        self.assertIn('unmatched_products', res)
+        self.assertEqual(len(res['unmatched_products']), 1)
+        unmatched = res['unmatched_products'][0]
+        self.assertEqual(unmatched['item_code'], 'UNKNOWN-01')
+        self.assertEqual(unmatched['item_name'], 'Rare Gadget')
+        self.assertEqual(unmatched['count'], 1)
+        self.assertIn('SO-801', unmatched['sample_orders'])
 
 
 if __name__ == '__main__':
