@@ -3,6 +3,45 @@
 {% block title %}Monthly Expense & Cash Tracker - {{ month_display }} - inFlow Premium{% endblock %}
 
 {% block content %}
+<style>
+.btn-save-sheet {
+    background: #FFFFFF;
+    border: 1.5px solid #0F766E;
+    color: #0F766E;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 15px;
+    border-radius: 6px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn-save-sheet:hover {
+    background: #F0FDFA;
+    border-color: #0D9488;
+    color: #0D9488;
+}
+.btn-save-sheet.is-dirty {
+    background: linear-gradient(180deg, #0F766E 0%, #0D9488 100%) !important;
+    border-color: #115E59 !important;
+    color: #FFFFFF !important;
+    box-shadow: 0 2px 8px rgba(15, 118, 110, 0.4) !important;
+    animation: saveSheetPulse 1.8s infinite;
+}
+@keyframes saveSheetPulse {
+    0% { box-shadow: 0 0 0 0 rgba(15, 118, 110, 0.5); }
+    70% { box-shadow: 0 0 0 6px rgba(15, 118, 110, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(15, 118, 110, 0); }
+}
+.btn-save-sheet.is-saved {
+    background: #ECFDF5 !important;
+    border-color: #10B981 !important;
+    color: #059669 !important;
+}
+</style>
 <div class="inflow-expense-container">
     <!-- Top Bar: Title & Primary Actions -->
     <div class="expense-top-header">
@@ -70,6 +109,14 @@
             <button type="button" class="btn btn-outline" onclick="openDeleteMonthModal()" style="color: #DC2626; border-color: #FCA5A5;" title="Delete this month sheet and all its entries">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                 <span>Delete Month</span>
+            </button>
+            <button type="button" class="btn btn-save-sheet" id="btnTopSaveExpenseSheet" onclick="saveAllExpensesSheet()" title="Save changes (Ctrl+S)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                    <polyline points="17 21 17 13 7 13 7 21"/>
+                    <polyline points="7 3 7 8 15 8"/>
+                </svg>
+                <span id="btnTopSaveText">Save</span>
             </button>
             <button type="button" class="btn btn-primary" onclick="openRecordModal()">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -885,6 +932,32 @@
             </div>
         </form>
     </div>
+<!-- inFlow Save Prompt Modal (Triggered when user edits any info and tries to leave) -->
+<div id="inflowSavePromptModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 99999; align-items: center; justify-content: center;">
+    <div class="inflow-modal-box" style="background: #FFFFFF; border-radius: 6px; box-shadow: 0 10px 30px rgba(0,0,0,0.3); width: 440px; max-width: 92vw; overflow: hidden; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: linear-gradient(180deg, #F8FAFC 0%, #EEF2F6 100%); border-bottom: 1px solid #CBD5E1; padding: 8px 14px; display: flex; justify-content: space-between; align-items: center;">
+            <div class="inflow-modal-title" style="display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: #1E293B;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="11" fill="#F97316"/>
+                    <path d="M12 6v12M6 12h12" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+                </svg>
+                <span>inFlow Inventory</span>
+            </div>
+            <button type="button" class="inflow-modal-close" onclick="handlePromptAction('cancel')" style="border: none; background: transparent; font-size: 14px; cursor: pointer; color: #64748B;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 20px 18px; display: flex; align-items: flex-start; gap: 14px; background: #FFFFFF;">
+            <div style="font-size: 28px; line-height: 1;">💾</div>
+            <div style="font-size: 13px; color: #1E293B; line-height: 1.5;">
+                <div style="font-weight: 700; margin-bottom: 4px;">Save changes to Monthly Expense & Cash Flow Record?</div>
+                <div style="color: #64748B; font-size: 12px;">If you choose <b>Don't Save</b>, your unsaved changes will be discarded.</div>
+            </div>
+        </div>
+        <div class="inflow-modal-footer" style="padding: 10px 14px; background: #F8FAFC; border-top: 1px solid #CBD5E1; display: flex; justify-content: flex-end; gap: 8px;">
+            <button type="button" class="inflow-dlg-btn btn-save" onclick="handlePromptAction('save')" style="min-width: 80px; padding: 5px 16px; font-size: 12px; font-weight: 600; color: #FFFFFF; background: #0F766E; border: 1px solid #0D9488; border-radius: 4px; cursor: pointer;">Save</button>
+            <button type="button" class="inflow-dlg-btn btn-dont-save" onclick="handlePromptAction('dont_save')" style="min-width: 80px; padding: 5px 16px; font-size: 12px; font-weight: 600; color: #1E293B; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; cursor: pointer;">Don't Save</button>
+            <button type="button" class="inflow-dlg-btn" onclick="handlePromptAction('cancel')" style="min-width: 80px; padding: 5px 16px; font-size: 12px; color: #475569; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; cursor: pointer;">Cancel</button>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -894,6 +967,37 @@
     const EXPECTED_MONEY_IN_HAND = {{ money_in_hand }};
     const PREV_MONEY_IN_HAND = {{ prev_money_in_hand }};
     const MEDIA_SHEET_TOTAL = {{ media_sheet_total }};
+
+    let isSheetDirty = false;
+    let promptCallbacks = {};
+    let pendingNavigationTarget = null;
+
+    function markSheetDirty() {
+        if (isSheetDirty) return;
+        isSheetDirty = true;
+        updateSaveButtonState();
+    }
+
+    function clearSheetDirty() {
+        isSheetDirty = false;
+        updateSaveButtonState();
+    }
+
+    function updateSaveButtonState() {
+        const saveBtn = document.getElementById('btnTopSaveExpenseSheet');
+        const saveText = document.getElementById('btnTopSaveText');
+        if (!saveBtn || !saveText) return;
+
+        if (isSheetDirty) {
+            saveBtn.classList.add('is-dirty');
+            saveText.innerHTML = 'Save <span style="display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #FEF08A; margin-left: 2px; vertical-align: middle;"></span>';
+            saveBtn.setAttribute('title', 'You have unsaved changes. Click to Save (Ctrl+S)');
+        } else {
+            saveBtn.classList.remove('is-dirty');
+            saveText.textContent = 'Save';
+            saveBtn.setAttribute('title', 'Save changes (Ctrl+S)');
+        }
+    }
 
     function toggleExportMenu(e) {
         e.stopPropagation();
@@ -1146,6 +1250,7 @@
     }
 
     function handleAccountInput(input) {
+        markSheetDirty();
         const raw = input.value.trim();
         const evalVal = evaluateArithmetic(raw);
         input.dataset.expr = raw;
@@ -1203,6 +1308,7 @@
     }
 
     function addAccountRow() {
+        markSheetDirty();
         const tbody = document.getElementById('reconAccountsBody');
         const tr = document.createElement('tr');
         tr.className = 'recon-acc-row';
@@ -1232,9 +1338,11 @@
         nameInput.focus();
         nameInput.select();
         calcCountedCashTotal();
+        scheduleAutoSaveAccountBalances(1000);
     }
 
     function deleteAccountRow(btn) {
+        markSheetDirty();
         const row = btn.closest('tr');
         if (row) {
             row.remove();
@@ -1292,6 +1400,7 @@
     let isSavingAccountBalances = false;
 
     function scheduleAutoSaveAccountBalances(delay = 600) {
+        markSheetDirty();
         if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
         const statusEl = document.getElementById('reconAutosaveStatus');
         if (statusEl && !isSavingAccountBalances) {
@@ -1366,19 +1475,187 @@
                         }
                     }, 2500);
                 }
+                clearSheetDirty();
+                return true;
             } else {
                 if (statusEl) {
                     statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600;" title="' + (res.error || 'Save error') + '">⚠️ Save failed</span>';
                 }
+                return false;
             }
         } catch (e) {
             if (statusEl) {
                 statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600;" title="' + e.message + '">⚠️ Network error</span>';
             }
+            return false;
         } finally {
             isSavingAccountBalances = false;
         }
     }
+
+    // Save button click handler in Top Bar
+    async function saveAllExpensesSheet(onSuccessCallback) {
+        const saveBtn = document.getElementById('btnTopSaveExpenseSheet');
+        const saveText = document.getElementById('btnTopSaveText');
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            if (saveText) saveText.innerHTML = '<span>⏳ Saving...</span>';
+        }
+
+        try {
+            if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
+            const ok = await saveAccountBalances();
+            if (ok) {
+                clearSheetDirty();
+                if (saveBtn) {
+                    saveBtn.classList.remove('is-dirty');
+                    saveBtn.classList.add('is-saved');
+                }
+                if (saveText) saveText.innerHTML = '<span>✓ Saved</span>';
+                setTimeout(() => {
+                    if (saveBtn) {
+                        saveBtn.classList.remove('is-saved');
+                        saveBtn.disabled = false;
+                    }
+                    if (!isSheetDirty && saveText) {
+                        saveText.textContent = 'Save';
+                    }
+                }, 2000);
+                if (typeof onSuccessCallback === 'function') onSuccessCallback();
+                return true;
+            } else {
+                if (saveText) saveText.innerHTML = '<span>⚠️ Failed</span>';
+                if (saveBtn) saveBtn.disabled = false;
+                return false;
+            }
+        } catch (err) {
+            console.error('Error saving expenses sheet:', err);
+            if (saveText) saveText.innerHTML = '<span>⚠️ Error</span>';
+            if (saveBtn) saveBtn.disabled = false;
+            return false;
+        }
+    }
+
+    function openSavePromptModal(onSave, onDiscard, onCancel) {
+        promptCallbacks = { onSave, onDiscard, onCancel };
+        const modal = document.getElementById('inflowSavePromptModal');
+        if (modal) modal.style.display = 'flex';
+    }
+
+    function closeSavePromptModal() {
+        const modal = document.getElementById('inflowSavePromptModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    async function handlePromptAction(action) {
+        closeSavePromptModal();
+        if (action === 'save') {
+            if (typeof promptCallbacks.onSave === 'function') {
+                promptCallbacks.onSave();
+            } else {
+                const ok = await saveAllExpensesSheet();
+                if (ok) proceedWithPendingNavigation();
+            }
+        } else if (action === 'dont_save') {
+            if (typeof promptCallbacks.onDiscard === 'function') {
+                promptCallbacks.onDiscard();
+            } else {
+                clearSheetDirty();
+                proceedWithPendingNavigation();
+            }
+        } else if (action === 'cancel') {
+            if (typeof promptCallbacks.onCancel === 'function') {
+                promptCallbacks.onCancel();
+            } else {
+                pendingNavigationTarget = null;
+            }
+        }
+    }
+
+    function proceedWithPendingNavigation() {
+        if (!pendingNavigationTarget) return;
+        const target = pendingNavigationTarget;
+        pendingNavigationTarget = null;
+        isSheetDirty = false;
+        if (target === '__CLOSE__') {
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.closeTab === 'function') {
+                window.top.inflowMdi.closeTab(window.top.inflowMdi.activeTabId);
+            }
+        } else {
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
+                window.top.inflowMdi.navigateOrOpenTab(target);
+            } else {
+                window.location.href = target;
+            }
+        }
+    }
+
+    // MDI tab close & switch attempt hook
+    window.handleTabCloseAttempt = function(targetUrl) {
+        if (!isSheetDirty) return true;
+        pendingNavigationTarget = targetUrl || '__CLOSE__';
+        openSavePromptModal(
+            async function() {
+                const ok = await saveAllExpensesSheet();
+                if (ok) proceedWithPendingNavigation();
+            },
+            function() {
+                clearSheetDirty();
+                proceedWithPendingNavigation();
+            },
+            function() {
+                pendingNavigationTarget = null;
+            }
+        );
+        return false;
+    };
+
+    // Intercept document link clicks when dirty
+    document.addEventListener('click', function(e) {
+        if (!isSheetDirty) return;
+        if (e.target.closest('#inflowSavePromptModal') || e.target.closest('#btnTopSaveExpenseSheet') || e.target.closest('.modal-overlay')) return;
+
+        const link = e.target.closest('a');
+        if (!link) return;
+        const href = link.getAttribute('href');
+        if (!href || href.startsWith('javascript:') || href.startsWith('#')) return;
+        if (link.target === '_blank' || link.hasAttribute('download')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        pendingNavigationTarget = href;
+        openSavePromptModal(
+            async function() {
+                const ok = await saveAllExpensesSheet();
+                if (ok) proceedWithPendingNavigation();
+            },
+            function() {
+                clearSheetDirty();
+                proceedWithPendingNavigation();
+            },
+            function() {
+                pendingNavigationTarget = null;
+            }
+        );
+    }, true);
+
+    // Browser beforeunload prompt
+    window.addEventListener('beforeunload', function(e) {
+        if (isSheetDirty) {
+            e.preventDefault();
+            e.returnValue = 'You have unsaved changes on this expense sheet.';
+            return e.returnValue;
+        }
+    });
+
+    // Keyboard shortcut Ctrl+S / Cmd+S
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+            e.preventDefault();
+            saveAllExpensesSheet();
+        }
+    });
 
     // Reset opening balance in modal to auto from previous month
     function resetOpeningToAuto() {
@@ -1449,6 +1726,7 @@
             });
             const res = await resp.json();
             if (res.success) {
+                isSheetDirty = false;
                 window.location.reload();
             } else {
                 alert("Error: " + res.error);
@@ -1459,6 +1737,19 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+        // Reset dirty flag on any form submission so submission isn't blocked
+        document.querySelectorAll('form').forEach(form => {
+            form.addEventListener('submit', () => {
+                isSheetDirty = false;
+            });
+        });
+
+        // Track dirty on quick expense form inputs
+        const quickItem = document.getElementById('quickItem');
+        const quickPrice = document.getElementById('quickPrice');
+        if (quickItem) quickItem.addEventListener('input', () => { if (quickItem.value.trim()) markSheetDirty(); });
+        if (quickPrice) quickPrice.addEventListener('input', () => { if (quickPrice.value.trim()) markSheetDirty(); });
+
         // Automatically evaluate all expressions and ensure calculated results display in inputs
         document.querySelectorAll('.acc-val-input').forEach(inp => {
             const expr = (inp.dataset.expr || '').trim();

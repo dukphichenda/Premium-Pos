@@ -1319,17 +1319,17 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
 /* Product Search / Line Item Autocomplete Popup (Bigger & Can Over The Sheet) */
 .inflow-item-dropdown-popup {
     display: none;
-    position: fixed !important;
-    width: 860px !important;
-    max-width: calc(100vw - 40px) !important;
-    max-height: 400px !important;
-    background: #FFFFFF !important;
-    border: 1.5px solid #7F9DB9 !important;
-    border-radius: 6px !important;
-    box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.35), 0 8px 18px -4px rgba(0, 0, 0, 0.2) !important;
-    z-index: 9999999 !important;
-    overflow-y: auto !important;
-    overflow-x: hidden !important;
+    position: fixed;
+    width: 650px;
+    max-width: calc(100vw - 40px);
+    max-height: 400px;
+    background: #FFFFFF;
+    border: 1.5px solid #7F9DB9;
+    border-radius: 6px;
+    box-shadow: 0 20px 48px -6px rgba(0, 0, 0, 0.35), 0 8px 18px -4px rgba(0, 0, 0, 0.2);
+    z-index: 9999999;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .inflow-item-dropdown-popup.show {
@@ -3683,10 +3683,23 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
                 if (incomingCustBody) incomingCustBody.replaceWith(cachedCustBody);
             }
         }
-        if (cachedItemBody && cachedItemBody.children.length > 0) {
-            const incomingItemBody = newCanvas.querySelector('#itemDropdownBody');
-            if (incomingItemBody) incomingItemBody.replaceWith(cachedItemBody);
+        // Ensure only one itemDropdownPopup exists on document.body and canvas has no duplicate
+        const incomingItemPopup = newCanvas.querySelector('#itemDropdownPopup');
+        const existingBodyItemPopup = document.querySelector('body > #itemDropdownPopup');
+        if (existingBodyItemPopup) {
+            const existingBody = existingBodyItemPopup.querySelector('#itemDropdownBody');
+            const incomingBody = incomingItemPopup ? incomingItemPopup.querySelector('#itemDropdownBody') : null;
+            if (incomingBody && incomingBody.children.length > 0 && (!existingBody || existingBody.children.length === 0)) {
+                existingBodyItemPopup.replaceWith(incomingItemPopup);
+            } else if (incomingItemPopup) {
+                incomingItemPopup.remove();
+            }
+            existingBodyItemPopup.classList.remove('show');
+        } else if (incomingItemPopup) {
+            document.body.appendChild(incomingItemPopup);
         }
+        activeItemInputEl = null;
+        activeGridRowEl = null;
 
         // Swap out document canvas instantly
         const currCanvas = document.querySelector('main.inflow-document-canvas');
@@ -4601,45 +4614,73 @@ function onDrawerCustomerType(val) {
    ========================================================================== */
 function positionItemDropdown(inputEl) {
     const popup = document.getElementById('itemDropdownPopup');
-    if (!popup || !inputEl) return;
-    const rect = inputEl.getBoundingClientRect();
+    if (!popup) return;
     
+    // Resolve active input element if missing or disconnected
+    if (!inputEl || !inputEl.isConnected) {
+        inputEl = (document.activeElement && document.activeElement.classList.contains('grid-item-input')) 
+                  ? document.activeElement 
+                  : activeItemInputEl;
+    }
+    if (!inputEl || !inputEl.isConnected || typeof inputEl.getBoundingClientRect !== 'function') return;
+
+    const rect = inputEl.getBoundingClientRect();
+    // Do not position if element is invisible or zero-dimensioned
+    if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) return;
+
     popup.style.position = 'fixed';
     popup.style.zIndex = '9999999';
-    
-    // Bigger width: 880px (or clamped to screen)
-    const popupWidth = Math.min(880, window.innerWidth - 30);
+
+    // Establish canvas boundaries so popup never overlaps or spills into the left sidebar
+    const canvasEl = document.querySelector('main.inflow-document-canvas') || document.body;
+    const canvasRect = canvasEl.getBoundingClientRect();
+    const minLeft = Math.max(10, Math.floor(canvasRect.left + 5));
+
+    // Dynamic width calculation (default 650px, bounded by viewport)
+    const availableWidth = window.innerWidth - minLeft - 20;
+    const popupWidth = Math.min(650, Math.max(450, availableWidth));
     popup.style.width = popupWidth + 'px';
-    
-    // Vertical boundary: if space below is less than 260px and space above is larger, flip above
+
+    // Vertical placement: prefer opening below the input
     const spaceBelow = window.innerHeight - rect.bottom;
     const spaceAbove = rect.top;
-    if (spaceBelow < 260 && spaceAbove > spaceBelow) {
+
+    // Flip above ONLY if space below is severely constrained (< 180px) AND space above offers more room
+    if (spaceBelow < 180 && spaceAbove > spaceBelow) {
         popup.style.top = 'auto';
-        popup.style.bottom = (window.innerHeight - rect.top + 3) + 'px';
-        popup.style.maxHeight = Math.min(420, Math.max(180, spaceAbove - 20)) + 'px';
+        popup.style.bottom = (window.innerHeight - rect.top + 2) + 'px';
+        popup.style.maxHeight = Math.min(380, Math.max(140, spaceAbove - 20)) + 'px';
     } else {
         popup.style.bottom = 'auto';
-        popup.style.top = (rect.bottom + 3) + 'px';
-        popup.style.maxHeight = Math.min(420, Math.max(180, spaceBelow - 20)) + 'px';
+        popup.style.top = (rect.bottom + 2) + 'px';
+        popup.style.maxHeight = Math.min(380, Math.max(140, spaceBelow - 20)) + 'px';
     }
-    
-    // Horizontal positioning: align with input left, clamped to viewport
+
+    // Horizontal placement: align left with item input, clamped between minLeft and right viewport edge
     let leftPos = rect.left;
     if (leftPos + popupWidth > window.innerWidth - 15) {
         leftPos = window.innerWidth - popupWidth - 15;
     }
-    if (leftPos < 10) leftPos = 10;
-    popup.style.left = leftPos + 'px';
+    if (leftPos < minLeft) {
+        leftPos = minLeft;
+    }
+    popup.style.left = Math.round(leftPos) + 'px';
 }
 
 function openItemDropdown(inputEl) {
+    if (!inputEl || !inputEl.isConnected) {
+        inputEl = (document.activeElement && document.activeElement.classList.contains('grid-item-input')) 
+                  ? document.activeElement 
+                  : null;
+    }
     activeItemInputEl = inputEl;
-    activeGridRowEl = inputEl.closest('tr');
-    selectGridRow(activeGridRowEl);
+    if (inputEl) {
+        activeGridRowEl = inputEl.closest('tr');
+        selectGridRow(activeGridRowEl);
+    }
 
     const popup = document.getElementById('itemDropdownPopup');
-    if (popup && inputEl) {
+    if (popup && inputEl && inputEl.isConnected) {
         // Detach and append directly to document.body so it floats OVER the entire sheet and is NEVER clipped
         if (popup.parentElement !== document.body) {
             document.body.appendChild(popup);
@@ -4649,14 +4690,25 @@ function openItemDropdown(inputEl) {
     }
 }
 
-function filterItemDropdown(val) {
+function filterItemDropdown(val, inputEl) {
+    if (inputEl && inputEl.isConnected) {
+        activeItemInputEl = inputEl;
+        activeGridRowEl = inputEl.closest('tr');
+    } else if (!activeItemInputEl || !activeItemInputEl.isConnected) {
+        if (document.activeElement && document.activeElement.classList.contains('grid-item-input')) {
+            activeItemInputEl = document.activeElement;
+            activeGridRowEl = activeItemInputEl.closest('tr');
+        }
+    }
     const popup = document.getElementById('itemDropdownPopup');
     if (popup) {
         if (popup.parentElement !== document.body) {
             document.body.appendChild(popup);
         }
-        if (activeItemInputEl) positionItemDropdown(activeItemInputEl);
-        popup.classList.add('show');
+        if (activeItemInputEl && activeItemInputEl.isConnected) {
+            positionItemDropdown(activeItemInputEl);
+            popup.classList.add('show');
+        }
     }
 
     const query = (val || '').toLowerCase().trim();
@@ -4770,7 +4822,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                 </div>
             </td>
             <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
-                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`}
+                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`}
             </td>
             <td style="position: relative;">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
@@ -4779,7 +4831,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
                 <input type="text" class="inflow-field-input grid-item-input" value="${sku} ${name}" 
                        placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
-                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value)"
+                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
                        onkeydown="handleItemDropdownKey(event, this)">
             </td>
             <td style="position: relative;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
@@ -4838,7 +4890,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         activeGridRowEl.querySelector('.grid-item-input').value = `${sku} ${name}`;
         const picCell = activeGridRowEl.querySelector('.line-pic-cell');
         if (picCell) {
-            picCell.innerHTML = prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 3px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 3px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`;
+            picCell.innerHTML = prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`;
         }
         const descInput = activeGridRowEl.querySelector('input[name*="[description]"]');
         if (descInput) descInput.value = desc;

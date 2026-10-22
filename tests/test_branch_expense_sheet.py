@@ -211,6 +211,25 @@ class TestBranchExpenseSheet(unittest.TestCase):
         self.assertIn('/expenses/monthly', resp.headers['Location'])
         self.assertIn('branch=1', resp.headers['Location'])
 
+    def test_save_button_and_prompt_modal_present(self):
+        """
+        Verify that:
+        - Top bar has '#btnTopSaveExpenseSheet' right near Record Expense.
+        - Unsaved changes modal '#inflowSavePromptModal' is rendered with Save, Don't Save, Cancel.
+        - JavaScript dirty tracking and window.handleTabCloseAttempt navigation guard are present.
+        """
+        resp = self.client.get('/expenses/monthly?month=2026-10&branch=main')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        self.assertIn('id="btnTopSaveExpenseSheet"', html)
+        self.assertIn('btn-save-sheet', html)
+        self.assertIn('id="inflowSavePromptModal"', html)
+        self.assertIn('handleTabCloseAttempt', html)
+        self.assertIn('saveAllExpensesSheet', html)
+        self.assertIn('isSheetDirty', html)
+        self.assertIn('markSheetDirty', html)
+
 
 if __name__ == '__main__':
     unittest.main()
+

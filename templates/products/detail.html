@@ -690,7 +690,8 @@
                         </div>
 
                         <!-- Price Table Style Switcher (Classic / Modern / Cute Look) -->
-                        {% set active_style = (price_card.price_table_style if price_card else (product.price_table_style or 'classic'))|lower %}
+                        {% set raw_style = (price_card.price_table_style if price_card and price_card.price_table_style else (product.price_table_style or 'classic'))|lower %}
+                        {% set active_style = raw_style if raw_style in ('classic', 'modern', 'cute', 'gen_z', 'genz') else 'classic' %}
                         {% set std_uom_name = (price_card.standard_uom if price_card and price_card.standard_uom else (product.uom or 'pcs.')) %}
                         {% set std_uom_badge = (price_card.standard_uom_display if price_card and price_card.standard_uom_display else (std_uom_name|replace('.', '')|upper)) %}
                         <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic, Modern, ឬ Cute Look)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
@@ -1204,24 +1205,12 @@
 
                                 <div class="inflow-genz-image-frame">
                                     {% if product.image_url %}
-                                    <img src="{{ product.image_url }}" alt="{{ product.name }}">
+                                    <img src="{{ product.image_url }}" alt="{{ product.name }}" style="border-radius: 14px; object-fit: contain;">
                                     {% else %}
                                     <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
                                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                                         <span style="font-size: 11px; margin-top: 6px;">No Image</span>
                                     </div>
-                                    {% endif %}
-                                    
-                                    {% set dim_str = price_card.dim_str if price_card else '25cm x 18cm x 3cm' %}
-                                    {% set parts = dim_str.split('x') %}
-                                    {% if parts|length >= 1 and parts[0].strip() %}
-                                    <div class="inflow-genz-dim-top"><span class="font-khmer">បណ្តោយ</span> {{ parts[0].strip() }}</div>
-                                    {% endif %}
-                                    {% if parts|length >= 2 and parts[1].strip() %}
-                                    <div class="inflow-genz-dim-left"><span class="font-khmer">ទទឹង</span> {{ parts[1].strip() }}</div>
-                                    {% endif %}
-                                    {% if parts|length >= 3 and parts[2].strip() %}
-                                    <div class="inflow-genz-dim-right"><span class="font-khmer">កម្ពស់</span> {{ parts[2].strip() }}</div>
                                     {% endif %}
                                     {% if product.capacity %}
                                     <div class="inflow-genz-capacity-badge font-khmer">{{ product.capacity }}</div>
@@ -2499,6 +2488,13 @@ function toggleInternalProfitDrawerDetail() {
 }
 
 function setProductPriceCardStyleDetail(style) {
+    if (!style || !['classic', 'modern', 'cute', 'gen_z', 'genz'].includes(String(style).toLowerCase().trim())) {
+        style = 'classic';
+    } else {
+        style = String(style).toLowerCase().trim();
+        if (style === 'genz') style = 'gen_z';
+    }
+
     const card = document.getElementById('printablePriceCardDetail');
     const classicContent = document.getElementById('cardContentClassicDetail');
     const modernContent = document.getElementById('cardContentModernDetail');
@@ -2510,21 +2506,19 @@ function setProductPriceCardStyleDetail(style) {
     const btnGenZ = document.getElementById('btnDetailStyleGenZDetail');
     
     if (card) {
-        card.classList.remove('modern', 'cute', 'gen_z');
-        if (style === 'modern') card.classList.add('modern');
-        else if (style === 'cute') card.classList.add('cute');
-        else if (style === 'gen_z' || style === 'genz') card.classList.add('gen_z');
+        card.classList.remove('classic', 'modern', 'cute', 'gen_z');
+        card.classList.add(style);
     }
 
     if (classicContent) classicContent.style.display = (style === 'classic') ? 'block' : 'none';
     if (modernContent) modernContent.style.display = (style === 'modern') ? 'block' : 'none';
     if (cuteContent) cuteContent.style.display = (style === 'cute') ? 'block' : 'none';
-    if (genZContent) genZContent.style.display = (style === 'gen_z' || style === 'genz') ? 'block' : 'none';
+    if (genZContent) genZContent.style.display = (style === 'gen_z') ? 'block' : 'none';
 
     if (btnClassic) btnClassic.classList.toggle('active-classic', style === 'classic');
     if (btnModern) btnModern.classList.toggle('active-modern', style === 'modern');
     if (btnCute) btnCute.classList.toggle('active-cute', style === 'cute');
-    if (btnGenZ) btnGenZ.classList.toggle('active-gen_z', style === 'gen_z' || style === 'genz');
+    if (btnGenZ) btnGenZ.classList.toggle('active-gen_z', style === 'gen_z');
 }
 
 function hexToRgbaDetail(hex, alpha) {
