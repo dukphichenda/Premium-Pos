@@ -9,9 +9,18 @@ class TestProductImageSaveAndExit(unittest.TestCase):
         self.detail_path = os.path.join(self.base_dir, 'templates', 'products', 'detail.html')
         self.routes_path = os.path.join(self.base_dir, 'routes', 'products.py')
 
-    def test_catalog_html_staged_image_and_save_guard(self):
+    def _read_catalog_full(self):
         with open(self.catalog_path, 'r', encoding='utf-8') as f:
             content = f.read()
+        for partial in ['_catalog_workspace_main.html', '_catalog_workspace_modals.html', '_catalog_workspace_scripts.html']:
+            p_path = os.path.join(self.base_dir, 'templates', 'products', partial)
+            if os.path.exists(p_path):
+                with open(p_path, 'r', encoding='utf-8') as f:
+                    content += "\n" + f.read()
+        return content
+
+    def test_catalog_html_staged_image_and_save_guard(self):
+        content = self._read_catalog_full()
 
         # Must have stagedProductImageFile and originalProductImageUrl
         self.assertIn('stagedProductImageFile', content)
@@ -78,8 +87,7 @@ class TestProductImageSaveAndExit(unittest.TestCase):
         self.assertIn("if next_url:\n            return redirect(next_url)", content)
 
     def test_showcase_uses_top_save_button(self):
-        with open(self.catalog_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        content = self._read_catalog_full()
 
         # Verify showcase toolbar does not contain separate Save button
         showcase_toolbar_idx = content.find('class="inflow-price-showcase-actions"')

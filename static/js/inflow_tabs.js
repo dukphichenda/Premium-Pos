@@ -284,7 +284,10 @@
                     return 'Purchase Order';
                 }
                 if (type === 'product') {
-                    if (url.includes('/new')) return 'Product';
+                    if (url.includes('/merge-duplicates')) return 'Merge Duplicates';
+                    if (url.includes('/price-list')) return 'Price List';
+                    if (url.includes('/catalog-view')) return 'Product Catalog';
+                    if (url.includes('/new')) return 'New Product';
                     return 'Product';
                 }
                 if (type === 'reports') {
