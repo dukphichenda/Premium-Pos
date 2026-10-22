@@ -742,7 +742,18 @@
                 this.saveTabsToStorage();
             },
 
-            createTab: function (cleanUrl, displayTitle, detectedType) {
+            createTab: function (cleanUrl, displayTitle, detectedType, bypassGuard = false) {
+                if (!bypassGuard && this.activeTabId) {
+                    const curVp = document.getElementById(`viewport-${this.activeTabId}`);
+                    if (curVp) {
+                        const curIfr = curVp.querySelector('iframe');
+                        if (curIfr && curIfr.contentWindow && typeof curIfr.contentWindow.handleTabCloseAttempt === 'function') {
+                            const canProceed = curIfr.contentWindow.handleTabCloseAttempt(cleanUrl);
+                            if (!canProceed) return;
+                        }
+                    }
+                }
+
                 const newId = `tab-${detectedType}-${Date.now()}`;
                 const newTab = {
                     id: newId,
@@ -762,7 +773,7 @@
                 }
 
                 this.renderTabBar();
-                this.switchTab(newId);
+                this.switchTab(newId, true);
                 this.saveTabsToStorage();
 
                 setTimeout(() => {
@@ -771,9 +782,20 @@
                 }, 50);
             },
 
-            switchTab: function (tabId) {
+            switchTab: function (tabId, bypassGuard = false) {
                 const targetTab = this.tabs.find(t => t.id === tabId);
                 if (!targetTab) return;
+
+                if (!bypassGuard && this.activeTabId && this.activeTabId !== tabId) {
+                    const curVp = document.getElementById(`viewport-${this.activeTabId}`);
+                    if (curVp) {
+                        const curIfr = curVp.querySelector('iframe');
+                        if (curIfr && curIfr.contentWindow && typeof curIfr.contentWindow.handleTabCloseAttempt === 'function') {
+                            const canProceed = curIfr.contentWindow.handleTabCloseAttempt(targetTab.url || '');
+                            if (!canProceed) return;
+                        }
+                    }
+                }
 
                 this.activeTabId = tabId;
 

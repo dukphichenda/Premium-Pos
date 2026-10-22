@@ -495,7 +495,7 @@
                             <tr class="recon-acc-row">
                                 <td class="acc-name-cell">
                                     <span class="acc-icon-indicator"></span>
-                                    <input type="text" class="acc-name-input" value="{{ acc.name }}" placeholder="Account name" oninput="scheduleAutoSaveAccountBalances(1000)" onchange="scheduleAutoSaveAccountBalances(50)" onblur="scheduleAutoSaveAccountBalances(50)">
+                                    <input type="text" class="acc-name-input" value="{{ acc.name }}" placeholder="Account name" oninput="markSheetDirty()" onchange="markSheetDirty()">
                                 </td>
                                 <td>
                                     <input type="text" 
@@ -973,14 +973,23 @@
     let pendingNavigationTarget = null;
 
     function markSheetDirty() {
-        if (isSheetDirty) return;
-        isSheetDirty = true;
-        updateSaveButtonState();
+        if (!isSheetDirty) {
+            isSheetDirty = true;
+            updateSaveButtonState();
+        }
+        const statusEl = document.getElementById('reconAutosaveStatus');
+        if (statusEl) {
+            statusEl.innerHTML = '<span style="color: #D97706; font-weight: 600; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">● Unsaved edits</span>';
+        }
     }
 
     function clearSheetDirty() {
         isSheetDirty = false;
         updateSaveButtonState();
+        const statusEl = document.getElementById('reconAutosaveStatus');
+        if (statusEl && !statusEl.innerHTML.includes('✓ Saved')) {
+            statusEl.innerHTML = '';
+        }
     }
 
     function updateSaveButtonState() {
@@ -1074,9 +1083,27 @@
 
     function goToSelectedMonth() {
         const val = document.getElementById('newMonthInput').value;
-        if (val) {
-            window.location.href = "{{ url_for('expenses.monthly_expenses') }}?month=" + encodeURIComponent(val);
+        if (!val) return;
+        const url = "{{ url_for('expenses.monthly_expenses') }}?month=" + encodeURIComponent(val);
+        if (isSheetDirty) {
+            closeModal('newMonthModal');
+            pendingNavigationTarget = url;
+            openSavePromptModal(
+                async function() {
+                    const ok = await saveAllExpensesSheet();
+                    if (ok) proceedWithPendingNavigation();
+                },
+                function() {
+                    clearSheetDirty();
+                    proceedWithPendingNavigation();
+                },
+                function() {
+                    pendingNavigationTarget = null;
+                }
+            );
+            return;
         }
+        window.location.href = url;
     }
 
     function calcModalTotal() {
@@ -1266,7 +1293,6 @@
         }
 
         calcCountedCashTotal();
-        scheduleAutoSaveAccountBalances(1000);
     }
 
     function formatAccountBlur(input) {
@@ -1290,7 +1316,6 @@
             }
         }
         calcCountedCashTotal();
-        scheduleAutoSaveAccountBalances(50);
     }
 
     function formatAccountFocus(input) {
@@ -1315,7 +1340,7 @@
         tr.innerHTML = `
             <td class="acc-name-cell">
                 <span class="acc-icon-indicator"></span>
-                <input type="text" class="acc-name-input" value="New Account" placeholder="Account name" oninput="scheduleAutoSaveAccountBalances(1000)" onchange="scheduleAutoSaveAccountBalances(50)" onblur="scheduleAutoSaveAccountBalances(50)">
+                <input type="text" class="acc-name-input" value="New Account" placeholder="Account name" oninput="markSheetDirty()" onchange="markSheetDirty()">
             </td>
             <td>
                 <input type="text" 
@@ -1338,7 +1363,6 @@
         nameInput.focus();
         nameInput.select();
         calcCountedCashTotal();
-        scheduleAutoSaveAccountBalances(1000);
     }
 
     function deleteAccountRow(btn) {
@@ -1347,7 +1371,6 @@
         if (row) {
             row.remove();
             calcCountedCashTotal();
-            scheduleAutoSaveAccountBalances(50);
         }
     }
 
@@ -1396,27 +1419,13 @@
         }
     }
 
-    let autoSaveAccountBalancesTimer = null;
     let isSavingAccountBalances = false;
 
-    function scheduleAutoSaveAccountBalances(delay = 600) {
-        markSheetDirty();
-        if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
-        const statusEl = document.getElementById('reconAutosaveStatus');
-        if (statusEl && !isSavingAccountBalances) {
-            statusEl.innerHTML = '<span style="color: #64748B; font-weight: 500;">● Editing...</span>';
-        }
-        autoSaveAccountBalancesTimer = setTimeout(() => {
-            saveAccountBalances();
-        }, delay);
-    }
-
-    // Auto-Save Bank & Cash Account Balances
+    // Save Bank & Cash Account Balances to server
     async function saveAccountBalances() {
-        if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
         const statusEl = document.getElementById('reconAutosaveStatus');
         if (statusEl) {
-            statusEl.innerHTML = '<span style="color: #0284C7; font-weight: 600;">🔄 Saving...</span>';
+            statusEl.innerHTML = '<span style="color: #0284C7; font-weight: 600; font-size: 11px;">🔄 Saving...</span>';
         }
         isSavingAccountBalances = true;
 
@@ -1468,7 +1477,7 @@
                 });
                 calcCountedCashTotal();
                 if (statusEl) {
-                    statusEl.innerHTML = '<span style="color: #059669; font-weight: 600;">✓ Saved</span>';
+                    statusEl.innerHTML = '<span style="color: #059669; font-weight: 600; font-size: 11px;">✓ Saved</span>';
                     setTimeout(() => {
                         if (statusEl && statusEl.innerHTML.includes('✓ Saved')) {
                             statusEl.innerHTML = '';
@@ -1479,13 +1488,13 @@
                 return true;
             } else {
                 if (statusEl) {
-                    statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600;" title="' + (res.error || 'Save error') + '">⚠️ Save failed</span>';
+                    statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600; font-size: 11px;" title="' + (res.error || 'Save error') + '">⚠️ Save failed</span>';
                 }
                 return false;
             }
         } catch (e) {
             if (statusEl) {
-                statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600;" title="' + e.message + '">⚠️ Network error</span>';
+                statusEl.innerHTML = '<span style="color: #DC2626; font-weight: 600; font-size: 11px;" title="' + e.message + '">⚠️ Network error</span>';
             }
             return false;
         } finally {
@@ -1493,7 +1502,7 @@
         }
     }
 
-    // Save button click handler in Top Bar
+    // Master Save button click handler in Top Bar
     async function saveAllExpensesSheet(onSuccessCallback) {
         const saveBtn = document.getElementById('btnTopSaveExpenseSheet');
         const saveText = document.getElementById('btnTopSaveText');
@@ -1503,7 +1512,6 @@
         }
 
         try {
-            if (autoSaveAccountBalancesTimer) clearTimeout(autoSaveAccountBalancesTimer);
             const ok = await saveAccountBalances();
             if (ok) {
                 clearSheetDirty();
@@ -1582,8 +1590,16 @@
                 window.top.inflowMdi.closeTab(window.top.inflowMdi.activeTabId);
             }
         } else {
-            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
-                window.top.inflowMdi.navigateOrOpenTab(target);
+            if (window.top && window.top.inflowMdi) {
+                const clean = target.replace(/[?&]embed=1/, '');
+                const existing = window.top.inflowMdi.tabs ? window.top.inflowMdi.tabs.find(t => t.url.replace(/[?&]embed=1/, '') === clean) : null;
+                if (existing && typeof window.top.inflowMdi.switchTab === 'function') {
+                    window.top.inflowMdi.switchTab(existing.id, true);
+                } else if (typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
+                    window.top.inflowMdi.navigateOrOpenTab(target);
+                } else {
+                    window.location.href = target;
+                }
             } else {
                 window.location.href = target;
             }
