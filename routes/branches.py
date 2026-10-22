@@ -952,11 +952,21 @@ def branch_pos(id):
             COALESCE(NULLIF(p.pcs_per_pack, 0), 50) as pcs_per_pack,
             p.category_id,
             COALESCE(c.name, 'General') as category_name,
-            COALESCE(i.quantity, 0) as stock_qty
+            COALESCE(i.quantity, 0) as stock_qty,
+            COALESCE(s.order_count, 0) as order_count,
+            COALESCE(s.total_sold_qty, 0) as total_sold_qty
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN inventory i ON p.id = i.product_id AND i.location_id = %s
         LEFT JOIN product_prices pp_def ON p.id = pp_def.product_id AND pp_def.pricing_scheme_id = 100
+        LEFT JOIN (
+            SELECT 
+                sol.product_id, 
+                SUM(sol.quantity) as total_sold_qty, 
+                COUNT(DISTINCT sol.sales_order_id) as order_count
+            FROM sales_order_lines sol
+            GROUP BY sol.product_id
+        ) s ON p.id = s.product_id
         WHERE p.is_active = TRUE AND p.is_sellable = TRUE
         ORDER BY p.name ASC
     """, (selected_wh_id,))
@@ -979,6 +989,22 @@ def branch_pos(id):
 
     branch_settings = _get_branch_settings(branch)
 
+    # Branch Color Scheme matching user's branch settings or branch color
+    branch_color = (branch.get('color') or (branch_settings.get('primary_color') if branch_settings else None) or '#10B981').strip()
+    h = branch_color.lstrip('#')
+    if len(h) == 3:
+        h = ''.join(c * 2 for c in h)
+    try:
+        branch_color_rgb = f"{int(h[0:2], 16)}, {int(h[2:4], 16)}, {int(h[4:6], 16)}"
+    except Exception:
+        branch_color_rgb = "16, 185, 129"
+
+    # Branch Favorite Products
+    favorite_product_ids = branch_settings.get('favorite_product_ids') or []
+    if not isinstance(favorite_product_ids, list):
+        favorite_product_ids = []
+    favorite_product_ids = [int(x) for x in favorite_product_ids if str(x).isdigit()]
+
     from database import preview_order_number
     pos_preview_number = preview_order_number('POS', branch_id=id) or f"SO-{(branch.get('code') or 'STM').strip().upper()}-P-00001"
     cashier_name = session.get('username') or session.get('display_name') or branch.get('manager_name') or 'Cashier'
@@ -986,6 +1012,9 @@ def branch_pos(id):
     return render_template('branches/pos.html',
                            branch=branch,
                            branch_settings=branch_settings,
+                           branch_color=branch_color,
+                           branch_color_rgb=branch_color_rgb,
+                           favorite_product_ids=favorite_product_ids,
                            cashier_name=cashier_name,
                            pos_preview_number=pos_preview_number,
                            perms=perms,
@@ -996,6 +1025,41 @@ def branch_pos(id):
                            customers=customers,
                            pricing_schemes=pricing_schemes,
                            product_prices_map=product_prices_map)
+
+@branches_bp.route('/branches/<int:id>/pos/toggle_favorite', methods=['POST'])
+def branch_pos_toggle_favorite(id):
+    """Persists favorite product state for this branch."""
+    try:
+        data = request.get_json(force=True) or {}
+        product_id = int(data.get('product_id') or 0)
+        if not product_id:
+            return jsonify({'success': False, 'message': 'Missing product_id'}), 400
+
+        branch = query_one("SELECT id, settings_json FROM branches WHERE id = %s", (id,))
+        if not branch:
+            return jsonify({'success': False, 'message': 'Branch not found'}), 404
+
+        settings = branch.get('settings_json') or {}
+        if not isinstance(settings, dict):
+            settings = {}
+        favs = set(settings.get('favorite_product_ids') or [])
+        if 'is_favorite' in data:
+            is_fav = bool(data['is_favorite'])
+        else:
+            is_fav = product_id not in favs
+
+        if is_fav:
+            favs.add(product_id)
+        else:
+            favs.discard(product_id)
+
+        settings['favorite_product_ids'] = sorted(list(favs))
+        execute("UPDATE branches SET settings_json = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+                (json.dumps(settings), id))
+        return jsonify({'success': True, 'is_favorite': is_fav, 'favorite_product_ids': settings['favorite_product_ids']})
+    except Exception as e:
+        logger.error(f"Error toggling favorite product: {e}")
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @branches_bp.route('/branches/<int:id>/pos/checkout', methods=['POST'])
 def branch_checkout(id):

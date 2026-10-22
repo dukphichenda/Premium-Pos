@@ -7,6 +7,15 @@
 {% block content %}
 {% set current_cashier = cashier_name or session.get('username') or session.get('display_name') or branch.manager_name or 'Cashier' %}
 <style>
+/* Dynamic Branch Color Scheme */
+:root {
+    --pos-primary: {{ branch_color or '#10B981' }};
+    --pos-primary-rgb: {{ branch_color_rgb or '16, 185, 129' }};
+    --pos-primary-light: rgba(var(--pos-primary-rgb), 0.08);
+    --pos-primary-border: rgba(var(--pos-primary-rgb), 0.28);
+    --pos-primary-shadow: rgba(var(--pos-primary-rgb), 0.35);
+}
+
 /* Modern POS Layout & Typography matching reference design */
 .pos-modern-body {
     background-color: #F8F9FA !important;
@@ -63,8 +72,8 @@
 }
 
 .pos-search-input:focus {
-    border-color: #FF5A5F;
-    box-shadow: 0 0 0 3px rgba(255, 90, 95, 0.12);
+    border-color: var(--pos-primary);
+    box-shadow: 0 0 0 3px rgba(var(--pos-primary-rgb), 0.15);
 }
 
 .pos-search-icon {
@@ -134,14 +143,14 @@
     width: 36px;
     height: 36px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #FF8A80, #FF5A5F);
+    background: linear-gradient(135deg, rgba(var(--pos-primary-rgb), 0.75), var(--pos-primary));
     color: #FFFFFF;
     font-weight: 800;
     font-size: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: 0 2px 5px rgba(255, 90, 95, 0.3);
+    box-shadow: 0 2px 6px var(--pos-primary-shadow);
 }
 
 .pos-cashier-meta {
@@ -159,156 +168,278 @@
     color: #94A3B8;
 }
 
-/* Category Carousel Section */
-.pos-category-section {
+/* ==================================================================== */
+/* View By Tab Bar (Replacing bulky Category Carousel)                   */
+/* ==================================================================== */
+.pos-viewby-bar {
     display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.pos-section-header {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
-}
-
-.pos-section-title {
-    font-size: 17px;
-    font-weight: 800;
-    color: #0F172A;
-    margin: 0;
-}
-
-.pos-icon-btn {
-    background: transparent;
-    border: none;
-    color: #94A3B8;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    font-size: 18px;
-    transition: background 0.15s;
-}
-
-.pos-icon-btn:hover {
-    background: #EDF2F7;
-    color: #475569;
-}
-
-/* Horizontal Category Carousel */
-.pos-category-carousel {
-    display: flex;
+    justify-content: space-between;
     gap: 12px;
-    overflow-x: auto;
-    padding: 4px 2px 8px 2px;
-    scrollbar-width: thin;
-    scrollbar-color: #CBD5E1 transparent;
-}
-
-.pos-category-carousel::-webkit-scrollbar {
-    height: 5px;
-}
-
-.pos-category-carousel::-webkit-scrollbar-thumb {
-    background: #E2E8F0;
-    border-radius: 10px;
-}
-
-.pos-cat-card {
-    min-width: 96px;
-    height: 88px;
     background: #FFFFFF;
     border: 1.5px solid #EEF0F3;
     border-radius: 16px;
+    padding: 8px 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+    flex-wrap: wrap;
+}
+
+.pos-viewby-tabs {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: 6px;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pos-viewby-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    border: 1.5px solid #EEF0F3;
+    background: #F8FAFC;
+    color: #475569;
+    font-size: 13px;
+    font-weight: 700;
     cursor: pointer;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
     user-select: none;
-    flex-shrink: 0;
-}
-
-.pos-cat-card:hover {
-    transform: translateY(-2px);
-    border-color: #CBD5E1;
-    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.05);
-}
-
-.pos-cat-card.active {
-    background: #FFF2F2;
-    border: 2px solid #FF5A5F;
-    box-shadow: 0 6px 16px rgba(255, 90, 95, 0.16);
-    transform: translateY(-2px);
-}
-
-.pos-cat-icon {
-    font-size: 26px;
-    line-height: 1;
-    transition: transform 0.2s;
-}
-
-.pos-cat-card:hover .pos-cat-icon {
-    transform: scale(1.1);
-}
-
-.pos-cat-name {
-    font-size: 12px;
-    font-weight: 700;
-    color: #475569;
-    text-align: center;
     white-space: nowrap;
-    padding: 0 6px;
 }
 
-.pos-cat-card.active .pos-cat-name {
-    color: #FF5A5F;
-    font-weight: 800;
-}
-
-/* Products Menu Section */
-.pos-menu-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-top: 4px;
-}
-
-.pos-menu-title {
-    font-size: 17px;
-    font-weight: 800;
+.pos-viewby-tab:hover {
+    background: #F1F5F9;
     color: #0F172A;
-    margin: 0;
+    border-color: #CBD5E1;
+    transform: translateY(-1px);
 }
 
-.pos-sort-container {
+.pos-viewby-tab.active {
+    background: var(--pos-primary);
+    color: #FFFFFF;
+    border-color: var(--pos-primary);
+    box-shadow: 0 4px 12px var(--pos-primary-shadow);
+}
+
+.pos-viewby-tab .pos-tab-icon {
+    font-size: 15px;
+    line-height: 1;
+}
+
+.pos-viewby-tab .pos-tab-badge {
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.07);
+    color: #475569;
+    line-height: 1;
+}
+
+.pos-viewby-tab.active .pos-tab-badge {
+    background: rgba(255, 255, 255, 0.28);
+    color: #FFFFFF;
+}
+
+.pos-viewby-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.pos-ctrl-capsule {
     display: flex;
     align-items: center;
     gap: 6px;
+    background: #F8FAFC;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 6px 12px;
+    transition: all 0.15s ease;
+}
+
+.pos-ctrl-capsule:focus-within, .pos-ctrl-capsule:hover {
+    border-color: var(--pos-primary);
     background: #FFFFFF;
-    border: 1px solid #E2E8F0;
-    border-radius: 20px;
-    padding: 4px 12px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
 }
 
-.pos-sort-label {
-    font-size: 11.5px;
-    color: #94A3B8;
-    font-weight: 600;
+.pos-ctrl-icon {
+    font-size: 13px;
+    color: #64748B;
+    line-height: 1;
 }
 
-.pos-sort-select {
+.pos-ctrl-select {
     border: none;
     background: transparent;
     font-size: 12.5px;
     font-weight: 700;
-    color: #475569;
+    color: #0F172A;
     outline: none;
     cursor: pointer;
+    max-width: 190px;
+}
+
+/* Subheader row under View By Tab */
+.pos-menu-subheader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 2px 4px;
+}
+
+.pos-subheader-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.pos-menu-title {
+    font-size: 16.5px;
+    font-weight: 800;
+    color: #0F172A;
+    margin: 0;
+}
+
+.pos-menu-count-badge {
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #64748B;
+    background: #EEF2F6;
+    padding: 3px 9px;
+    border-radius: 9999px;
+}
+
+.pos-filter-reset-btn {
+    background: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    padding: 4px 10px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.pos-filter-reset-btn:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+/* Star Favorite Button */
+.pos-star-btn {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.92);
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 5;
+    color: #94A3B8;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    padding: 0;
+}
+
+.pos-star-btn:hover {
+    transform: scale(1.15);
+    color: #F59E0B;
+    border-color: #FCD34D;
+    background: #FFFBEB;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
+.pos-star-btn.active {
+    color: #F59E0B;
+    background: #FFFBEB;
+    border-color: #FDE68A;
+    box-shadow: 0 2px 10px rgba(245, 158, 11, 0.35);
+}
+
+.pos-star-btn svg {
+    transition: transform 0.15s ease;
+}
+
+.pos-star-btn:hover svg {
+    transform: scale(1.1);
+}
+
+.pos-star-btn.active svg {
+    fill: #F59E0B;
+    stroke: #D97706;
+    stroke-width: 1.5;
+}
+
+.pos-star-btn:not(.active) svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Frequent sales badge on card */
+.pos-prod-frequent-pill {
+    position: absolute;
+    bottom: 8px;
+    left: 8px;
+    padding: 2.5px 8px;
+    border-radius: 9999px;
+    font-size: 10.5px;
+    font-weight: 800;
+    background: rgba(254, 243, 199, 0.95);
+    color: #B45309;
+    border: 1px solid #FDE68A;
+    backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    z-index: 4;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+/* Empty State */
+.pos-empty-catalog {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    text-align: center;
+    background: #FFFFFF;
+    border: 1.5px dashed #CBD5E1;
+    border-radius: 18px;
+    margin: 20px 0;
+}
+
+.pos-empty-icon {
+    font-size: 44px;
+    margin-bottom: 12px;
+}
+
+.pos-empty-title {
+    font-size: 16.5px;
+    font-weight: 800;
+    color: #0F172A;
+    margin-bottom: 6px;
+}
+
+.pos-empty-sub {
+    font-size: 13px;
+    color: #64748B;
+    max-width: 380px;
+    line-height: 1.45;
 }
 
 /* Products Grid */
@@ -339,8 +470,8 @@
 
 .pos-product-card:hover {
     transform: translateY(-3px);
-    border-color: #FFCCD0;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+    border-color: var(--pos-primary-border);
+    box-shadow: 0 10px 24px rgba(var(--pos-primary-rgb), 0.08);
 }
 
 .pos-prod-img-wrap {
@@ -446,7 +577,7 @@
 .pos-btn-add {
     width: 100%;
     height: 38px;
-    background: #FF5A5F;
+    background: var(--pos-primary);
     color: #FFFFFF;
     border: none;
     border-radius: 12px;
@@ -458,13 +589,13 @@
     align-items: center;
     justify-content: center;
     gap: 6px;
-    box-shadow: 0 3px 8px rgba(255, 90, 95, 0.25);
+    box-shadow: 0 3px 8px var(--pos-primary-shadow);
 }
 
 .pos-btn-add:hover {
-    background: #E84C51;
+    filter: brightness(0.92);
     transform: translateY(-1px);
-    box-shadow: 0 5px 12px rgba(255, 90, 95, 0.35);
+    box-shadow: 0 5px 12px var(--pos-primary-shadow);
 }
 
 .pos-btn-add:active {
@@ -560,7 +691,7 @@
 }
 
 .pos-cust-btn-new {
-    background: #FF5A5F;
+    background: var(--pos-primary);
     color: #FFFFFF;
     border: none;
     border-radius: 10px;
@@ -569,12 +700,12 @@
     font-weight: 700;
     cursor: pointer;
     white-space: nowrap;
-    transition: background 0.15s;
+    transition: all 0.15s;
     flex-shrink: 0;
 }
 
 .pos-cust-btn-new:hover {
-    background: #E84C51;
+    filter: brightness(0.92);
 }
 
 /* Searchable Customer Popover Dropdown */
@@ -611,7 +742,7 @@
 }
 
 .pos-cust-search-input:focus {
-    border-color: #FF5A5F;
+    border-color: var(--pos-primary);
 }
 
 .pos-cust-quick-bar {
@@ -697,8 +828,8 @@
 }
 
 .pos-direct-input-wrap:focus-within {
-    border-color: #FF5A5F;
-    box-shadow: 0 0 0 3px rgba(255, 90, 95, 0.12);
+    border-color: var(--pos-primary);
+    box-shadow: 0 0 0 3px rgba(var(--pos-primary-rgb), 0.15);
 }
 
 .pos-direct-icon {
@@ -985,12 +1116,12 @@
 }
 
 .pos-step-btn.plus {
-    background: #FF5A5F;
+    background: var(--pos-primary);
     color: #FFFFFF;
 }
 
 .pos-step-btn.plus:hover {
-    background: #E84C51;
+    filter: brightness(0.92);
 }
 
 .pos-step-qty-input {
@@ -1016,9 +1147,9 @@
 }
 
 .pos-step-qty-input:focus {
-    border-color: #FF5A5F;
-    box-shadow: 0 0 0 2px rgba(255, 90, 95, 0.2);
-    background: #FFF5F5;
+    border-color: var(--pos-primary);
+    box-shadow: 0 0 0 2px rgba(var(--pos-primary-rgb), 0.2);
+    background: #FFFFFF;
 }
 
 .pos-bill-price-wrap {
@@ -1054,8 +1185,8 @@
 
 .pos-unit-price-edit-wrap:focus-within {
     background: #FFFFFF;
-    border-color: #FF5A5F;
-    box-shadow: 0 0 0 2px rgba(255, 90, 95, 0.15);
+    border-color: var(--pos-primary);
+    box-shadow: 0 0 0 2px rgba(var(--pos-primary-rgb), 0.15);
 }
 
 .pos-unit-price-prefix {
@@ -1244,8 +1375,8 @@
 }
 
 .pos-pay-card.active {
-    background: #ECFDF5;
-    border: 2px solid #059669;
+    background: var(--pos-primary-light);
+    border: 2px solid var(--pos-primary);
 }
 
 .pos-pay-icon {
@@ -1260,7 +1391,7 @@
 }
 
 .pos-pay-card.active .pos-pay-name {
-    color: #065F46;
+    color: var(--pos-primary);
     font-weight: 800;
 }
 
@@ -1270,21 +1401,21 @@
 }
 
 .pos-pay-card.active .pos-pay-sub {
-    color: #059669;
+    color: var(--pos-primary);
 }
 
 /* Charge CTA Button */
 .pos-btn-charge {
     width: 100%;
     height: 48px;
-    background: #FF5A5F;
+    background: var(--pos-primary);
     color: #FFFFFF;
     border: none;
     border-radius: 14px;
     font-size: 15px;
     font-weight: 800;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(255, 90, 95, 0.35);
+    box-shadow: 0 4px 14px var(--pos-primary-shadow);
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
@@ -1293,9 +1424,9 @@
 }
 
 .pos-btn-charge:hover {
-    background: #E84C51;
+    filter: brightness(0.92);
     transform: translateY(-1px);
-    box-shadow: 0 6px 18px rgba(255, 90, 95, 0.45);
+    box-shadow: 0 6px 18px var(--pos-primary-shadow);
 }
 
 .pos-btn-charge:disabled {
@@ -1635,64 +1766,86 @@
             </div>
         </div>
 
-        <!-- Choose Category Section -->
-        <div class="pos-category-section">
-            <div class="pos-section-header">
-                <h3 class="pos-section-title">Choose Category</h3>
-                <button type="button" class="pos-icon-btn" title="Categories Overview" onclick="resetToAllCategory()">•••</button>
+        <!-- View By Tab Bar (Replaces old category carousel) -->
+        <div class="pos-viewby-bar">
+            <!-- Tabs Group -->
+            <div class="pos-viewby-tabs" role="tablist">
+                <!-- 1. By All Product -->
+                <button type="button" 
+                        class="pos-viewby-tab active" 
+                        id="viewTab-all" 
+                        role="tab"
+                        aria-selected="true"
+                        onclick="switchViewByTab('all')">
+                    <span class="pos-tab-icon">📦</span>
+                    <span class="pos-tab-label">By All Product</span>
+                    <span class="pos-tab-badge" id="badgeAllCount">{{ products|length }}</span>
+                </button>
+
+                <!-- 2. By Most Frequent Sale Product -->
+                <button type="button" 
+                        class="pos-viewby-tab" 
+                        id="viewTab-frequent" 
+                        role="tab"
+                        aria-selected="false"
+                        onclick="switchViewByTab('frequent')">
+                    <span class="pos-tab-icon">🔥</span>
+                    <span class="pos-tab-label">By Most Frequent Sale Product</span>
+                    <span class="pos-tab-badge" id="badgeFrequentCount">Top</span>
+                </button>
+
+                <!-- 3. By Favorite Product -->
+                <button type="button" 
+                        class="pos-viewby-tab" 
+                        id="viewTab-favorite" 
+                        role="tab"
+                        aria-selected="false"
+                        onclick="switchViewByTab('favorite')">
+                    <span class="pos-tab-icon">⭐</span>
+                    <span class="pos-tab-label">By Favorite Product</span>
+                    <span class="pos-tab-badge" id="badgeFavoriteCount">{{ favorite_product_ids|length }}</span>
+                </button>
             </div>
 
-            <!-- Horizontal Category Carousel -->
-            <div class="pos-category-carousel" id="posCategoryCarousel">
-                
-                <!-- 1. Default Option: All Products (Active Default) -->
-                <div class="pos-cat-card active" id="catCard-all" onclick="selectCategory('all', 'All Products')">
-                    <span class="pos-cat-icon">🌟</span>
-                    <span class="pos-cat-name">All Products</span>
+            <!-- Controls: Category Dropdown & Sorting Dropdown -->
+            <div class="pos-viewby-controls">
+                <!-- Category Select Dropdown (By All Product or Selected Category) -->
+                <div class="pos-ctrl-capsule" title="Filter by Selected Category">
+                    <span class="pos-ctrl-icon">🏷️</span>
+                    <select id="posCategorySelect" class="pos-ctrl-select" onchange="onCategorySelectChange(this.value)">
+                        <option value="all">Selected Category: All ({{ categories|length }})</option>
+                        {% for cat in categories %}
+                        <option value="{{ cat.id }}">{{ cat.name }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
 
-                <!-- 2. Dynamic Categories with Emojis -->
-                {% for cat in categories %}
-                {% set cname = cat.name %}
-                {% set clow = cname.lower() %}
-                <div class="pos-cat-card" id="catCard-{{ cat.id }}" onclick="selectCategory('{{ cat.id }}', '{{ cname|replace('\'', '\\\'') }}')">
-                    <span class="pos-cat-icon">
-                        {% if 'rice' in clow or 'bowl' in clow %}🍚
-                        {% elif 'cup' in clow or 'drink' in clow or 'beverage' in clow %}🥤
-                        {% elif 'small cup' in clow %}☕
-                        {% elif 'cake' in clow or 'bakery' in clow %}🍰
-                        {% elif 'bottle' in clow %}🍼
-                        {% elif 'folk' in clow or 'spoon' in clow %}🍴
-                        {% elif 'box' in clow or 'aluminium' in clow or 'rec' in clow %}🍱
-                        {% elif 'snack' in clow or 'popcorn' in clow or 'fry' in clow %}🍿
-                        {% elif 'salad' in clow %}🥗
-                        {% elif 'ice' in clow or 'cream' in clow %}🍦
-                        {% elif 'plastic' in clow or 'delivery' in clow or 'bag' in clow %}🛍️
-                        {% elif 'eco' in clow or 'bio' in clow %}🌿
-                        {% else %}📦{% endif %}
-                    </span>
-                    <span class="pos-cat-name">{{ cname }}</span>
+                <!-- Sort Select Dropdown -->
+                <div class="pos-ctrl-capsule" title="Sort products">
+                    <span class="pos-ctrl-icon">↕️</span>
+                    <select id="posSortSelect" class="pos-ctrl-select" onchange="onSortChange(this.value)">
+                        <option value="az">Sort: A-Z ▾</option>
+                        <option value="za">Sort: Z-A</option>
+                        <option value="frequent">Most Frequent Sale</option>
+                        <option value="price_asc">Price: Low to High</option>
+                        <option value="price_desc">Price: High to Low</option>
+                        <option value="stock_desc">Stock: High to Low</option>
+                        <option value="stock_asc">Stock: Low to High</option>
+                    </select>
                 </div>
-                {% endfor %}
-
             </div>
         </div>
 
-        <!-- Menu Title & Sort Header -->
-        <div class="pos-menu-header">
-            <h2 class="pos-menu-title" id="posMenuTitle">All Products Menu</h2>
-
-            <!-- Sort Option (A-Z default, Z-A, Price Low-High, Price High-Low, Stock High-Low) -->
-            <div class="pos-sort-container">
-                <span class="pos-sort-label">Sort by:</span>
-                <select id="posSortSelect" class="pos-sort-select" onchange="onSortChange(this.value)">
-                    <option value="az">Sort by A-Z ▾</option>
-                    <option value="za">Sort by Z-A</option>
-                    <option value="price_asc">Price: Low to High</option>
-                    <option value="price_desc">Price: High to Low</option>
-                    <option value="stock_desc">Stock: High to Low</option>
-                    <option value="stock_asc">Stock: Low to High</option>
-                </select>
+        <!-- Menu Subheader Row -->
+        <div class="pos-menu-subheader">
+            <div class="pos-subheader-left">
+                <h2 class="pos-menu-title" id="posMenuTitle">All Products</h2>
+                <span class="pos-menu-count-badge" id="posMenuCountBadge">{{ products|length }} items</span>
+            </div>
+            <div class="pos-subheader-right" id="posFilterResetWrap" style="display: none;">
+                <button type="button" class="pos-filter-reset-btn" onclick="resetAllPosFilters()">
+                    ✕ Reset Filter
+                </button>
             </div>
         </div>
 
@@ -1700,6 +1853,7 @@
         <div class="pos-products-grid" id="posProductsGrid">
             {% for p in products %}
             {% set stock = p.stock_qty|float %}
+            {% set is_fav = (p.id in favorite_product_ids) %}
             <div class="pos-product-card" 
                  id="product-card-{{ p.id }}"
                  data-id="{{ p.id }}" 
@@ -1709,12 +1863,32 @@
                  data-category-id="{{ p.category_id or '' }}"
                  data-price="{{ p.default_price or 0 }}" 
                  data-stock="{{ stock }}"
+                 data-order-count="{{ p.order_count or 0 }}"
+                 data-sold-qty="{{ p.total_sold_qty or 0 }}"
+                 data-favorite="{% if is_fav %}1{% else %}0{% endif %}"
                  data-image="{{ p.image_url or '' }}"
                  data-uom="{{ p.sales_uom or 'pcs' }}">
                 
                 <div>
                     <!-- Product Image -->
                     <div class="pos-prod-img-wrap">
+                        <!-- Star Favorite Button -->
+                        <button type="button" 
+                                class="pos-star-btn {% if is_fav %}active{% endif %}" 
+                                id="starBtn-{{ p.id }}" 
+                                title="{% if is_fav %}Remove from Favorites{% else %}Add to Favorites{% endif %}"
+                                onclick="toggleFavoriteProduct(event, {{ p.id }})">
+                            <svg class="pos-star-icon" viewBox="0 0 24 24" width="16" height="16">
+                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                            </svg>
+                        </button>
+
+                        {% if (p.order_count or 0) > 0 %}
+                        <div class="pos-prod-frequent-pill" title="Sold in {{ p.order_count }} orders ({{ p.total_sold_qty|int }} total sold)">
+                            <span>🔥</span> <span>{{ p.order_count }} sold</span>
+                        </div>
+                        {% endif %}
+
                         {% if p.image_url %}
                         <img src="{{ p.image_url }}" alt="{{ p.name }}" class="pos-prod-img" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
                         <div class="pos-prod-placeholder" style="display: none;">📦</div>
@@ -1976,7 +2150,7 @@
             </div>
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 6px;">
                 <button type="button" onclick="closePosAddCustModal()" class="btn btn-secondary" style="padding: 8px 14px; font-size: 12.5px; border-radius: 8px;">Cancel</button>
-                <button type="button" id="btnPosSaveCust" onclick="submitPosQuickCust()" style="padding: 8px 16px; background: #FF5A5F; color: #FFFFFF; border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">✓ Save & Select</button>
+                <button type="button" id="btnPosSaveCust" onclick="submitPosQuickCust()" style="padding: 8px 16px; background: var(--pos-primary); color: #FFFFFF; border: none; border-radius: 8px; font-weight: 700; font-size: 13px; cursor: pointer;">✓ Save & Select</button>
             </div>
         </div>
     </div>
@@ -2059,7 +2233,7 @@
                 <strong style="font-size: 13.5px; color: #0F172A; display: flex; align-items: center; gap: 6px;" class="font-khmer" id="recModalTitle">វិក្កយបត្របង់ប្រាក់ (80mm)</strong>
             </div>
             <div style="display: flex; gap: 8px;">
-                <button type="button" onclick="printReceipt()" class="btn btn-sm btn-primary" style="background: #059669; border: none; font-weight: 700; border-radius: 6px; padding: 5px 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #FFFFFF;">
+                <button type="button" onclick="printReceipt()" class="btn btn-sm btn-primary" style="background: var(--pos-primary); border: none; font-weight: 700; border-radius: 6px; padding: 5px 12px; display: flex; align-items: center; gap: 4px; cursor: pointer; color: #FFFFFF;">
                     🖨️ Print Receipt
                 </button>
                 <button type="button" onclick="closePosReceiptModal()" class="btn btn-sm btn-secondary" style="border-radius: 6px; padding: 5px 10px; font-weight: 700; cursor: pointer;">
@@ -2212,7 +2386,7 @@
 
         <!-- Footer Action -->
         <div class="no-print-thermal" style="margin-top: 14px; display: flex; gap: 8px;">
-            <button type="button" onclick="printReceipt()" class="btn btn-primary" style="flex: 2; background: #059669; border: none; border-radius: 8px; font-weight: 800; padding: 10px; cursor: pointer; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px rgba(5,150,105,0.25);">
+            <button type="button" onclick="printReceipt()" class="btn btn-primary" style="flex: 2; background: var(--pos-primary); border: none; border-radius: 8px; font-weight: 800; padding: 10px; cursor: pointer; color: #FFFFFF; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 4px 12px var(--pos-primary-shadow);">
                 🖨️ Print Receipt (បោះពុម្ពវិក្កយបត្រ)
             </button>
             <button type="button" onclick="handleNewSaleAfterPrint()" class="btn btn-secondary" style="flex: 1; border-radius: 8px; font-weight: 700; padding: 10px; cursor: pointer; background: #FFFFFF; border: 1.5px solid #CBD5E1; color: #0F172A;">
@@ -2243,7 +2417,9 @@ const productsCatalog = [
         pcs_per_pack: {{ (p.pcs_per_pack or 0)|float }},
         stock_qty: {{ (p.stock_qty or 0)|float }},
         category_id: {{ p.category_id or 'null' }},
-        category_name: {{ (p.category_name or '')|tojson }}
+        category_name: {{ (p.category_name or '')|tojson }},
+        order_count: {{ (p.order_count or 0)|int }},
+        total_sold_qty: {{ (p.total_sold_qty or 0)|float }}
     },
     {% endfor %}
 ];
@@ -2278,6 +2454,7 @@ const customersList = [
 ];
 
 // POS State Variables
+let currentViewTab = 'all'; // 'all' | 'frequent' | 'favorite'
 let currentCategory = 'all';
 let currentCategoryName = 'All Products';
 let currentSort = 'az';
@@ -2285,6 +2462,21 @@ let currentSearch = '';
 let selectedPaymentMethod = 'Cash';
 let selectedCustomer = null; // null = Walk-in Customer (Default)
 let cart = {}; // cart[productId] = { id, qty, uom ('Pack'|'Case'|'Pcs'), pricingSchemeId }
+
+// Favorites State
+const SERVER_FAVORITE_IDS = {{ favorite_product_ids|tojson }};
+let favoriteProductIds = new Set(SERVER_FAVORITE_IDS.map(Number));
+try {
+    const cachedFavs = localStorage.getItem(`pos_favs_branch_{{ branch.id }}`);
+    if (cachedFavs) {
+        const parsed = JSON.parse(cachedFavs);
+        if (Array.isArray(parsed)) {
+            parsed.forEach(id => favoriteProductIds.add(Number(id)));
+        }
+    }
+} catch (e) {
+    console.warn('Could not read cached favorites', e);
+}
 
 // -------------------------------------------------------------------------
 // Warehouse Selector
@@ -2296,34 +2488,188 @@ function onWarehouseChange(whId) {
 }
 
 // -------------------------------------------------------------------------
-// Catalog Category & Search Filtering
+// View By Tabs & Category Filtering
 // -------------------------------------------------------------------------
-function selectCategory(catId, catName) {
-    currentCategory = catId;
-    currentCategoryName = catName || 'All Products';
-    document.querySelectorAll('.pos-cat-card').forEach(el => el.classList.remove('active'));
-    const targetCard = document.getElementById(catId === 'all' ? 'catCard-all' : `catCard-${catId}`);
-    if (targetCard) targetCard.classList.add('active');
+function switchViewByTab(tab) {
+    currentViewTab = tab;
+    document.querySelectorAll('.pos-viewby-tab').forEach(el => {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+    });
+    const targetTab = document.getElementById(`viewTab-${tab}`);
+    if (targetTab) {
+        targetTab.classList.add('active');
+        targetTab.setAttribute('aria-selected', 'true');
+    }
+
+    if (tab === 'frequent') {
+        currentSort = 'frequent';
+        const sortSel = document.getElementById('posSortSelect');
+        if (sortSel) sortSel.value = 'frequent';
+    } else if (tab === 'all' && currentSort === 'frequent') {
+        currentSort = 'az';
+        const sortSel = document.getElementById('posSortSelect');
+        if (sortSel) sortSel.value = 'az';
+    }
 
     updatePosMenuTitle();
     applyFiltersAndSort();
+}
+
+function onCategorySelectChange(catId) {
+    const catSelect = document.getElementById('posCategorySelect');
+    const selectedText = (catSelect && catSelect.selectedIndex >= 0) ? catSelect.options[catSelect.selectedIndex].text : 'All';
+    selectCategory(catId, selectedText);
+}
+
+function selectCategory(catId, catName) {
+    currentCategory = catId;
+    currentCategoryName = (catId === 'all') ? 'All Products' : (catName || 'Selected Category');
+    const catSelect = document.getElementById('posCategorySelect');
+    if (catSelect && catSelect.value !== catId) {
+        catSelect.value = catId;
+    }
+
+    updatePosMenuTitle();
+    applyFiltersAndSort();
+}
+
+function resetToAllCategory() {
+    selectCategory('all', 'All Products');
+}
+
+function resetAllPosFilters() {
+    currentViewTab = 'all';
+    currentCategory = 'all';
+    currentSort = 'az';
+    currentSearch = '';
+
+    const catSelect = document.getElementById('posCategorySelect');
+    if (catSelect) catSelect.value = 'all';
+
+    const sortSelect = document.getElementById('posSortSelect');
+    if (sortSelect) sortSelect.value = 'az';
+
+    const searchInput = document.getElementById('posSearchInput');
+    if (searchInput) searchInput.value = '';
+
+    document.querySelectorAll('.pos-viewby-tab').forEach(el => {
+        el.classList.remove('active');
+        el.setAttribute('aria-selected', 'false');
+    });
+    const tabAll = document.getElementById('viewTab-all');
+    if (tabAll) {
+        tabAll.classList.add('active');
+        tabAll.setAttribute('aria-selected', 'true');
+    }
+
+    updatePosMenuTitle();
+    applyFiltersAndSort();
+}
+
+// -------------------------------------------------------------------------
+// Favorites Management
+// -------------------------------------------------------------------------
+function toggleFavoriteProduct(e, productId) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    productId = Number(productId);
+    const card = document.getElementById(`product-card-${productId}`);
+    const btn = document.getElementById(`starBtn-${productId}`);
+    if (!card) return;
+
+    const isFav = favoriteProductIds.has(productId);
+    const nextFav = !isFav;
+
+    if (nextFav) {
+        favoriteProductIds.add(productId);
+        card.dataset.favorite = '1';
+        if (btn) {
+            btn.classList.add('active');
+            btn.title = 'Remove from Favorites';
+        }
+    } else {
+        favoriteProductIds.delete(productId);
+        card.dataset.favorite = '0';
+        if (btn) {
+            btn.classList.remove('active');
+            btn.title = 'Add to Favorites';
+        }
+    }
+
+    // Save to localStorage
+    try {
+        localStorage.setItem(`pos_favs_branch_{{ branch.id }}`, JSON.stringify(Array.from(favoriteProductIds)));
+    } catch (err) {}
+
+    updateFavoritesCountBadge();
+
+    // If on favorite tab and unstarred, refresh visible products
+    if (currentViewTab === 'favorite') {
+        applyFiltersAndSort();
+    }
+
+    // Sync to server
+    fetch(`/branches/{{ branch.id }}/pos/toggle_favorite`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ product_id: productId, is_favorite: nextFav })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success && Array.isArray(data.favorite_product_ids)) {
+            data.favorite_product_ids.forEach(id => favoriteProductIds.add(Number(id)));
+            updateFavoritesCountBadge();
+        }
+    })
+    .catch(err => {
+        console.warn('Favorite sync warning:', err);
+    });
+}
+
+function updateFavoritesCountBadge() {
+    const badge = document.getElementById('badgeFavoriteCount');
+    if (badge) {
+        badge.textContent = favoriteProductIds.size;
+    }
+}
+
+function syncFavoritesUIOnLoad() {
+    favoriteProductIds.forEach(id => {
+        const card = document.getElementById(`product-card-${id}`);
+        const btn = document.getElementById(`starBtn-${id}`);
+        if (card) card.dataset.favorite = '1';
+        if (btn) {
+            btn.classList.add('active');
+            btn.title = 'Remove from Favorites';
+        }
+    });
+    updateFavoritesCountBadge();
 }
 
 function updatePosMenuTitle() {
     const titleEl = document.getElementById('posMenuTitle');
     if (!titleEl) return;
     const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
-    if (currentCategory === 'all') {
-        titleEl.textContent = isKm ? 'បញ្ជីមុខទំនិញទាំងអស់' : 'All Products Menu';
-    } else {
-        const cat = currentCategoryName || '';
-        const kmCat = (typeof INFLOW_I18N_KM !== 'undefined' && INFLOW_I18N_KM[cat]) ? INFLOW_I18N_KM[cat] : cat;
-        titleEl.textContent = isKm ? `បញ្ជីមុខទំនិញ ${kmCat}` : `${cat} Menu`;
-    }
-}
 
-function resetToAllCategory() {
-    selectCategory('all', 'All Products');
+    if (currentViewTab === 'favorite') {
+        titleEl.textContent = isKm ? 'មុខទំនិញពេញនិយម (Favorite Products)' : 'Favorite Products';
+    } else if (currentViewTab === 'frequent') {
+        titleEl.textContent = isKm ? 'មុខទំនិញលក់ដាច់ញឹកញាប់ (Most Frequent Sale)' : 'Most Frequent Sale Products';
+    } else {
+        if (currentCategory === 'all') {
+            titleEl.textContent = isKm ? 'បញ្ជីមុខទំនិញទាំងអស់' : 'All Products';
+        } else {
+            const cat = currentCategoryName || '';
+            const kmCat = (typeof INFLOW_I18N_KM !== 'undefined' && INFLOW_I18N_KM[cat]) ? INFLOW_I18N_KM[cat] : cat;
+            titleEl.textContent = isKm ? `មុខទំនិញ ${kmCat}` : `${cat}`;
+        }
+    }
 }
 
 function onSearchInput(val) {
@@ -2341,18 +2687,60 @@ function applyFiltersAndSort() {
     if (!grid) return;
 
     const cards = Array.from(grid.querySelectorAll('.pos-product-card'));
+    let visibleCount = 0;
+
     cards.forEach(card => {
         const catId = card.dataset.categoryId || '';
         const name = (card.dataset.name || '').toLowerCase();
         const sku = (card.dataset.sku || '').toLowerCase();
         const barcode = (card.dataset.barcode || '').toLowerCase();
+        const isFav = card.dataset.favorite === '1';
 
+        // 1. Tab filter
+        let matchTab = true;
+        if (currentViewTab === 'favorite') {
+            matchTab = isFav;
+        }
+
+        // 2. Category filter
         const matchCat = (currentCategory === 'all') || (catId.toString() === currentCategory.toString());
+
+        // 3. Search filter
         const matchSearch = !currentSearch || name.includes(currentSearch) || sku.includes(currentSearch) || barcode.includes(currentSearch);
 
-        card.style.display = (matchCat && matchSearch) ? 'flex' : 'none';
+        const isVisible = matchTab && matchCat && matchSearch;
+        card.style.display = isVisible ? 'flex' : 'none';
+        if (isVisible) visibleCount++;
     });
 
+    // Empty state management
+    let emptyEl = document.getElementById('posEmptyState');
+    if (visibleCount === 0) {
+        if (!emptyEl) {
+            emptyEl = document.createElement('div');
+            emptyEl.id = 'posEmptyState';
+            emptyEl.className = 'pos-empty-catalog';
+            grid.appendChild(emptyEl);
+        }
+        emptyEl.style.display = 'flex';
+        if (currentViewTab === 'favorite') {
+            emptyEl.innerHTML = `
+                <div class="pos-empty-icon">⭐</div>
+                <div class="pos-empty-title">No Favorite Products Yet</div>
+                <div class="pos-empty-sub">Click the star (⭐) icon on any product card to pin it here for rapid 1-click counter sales.</div>
+            `;
+        } else {
+            emptyEl.innerHTML = `
+                <div class="pos-empty-icon">🔍</div>
+                <div class="pos-empty-title">No Matching Products Found</div>
+                <div class="pos-empty-sub">Try searching with a different keyword or resetting your category filter.</div>
+            `;
+        }
+    } else if (emptyEl) {
+        emptyEl.style.display = 'none';
+    }
+
+    // Sorting
     cards.sort((a, b) => {
         const nameA = (a.dataset.name || '').toLowerCase();
         const nameB = (b.dataset.name || '').toLowerCase();
@@ -2360,7 +2748,16 @@ function applyFiltersAndSort() {
         const priceB = parseFloat(b.dataset.price) || 0;
         const stockA = parseFloat(a.dataset.stock) || 0;
         const stockB = parseFloat(b.dataset.stock) || 0;
+        const orderCountA = parseInt(a.dataset.orderCount) || 0;
+        const orderCountB = parseInt(b.dataset.orderCount) || 0;
+        const soldQtyA = parseFloat(a.dataset.soldQty) || 0;
+        const soldQtyB = parseFloat(b.dataset.soldQty) || 0;
 
+        if (currentSort === 'frequent' || currentViewTab === 'frequent') {
+            if (orderCountB !== orderCountA) return orderCountB - orderCountA;
+            if (soldQtyB !== soldQtyA) return soldQtyB - soldQtyA;
+            return nameA.localeCompare(nameB);
+        }
         if (currentSort === 'az') return nameA.localeCompare(nameB);
         if (currentSort === 'za') return nameB.localeCompare(nameA);
         if (currentSort === 'price_asc') return priceA - priceB;
@@ -2371,6 +2768,18 @@ function applyFiltersAndSort() {
     });
 
     cards.forEach(c => grid.appendChild(c));
+
+    // Update count badge & filter reset indicator
+    const countBadge = document.getElementById('posMenuCountBadge');
+    if (countBadge) {
+        countBadge.textContent = `${visibleCount} item${visibleCount === 1 ? '' : 's'}`;
+    }
+
+    const resetWrap = document.getElementById('posFilterResetWrap');
+    if (resetWrap) {
+        const hasActiveFilter = (currentCategory !== 'all') || Boolean(currentSearch) || (currentViewTab !== 'all');
+        resetWrap.style.display = hasActiveFilter ? 'block' : 'none';
+    }
 }
 
 // -------------------------------------------------------------------------
@@ -3492,6 +3901,7 @@ window.addEventListener('inflow-lang-changed', () => {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
+    syncFavoritesUIOnLoad();
     applyFiltersAndSort();
     recalculateTotals();
 });
