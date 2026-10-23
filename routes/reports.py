@@ -446,14 +446,14 @@ def view_report(report_key):
 
     def apply_branch_scope(where_list, params_list):
         if branch_scope == 'main':
-            where_list.append("so.branch_id IS NULL")
+            where_list.append("(so.branch_id IS NULL OR so.branch_id = 0)")
         elif branch_scope != 'all':
             try:
                 bid = int(branch_scope)
                 where_list.append("so.branch_id = %s")
                 params_list.append(bid)
             except ValueError:
-                where_list.append("so.branch_id IS NULL")
+                where_list.append("(so.branch_id IS NULL OR so.branch_id = 0)")
 
     rows = []
     total_count = 0
@@ -476,7 +476,7 @@ def view_report(report_key):
             params.append(f"%{customer_search}%")
 
         if status == 'Paid':
-            base_where.append("so.payment_status = 'PAID'")
+            base_where.append("(so.payment_status = 'PAID' OR so.status = 'PAID')")
         elif status == 'Open':
             base_where.append("so.status = 'OPEN'")
         elif status == 'Invoiced':
@@ -1686,7 +1686,7 @@ def view_report(report_key):
         params = [start_date, end_date]
 
         if branch_scope == 'main':
-            base_where.append("so.branch_id IS NULL")
+            base_where.append("(so.branch_id IS NULL OR so.branch_id = 0)")
         elif branch_scope != 'all':
             try:
                 base_where.append("so.branch_id = %s")
@@ -2005,7 +2005,7 @@ def export_report(report_key):
         base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
         params = [start_date, end_date]
         if branch_scope == 'main':
-            base_where.append("so.branch_id IS NULL")
+            base_where.append("(so.branch_id IS NULL OR so.branch_id = 0)")
         elif branch_scope != 'all' and str(branch_scope).isdigit():
             base_where.append("so.branch_id = %s")
             params.append(int(branch_scope))
@@ -2018,7 +2018,7 @@ def export_report(report_key):
             params.append(f"%{customer_search}%")
 
         if status == 'Paid':
-            base_where.append("so.payment_status = 'PAID'")
+            base_where.append("(so.payment_status = 'PAID' OR so.status = 'PAID')")
         elif status == 'Open':
             base_where.append("so.status = 'OPEN'")
         elif status == 'Invoiced':

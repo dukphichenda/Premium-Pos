@@ -57,5 +57,46 @@ class TestDashboardChartProfitMatch(unittest.TestCase):
                 self.assertEqual(chart_paid, expected_sales)
                 self.assertEqual(chart_profit, expected_profit)
 
+    def test_dashboard_chart_open_sales_matches_open_report(self):
+        """
+        Verify that monthly financial breakdown chart's Open Sale metric
+        matches the Sales Order Profit report totals when filtered by status='Open'.
+        """
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess['user_id'] = 1
+                sess['username'] = 'admin'
+                sess['role'] = 'main_admin'
+
+            chart_resp = client.get('/api/dashboard/charts?branch=main')
+            self.assertEqual(chart_resp.status_code, 200)
+            chart_data = chart_resp.get_json()
+
+            self.assertIn('monthly_open', chart_data)
+            if 'Oct 2026' in chart_data['monthly_labels']:
+                idx = chart_data['monthly_labels'].index('Oct 2026')
+                chart_open = chart_data['monthly_open'][idx]
+
+                # Check report totals query for status = 'Open'
+                rep_sql = """
+                    SELECT 
+                        COALESCE(SUM(so.total_amount), 0) as total_sales
+                    FROM sales_orders so
+                    WHERE so.status != 'CANCELLED'
+                      AND (so.branch_id IS NULL OR so.branch_id = 0)
+                      AND (so.status = 'OPEN' OR so.balance_due > 0)
+                      AND NOT (so.status = 'PAID' OR so.payment_status = 'PAID')
+                      AND so.order_date >= '2026-10-01' AND so.order_date <= '2026-10-31'
+                """
+                db_row = query_one(rep_sql)
+                expected_open_sales = round(float(db_row['total_sales']), 2)
+                self.assertEqual(chart_open, expected_open_sales)
+
+                # Check that revenue equals paid_sales + open_sales
+                chart_paid = chart_data['monthly_paid'][idx]
+                chart_revenue = chart_data['monthly_revenue'][idx]
+                self.assertAlmostEqual(chart_paid + chart_open, chart_revenue, places=2)
+
 if __name__ == '__main__':
     unittest.main()
+

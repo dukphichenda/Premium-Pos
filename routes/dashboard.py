@@ -300,7 +300,7 @@ def chart_data():
             TO_CHAR(so.order_date, 'Mon YYYY') as month_label,
             date_trunc('month', so.order_date) as month_date,
             COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN so.total_amount ELSE 0 END), 0) as paid_sales,
-            COALESCE(SUM(CASE WHEN so.status = 'OPEN' OR so.balance_due > 0 THEN so.balance_due ELSE 0 END), 0) as open_sales,
+            COALESCE(SUM(CASE WHEN (so.status = 'OPEN' OR so.balance_due > 0) AND NOT (so.status = 'PAID' OR so.payment_status = 'PAID') THEN so.total_amount ELSE 0 END), 0) as open_sales,
             COALESCE(SUM(so.total_amount), 0) as revenue,
             COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN (so.total_amount - COALESCE(oc.total_cogs, 0)) ELSE 0 END), 0) as paid_profit,
             COALESCE(SUM(so.total_amount - COALESCE(oc.total_cogs, 0)), 0) as total_profit,

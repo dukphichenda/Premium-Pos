@@ -735,7 +735,7 @@ def branch_chart_data(id):
         SELECT 
             TO_CHAR(m.month_date, 'Mon YYYY') as month_label,
             COALESCE(SUM(CASE WHEN so.status = 'PAID' OR so.payment_status = 'PAID' THEN so.total_amount ELSE 0 END), 0) as paid_sales,
-            COALESCE(SUM(CASE WHEN so.status = 'OPEN' OR so.balance_due > 0 THEN so.balance_due ELSE 0 END), 0) as open_sales,
+            COALESCE(SUM(CASE WHEN (so.status = 'OPEN' OR so.balance_due > 0) AND NOT (so.status = 'PAID' OR so.payment_status = 'PAID') THEN so.total_amount ELSE 0 END), 0) as open_sales,
             COALESCE(SUM(so.total_amount), 0) as revenue,
             COUNT(so.id) as order_count
         FROM generate_series(
