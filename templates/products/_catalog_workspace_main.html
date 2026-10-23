@@ -146,9 +146,9 @@
                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                                 </span>
                                 <select class="inflow-cat-select" id="productCategorySelect" onchange="onCategorySelectChange(this)">
-                                    <option value="" data-color="#00A3E0">(None)</option>
+                                    <option value="" data-color="#00A3E0" data-style="{{ global_price_table_style or 'classic' }}">(None)</option>
                                     {% for c in categories %}
-                                    <option value="{{ c.id }}" data-color="{{ c.color }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
+                                    <option value="{{ c.id }}" data-color="{{ c.color }}" data-style="{{ c.price_table_style or 'classic' }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
                                     {% endfor %}
                                 </select>
                             </div>
@@ -1141,25 +1141,12 @@
                             </label>
                         </div>
 
-                        <!-- Price Table Style Switcher (Classic / Modern / Cute Look) -->
-                        {% set raw_style = (price_card.price_table_style if price_card and price_card.price_table_style else (product.price_table_style or 'classic'))|lower %}
+                        <!-- Price Table Style is auto-selected by Category (No manual switcher buttons needed here) -->
+                        {% set raw_style = (product.category_price_table_style or price_card.price_table_style or product.price_table_style or global_price_table_style or 'classic')|lower %}
                         {% set active_style = raw_style if raw_style in ('classic', 'modern', 'cute', 'gen_z', 'genz') else 'classic' %}
+                        {% if active_style == 'genz' %}{% set active_style = 'gen_z' %}{% endif %}
                         {% set std_uom_name = (price_card.standard_uom if price_card and price_card.standard_uom else (product.uom or 'pcs.')) %}
                         {% set std_uom_badge = (price_card.standard_uom_display if price_card and price_card.standard_uom_display else (std_uom_name|replace('.', '')|upper)) %}
-                        <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic, Modern, ឬ Cute Look)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
-                            <button type="button" id="btnDetailStyleClassic" class="btn-detail-style {{ 'active-classic' if active_style == 'classic' else '' }}" onclick="setProductPriceCardStyle('classic')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                Classic
-                            </button>
-                            <button type="button" id="btnDetailStyleModern" class="btn-detail-style {{ 'active-modern' if active_style == 'modern' else '' }}" onclick="setProductPriceCardStyle('modern')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                ✨ Modern
-                            </button>
-                            <button type="button" id="btnDetailStyleCute" class="btn-detail-style {{ 'active-cute' if active_style == 'cute' else '' }}" onclick="setProductPriceCardStyle('cute')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                🌸 Cute Look
-                            </button>
-                            <button type="button" id="btnDetailStyleGenZ" class="btn-detail-style {{ 'active-gen_z' if active_style in ('gen_z', 'genz') else '' }}" onclick="setProductPriceCardStyle('gen_z')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                ⚡ Gen Z
-                            </button>
-                        </div>
 
                         {% if can_view_costs %}
                         <button type="button" class="inflow-btn-showcase-action" id="btnToggleProfit" onclick="toggleInternalProfitDrawer()" title="Click to view internal cost & profit analysis (Screenshot 2)">

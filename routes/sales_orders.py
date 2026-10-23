@@ -403,14 +403,54 @@ def list_orders():
     search = request.args.get('search') or ''
 
     if not is_main:
-        latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,)) if user_bid else None
+        if status_filter.upper() == 'PAID':
+            latest = query_one("""
+                SELECT id FROM sales_orders 
+                WHERE branch_id = %s 
+                  AND (UPPER(status) IN ('PAID', 'INVOICED') OR UPPER(payment_status) = 'PAID')
+                ORDER BY id DESC LIMIT 1
+            """, (user_bid,)) if user_bid else None
+            if not latest and user_bid:
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,))
+        else:
+            latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,)) if user_bid else None
     else:
         if branch_filter == 'main':
-            latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+            if status_filter.upper() == 'PAID':
+                latest = query_one("""
+                    SELECT id FROM sales_orders 
+                    WHERE branch_id IS NULL 
+                      AND (UPPER(status) IN ('PAID', 'INVOICED') OR UPPER(payment_status) = 'PAID')
+                    ORDER BY id DESC LIMIT 1
+                """)
+                if not latest:
+                    latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+            else:
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
         elif branch_filter.isdigit():
-            latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (int(branch_filter),))
+            b_id = int(branch_filter)
+            if status_filter.upper() == 'PAID':
+                latest = query_one("""
+                    SELECT id FROM sales_orders 
+                    WHERE branch_id = %s 
+                      AND (UPPER(status) IN ('PAID', 'INVOICED') OR UPPER(payment_status) = 'PAID')
+                    ORDER BY id DESC LIMIT 1
+                """, (b_id,))
+                if not latest:
+                    latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (b_id,))
+            else:
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (b_id,))
         else:
-            latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
+            if status_filter.upper() == 'PAID':
+                latest = query_one("""
+                    SELECT id FROM sales_orders 
+                    WHERE (UPPER(status) IN ('PAID', 'INVOICED') OR UPPER(payment_status) = 'PAID')
+                    ORDER BY id DESC LIMIT 1
+                """)
+                if not latest:
+                    latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
+            else:
+                latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
 
     if latest:
         return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter, status_filter=status_filter, date_filter=date_filter, search=search))
@@ -2055,7 +2095,7 @@ def detail_order(id):
         flash("You do not have permission to view orders from another store or Main Store. / អ្នកមិនមានសិទ្ធិមើលការបញ្ជាទិញរបស់សាខាផ្សេង ឬហាងធំទេ", "warning")
         user_bid = _get_user_branch_id()
         if user_bid:
-            return redirect(url_for('branches.branch_orders', id=user_bid))
+            return redirect(url_for('sales_orders.list_orders', status='PAID', branch=user_bid))
     if 'date_filter' in request.args:
         date_filter = request.args.get('date_filter') or 'All'
         session['so_date_filter'] = date_filter

@@ -274,6 +274,7 @@
                     return bCode ? `${bCode} Workspace` : 'Branch Workspace';
                 }
                 if (type === 'sales') {
+                    if (url.includes('status=PAID') || url.includes('status_filter=PAID')) return 'Paid Invoice';
                     if (url.includes('/create') || url.includes('/new')) return 'Sales Order';
                     if (url.includes('/customers')) return 'Customer List';
                     return 'Sales Order';
@@ -850,7 +851,7 @@
                 if (vpCheck) {
                     const ifr = vpCheck.querySelector('iframe');
                     if (ifr && ifr.contentWindow && typeof ifr.contentWindow.handleTabCloseAttempt === 'function') {
-                        const canClose = ifr.contentWindow.handleTabCloseAttempt('__CLOSE__');
+                        const canClose = ifr.contentWindow.handleTabCloseAttempt('__CLOSE__', tabId);
                         if (!canClose) return;
                     }
                 }
@@ -1155,6 +1156,10 @@
                     'Home': 'ទំព័រដើម',
                     'Sales Orders': 'បញ្ជីការលក់',
                     'Sales Order': 'ការបញ្ជាទិញលក់',
+                    'Paid Invoice': 'វិក្កយបត្រទូទាត់រួច',
+                    'Paid Invoices': 'វិក្កយបត្រទូទាត់រួច',
+                    'Invoices': 'វិក្កយបត្រ',
+                    'Invoice': 'វិក្កយបត្រ',
                     'New Sales Order': 'បង្កើតការបញ្ជាទិញថ្មី',
                     'Create Sales Order': 'បង្កើតការបញ្ជាទិញ',
                     'Products Master Catalog': 'កាតាឡុកទំនិញមេ',

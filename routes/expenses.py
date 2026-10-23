@@ -859,55 +859,91 @@ def update_monthly_summary():
             branch_id = None
             is_branch = False
 
+        if branch_id is not None:
+            existing = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id))
+        else:
+            existing = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
+
         # 1. Opening Balance: Manual vs Auto
-        mob_raw = data.get('manual_opening_balance')
-        if mob_raw is None or str(mob_raw).strip() == '':
-            mob_raw = data.get('opening_balance')
-        scope_arg = str(branch_id) if branch_id else 'main'
-        if mob_raw is not None and str(mob_raw).strip() != '':
-            manual_opening = float(mob_raw)
-            opening_balance = manual_opening
+        has_opening_in_req = ('manual_opening_balance' in data or 'opening_balance' in data)
+        if has_opening_in_req:
+            mob_raw = data.get('manual_opening_balance')
+            if mob_raw is None or str(mob_raw).strip() == '':
+                mob_raw = data.get('opening_balance')
+            scope_arg = str(branch_id) if branch_id else 'main'
+            if mob_raw is not None and str(mob_raw).strip() != '':
+                manual_opening = float(mob_raw)
+                opening_balance = manual_opening
+            else:
+                manual_opening = None
+                prev_m = _get_previous_month_key(month_key)
+                opening_balance = _calculate_month_money_in_hand(prev_m, branch_id=scope_arg) if prev_m else 0.0
+        elif existing:
+            manual_opening = existing.get('manual_opening_balance')
+            opening_balance = float(existing.get('opening_balance') or 0.0)
         else:
             manual_opening = None
             prev_m = _get_previous_month_key(month_key)
-            opening_balance = _calculate_month_money_in_hand(prev_m, branch_id=scope_arg) if prev_m else 0.0
+            opening_balance = _calculate_month_money_in_hand(prev_m, branch_id=str(branch_id) if branch_id else 'main') if prev_m else 0.0
 
         if is_branch:
             clear_stm = 0.0
             media_total = 0.0
             manual_media = None
         else:
-            clear_stm = float(data.get('clear_stm', 0) or 0)
-            mmi_raw = data.get('manual_media_income')
-            if mmi_raw is None or str(mmi_raw).strip() == '':
-                mmi_raw = data.get('media')
-            if mmi_raw is None or str(mmi_raw).strip() == '':
-                mmi_raw = data.get('media_expense')
-            if mmi_raw is not None and str(mmi_raw).strip() != '':
-                manual_media = float(mmi_raw)
-                media_total = manual_media
+            if 'clear_stm' in data:
+                clear_stm = float(data.get('clear_stm', 0) or 0)
+            elif existing:
+                clear_stm = float(existing.get('clear_stm') or 0.0)
+            else:
+                clear_stm = 0.0
+
+            has_media_in_req = ('manual_media_income' in data or 'media' in data or 'media_expense' in data)
+            if has_media_in_req:
+                mmi_raw = data.get('manual_media_income')
+                if mmi_raw is None or str(mmi_raw).strip() == '':
+                    mmi_raw = data.get('media')
+                if mmi_raw is None or str(mmi_raw).strip() == '':
+                    mmi_raw = data.get('media_expense')
+                if mmi_raw is not None and str(mmi_raw).strip() != '':
+                    manual_media = float(mmi_raw)
+                    media_total = manual_media
+                else:
+                    manual_media = None
+                    med_tot = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
+                    media_total = float(med_tot['tot'] if med_tot else 0)
+            elif existing:
+                manual_media = existing.get('manual_media_income')
+                media_total = float(existing.get('media_expense') or 0.0)
             else:
                 manual_media = None
                 med_tot = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
                 media_total = float(med_tot['tot'] if med_tot else 0)
-        
-        custom_sales = data.get('custom_sales_income')
-        if custom_sales is None or str(custom_sales).strip() == '':
-            custom_sales = data.get('inflow_sales')
-        if custom_sales is not None and str(custom_sales).strip() != '':
-            custom_sales = float(custom_sales)
+
+        has_sales_in_req = ('custom_sales_income' in data or 'inflow_sales' in data)
+        if has_sales_in_req:
+            custom_sales = data.get('custom_sales_income')
+            if custom_sales is None or str(custom_sales).strip() == '':
+                custom_sales = data.get('inflow_sales')
+            if custom_sales is not None and str(custom_sales).strip() != '':
+                custom_sales = float(custom_sales)
+            else:
+                custom_sales = None
+        elif existing:
+            custom_sales = existing.get('custom_sales_income')
         else:
             custom_sales = None
 
-        accounts_data = data.get('accounts_json')
-        if accounts_data is None:
-            accounts_data = data.get('accounts')
-        accounts_list = _normalize_accounts(accounts_data)
-
-        if branch_id is not None:
-            existing = query_one("SELECT id FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id))
+        has_accounts_in_req = ('accounts_json' in data or 'accounts' in data)
+        if has_accounts_in_req:
+            accounts_data = data.get('accounts_json')
+            if accounts_data is None:
+                accounts_data = data.get('accounts')
+            accounts_list = _normalize_accounts(accounts_data)
+        elif existing:
+            accounts_list = _normalize_accounts(existing.get('accounts_json'))
         else:
-            existing = query_one("SELECT id FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
+            accounts_list = DEFAULT_ACCOUNTS_LIST
 
         if existing:
             execute("""

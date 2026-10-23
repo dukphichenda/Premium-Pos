@@ -113,17 +113,18 @@ class TestGenZPriceTableStyle(unittest.TestCase):
                 prod = cursor.fetchone()
             prod_id = prod['id']
 
-            # Set product price_card_style to 'gen_z'
-            cursor.execute("UPDATE products SET price_card_style = 'gen_z' WHERE id = %s;", (prod_id,))
+            # Set category price_table_style to 'gen_z'
+            cursor.execute("UPDATE categories SET price_table_style = 'gen_z' WHERE id = %s;", (self.test_cat_id,))
+            cursor.execute("UPDATE products SET category_id = %s, price_card_style = 'gen_z' WHERE id = %s;", (self.test_cat_id, prod_id))
 
         resp = self.client.get(f'/products/{prod_id}')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        # Style switcher has Gen Z button
-        self.assertIn('btnDetailStyleGenZ', html)
-        self.assertIn('⚡ Gen Z', html)
-        self.assertIn("setProductPriceCardStyle('gen_z')", html)
+        # Style switcher buttons are removed from detail page (auto by category)
+        self.assertNotIn('btnDetailStyleGenZ', html)
+        self.assertIn('setProductPriceCardStyle', html)
+        self.assertIn('inflow-spec-card gen_z', html)
 
         # Card container has gen_z class and #cardContentGenZ
         self.assertIn('id="cardContentGenZ"', html)
@@ -139,7 +140,8 @@ class TestGenZPriceTableStyle(unittest.TestCase):
         resp_leg = self.client.get(f'/products/{prod_id}?legacy=1')
         self.assertEqual(resp_leg.status_code, 200)
         leg_html = resp_leg.data.decode('utf-8')
-        self.assertIn('btnDetailStyleGenZDetail', leg_html)
+        self.assertNotIn('btnDetailStyleGenZDetail', leg_html)
+        self.assertIn('inflow-spec-card gen_z', leg_html)
         self.assertIn('id="cardContentGenZDetail"', leg_html)
         self.assertIn('inflow-genz-header', leg_html)
         self.assertIn('inflow-genz-specs-card', leg_html)

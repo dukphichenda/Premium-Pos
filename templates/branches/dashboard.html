@@ -175,9 +175,9 @@
                 </div>
             </div>
 
-            <!-- 4. SALES ORDER -->
+            <!-- 4. PAID INVOICES -->
             <div class="inflow-wf-node">
-                <a href="{{ url_for('branches.branch_orders', id=branch.id) if perms.sales_orders else '#' }}" class="inflow-wf-icon-btn" title="Branch Sales Orders">
+                <a href="{{ url_for('sales_orders.list_orders', status='PAID', branch=branch.id) if perms.invoices else '#' }}" class="inflow-wf-icon-btn" title="Branch Paid Invoices">
                     <svg width="50" height="56" viewBox="0 0 56 64" fill="none">
                         <path d="M8 4h30l12 12v44H8V4z" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2"/>
                         <polygon points="38,4 38,16 50,16" fill="#E2E8F0"/>
@@ -186,13 +186,12 @@
                         <text x="28" y="48" font-size="16" font-weight="800" fill="#0284C7" text-anchor="middle">$</text>
                     </svg>
                 </a>
-                <div class="inflow-wf-title">SALES ORDER</div>
+                <div class="inflow-wf-title">PAID INVOICES</div>
                 <div class="inflow-wf-links">
-                    {% if perms.sales_orders %}
-                    <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}">+ New Branch SO</a>
-                    <a href="{{ url_for('branches.branch_orders', id=branch.id) }}">Branch Orders</a>
+                    {% if perms.invoices %}
+                    <a href="{{ url_for('sales_orders.list_orders', status='PAID', branch=branch.id) }}">Paid Invoices</a>
                     {% else %}
-                    <span style="color: #94A3B8; font-size: 10.5px;">Orders Locked</span>
+                    <span style="color: #94A3B8; font-size: 10.5px;">Invoices Locked</span>
                     {% endif %}
                 </div>
             </div>
@@ -402,25 +401,24 @@
             </div>
         </div>
 
-        <!-- 2. Sales Orders & Invoices -->
-        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.sales_orders %}opacity: 0.6;{% endif %}">
+        <!-- 2. Paid Invoices -->
+        <div class="card" style="padding: 16px; border-radius: 8px; border: 1px solid #E2E8F0; background: #FFFFFF; display: flex; flex-direction: column; justify-content: space-between; {% if not perms.invoices %}opacity: 0.6;{% endif %}">
             <div>
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
-                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 18px;">📋</div>
-                    {% if perms.sales_orders %}
+                    <div style="width: 36px; height: 36px; border-radius: 8px; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; font-size: 18px;">🧾</div>
+                    {% if perms.invoices %}
                     <span style="background: #DCFCE7; color: #166534; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">ALLOWED</span>
                     {% else %}
                     <span style="background: #FEE2E2; color: #991B1B; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 4px;">DISABLED BY MAIN</span>
                     {% endif %}
                 </div>
-                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Sales Orders (វិក្កយបត្រ)</div>
-                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Manage sales invoices, track customer order status and official PDF printing.</div>
+                <div style="font-size: 14px; font-weight: 700; color: #0F172A;">Paid Invoices (វិក្កយបត្រទូទាត់រួច)</div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px;">Track paid sales invoices, customer receipt history and official PDF printing.</div>
             </div>
             <div style="margin-top: 14px;">
-                {% if perms.sales_orders %}
+                {% if perms.invoices %}
                 <div style="display: flex; gap: 8px;">
-                    <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}" class="btn btn-sm btn-primary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; background: #0284C7; border-color: #0284C7; font-weight: 700;">+ New Order</a>
-                    <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" class="btn btn-sm btn-secondary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; font-weight: 600;">View Orders →</a>
+                    <a href="{{ url_for('sales_orders.list_orders', status='PAID', branch=branch.id) }}" class="btn btn-sm btn-primary" style="flex: 1; text-align: center; text-decoration: none; padding: 7px 0; background: #0284C7; border-color: #0284C7; font-weight: 700;">View Paid Invoices →</a>
                 </div>
                 {% else %}
                 <button class="btn btn-sm btn-secondary" disabled style="width: 100%; padding: 7px 0;">Not Allowed by Main Store</button>
@@ -557,8 +555,8 @@
     <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h3 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Recent Orders at {{ branch.code }}</h3>
-            {% if perms.sales_orders %}
-            <a href="{{ url_for('branches.branch_orders', id=branch.id) }}" style="font-size: 12px; color: #0284C7; font-weight: 700; text-decoration: none;">View All Orders →</a>
+            {% if perms.invoices %}
+            <a href="{{ url_for('sales_orders.list_orders', status='PAID', branch=branch.id) }}" style="font-size: 12px; color: #0284C7; font-weight: 700; text-decoration: none;">View Paid Invoices →</a>
             {% endif %}
         </div>
         <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #E2E8F0; border-radius: 8px;">

@@ -160,10 +160,11 @@ class TestCategoryPriceTableStyle(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        # Check for style switcher buttons
-        self.assertIn('btnDetailStyleClassic', html)
-        self.assertIn('btnDetailStyleModern', html)
+        # Check that manual style switcher buttons are removed from detail page (auto by category)
+        self.assertNotIn('btnDetailStyleClassic', html)
+        self.assertNotIn('btnDetailStyleModern', html)
         self.assertIn('setProductPriceCardStyle', html)
+        self.assertIn('inflow-spec-card modern', html)
 
         # Check for both card content containers
         self.assertIn('id="cardContentClassic"', html)

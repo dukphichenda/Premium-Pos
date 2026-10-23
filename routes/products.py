@@ -291,12 +291,16 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         profit_pct_2 = 0
         profit_pct_3 = 0
 
-    # Determine category color
+    # Determine category color and style
     cat_color = product.get('category_color')
-    if not cat_color and product.get('category_id'):
-        c_row = query_one("SELECT color FROM categories WHERE id = %s", (product['category_id'],))
-        if c_row and c_row.get('color'):
-            cat_color = c_row['color']
+    cat_style = product.get('category_price_table_style')
+    if (not cat_color or not cat_style) and product.get('category_id'):
+        c_row = query_one("SELECT color, price_table_style FROM categories WHERE id = %s", (product['category_id'],))
+        if c_row:
+            if not cat_color and c_row.get('color'):
+                cat_color = c_row['color']
+            if not cat_style and c_row.get('price_table_style'):
+                cat_style = c_row['price_table_style']
             
     if not cat_color:
         c_name = (product.get('category_name') or '').strip().lower()
@@ -358,7 +362,7 @@ def _build_price_card_data(product, price_tiers, can_view_costs=None):
         'auto_detail_text': auto_detail_text,
         'modern_specs_rows': _parse_specs_to_rows(custom_detail if (is_custom_detail and custom_detail) else auto_detail_text),
         'notes': product.get('price_card_notes') or '',
-        'price_table_style': product.get('price_table_style') or product.get('price_card_style') or 'classic',
+        'price_table_style': cat_style or product.get('category_price_table_style') or product.get('price_table_style') or 'classic',
         'can_view_costs': can_view_costs
     }
 
@@ -449,6 +453,7 @@ def _get_catalog_sidebar_products():
             COALESCE(bom_tbl.bom_count, 0) as bom_count,
             COALESCE(c.name, '') as category_name,
             COALESCE(c.color, '#00A3E0') as category_color,
+            COALESCE(c.price_table_style, 'classic') as category_price_table_style,
             COALESCE(SUM(i.quantity), 0) as total_qty,
             COALESCE(s.total_sold_qty, 0) as total_sold_qty,
             COALESCE(s.order_count, 0) as order_count,
@@ -496,8 +501,8 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             p.*, 
             c.name as category_name,
             COALESCE(c.color, '#00A3E0') as category_color,
-            COALESCE(c.price_table_style, 'classic') as category_price_table_style,
-            COALESCE(p.price_card_style, c.price_table_style, %s, 'classic') as price_table_style,
+            COALESCE(c.price_table_style, %s, 'classic') as category_price_table_style,
+            COALESCE(c.price_table_style, %s, 'classic') as price_table_style,
             l.name as default_location_name,
             COALESCE(inv.total_qty, 0) as total_qty,
             COALESCE(inv.reserved_qty, 0) as reserved_qty
@@ -509,7 +514,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             FROM inventory GROUP BY product_id
         ) inv ON p.id = inv.product_id
         WHERE p.id = %s
-    """, (global_price_table_style, product_id))
+    """, (global_price_table_style, global_price_table_style, product_id))
 
     if not product:
         return None
@@ -781,7 +786,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
         SELECT * FROM product_attachments WHERE product_id = %s ORDER BY created_at DESC
     """, (product_id,))
 
-    categories = query_all("SELECT id, name, COALESCE(color, '#00A3E0') as color FROM categories WHERE is_active = TRUE ORDER BY name")
+    categories = query_all("SELECT id, name, COALESCE(color, '#00A3E0') as color, COALESCE(price_table_style, 'classic') as price_table_style FROM categories WHERE is_active = TRUE ORDER BY name")
     locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name ASC")
 
@@ -1148,7 +1153,9 @@ def update_product_ajax(id):
 
         # Fetch updated bundle data for live card synchronization
         updated_prod = query_one("""
-            SELECT p.*, c.name as category_name
+            SELECT p.*, c.name as category_name, c.color as category_color,
+                   COALESCE(c.price_table_style, 'classic') as category_price_table_style,
+                   COALESCE(c.price_table_style, 'classic') as price_table_style
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.id = %s
@@ -1681,7 +1688,7 @@ def new_product():
         'remarks': ''
     }
 
-    categories = query_all("SELECT id, name, COALESCE(color, '#00A3E0') as color FROM categories WHERE is_active = TRUE ORDER BY name")
+    categories = query_all("SELECT id, name, COALESCE(color, '#00A3E0') as color, COALESCE(price_table_style, 'classic') as price_table_style FROM categories WHERE is_active = TRUE ORDER BY name")
     locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name ASC")
     all_products = query_all("SELECT id, name, sku, description, standard_cost FROM products WHERE is_active = TRUE ORDER BY name ASC")
@@ -2809,7 +2816,7 @@ def api_get_price_cards_data():
                 COALESCE(c.name, 'General') as category_name,
                 COALESCE(c.color, '#00A3E0') as category_color,
                 COALESCE(c.price_table_style, 'classic') as category_price_table_style,
-                COALESCE(p.price_card_style, c.price_table_style, 'classic') as price_table_style
+                COALESCE(c.price_table_style, 'classic') as price_table_style
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE p.is_active = TRUE
@@ -3392,7 +3399,7 @@ def price_list_view():
             p.*,
             COALESCE(c.name, 'General') as category_name,
             COALESCE(c.color, '#00A3E0') as category_color,
-            COALESCE(p.price_card_style, c.price_table_style, %s, 'classic') as price_table_style
+            COALESCE(c.price_table_style, %s, 'classic') as price_table_style
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         WHERE p.is_active = TRUE

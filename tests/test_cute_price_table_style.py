@@ -113,17 +113,18 @@ class TestCutePriceTableStyle(unittest.TestCase):
                 prod = cursor.fetchone()
             prod_id = prod['id']
 
-            # Set product price_card_style to 'cute'
-            cursor.execute("UPDATE products SET price_card_style = 'cute' WHERE id = %s;", (prod_id,))
+            # Set category price_table_style to 'cute'
+            cursor.execute("UPDATE categories SET price_table_style = 'cute' WHERE id = %s;", (self.test_cat_id,))
+            cursor.execute("UPDATE products SET category_id = %s, price_card_style = 'cute' WHERE id = %s;", (self.test_cat_id, prod_id))
 
         resp = self.client.get(f'/products/{prod_id}')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        # Style switcher has Cute Look button
-        self.assertIn('btnDetailStyleCute', html)
-        self.assertIn('🌸 Cute Look', html)
-        self.assertIn('setProductPriceCardStyle(\'cute\')', html)
+        # Style switcher buttons are removed from detail page (auto by category)
+        self.assertNotIn('btnDetailStyleCute', html)
+        self.assertIn('setProductPriceCardStyle', html)
+        self.assertIn('inflow-spec-card cute', html)
 
         # Card container has cute class and #cardContentCute
         self.assertIn('id="cardContentCute"', html)
@@ -140,7 +141,8 @@ class TestCutePriceTableStyle(unittest.TestCase):
         resp_leg = self.client.get(f'/products/{prod_id}?legacy=1')
         self.assertEqual(resp_leg.status_code, 200)
         leg_html = resp_leg.data.decode('utf-8')
-        self.assertIn('btnDetailStyleCuteDetail', leg_html)
+        self.assertNotIn('btnDetailStyleCuteDetail', leg_html)
+        self.assertIn('inflow-spec-card cute', leg_html)
         self.assertIn('id="cardContentCuteDetail"', leg_html)
         self.assertIn('inflow-cute-tier-tot-coral', leg_html)
         self.assertNotIn('inflow-cute-tier-tot-green font-khmer', leg_html)

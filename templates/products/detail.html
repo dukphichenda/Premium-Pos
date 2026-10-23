@@ -411,10 +411,10 @@
 
                     <div class="inflow-form-row">
                         <label class="inflow-form-lbl">Category</label>
-                        <select name="category_id" id="categorySelect" class="inflow-combo" style="width: 320px;">
-                            <option value="">(None)</option>
+                        <select name="category_id" id="categorySelect" class="inflow-combo" style="width: 320px;" onchange="onCategorySelectChangeDetail(this)">
+                            <option value="" data-color="#00A3E0" data-style="classic">(None)</option>
                             {% for cat in categories %}
-                            <option value="{{ cat.id }}" {% if product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                            <option value="{{ cat.id }}" data-color="{{ cat.color }}" data-style="{{ cat.price_table_style or 'classic' }}" {% if product.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -689,25 +689,12 @@
                             </div>
                         </div>
 
-                        <!-- Price Table Style Switcher (Classic / Modern / Cute Look) -->
-                        {% set raw_style = (price_card.price_table_style if price_card and price_card.price_table_style else (product.price_table_style or 'classic'))|lower %}
+                        <!-- Price Table Style is auto-selected by Category (No manual switcher buttons needed here) -->
+                        {% set raw_style = (product.category_price_table_style or price_card.price_table_style if price_card and price_card.price_table_style else (product.price_table_style or 'classic'))|lower %}
                         {% set active_style = raw_style if raw_style in ('classic', 'modern', 'cute', 'gen_z', 'genz') else 'classic' %}
+                        {% if active_style == 'genz' %}{% set active_style = 'gen_z' %}{% endif %}
                         {% set std_uom_name = (price_card.standard_uom if price_card and price_card.standard_uom else (product.uom or 'pcs.')) %}
                         {% set std_uom_badge = (price_card.standard_uom_display if price_card and price_card.standard_uom_display else (std_uom_name|replace('.', '')|upper)) %}
-                        <div class="inflow-style-control-group" title="ជ្រើសរើសទម្រង់តារាងតម្លៃ (Classic, Modern, ឬ Cute Look)" style="display: inline-flex; align-items: center; background: #F1F5F9; padding: 2px; border-radius: 7px; border: 1.5px solid #CBD5E1;">
-                            <button type="button" id="btnDetailStyleClassicDetail" class="btn-detail-style {{ 'active-classic' if active_style == 'classic' else '' }}" onclick="setProductPriceCardStyleDetail('classic')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                Classic
-                            </button>
-                            <button type="button" id="btnDetailStyleModernDetail" class="btn-detail-style {{ 'active-modern' if active_style == 'modern' else '' }}" onclick="setProductPriceCardStyleDetail('modern')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                ✨ Modern
-                            </button>
-                            <button type="button" id="btnDetailStyleCuteDetail" class="btn-detail-style {{ 'active-cute' if active_style == 'cute' else '' }}" onclick="setProductPriceCardStyleDetail('cute')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                🌸 Cute Look
-                            </button>
-                            <button type="button" id="btnDetailStyleGenZDetail" class="btn-detail-style {{ 'active-gen_z' if active_style in ('gen_z', 'genz') else '' }}" onclick="setProductPriceCardStyleDetail('gen_z')" style="padding: 4px 10px; font-size: 12px; font-weight: 700; border-radius: 5px; transition: all 0.2s;">
-                                ⚡ Gen Z
-                            </button>
-                        </div>
                     </div>
                 </div>
 
@@ -2574,6 +2561,20 @@ function changePriceCardColorDetail(color) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ price_card_color: color })
     }).catch(err => console.warn('Failed to save color:', err));
+}
+
+function onCategorySelectChangeDetail(selectEl) {
+    if (!selectEl) return;
+    const opt = selectEl.options[selectEl.selectedIndex];
+    if (!opt) return;
+    const catColor = opt.getAttribute('data-color');
+    if (catColor && typeof changePriceCardColorDetail === 'function') {
+        changePriceCardColorDetail(catColor);
+    }
+    const catStyle = opt.getAttribute('data-style');
+    if (catStyle && typeof setProductPriceCardStyleDetail === 'function') {
+        setProductPriceCardStyleDetail(catStyle);
+    }
 }
 
 function addExportMarginToCanvas(sourceCanvas, marginPx = 28, scale = 3.2) {
