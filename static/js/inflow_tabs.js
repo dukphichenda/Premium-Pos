@@ -35,7 +35,8 @@
         if (!url) return 'home';
         const clean = getCleanPath(url).toLowerCase();
         const full = (url || '').toLowerCase();
-        if (clean === '/' || clean === '' || clean.includes('/dashboard') || clean.includes('/workspace')) return 'home';
+        if (clean === '/' || clean === '') return 'home';
+        if (clean.includes('/dashboard') || clean.includes('/workspace')) return 'dashboard';
         if (clean.includes('/sales/new') || clean.includes('/sales/create') || clean.includes('/orders/new') || clean.includes('/order/new')) return 'sales_new';
         if (clean.includes('/sales') || clean.includes('/customers') || clean.includes('/contacts/customers') || (clean.includes('/branches/') && clean.includes('/orders'))) {
             if (full.includes('status=paid') || full.includes('status_filter=paid')) return 'sales_paid';
@@ -51,55 +52,79 @@
         return 'default';
     }
 
-    function getTabIconSvg(type) {
+    function getTabIconSvg(type, title = '') {
+        const titleLower = (title || '').toLowerCase();
+        
+        // Store Dashboard (Main Store Dashboard / Branch Dashboard) -> Green storefront icon
+        if (type === 'dashboard' || type === 'store' || titleLower.includes('dashboard') || titleLower.includes('main store') || titleLower.includes('branch')) {
+            return `<span class="inflow-tab-icon icon-dashboard" title="Store Dashboard">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="#10B981">
+                    <path d="M4 4h16l1.2 5.5H2.8L4 4z"/>
+                    <path d="M3.5 10.5a3 3 0 0 0 5.5 1.5 3 3 0 0 0 6 0 3 3 0 0 0 5.5-1.5v9a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 19.5v-9z"/>
+                    <rect x="9.5" y="14" width="5" height="7" rx="0.5" fill="#FFFFFF"/>
+                </svg>
+            </span>`;
+        }
+
+        // Homepage -> Blue home icon
+        if (type === 'home' || titleLower.includes('homepage') || titleLower.includes('home')) {
+            return `<span class="inflow-tab-icon icon-home" title="Homepage">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="#2563EB">
+                    <path d="M12 2.5L2 11h3v10a1 1 0 0 0 1 1h5v-6h2v6h5a1 1 0 0 0 1-1V11h3L12 2.5z"/>
+                </svg>
+            </span>`;
+        }
+
+        // Purchase -> Green shopping cart icon (matching user screenshot)
+        if (type === 'purchase' || type === 'purchase_new' || titleLower.includes('purchase')) {
+            return `<span class="inflow-tab-icon icon-purchase" title="Purchase Order">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="9" cy="20" r="1.5" fill="#10B981"/>
+                    <circle cx="18" cy="20" r="1.5" fill="#10B981"/>
+                    <path d="M1 1h4l2.6 12a1.5 1.5 0 0 0 1.5 1.2h9.7a1.5 1.5 0 0 0 1.5-1.2L22 6H5.5" stroke="#10B981" fill="#10B981" fill-opacity="0.15"/>
+                </svg>
+            </span>`;
+        }
+
+        // Sales -> Blue document icon with lines (matching user screenshot)
+        if (type.startsWith('sales') || titleLower.includes('sales') || titleLower.includes('sale') || titleLower.includes('invoice')) {
+            return `<span class="inflow-tab-icon icon-sales" title="Sales Order">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z" fill="#2563EB"/>
+                    <path d="M14 2v6h6" fill="#93C5FD"/>
+                    <line x1="8" y1="12" x2="16" y2="12" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+                    <line x1="8" y1="16" x2="13" y2="16" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </span>`;
+        }
+
         switch (type) {
             case 'expenses':
                 return `<span class="inflow-tab-icon icon-expenses" title="Monthly Expenses & Cash Flow">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <rect x="2" y="5" width="20" height="14" rx="2.5" fill="#CCFBF1" stroke="#0F766E" stroke-width="1.6"/>
-                        <path d="M16 12h4" stroke="#0F766E" stroke-width="2" stroke-linecap="round"/>
-                        <circle cx="17.5" cy="12" r="1" fill="#0F766E"/>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <rect x="2" y="5" width="20" height="14" rx="3" fill="#CCFBF1" stroke="#0D9488" stroke-width="1.8"/>
+                        <path d="M16 12h4" stroke="#0D9488" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="17.5" cy="12" r="1" fill="#0D9488"/>
                     </svg>
                 </span>`;
             case 'product':
                 return `<span class="inflow-tab-icon icon-product" title="Product / Inventory">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                         <path d="M12 2L2 7l10 5 10-5-10-5z" fill="#FDBA74" stroke="#EA580C" stroke-width="1.5"/>
                         <path d="M2 17l10 5V12L2 7v10z" fill="#FB923C" stroke="#EA580C" stroke-width="1.5"/>
                         <path d="M22 17l-10 5V12l10-5v10z" fill="#F97316" stroke="#EA580C" stroke-width="1.5"/>
                     </svg>
                 </span>`;
-            case 'sales':
-            case 'sales_all':
-            case 'sales_open':
-            case 'sales_paid':
-            case 'sales_new':
-                return `<span class="inflow-tab-icon icon-sales" title="Sales">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 3h11l5 5v13H4V3z" fill="#FFFFFF" stroke="#84C225" stroke-width="1.5"/>
-                        <path d="M15 3v5h5" fill="#E2F8CB" stroke="#84C225" stroke-width="1.5"/>
-                        <text x="11" y="17" font-size="11" font-weight="900" fill="#689F38" text-anchor="middle">$</text>
-                    </svg>
-                </span>`;
-            case 'purchase':
-                return `<span class="inflow-tab-icon icon-purchase" title="Purchasing">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 3h11l5 5v13H4V3z" fill="#FFFFFF" stroke="#F5A623" stroke-width="1.5"/>
-                        <path d="M15 3v5h5" fill="#FEF3C7" stroke="#F5A623" stroke-width="1.5"/>
-                        <circle cx="12" cy="14" r="3.2" fill="#EA580C"/>
-                        <path d="M10 14h4" stroke="#FFFFFF" stroke-width="1.2"/>
-                    </svg>
-                </span>`;
             case 'reports':
                 return `<span class="inflow-tab-icon icon-reports" title="Reports">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <path d="M4 3h12l4 4v14H4V3z" fill="#FFFFFF" stroke="#4338CA" stroke-width="1.5"/>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                        <path d="M4 3h12l4 4v14H4V3z" fill="#EEF2FF" stroke="#4338CA" stroke-width="1.5"/>
                         <path d="M8 17v-4M12 17v-8M16 17v-2" stroke="#4338CA" stroke-width="2" stroke-linecap="round"/>
                     </svg>
                 </span>`;
             case 'settings':
                 return `<span class="inflow-tab-icon icon-settings" title="Settings">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#64748B">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#64748B">
                         <path d="M12 15a3 3 0 100-6 3 3 0 000 6z"/>
                         <path fill-rule="evenodd" d="M10.3 2.3c.4-.2.9-.3 1.4-.3s1 .1 1.4.3l.6 1.4c.5.2 1 .4 1.4.8l1.4-.5c.8-.3 1.7 0 2.2.7l1 1.7c.4.7.3 1.6-.2 2.2l-1.1 1c.1.5.2 1 .2 1.5s-.1 1-.2 1.5l1.1 1c.5.6.6 1.5.2 2.2l-1 1.7c-.5.7-1.4 1-2.2.7l-1.4-.5c-.4.4-.9.6-1.4.8l-.6 1.4c-.4.8-1.2 1.3-2.1 1.3s-1.7-.5-2.1-1.3l-.6-1.4c-.5-.2-1-.4-1.4-.8l-1.4.5c-.8.3-1.7 0-2.2-.7l-1-1.7c-.4-.7-.3-1.6.2-2.2l1.1-1c-.1-.5-.2-1-.2-1.5s.1-1 .2-1.5l-1.1-1c-.5-.6-.6-1.5-.2-2.2l1-1.7c.5-.7 1.4-1 2.2-.7l1.4.5c.4-.4.9-.6 1.4-.8l.6-1.4z" clip-rule="evenodd"/>
                     </svg>
@@ -107,8 +132,8 @@
             case 'home':
             default:
                 return `<span class="inflow-tab-icon icon-home" title="Homepage">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="#3B82F6" stroke="#1D4ED8" stroke-width="1.2">
-                        <path d="M3 10l9-7 9 7v10a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1V10z"/>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="#2563EB">
+                        <path d="M12 2.5L2 11h3v10a1 1 0 0 0 1 1h5v-6h2v6h5a1 1 0 0 0 1-1V11h3L12 2.5z"/>
                     </svg>
                 </span>`;
         }
@@ -233,7 +258,7 @@
                         const bCode = currentBranch.code || 'STM';
                         const homeUrl = `/branches/${currentBranch.id}/workspace`;
                         this.tabs = [
-                            { id: 'tab-branch-home-' + Date.now(), type: 'home', title: `${bCode} Workspace`, label: `${bCode} Workspace`, url: homeUrl }
+                            { id: 'tab-branch-home-' + Date.now(), type: 'dashboard', title: `${bCode} Workspace`, label: `${bCode} Workspace`, url: homeUrl }
                         ];
                         this.activeTabId = this.tabs[0].id;
                     } else if (cleanCurrent !== '/' && cleanCurrent !== '' && !cleanCurrent.startsWith('/login')) {
@@ -245,9 +270,8 @@
                         this.activeTabId = this.tabs[0].id;
                     } else {
                         // Default tab: Homepage / Main Store Dashboard
-                        // title: 'Homepage'
                         this.tabs = [
-                            { id: 'tab-home-' + Date.now(), type: 'home', title: 'Main Store Dashboard', label: 'Main Store Dashboard', url: '/dashboard' }
+                            { id: 'tab-home-' + Date.now(), type: 'dashboard', title: 'Main Store Dashboard', label: 'Main Store Dashboard', url: '/dashboard' }
                         ];
                         this.activeTabId = this.tabs[0].id;
                     }
@@ -352,7 +376,7 @@
                             title: 'Main Store Dashboard',
                             label: 'Main Store Dashboard',
                             origTitleEn: 'Main Store Dashboard',
-                            type: 'home',
+                            type: 'dashboard',
                             closable: false
                         }];
                         this.activeTabId = 'tab_home_default';
@@ -403,9 +427,11 @@
                 this.tabs.forEach(tab => {
                     const isActive = (tab.id === this.activeTabId);
                     const activeClass = isActive ? 'active' : '';
-                    const typeClass = `tab-${tab.type || 'default'}`;
-                    const rawTitle = tab.origTitleEn || tab.label || tab.title;
+                    const rawTitle = tab.origTitleEn || tab.label || tab.title || '';
                     if (!tab.origTitleEn) tab.origTitleEn = rawTitle;
+                    const isStore = (tab.type === 'dashboard' || tab.type === 'store' || (rawTitle && (rawTitle.includes('Dashboard') || rawTitle.includes('Main Store') || rawTitle.includes('Branch'))));
+                    const effectiveType = isStore ? 'dashboard' : (tab.type || 'default');
+                    const typeClass = `tab-${effectiveType}`;
                     const displayTitle = (currentLangForTabs === 'km') ? this.translateTabTitle(rawTitle, 'km') : rawTitle;
 
                     html += `
@@ -413,7 +439,7 @@
                              id="tab-item-${tab.id}"
                              onclick="window.inflowMdi.switchTab('${tab.id}')" 
                              title="${displayTitle}">
-                            ${getTabIconSvg(tab.type)}
+                            ${getTabIconSvg(effectiveType, rawTitle)}
                             <span class="inflow-tab-label" id="tab-label-${tab.id}">${displayTitle}</span>
                             <button type="button" class="inflow-tab-close" 
                                     onclick="window.inflowMdi.closeTab('${tab.id}', event)" title="Close tab">✕</button>
@@ -580,7 +606,7 @@
                                     tabElem.className = `inflow-tab-item tab-${detected} ${tab.id === MdiShell.activeTabId ? 'active' : ''}`.trim();
                                     const iconSpan = tabElem.querySelector('.inflow-tab-icon');
                                     if (iconSpan) {
-                                        iconSpan.outerHTML = getTabIconSvg(detected);
+                                        iconSpan.outerHTML = getTabIconSvg(detected, tab.origTitleEn || tab.title || tab.label);
                                     }
                                 }
                                 if (tab.id === MdiShell.activeTabId) {
@@ -704,7 +730,7 @@
                     tabElem.className = `inflow-tab-item tab-${detectedType} ${isActive ? 'active' : ''}`.trim();
                     tabElem.title = displayTitle;
                     tabElem.innerHTML = `
-                        ${getTabIconSvg(detectedType)}
+                        ${getTabIconSvg(detectedType, origTitleEn || title)}
                         <span class="inflow-tab-label" id="tab-label-${tab.id}">${displayTitle}</span>
                         <button type="button" class="inflow-tab-close" 
                                 onclick="window.inflowMdi.closeTab('${tab.id}', event)" title="Close tab">✕</button>
@@ -892,9 +918,9 @@
                     const currentBranch = storeCtx.current_branch;
                     if (isBranchMode && currentBranch) {
                         const bCode = currentBranch.code || 'STM';
-                        this.transformTab(this.tabs[0].id, `/branches/${currentBranch.id}/workspace`, `${bCode} Workspace`, 'home');
+                        this.transformTab(this.tabs[0].id, `/branches/${currentBranch.id}/workspace`, `${bCode} Workspace`, 'dashboard');
                     } else {
-                        this.transformTab(this.tabs[0].id, '/dashboard', 'Main Store Dashboard', 'home');
+                        this.transformTab(this.tabs[0].id, '/dashboard', 'Main Store Dashboard', 'dashboard');
                     }
                     return;
                 }
@@ -936,9 +962,9 @@
                 const currentBranch = storeCtx.current_branch;
                 if (isBranchMode && currentBranch) {
                     const bCode = currentBranch.code || 'STM';
-                    this.createTab(`/branches/${currentBranch.id}/workspace`, `${bCode} Workspace`, 'home');
+                    this.createTab(`/branches/${currentBranch.id}/workspace`, `${bCode} Workspace`, 'dashboard');
                 } else {
-                    this.createTab('/dashboard', 'Main Store Dashboard', 'home');
+                    this.createTab('/dashboard', 'Main Store Dashboard', 'dashboard');
                 }
             },
 
