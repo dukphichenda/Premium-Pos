@@ -135,6 +135,42 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
         self.assertIn('isDragHandlePressed', html)
         self.assertIn('handleLineDragStart', html)
 
+    def test_kit_components_in_hand_and_reserved_stock(self):
+        """
+        Verify:
+        1. #qtyKitComponentsContainer and #qtyKitComponentsList exist in Sales detail template.
+        2. window.productsCatalog injects components, is_kit, and max_kits_buildable.
+        3. Endpoint GET /api/products/<id>/components returns component stock with In Hand and Reserved.
+        """
+        # 1. Page template verification
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        self.assertIn('id="qtyKitComponentsContainer"', html)
+        self.assertIn('id="qtyKitComponentsList"', html)
+        self.assertIn('id="qtyKitMaxBuildable"', html)
+        self.assertIn('Kit Components Stock', html)
+        self.assertIn('is_kit:', html)
+        self.assertIn('max_kits_buildable:', html)
+        self.assertIn('components:', html)
+
+        # 2. API Endpoint verification
+        api_resp = self.client.get('/api/products/513/components')
+        self.assertEqual(api_resp.status_code, 200)
+        data = api_resp.get_json()
+        self.assertTrue(data.get('success'))
+        self.assertTrue(data.get('is_combined'))
+        comps = data.get('components', [])
+        self.assertGreaterEqual(len(comps), 1)
+        for c in comps:
+            self.assertIn('stock_on_hand', c)
+            self.assertIn('stock_reserved', c)
+            self.assertIn('stock_available', c)
+            self.assertIn('sku', c)
+            self.assertIn('quantity', c)
+
 if __name__ == '__main__':
     unittest.main()
+
 

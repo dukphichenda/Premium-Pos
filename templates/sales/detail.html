@@ -3509,7 +3509,10 @@ window.productsCatalog = {
         image_url: {{ (p.image_url or '')|tojson }},
         stock_on_hand: {{ (p.stock_on_hand or 0.0)|float }},
         stock_reserved: {{ (p.stock_reserved or 0.0)|float }},
-        combine_type: {{ (p.combine_type or 'single')|tojson }}
+        combine_type: {{ (p.combine_type or 'single')|tojson }},
+        is_kit: {{ 'true' if p.is_kit else 'false' }},
+        max_kits_buildable: {{ p.max_kits_buildable or 0 }},
+        components: {{ (p.components or [])|tojson }}
     },
     {% endfor %}
 };
@@ -3788,16 +3791,82 @@ function openQtyDropdown(event, btnEl) {
     const onHand = prod ? (prod.stock_on_hand || 0) : 0;
     const reserved = prod ? (prod.stock_reserved || 0) : 0;
     const avail = onHand - reserved;
+    const hasComponents = !!(prod && prod.components && prod.components.length > 0);
 
     const onHandEl = document.getElementById('qtyOnHandVal');
     const availEl = document.getElementById('qtyAvailVal');
     const reservedEl = document.getElementById('qtyReservedVal');
     const onOrderEl = document.getElementById('qtyOnOrderVal');
 
-    if (onHandEl) onHandEl.innerHTML = prod ? `<u>${formatQtyNum(onHand)} ${baseUom}</u>` : `-`;
-    if (availEl) availEl.innerHTML = prod ? `<u>${formatQtyNum(avail)} ${baseUom}</u>` : `-`;
-    if (reservedEl) reservedEl.innerHTML = prod ? `<u>${formatQtyNum(reserved)} ${baseUom}</u>` : `-`;
-    if (onOrderEl) onOrderEl.innerHTML = prod ? `<u>0 ${baseUom}</u>` : `-`;
+    const kitContainer = document.getElementById('qtyKitComponentsContainer');
+    const kitList = document.getElementById('qtyKitComponentsList');
+    const kitBuildableBadge = document.getElementById('qtyKitMaxBuildable');
+
+    if (hasComponents && kitContainer && kitList) {
+        kitContainer.style.display = 'block';
+        kitList.innerHTML = '';
+
+        let minBuildable = 999999999;
+        prod.components.forEach(c => {
+            const cRatio = parseFloat(c.quantity) || 1.0;
+            const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
+            const cReserved = parseFloat(c.stock_reserved) || 0.0;
+            const cAvail = Math.max(0, cOnHand - cReserved);
+            const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
+            if (buildable < minBuildable) minBuildable = buildable;
+
+            const card = document.createElement('div');
+            card.className = 'kit-comp-card';
+            card.style.cssText = 'background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 5px 8px; font-size: 10.5px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);';
+            card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px;">
+                    <span style="font-weight: 600; color: #0F172A; max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.name || c.sku}">
+                        ${c.sku ? `<span style="color: #2563EB;">${c.sku}</span> ` : ''}${c.name || ''}
+                    </span>
+                    <span style="color: #64748B; font-size: 9.5px; font-weight: 500; white-space: nowrap;">
+                        ${formatQtyNum(cRatio)} ${c.uom}/kit
+                    </span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 4px; padding: 3px 6px;">
+                    <div style="display: flex; justify-content: space-between; gap: 4px;">
+                        <span style="color: #475569; font-size: 10px;">In Hand:</span>
+                        <span style="font-weight: 600; color: #0F172A; font-size: 10px; text-decoration: underline; text-decoration-color: #CBD5E1;">
+                            ${formatQtyNum(cOnHand)} ${c.uom}
+                        </span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; gap: 4px;">
+                        <span style="color: #475569; font-size: 10px;">Reserved:</span>
+                        <span style="font-weight: 600; color: ${cReserved > 0 ? '#D97706' : '#64748B'}; font-size: 10px; text-decoration: underline; text-decoration-color: #CBD5E1;">
+                            ${formatQtyNum(cReserved)} ${c.uom}
+                        </span>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-top: 3px; padding: 0 2px;">
+                    <span style="color: #64748B; font-size: 9.5px;">Available:</span>
+                    <span style="font-weight: 700; color: ${cAvail > 0 ? '#16A34A' : '#DC2626'}; font-size: 10px;">
+                        ${formatQtyNum(cAvail)} ${c.uom}
+                    </span>
+                </div>
+            `;
+            kitList.appendChild(card);
+        });
+
+        const maxKitCount = minBuildable !== 999999999 ? Math.max(0, minBuildable) : 0;
+        if (kitBuildableBadge) {
+            kitBuildableBadge.innerText = `Buildable: ${formatQtyNum(maxKitCount)} kits`;
+        }
+
+        if (onHandEl) onHandEl.innerHTML = `<u>${formatQtyNum(onHand)} ${baseUom}</u>`;
+        if (availEl) availEl.innerHTML = `<u>${formatQtyNum(maxKitCount)} ${baseUom}</u> <span style="font-size: 9.5px; color: #16A34A; font-weight: 600;">(Kit)</span>`;
+        if (reservedEl) reservedEl.innerHTML = `<u>${formatQtyNum(reserved)} ${baseUom}</u>`;
+        if (onOrderEl) onOrderEl.innerHTML = `<u>0 ${baseUom}</u>`;
+    } else {
+        if (kitContainer) kitContainer.style.display = 'none';
+        if (onHandEl) onHandEl.innerHTML = prod ? `<u>${formatQtyNum(onHand)} ${baseUom}</u>` : `-`;
+        if (availEl) availEl.innerHTML = prod ? `<u>${formatQtyNum(avail)} ${baseUom}</u>` : `-`;
+        if (reservedEl) reservedEl.innerHTML = prod ? `<u>${formatQtyNum(reserved)} ${baseUom}</u>` : `-`;
+        if (onOrderEl) onOrderEl.innerHTML = prod ? `<u>0 ${baseUom}</u>` : `-`;
+    }
 
     // Position popup cleanly using fixed viewport coordinates
     const popup = document.getElementById('qtyDropdownPopup');
@@ -3808,14 +3877,20 @@ function openQtyDropdown(event, btnEl) {
             return;
         }
         popup._activeBtn = btnEl;
+        if (hasComponents) {
+            popup.classList.add('is-kit');
+        } else {
+            popup.classList.remove('is-kit');
+        }
         if (!document.documentElement.classList.contains('is-mobile-view')) {
             const rect = btnEl.getBoundingClientRect();
             popup.style.position = 'fixed';
             popup.style.zIndex = '999999';
             popup.style.top = (rect.bottom + 4) + 'px';
-            let leftPos = rect.right - 220;
+            const popupWidth = hasComponents ? 285 : 220;
+            let leftPos = rect.right - popupWidth;
             if (leftPos < 10) leftPos = 10;
-            if (leftPos + 230 > window.innerWidth) leftPos = window.innerWidth - 235;
+            if (leftPos + popupWidth + 10 > window.innerWidth) leftPos = window.innerWidth - popupWidth - 15;
             popup.style.left = leftPos + 'px';
         }
         popup.classList.add('show');
@@ -3861,9 +3936,21 @@ function selectUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
 
         // Check backorder warning icon
         const stdQty = currentQty * (targetRatio || 1.0);
-        const onHand = prod.stock_on_hand || 0;
+        let effectiveStock = prod.stock_on_hand || 0;
+        if (prod.components && prod.components.length > 0) {
+            let minBuildable = 999999999;
+            prod.components.forEach(c => {
+                const cRatio = parseFloat(c.quantity) || 1.0;
+                const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
+                const cReserved = parseFloat(c.stock_reserved) || 0.0;
+                const cAvail = Math.max(0, cOnHand - cReserved);
+                const b = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
+                if (b < minBuildable) minBuildable = b;
+            });
+            effectiveStock = minBuildable !== 999999999 ? minBuildable : 0;
+        }
         let badge = row.querySelector('.inflow-backorder-badge');
-        if (onHand < stdQty) {
+        if (effectiveStock < stdQty) {
             if (!badge) {
                 badge = document.createElement('span');
                 badge.className = 'inflow-backorder-badge';
@@ -3896,9 +3983,21 @@ function onQtyNumberChange(inputEl) {
         }
         const qty = parseFloat(inputEl.value) || 0;
         const stdQty = qty * ratio;
-        const onHand = prod.stock_on_hand || 0;
+        let effectiveStock = prod.stock_on_hand || 0;
+        if (prod.components && prod.components.length > 0) {
+            let minBuildable = 999999999;
+            prod.components.forEach(c => {
+                const cRatio = parseFloat(c.quantity) || 1.0;
+                const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
+                const cReserved = parseFloat(c.stock_reserved) || 0.0;
+                const cAvail = Math.max(0, cOnHand - cReserved);
+                const b = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
+                if (b < minBuildable) minBuildable = b;
+            });
+            effectiveStock = minBuildable !== 999999999 ? minBuildable : 0;
+        }
         let badge = row.querySelector('.inflow-backorder-badge');
-        if (onHand < stdQty) {
+        if (effectiveStock < stdQty) {
             if (!badge) {
                 badge = document.createElement('span');
                 badge.className = 'inflow-backorder-badge';

@@ -3113,11 +3113,14 @@ def get_product_boms(id):
     boms = query_all("""
         SELECT pb.id, pb.component_product_id, p.name as component_name, p.sku as component_sku,
                p.image_url as component_image_url,
+               COALESCE(p.uom, 'pcs.') as component_uom,
                COALESCE(pb.description, p.description, '') as description,
                pb.quantity, 
                COALESCE(p.standard_cost, pb.cost, 0) as cost,
                ROUND(pb.quantity * COALESCE(p.standard_cost, pb.cost, 0), 4) as subtotal_cost,
-               COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = pb.component_product_id), 0) as component_stock
+               COALESCE((SELECT SUM(quantity) FROM inventory WHERE product_id = pb.component_product_id), 0) as component_stock,
+               COALESCE((SELECT SUM(reserved_quantity) FROM inventory WHERE product_id = pb.component_product_id), 0) as component_reserved,
+               COALESCE((SELECT SUM(quantity) - SUM(reserved_quantity) FROM inventory WHERE product_id = pb.component_product_id), 0) as component_available
         FROM product_boms pb
         LEFT JOIN products p ON pb.component_product_id = p.id
         WHERE pb.product_id = %s
@@ -3136,7 +3139,9 @@ def get_product_boms(id):
         total_cost += b_sub
 
         c_stock = float(b.get('component_stock') or 0.0)
-        possible = int(c_stock // b_qty) if b_qty > 0 else 0
+        c_reserved = float(b.get('component_reserved') or 0.0)
+        c_avail = max(0.0, float(b.get('component_available') or (c_stock - c_reserved)))
+        possible = int(c_avail // b_qty) if b_qty > 0 else 0
         b['max_kits_possible'] = max(0, possible)
         if possible < available_bundle_qty:
             available_bundle_qty = max(0, possible)

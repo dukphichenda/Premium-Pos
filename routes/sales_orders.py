@@ -224,6 +224,93 @@ def _get_product_bom_components(cur, product_id):
     """, (product_id,))
     return cur.fetchall()
 
+def _get_product_components_map():
+    """
+    Returns a mapping of {product_id: [component_dict, ...]} for all kit/bundle products
+    including each component's live stock_on_hand, stock_reserved, and stock_available.
+    Checks both product_boms and product_combine_options.
+    """
+    comp_map = {}
+    
+    # 1. From product_boms
+    boms = query_all("""
+        SELECT 
+            pb.product_id,
+            pb.component_product_id as component_id,
+            COALESCE(pb.quantity, 1.0) as quantity,
+            COALESCE(p.sku, '') as sku,
+            COALESCE(p.name, '') as name,
+            COALESCE(p.uom, 'pcs.') as uom,
+            COALESCE(inv.stock_on_hand, 0) as stock_on_hand,
+            COALESCE(inv.stock_reserved, 0) as stock_reserved,
+            (COALESCE(inv.stock_on_hand, 0) - COALESCE(inv.stock_reserved, 0)) as stock_available
+        FROM product_boms pb
+        JOIN products p ON pb.component_product_id = p.id
+        LEFT JOIN (
+            SELECT product_id, 
+                   SUM(quantity) as stock_on_hand, 
+                   SUM(reserved_quantity) as stock_reserved 
+            FROM inventory 
+            GROUP BY product_id
+        ) inv ON p.id = inv.product_id
+        ORDER BY pb.product_id, pb.id ASC
+    """)
+    for row in (boms or []):
+        pid = row['product_id']
+        if pid not in comp_map:
+            comp_map[pid] = []
+        comp_map[pid].append({
+            'component_id': row['component_id'],
+            'sku': row['sku'] or '',
+            'name': row['name'] or '',
+            'uom': row['uom'] or 'pcs.',
+            'quantity': float(row['quantity'] or 1.0),
+            'stock_on_hand': float(row['stock_on_hand'] or 0.0),
+            'stock_reserved': float(row['stock_reserved'] or 0.0),
+            'stock_available': float(row['stock_available'] or 0.0),
+        })
+
+    # 2. From product_combine_options
+    combos = query_all("""
+        SELECT 
+            pco.product_id,
+            pco.component_product_id as component_id,
+            COALESCE(pco.component_quantity, 1.0) as quantity,
+            COALESCE(pco.option_name, p.name, '') as name,
+            COALESCE(p.sku, '') as sku,
+            COALESCE(p.uom, 'pcs.') as uom,
+            COALESCE(inv.stock_on_hand, 0) as stock_on_hand,
+            COALESCE(inv.stock_reserved, 0) as stock_reserved,
+            (COALESCE(inv.stock_on_hand, 0) - COALESCE(inv.stock_reserved, 0)) as stock_available
+        FROM product_combine_options pco
+        JOIN products p ON pco.component_product_id = p.id
+        LEFT JOIN (
+            SELECT product_id, 
+                   SUM(quantity) as stock_on_hand, 
+                   SUM(reserved_quantity) as stock_reserved 
+            FROM inventory 
+            GROUP BY product_id
+        ) inv ON p.id = inv.product_id
+        ORDER BY pco.product_id, pco.sort_order ASC, pco.id ASC
+    """)
+    for row in (combos or []):
+        pid = row['product_id']
+        if pid not in comp_map:
+            comp_map[pid] = []
+        if not any(c['component_id'] == row['component_id'] for c in comp_map[pid]):
+            comp_map[pid].append({
+                'component_id': row['component_id'],
+                'sku': row['sku'] or '',
+                'name': row['name'] or '',
+                'uom': row['uom'] or 'pcs.',
+                'quantity': float(row['quantity'] or 1.0),
+                'stock_on_hand': float(row['stock_on_hand'] or 0.0),
+                'stock_reserved': float(row['stock_reserved'] or 0.0),
+                'stock_available': float(row['stock_available'] or 0.0),
+            })
+
+    return comp_map
+
 def _reserve_order_stock(cur, location_id, product_id, qty):
     """Reserves inventory: if combined kit, reserves all components; otherwise reserves product."""
     if not location_id or not product_id or qty <= 0:
@@ -1174,6 +1261,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     all_products = query_all("""
         SELECT 
             p.id, p.sku, p.name, p.description, 
+            COALESCE(p.combine_type, 'single') as combine_type,
             COALESCE(p.image_url, '') as image_url,
             COALESCE(p.uom, 'pcs.') as uom,
             COALESCE(p.sales_uom, '') as sales_uom,
@@ -1190,9 +1278,28 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         LEFT JOIN product_prices pp ON p.id = pp.product_id AND pp.pricing_scheme_id = %s
         LEFT JOIN inventory inv ON p.id = inv.product_id
         WHERE p.is_active = TRUE
-        GROUP BY p.id, p.image_url, c.name, pp.unit_price, p.default_price, p.price_decimals
+        GROUP BY p.id, p.sku, p.name, p.description, p.combine_type, p.image_url, p.uom, p.sales_uom, p.sales_uom_ratio_std, p.purchasing_uom, p.purchasing_uom_ratio_std, c.name, pp.unit_price, p.default_price, p.price_decimals
         ORDER BY p.sku ASC
     """, (scheme_id,))
+
+    components_map = _get_product_components_map()
+    for p in all_products:
+        pid = p['id']
+        comps = components_map.get(pid, [])
+        p['components'] = comps
+        if comps:
+            p['is_kit'] = True
+            min_buildable = 999999999
+            for c in comps:
+                c_qty = float(c.get('quantity') or 1.0)
+                c_avail = max(0.0, float(c.get('stock_available') or 0.0))
+                b = int(c_avail // c_qty) if c_qty > 0 else 0
+                if b < min_buildable:
+                    min_buildable = b
+            p['max_kits_buildable'] = max(0, min_buildable) if min_buildable != 999999999 else 0
+        else:
+            p['is_kit'] = False
+            p['max_kits_buildable'] = 0
 
     company = query_one("SELECT * FROM companies LIMIT 1")
     if is_main:
@@ -1210,6 +1317,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         'all_locations': all_locations,
         'pricing_schemes': pricing_schemes,
         'all_products': all_products,
+        'components_map': components_map,
         'product_prices_map': product_prices_map,
         'company': company,
         'all_branches': all_branches,
@@ -1994,9 +2102,25 @@ def new_order():
     scheme_id = order.get('pricing_scheme_id') or 100
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch, search_query=search_query)
 
+    components_map = drawer_data.get('components_map') or _get_product_components_map()
     for l in lines:
-        l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
         pid = l['product_id']
+        comps = components_map.get(pid, [])
+        l['components'] = comps
+        if comps:
+            min_buildable = 999999999
+            for c in comps:
+                c_qty = float(c.get('quantity') or 1.0)
+                c_avail = max(0.0, float(c.get('stock_available') or 0.0))
+                b = int(c_avail // c_qty) if c_qty > 0 else 0
+                if b < min_buildable:
+                    min_buildable = b
+            max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
+            l['max_kits_buildable'] = max_kits
+            l['is_backordered'] = (float(max_kits) < float(l.get('quantity') or 0))
+        else:
+            l['max_kits_buildable'] = 0
+            l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
 
@@ -2224,8 +2348,25 @@ def detail_order(id):
         company = query_one("SELECT * FROM companies LIMIT 1") or {}
 
         scheme_id = order.get('pricing_scheme_id') or 100
+        components_map = _get_product_components_map()
         for l in lines:
-            l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
+            pid = l['product_id']
+            comps = components_map.get(pid, [])
+            l['components'] = comps
+            if comps:
+                min_buildable = 999999999
+                for c in comps:
+                    c_qty = float(c.get('quantity') or 1.0)
+                    c_avail = max(0.0, float(c.get('stock_available') or 0.0))
+                    b = int(c_avail // c_qty) if c_qty > 0 else 0
+                    if b < min_buildable:
+                        min_buildable = b
+                max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
+                l['max_kits_buildable'] = max_kits
+                l['is_backordered'] = (float(max_kits) < float(l.get('quantity') or 0))
+            else:
+                l['max_kits_buildable'] = 0
+                l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
             l['case_price'] = float(l.get('unit_price') or 0)
             suom = (l.get('sales_uom') or '').strip()
             curr_uom = (l.get('display_uom') or '').strip()
@@ -2322,9 +2463,25 @@ def detail_order(id):
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope, search_query=search_query)
 
     # Mark backorder flag if stock is insufficient and resolve case price / display UOM
+    components_map = drawer_data.get('components_map') or _get_product_components_map()
     for l in lines:
-        l['is_backordered'] = (float(l['stock_on_hand'] or 0) < float(l['quantity'] or 0))
         pid = l['product_id']
+        comps = components_map.get(pid, [])
+        l['components'] = comps
+        if comps:
+            min_buildable = 999999999
+            for c in comps:
+                c_qty = float(c.get('quantity') or 1.0)
+                c_avail = max(0.0, float(c.get('stock_available') or 0.0))
+                b = int(c_avail // c_qty) if c_qty > 0 else 0
+                if b < min_buildable:
+                    min_buildable = b
+            max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
+            l['max_kits_buildable'] = max_kits
+            l['is_backordered'] = (float(max_kits) < float(l.get('quantity') or 0))
+        else:
+            l['max_kits_buildable'] = 0
+            l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
 
@@ -4872,5 +5029,30 @@ def get_order_version_snapshot(id, ver_id):
         'version': v_dict,
         'snapshot': snapshot
     })
+
+@sales_orders_bp.route('/api/products/<int:id>/components', methods=['GET'])
+def get_order_product_components(id):
+    """Returns component details with live on-hand and reserved quantities for a kit/combined product."""
+    try:
+        comp_map = _get_product_components_map()
+        comps = comp_map.get(id, [])
+        min_buildable = 999999999 if comps else 0
+        for c in comps:
+            c_qty = float(c.get('quantity') or 1.0)
+            c_avail = max(0.0, float(c.get('stock_available') or 0.0))
+            b = int(c_avail // c_qty) if c_qty > 0 else 0
+            if b < min_buildable:
+                min_buildable = b
+        max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
+        return jsonify({
+            'success': True,
+            'is_combined': len(comps) > 0,
+            'max_kits_buildable': max_kits,
+            'components': comps
+        })
+    except Exception as e:
+        logger.error(f"Error fetching components for product {id}: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 
 
