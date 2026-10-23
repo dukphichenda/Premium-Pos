@@ -263,13 +263,11 @@ def delete_pricing_scheme_setting(id):
         if scheme['is_default']:
             return jsonify({'success': False, 'message': 'Cannot delete the default pricing scheme. Please set another scheme as default first.'}), 400
 
-        cnt = query_one("SELECT COUNT(*) as c FROM product_prices WHERE pricing_scheme_id = %s", (id,))['c']
-        if cnt > 0:
-            execute("UPDATE pricing_schemes SET is_active = FALSE WHERE id = %s", (id,))
-            msg = f"Pricing scheme has {cnt} product prices assigned; it has been deactivated rather than permanently removed."
-        else:
-            execute("DELETE FROM pricing_schemes WHERE id = %s", (id,))
-            msg = "Pricing scheme permanently deleted."
+        execute("DELETE FROM product_prices WHERE pricing_scheme_id = %s", (id,))
+        execute("UPDATE customers SET default_pricing_scheme_id = NULL WHERE default_pricing_scheme_id = %s", (id,))
+        execute("UPDATE sales_order_lines SET pricing_scheme_id = NULL WHERE pricing_scheme_id = %s", (id,))
+        execute("DELETE FROM pricing_schemes WHERE id = %s", (id,))
+        msg = "Pricing scheme permanently deleted."
 
         if request.is_json:
             return jsonify({'success': True, 'message': msg})

@@ -66,7 +66,24 @@ class TestPricingCurrencySettings(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         data = resp.get_json()
         self.assertTrue(data['success'])
-        execute("DELETE FROM pricing_schemes WHERE id = %s", (sid,))
+        # Verify it was completely deleted from DB
+        check = query_one("SELECT id FROM pricing_schemes WHERE id = %s", (sid,))
+        self.assertIsNone(check)
+
+    def test_five_pricing_schemes_configured(self):
+        """Verify the 5 expected active pricing schemes are defined and rendered in Settings."""
+        resp = self.client.get('/settings?tab=tabPricing')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        expected_schemes = ['Retail 1', 'Retail 2', 'Retail 3', 'Whole sale', 'Branch Cost']
+        for name in expected_schemes:
+            self.assertIn(name, html)
+
+        # Removed schemes must not appear in the table
+        removed_schemes = ['4. 1000 pcs', '5. Other', 'លុយរៀល', 'Normal Price', 'CAD Price', 'Cost/Employee', 'Employee/Project', 'Test Tier']
+        for name in removed_schemes:
+            self.assertNotIn(name, html)
 
 if __name__ == '__main__':
     unittest.main()

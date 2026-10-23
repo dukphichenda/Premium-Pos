@@ -2779,13 +2779,19 @@ def save_pricing_schemes_batch():
         schemes = data.get('schemes', [])
         deleted_ids = data.get('deleted_ids', [])
 
-        # Process deleted schemes: set is_active = FALSE
+        # Process deleted schemes: permanently delete product prices and schemes
         for del_id in deleted_ids:
             try:
                 del_id = int(del_id)
-                execute("UPDATE pricing_schemes SET is_active = FALSE WHERE id = %s", (del_id,))
+                scheme = query_one("SELECT is_default FROM pricing_schemes WHERE id = %s", (del_id,))
+                if scheme and scheme.get('is_default'):
+                    continue
+                execute("DELETE FROM product_prices WHERE pricing_scheme_id = %s", (del_id,))
+                execute("UPDATE customers SET default_pricing_scheme_id = NULL WHERE default_pricing_scheme_id = %s", (del_id,))
+                execute("UPDATE sales_order_lines SET pricing_scheme_id = NULL WHERE pricing_scheme_id = %s", (del_id,))
+                execute("DELETE FROM pricing_schemes WHERE id = %s", (del_id,))
             except Exception as e:
-                print(f"Error deactivating pricing scheme {del_id}: {e}")
+                print(f"Error deleting pricing scheme {del_id}: {e}")
 
         # Process schemes to insert or update
         for item in schemes:
@@ -2835,8 +2841,14 @@ def delete_pricing_scheme(id):
     if not user_can_edit_prices():
         return jsonify({'success': False, 'message': 'Permission denied: Editing pricing schemes is disabled.'}), 403
     try:
-        execute("UPDATE pricing_schemes SET is_active = FALSE WHERE id = %s", (id,))
-        return jsonify({'success': True, 'message': 'Pricing scheme deleted.'})
+        scheme = query_one("SELECT is_default FROM pricing_schemes WHERE id = %s", (id,))
+        if scheme and scheme['is_default']:
+            return jsonify({'success': False, 'message': 'Cannot delete the default pricing scheme.'}), 400
+        execute("DELETE FROM product_prices WHERE pricing_scheme_id = %s", (id,))
+        execute("UPDATE customers SET default_pricing_scheme_id = NULL WHERE default_pricing_scheme_id = %s", (id,))
+        execute("UPDATE sales_order_lines SET pricing_scheme_id = NULL WHERE pricing_scheme_id = %s", (id,))
+        execute("DELETE FROM pricing_schemes WHERE id = %s", (id,))
+        return jsonify({'success': True, 'message': 'Pricing scheme permanently deleted.'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 
