@@ -173,31 +173,43 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
     def test_so_item_detail_navigation_and_dropdown_reset(self):
         """
         Verify:
-        1. Line items contain .so-item-name-link navigating directly to product detail via goToProductDetail.
-        2. .so-item-change-trigger is available to switch products via openItemDropdownForLine.
-        3. openItemDropdown clears previous search filter results and highlights current product.
-        4. Dropdown table DETAILS column contains View link calling goToProductDetail.
+        1. Line items keep normal directly editable textarea (no intrusive wrappers or custom triggers).
+        2. openItemDropdown auto-selects text, resets stale previous search filters, and focuses current product.
+        3. Dropdown popup contains Inventory Info preview panel (#itemDropdownPreviewPanel) matching screenshot.
+        4. updateItemDropdownPreview function updates stock, price, cost, and image.
+        5. In dropdown table DETAILS column, View link is available.
         """
         resp = self.client.get('/sales/new')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        # Functions defined
-        self.assertIn('function goToProductDetail(pid, name, event)', html)
-        self.assertIn('function openItemDropdownForLine(btnEl, event)', html)
-        self.assertIn('function openItemDropdown(inputEl)', html)
+        # Directly editable textarea is present without so-item-change-trigger
+        self.assertIn('grid-item-input so-item-input', html)
+        self.assertNotIn('class="so-item-change-trigger"', html)
+        self.assertNotIn('class="so-item-name-link"', html)
 
-        # Dropdown reset logic present
+        # Functions defined
+        self.assertIn('function openItemDropdown(inputEl)', html)
+        self.assertIn('function updateItemDropdownPreview(pid)', html)
+
+        # Dropdown reset and focus logic present
         self.assertIn("r.style.display = '';", html)
         self.assertIn("data-pid=", html)
+        self.assertIn("inputEl.select()", html)
+
+        # Dropdown Inventory Info preview panel exists
+        self.assertIn('id="itemDropdownPreviewPanel"', html)
+        self.assertIn('id="previewSkuName"', html)
+        self.assertIn('id="previewQtyOnHand"', html)
+        self.assertIn('id="previewQtyAvailable"', html)
+        self.assertIn('id="previewQtyReserved"', html)
+        self.assertIn('id="previewPrice"', html)
+        self.assertIn('id="previewCost"', html)
+        self.assertIn('id="previewImage"', html)
 
         # Dropdown DETAILS column View link
         self.assertIn('goToProductDetail(', html)
         self.assertIn('title="View product detail">View</span>', html)
-
-        # CSS classes
-        self.assertIn('.so-item-name-link', html)
-        self.assertIn('.so-item-change-trigger', html)
 
 if __name__ == '__main__':
     unittest.main()

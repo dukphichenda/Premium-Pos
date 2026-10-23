@@ -1323,24 +1323,9 @@
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_product_id]" class="line-addon-product-id" value="{{ l.addon_product_id or '' }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_quantity]" class="line-addon-quantity" value="{{ l.addon_quantity or 1.0 }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][combine_option_id]" class="line-combine-option-id" value="{{ l.combine_option_id or '' }}">
-                                                <div class="so-item-display-wrap" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; width: 100%;">
-                                                    <div class="so-item-name-link" 
-                                                         onclick="goToProductDetail({{ l.product_id }}, '{{ (l.product_sku ~ " " ~ l.product_name)|replace('\'', '\\\'') }}', event)" 
-                                                         title="Click to view product detail / ចុចដើម្បីមើលព័ត៌មានលម្អិតមុខទំនិញ"
-                                                         style="cursor: pointer; flex: 1; font-weight: 600; font-size: 12px; line-height: 1.35; color: #0F172A; text-decoration: none;">
-                                                        <span class="so-product-sku-text" style="color: #2563EB;">{{ l.product_sku }}</span> {{ l.product_name }}
-                                                    </div>
-                                                    {% if not is_paid %}
-                                                    <button type="button" class="so-item-change-trigger" onclick="openItemDropdownForLine(this, event)" title="Change product / ប្តូរមុខទំនិញ" 
-                                                            style="background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 10px; color: #94A3B8; cursor: pointer; line-height: 1; flex-shrink: 0;"
-                                                            onmouseover="this.style.background='#F1F5F9'; this.style.color='#0F172A';" onmouseout="this.style.background='transparent'; this.style.color='#94A3B8';">
-                                                        ⌵
-                                                    </button>
-                                                    {% endif %}
-                                                </div>
                                                 <textarea rows="2" class="inflow-field-input grid-item-input so-item-input" 
-                                                          placeholder="Type item name/code..." style="display: none; border: 1px solid #CBD5E1; border-radius: 4px; background: #FFFFFF; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 4px; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; box-sizing: border-box;"
-                                                          oninput="filterItemDropdown(this.value, this)"
+                                                          placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
+                                                          onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
                                                           onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>{{ l.product_sku }} {{ l.product_name }}</textarea>
                                             </td>
                                             <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
@@ -1464,41 +1449,88 @@
                                 </table>
                             </div>
 
-                            <!-- Floating Item Dropdown Popup Table -->
+                            <!-- Floating Item Dropdown Popup Table with Inventory Info Preview (Matching inFlow Screenshot) -->
                             <div id="itemDropdownPopup" class="inflow-item-dropdown-popup">
-                                <table class="inflow-item-table">
-                                    <thead>
-                                        <tr>
-                                            <th style="width: 38px; text-align: center;">Photo</th>
-                                            <th style="width: 16%;">Category</th>
-                                            <th style="width: 36%;">Item</th>
-                                            <th style="width: 22%;">Description</th>
-                                            <th style="width: 16%; text-align: right;">Price</th>
-                                            <th style="width: 8%; text-align: center;">Details</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="itemDropdownBody">
-                                        {% if all_products %}
-                                        {% for p in all_products %}
-                                        <tr onclick="selectItemForActiveRow({{ p.id }}, '{{ p.sku }}', '{{ p.name|replace('\'', '\\\'') }}', '{{ (p.description or '')|replace('\'', '\\\'') }}', {{ p.price or p.default_price or 0 }}, '{{ p.uom or 'pcs' }}')"
-                                            data-pid="{{ p.id }}" data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}" data-cat="{{ (p.category_name or '')|lower }}">
-                                            <td style="width: 38px; text-align: center; vertical-align: middle; padding: 2px;">
-                                                {% if p.image_url %}
-                                                <img src="{{ p.image_url }}" alt="" style="width: 28px; height: 28px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="event.stopPropagation(); previewImageModal(this.src);" title="Click to preview image">
-                                                {% else %}
-                                                <div style="width: 28px; height: 28px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #94A3B8;">🖼️</div>
+                                <div class="inflow-item-dropdown-layout" style="display: flex; flex-direction: row; width: 100%; min-width: 780px; max-width: 890px; background: #FFFFFF; overflow: hidden;">
+                                    <!-- Left: Scrollable Product Table -->
+                                    <div class="inflow-item-table-container" style="flex: 1; min-width: 480px; max-height: 360px; overflow-y: auto;">
+                                        <table class="inflow-item-table">
+                                            <thead>
+                                                <tr>
+                                                    <th style="width: 36px; text-align: center;">Photo</th>
+                                                    <th style="width: 18%;">Category</th>
+                                                    <th style="width: 38%;">Item</th>
+                                                    <th style="width: 22%;">Description</th>
+                                                    <th style="width: 14%; text-align: right;">Price</th>
+                                                    <th style="width: 8%; text-align: center;">Details</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="itemDropdownBody">
+                                                {% if all_products %}
+                                                {% for p in all_products %}
+                                                <tr onclick="selectItemForActiveRow({{ p.id }}, '{{ p.sku }}', '{{ p.name|replace('\'', '\\\'') }}', '{{ (p.description or '')|replace('\'', '\\\'') }}', {{ p.price or p.default_price or 0 }}, '{{ p.uom or 'pcs' }}')"
+                                                    onmouseenter="highlightItemRow(this)"
+                                                    data-pid="{{ p.id }}" data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}" data-cat="{{ (p.category_name or '')|lower }}">
+                                                    <td style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
+                                                        {% if p.image_url %}
+                                                        <img src="{{ p.image_url }}" alt="" style="width: 26px; height: 26px; object-fit: cover; border-radius: 4px; border: 1px solid #CBD5E1; vertical-align: middle; cursor: pointer;" onclick="event.stopPropagation(); previewImageModal(this.src);" title="Click to preview image">
+                                                        {% else %}
+                                                        <div style="width: 26px; height: 26px; border-radius: 4px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; color: #94A3B8;">🖼️</div>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td style="color: #64748B;">{{ p.category_name or 'GENERAL' }}</td>
+                                                    <td style="font-weight: 600;">{{ p.sku }} {{ p.name }}</td>
+                                                    <td style="color: #64748B;">{{ p.description or '' }}</td>
+                                                    <td style="text-align: right; font-weight: 600;">${{ "%.2f"|format(p.price or p.default_price or 0) }}</td>
+                                                    <td style="text-align: center;"><span class="inflow-blue-link" onclick="goToProductDetail({{ p.id }}, '{{ (p.sku ~ " " ~ p.name)|replace('\'', '\\\'') }}', event)" title="View product detail">View</span></td>
+                                                </tr>
+                                                {% endfor %}
                                                 {% endif %}
-                                            </td>
-                                            <td style="color: #64748B;">{{ p.category_name or 'GENERAL' }}</td>
-                                            <td style="font-weight: 600;">{{ p.sku }} {{ p.name }}</td>
-                                            <td style="color: #64748B;">{{ p.description or '' }}</td>
-                                            <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(p.price or p.default_price or 0) }}</td>
-                                            <td style="text-align: center;"><span class="inflow-blue-link" onclick="goToProductDetail({{ p.id }}, '{{ (p.sku ~ " " ~ p.name)|replace('\'', '\\\'') }}', event)" title="View product detail">View</span></td>
-                                        </tr>
-                                        {% endfor %}
-                                        {% endif %}
-                                    </tbody>
-                                </table>
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    <!-- Right: Inventory Info Preview Panel (Matching inFlow Screenshot 2) -->
+                                    <div id="itemDropdownPreviewPanel" class="inflow-item-preview-panel" style="width: 280px; flex-shrink: 0; background: #EDF8FD; border-left: 2px solid #00A2E8; padding: 10px 12px; font-size: 11.5px; display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;">
+                                        <div id="previewTitle" style="font-weight: 700; color: #0284C7; font-size: 12px; line-height: 1.35; border-bottom: 1px solid #BAE6FD; padding-bottom: 6px; word-break: break-word;">
+                                            Inventory Info: <span id="previewSkuName" style="color: #0F172A;">-</span>
+                                        </div>
+                                        <div style="font-family: monospace; font-size: 11px; color: #0F172A; display: flex; flex-direction: column; gap: 4px;">
+                                            <div style="display: flex; justify-content: space-between;">
+                                                <span style="color: #334155;">Qty on Hand</span>
+                                                <span id="previewQtyOnHand" style="font-weight: 700; text-align: right;">-</span>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between;">
+                                                <span style="color: #334155;">Qty Available</span>
+                                                <span id="previewQtyAvailable" style="font-weight: 700; text-align: right;">-</span>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between;">
+                                                <span style="color: #334155;">Qty Reserved</span>
+                                                <span id="previewQtyReserved" style="font-weight: 700; text-align: right;">-</span>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between;">
+                                                <span style="color: #334155;">Qty on Order</span>
+                                                <span id="previewQtyOnOrder" style="font-weight: 700; text-align: right;">0</span>
+                                            </div>
+                                        </div>
+                                        <div style="height: 1px; background: #BAE6FD; margin: 2px 0;"></div>
+                                        <div style="font-family: monospace; font-size: 11px; color: #0F172A; display: flex; flex-direction: column; gap: 4px;">
+                                            <div style="display: flex; justify-content: space-between;">
+                                                <span id="previewSchemeName" style="color: #334155;">Retail 1</span>
+                                                <span id="previewPrice" style="font-weight: 700; text-align: right; color: #0F766E;">$0.00</span>
+                                            </div>
+                                            <div style="display: flex; justify-content: space-between;">
+                                                <span style="color: #334155;">Cost</span>
+                                                <span id="previewCost" style="font-weight: 700; text-align: right; color: #475569;">$0.00</span>
+                                            </div>
+                                        </div>
+                                        <!-- Product Image Box -->
+                                        <div style="flex: 1; display: flex; align-items: center; justify-content: center; min-height: 130px; max-height: 160px; background: #FFFFFF; border: 1px solid #BAE6FD; border-radius: 4px; overflow: hidden; padding: 4px; margin-top: auto;">
+                                            <img id="previewImage" src="" alt="" style="max-width: 100%; max-height: 150px; object-fit: contain; display: none;">
+                                            <div id="previewImagePlaceholder" style="color: #94A3B8; font-size: 11px; text-align: center;">No Image Available</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Floating Quantity & Unit Conversion Dropdown Popup -->

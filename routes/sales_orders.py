@@ -1271,6 +1271,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             COALESCE(c.name, 'GENERAL') as category_name,
             COALESCE(pp.unit_price, p.default_price, 0) as price,
             p.price_decimals,
+            COALESCE(p.costing_sheet_cost, p.standard_cost, p.average_cost, p.last_purchase_cost, 0) as cost,
             COALESCE(SUM(inv.quantity), 0) as stock_on_hand,
             COALESCE(SUM(inv.reserved_quantity), 0) as stock_reserved
         FROM products p
@@ -1278,7 +1279,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         LEFT JOIN product_prices pp ON p.id = pp.product_id AND pp.pricing_scheme_id = %s
         LEFT JOIN inventory inv ON p.id = inv.product_id
         WHERE p.is_active = TRUE
-        GROUP BY p.id, p.sku, p.name, p.description, p.combine_type, p.image_url, p.uom, p.sales_uom, p.sales_uom_ratio_std, p.purchasing_uom, p.purchasing_uom_ratio_std, c.name, pp.unit_price, p.default_price, p.price_decimals
+        GROUP BY p.id, p.sku, p.name, p.description, p.combine_type, p.image_url, p.uom, p.sales_uom, p.sales_uom_ratio_std, p.purchasing_uom, p.purchasing_uom_ratio_std, c.name, pp.unit_price, p.default_price, p.price_decimals, p.costing_sheet_cost, p.standard_cost, p.average_cost, p.last_purchase_cost
         ORDER BY p.sku ASC
     """, (scheme_id,))
 
