@@ -50,5 +50,40 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
         self.assertIn('function openQtyDropdown(event, btnEl)', html)
         self.assertIn('function selectUnitForLine(', html)
 
+    def test_shorter_sheet_pay2x2_item_wrap_and_uom_display(self):
+        """
+        Verify:
+        1. Shorter right card width (260px) in grid and main-right.
+        2. Exactly 2x2 payment tiles grid (repeat(2, 1fr)) with Cash, ABA, ACLEDA, KB PRASAC.
+        3. Credit / Debit and Other Bank removed.
+        4. Item inputs use textarea rows="2" for 2nd line wrapping.
+        5. Stock values in UOM popup use <u> tag underlines matching inFlow design.
+        """
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # 1. 260px width
+        self.assertIn('260px', html)
+        self.assertIn('.so-main-right', html)
+
+        # 2. 2x2 payment tiles
+        self.assertIn('repeat(2, 1fr)', html)
+        self.assertIn('data-method="Cash"', html)
+        self.assertIn('data-method="ABA Bank"', html)
+        self.assertIn('data-method="ACLEDA"', html)
+        self.assertIn('data-method="KB PRASAC"', html)
+
+        # 3. Credit / Debit and Other Bank removed
+        self.assertNotIn('data-method="Credit/Debit"', html)
+        self.assertNotIn('data-method="Other Bank"', html)
+
+        # 4. Item inputs use textarea for 2nd line wrapping
+        self.assertIn('<textarea rows="2"', html)
+
+        # 5. Stock underline styling in JS
+        self.assertIn('<u>${formatQtyNum(onHand)}', html)
+        self.assertIn('<u>${formatQtyNum(reserved)}', html)
+
 if __name__ == '__main__':
     unittest.main()

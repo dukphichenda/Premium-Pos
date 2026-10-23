@@ -1680,7 +1680,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
     min-width: 0 !important;
 }
 .so-main-right {
-    width: 320px !important;
+    width: 260px !important;
     flex-shrink: 0 !important;
 }
 .so-card-items {
@@ -3614,32 +3614,16 @@ function openQtyDropdown(event, btnEl) {
         });
     }
 
-    // 1. Base UOM
+    // 1. Standard UOM (Base UOM based on product detail)
     addUnitOption(baseUom, 1.0, true);
 
-    // 2. Product-specific sales & purchasing UOMs
-    if (prod) {
-        if (prod.sales_uom) {
-            addUnitOption(prod.sales_uom, prod.sales_ratio || 1.0, false);
-        }
-        if (prod.purchasing_uom) {
-            addUnitOption(prod.purchasing_uom, prod.purchasing_ratio || 1.0, false);
-        }
+    // 2. Sale UOM (based on product detail)
+    if (prod && prod.sales_uom && prod.sales_uom.trim().toLowerCase() !== baseUom.toLowerCase()) {
+        addUnitOption(prod.sales_uom, prod.sales_ratio || 1.0, false);
+    } else if (!prod) {
+        // If no product is chosen yet, offer common base options (pcs., box)
+        addUnitOption('box', 1.0, false);
     }
-
-    // 3. Common business standard units
-    const commonUoms = ['pcs.', 'box', 'pack', 'carton', 'case', 'dozen', 'set', 'bottle', 'can', 'bag', 'pair', 'kg', 'g', 'unit'];
-    commonUoms.forEach(u => {
-        let r = 1.0;
-        if (prod) {
-            if (prod.sales_uom && u.toLowerCase() === prod.sales_uom.toLowerCase()) r = prod.sales_ratio || 1.0;
-            else if (prod.purchasing_uom && u.toLowerCase() === prod.purchasing_uom.toLowerCase()) r = prod.purchasing_ratio || 1.0;
-            else if (u.toLowerCase() === 'dozen' && baseUom.toLowerCase().startsWith('pc')) r = 12.0;
-        } else if (u.toLowerCase() === 'dozen') {
-            r = 12.0;
-        }
-        addUnitOption(u, r, false);
-    });
 
     units.forEach(u => {
         const tr = document.createElement('tr');
@@ -3650,11 +3634,12 @@ function openQtyDropdown(event, btnEl) {
 
         const stdQty = currentQty * u.ratio;
         tr.innerHTML = `
-            <td style="padding: 6px 10px; cursor: pointer; font-size: 11.5px;">
-                <span style="${isActive ? 'color: #2563EB; font-weight: 700;' : 'color: #0F172A; font-weight: 500;'}">${formatQtyNum(currentQty)} ${u.uom}</span>
-                ${isActive ? '<span style="color: #2563EB; font-size: 11px; margin-left: 4px; font-weight: 800;">✓</span>' : ''}
+            <td style="padding: 5px 8px; cursor: pointer; font-size: 11px; ${isActive ? 'background: #0078D7; color: #FFFFFF; font-weight: 700;' : 'color: #0F172A;'}">
+                ${formatQtyNum(currentQty)} ${u.uom}
             </td>
-            <td style="text-align: right; padding: 6px 10px; color: #64748B; cursor: pointer; font-size: 11px;">${formatQtyNum(stdQty)} ${baseUom}</td>
+            <td style="text-align: right; padding: 5px 8px; cursor: pointer; font-size: 11px; ${isActive ? 'background: #0078D7; color: #FFFFFF; font-weight: 700;' : 'color: #334155;'}">
+                ${formatQtyNum(stdQty)} ${baseUom}
+            </td>
         `;
 
         tr.onclick = function(e) {
@@ -3664,7 +3649,7 @@ function openQtyDropdown(event, btnEl) {
         tbody.appendChild(tr);
     });
 
-    // Populate Stock panel
+    // Populate Stock panel (Matching inFlow Screenshot: Qty On Hand, Qty Available, Qty Reserved)
     const onHand = prod ? (prod.stock_on_hand || 0) : 0;
     const reserved = prod ? (prod.stock_reserved || 0) : 0;
     const avail = onHand - reserved;
@@ -3674,10 +3659,10 @@ function openQtyDropdown(event, btnEl) {
     const reservedEl = document.getElementById('qtyReservedVal');
     const onOrderEl = document.getElementById('qtyOnOrderVal');
 
-    if (onHandEl) onHandEl.innerText = prod ? `${formatQtyNum(onHand)} ${baseUom}` : `-`;
-    if (availEl) availEl.innerText = prod ? `${formatQtyNum(avail)} ${baseUom}` : `-`;
-    if (reservedEl) reservedEl.innerText = prod ? `${formatQtyNum(reserved)} ${baseUom}` : `-`;
-    if (onOrderEl) onOrderEl.innerText = prod ? `0 ${baseUom}` : `-`;
+    if (onHandEl) onHandEl.innerHTML = prod ? `<u>${formatQtyNum(onHand)} ${baseUom}</u>` : `-`;
+    if (availEl) availEl.innerHTML = prod ? `<u>${formatQtyNum(avail)} ${baseUom}</u>` : `-`;
+    if (reservedEl) reservedEl.innerHTML = prod ? `<u>${formatQtyNum(reserved)} ${baseUom}</u>` : `-`;
+    if (onOrderEl) onOrderEl.innerHTML = prod ? `<u>0 ${baseUom}</u>` : `-`;
 
     // Position popup cleanly using fixed viewport coordinates
     const popup = document.getElementById('qtyDropdownPopup');
@@ -5611,10 +5596,10 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
                 <input type="hidden" name="lines[${existingCount}][addon_quantity]" class="line-addon-quantity" value="1">
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
-                <input type="text" class="inflow-field-input grid-item-input so-item-input" value="${sku} ${name}" 
-                       placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12.5px; padding: 0;"
-                       onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
-                       onkeydown="handleItemDropdownKey(event, this)">
+                <textarea rows="2" class="inflow-field-input grid-item-input so-item-input" 
+                          placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
+                          onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
+                          onkeydown="handleItemDropdownKey(event, this)">${sku} ${name}</textarea>
             </td>
             <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
                 <input type="text" name="lines[${existingCount}][description]" value="${(effectiveDesc || '').replace(/"/g, '&quot;')}" 
