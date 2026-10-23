@@ -1270,7 +1270,7 @@
                                     </thead>
                                     <tbody id="lineItemsBody">
                                         {% for l in lines %}
-                                        <tr data-line-index="{{ loop.index0 }}" {% if not is_paid %}ondragstart="handleLineDragStart(event)" ondragover="handleLineDragOver(event)" ondragleave="handleLineDragLeave(event)" ondrop="handleLineDrop(event)" ondragend="handleLineDragEnd(event)"{% endif %} onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
+                                        <tr data-line-index="{{ loop.index0 }}" {% if not is_paid %}draggable="true" ondragstart="handleLineDragStart(event)" ondragover="handleLineDragOver(event)" ondragleave="handleLineDragLeave(event)" ondrop="handleLineDrop(event)" ondragend="handleLineDragEnd(event)"{% endif %} onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
                                             <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 600; color: #64748B; font-size: 12px;">
                                                 {{ loop.index }}
                                             </td>
@@ -1343,7 +1343,7 @@
                                                         </svg>
                                                     </button>
                                                     {% endif %}
-                                                    <span class="so-drag-handle" title="Drag to reorder row" onmousedown="handleDragHandleMouseDown(this, event)">⠿</span>
+                                                    <span class="so-drag-handle" title="Drag to reorder row" onmousedown="isDragHandlePressed = true;">⠿</span>
                                                 </div>
                                             </td>
                                         </tr>
@@ -1862,40 +1862,27 @@
     }
 
     // Drag & Drop Row Reordering
+    let isDragHandlePressed = false;
     let draggedSoLineRow = null;
 
     function cleanupSoDragClasses() {
         document.querySelectorAll('#lineItemsBody tr').forEach(r => {
             r.classList.remove('so-row-dragging', 'so-drop-above', 'so-drop-below');
-            r.removeAttribute('draggable');
         });
+        isDragHandlePressed = false;
     }
 
-    function handleDragHandleMouseDown(handleEl, e) {
-        {% if is_paid %}
-        return;
-        {% endif %}
-        const row = handleEl.closest('tr[data-line-index]');
-        if (row) {
-            row.setAttribute('draggable', 'true');
-        }
-    }
-
-    // Safety: ensure only drag handle activates draggable attribute
+    // Safety: track mousedown specifically on the drag handle
     document.addEventListener('mousedown', function(e) {
-        const handle = e.target.closest('.so-drag-handle');
-        if (handle) {
-            const row = handle.closest('tr[data-line-index]');
-            if (row) row.setAttribute('draggable', 'true');
+        if (e.target && e.target.closest('.so-drag-handle')) {
+            isDragHandlePressed = true;
         } else {
-            document.querySelectorAll('#lineItemsBody tr[draggable="true"]').forEach(r => r.removeAttribute('draggable'));
+            isDragHandlePressed = false;
         }
     }, true);
 
-    document.addEventListener('mouseup', function(e) {
-        setTimeout(() => {
-            document.querySelectorAll('#lineItemsBody tr[draggable="true"]').forEach(r => r.removeAttribute('draggable'));
-        }, 50);
+    document.addEventListener('mouseup', function() {
+        isDragHandlePressed = false;
     }, true);
 
     function handleLineDragStart(e) {
@@ -1903,9 +1890,8 @@
         e.preventDefault();
         return false;
         {% endif %}
-        // Strictly allow drag ONLY when pointing/grabbing the drag icon
-        const handle = e.target.closest('.so-drag-handle');
-        if (!handle) {
+        // Strictly allow drag ONLY when mouse was pressed on the drag handle icon!
+        if (!isDragHandlePressed) {
             e.preventDefault();
             return false;
         }
