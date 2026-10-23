@@ -28,8 +28,7 @@ class TestGridMultiDelete(unittest.TestCase):
             sess['role'] = 'main_admin'
 
     def test_po_detail_has_multi_select_and_cross_delete(self):
-        """Verify PO detail template renders multi-select checkboxes and 1-by-1 cross delete buttons."""
-        # Find any existing PO or create a sample
+        """Verify PO detail template has tick boxes removed while keeping 1-by-1 cross delete and line operations."""
         po = query_one("SELECT id FROM purchase_orders ORDER BY id DESC LIMIT 1")
         if not po:
             self.skipTest("No purchase order found in database.")
@@ -38,19 +37,17 @@ class TestGridMultiDelete(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
 
-        # Check master select-all checkbox
-        self.assertIn('id="masterSelectAllPoLines"', html)
-        self.assertIn('toggleSelectAllPoLines', html)
+        # Check tick box is removed
+        self.assertNotIn('id="masterSelectAllPoLines"', html)
+        self.assertNotIn('class="line-select-chk"', html)
 
-        # Check row select checkbox and cross delete button
-        self.assertIn('class="line-select-chk"', html)
+        # Check cross delete button and operations remain
         self.assertIn('class="line-delete-cross-btn"', html)
         self.assertIn('deleteSpecificPoLine', html)
         self.assertIn('deleteSelectedPoLine', html)
 
     def test_so_detail_has_multi_select_and_cross_delete(self):
-        """Verify SO detail template renders multi-select checkboxes and 1-by-1 cross delete buttons."""
-        # Find any existing SO or create a sample
+        """Verify SO detail template has tick boxes removed while keeping line operations."""
         so = query_one("SELECT id FROM sales_orders WHERE status != 'PAID' ORDER BY id DESC LIMIT 1")
         if not so:
             so = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
@@ -61,14 +58,13 @@ class TestGridMultiDelete(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
 
-        # Check master select-all checkbox
-        self.assertIn('id="masterSelectAllSoLines"', html)
-        self.assertIn('toggleSelectAllSoLines', html)
+        # Check tick box is removed
+        self.assertNotIn('id="masterSelectAllSoLines"', html)
+        self.assertNotIn('class="line-select-chk"', html)
 
         # Check JS function presence
         self.assertIn('deleteSpecificSoLine', html)
         self.assertIn('deleteSelectedLine', html)
-        self.assertIn('onSoLineCheckboxChange', html)
 
     def test_css_has_line_delete_cross_btn_styles(self):
         """Verify static/css/styles.css contains the styles for cross delete button and row selection."""

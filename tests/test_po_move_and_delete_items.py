@@ -81,12 +81,11 @@ class TestPoMoveAndDeleteItems(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
 
-        # 1. Master select-all checkbox
-        self.assertIn('id="masterSelectAllPoLines"', html)
-        self.assertIn('toggleSelectAllPoLines', html)
+        # 1. Master select-all checkbox removed
+        self.assertNotIn('id="masterSelectAllPoLines"', html)
 
-        # 2. Row controls
-        self.assertIn('class="line-select-chk"', html)
+        # 2. Row controls (tick box removed, cross delete and move buttons remain)
+        self.assertNotIn('class="line-select-chk"', html)
         self.assertIn('class="line-delete-cross-btn"', html)
         self.assertIn('class="po-line-move-btn"', html)
         self.assertIn('class="po-line-move-stack"', html)
