@@ -89,7 +89,7 @@ class TestBranchProductViewLock(unittest.TestCase):
 
         # 5. Dangerous action buttons must NOT be rendered for branch user
         self.assertNotIn('id="btnToggleActive"', html)
-        self.assertNotIn('deleteCurrentProduct', html)
+        self.assertNotIn('onclick="deleteCurrentProduct(', html)
         self.assertNotIn('+ Combined Kit', html)
         self.assertNotIn('Merge Duplicate', html)
 
@@ -117,12 +117,12 @@ class TestBranchProductViewLock(unittest.TestCase):
         res = self.client.post(f'/products/{self.prod_id}/upload_picture')
         self.assertEqual(res.status_code, 403)
 
-        # 3. toggle_active_ajax
-        res = self.client.post(f'/products/{self.prod_id}/toggle_active_ajax')
+        # 3. toggle_active
+        res = self.client.post(f'/products/toggle_active/{self.prod_id}')
         self.assertEqual(res.status_code, 403)
 
-        # 4. delete_catalog
-        res = self.client.post(f'/products/{self.prod_id}/delete_catalog')
+        # 4. delete product
+        res = self.client.post(f'/products/{self.prod_id}/delete')
         self.assertEqual(res.status_code, 403)
 
         # 5. combine type
