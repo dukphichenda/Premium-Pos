@@ -170,7 +170,37 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
             self.assertIn('sku', c)
             self.assertIn('quantity', c)
 
+    def test_so_item_detail_navigation_and_dropdown_reset(self):
+        """
+        Verify:
+        1. Line items contain .so-item-name-link navigating directly to product detail via goToProductDetail.
+        2. .so-item-change-trigger is available to switch products via openItemDropdownForLine.
+        3. openItemDropdown clears previous search filter results and highlights current product.
+        4. Dropdown table DETAILS column contains View link calling goToProductDetail.
+        """
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Functions defined
+        self.assertIn('function goToProductDetail(pid, name, event)', html)
+        self.assertIn('function openItemDropdownForLine(btnEl, event)', html)
+        self.assertIn('function openItemDropdown(inputEl)', html)
+
+        # Dropdown reset logic present
+        self.assertIn("r.style.display = '';", html)
+        self.assertIn("data-pid=", html)
+
+        # Dropdown DETAILS column View link
+        self.assertIn('goToProductDetail(', html)
+        self.assertIn('title="View product detail">View</span>', html)
+
+        # CSS classes
+        self.assertIn('.so-item-name-link', html)
+        self.assertIn('.so-item-change-trigger', html)
+
 if __name__ == '__main__':
     unittest.main()
+
 
 

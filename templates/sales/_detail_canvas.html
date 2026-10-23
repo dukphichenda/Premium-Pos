@@ -1318,14 +1318,29 @@
                                                 <div class="line-item-thumb-placeholder" style="width: 32px; height: 32px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 13px;" title="No image">🖼️</div>
                                                 {% endif %}
                                             </td>
-                                            <td style="position: relative; vertical-align: middle;">
+                                            <td style="position: relative; vertical-align: middle;" class="so-item-cell">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][product_id]" value="{{ l.product_id }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_product_id]" class="line-addon-product-id" value="{{ l.addon_product_id or '' }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_quantity]" class="line-addon-quantity" value="{{ l.addon_quantity or 1.0 }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][combine_option_id]" class="line-combine-option-id" value="{{ l.combine_option_id or '' }}">
+                                                <div class="so-item-display-wrap" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; width: 100%;">
+                                                    <div class="so-item-name-link" 
+                                                         onclick="goToProductDetail({{ l.product_id }}, '{{ (l.product_sku ~ " " ~ l.product_name)|replace('\'', '\\\'') }}', event)" 
+                                                         title="Click to view product detail / ចុចដើម្បីមើលព័ត៌មានលម្អិតមុខទំនិញ"
+                                                         style="cursor: pointer; flex: 1; font-weight: 600; font-size: 12px; line-height: 1.35; color: #0F172A; text-decoration: none;">
+                                                        <span class="so-product-sku-text" style="color: #2563EB;">{{ l.product_sku }}</span> {{ l.product_name }}
+                                                    </div>
+                                                    {% if not is_paid %}
+                                                    <button type="button" class="so-item-change-trigger" onclick="openItemDropdownForLine(this, event)" title="Change product / ប្តូរមុខទំនិញ" 
+                                                            style="background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 10px; color: #94A3B8; cursor: pointer; line-height: 1; flex-shrink: 0;"
+                                                            onmouseover="this.style.background='#F1F5F9'; this.style.color='#0F172A';" onmouseout="this.style.background='transparent'; this.style.color='#94A3B8';">
+                                                        ⌵
+                                                    </button>
+                                                    {% endif %}
+                                                </div>
                                                 <textarea rows="2" class="inflow-field-input grid-item-input so-item-input" 
-                                                          placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
-                                                          onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
+                                                          placeholder="Type item name/code..." style="display: none; border: 1px solid #CBD5E1; border-radius: 4px; background: #FFFFFF; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 4px; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; box-sizing: border-box;"
+                                                          oninput="filterItemDropdown(this.value, this)"
                                                           onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>{{ l.product_sku }} {{ l.product_name }}</textarea>
                                             </td>
                                             <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
@@ -1466,7 +1481,7 @@
                                         {% if all_products %}
                                         {% for p in all_products %}
                                         <tr onclick="selectItemForActiveRow({{ p.id }}, '{{ p.sku }}', '{{ p.name|replace('\'', '\\\'') }}', '{{ (p.description or '')|replace('\'', '\\\'') }}', {{ p.price or p.default_price or 0 }}, '{{ p.uom or 'pcs' }}')"
-                                            data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}" data-cat="{{ (p.category_name or '')|lower }}">
+                                            data-pid="{{ p.id }}" data-sku="{{ p.sku|lower }}" data-name="{{ p.name|lower }}" data-cat="{{ (p.category_name or '')|lower }}">
                                             <td style="width: 38px; text-align: center; vertical-align: middle; padding: 2px;">
                                                 {% if p.image_url %}
                                                 <img src="{{ p.image_url }}" alt="" style="width: 28px; height: 28px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="event.stopPropagation(); previewImageModal(this.src);" title="Click to preview image">
@@ -1478,7 +1493,7 @@
                                             <td style="font-weight: 600;">{{ p.sku }} {{ p.name }}</td>
                                             <td style="color: #64748B;">{{ p.description or '' }}</td>
                                             <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(p.price or p.default_price or 0) }}</td>
-                                            <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
+                                            <td style="text-align: center;"><span class="inflow-blue-link" onclick="goToProductDetail({{ p.id }}, '{{ (p.sku ~ " " ~ p.name)|replace('\'', '\\\'') }}', event)" title="View product detail">View</span></td>
                                         </tr>
                                         {% endfor %}
                                         {% endif %}

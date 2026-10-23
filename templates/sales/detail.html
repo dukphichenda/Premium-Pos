@@ -5193,8 +5193,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const itemPopup = document.getElementById('itemDropdownPopup');
-        if (itemPopup && !itemPopup.contains(e.target) && !e.target.classList.contains('grid-item-input')) {
+        if (itemPopup && !itemPopup.contains(e.target) && !e.target.classList.contains('grid-item-input') && !e.target.closest('.so-item-change-trigger')) {
             itemPopup.classList.remove('show');
+            document.querySelectorAll('#lineItemsBody tr').forEach(r => {
+                const wrap = r.querySelector('.so-item-display-wrap');
+                const inp = r.querySelector('.grid-item-input');
+                if (wrap && inp && inp.style.display !== 'none' && document.activeElement !== inp) {
+                    inp.style.display = 'none';
+                    wrap.style.display = 'flex';
+                }
+            });
         }
     });
 
@@ -5657,6 +5665,41 @@ function positionItemDropdown(inputEl) {
     popup.style.left = Math.round(leftPos) + 'px';
 }
 
+function goToProductDetail(pid, name, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    if (!pid) return;
+    const url = '/products/' + pid;
+    const cleanName = (name || '').trim();
+    const tabTitle = cleanName ? (cleanName.length > 25 ? cleanName.substring(0, 25) + '...' : cleanName) : ('Product #' + pid);
+    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.openTab === 'function') {
+        window.top.inflowMdi.openTab(url, 'Product: ' + tabTitle, 'product');
+    } else {
+        window.open(url, '_blank');
+    }
+}
+
+function openItemDropdownForLine(btnEl, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    if (!btnEl) return;
+    const cell = btnEl.closest('.so-item-cell') || btnEl.closest('td');
+    if (!cell) return;
+    const wrap = cell.querySelector('.so-item-display-wrap');
+    const input = cell.querySelector('.grid-item-input');
+    if (wrap) wrap.style.display = 'none';
+    if (input) {
+        input.style.display = 'block';
+        input.focus();
+        if (typeof input.select === 'function') input.select();
+        openItemDropdown(input);
+    }
+}
+
 function openItemDropdown(inputEl) {
     if (!inputEl || !inputEl.isConnected) {
         inputEl = (document.activeElement && document.activeElement.classList.contains('grid-item-input')) 
@@ -5675,8 +5718,35 @@ function openItemDropdown(inputEl) {
         if (popup.parentElement !== document.body) {
             document.body.appendChild(popup);
         }
+
+        // Always reset rows filter so previous search query results are never stuck
+        const rows = document.querySelectorAll('#itemDropdownBody tr');
+        rows.forEach(r => {
+            r.style.display = '';
+            r.classList.remove('highlighted');
+        });
+
+        // Highlight current product if row already has a product assigned
+        let currentPid = null;
+        if (activeGridRowEl) {
+            currentPid = activeGridRowEl.getAttribute('data-product-id') || 
+                         activeGridRowEl.querySelector('input[name*="[product_id]"]')?.value;
+        }
+
+        let targetRow = null;
+        if (currentPid) {
+            targetRow = document.querySelector(`#itemDropdownBody tr[data-pid="${currentPid}"]`);
+        }
+        if (!targetRow && rows.length > 0) {
+            targetRow = rows[0];
+        }
+
         positionItemDropdown(inputEl);
         popup.classList.add('show');
+
+        if (targetRow) {
+            highlightItemRow(targetRow);
+        }
     }
 }
 
@@ -5759,8 +5829,16 @@ function handleItemDropdownKey(e, inputEl) {
                 activeRow.click();
             }
         }
-    } else if (e.key === 'Escape') {
+    } else if (e.key === 'Escape' || e.key === 'Tab') {
         if (popup) popup.classList.remove('show');
+        if (inputEl) {
+            const cell = inputEl.closest('.so-item-cell') || inputEl.closest('td');
+            const wrap = cell?.querySelector('.so-item-display-wrap');
+            if (wrap) {
+                inputEl.style.display = 'none';
+                wrap.style.display = 'flex';
+            }
+        }
     }
 }
 
@@ -5822,14 +5900,27 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
             <td class="line-pic-cell" style="text-align: center; vertical-align: middle; padding: 4px;">
                 ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 32px; height: 32px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 32px; height: 32px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 13px;" title="No image">🖼️</div>`}
             </td>
-            <td style="position: relative; vertical-align: middle;">
+            <td style="position: relative; vertical-align: middle;" class="so-item-cell">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
                 <input type="hidden" name="lines[${existingCount}][addon_quantity]" class="line-addon-quantity" value="1">
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
+                <div class="so-item-display-wrap" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; width: 100%;">
+                    <div class="so-item-name-link" 
+                         onclick="goToProductDetail(${pid}, '${(sku + " " + name).replace(/'/g, "\\'")}', event)" 
+                         title="Click to view product detail / ចុចដើម្បីមើលព័ត៌មានលម្អិតមុខទំនិញ"
+                         style="cursor: pointer; flex: 1; font-weight: 600; font-size: 12px; line-height: 1.35; color: #0F172A; text-decoration: none;">
+                        <span class="so-product-sku-text" style="color: #2563EB;">${sku}</span> ${name}
+                    </div>
+                    <button type="button" class="so-item-change-trigger" onclick="openItemDropdownForLine(this, event)" title="Change product / ប្តូរមុខទំនិញ" 
+                            style="background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 10px; color: #94A3B8; cursor: pointer; line-height: 1; flex-shrink: 0;"
+                            onmouseover="this.style.background='#F1F5F9'; this.style.color='#0F172A';" onmouseout="this.style.background='transparent'; this.style.color='#94A3B8';">
+                        ⌵
+                    </button>
+                </div>
                 <textarea rows="2" class="inflow-field-input grid-item-input so-item-input" 
-                          placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
-                          onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
+                          placeholder="Type item name/code..." style="display: none; border: 1px solid #CBD5E1; border-radius: 4px; background: #FFFFFF; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 4px; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; box-sizing: border-box;"
+                          oninput="filterItemDropdown(this.value, this)"
                           onkeydown="handleItemDropdownKey(event, this)">${sku} ${name}</textarea>
             </td>
             <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
@@ -5903,7 +5994,41 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         activeGridRowEl.setAttribute('data-addon-quantity', '1');
         activeGridRowEl.setAttribute('data-combine-option-id', '');
         activeGridRowEl.querySelector('input[name*="[product_id]"]').value = pid;
-        activeGridRowEl.querySelector('.grid-item-input').value = `${sku} ${name}`;
+        const itemInput = activeGridRowEl.querySelector('.grid-item-input');
+        if (itemInput) itemInput.value = `${sku} ${name}`;
+
+        let displayWrap = activeGridRowEl.querySelector('.so-item-display-wrap');
+        const escapedName = (sku + ' ' + name).replace(/'/g, "\\'");
+        if (!displayWrap && itemInput) {
+            const itemCell = activeGridRowEl.querySelector('.so-item-cell') || itemInput.parentElement;
+            displayWrap = document.createElement('div');
+            displayWrap.className = 'so-item-display-wrap';
+            displayWrap.style.cssText = 'display: flex; align-items: flex-start; justify-content: space-between; gap: 4px; width: 100%;';
+            displayWrap.innerHTML = `
+                <div class="so-item-name-link" 
+                     onclick="goToProductDetail(${pid}, '${escapedName}', event)" 
+                     title="Click to view product detail / ចុចដើម្បីមើលព័ត៌មានលម្អិតមុខទំនិញ"
+                     style="cursor: pointer; flex: 1; font-weight: 600; font-size: 12px; line-height: 1.35; color: #0F172A; text-decoration: none;">
+                    <span class="so-product-sku-text" style="color: #2563EB;">${sku}</span> ${name}
+                </div>
+                <button type="button" class="so-item-change-trigger" onclick="openItemDropdownForLine(this, event)" title="Change product / ប្តូរមុខទំនិញ" 
+                        style="background: transparent; border: 1px solid transparent; border-radius: 4px; padding: 2px 4px; font-size: 10px; color: #94A3B8; cursor: pointer; line-height: 1; flex-shrink: 0;"
+                        onmouseover="this.style.background='#F1F5F9'; this.style.color='#0F172A';" onmouseout="this.style.background='transparent'; this.style.color='#94A3B8';">
+                    ⌵
+                </button>
+            `;
+            itemCell.insertBefore(displayWrap, itemInput);
+        } else if (displayWrap) {
+            const nameLink = displayWrap.querySelector('.so-item-name-link');
+            if (nameLink) {
+                nameLink.setAttribute('onclick', `goToProductDetail(${pid}, '${escapedName}', event)`);
+                nameLink.innerHTML = `<span class="so-product-sku-text" style="color: #2563EB;">${sku}</span> ${name}`;
+            }
+            displayWrap.style.display = 'flex';
+        }
+        if (itemInput) {
+            itemInput.style.display = 'none';
+        }
         const picCell = activeGridRowEl.querySelector('.line-pic-cell');
         if (picCell) {
             picCell.innerHTML = prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`;
