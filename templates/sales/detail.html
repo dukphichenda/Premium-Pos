@@ -148,7 +148,27 @@
 
 /* Modern Sales Order Master Sidebar (Matching UI Screenshot)               */
 /* ========================================================================= */
+/* Modern Sales Order Master Sidebar (Flush against the blue main sidebar)  */
+/* ========================================================================= */
+html.is-embedded,
+html.is-embedded body,
+html.is-embedded .app-container,
+html.is-embedded .main-wrapper,
+html.is-embedded #inflowDirectContent,
+html.is-embedded .inflow-direct-content,
+body.sales-order-body-fullscreen .main-wrapper,
+body.sales-order-body-fullscreen #inflowDirectContent {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
+.inflow-so-workspace {
+    margin-left: 0 !important;
+    padding-left: 0 !important;
+}
+
 .so-master-sidebar {
+    margin-left: 0 !important;
     width: 280px !important;
     min-width: 280px !important;
     background: #F8FAFC !important;
@@ -3566,54 +3586,75 @@ function openQtyDropdown(event, btnEl) {
 
     const pidInput = row.querySelector('input[name*="[product_id]"]');
     const pid = pidInput ? parseInt(pidInput.value) : 0;
-    if (!pid || !window.productsCatalog[pid]) {
-        return;
-    }
+    const prod = (pid && window.productsCatalog && window.productsCatalog[pid]) ? window.productsCatalog[pid] : null;
 
-    const prod = window.productsCatalog[pid];
     const qtyInput = row.querySelector('.line-qty');
     const currentQty = parseFloat(qtyInput ? qtyInput.value : 1) || 1;
-    const currentUom = (row.querySelector('.line-uom')?.value || prod.base_uom || 'pcs.').trim();
+    const currentUom = (row.querySelector('.line-uom')?.value || (row.id === 'newRowEntry' ? document.getElementById('newItemUomInput')?.value : null) || (prod ? prod.base_uom : 'pcs.') || 'pcs.').trim();
+
+    const baseUom = (prod && prod.base_uom) ? prod.base_uom : (currentUom || 'pcs.');
 
     // Populate units table
     const tbody = document.getElementById('qtyDropdownBody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
     const units = [];
-    const baseUom = prod.base_uom || 'pcs.';
-    units.push({
-        uom: baseUom,
-        ratio: 1.0,
-        isBase: true
+    const addedUoms = new Set();
+
+    function addUnitOption(uomName, ratio, isBase) {
+        if (!uomName) return;
+        const key = uomName.trim().toLowerCase();
+        if (addedUoms.has(key)) return;
+        addedUoms.add(key);
+        units.push({
+            uom: uomName.trim(),
+            ratio: parseFloat(ratio) || 1.0,
+            isBase: !!isBase
+        });
+    }
+
+    // 1. Base UOM
+    addUnitOption(baseUom, 1.0, true);
+
+    // 2. Product-specific sales & purchasing UOMs
+    if (prod) {
+        if (prod.sales_uom) {
+            addUnitOption(prod.sales_uom, prod.sales_ratio || 1.0, false);
+        }
+        if (prod.purchasing_uom) {
+            addUnitOption(prod.purchasing_uom, prod.purchasing_ratio || 1.0, false);
+        }
+    }
+
+    // 3. Common business standard units
+    const commonUoms = ['pcs.', 'box', 'pack', 'carton', 'case', 'dozen', 'set', 'bottle', 'can', 'bag', 'pair', 'kg', 'g', 'unit'];
+    commonUoms.forEach(u => {
+        let r = 1.0;
+        if (prod) {
+            if (prod.sales_uom && u.toLowerCase() === prod.sales_uom.toLowerCase()) r = prod.sales_ratio || 1.0;
+            else if (prod.purchasing_uom && u.toLowerCase() === prod.purchasing_uom.toLowerCase()) r = prod.purchasing_ratio || 1.0;
+            else if (u.toLowerCase() === 'dozen' && baseUom.toLowerCase().startsWith('pc')) r = 12.0;
+        } else if (u.toLowerCase() === 'dozen') {
+            r = 12.0;
+        }
+        addUnitOption(u, r, false);
     });
-
-    if (prod.sales_uom && prod.sales_uom.toLowerCase() !== baseUom.toLowerCase()) {
-        units.push({
-            uom: prod.sales_uom,
-            ratio: prod.sales_ratio || 1.0,
-            isBase: false
-        });
-    }
-
-    if (prod.purchasing_uom && 
-        prod.purchasing_uom.toLowerCase() !== baseUom.toLowerCase() && 
-        (!prod.sales_uom || prod.purchasing_uom.toLowerCase() !== prod.sales_uom.toLowerCase())) {
-        units.push({
-            uom: prod.purchasing_uom,
-            ratio: prod.purchasing_ratio || 1.0,
-            isBase: false
-        });
-    }
 
     units.forEach(u => {
         const tr = document.createElement('tr');
         const isActive = (u.uom.toLowerCase() === currentUom.toLowerCase());
-        if (isActive) tr.classList.add('active');
+        if (isActive) {
+            tr.classList.add('active');
+        }
 
         const stdQty = currentQty * u.ratio;
         tr.innerHTML = `
-            <td>${formatQtyNum(currentQty)} ${u.uom}</td>
-            <td style="text-align: right;">${formatQtyNum(stdQty)} ${baseUom}</td>
+            <td style="padding: 6px 10px; cursor: pointer; font-size: 11.5px;">
+                <span style="${isActive ? 'color: #2563EB; font-weight: 700;' : 'color: #0F172A; font-weight: 500;'}">${formatQtyNum(currentQty)} ${u.uom}</span>
+                ${isActive ? '<span style="color: #2563EB; font-size: 11px; margin-left: 4px; font-weight: 800;">✓</span>' : ''}
+            </td>
+            <td style="text-align: right; padding: 6px 10px; color: #64748B; cursor: pointer; font-size: 11px;">${formatQtyNum(stdQty)} ${baseUom}</td>
         `;
 
         tr.onclick = function(e) {
@@ -3624,29 +3665,49 @@ function openQtyDropdown(event, btnEl) {
     });
 
     // Populate Stock panel
-    const onHand = prod.stock_on_hand || 0;
-    const reserved = prod.stock_reserved || 0;
+    const onHand = prod ? (prod.stock_on_hand || 0) : 0;
+    const reserved = prod ? (prod.stock_reserved || 0) : 0;
     const avail = onHand - reserved;
 
-    document.getElementById('qtyOnHandVal').innerText = `${formatQtyNum(onHand)} ${baseUom}`;
-    document.getElementById('qtyAvailVal').innerText = `${formatQtyNum(avail)} ${baseUom}`;
-    document.getElementById('qtyReservedVal').innerText = `${formatQtyNum(reserved)} ${baseUom}`;
-    document.getElementById('qtyOnOrderVal').innerText = `0 ${baseUom}`;
+    const onHandEl = document.getElementById('qtyOnHandVal');
+    const availEl = document.getElementById('qtyAvailVal');
+    const reservedEl = document.getElementById('qtyReservedVal');
+    const onOrderEl = document.getElementById('qtyOnOrderVal');
 
-    // Position popup
+    if (onHandEl) onHandEl.innerText = prod ? `${formatQtyNum(onHand)} ${baseUom}` : `-`;
+    if (availEl) availEl.innerText = prod ? `${formatQtyNum(avail)} ${baseUom}` : `-`;
+    if (reservedEl) reservedEl.innerText = prod ? `${formatQtyNum(reserved)} ${baseUom}` : `-`;
+    if (onOrderEl) onOrderEl.innerText = prod ? `0 ${baseUom}` : `-`;
+
+    // Position popup cleanly using fixed viewport coordinates
     const popup = document.getElementById('qtyDropdownPopup');
     if (popup) {
-        const rect = btnEl.getBoundingClientRect();
-        const containerRect = document.querySelector('.inflow-grid-container').getBoundingClientRect();
-        popup.style.top = (rect.bottom - containerRect.top + 2) + 'px';
-        popup.style.left = Math.max(10, (rect.right - containerRect.left - 185)) + 'px';
+        if (popup.classList.contains('show') && popup._activeBtn === btnEl) {
+            popup.classList.remove('show');
+            popup._activeBtn = null;
+            return;
+        }
+        popup._activeBtn = btnEl;
+        if (!document.documentElement.classList.contains('is-mobile-view')) {
+            const rect = btnEl.getBoundingClientRect();
+            popup.style.position = 'fixed';
+            popup.style.zIndex = '999999';
+            popup.style.top = (rect.bottom + 4) + 'px';
+            let leftPos = rect.right - 220;
+            if (leftPos < 10) leftPos = 10;
+            if (leftPos + 230 > window.innerWidth) leftPos = window.innerWidth - 235;
+            popup.style.left = leftPos + 'px';
+        }
         popup.classList.add('show');
     }
 }
 
 function selectUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
     const popup = document.getElementById('qtyDropdownPopup');
-    if (popup) popup.classList.remove('show');
+    if (popup) {
+        popup.classList.remove('show');
+        popup._activeBtn = null;
+    }
 
     // Update UOM display & hidden
     const uomText = row.querySelector('.uom-text');
@@ -3654,30 +3715,45 @@ function selectUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
     const uomHidden = row.querySelector('.line-uom');
     if (uomHidden) uomHidden.value = targetUom;
 
-    // Case price for row's scheme
-    const schemeSelect = row.querySelector('.line-scheme-select');
-    const schemeId = schemeSelect ? parseInt(schemeSelect.value) : (parseInt(document.getElementById('masterPricingSchemeSelect')?.value || 100));
-    const casePrice = getProductPriceForScheme(prod.id, schemeId) || parseFloat(row.getAttribute('data-case-price') || row.getAttribute('data-base-price') || prod.price || 0) || 0;
-    const newPrice = calculateUnitPriceForUom(prod, casePrice, targetUom);
-    const priceInput = row.querySelector('.line-price');
-    if (priceInput) {
-        priceInput.value = formatPriceValue(newPrice, prod.price_decimals);
+    // Handle newRowEntry (asterisk row)
+    if (row.id === 'newRowEntry') {
+        let newUomInput = document.getElementById('newItemUomInput');
+        if (!newUomInput) {
+            newUomInput = document.createElement('input');
+            newUomInput.type = 'hidden';
+            newUomInput.id = 'newItemUomInput';
+            row.appendChild(newUomInput);
+        }
+        newUomInput.value = targetUom;
+        return;
     }
 
-    // Check backorder warning icon
-    const stdQty = currentQty * (targetRatio || 1.0);
-    const onHand = prod.stock_on_hand || 0;
-    let badge = row.querySelector('.inflow-backorder-badge');
-    if (onHand < stdQty) {
-        if (!badge) {
-            badge = document.createElement('span');
-            badge.className = 'inflow-backorder-badge';
-            badge.title = 'Insufficient Stock - Backordered';
-            badge.innerText = '!';
-            row.querySelector('.inflow-qty-cell-wrapper').prepend(badge);
+    // Case price for row's scheme
+    if (prod && prod.id) {
+        const schemeSelect = row.querySelector('.line-scheme-select');
+        const schemeId = schemeSelect ? parseInt(schemeSelect.value) : (parseInt(document.getElementById('masterPricingSchemeSelect')?.value || 100));
+        const casePrice = getProductPriceForScheme(prod.id, schemeId) || parseFloat(row.getAttribute('data-case-price') || row.getAttribute('data-base-price') || prod.price || 0) || 0;
+        const newPrice = calculateUnitPriceForUom(prod, casePrice, targetUom);
+        const priceInput = row.querySelector('.line-price');
+        if (priceInput) {
+            priceInput.value = formatPriceValue(newPrice, prod.price_decimals);
         }
-    } else {
-        if (badge) badge.remove();
+
+        // Check backorder warning icon
+        const stdQty = currentQty * (targetRatio || 1.0);
+        const onHand = prod.stock_on_hand || 0;
+        let badge = row.querySelector('.inflow-backorder-badge');
+        if (onHand < stdQty) {
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'inflow-backorder-badge';
+                badge.title = 'Insufficient Stock - Backordered';
+                badge.innerText = '!';
+                row.querySelector('.inflow-qty-cell-wrapper')?.prepend(badge);
+            }
+        } else {
+            if (badge) badge.remove();
+        }
     }
 
     recalculateTotals();
@@ -4892,8 +4968,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         const qtyPopup = document.getElementById('qtyDropdownPopup');
-        if (qtyPopup && !qtyPopup.contains(e.target) && !e.target.closest('.inflow-qty-uom-btn')) {
+        if (qtyPopup && !qtyPopup.contains(e.target) && !e.target.closest('.inflow-qty-uom-btn') && !e.target.closest('.so-uom-badge')) {
             qtyPopup.classList.remove('show');
+            qtyPopup._activeBtn = null;
         }
 
         const itemPopup = document.getElementById('itemDropdownPopup');
@@ -5474,7 +5551,12 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
     if (popup) popup.classList.remove('show');
 
     const prodInfo = window.productsCatalog[pid] || {};
-    const baseUom = prodInfo.base_uom || uom || 'pcs.';
+    const preChosenUom = (activeGridRowEl && activeGridRowEl.id === 'newRowEntry') 
+        ? document.getElementById('newItemUomInput')?.value?.trim() 
+        : null;
+    const baseUom = (preChosenUom && preChosenUom !== 'pcs.') 
+        ? preChosenUom 
+        : (prodInfo.base_uom || uom || 'pcs.');
 
     let activeSchemeId = parseInt(document.getElementById('masterPricingSchemeSelect')?.value || 100);
     if (activeGridRowEl && activeGridRowEl.id !== 'newRowEntry') {
@@ -5585,6 +5667,10 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         document.getElementById('newItemTextInput').value = '';
         const newDescInput = document.getElementById('newItemDescInput');
         if (newDescInput) newDescInput.value = '';
+        const newUomInput = document.getElementById('newItemUomInput');
+        if (newUomInput) newUomInput.value = 'pcs.';
+        const newUomText = document.querySelector('#newRowEntry .uom-text');
+        if (newUomText) newUomText.innerText = 'pcs.';
         selectGridRow(tr);
         syncSoSelectAllCheckbox();
 
