@@ -90,8 +90,8 @@ class TestBranchProductViewLock(unittest.TestCase):
         # 5. Dangerous action buttons must NOT be rendered for branch user
         self.assertNotIn('id="btnToggleActive"', html)
         self.assertNotIn('onclick="deleteCurrentProduct(', html)
-        self.assertNotIn('+ Combined Kit', html)
-        self.assertNotIn('Merge Duplicate', html)
+        self.assertNotIn('onclick="openNewCombinedModal()"', html)
+        self.assertNotIn('merge_duplicates_view', html)
 
         # 6. Title and SKU must be contenteditable="false"
         self.assertIn('contenteditable="false"', html)
