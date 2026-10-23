@@ -257,8 +257,8 @@
         <!-- CREATE -->
         <div class="flyout-section" id="flyout-create">
             <div class="flyout-header">Create new</div>
-            {% if not is_branch_mode %}
-            <a href="{{ url_for('sales_orders.new_order') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+            {% if not is_branch_mode or branch_permissions.invoices or branch_permissions.sales_orders %}
+            <a href="{{ url_for('sales_orders.new_order', branch=current_branch.id if (is_branch_mode and current_branch) else None) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></span>
                 <span class="flyout-label">Sales order</span>
             </a>
@@ -320,8 +320,8 @@
                 <span class="flyout-label">POS Quick Checkout</span>
             </a>
             {% endif %}
-            {% if not is_branch_mode %}
-            <a href="{{ url_for('sales_orders.new_order') }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+            {% if not is_branch_mode or branch_permissions.invoices or branch_permissions.sales_orders %}
+            <a href="{{ url_for('sales_orders.new_order', branch=current_branch.id if (is_branch_mode and current_branch) else None) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>
                 <span class="flyout-label">New sales order (SO)</span>
             </a>
@@ -547,7 +547,11 @@
                 <span class="flyout-label">Branch POS Counter</span>
             </a>
             {% endif %}
-            {% if branch_permissions.invoices %}
+            {% if branch_permissions.invoices or branch_permissions.sales_orders %}
+            <a href="{{ url_for('sales_orders.new_order', branch=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
+                <span class="flyout-icon">➕</span>
+                <span class="flyout-label">New Sales Order (SO)</span>
+            </a>
             <a href="{{ url_for('sales_orders.list_orders', status='ALL', branch=current_branch.id) }}" class="flyout-item" onclick="onFlyoutNav(event, this)">
                 <span class="flyout-icon">📋</span>
                 <span class="flyout-label">Sale Order (All Invoices)</span>

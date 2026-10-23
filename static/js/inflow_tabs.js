@@ -36,7 +36,8 @@
         const clean = getCleanPath(url).toLowerCase();
         const full = (url || '').toLowerCase();
         if (clean === '/' || clean === '' || clean.includes('/dashboard') || clean.includes('/workspace')) return 'home';
-        if (clean.includes('/sales') || clean.includes('/customers') || clean.includes('/contacts/customers')) {
+        if (clean.includes('/sales/new') || clean.includes('/sales/create') || clean.includes('/orders/new') || clean.includes('/order/new')) return 'sales_new';
+        if (clean.includes('/sales') || clean.includes('/customers') || clean.includes('/contacts/customers') || (clean.includes('/branches/') && clean.includes('/orders'))) {
             if (full.includes('status=paid') || full.includes('status_filter=paid')) return 'sales_paid';
             if (full.includes('status=open') || full.includes('status_filter=open')) return 'sales_open';
             if (full.includes('status=all') || full.includes('status_filter=all')) return 'sales_all';
@@ -72,6 +73,7 @@
             case 'sales_all':
             case 'sales_open':
             case 'sales_paid':
+            case 'sales_new':
                 return `<span class="inflow-tab-icon icon-sales" title="Sales">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                         <path d="M4 3h11l5 5v13H4V3z" fill="#FFFFFF" stroke="#84C225" stroke-width="1.5"/>
@@ -282,11 +284,11 @@
                     const bCode = (storeCtx.current_branch && storeCtx.current_branch.code) ? storeCtx.current_branch.code : '';
                     return bCode ? `${bCode} Workspace` : 'Branch Workspace';
                 }
-                if (type === 'sales' || type === 'sales_all' || type === 'sales_open' || type === 'sales_paid') {
+                if (type === 'sales' || type === 'sales_all' || type === 'sales_open' || type === 'sales_paid' || type === 'sales_new') {
+                    if (url.includes('/sales/new') || url.includes('/sales/create') || url.includes('/orders/new') || type === 'sales_new') return 'New Sales Order';
                     if (url.includes('status=PAID') || url.includes('status_filter=PAID')) return 'Paid Invoice';
                     if (url.includes('status=OPEN') || url.includes('status_filter=OPEN')) return 'Open Invoice';
                     if (url.includes('status=ALL') || url.includes('status_filter=ALL') || url.includes('/sales')) return 'Sale Order';
-                    if (url.includes('/create') || url.includes('/new')) return 'Sale Order';
                     if (url.includes('/customers')) return 'Customer List';
                     return 'Sale Order';
                 }
@@ -523,7 +525,7 @@
 
                             const docTitle = frameDoc.title || '';
                             const pageTitle = docTitle.split('|')[0].split('-')[0].trim();
-                            if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order') {
+                            if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || tab.title === 'New Sales Order') {
                                 // Preserve dedicated category tab identities
                             } else if (pageTitle && pageTitle.toLowerCase() !== 'inflow premium' && pageTitle.length > 0) {
                                 tab.origTitleEn = pageTitle;
@@ -744,8 +746,10 @@
                 tab.url = normalized;
 
                 let finalTitle = displayTitle;
-                if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order') {
+                if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || tab.title === 'New Sales Order') {
                     finalTitle = tab.title;
+                } else if (normalized.includes('/sales/new') || normalized.includes('/sales/create') || normalized.includes('/orders/new')) {
+                    finalTitle = 'New Sales Order';
                 } else if (normalized.includes('status=PAID') || normalized.includes('status_filter=PAID')) {
                     finalTitle = 'Paid Invoice';
                 } else if (normalized.includes('status=OPEN') || normalized.includes('status_filter=OPEN')) {
@@ -1181,6 +1185,8 @@
                     'Home': 'ទំព័រដើម',
                     'Sales Orders': 'បញ្ជីការលក់',
                     'Sales Order': 'ការបញ្ជាទិញលក់',
+                    'Sale Order': 'ការបញ្ជាទិញលក់',
+                    'Sales order': 'ការបញ្ជាទិញលក់',
                     'Paid Invoice': 'វិក្កយបត្រទូទាត់រួច',
                     'Paid Invoices': 'វិក្កយបត្រទូទាត់រួច',
                     'Open Invoice': 'វិក្កយបត្រមិនទាន់ទូទាត់',

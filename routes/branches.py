@@ -783,7 +783,7 @@ def branch_new_order(id):
         return redirect(url_for('branches.list_branches'))
 
     perms = _get_branch_permissions(branch)
-    if not perms.get('sales_orders'):
+    if not (perms.get('sales_orders') or perms.get('invoices')):
         flash("Sales orders are disabled for this branch by the Main Store.", "error")
         return redirect(url_for('branches.branch_workspace', id=id))
 
