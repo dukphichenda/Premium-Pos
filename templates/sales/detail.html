@@ -4145,6 +4145,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.addEventListener('keydown', function (e) {
         if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
             e.preventDefault();
+            if (window.isSavingOrder) return;
             saveSalesOrder();
         } else if (e.key === 'Delete') {
             {% if not is_paid %}
@@ -5208,6 +5209,10 @@ function handleBillDateChange(input) {
 }
 
 function saveSalesOrder() {
+    if (window.isSavingOrder) {
+        console.warn('Order save already in progress, ignoring duplicate submit');
+        return;
+    }
     const custId = document.getElementById('customerIdHidden');
     if (!custId || !custId.value) {
         alert('Please select a Customer before saving.');
@@ -5243,6 +5248,18 @@ function saveSalesOrder() {
 
     const form = document.getElementById('salesOrderForm');
     if (form) {
+        window.isSavingOrder = true;
+        // Visual indicator and disable save buttons to prevent multiple clicks
+        document.querySelectorAll('.inflow-tb-btn, .inflow-action-btn-save, .btn-save-order, button[onclick*="saveSalesOrder"]').forEach(btn => {
+            btn.disabled = true;
+            btn.style.opacity = '0.65';
+            btn.style.cursor = 'wait';
+            if (btn.querySelector('.inflow-tb-text') || (btn.innerText && btn.innerText.includes('Save'))) {
+                btn.setAttribute('data-orig-html', btn.innerHTML);
+                btn.innerHTML = '⏳ Saving...';
+            }
+        });
+
         syncDrawerFiltersToStorage();
         attachFiltersToForm(form);
 

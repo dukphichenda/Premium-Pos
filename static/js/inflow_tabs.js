@@ -34,8 +34,14 @@
     function detectTypeFromUrl(url) {
         if (!url) return 'home';
         const clean = getCleanPath(url).toLowerCase();
+        const full = (url || '').toLowerCase();
         if (clean === '/' || clean === '' || clean.includes('/dashboard') || clean.includes('/workspace')) return 'home';
-        if (clean.includes('/sales') || clean.includes('/customers') || clean.includes('/contacts/customers')) return 'sales';
+        if (clean.includes('/sales') || clean.includes('/customers') || clean.includes('/contacts/customers')) {
+            if (full.includes('status=paid') || full.includes('status_filter=paid')) return 'sales_paid';
+            if (full.includes('status=open') || full.includes('status_filter=open')) return 'sales_open';
+            if (full.includes('status=all') || full.includes('status_filter=all')) return 'sales_all';
+            return 'sales_all';
+        }
         if (clean.includes('/purchase') || clean.includes('/vendors') || clean.includes('/contacts/vendors')) return 'purchase';
         if (clean.includes('/product') || clean.includes('/inventory') || clean.includes('/locations')) return 'product';
         if (clean.includes('/reports')) return 'reports';
@@ -63,6 +69,9 @@
                     </svg>
                 </span>`;
             case 'sales':
+            case 'sales_all':
+            case 'sales_open':
+            case 'sales_paid':
                 return `<span class="inflow-tab-icon icon-sales" title="Sales">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                         <path d="M4 3h11l5 5v13H4V3z" fill="#FFFFFF" stroke="#84C225" stroke-width="1.5"/>
@@ -273,12 +282,13 @@
                     const bCode = (storeCtx.current_branch && storeCtx.current_branch.code) ? storeCtx.current_branch.code : '';
                     return bCode ? `${bCode} Workspace` : 'Branch Workspace';
                 }
-                if (type === 'sales') {
+                if (type === 'sales' || type === 'sales_all' || type === 'sales_open' || type === 'sales_paid') {
                     if (url.includes('status=PAID') || url.includes('status_filter=PAID')) return 'Paid Invoice';
                     if (url.includes('status=OPEN') || url.includes('status_filter=OPEN')) return 'Open Invoice';
-                    if (url.includes('/create') || url.includes('/new')) return 'Sales Order';
+                    if (url.includes('status=ALL') || url.includes('status_filter=ALL') || url.includes('/sales')) return 'Sale Order';
+                    if (url.includes('/create') || url.includes('/new')) return 'Sale Order';
                     if (url.includes('/customers')) return 'Customer List';
-                    return 'Sales Order';
+                    return 'Sale Order';
                 }
                 if (type === 'purchase') {
                     if (url.includes('/create') || url.includes('/new')) return 'Purchase Order';
@@ -513,7 +523,9 @@
 
                             const docTitle = frameDoc.title || '';
                             const pageTitle = docTitle.split('|')[0].split('-')[0].trim();
-                            if (pageTitle && pageTitle.toLowerCase() !== 'inflow premium' && pageTitle.length > 0) {
+                            if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order') {
+                                // Preserve dedicated category tab identities
+                            } else if (pageTitle && pageTitle.toLowerCase() !== 'inflow premium' && pageTitle.length > 0) {
                                 tab.origTitleEn = pageTitle;
                                 const curL = MdiShell.getLanguage ? MdiShell.getLanguage() : (localStorage.getItem('inflow_app_lang') || 'en');
                                 const finalTitle = (curL === 'km') ? MdiShell.translateTabTitle(pageTitle, 'km') : pageTitle;
@@ -730,13 +742,25 @@
                 if (!tab) return;
                 const normalized = (cleanUrl || '').replace(/[?&]embed=1/, '');
                 tab.url = normalized;
-                if (displayTitle) {
-                    tab.title = displayTitle;
-                    tab.label = displayTitle;
+
+                let finalTitle = displayTitle;
+                if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order') {
+                    finalTitle = tab.title;
+                } else if (normalized.includes('status=PAID') || normalized.includes('status_filter=PAID')) {
+                    finalTitle = 'Paid Invoice';
+                } else if (normalized.includes('status=OPEN') || normalized.includes('status_filter=OPEN')) {
+                    finalTitle = 'Open Invoice';
+                } else if (normalized.includes('status=ALL') || normalized.includes('status_filter=ALL')) {
+                    finalTitle = 'Sale Order';
+                }
+
+                if (finalTitle) {
+                    tab.title = finalTitle;
+                    tab.label = finalTitle;
                     const lbl = document.getElementById(`tab-label-${tab.id}`);
-                    if (lbl) lbl.textContent = displayTitle;
+                    if (lbl) lbl.textContent = finalTitle;
                     const tabElem = document.getElementById(`tab-item-${tab.id}`);
-                    if (tabElem) tabElem.title = displayTitle;
+                    if (tabElem) tabElem.title = finalTitle;
                 }
                 if (window.history && window.history.replaceState) {
                     window.history.replaceState(null, '', normalized || '/');
