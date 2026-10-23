@@ -485,7 +485,7 @@ def _get_catalog_sidebar_products():
             FROM product_boms
             GROUP BY product_id
         ) bom_tbl ON p.id = bom_tbl.product_id
-        GROUP BY p.id, p.combine_type, bom_tbl.bom_count, c.name, c.color, s.total_sold_qty, s.order_count, pr.max_price
+        GROUP BY p.id, p.combine_type, bom_tbl.bom_count, c.name, c.color, c.price_table_style, s.total_sold_qty, s.order_count, pr.max_price
         ORDER BY p.name ASC, p.id ASC
     """)
 
