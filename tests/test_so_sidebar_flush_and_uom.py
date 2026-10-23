@@ -85,5 +85,31 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
         self.assertIn('<u>${formatQtyNum(onHand)}', html)
         self.assertIn('<u>${formatQtyNum(reserved)}', html)
 
+    def test_complete_and_pay_below_cancel_and_compact_height(self):
+        """
+        Verify:
+        1. Action buttons group contains .so-actions-sub-row with Delete and Cancel.
+        2. Complete & Pay (.so-btn-complete) is placed below the sub-row.
+        3. Compact height styles are applied to fit screen without scrolling.
+        """
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        self.assertIn('so-actions-sub-row', html)
+        self.assertIn('so-btn-delete', html)
+        self.assertIn('so-btn-cancel', html)
+        self.assertIn('so-btn-complete', html)
+
+        # Confirm Delete and Cancel precede Complete & Pay
+        delete_pos = html.find('so-btn-delete')
+        cancel_pos = html.find('so-btn-cancel')
+        complete_pos = html.find('so-btn-complete')
+        self.assertTrue(delete_pos < cancel_pos < complete_pos, "Complete & Pay must be placed below Delete and Cancel")
+
+        # Compact card padding and tiles
+        self.assertIn('.so-card-summary', html)
+        self.assertIn('min-height: 34px', html)
+
 if __name__ == '__main__':
     unittest.main()
