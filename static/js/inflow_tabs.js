@@ -275,6 +275,7 @@
                 }
                 if (type === 'sales') {
                     if (url.includes('status=PAID') || url.includes('status_filter=PAID')) return 'Paid Invoice';
+                    if (url.includes('status=OPEN') || url.includes('status_filter=OPEN')) return 'Open Invoice';
                     if (url.includes('/create') || url.includes('/new')) return 'Sales Order';
                     if (url.includes('/customers')) return 'Customer List';
                     return 'Sales Order';
@@ -1158,6 +1159,8 @@
                     'Sales Order': 'ការបញ្ជាទិញលក់',
                     'Paid Invoice': 'វិក្កយបត្រទូទាត់រួច',
                     'Paid Invoices': 'វិក្កយបត្រទូទាត់រួច',
+                    'Open Invoice': 'វិក្កយបត្រមិនទាន់ទូទាត់',
+                    'Open Invoices': 'វិក្កយបត្រមិនទាន់ទូទាត់',
                     'Invoices': 'វិក្កយបត្រ',
                     'Invoice': 'វិក្កយបត្រ',
                     'New Sales Order': 'បង្កើតការបញ្ជាទិញថ្មី',

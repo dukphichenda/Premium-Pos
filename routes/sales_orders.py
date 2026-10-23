@@ -412,6 +412,15 @@ def list_orders():
             """, (user_bid,)) if user_bid else None
             if not latest and user_bid:
                 latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,))
+        elif status_filter.upper() == 'OPEN':
+            latest = query_one("""
+                SELECT id FROM sales_orders 
+                WHERE branch_id = %s 
+                  AND UPPER(status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')
+                ORDER BY id DESC LIMIT 1
+            """, (user_bid,)) if user_bid else None
+            if not latest and user_bid:
+                latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,))
         else:
             latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (user_bid,)) if user_bid else None
     else:
@@ -421,6 +430,15 @@ def list_orders():
                     SELECT id FROM sales_orders 
                     WHERE branch_id IS NULL 
                       AND (UPPER(status) IN ('PAID', 'INVOICED') OR UPPER(payment_status) = 'PAID')
+                    ORDER BY id DESC LIMIT 1
+                """)
+                if not latest:
+                    latest = query_one("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 1")
+            elif status_filter.upper() == 'OPEN':
+                latest = query_one("""
+                    SELECT id FROM sales_orders 
+                    WHERE branch_id IS NULL 
+                      AND UPPER(status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')
                     ORDER BY id DESC LIMIT 1
                 """)
                 if not latest:
@@ -438,6 +456,15 @@ def list_orders():
                 """, (b_id,))
                 if not latest:
                     latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (b_id,))
+            elif status_filter.upper() == 'OPEN':
+                latest = query_one("""
+                    SELECT id FROM sales_orders 
+                    WHERE branch_id = %s 
+                      AND UPPER(status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')
+                    ORDER BY id DESC LIMIT 1
+                """, (b_id,))
+                if not latest:
+                    latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (b_id,))
             else:
                 latest = query_one("SELECT id FROM sales_orders WHERE branch_id = %s ORDER BY id DESC LIMIT 1", (b_id,))
         else:
@@ -445,6 +472,14 @@ def list_orders():
                 latest = query_one("""
                     SELECT id FROM sales_orders 
                     WHERE (UPPER(status) IN ('PAID', 'INVOICED') OR UPPER(payment_status) = 'PAID')
+                    ORDER BY id DESC LIMIT 1
+                """)
+                if not latest:
+                    latest = query_one("SELECT id FROM sales_orders ORDER BY id DESC LIMIT 1")
+            elif status_filter.upper() == 'OPEN':
+                latest = query_one("""
+                    SELECT id FROM sales_orders 
+                    WHERE UPPER(status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')
                     ORDER BY id DESC LIMIT 1
                 """)
                 if not latest:
