@@ -140,7 +140,7 @@ def _parse_specs_to_rows(text):
             
     return items
 
-from routes.auth import user_can_edit_prices, user_can_view_costs, user_can_adjust_stock
+from routes.auth import user_can_edit_prices, user_can_view_costs, user_can_adjust_stock, user_can_edit_product
 
 def _build_price_card_data(product, price_tiers, can_view_costs=None):
     if can_view_costs is None:
@@ -867,6 +867,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
         'can_view_costs': can_view_costs,
         'can_edit_prices': user_can_edit_prices(),
         'can_adjust_stock': user_can_adjust_stock(),
+        'can_edit_product': user_can_edit_product(),
         'global_price_table_style': global_price_table_style,
         'effective_price_table_style': (product.get('price_table_style') or global_price_table_style or 'classic').lower()
     }
@@ -1018,6 +1019,12 @@ def detail_product(id):
 @products_bp.route('/products/<int:id>/update_ajax', methods=['POST'])
 def update_product_ajax(id):
     try:
+        if not user_can_edit_product():
+            return jsonify({
+                'success': False,
+                'error': '🔒 Access Denied: Branch users are not allowed to edit product details. Product details are locked to read-only mode for branches.'
+            }), 403
+
         data = request.get_json(force=True) or {}
         
         # Protect internal cost fields from branch updates if branch cannot view/edit costs
@@ -1475,6 +1482,9 @@ def api_batch_adjust_product_stock(id):
 @products_bp.route('/products/<int:id>/upload_picture', methods=['POST'])
 def upload_product_picture(id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot upload or modify product pictures.'}), 403
+
         save_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'uploads', 'products')
         os.makedirs(save_dir, exist_ok=True)
 
@@ -1530,6 +1540,9 @@ def upload_product_picture(id):
 @products_bp.route('/products/toggle_active/<int:id>', methods=['POST'])
 def toggle_product_active_ajax(id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot activate or deactivate products.'}), 403
+
         prod = query_one("SELECT is_active FROM products WHERE id = %s", (id,))
         if not prod:
             return jsonify({'success': False, 'message': 'Product not found'}), 404
@@ -1543,6 +1556,9 @@ def toggle_product_active_ajax(id):
 @products_bp.route('/products/<int:id>/delete', methods=['POST', 'DELETE'])
 def delete_catalog_product(id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot delete products.'}), 403
+
         prod = query_one("SELECT id, name, sku FROM products WHERE id = %s", (id,))
         if not prod:
             return jsonify({'success': False, 'message': 'Product not found'}), 404
@@ -1620,6 +1636,10 @@ def delete_catalog_product(id):
 
 @products_bp.route('/products/new')
 def new_product():
+    if not user_can_edit_product():
+        flash("🔒 Access Denied: Branch accounts cannot create new products. Products are managed by Main Store HQ.", "error")
+        return redirect(url_for('products.list_products'))
+
     next_id = query_one("SELECT COALESCE(MAX(id), 0) + 1 as nid FROM products")['nid']
     new_sku = f"SKU-{next_id:04d}"
     
@@ -1724,6 +1744,10 @@ def new_product():
 
 @products_bp.route('/products/create', methods=['POST'])
 def create_product():
+    if not user_can_edit_product():
+        flash("🔒 Access Denied: Branch accounts cannot create new products. Products are managed by Main Store HQ.", "error")
+        return redirect(url_for('products.list_products'))
+
     try:
         sku = request.form.get('sku', '').strip()
         name = request.form.get('name', '').strip()
@@ -1984,6 +2008,10 @@ def create_product():
 @products_bp.route('/products/<int:id>/save', methods=['POST'])
 @products_bp.route('/products/<int:id>/edit', methods=['POST'])
 def edit_product(id):
+    if not user_can_edit_product():
+        flash("🔒 Access Denied: Branch users are not allowed to edit product details. Products can only be modified by Main Store HQ.", "error")
+        return redirect(url_for('products.detail_product', id=id))
+
     try:
         prod = query_one("SELECT * FROM products WHERE id = %s", (id,))
         if not prod:
@@ -2303,6 +2331,10 @@ def edit_product(id):
 
 @products_bp.route('/products/<int:id>/copy', methods=['GET', 'POST'])
 def copy_product(id):
+    if not user_can_edit_product():
+        flash("🔒 Access Denied: Branch accounts cannot copy or create products.", "error")
+        return redirect(url_for('products.detail_product', id=id))
+
     try:
         source = query_one("SELECT * FROM products WHERE id = %s", (id,))
         if not source:
@@ -2448,6 +2480,10 @@ def delete_attachment(id, att_id):
 
 @products_bp.route('/products/<int:id>/toggle-status', methods=['POST'])
 def toggle_product_status(id):
+    if not user_can_edit_product():
+        flash("🔒 Access Denied: Branch accounts cannot activate or archive products.", "error")
+        return redirect(url_for('products.detail_product', id=id))
+
     prod = query_one("SELECT is_active, name FROM products WHERE id = %s", (id,))
     if prod:
         new_status = not prod['is_active']
@@ -2885,6 +2921,9 @@ def api_get_price_cards_data():
 @products_bp.route('/api/products/<int:id>/combine-type', methods=['POST'])
 def api_set_combine_type(id):
     """Update product combine_type: 'single' (Default) or 'multi' (Multi Combine / With Options)"""
+    if not user_can_edit_product():
+        return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify product combine type.'}), 403
+
     data = request.get_json() or {}
     c_type = data.get('combine_type', 'single')
     if c_type not in ('single', 'multi'):
@@ -2925,6 +2964,9 @@ def api_get_combine_options(id):
 @products_bp.route('/api/products/<int:id>/combine-options', methods=['POST'])
 def api_add_combine_option(id):
     """Add a new combine option / add-on component to a product"""
+    if not user_can_edit_product():
+        return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify product combine options.'}), 403
+
     data = request.get_json() or {}
     opt_name = (data.get('option_name') or '').strip()
     if not opt_name:
@@ -2958,6 +3000,9 @@ def api_add_combine_option(id):
 @products_bp.route('/api/products/<int:id>/combine-options/<int:option_id>', methods=['PUT', 'POST'])
 def api_update_combine_option(id, option_id):
     """Update an existing combine option"""
+    if not user_can_edit_product():
+        return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify product combine options.'}), 403
+
     data = request.get_json() or {}
     opt_name = (data.get('option_name') or '').strip()
     if not opt_name:
@@ -2988,6 +3033,9 @@ def api_update_combine_option(id, option_id):
 @products_bp.route('/api/products/<int:id>/combine-options/<int:option_id>', methods=['DELETE'])
 def api_delete_combine_option(id, option_id):
     """Delete a combine option"""
+    if not user_can_edit_product():
+        return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot delete product combine options.'}), 403
+
     execute("DELETE FROM product_combine_options WHERE id = %s AND product_id = %s", (option_id, id))
     rem = query_one("SELECT COUNT(*) as cnt FROM product_combine_options WHERE product_id = %s", (id,))
     if rem and rem['cnt'] == 0:
@@ -2998,6 +3046,9 @@ def api_delete_combine_option(id, option_id):
 @products_bp.route('/api/products/<int:id>/preset-lid-options', methods=['POST'])
 def api_preset_lid_options(id):
     """Auto-populate standard 3 packaging options (Without Lid, Flat Lid, Clear PET Lid)"""
+    if not user_can_edit_product():
+        return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify product combine options.'}), 403
+
     prod = query_one("SELECT id, name, sku, default_price FROM products WHERE id = %s", (id,))
     if not prod:
         return jsonify({'success': False, 'message': 'Product not found'}), 404
@@ -3097,6 +3148,9 @@ def get_product_boms(id):
 @products_bp.route('/products/<int:id>/boms/add', methods=['POST'])
 def add_product_bom_component(id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify kit components.'}), 403
+
         data = request.get_json(silent=True) or request.form
         comp_id = data.get('component_product_id')
         if not comp_id:
@@ -3138,6 +3192,9 @@ def add_product_bom_component(id):
 @products_bp.route('/products/<int:id>/boms/<int:bom_id>/delete', methods=['POST'])
 def delete_product_bom_component(id, bom_id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify kit components.'}), 403
+
         execute("DELETE FROM product_boms WHERE id = %s AND product_id = %s", (bom_id, id))
         total_cost = recalc_product_bom_cost(id)
         return jsonify({
@@ -3151,6 +3208,9 @@ def delete_product_bom_component(id, bom_id):
 @products_bp.route('/products/<int:id>/boms/<int:bom_id>/update', methods=['POST'])
 def update_product_bom_component(id, bom_id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify kit components.'}), 403
+
         data = request.get_json(silent=True) or request.form
         qty = max(0.0001, float(data.get('quantity') or 1.0))
         execute("UPDATE product_boms SET quantity = %s WHERE id = %s AND product_id = %s", (qty, bom_id, id))
@@ -3166,6 +3226,9 @@ def update_product_bom_component(id, bom_id):
 @products_bp.route('/products/<int:id>/boms/sync_cost', methods=['POST'])
 def sync_product_bom_cost(id):
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot modify kit components.'}), 403
+
         total_cost = recalc_product_bom_cost(id)
         return jsonify({
             'success': True,
@@ -3182,6 +3245,9 @@ def create_combined_product_ajax():
     and BOM components, automatically summing the cost from the components.
     """
     try:
+        if not user_can_edit_product():
+            return jsonify({'success': False, 'message': '🔒 Access Denied: Branch users cannot create products.'}), 403
+
         name = request.form.get('name', '').strip()
         if not name:
             return jsonify({'success': False, 'message': 'Product name is required'}), 400

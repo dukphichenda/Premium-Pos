@@ -896,9 +896,11 @@ html.is-desktop-view .product-mobile-drawer-backdrop {
             <a href="{{ url_for('products.product_catalog_view') }}" class="inflow-cat-tool-btn" onclick="return handleNavClick(event, this.href);" title="Product Catalog (កាតាឡុកទំនិញ)" style="display: flex; align-items: center; justify-content: center; text-decoration: none; color: #475569;">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="13" y2="11"/></svg>
             </a>
+            {% if can_edit_product %}
             <a href="{{ url_for('products.new_product') }}" class="inflow-cat-add-btn" onclick="return handleNavClick(event, this.href);" title="Add New Product">
                 +
             </a>
+            {% endif %}
             <!-- Minimize Button: [ ◀ ] -->
             <button type="button" class="inflow-cat-tool-btn inflow-cat-minimize-btn" id="btnMinimizeProductSidebar" onclick="toggleProductSidebarCollapse()" title="Minimize Product Catalog / បង្រួមបញ្ជីទំនិញ (Ctrl+[)">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -2494,6 +2496,7 @@ function updateProductDecimalsAjax() {
     .catch(err => console.error('Error updating decimals:', err));
 }
 
+window.CAN_EDIT_PRODUCT = {{ 'true' if can_edit_product else 'false' }};
 isDirty = false;
 pendingChanges = {};
 pendingPrices = {};
@@ -2502,6 +2505,10 @@ stagedProductImageFile = null;
 originalProductImageUrl = {{ (product.image_url or '')|tojson|safe }};
 
 function setDirtyState(dirty) {
+    if (!window.CAN_EDIT_PRODUCT) {
+        isDirty = false;
+        return;
+    }
     isDirty = dirty;
     const btn = document.getElementById('btnSaveProduct');
     const text = document.getElementById('btnSaveText');
@@ -2522,16 +2529,22 @@ function setDirtyState(dirty) {
 }
 
 function markFieldDirty(field, val) {
+    if (!window.CAN_EDIT_PRODUCT) return;
     pendingChanges[field] = val;
     setDirtyState(true);
 }
 
 function markPriceDirty(schemeId, val) {
+    if (!window.CAN_EDIT_PRODUCT) return;
     pendingPrices[schemeId] = parseFloat(val) || 0;
     setDirtyState(true);
 }
 
 function saveProductChanges(callback) {
+    if (!window.CAN_EDIT_PRODUCT) {
+        if (typeof callback === 'function') callback(true);
+        return;
+    }
     // Harvest any live card tier quantities and prices that user modified
     [1, 2, 3].forEach(idx => {
         const qEl = document.getElementById('cardTierQtyInput' + idx);
@@ -3730,16 +3743,19 @@ function stageProductImage(file, id) {
 }
 
 function uploadProductImage(input, id) {
+    if (!window.CAN_EDIT_PRODUCT) return;
     if (!input.files || !input.files[0]) return;
     stageProductImage(input.files[0], id);
 }
 
 function uploadPastedProductImage(file, id) {
+    if (!window.CAN_EDIT_PRODUCT) return;
     stageProductImage(file, id);
 }
 
 // Global Paste Handler: Allow pasting image directly into product photo
 document.addEventListener('paste', function(e) {
+    if (!window.CAN_EDIT_PRODUCT) return;
     const clipboardData = e.clipboardData || window.clipboardData;
     if (!clipboardData || !clipboardData.items) return;
 
@@ -3776,6 +3792,7 @@ document.addEventListener('paste', function(e) {
 
 // Drag and Drop on Product Image Card
 function initCatImageDragDrop() {
+    if (!window.CAN_EDIT_PRODUCT) return;
     const card = document.getElementById('catImgCardContainer');
     if (!card) return;
 
@@ -3873,7 +3890,9 @@ window.addEventListener('beforeunload', function(e) {
 document.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) {
         e.preventDefault();
-        saveProductChanges();
+        if (window.CAN_EDIT_PRODUCT) {
+            saveProductChanges();
+        }
     }
 });
 

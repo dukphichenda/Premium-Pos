@@ -156,6 +156,27 @@ def user_can_adjust_stock():
     """Returns True if the current user is allowed to adjust stock, else False."""
     return check_permission('adjustments', default=True)
 
+def user_can_edit_product():
+    """
+    Returns True if the current user is authorized to edit product master details.
+    Branch users (branch_admin, branch_cashier, or assigned to branch) and branch view modes
+    are strictly locked to read-only view mode (can view normally, but cannot edit).
+    Only Main Store HQ Admin (main_admin) at HQ can edit/create/delete product master data.
+    """
+    from flask import session, request
+    role = session.get('role')
+    if role != 'main_admin':
+        return False
+    if session.get('branch_id') is not None:
+        return False
+    
+    # Check if active store context is set to a specific branch
+    active_bid = session.get('active_branch_id') or request.args.get('branch')
+    if active_bid and str(active_bid).lower() not in ('main', 'all', '', 'none', '0'):
+        return False
+        
+    return True
+
 # -------------------------------------------------------------
 # LOGIN & LOGOUT
 # -------------------------------------------------------------

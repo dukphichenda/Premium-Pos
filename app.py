@@ -500,13 +500,15 @@ def create_app():
                 'is_branch': False
             }
 
-        from routes.auth import user_can_edit_prices, user_can_view_costs, check_permission
+        from routes.auth import user_can_edit_prices, user_can_view_costs, user_can_edit_product, check_permission
 
         can_edit_prices = user_can_edit_prices()
         can_view_costs = user_can_view_costs()
+        can_edit_product = user_can_edit_product()
 
         branch_permissions['edit_prices'] = can_edit_prices
         branch_permissions['view_costs'] = can_view_costs
+        branch_permissions['edit_products'] = can_edit_product
 
         return {
             'company': company_data or default_company,
@@ -518,6 +520,7 @@ def create_app():
             'branch_permissions': branch_permissions,
             'can_view_costs': can_view_costs,
             'can_edit_prices': can_edit_prices,
+            'can_edit_product': can_edit_product,
             'has_permission': check_permission,
             'current_user': current_user,
             'app_logo_url': (company_data.get('app_logo_url') if company_data else None),

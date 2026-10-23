@@ -29,14 +29,22 @@
             </div>
             
             <div class="inflow-cat-top-actions">
-                <!-- Save Button -->
+                <!-- Save Button (HQ) vs View-Only Badge (Branch) -->
+                {% if can_edit_product %}
                 <button type="button" class="inflow-cat-save-btn" id="btnSaveProduct" onclick="saveProductChanges()" title="Save changes (Ctrl+S)">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                     <span id="btnSaveText">Save</span>
                     <span id="btnSaveDot" class="inflow-unsaved-dot" style="display: none;"></span>
                 </button>
+                {% else %}
+                <div class="inflow-cat-viewonly-badge" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: #FEF3C7; color: #92400E; border: 1px solid #FCD34D; border-radius: 9999px; font-size: 12px; font-weight: 700; box-shadow: 0 1px 2px rgba(0,0,0,0.05);" title="Product details are locked for branch accounts (View-only mode)">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    <span>🔒 View Only (Branch)</span>
+                </div>
+                {% endif %}
 
-                <!-- Deactivate / Activate -->
+                <!-- Deactivate / Activate (HQ Only) -->
+                {% if can_edit_product %}
                 <button type="button" class="inflow-cat-action-link {% if product.is_active %}danger{% endif %}" onclick="toggleProductActive({{ product.id }})" id="btnToggleActive">
                     {% if product.is_active %}
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
@@ -46,6 +54,7 @@
                     <span style="color: #10B981;">Activate</span>
                     {% endif %}
                 </button>
+                {% endif %}
 
                 <!-- Attachments -->
                 <button type="button" class="inflow-cat-action-link" onclick="openAttachmentsModal()">
@@ -53,18 +62,21 @@
                     <span>Attachments</span>
                 </button>
 
-                <!-- Copy -->
+                <!-- Copy (HQ Only) -->
+                {% if can_edit_product %}
                 <a href="{{ url_for('products.copy_product', id=product.id) }}" class="inflow-cat-action-link" onclick="return handleNavClick(event, this.href);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     <span>Copy</span>
                 </a>
+                {% endif %}
 
-                <!-- Sell -->
+                <!-- Sell (Accessible by HQ and Branch) -->
                 <a href="{{ url_for('sales_orders.create_order', product_id=product.id) }}" class="inflow-cat-action-link" onclick="return handleNavClick(event, this.href);">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     <span>Sell</span>
                 </a>
 
+                {% if can_edit_product %}
                 <!-- New Combined Kit Button -->
                 <button type="button" class="inflow-cat-action-link" onclick="openNewCombinedModal()" title="Create New Combined / Bundle Product" style="color: #0284C7; font-weight: 600;">
                     <span style="font-size: 13px;">🧩</span>
@@ -76,6 +88,7 @@
                     <span style="font-size: 13px;">🔀</span>
                     <span>Merge Duplicate</span>
                 </a>
+                {% endif %}
 
                 <!-- Print labels -->
                 <button type="button" class="inflow-cat-action-link" onclick="window.print()">
@@ -83,11 +96,13 @@
                     <span>Print labels</span>
                 </button>
 
+                {% if can_edit_product %}
                 <!-- Delete -->
                 <button type="button" class="inflow-cat-action-link danger" onclick="deleteCurrentProduct({{ product.id }})" title="Delete Product">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                     <span>Delete</span>
                 </button>
+                {% endif %}
 
                 <!-- More ▾ -->
                 <div style="position: relative; display: inline-block;">
@@ -97,19 +112,34 @@
                     <div id="catMoreMenu" class="inflow-tab-dropdown-menu" style="right: 0; min-width: 170px;">
                         <a href="{{ url_for('purchase_orders.create_purchase', product_id=product.id) }}" onclick="return handleNavClick(event, this.href);">+ Create Purchase Order</a>
                         <a href="javascript:void(0)" onclick="openModal('versionHistoryModal')">Version History</a>
+                        {% if can_edit_product %}
                         <a href="javascript:void(0)" onclick="deleteCurrentProduct({{ product.id }})" style="color: #DC2626;">🗑 Delete Product</a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
         </div>
+
+        {% if not can_edit_product %}
+        <!-- Branch View-Only Info Banner -->
+        <div class="inflow-cat-viewonly-banner" style="background: #FFFBEB; border-bottom: 1px solid #FDE68A; padding: 8px 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: #92400E;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 15px;">🔒</span>
+                <span><strong>Branch View-Only Mode:</strong> Product master catalog details are managed by HQ. Branches can view all specifications, pricing, stock levels, and create sales orders, but product modifications are locked.</span>
+            </div>
+            <span style="font-size: 11px; font-weight: 700; color: #B45309; background: #FEF3C7; padding: 2px 8px; border-radius: 4px; border: 1px solid #FCD34D; white-space: nowrap;">Read-Only</span>
+        </div>
+        {% endif %}
 
         <!-- Product Workspace Content -->
         <div class="inflow-cat-content">
             <!-- Product Header Area -->
             <div class="inflow-cat-header-block">
                 <!-- Large Image Box -->
-                <div class="inflow-cat-img-card" id="catImgCardContainer" onclick="document.getElementById('catImageUploadInput').click()" title="Click to upload, or Paste (Ctrl+V) / Drop image directly" tabindex="0">
+                <div class="inflow-cat-img-card" id="catImgCardContainer" {% if can_edit_product %}onclick="document.getElementById('catImageUploadInput').click()" title="Click to upload, or Paste (Ctrl+V) / Drop image directly" tabindex="0"{% else %}title="Product photo (HQ Managed - View Only)" style="cursor: default;"{% endif %}>
+                    {% if can_edit_product %}
                     <input type="file" id="catImageUploadInput" style="display: none;" accept="image/*" onchange="uploadProductImage(this, {{ product.id }})">
+                    {% endif %}
                     {% if product.image_url %}
                     <img src="{{ product.image_url }}" alt="{{ product.name }}" id="catProductMainImg" class="inflow-cat-main-img">
                     {% else %}
@@ -118,7 +148,9 @@
                     </div>
                     {% endif %}
                     <div class="inflow-cat-img-badge">1</div>
+                    {% if can_edit_product %}
                     <div class="inflow-cat-paste-hint">📋 Paste (Ctrl+V) / Drop Photo</div>
+                    {% endif %}
                     <div class="inflow-cat-upload-spinner" id="catImgUploadSpinner">
                         <div class="inflow-spinner" style="width: 24px; height: 24px; border: 3px solid #CBD5E1; border-top-color: #0284C7; border-radius: 50%; animation: spin 0.8s linear infinite;"></div>
                         <span>Uploading photo...</span>
@@ -128,7 +160,7 @@
                 <!-- Product Information & Meta Details -->
                 <div class="inflow-cat-header-info">
                     <!-- Title -->
-                    <h1 class="inflow-cat-main-title" contenteditable="true" spellcheck="false" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" oninput="markFieldDirty('name', this.innerText.trim())">
+                    <h1 class="inflow-cat-main-title" contenteditable="{{ 'true' if can_edit_product else 'false' }}" spellcheck="false" {% if can_edit_product %}onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" oninput="markFieldDirty('name', this.innerText.trim())"{% else %}style="cursor: default; user-select: text;" title="Product Name (View Only)"{% endif %}>
                         {{ product.name }}
                     </h1>
 
@@ -138,14 +170,14 @@
                         <div class="inflow-cat-upper-left">
                             <div class="inflow-cat-meta-field">
                                 <span class="lbl">SKU</span>
-                                <span class="val" contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" oninput="markFieldDirty('sku', this.innerText.trim())">{{ product.sku }}</span>
+                                <span class="val" contenteditable="{{ 'true' if can_edit_product else 'false' }}" {% if can_edit_product %}onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" oninput="markFieldDirty('sku', this.innerText.trim())"{% else %}style="cursor: default; user-select: text;" title="SKU (View Only)"{% endif %}>{{ product.sku }}</span>
                             </div>
 
                             <div class="inflow-cat-meta-field">
                                 <span class="lbl-icon">
                                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
                                 </span>
-                                <select class="inflow-cat-select" id="productCategorySelect" onchange="onCategorySelectChange(this)">
+                                <select class="inflow-cat-select" id="productCategorySelect" {% if can_edit_product %}onchange="onCategorySelectChange(this)"{% else %}disabled style="background: #F1F5F9; cursor: not-allowed; opacity: 0.9;" title="Category (View Only)"{% endif %}>
                                     <option value="" data-color="#00A3E0" data-style="{{ global_price_table_style or 'classic' }}">(None)</option>
                                     {% for c in categories %}
                                     <option value="{{ c.id }}" data-color="{{ c.color }}" data-style="{{ c.price_table_style or 'classic' }}" {% if product.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
@@ -156,7 +188,7 @@
                         </div>
                         <!-- Right Description Block -->
                         <div class="inflow-cat-upper-right">
-                            <textarea class="inflow-cat-desc-textarea" placeholder="Enter product description..." oninput="markFieldDirty('description', this.value)">{{ product.description or '' }}</textarea>
+                            <textarea class="inflow-cat-desc-textarea" placeholder="Enter product description..." {% if can_edit_product %}oninput="markFieldDirty('description', this.value)"{% else %}readonly style="background: #F8FAFC; cursor: default;" title="Description (View Only)"{% endif %}>{{ product.description or '' }}</textarea>
                         </div>
                     </div>
 
@@ -169,7 +201,7 @@
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Barcode</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <input type="text" id="storageBarcode" value="{{ product.barcode or '' }}" class="inflow-txt-input" placeholder="" oninput="markFieldDirty('barcode', this.value)">
+                                    <input type="text" id="storageBarcode" value="{{ product.barcode or '' }}" class="inflow-txt-input" placeholder="" {% if can_edit_product %}oninput="markFieldDirty('barcode', this.value)"{% else %}readonly style="background: #F8FAFC; cursor: default;" title="Barcode (View Only)"{% endif %}>
                                 </div>
                             </div>
 
@@ -177,7 +209,7 @@
                                 <span class="inflow-cat-field-lbl">Reorder Point</span>
                                 <div class="inflow-cat-field-ctrl">
                                     <div class="inflow-input-suffix-wrapper">
-                                        <input type="number" step="any" min="0" id="reorderPointInput" value="{{ '{:g}'.format(product.reorder_point or 0) }}" class="inflow-txt-input" oninput="markFieldDirty('reorder_point', this.value)">
+                                        <input type="number" step="any" min="0" id="reorderPointInput" value="{{ '{:g}'.format(product.reorder_point or 0) }}" class="inflow-txt-input" {% if can_edit_product %}oninput="markFieldDirty('reorder_point', this.value)"{% else %}readonly style="background: #F8FAFC; cursor: default;" title="Reorder Point (View Only)"{% endif %}>
                                         <span class="suffix-tag" id="reorderPointSuffix">{{ product.uom or 'pcs.' }}</span>
                                     </div>
                                 </div>
@@ -186,14 +218,14 @@
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Reorder Quantity</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <input type="number" step="any" min="0" id="reorderQtyInput" value="{{ '{:g}'.format(product.reorder_quantity or 0) if product.reorder_quantity else '' }}" class="inflow-txt-input" placeholder="" oninput="markFieldDirty('reorder_quantity', this.value)">
+                                    <input type="number" step="any" min="0" id="reorderQtyInput" value="{{ '{:g}'.format(product.reorder_quantity or 0) if product.reorder_quantity else '' }}" class="inflow-txt-input" placeholder="" {% if can_edit_product %}oninput="markFieldDirty('reorder_quantity', this.value)"{% else %}readonly style="background: #F8FAFC; cursor: default;" title="Reorder Quantity (View Only)"{% endif %}>
                                 </div>
                             </div>
 
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Default Location</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <select id="defaultLocationSelect" class="inflow-combo" onchange="markFieldDirty('default_location_id', this.value)">
+                                    <select id="defaultLocationSelect" class="inflow-combo" {% if can_edit_product %}onchange="markFieldDirty('default_location_id', this.value)"{% else %}disabled style="background: #F1F5F9; cursor: not-allowed;" title="Location (View Only)"{% endif %}>
                                         <option value="">(None)</option>
                                         {% for loc in locations %}
                                         <option value="{{ loc.id }}" {% if product.default_location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
@@ -205,14 +237,14 @@
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Default Sublocation</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <input type="text" id="defaultSublocationInput" list="sublocationSuggestions" value="{{ product.default_sublocation or '' }}" class="inflow-txt-input" placeholder="" oninput="markFieldDirty('default_sublocation', this.value)">
+                                    <input type="text" id="defaultSublocationInput" list="sublocationSuggestions" value="{{ product.default_sublocation or '' }}" class="inflow-txt-input" placeholder="" {% if can_edit_product %}oninput="markFieldDirty('default_sublocation', this.value)"{% else %}readonly style="background: #F8FAFC; cursor: default;" title="Sublocation (View Only)"{% endif %}>
                                     <datalist id="sublocationSuggestions">
                                         <option value="Aisle 1">
-                                        <option value="Aisle 2">
-                                        <option value="Bin 1">
-                                        <option value="Bin 2">
-                                        <option value="Floor">
-                                        <option value="Shelf A">
+                                         <option value="Aisle 2">
+                                         <option value="Bin 1">
+                                         <option value="Bin 2">
+                                         <option value="Floor">
+                                         <option value="Shelf A">
                                     </datalist>
                                 </div>
                             </div>
@@ -220,7 +252,7 @@
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Last Vendor</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <select id="lastVendorSelect" class="inflow-combo" onchange="markFieldDirty('last_vendor_id', this.value)">
+                                    <select id="lastVendorSelect" class="inflow-combo" {% if can_edit_product %}onchange="markFieldDirty('last_vendor_id', this.value)"{% else %}disabled style="background: #F1F5F9; cursor: not-allowed;" title="Vendor (View Only)"{% endif %}>
                                         <option value="">(None)</option>
                                         {% for v in all_vendors %}
                                         <option value="{{ v.id }}" {% if product.last_vendor_id == v.id %}selected{% endif %}>{{ v.name }}</option>
@@ -237,7 +269,7 @@
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Standard UoM</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <select id="stdUomSelect" class="inflow-combo inflow-combo-sm" onchange="onStandardUomChange(this.value)">
+                                    <select id="stdUomSelect" class="inflow-combo inflow-combo-sm" {% if can_edit_product %}onchange="onStandardUomChange(this.value)"{% else %}disabled style="background: #F1F5F9; cursor: not-allowed;" title="Standard UoM (View Only)"{% endif %}>
                                         {% set uom_options = ['pcs.', 'ea', 'box', 'case', 'kg', 'g', 'm', 'carton', 'pack', 'set', 'roll', 'bag'] %}
                                         {% if product.uom and product.uom not in uom_options %}
                                         <option value="{{ product.uom }}" selected>{{ product.uom }}</option>
@@ -252,7 +284,7 @@
                             <div class="inflow-cat-field-row">
                                 <span class="inflow-cat-field-lbl">Sales UoM</span>
                                 <div class="inflow-cat-field-ctrl">
-                                    <select id="salesUomSelect" class="inflow-combo inflow-combo-sm" onchange="onSalesUomChange(this.value)">
+                                    <select id="salesUomSelect" class="inflow-combo inflow-combo-sm" {% if can_edit_product %}onchange="onSalesUomChange(this.value)"{% else %}disabled style="background: #F1F5F9; cursor: not-allowed;" title="Sales UoM (View Only)"{% endif %}>
                                         {% set sales_options = ['cases', 'pcs.', 'box', 'ea', 'carton', 'pack', 'set', 'roll', 'bag', 'kg'] %}
                                         {% if product.sales_uom and product.sales_uom not in sales_options %}
                                         <option value="{{ product.sales_uom }}" selected>{{ product.sales_uom }}</option>
@@ -268,10 +300,10 @@
                             <div class="inflow-uom-conv-row" id="salesConvRow">
                                 <span class="inflow-uom-conv-lbl">Conversion</span>
                                 <div class="inflow-uom-conv-formula">
-                                    <input type="number" step="any" min="0.0001" id="salesConvRatio" class="inflow-conv-input" value="{{ '{:g}'.format(product.sales_uom_ratio or 1) }}" oninput="onConversionRatioChange(); markFieldDirty('sales_uom_ratio', this.value);">
+                                    <input type="number" step="any" min="0.0001" id="salesConvRatio" class="inflow-conv-input" value="{{ '{:g}'.format(product.sales_uom_ratio or 1) }}" {% if can_edit_product %}oninput="onConversionRatioChange(); markFieldDirty('sales_uom_ratio', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %}>
                                     <span class="inflow-conv-unit" id="lblSalesUom">{{ product.sales_uom or 'cases' }}</span>
                                     <span class="inflow-conv-equal">=</span>
-                                    <input type="number" step="any" min="0.0001" id="salesConvStd" class="inflow-conv-input wider" value="{{ '{:g}'.format(product.sales_uom_ratio_std or 1000) }}" oninput="onConversionRatioChange(); markFieldDirty('sales_uom_ratio_std', this.value);">
+                                    <input type="number" step="any" min="0.0001" id="salesConvStd" class="inflow-conv-input wider" value="{{ '{:g}'.format(product.sales_uom_ratio_std or 1000) }}" {% if can_edit_product %}oninput="onConversionRatioChange(); markFieldDirty('sales_uom_ratio_std', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %}>
                                     <span class="inflow-conv-unit" id="lblSalesStdUom">{{ product.uom or 'pcs.' }}</span>
                                 </div>
                             </div>
@@ -309,17 +341,17 @@
                                 <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
                                     <div style="display: flex; align-items: center; gap: 3px;">
                                         <label style="font-size: 11px; color: #475569; font-weight: 700;">L:</label>
-                                        <input type="number" step="0.01" id="dimLengthInput" value="{{ '{:g}'.format(product.length or 21) }}" class="inflow-dim-mini-input" placeholder="L cm" oninput="onDimensionChange(); markFieldDirty('length', this.value);" title="Length in cm">
+                                        <input type="number" step="0.01" id="dimLengthInput" value="{{ '{:g}'.format(product.length or 21) }}" class="inflow-dim-mini-input" placeholder="L cm" {% if can_edit_product %}oninput="onDimensionChange(); markFieldDirty('length', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %} title="Length in cm">
                                         <span style="font-size: 10px; color: #64748B;">cm</span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 3px;">
                                         <label style="font-size: 11px; color: #475569; font-weight: 700;">W:</label>
-                                        <input type="number" step="0.01" id="dimWidthInput" value="{{ '{:g}'.format(product.width or 21) }}" class="inflow-dim-mini-input" placeholder="W cm" oninput="onDimensionChange(); markFieldDirty('width', this.value);" title="Width in cm">
+                                        <input type="number" step="0.01" id="dimWidthInput" value="{{ '{:g}'.format(product.width or 21) }}" class="inflow-dim-mini-input" placeholder="W cm" {% if can_edit_product %}oninput="onDimensionChange(); markFieldDirty('width', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %} title="Width in cm">
                                         <span style="font-size: 10px; color: #64748B;">cm</span>
                                     </div>
                                     <div style="display: flex; align-items: center; gap: 3px;">
                                         <label style="font-size: 11px; color: #475569; font-weight: 700;">H:</label>
-                                        <input type="number" step="0.01" id="dimHeightInput" value="{{ '{:g}'.format(product.height or 4) }}" class="inflow-dim-mini-input" placeholder="H cm" oninput="onDimensionChange(); markFieldDirty('height', this.value);" title="Height in cm">
+                                        <input type="number" step="0.01" id="dimHeightInput" value="{{ '{:g}'.format(product.height or 4) }}" class="inflow-dim-mini-input" placeholder="H cm" {% if can_edit_product %}oninput="onDimensionChange(); markFieldDirty('height', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %} title="Height in cm">
                                         <span style="font-size: 10px; color: #64748B;">cm</span>
                                     </div>
                                 </div>
@@ -329,14 +361,14 @@
                                     <div>
                                         <label style="font-size: 10.5px; color: #334155; display: block; font-weight: 600;" class="font-khmer">1 កេស មាន (Packs/Case):</label>
                                         <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
-                                            <input type="number" step="any" id="packsPerCaseInput" value="{{ '{:g}'.format(product.packs_per_case or 10) }}" class="inflow-dim-mini-input" style="width: 58px;" oninput="onPackagingChange('packs'); markFieldDirty('packs_per_case', this.value);" title="Automatically calculated: (pcs per case) / (pcs per pack)">
+                                            <input type="number" step="any" id="packsPerCaseInput" value="{{ '{:g}'.format(product.packs_per_case or 10) }}" class="inflow-dim-mini-input" style="width: 58px;" {% if can_edit_product %}oninput="onPackagingChange('packs'); markFieldDirty('packs_per_case', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %} title="Automatically calculated: (pcs per case) / (pcs per pack)">
                                             <span style="font-size: 10.5px; color: #64748B;" class="font-khmer">ដុំ</span>
                                         </div>
                                     </div>
                                     <div>
                                         <label style="font-size: 10.5px; color: #334155; display: block; font-weight: 600;" class="font-khmer">1 ដុំ មាន (Pcs/Pack):</label>
                                         <div style="display: flex; align-items: center; gap: 3px; margin-top: 2px;">
-                                            <input type="number" step="any" id="pcsPerPackInput" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-dim-mini-input" style="width: 58px;" oninput="onPackagingChange('pcs_pack'); markFieldDirty('pcs_per_pack', this.value);">
+                                            <input type="number" step="any" id="pcsPerPackInput" value="{{ '{:g}'.format(product.pcs_per_pack or 50) }}" class="inflow-dim-mini-input" style="width: 58px;" {% if can_edit_product %}oninput="onPackagingChange('pcs_pack'); markFieldDirty('pcs_per_pack', this.value);"{% else %}readonly style="background: #F8FAFC; cursor: default;"{% endif %}>
                                             <span style="font-size: 10.5px; color: #64748B;" class="font-khmer">ប្រអប់</span>
                                         </div>
                                     </div>
@@ -473,7 +505,7 @@
                                 <div class="inflow-cat-decimals-group" style="display: flex; align-items: center; gap: 8px; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 2px 8px; border-radius: 6px;" title="Set decimal places for selling prices and costs">
                                     <div style="display: flex; align-items: center; gap: 4px;">
                                         <span style="font-size: 10.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Price Decimals:</span>
-                                        <select id="catPriceDecimalsSelect" onchange="updateProductDecimalsAjax()" style="font-size: 11px; height: 21px; font-weight: 600; color: #0284C7; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: pointer;">
+                                        <select id="catPriceDecimalsSelect" {% if can_edit_product %}onchange="updateProductDecimalsAjax()" style="font-size: 11px; height: 21px; font-weight: 600; color: #0284C7; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: pointer;"{% else %}disabled style="font-size: 11px; height: 21px; font-weight: 600; color: #64748B; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: not-allowed;" title="Price Decimals (HQ Managed)"{% endif %}>
                                             <option value="" {% if product.price_decimals is none %}selected{% endif %}>Default ({{ company.decimal_places_price or 2 }})</option>
                                             <option value="0" {% if product.price_decimals == 0 %}selected{% endif %}>0 ($39)</option>
                                             <option value="1" {% if product.price_decimals == 1 %}selected{% endif %}>1 ($39.0)</option>
@@ -488,7 +520,7 @@
                                     <div style="width: 1px; height: 14px; background: #CBD5E1;"></div>
                                     <div style="display: flex; align-items: center; gap: 4px;">
                                         <span style="font-size: 10.5px; font-weight: 700; color: #475569; text-transform: uppercase;">Cost Decimals:</span>
-                                        <select id="catCostDecimalsSelect" onchange="updateProductDecimalsAjax()" style="font-size: 11px; height: 21px; font-weight: 600; color: #0284C7; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: pointer;">
+                                        <select id="catCostDecimalsSelect" {% if can_edit_product %}onchange="updateProductDecimalsAjax()" style="font-size: 11px; height: 21px; font-weight: 600; color: #0284C7; background: #FFFFFF; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: pointer;"{% else %}disabled style="font-size: 11px; height: 21px; font-weight: 600; color: #64748B; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 0 4px; cursor: not-allowed;" title="Cost Decimals (HQ Managed)"{% endif %}>
                                             <option value="" {% if product.cost_decimals is none %}selected{% endif %}>Default ({{ company.decimal_places_cost or 3 }})</option>
                                             <option value="0" {% if product.cost_decimals == 0 %}selected{% endif %}>0 ($0)</option>
                                             <option value="1" {% if product.cost_decimals == 1 %}selected{% endif %}>1 ($0.1)</option>
@@ -856,6 +888,7 @@
                                 Combine multiple items into this product. Costing calculates automatically from component standard costs. When sold, required quantities of each component are automatically deducted from stock.
                             </p>
                         </div>
+                        {% if can_edit_product %}
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <button type="button" class="inflow-btn-secondary" onclick="syncBomCost()" title="Recalculate cost from current component prices" style="display: flex; align-items: center; gap: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #334155; cursor: pointer;">
                                 <span>🔄</span>
@@ -866,6 +899,7 @@
                                 <span>New Combined Product</span>
                             </button>
                         </div>
+                        {% endif %}
                     </div>
 
                     <!-- Metric Cards Grid -->
@@ -954,7 +988,7 @@
                                     <tr class="inflow-grid-row" id="bomRow_{{ b.id }}" style="border-bottom: 1px solid #F1F5F9;">
                                         <td style="text-align: center; font-size: 11px; color: #94A3B8;">{{ loop.index }}</td>
                                         <td style="padding: 6px 10px;">
-                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                             <div style="display: flex; align-items: center; gap: 8px;">
                                                 {% if b.component_image_url %}
                                                 <img src="{{ b.component_image_url }}" alt="{{ b.component_name }}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid #E2E8F0;">
                                                 {% else %}
@@ -967,7 +1001,7 @@
                                             </div>
                                         </td>
                                         <td style="text-align: right; padding: 6px 10px;">
-                                            <input type="number" step="any" min="0.001" value="{{ '{:g}'.format(b.quantity) }}" class="inflow-dim-mini-input" style="width: 65px; text-align: right; font-weight: 600;" onchange="updateBomQty({{ b.id }}, this.value)">
+                                            <input type="number" step="any" min="0.001" value="{{ '{:g}'.format(b.quantity) }}" class="inflow-dim-mini-input" style="width: 65px; text-align: right; font-weight: 600; {% if not can_edit_product %}background: #F8FAFC; cursor: default;{% endif %}" {% if can_edit_product %}onchange="updateBomQty({{ b.id }}, this.value)"{% else %}readonly title="Quantity (HQ Managed)"{% endif %}>
                                         </td>
                                         <td style="text-align: right; padding: 6px 10px; font-size: 12px; color: {% if b.component_stock <= 0 %}#DC2626; font-weight: 700;{% else %}#334155;{% endif %}">
                                             {{ "{:,.0f}".format(b.component_stock) }}
@@ -979,14 +1013,18 @@
                                             ${{ '{:.4f}'.format(b.subtotal_cost) }}
                                         </td>
                                         <td style="text-align: center; padding: 6px;">
+                                            {% if can_edit_product %}
                                             <button type="button" onclick="deleteBomComponent({{ b.id }})" style="background: none; border: none; color: #EF4444; cursor: pointer; padding: 2px 4px; font-size: 13px;" title="Remove component">🗑️</button>
+                                            {% else %}
+                                            <span style="font-size: 12px; color: #94A3B8;" title="Locked">🔒</span>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% endfor %}
                                     {% else %}
                                     <tr id="bomEmptyRow">
                                         <td colspan="7" style="text-align: center; padding: 24px; color: #64748B; font-size: 12.5px;">
-                                            No components added yet. Use the form below to add products that make up this kit.
+                                            No components added yet.
                                         </td>
                                     </tr>
                                     {% endif %}
@@ -1006,6 +1044,7 @@
                         </div>
                     </div>
 
+                    {% if can_edit_product %}
                     <!-- Add Component Form Bar -->
                     <div style="background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 8px; padding: 14px 16px;">
                         <h4 style="font-size: 12.5px; font-weight: 700; color: #334155; margin: 0 0 10px 0;">
@@ -1071,6 +1110,7 @@
                             </div>
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -1962,9 +2002,11 @@
                 <div class="inflow-cat-remarks-title">Remarks</div>
                 <div id="remarksDisplayArea">
                     {% if product.remarks %}
-                    <div class="inflow-cat-remarks-text" onclick="editRemarks()">{{ product.remarks }}</div>
-                    {% else %}
+                    <div class="inflow-cat-remarks-text" {% if can_edit_product %}onclick="editRemarks()"{% else %}style="cursor: default;" title="Remarks (View Only)"{% endif %}>{{ product.remarks }}</div>
+                    {% elif can_edit_product %}
                     <a href="javascript:void(0)" onclick="editRemarks()" class="inflow-cat-add-remarks-link">+ Add remarks</a>
+                    {% else %}
+                    <span style="font-size: 12px; color: #94A3B8; font-style: italic;">No remarks.</span>
                     {% endif %}
                 </div>
                 <div id="remarksEditArea" style="display: none; margin-top: 6px;">
