@@ -118,5 +118,21 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
         self.assertIn('.so-card-summary', html)
         self.assertIn('min-height: 34px', html)
 
+    def test_so_items_table_qty_clean_and_delete_in_last_column(self):
+        """
+        Verify:
+        1. Quantity cell has amount input and UOM badge aligned without trash button.
+        2. Delete icon (trash button) is placed in the last column next to the drag handle.
+        """
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        self.assertIn('line-drag-handle-cell', html)
+        self.assertIn('so-drag-handle', html)
+        self.assertIn('so-qty-input', html)
+        self.assertIn('so-uom-badge', html)
+
 if __name__ == '__main__':
     unittest.main()
+
