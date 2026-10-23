@@ -5501,6 +5501,12 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         const existingCount = tbody.querySelectorAll('tr[data-line-index]').length;
         const tr = document.createElement('tr');
         tr.setAttribute('data-line-index', existingCount);
+        tr.setAttribute('draggable', 'true');
+        tr.ondragstart = typeof handleLineDragStart === 'function' ? handleLineDragStart : null;
+        tr.ondragover = typeof handleLineDragOver === 'function' ? handleLineDragOver : null;
+        tr.ondragleave = typeof handleLineDragLeave === 'function' ? handleLineDragLeave : null;
+        tr.ondrop = typeof handleLineDrop === 'function' ? handleLineDrop : null;
+        tr.ondragend = typeof handleLineDragEnd === 'function' ? handleLineDragEnd : null;
         tr.setAttribute('data-case-price', resolvedCasePrice);
         tr.setAttribute('data-base-price', resolvedCasePrice);
         tr.setAttribute('data-product-id', pid);
@@ -5509,56 +5515,68 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         tr.setAttribute('data-combine-option-id', '');
         tr.onclick = function() { selectGridRow(this); };
         tr.innerHTML = `
-            <td class="inflow-grid-selector-col">
-                <div class="inflow-selector-cell-content">
-                    <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onSoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 13px; height: 13px; accent-color: #0284C7;">
-                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
-                </div>
+            <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 600; color: #64748B; font-size: 12px;">
+                ${existingCount + 1}
             </td>
-            <td class="line-pic-cell" style="width: 36px; text-align: center; vertical-align: middle; padding: 2px;">
-                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`}
+            <td style="text-align: center; vertical-align: middle;">
+                <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onSoLineCheckboxChange(this, event)" title="Select item" style="cursor: pointer; margin: 0; width: 14px; height: 14px; accent-color: #2563EB;">
             </td>
-            <td style="position: relative;">
+            <td class="line-pic-cell" style="text-align: center; vertical-align: middle; padding: 4px;">
+                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 32px; height: 32px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 32px; height: 32px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 13px;" title="No image">🖼️</div>`}
+            </td>
+            <td style="position: relative; vertical-align: middle;">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
                 <input type="hidden" name="lines[${existingCount}][addon_quantity]" class="line-addon-quantity" value="1">
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
-                <input type="text" class="inflow-field-input grid-item-input" value="${sku} ${name}" 
-                       placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 500;"
+                <input type="text" class="inflow-field-input grid-item-input so-item-input" value="${sku} ${name}" 
+                       placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12.5px; padding: 0;"
                        onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
                        onkeydown="handleItemDropdownKey(event, this)">
             </td>
-            <td style="position: relative;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
+            <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
                 <input type="text" name="lines[${existingCount}][description]" value="${(effectiveDesc || '').replace(/"/g, '&quot;')}" 
-                       class="inflow-field-input grid-desc-input" placeholder="Description..." 
-                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #334155; font-size: 11.5px; padding: 2px 5px; border-radius: 3px;"
+                       class="inflow-field-input grid-desc-input so-clean-input" placeholder="Description..." 
+                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #475569; font-size: 12px; padding: 4px 6px; border-radius: 4px;"
                        oninput="markDirty()">
             </td>
-            <td style="position: relative;" class="qty-cell">
-                <div class="inflow-qty-cell-wrapper">
+            <td style="position: relative; vertical-align: middle;" class="qty-cell">
+                <div class="inflow-qty-cell-wrapper so-qty-wrapper">
+                    <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
                     <input type="number" step="any" name="lines[${existingCount}][quantity]" value="1" 
-                           class="inflow-qty-num-input line-qty" 
+                           class="inflow-qty-num-input line-qty so-clean-input so-qty-input" 
                            oninput="onQtyNumberChange(this)" onchange="recalculateTotals(); markDirty();">
-                    <div class="inflow-qty-uom-btn" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock">
+                    <div class="inflow-qty-uom-btn so-uom-badge" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock">
                         <span class="uom-text">${baseUom}</span>
-                        <span class="uom-arrow">▾</span>
+                        <span class="uom-arrow" style="font-size: 10px;">⌵</span>
                     </div>
                     <input type="hidden" name="lines[${existingCount}][uom]" class="line-uom" value="${baseUom}">
                 </div>
             </td>
-            <td>
-                <select name="lines[${existingCount}][pricing_scheme_id]" class="inflow-field-select line-scheme-select" style="width: 100%; font-size: 11px; padding: 1px 2px; height: 20px; background: transparent; border: 1px solid #D1D5DB; border-radius: 2px;" onchange="onLinePricingSchemeChange(this)">
+            <td style="vertical-align: middle;">
+                <select name="lines[${existingCount}][pricing_scheme_id]" class="inflow-field-select line-scheme-select so-clean-select" onchange="onLinePricingSchemeChange(this)">
                     ${generatePricingSchemeOptions(activeSchemeId)}
                 </select>
             </td>
-            <td style="text-align: right;">
-                <input type="number" step="0.0001" name="lines[${existingCount}][unit_price]" value="${formattedPrice}" class="inflow-field-input line-price" style="width: 70px; text-align: right;" onchange="recalculateTotals(); markDirty();">
+            <td style="text-align: right; vertical-align: middle;">
+                <input type="number" step="0.0001" name="lines[${existingCount}][unit_price]" value="${formattedPrice}" class="inflow-field-input line-price so-clean-input" style="width: 72px; text-align: right;" onchange="recalculateTotals(); markDirty();">
             </td>
-            <td style="text-align: right;">
-                <input type="number" step="any" name="lines[${existingCount}][discount_percent]" value="0" class="inflow-field-input line-disc" style="width: 40px; text-align: right;" onchange="recalculateTotals(); markDirty();"> %
+            <td style="text-align: right; vertical-align: middle; white-space: nowrap;">
+                <div style="display: inline-flex; align-items: center; gap: 2px;">
+                    <input type="number" step="any" name="lines[${existingCount}][discount_percent]" value="0" class="inflow-field-input line-disc so-clean-input" style="width: 42px; text-align: right;" onchange="recalculateTotals(); markDirty();">
+                    <span style="font-size: 11px; color: #64748B;">%</span>
+                </div>
             </td>
-            <td style="text-align: right; font-weight: 600;" class="line-subtotal">
+            <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13px;" class="line-subtotal">
                 $${(1 * initialUnitPrice).toFixed(2)}
+            </td>
+            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 16px; cursor: grab;" title="Drag to reorder row">
+                <span class="so-drag-handle">⠿</span>
             </td>
         `;
 
@@ -5650,6 +5668,10 @@ function resequenceSoLineIndices() {
     const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
     rows.forEach((r, idx) => {
         r.setAttribute('data-line-index', idx);
+        const noCol = r.querySelector('.line-no-col');
+        if (noCol) {
+            noCol.textContent = idx + 1;
+        }
         r.querySelectorAll('input, select').forEach(el => {
             if (el.name && el.name.startsWith('lines[')) {
                 el.name = el.name.replace(/lines\[\d+\]/, `lines[${idx}]`);

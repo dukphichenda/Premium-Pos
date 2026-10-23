@@ -94,7 +94,7 @@
         }
         .so-card-grid-top {
             display: grid !important;
-            grid-template-columns: 280px 1fr 260px !important;
+            grid-template-columns: 280px 1fr 320px !important;
             gap: 16px !important;
             margin-bottom: 16px !important;
         }
@@ -363,6 +363,37 @@
         .so-btn-add-product:hover {
             background: #1D4ED8 !important;
         }
+        #newItemTextInput {
+            padding-left: 32px !important;
+        }
+        .so-row-dragging {
+            opacity: 0.45 !important;
+            background: #EFF6FF !important;
+        }
+        tr.so-drop-above td {
+            border-top: 2px solid #2563EB !important;
+        }
+        tr.so-drop-below td {
+            border-bottom: 2px solid #2563EB !important;
+        }
+        .so-drag-handle {
+            cursor: grab !important;
+            color: #94A3B8 !important;
+            padding: 3px 6px !important;
+            border-radius: 4px !important;
+            transition: all 0.15s ease !important;
+            user-select: none !important;
+            display: inline-block !important;
+            font-size: 16px !important;
+            line-height: 1 !important;
+        }
+        .so-drag-handle:hover {
+            color: #2563EB !important;
+            background: #EFF6FF !important;
+        }
+        .so-drag-handle:active {
+            cursor: grabbing !important;
+        }
         .so-modern-table-wrap {
             width: 100% !important;
             overflow-x: auto !important;
@@ -622,44 +653,62 @@
         }
         .so-actions-group {
             display: flex !important;
-            gap: 8px !important;
+            gap: 6px !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
         }
         .so-action-btn {
-            flex: 1 !important;
             height: 38px !important;
             border-radius: 8px !important;
-            font-size: 12px !important;
+            font-size: 11.5px !important;
             font-weight: 600 !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
-            gap: 6px !important;
+            gap: 4px !important;
             cursor: pointer !important;
             border: 1px solid #E2E8F0 !important;
             background: #FFFFFF !important;
             color: #334155 !important;
             transition: all 0.15s ease !important;
             white-space: nowrap !important;
-            padding: 0 10px !important;
+            padding: 0 6px !important;
+            box-sizing: border-box !important;
         }
         .so-action-btn:hover {
             background: #F8FAFC !important;
             border-color: #CBD5E1 !important;
         }
-        .so-btn-delete:hover {
+        .so-btn-delete {
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
             background: #FEF2F2 !important;
             border-color: #FECACA !important;
             color: #DC2626 !important;
         }
+        .so-btn-delete:hover {
+            background: #FEE2E2 !important;
+            border-color: #EF4444 !important;
+            color: #B91C1C !important;
+        }
+        .so-btn-cancel {
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
+            background: #FFFBEB !important;
+            border-color: #FCD34D !important;
+            color: #78350F !important;
+        }
         .so-btn-cancel:hover {
-            background: #F1F5F9 !important;
-            color: #0F172A !important;
+            background: #FEF3C7 !important;
+            border-color: #F59E0B !important;
+            color: #451A03 !important;
         }
         .so-btn-complete {
-            flex: 1.4 !important;
+            flex: 1.5 1 0% !important;
+            min-width: 0 !important;
             background: #059669 !important;
             color: #FFFFFF !important;
-            border: none !important;
+            border: 1px solid #047857 !important;
             font-weight: 700 !important;
             box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25) !important;
         }
@@ -1114,23 +1163,27 @@
                                 <table class="so-modern-table" id="lineItemsTable">
                                     <thead>
                                         <tr>
+                                            <th style="width: 32px; text-align: center;">No.</th>
                                             <th style="width: 38px; text-align: center;">
                                                 <input type="checkbox" id="masterSelectAllSoLines" title="Select all items" onchange="toggleSelectAllSoLines(this.checked)" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 14px; height: 14px; accent-color: #2563EB;">
                                             </th>
                                             <th style="width: 44px; text-align: center;">Photo</th>
-                                            <th style="width: 25%;">Item</th>
+                                            <th style="width: 24%;">Item</th>
                                             <th style="width: 18%;">Description</th>
-                                            <th style="width: 15%;">Quantity</th>
+                                            <th style="width: 14%;">Quantity</th>
                                             <th style="width: 12%;">Price Tier</th>
                                             <th style="width: 10%; text-align: right;">Unit Price</th>
                                             <th style="width: 7%; text-align: right;">Discount</th>
                                             <th style="width: 10%; text-align: right;">Sub-Total</th>
-                                            <th style="width: 32px; text-align: center;"></th>
+                                            <th style="width: 32px; text-align: center;" title="Drag to reorder"></th>
                                         </tr>
                                     </thead>
                                     <tbody id="lineItemsBody">
                                         {% for l in lines %}
-                                        <tr data-line-index="{{ loop.index0 }}" onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
+                                        <tr data-line-index="{{ loop.index0 }}" {% if not is_paid %}draggable="true" ondragstart="handleLineDragStart(event)" ondragover="handleLineDragOver(event)" ondragleave="handleLineDragLeave(event)" ondrop="handleLineDrop(event)" ondragend="handleLineDragEnd(event)"{% endif %} onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
+                                            <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 600; color: #64748B; font-size: 12px;">
+                                                {{ loop.index }}
+                                            </td>
                                             <td style="text-align: center; vertical-align: middle;">
                                                 <input type="checkbox" class="line-select-chk" onclick="event.stopPropagation();" onchange="onSoLineCheckboxChange(this, event)" title="Select item" {% if is_paid %}disabled{% endif %} style="cursor: pointer; margin: 0; width: 14px; height: 14px; accent-color: #2563EB;">
                                             </td>
@@ -1160,7 +1213,7 @@
                                             <td style="position: relative; vertical-align: middle;" class="qty-cell">
                                                 <div class="inflow-qty-cell-wrapper so-qty-wrapper">
                                                     {% if not is_paid %}
-                                                    <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
+                                                     <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                                             <polyline points="3 6 5 6 21 6"></polyline>
                                                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -1201,14 +1254,17 @@
                                             <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13px;" class="line-subtotal">
                                                 ${{ "%.2f"|format(l.subtotal) }}
                                             </td>
-                                            <td style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 16px; cursor: pointer;">
-                                                ⋮
+                                            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 16px; cursor: grab;" title="Drag to reorder row">
+                                                <span class="so-drag-handle">⠿</span>
                                             </td>
                                         </tr>
                                         {% endfor %}
 
                                         <!-- Asterisk Row for Typing / Adding New Items (*) -->
                                         <tr id="newRowEntry" onclick="selectGridRow(this)" {% if is_paid %}style="display:none;"{% endif %}>
+                                            <td style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 12px; font-weight: 600;">
+                                                *
+                                            </td>
                                             <td style="text-align: center; vertical-align: middle;">
                                                 <input type="checkbox" disabled style="opacity: 0.3; margin: 0; width: 14px; height: 14px;">
                                             </td>
@@ -1218,10 +1274,10 @@
                                             <td style="position: relative; vertical-align: middle;">
                                                 <div style="position: relative; display: flex; align-items: center;">
                                                     <input type="text" id="newItemTextInput" class="inflow-field-input grid-item-input so-clean-input" 
-                                                           placeholder="Type to add item..." style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding: 6px 10px 6px 30px; font-size: 12.5px; background: #FFFFFF;"
+                                                           placeholder="Type to add item..." style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 32px !important; font-size: 12.5px; background: #FFFFFF;"
                                                            onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
                                                            onkeydown="handleItemDropdownKey(event, this)">
-                                                    <span style="position: absolute; left: 9px; color: #94A3B8; pointer-events: none; font-size: 13px;">🔍</span>
+                                                    <span style="position: absolute; left: 10px; color: #94A3B8; pointer-events: none; font-size: 13px;">🔍</span>
                                                 </div>
                                             </td>
                                             <td style="vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
@@ -1258,8 +1314,8 @@
                                             <td style="text-align: right; font-weight: 600; color: #64748B; vertical-align: middle; font-size: 13px;">
                                                 $0.00
                                             </td>
-                                            <td style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 16px;">
-                                                ⋮
+                                            <td style="text-align: center; vertical-align: middle; color: #CBD5E1; font-size: 16px;">
+                                                ⠿
                                             </td>
                                         </tr>
                                     </tbody>
@@ -1359,14 +1415,13 @@
                                     <span style="font-weight: 700; font-size: 12.5px; color: #334155;">Pricing / Currency</span>
                                 </div>
                                 <div style="position: relative; margin-top: 8px;">
-                                    <select name="pricing_scheme_id" id="masterPricingSchemeSelect" class="so-clean-select" style="padding-left: 28px;" onchange="onMasterPricingSchemeChange(this.value)" {% if is_paid %}disabled{% endif %}>
+                                    <select name="pricing_scheme_id" id="masterPricingSchemeSelect" class="so-clean-select" onchange="onMasterPricingSchemeChange(this.value)" {% if is_paid %}disabled{% endif %}>
                                         {% for ps in pricing_schemes %}
                                         <option value="{{ ps.id }}" {% if order.pricing_scheme_id == ps.id or (not order.pricing_scheme_id and ps.name == 'Retail 1') %}selected{% endif %}>
                                             {{ ps.name }}
                                         </option>
                                         {% endfor %}
                                     </select>
-                                    <span style="position: absolute; left: 10px; top: 10px; font-size: 12px; color: #64748B; pointer-events: none;">🔍</span>
                                 </div>
                             </div>
 
@@ -1510,7 +1565,7 @@
                                         <line x1="18" y1="6" x2="6" y2="18"></line>
                                         <line x1="6" y1="6" x2="18" y2="18"></line>
                                     </svg>
-                                    <span>Cancel Order</span>
+                                    <span>Cancel</span>
                                 </button>
                                 <button type="button" class="so-action-btn so-btn-complete" onclick="handleCanvasCompletePay()" title="Complete & Pay order">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1716,6 +1771,99 @@
         if (typeof addNewBlankLine === 'function') {
             addNewBlankLine();
         }
+    }
+
+    // Drag & Drop Row Reordering
+    let draggedSoLineRow = null;
+
+    function cleanupSoDragClasses() {
+        document.querySelectorAll('#lineItemsBody tr').forEach(r => {
+            r.classList.remove('so-row-dragging', 'so-drop-above', 'so-drop-below');
+        });
+    }
+
+    function handleLineDragStart(e) {
+        {% if is_paid %}
+        e.preventDefault();
+        return;
+        {% endif %}
+        const tag = (e.target.tagName || '').toUpperCase();
+        if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || tag === 'BUTTON') {
+            e.preventDefault();
+            return;
+        }
+        const row = e.target.closest('tr[data-line-index]');
+        if (!row) {
+            e.preventDefault();
+            return;
+        }
+        draggedSoLineRow = row;
+        row.classList.add('so-row-dragging');
+        if (e.dataTransfer) {
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', row.getAttribute('data-line-index') || '0');
+        }
+    }
+
+    function handleLineDragOver(e) {
+        if (!draggedSoLineRow) return;
+        const targetRow = e.target.closest('tr[data-line-index]');
+        if (!targetRow || targetRow === draggedSoLineRow) {
+            e.preventDefault();
+            return;
+        }
+        e.preventDefault();
+        if (e.dataTransfer) {
+            e.dataTransfer.dropEffect = 'move';
+        }
+        const rect = targetRow.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        if (e.clientY < midY) {
+            targetRow.classList.add('so-drop-above');
+            targetRow.classList.remove('so-drop-below');
+        } else {
+            targetRow.classList.add('so-drop-below');
+            targetRow.classList.remove('so-drop-above');
+        }
+    }
+
+    function handleLineDragLeave(e) {
+        const targetRow = e.target.closest('tr[data-line-index]');
+        if (targetRow) {
+            targetRow.classList.remove('so-drop-above', 'so-drop-below');
+        }
+    }
+
+    function handleLineDrop(e) {
+        if (!draggedSoLineRow) return;
+        e.preventDefault();
+        const targetRow = e.target.closest('tr[data-line-index]');
+        const tbody = document.getElementById('lineItemsBody');
+        if (targetRow && tbody && targetRow !== draggedSoLineRow) {
+            const rect = targetRow.getBoundingClientRect();
+            const midY = rect.top + rect.height / 2;
+            if (e.clientY < midY) {
+                tbody.insertBefore(draggedSoLineRow, targetRow);
+            } else {
+                tbody.insertBefore(draggedSoLineRow, targetRow.nextSibling);
+            }
+            if (typeof resequenceSoLineIndices === 'function') {
+                resequenceSoLineIndices();
+            }
+            if (typeof recalculateTotals === 'function') {
+                recalculateTotals();
+            }
+            if (typeof markDirty === 'function') {
+                markDirty();
+            }
+        }
+        cleanupSoDragClasses();
+        draggedSoLineRow = null;
+    }
+
+    function handleLineDragEnd(e) {
+        cleanupSoDragClasses();
+        draggedSoLineRow = null;
     }
 
     // Auto-update Total Items count whenever lines change
