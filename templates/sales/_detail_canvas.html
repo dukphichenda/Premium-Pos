@@ -900,7 +900,7 @@
             <input type="hidden" name="mark_complete_pay" id="markCompletePayInput" value="0">
             <input type="hidden" name="branch_id" id="orderBranchIdInput" value="{{ effective_order_branch }}">
             <input type="hidden" name="branch" value="{{ effective_order_branch or 'main' }}">
-            <input type="hidden" name="payment_method" id="orderPaymentMethodHidden" value="{{ order_payment_method or 'Cash' }}">
+            <input type="hidden" name="payment_method" id="orderPaymentMethodHidden" value="{{ order_payment_method or 'ABA Bank' }}">
             <input type="hidden" name="carrier" id="hiddenFormCarrier" value="{{ order.carrier or '' }}">
             <input type="hidden" name="package_count" id="hiddenFormPackageCount" value="{{ (order.get('package_count') if order else 1) or 1 }}">
             <input type="hidden" name="cod_amount" id="hiddenFormCodAmount" value="{{ '%.2f'|format(order.get('cod_amount') if (order and order.get('cod_amount') is not none) else 0.0) }}">
@@ -1239,11 +1239,17 @@
                                     </svg>
                                     <span>Status</span>
                                 </div>
-                                <div class="so-meta-val">
+                                <div class="so-meta-val" style="display: flex; flex-direction: column; align-items: flex-end; gap: 4px;">
                                     <span class="so-status-pill {% if is_paid %}paid{% elif (order.status or '')|upper == 'CANCELLED' %}cancelled{% else %}open{% endif %}">
                                         <span class="so-status-dot">●</span>
                                         <span>{% if is_paid %}Paid{% elif (order.status or '')|upper == 'CANCELLED' %}Cancelled{% elif (order.status or '')|upper == 'OPEN' %}Open{% else %}{{ order.status | capitalize }}{% endif %}</span>
                                     </span>
+                                    {% if order.completed_by %}
+                                    <span style="font-size: 11px; font-weight: 700; color: #047857; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 4px; padding: 1px 6px; display: inline-flex; align-items: center; gap: 3px;" title="Completed and paid by user: {{ order.completed_by }}">
+                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                                        {{ order.completed_by }}
+                                    </span>
+                                    {% endif %}
                                 </div>
                             </div>
 
@@ -1689,6 +1695,16 @@
                                 <span class="so-balance-val" id="dispBalance">${{ "%.2f"|format(order.balance_due or 0) }}</span>
                             </div>
 
+                            {% if order.completed_by %}
+                            <div class="so-completed-notice" style="margin-top: 6px; margin-bottom: 2px; padding: 4px 8px; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 4px; font-size: 11px; color: #065F46; display: flex; align-items: center; justify-content: space-between;">
+                                <span style="display: flex; align-items: center; gap: 4px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                                    Completed by:
+                                </span>
+                                <b style="font-weight: 700; color: #047857;">@{{ order.completed_by }}</b>
+                            </div>
+                            {% endif %}
+
                             <!-- Payment Method Grid -->
                             <div class="so-pay-method-section">
                                 <div class="so-pay-method-header">
@@ -1699,17 +1715,17 @@
                                     <span>Payment Method</span>
                                 </div>
                                 <div class="so-pay-tiles-grid">
-                                    <!-- Cash -->
-                                    <div class="so-pay-tile {% if (order_payment_method or 'Cash')|upper == 'CASH' %}active{% endif %}" data-method="Cash" onclick="selectSoPayTile(this, 'Cash')">
-                                        <div class="so-tile-icon">💵</div>
-                                        <div class="so-tile-name">Cash</div>
-                                        <div class="so-tile-sub">សាច់ប្រាក់</div>
-                                    </div>
-                                    <!-- ABA Bank -->
-                                    <div class="so-pay-tile {% if order_payment_method|upper in ('ABA', 'ABA BANK') %}active{% endif %}" data-method="ABA" onclick="selectSoPayTile(this, 'ABA')">
+                                    <!-- ABA Bank (Default First Tile) -->
+                                    <div class="so-pay-tile {% if (order_payment_method or 'ABA Bank')|upper in ('ABA', 'ABA BANK', 'ABA PAY') %}active{% endif %}" data-method="ABA Bank" onclick="selectSoPayTile(this, 'ABA Bank')">
                                         <div class="so-tile-icon">🏦</div>
                                         <div class="so-tile-name">ABA Bank</div>
                                         <div class="so-tile-sub">ABA Pay</div>
+                                    </div>
+                                    <!-- Cash (Second Tile) -->
+                                    <div class="so-pay-tile {% if order_payment_method and order_payment_method|upper in ('CASH', 'សាច់ប្រាក់') %}active{% endif %}" data-method="Cash" onclick="selectSoPayTile(this, 'Cash')">
+                                        <div class="so-tile-icon">💵</div>
+                                        <div class="so-tile-name">Cash</div>
+                                        <div class="so-tile-sub">សាច់ប្រាក់</div>
                                     </div>
                                     <!-- ACLEDA -->
                                     <div class="so-pay-tile {% if order_payment_method|upper in ('ACLEDA', 'ACLEDA BANK', 'ACELEDA') %}active{% endif %}" data-method="ACLEDA" onclick="selectSoPayTile(this, 'ACLEDA')">
@@ -1930,12 +1946,14 @@
             }
         }
         const activeTile = document.querySelector('.so-pay-tile.active');
-        const method = activeTile ? activeTile.getAttribute('data-method') : (document.getElementById('orderPaymentMethodHidden')?.value || 'Cash');
+        const method = activeTile ? activeTile.getAttribute('data-method') : (document.getElementById('orderPaymentMethodHidden')?.value || 'ABA Bank');
         if (typeof selectedPaymentMethod !== 'undefined') {
             selectedPaymentMethod = method;
         }
         const hidden = document.getElementById('orderPaymentMethodHidden');
         if (hidden) hidden.value = method;
+
+        isDirty = false;
 
         if (typeof confirmCompletePayAction === 'function') {
             confirmCompletePayAction();

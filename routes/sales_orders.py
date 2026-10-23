@@ -2147,7 +2147,7 @@ def new_order():
                            all_products=drawer_data['all_products'],
                            product_prices_map=drawer_data['product_prices_map'],
                            all_delivery_men=drawer_data['all_delivery_men'],
-                           order_payment_method='',
+                           order_payment_method='ABA Bank',
                            payments=[],
                            company=drawer_data['company'],
                            is_paid=False,
@@ -2390,7 +2390,7 @@ def detail_order(id):
         )
 
         branch_obj = query_one("SELECT * FROM branches WHERE id = %s", (order['branch_id'],)) if order.get('branch_id') else None
-        order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or '').strip()
+        order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or 'ABA Bank').strip()
 
         attachments, versions = _get_order_attachments_and_versions(id)
         branch_scope = request.args.get('branch') or (str(order['branch_id']) if order.get('branch_id') else 'main')
@@ -2508,7 +2508,7 @@ def detail_order(id):
     )
 
     branch_obj = query_one("SELECT * FROM branches WHERE id = %s", (order['branch_id'],)) if order.get('branch_id') else None
-    order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or '').strip()
+    order_payment_method = (order.get('payment_method') or (payments[0]['payment_method'] if payments else '') or 'ABA Bank').strip()
 
     # Load attachments & versions for this sales order
     attachments, versions = _get_order_attachments_and_versions(id)
@@ -3004,7 +3004,7 @@ def save_order(id=0):
                     payment_status = 'PAID'
                     paid_amount = total_amount
                     balance_due = 0.0
-                    pay_method = payment_method or 'Cash'
+                    pay_method = payment_method or 'ABA Bank'
                     user_login_name = session.get('username') or session.get('display_name') or 'admin'
                     cur.execute("""
                         UPDATE sales_orders
@@ -3020,6 +3020,25 @@ def save_order(id=0):
                             INSERT INTO order_payments (order_type, order_id, amount, payment_method, notes)
                             VALUES ('SO', %s, %s, %s, %s)
                         """, (id, total_amount, pay_method, f"Completed by {user_login_name}"))
+
+                    # Deduct physical inventory upon Complete & Pay
+                    cur.execute("""
+                        SELECT sol.product_id, sol.quantity, sol.addon_product_id, sol.addon_quantity,
+                               p.name as product_name, ap.name as addon_name
+                        FROM sales_order_lines sol
+                        LEFT JOIN products p ON sol.product_id = p.id
+                        LEFT JOIN products ap ON sol.addon_product_id = ap.id
+                        WHERE sol.sales_order_id = %s
+                    """, (id,))
+                    so_lines = cur.fetchall()
+                    order_ref = {'id': id, 'order_number': order_number, 'location_id': location_id}
+                    for l in so_lines:
+                        if l['product_id']:
+                            qty = float(l['quantity'] or 0)
+                            _deduct_order_stock(cur, order_ref, l['product_id'], qty, l.get('product_name'), "Fulfillment Complete & Pay")
+                            if l.get('addon_product_id'):
+                                a_qty = qty * float(l.get('addon_quantity') or 1.0)
+                                _deduct_order_stock(cur, order_ref, l['addon_product_id'], a_qty, l.get('addon_name') or 'Add-on', "Fulfillment Add-on")
                 elif is_already_completed:
                     # Order was already completed: preserve completion status and synchronize paid amount if fully settled
                     status = order.get('status') or 'PAID'
@@ -3120,7 +3139,11 @@ def save_order(id=0):
 
         if request.is_json:
             return jsonify({'success': True, 'message': 'Saved successfully', 'order_id': id, 'order_number': order_number, 'redirect_url': redirect_url})
-        flash(f"Sales Order {order_number} saved successfully!", "success")
+        if mark_complete_pay:
+            user_login_name = session.get('username') or session.get('display_name') or 'admin'
+            flash(f"Sales Order {order_number} marked Complete & Paid by {user_login_name}!", "success")
+        else:
+            flash(f"Sales Order {order_number} saved successfully!", "success")
         return redirect(redirect_url)
 
     except Exception as e:
@@ -3155,7 +3178,7 @@ def complete_pay(id):
         return redirect(url_for('sales_orders.list_orders'))
 
     data = request.get_json(silent=True) or request.form or {}
-    payment_method = (data.get('payment_method') or order.get('payment_method') or 'Cash').strip()
+    payment_method = (data.get('payment_method') or order.get('payment_method') or 'ABA Bank').strip()
     user_login_name = session.get('username') or session.get('display_name') or 'admin'
 
     total = float(order['total_amount'] or 0)
@@ -3254,7 +3277,7 @@ def complete_pay(id):
             'next_order_id': target_id
         })
 
-    flash(f"Order {order['order_number']} is shipped and paid by {payment_method}!", "success")
+    flash(f"Order {order['order_number']} is marked Complete & Paid by {user_login_name} ({payment_method})!", "success")
     return redirect(redirect_url)
 
 @sales_orders_bp.route('/sales/<int:id>/reopen', methods=['POST'])

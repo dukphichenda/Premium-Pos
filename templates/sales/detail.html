@@ -2694,6 +2694,11 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                     <span class="so-card-cust-name" title="{{ s_ord.customer_name }}">
                         👤 {{ s_ord.customer_name or 'No Customer' }}
                     </span>
+                    {% if s_ord.completed_by %}
+                    <span class="so-card-completed-pill" title="Completed by {{ s_ord.completed_by }}" style="font-size: 10px; font-weight: 700; color: #047857; background: #ECFDF5; border: 1px solid #A7F3D0; border-radius: 3px; padding: 1px 5px; display: inline-flex; align-items: center; gap: 2px;">
+                        ✓ {{ s_ord.completed_by }}
+                    </span>
+                    {% endif %}
                     {% if s_ord.delivery_man %}
                     <span class="so-card-delivery-tag" title="Delivery: {{ s_ord.delivery_man }}">
                         🛵 {{ s_ord.delivery_man }}
@@ -3136,23 +3141,23 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                     Choose Payment Method / ជ្រើសរើសវិធីសាស្ត្រទូទាត់:
                 </label>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; box-sizing: border-box;" id="payMethodTiles">
-                    <!-- Cash Tile -->
-                    <div class="pay-method-tile active" data-method="Cash" onclick="selectPayMethodTile(this, 'Cash')"
+                    <!-- ABA Bank Tile (Default First Tile) -->
+                    <div class="pay-method-tile active" data-method="ABA Bank" onclick="selectPayMethodTile(this, 'ABA Bank')"
                          style="border: 2px solid #059669; background: #ECFDF5; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
-                        <div style="font-size: 22px; line-height: 1;">💵</div>
+                        <div style="font-size: 22px; line-height: 1;">🏦</div>
                         <div>
-                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #065F46;">Cash</div>
-                            <div class="method-sub" style="font-size: 11px; color: #047857;">លុយសុទ្ធ</div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #065F46;">ABA Bank</div>
+                            <div class="method-sub" style="font-size: 11px; color: #047857;">ធនាគារ ABA / QR</div>
                         </div>
                     </div>
 
-                    <!-- ABA Bank Tile -->
-                    <div class="pay-method-tile" data-method="ABA Bank" onclick="selectPayMethodTile(this, 'ABA Bank')"
+                    <!-- Cash Tile (Second Tile) -->
+                    <div class="pay-method-tile" data-method="Cash" onclick="selectPayMethodTile(this, 'Cash')"
                          style="border: 2px solid #CBD5E1; background: #FFFFFF; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
-                        <div style="font-size: 22px; line-height: 1;">🏦</div>
+                        <div style="font-size: 22px; line-height: 1;">💵</div>
                         <div>
-                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #0F172A;">ABA Bank</div>
-                            <div class="method-sub" style="font-size: 11px; color: #64748B;">ធនាគារ ABA / QR</div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #0F172A;">Cash</div>
+                            <div class="method-sub" style="font-size: 11px; color: #64748B;">លុយសុទ្ធ</div>
                         </div>
                     </div>
 
@@ -6433,6 +6438,7 @@ function cancelOrderAction() {
         return;
     }
     if (confirm('Are you sure you want to cancel this order?')) {
+        isDirty = false;
         syncDrawerFiltersToStorage();
         const cancelForm = document.getElementById('cancelOrderForm');
         if (cancelForm) {
@@ -7866,20 +7872,20 @@ function submitQuickAddCustomerAjax() {
 /* ==========================================================================
    Complete & Pay Payment Method Modal Functions
    ========================================================================== */
-let selectedPaymentMethod = 'Cash';
+let selectedPaymentMethod = 'ABA Bank';
 
 function openCompletePayModal() {
     const dispTotal = document.getElementById('dispTotal')?.innerText || '$0.00';
     const totalEl = document.getElementById('completePayTotalUsd');
     if (totalEl) totalEl.innerText = dispTotal;
 
-    // Reset selection to Cash by default
-    selectedPaymentMethod = 'Cash';
+    // Reset selection to ABA Bank by default
+    selectedPaymentMethod = 'ABA Bank';
     document.querySelectorAll('.pay-method-tile').forEach(t => {
-        const isCash = (t.getAttribute('data-method') === 'Cash');
+        const isAba = (t.getAttribute('data-method') === 'ABA Bank');
         const titleEl = t.querySelector('.method-title');
         const subEl = t.querySelector('.method-sub');
-        if (isCash) {
+        if (isAba) {
             t.classList.add('active');
             t.style.borderColor = '#059669';
             t.style.background = '#ECFDF5';
@@ -7896,7 +7902,7 @@ function openCompletePayModal() {
     const customBox = document.getElementById('customPayMethodBox');
     if (customBox) customBox.style.display = 'none';
     const labelEl = document.getElementById('completePaySelectedMethodLabel');
-    if (labelEl) labelEl.innerText = 'Cash';
+    if (labelEl) labelEl.innerText = 'ABA Bank';
 
     document.getElementById('modalCompletePay').style.display = 'flex';
 }
@@ -7950,15 +7956,21 @@ function confirmCompletePayAction() {
 
     syncDrawerFiltersToStorage();
 
-    if (isNewOrder) {
-        const cpInput = document.getElementById('markCompletePayInput');
-        if (cpInput) cpInput.value = '1';
-        closeCompletePayModal();
+    isDirty = false;
+
+    // Mark complete pay on main form and submit via saveSalesOrder()
+    const cpInput = document.getElementById('markCompletePayInput');
+    if (cpInput) cpInput.value = '1';
+
+    closeCompletePayModal();
+
+    const mainForm = document.getElementById('salesOrderForm');
+    if (mainForm && typeof saveSalesOrder === 'function') {
         saveSalesOrder();
         return;
     }
 
-    // For existing order
+    // Fallback for existing order if main form is absent
     const cpForm = document.getElementById('completePayForm');
     if (cpForm) {
         let pInput = cpForm.querySelector('input[name="payment_method"]');
@@ -7970,7 +7982,7 @@ function confirmCompletePayAction() {
         }
         pInput.value = finalMethod;
         attachFiltersToForm(cpForm);
-        closeCompletePayModal();
+        isDirty = false;
         cpForm.submit();
     }
 }
