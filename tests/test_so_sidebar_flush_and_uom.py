@@ -88,26 +88,33 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
     def test_complete_and_pay_below_cancel_and_compact_height(self):
         """
         Verify:
-        1. Action buttons group contains .so-actions-sub-row with Delete and Cancel.
-        2. Complete & Pay (.so-btn-complete) is placed below the sub-row.
-        3. Compact height styles are applied to fit screen without scrolling.
+        1. Wide Other Payment (.so-pay-tile-wide) is present above Cancel.
+        2. Action buttons group contains .so-actions-sub-row with Delete and Cancel.
+        3. Complete & Pay (.so-btn-complete) is placed below Cancel.
+        4. Both top grid and main split use 8px gap for flush vertical alignment.
         """
         resp = self.client.get('/sales/new')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
+
+        # Check wide other payment tile
+        self.assertIn('so-pay-tile-wide', html)
+        self.assertIn('data-method="Other Payment"', html)
 
         self.assertIn('so-actions-sub-row', html)
         self.assertIn('so-btn-delete', html)
         self.assertIn('so-btn-cancel', html)
         self.assertIn('so-btn-complete', html)
 
-        # Confirm Delete and Cancel precede Complete & Pay
-        delete_pos = html.find('so-btn-delete')
+        # Confirm Other Payment precedes Cancel, and Cancel precedes Complete & Pay
+        other_pos = html.find('so-pay-tile-wide')
         cancel_pos = html.find('so-btn-cancel')
         complete_pos = html.find('so-btn-complete')
-        self.assertTrue(delete_pos < cancel_pos < complete_pos, "Complete & Pay must be placed below Delete and Cancel")
+        self.assertTrue(other_pos < cancel_pos < complete_pos, "Other Payment must precede Cancel, and Cancel must precede Complete & Pay")
 
-        # Compact card padding and tiles
+        # Alignment check: 8px gap on both top grid and main split
+        self.assertIn('.so-card-grid-top', html)
+        self.assertIn('.so-modern-main-split', html)
         self.assertIn('.so-card-summary', html)
         self.assertIn('min-height: 34px', html)
 
