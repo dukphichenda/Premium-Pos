@@ -70,7 +70,7 @@ class TestBranchProductViewLock(unittest.TestCase):
             sess['branch_id'] = 1
             sess['active_branch_id'] = 1
 
-        res = self.client.get(f'/products/catalog?id={self.prod_id}')
+        res = self.client.get(f'/products/{self.prod_id}')
         self.assertEqual(res.status_code, 200)
         html = res.get_data(as_text=True)
 
@@ -144,7 +144,7 @@ class TestBranchProductViewLock(unittest.TestCase):
             sess['branch_id'] = None
             sess['active_branch_id'] = None
 
-        res = self.client.get(f'/products/catalog?id={self.prod_id}')
+        res = self.client.get(f'/products/{self.prod_id}')
         self.assertEqual(res.status_code, 200)
         html = res.get_data(as_text=True)
 
