@@ -133,7 +133,7 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
         self.assertIn('so-qty-input', html)
         self.assertIn('so-uom-badge', html)
         self.assertIn('isDragHandlePressed', html)
-        self.assertIn("draggable=\"true\"", html)
+        self.assertIn('handleLineDragStart', html)
 
 if __name__ == '__main__':
     unittest.main()
