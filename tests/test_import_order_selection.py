@@ -17,7 +17,7 @@ SO-101,2026-10-14,Acme Corp,OPEN,Box 1600ML,2,10.00,20.00
 SO-101,2026-10-14,Acme Corp,OPEN,Cup 500ML,1,5.00,5.00
 SO-102,2026-10-15,Global Retail,PAID,Plate 9-inch,3,4.00,12.00
 """
-        with patch('services.csv_exchange.query_all', return_value=[{'order_number': 'SO-101'}]):
+        with patch('services.csv_exchange.query_all', return_value=[{'order_number': 'SO-101', 'status': 'QUOTE', 'payment_status': 'UNPAID'}]):
             res = preview_import_data('sales_order', csv_data.encode('utf-8'), has_headers=True, import_mode='keep')
 
         self.assertEqual(res['data_type'], 'sales_order')
@@ -90,7 +90,10 @@ SO-303,2026-10-14,Cust C,OPEN,Item 3,1,30.00
             
             mock_cur = mock_cursor.return_value.__enter__.return_value
             mock_cur.fetchone.return_value = {'id': 1}
-            mock_cur.fetchall.return_value = [{'id': 1, 'order_number': 'SO-301', 'branch_id': None}, {'id': 2, 'order_number': 'SO-303', 'branch_id': None}]
+            mock_cur.fetchall.return_value = [
+                {'id': 1, 'order_number': 'SO-301', 'branch_id': None, 'status': 'QUOTE', 'payment_status': 'UNPAID'},
+                {'id': 2, 'order_number': 'SO-303', 'branch_id': None, 'status': 'QUOTE', 'payment_status': 'UNPAID'}
+            ]
 
             res = execute_import_data(
                 'sales_order',
@@ -137,7 +140,7 @@ SO-303,2026-10-14,Cust C,OPEN,Item 3,1,30.00
         self.assertIn('closeUnmatchedAlertAndKeepCustom', html)
 
     def test_keep_existing_auto_selects_new_and_status_changed_open_or_paid(self):
-        """Verify preview_import_data in keep mode only auto-selects new orders or orders changing status to/from Open/Paid"""
+        """Verify preview_import_data in keep mode only returns new orders and orders with status updates in preview"""
         csv_data = """Order Number,Order Date,Customer,OrderStatus,Item Name,Quantity,Unit Price,Subtotal
 SO-NEW,2026-10-22,New Client,OPEN,Widget A,1,10.00,10.00
 SO-OPEN-TO-PAID,2026-10-22,Client B,PAID,Widget B,1,20.00,20.00
@@ -145,11 +148,6 @@ SO-QUOTE-TO-OPEN,2026-10-22,Client C,OPEN,Widget C,1,30.00,30.00
 SO-UNCHANGED-OPEN,2026-10-22,Client D,OPEN,Widget D,1,40.00,40.00
 SO-UNCHANGED-PAID,2026-10-22,Client E,PAID,Widget E,1,50.00,50.00
 """
-        # Mock existing database records:
-        # SO-OPEN-TO-PAID has DB status 'OPEN'
-        # SO-QUOTE-TO-OPEN has DB status 'QUOTE'
-        # SO-UNCHANGED-OPEN has DB status 'OPEN'
-        # SO-UNCHANGED-PAID has DB status 'PAID'
         mock_db_orders = [
             {'order_number': 'SO-OPEN-TO-PAID', 'status': 'OPEN', 'payment_status': 'UNPAID'},
             {'order_number': 'SO-QUOTE-TO-OPEN', 'status': 'QUOTE', 'payment_status': 'UNPAID'},
@@ -160,7 +158,8 @@ SO-UNCHANGED-PAID,2026-10-22,Client E,PAID,Widget E,1,50.00,50.00
         with patch('services.csv_exchange.query_all', return_value=mock_db_orders):
             res = preview_import_data('sales_order', csv_data.encode('utf-8'), has_headers=True, import_mode='keep')
 
-        self.assertEqual(res['total_orders'], 5)
+        self.assertEqual(res['total_orders'], 3)
+        self.assertEqual(res['total_file_orders'], 5)
         self.assertEqual(res['new_orders_count'], 1)
         self.assertEqual(res['status_changed_count'], 2)  # SO-OPEN-TO-PAID and SO-QUOTE-TO-OPEN
         self.assertEqual(res['unchanged_orders_count'], 2)  # SO-UNCHANGED-OPEN and SO-UNCHANGED-PAID
@@ -168,47 +167,34 @@ SO-UNCHANGED-PAID,2026-10-22,Client E,PAID,Widget E,1,50.00,50.00
 
         orders = {o['order_number']: o for o in res['orders_summary']}
 
-        # 1. New order -> MUST be auto-selected
+        # 1. New order -> MUST be in preview and auto-selected
+        self.assertIn('SO-NEW', orders)
         so_new = orders['SO-NEW']
         self.assertFalse(so_new['is_existing'])
         self.assertTrue(so_new['is_auto_selected'])
         self.assertEqual(so_new['status_change_type'], 'new')
 
-        # 2. Existing order with status change OPEN -> PAID -> MUST be auto-selected
+        # 2. Existing order with status change OPEN -> PAID -> MUST be in preview
+        self.assertIn('SO-OPEN-TO-PAID', orders)
         so_paid = orders['SO-OPEN-TO-PAID']
         self.assertTrue(so_paid['is_existing'])
         self.assertTrue(so_paid['status_changed'])
         self.assertEqual(so_paid['db_status'], 'OPEN')
         self.assertEqual(so_paid['status'], 'PAID')
-        self.assertEqual(so_paid['status_change_type'], 'open_or_paid_change')
         self.assertTrue(so_paid['is_auto_selected'])
 
-        # 3. Existing order with status change QUOTE -> OPEN -> MUST be auto-selected
+        # 3. Existing order with status change QUOTE -> OPEN -> MUST be in preview
+        self.assertIn('SO-QUOTE-TO-OPEN', orders)
         so_quote_open = orders['SO-QUOTE-TO-OPEN']
         self.assertTrue(so_quote_open['is_existing'])
         self.assertTrue(so_quote_open['status_changed'])
         self.assertEqual(so_quote_open['db_status'], 'QUOTE')
         self.assertEqual(so_quote_open['status'], 'OPEN')
-        self.assertEqual(so_quote_open['status_change_type'], 'open_or_paid_change')
         self.assertTrue(so_quote_open['is_auto_selected'])
 
-        # 4. Existing order with unchanged OPEN status -> MUST NOT be auto-selected
-        so_unch_open = orders['SO-UNCHANGED-OPEN']
-        self.assertTrue(so_unch_open['is_existing'])
-        self.assertFalse(so_unch_open['status_changed'])
-        self.assertEqual(so_unch_open['db_status'], 'OPEN')
-        self.assertEqual(so_unch_open['status'], 'OPEN')
-        self.assertEqual(so_unch_open['status_change_type'], 'unchanged')
-        self.assertFalse(so_unch_open['is_auto_selected'])
-
-        # 5. Existing order with unchanged PAID status -> MUST NOT be auto-selected
-        so_unch_paid = orders['SO-UNCHANGED-PAID']
-        self.assertTrue(so_unch_paid['is_existing'])
-        self.assertFalse(so_unch_paid['status_changed'])
-        self.assertEqual(so_unch_paid['db_status'], 'PAID')
-        self.assertEqual(so_unch_paid['status'], 'PAID')
-        self.assertEqual(so_unch_paid['status_change_type'], 'unchanged')
-        self.assertFalse(so_unch_paid['is_auto_selected'])
+        # 4. Existing unchanged orders -> MUST NOT be in preview table!
+        self.assertNotIn('SO-UNCHANGED-OPEN', orders)
+        self.assertNotIn('SO-UNCHANGED-PAID', orders)
 
     def test_erase_mode_selects_all_orders(self):
         """Verify preview_import_data in erase mode selects all orders regardless of status"""

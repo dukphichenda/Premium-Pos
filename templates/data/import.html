@@ -240,7 +240,7 @@
                                 <span style="font-size: 12px; font-weight: 600; color: #1E293B;">
                                     Selected: <span id="selectedOrdersCount" style="color: #2563EB;">0</span> / <span id="totalOrdersCount">0</span>
                                 </span>
-                                <button type="button" class="inflow-win-btn-sm" id="btnAutoSelectRecommended" onclick="selectAutoRecommendedOrders()" title="Select only new orders and orders with status change to Open / Paid" style="background: #EFF6FF; border-color: #3B82F6; color: #1D4ED8; font-weight: 600;">✨ Auto-Select (New & Open/Paid)</button>
+                                <button type="button" class="inflow-win-btn-sm" id="btnAutoSelectRecommended" onclick="selectAutoRecommendedOrders()" title="Select only new orders and orders with status updates" style="background: #EFF6FF; border-color: #3B82F6; color: #1D4ED8; font-weight: 600;">✨ Auto-Select (New & Updates)</button>
                                 <button type="button" class="inflow-win-btn-sm" onclick="selectAllOrders(true)">Select All</button>
                                 <button type="button" class="inflow-win-btn-sm" onclick="selectAllOrders(false)">Deselect All</button>
                             </div>
@@ -1154,14 +1154,25 @@ function renderOrderSelectionTable(orders, res) {
 
     const newCnt = (res && res.new_orders_count !== undefined) ? res.new_orders_count : currentOrdersSummary.filter(o => !o.is_existing).length;
     const changedCnt = (res && res.status_changed_count !== undefined) ? res.status_changed_count : currentOrdersSummary.filter(o => o.is_existing && o.status_changed).length;
-    const unchCnt = (res && res.unchanged_orders_count !== undefined) ? res.unchanged_orders_count : currentOrdersSummary.filter(o => o.is_existing && !o.status_changed).length;
-    const autoCnt = (res && res.auto_selected_count !== undefined) ? res.auto_selected_count : (newCnt + changedCnt);
+    const unchCnt = (res && res.unchanged_orders_count !== undefined) ? res.unchanged_orders_count : 0;
+    const totalInFile = (res && res.total_file_orders !== undefined) ? res.total_file_orders : (currentOrdersSummary.length + unchCnt);
+    const autoCnt = (res && res.auto_selected_count !== undefined) ? res.auto_selected_count : currentOrdersSummary.filter(o => o.is_selected).length;
 
     // Populate category filter chip numbers
     if (document.getElementById('chipCntAll')) document.getElementById('chipCntAll').textContent = currentOrdersSummary.length;
     if (document.getElementById('chipCntNew')) document.getElementById('chipCntNew').textContent = newCnt;
     if (document.getElementById('chipCntChanged')) document.getElementById('chipCntChanged').textContent = changedCnt;
-    if (document.getElementById('chipCntUnchanged')) document.getElementById('chipCntUnchanged').textContent = unchCnt;
+    if (document.getElementById('chipCntUnchanged')) {
+        if (isKeep) {
+            document.getElementById('chipCntUnchanged').textContent = '0';
+            const chipUnch = document.getElementById('chipFilterUnchanged');
+            if (chipUnch) {
+                chipUnch.title = `${unchCnt} unchanged existing orders were skipped from preview to protect existing data.`;
+            }
+        } else {
+            document.getElementById('chipCntUnchanged').textContent = unchCnt;
+        }
+    }
 
     // Populate Notice Banner in BOTH Keep and Erase modes
     const noticeEl = document.getElementById('orderSelectionNotice');
@@ -1172,17 +1183,17 @@ function renderOrderSelectionTable(orders, res) {
 
         if (isKeep) {
             noticeEl.classList.remove('erase-mode');
-            document.getElementById('orderNoticeTitle').textContent = `ℹ️ ${typeLabel} Status Summary (Keep Safe Mode):`;
+            document.getElementById('orderNoticeTitle').textContent = `ℹ️ ${typeLabel} Status Summary (Keep Existing Data Mode):`;
             document.getElementById('orderNoticeBody').innerHTML = `
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; margin-bottom: 6px;">
-                    <span class="notice-pill">Total in File: <strong>${currentOrdersSummary.length}</strong></span>
-                    <span class="notice-pill pill-new">➕ New: <strong>${newCnt}</strong></span>
-                    <span class="notice-pill pill-changed">🔄 Status Changed: <strong>${changedCnt}</strong></span>
-                    <span class="notice-pill pill-unchanged">⏹ Existing Unchanged: <strong>${unchCnt}</strong></span>
+                    <span class="notice-pill">Total in File: <strong>${totalInFile}</strong></span>
+                    <span class="notice-pill pill-new">➕ New to Add: <strong>${newCnt}</strong></span>
+                    <span class="notice-pill pill-changed">🔄 Status Updates: <strong>${changedCnt}</strong></span>
+                    <span class="notice-pill pill-unchanged">⏹ Unchanged (Skipped): <strong>${unchCnt}</strong></span>
                 </div>
                 <div style="font-size: 11.5px; color: #1E293B;">
-                    ✨ Auto-selected <strong style="color: #0284C7;">${autoCnt}</strong> orders (new orders + orders with status updates). 
-                    Existing unchanged orders are unchecked to prevent unintended overwrites.
+                    ✨ Showing only <strong>${currentOrdersSummary.length} actionable orders</strong> (${newCnt} new orders + ${changedCnt} status updates). 
+                    <strong>${unchCnt} existing unchanged orders</strong> are skipped and excluded from preview to protect existing data.
                 </div>
             `;
         } else {
@@ -1190,10 +1201,10 @@ function renderOrderSelectionTable(orders, res) {
             document.getElementById('orderNoticeTitle').textContent = `⚠️ ${typeLabel} Status Summary (Erase Mode - Overwrites Database):`;
             document.getElementById('orderNoticeBody').innerHTML = `
                 <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; margin-bottom: 6px;">
-                    <span class="notice-pill">Total in File: <strong>${currentOrdersSummary.length}</strong></span>
+                    <span class="notice-pill">Total in File: <strong>${totalInFile}</strong></span>
                     <span class="notice-pill pill-new">➕ New: <strong>${newCnt}</strong></span>
                     <span class="notice-pill pill-changed">🔄 Status Changed: <strong>${changedCnt}</strong></span>
-                    <span class="notice-pill pill-unchanged">⏹ Existing (Same Status): <strong>${unchCnt}</strong></span>
+                    <span class="notice-pill pill-unchanged">⏹ Existing: <strong>${unchCnt}</strong></span>
                 </div>
                 <div style="font-size: 11.5px; color: #991B1B;">
                     ⚠️ All existing records will be deleted before importing. All <strong>${currentOrdersSummary.length} orders</strong> in this file will be imported.
@@ -1232,6 +1243,7 @@ function applyOrderFilters() {
 
 function renderOrderPage() {
     const tbody = document.getElementById('orderSelectionTableBody');
+    const isKeep = (currentImportMode === 'keep');
     const totalFiltered = filteredOrdersList.length;
     const totalPages = Math.max(1, Math.ceil(totalFiltered / ORDERS_PAGE_SIZE));
     if (orderCurrentPage > totalPages) orderCurrentPage = totalPages;
@@ -1243,7 +1255,19 @@ function renderOrderPage() {
 
     let html = '';
     if (pageOrders.length === 0) {
-        html = `<tr><td colspan="9" style="text-align: center; color: #94A3B8; padding: 20px;">No matching orders found</td></tr>`;
+        if (currentCategoryFilter === 'unchanged' && isKeep) {
+            html = `<tr><td colspan="9" style="text-align: center; color: #64748B; padding: 24px;">
+                <div style="font-weight: 600; font-size: 13px; color: #0F172A;">No Unchanged Orders in Preview</div>
+                <div style="font-size: 12px; margin-top: 4px; color: #64748B;">All unchanged existing orders were automatically skipped and excluded from preview to protect your existing database.</div>
+            </td></tr>`;
+        } else if (currentOrdersSummary.length === 0 && isKeep) {
+            html = `<tr><td colspan="9" style="text-align: center; color: #059669; padding: 24px;">
+                <div style="font-weight: 700; font-size: 13px;">✓ All Orders Already Up to Date</div>
+                <div style="font-size: 12px; margin-top: 4px; color: #475569;">All orders in this CSV file already exist in the database with identical statuses. No new orders or status updates to import.</div>
+            </td></tr>`;
+        } else {
+            html = `<tr><td colspan="9" style="text-align: center; color: #94A3B8; padding: 20px;">No matching orders found</td></tr>`;
+        }
     } else {
         pageOrders.forEach(ord => {
             const st = (ord.status || 'OPEN').toUpperCase();
@@ -1640,6 +1664,12 @@ async function onExecuteImport() {
     const branchEl = document.getElementById('branchSelect');
     if (branchEl && branchEl.value) {
         formData.append('branch_id', branchEl.value);
+    }
+
+    // If Keep mode and no actionable orders exist, alert user
+    if (currentImportMode === 'keep' && (!currentOrdersSummary || currentOrdersSummary.length === 0)) {
+        alert('All orders in this CSV file are already up to date in the database.\n\nNo new orders or status updates to import.');
+        return;
     }
 
     // If order selection is active, gather selected orders across all pages

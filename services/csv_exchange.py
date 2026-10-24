@@ -1204,7 +1204,11 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                     display_tag = f"{p_info['sku']} {p_info['name']}".strip() if p_info else (item_name or item_code or 'Item')
                     orders_grouped[ord_num]['items'].append(f"{display_tag} ({qty:g} {uom_tag})")
 
-        orders_summary = []
+        all_parsed_orders = []
+        new_cnt = 0
+        changed_cnt = 0
+        unchanged_cnt = 0
+
         for ord_num, odata in orders_grouped.items():
             total = round(odata['line_subtotals'] + odata['freight'], 2)
             db_rec = existing_orders_map.get(str(ord_num).strip().lower())
@@ -1214,46 +1218,29 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
 
             incoming_status = (odata.get('status') or 'OPEN').strip().upper()
             norm_incoming = normalize_order_status_for_comparison(incoming_status)
-            norm_db = normalize_order_status_for_comparison(db_status) if is_exist else None
+            eff_db_status = 'PAID' if (db_status == 'PAID' or db_payment_status == 'PAID') else db_status
+            norm_db = normalize_order_status_for_comparison(eff_db_status) if is_exist else None
 
             if is_exist:
                 status_changed = bool(norm_db and norm_incoming and norm_incoming != norm_db)
-                involves_open_or_paid = (
-                    norm_incoming in ('OPEN', 'PAID') or
-                    (norm_db and norm_db in ('OPEN', 'PAID'))
-                )
-                if status_changed and involves_open_or_paid:
-                    status_change_type = 'open_or_paid_change'
-                elif status_changed:
-                    status_change_type = 'other_status_change'
+                if status_changed:
+                    changed_cnt += 1
+                    status_change_type = 'status_change'
                 else:
+                    unchanged_cnt += 1
                     status_change_type = 'unchanged'
             else:
+                new_cnt += 1
                 status_changed = False
                 status_change_type = 'new'
 
-            # Auto-selection logic:
-            # When import_mode == 'keep':
-            #   - Auto-select only new sales orders (not is_exist)
-            #   - OR any order that changes status to/from OPEN or PAID (status_change_type == 'open_or_paid_change')
-            #   - Unchanged existing orders are deselected (is_auto_selected = False)
-            # When import_mode == 'erase':
-            #   - Select all orders (is_auto_selected = True)
-            if import_mode == 'keep':
-                if not is_exist:
-                    is_auto_selected = True
-                elif status_change_type == 'open_or_paid_change':
-                    is_auto_selected = True
-                else:
-                    is_auto_selected = False
-            else:
-                is_auto_selected = True
+            is_auto_selected = True
 
             items_str = ", ".join(odata['items'])
             if odata['total_line_count'] > len(odata['items']):
                 items_str += f", +{odata['total_line_count'] - len(odata['items'])} more"
 
-            orders_summary.append({
+            all_parsed_orders.append({
                 'order_number': ord_num,
                 'party_name': odata['party_name'],
                 'address': odata.get('address') or '',
@@ -1270,17 +1257,21 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                 'items_summary': items_str
             })
 
-        new_cnt = sum(1 for o in orders_summary if not o['is_existing'])
-        changed_cnt = sum(1 for o in orders_summary if o['is_existing'] and o.get('status_change_type') == 'open_or_paid_change')
-        unchanged_cnt = sum(1 for o in orders_summary if o['is_existing'] and not o.get('is_auto_selected'))
-        auto_selected_cnt = sum(1 for o in orders_summary if o.get('is_auto_selected'))
+        # User requirement:
+        # "when import sale an choose exising option you should effect new so or new update status only the rest don't care and show preview only new update too"
+        # In keep mode, only show new orders and orders with status updates in the preview table!
+        if import_mode == 'keep':
+            orders_summary = [o for o in all_parsed_orders if (not o['is_existing']) or o['status_changed']]
+        else:
+            orders_summary = all_parsed_orders
 
         result['orders_summary'] = orders_summary
         result['total_orders'] = len(orders_summary)
+        result['total_file_orders'] = len(all_parsed_orders)
         result['new_orders_count'] = new_cnt
         result['status_changed_count'] = changed_cnt
         result['unchanged_orders_count'] = unchanged_cnt
-        result['auto_selected_count'] = auto_selected_cnt
+        result['auto_selected_count'] = len(orders_summary)
         result['unmatched_products'] = list(unmatched_map.values())
         result['catalog_products'] = [
             {
@@ -1782,21 +1773,119 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
             # High-performance bulk lookup of existing orders (5,000 per chunk)
             for i in range(0, len(all_so_nums), 5000):
                 chunk_nums = all_so_nums[i:i + 5000]
-                cur.execute("SELECT id, order_number, branch_id FROM sales_orders WHERE order_number = ANY(%s);", (chunk_nums,))
+                cur.execute("""
+                    SELECT id, order_number, branch_id, status, payment_status, total_amount, paid_amount, balance_due, invoiced_date 
+                    FROM sales_orders 
+                    WHERE order_number = ANY(%s);
+                """, (chunk_nums,))
                 for r in cur.fetchall():
-                    existing_so_map[r['order_number']] = r
-
-            # Fast bulk delete of lines for updated orders in this branch
-            if not is_erase_mode:
-                so_ids_to_clean = [
-                    existing_so_map[s]['id'] for s in all_so_nums
-                    if s in existing_so_map and existing_so_map[s].get('branch_id') == bid
-                ]
-                for i in range(0, len(so_ids_to_clean), 5000):
-                    cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = ANY(%s);", (so_ids_to_clean[i:i + 5000],))
+                    onum = r['order_number']
+                    existing_so_map[onum] = r
+                    existing_so_map[str(onum).strip().lower()] = r
 
             for so_num, order_data in orders_map.items():
                 batch_count += 1
+                existing_so = existing_so_map.get(so_num) or existing_so_map.get(str(so_num).strip().lower())
+
+                # =============================================================
+                # KEEP MODE FOR EXISTING SALES ORDERS:
+                # User requirement:
+                # "when import sale an choose exising option you should effect new so or new update status only the rest don't care"
+                # =============================================================
+                if existing_so and not is_erase_mode:
+                    if existing_so.get('branch_id') != bid:
+                        errors.append(f"Order #{so_num}: Belongs to another branch or HQ. Cannot overwrite across branches.")
+                        skipped_orders_cnt += 1
+                        continue
+
+                    # Resolve incoming status from CSV
+                    raw_st = (order_data['status_raw'] or '').strip()
+                    raw_upper = raw_st.upper()
+                    amount_paid_raw = order_data['amount_paid_raw']
+                    dt_paid = parse_date_val(order_data['date_paid_raw'])
+
+                    if raw_upper in ('PAID',):
+                        incoming_status = 'PAID'
+                    elif raw_upper in ('INVOICED',):
+                        incoming_status = 'INVOICED'
+                    elif raw_upper in ('FULLY SHIPPED', 'SHIPPED'):
+                        incoming_status = 'SHIPPED'
+                    elif raw_upper in ('OPEN', 'UNINVOICED'):
+                        if amount_paid_raw > 0 or dt_paid:
+                            incoming_status = 'PAID'
+                        else:
+                            incoming_status = 'OPEN'
+                    elif raw_upper in ('QUOTE', 'QUOTED'):
+                        incoming_status = 'QUOTE'
+                    elif raw_upper in ('CANCELLED', 'CANCELED'):
+                        incoming_status = 'CANCELLED'
+                    elif raw_upper in ('IN PROGRESS', 'IN_PROGRESS', 'PICKED', 'PACKED'):
+                        incoming_status = raw_upper.replace(' ', '_')
+                    else:
+                        incoming_status = raw_upper or 'OPEN'
+
+                    db_st = existing_so.get('status')
+                    db_pay_st = existing_so.get('payment_status')
+                    eff_db_st = 'PAID' if (db_st == 'PAID' or db_pay_st == 'PAID') else db_st
+
+                    norm_db = normalize_order_status_for_comparison(eff_db_st)
+                    norm_incoming = normalize_order_status_for_comparison(incoming_status)
+
+                    # If status is unchanged: SKIP COMPLETELY!
+                    if norm_incoming == norm_db:
+                        skipped_orders_cnt += 1
+                        continue
+
+                    # If status is changed: ONLY update status and related payment/invoiced flags!
+                    # Do NOT modify lines, customer, amounts, notes, or items! ("the rest don't care")
+                    dt_invoiced = parse_date_val(order_data.get('invoiced_date_raw')) or dt_paid
+
+                    if norm_incoming == 'PAID':
+                        cur.execute("""
+                            UPDATE sales_orders
+                            SET status = 'PAID',
+                                payment_status = 'PAID',
+                                paid_amount = total_amount,
+                                balance_due = 0.0,
+                                invoiced_date = COALESCE(invoiced_date, %s, CURRENT_TIMESTAMP),
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (dt_invoiced, existing_so['id']))
+                    elif norm_incoming in ('INVOICED', 'SHIPPED'):
+                        cur.execute("""
+                            UPDATE sales_orders
+                            SET status = %s,
+                                invoiced_date = COALESCE(invoiced_date, %s, CURRENT_TIMESTAMP),
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (norm_incoming, dt_invoiced, existing_so['id']))
+                    elif norm_incoming in ('CANCELLED',):
+                        cur.execute("""
+                            UPDATE sales_orders
+                            SET status = 'CANCELLED',
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (existing_so['id'],))
+                    elif norm_incoming in ('OPEN',):
+                        cur.execute("""
+                            UPDATE sales_orders
+                            SET status = 'OPEN',
+                                payment_status = 'UNPAID',
+                                paid_amount = 0.0,
+                                balance_due = total_amount,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (existing_so['id'],))
+                    else:
+                        cur.execute("""
+                            UPDATE sales_orders
+                            SET status = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (norm_incoming, existing_so['id']))
+
+                    updated_cnt += 1
+                    continue
                 # Customer handling - Always keep customer name the same
                 cust_name = re.sub(r'[\u200b\u200c\u200d\ufeff]', '', (order_data['customer_name'] or 'Walk-in Customer')).strip() or 'Walk-in Customer'
                 cn_clean = cust_name.lower()
@@ -2012,58 +2101,23 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                 so_phone = (order_data.get('phone') or '').strip() or (cached_c.get('phone') or '').strip()
                 so_prov = (order_data.get('destination_province') or '').strip()
 
-                if existing_so and not is_erase_mode:
-                    if existing_so.get('branch_id') != bid:
-                        errors.append(f"Order #{so_num}: Belongs to another branch or HQ. Cannot overwrite across branches.")
-                        continue
-                    so_id = existing_so['id']
-                    cur.execute("""
-                        UPDATE sales_orders
-                        SET customer_id = %s,
-                            location_id = COALESCE(%s, location_id),
-                            order_date = %s,
-                            due_date = %s,
-                            status = %s,
-                            payment_status = %s,
-                            subtotal = %s,
-                            shipping_fee = %s,
-                            total_amount = %s,
-                            paid_amount = %s,
-                            balance_due = %s,
-                            sales_rep = COALESCE(NULLIF(%s, ''), sales_rep),
-                            po_number = COALESCE(NULLIF(%s, ''), po_number),
-                            notes = COALESCE(NULLIF(%s, ''), notes),
-                            customer_address = COALESCE(NULLIF(%s, ''), customer_address),
-                            customer_contact = COALESCE(NULLIF(%s, ''), customer_contact),
-                            customer_phone = COALESCE(NULLIF(%s, ''), customer_phone),
-                            destination_province = COALESCE(NULLIF(%s, ''), destination_province),
-                            invoiced_date = %s,
-                            branch_id = %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s;
-                    """, (cust_id, loc_id, ord_date, due_date, so_status, payment_status,
-                          calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
-                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'],
-                          so_address, so_contact, so_phone, so_prov,
-                          invoiced_date, bid, so_id))
-                    updated_cnt += 1
-                else:
-                    cur.execute("""
-                        INSERT INTO sales_orders (
-                            order_number, customer_id, location_id, order_date, due_date,
-                            status, payment_status, subtotal, shipping_fee, total_amount,
-                            paid_amount, balance_due, sales_rep, po_number, notes, invoiced_date,
-                            branch_id, customer_address, customer_contact, customer_phone, destination_province
-                        )
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        RETURNING id;
-                    """, (so_num, cust_id, loc_id, ord_date, due_date, so_status, payment_status,
-                          calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
-                          order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid,
-                          so_address, so_contact, so_phone, so_prov))
-                    so_id = cur.fetchone()['id']
-                    existing_so_map[so_num] = {'id': so_id, 'branch_id': bid}
-                    imported_cnt += 1
+                cur.execute("""
+                    INSERT INTO sales_orders (
+                        order_number, customer_id, location_id, order_date, due_date,
+                        status, payment_status, subtotal, shipping_fee, total_amount,
+                        paid_amount, balance_due, sales_rep, po_number, notes, invoiced_date,
+                        branch_id, customer_address, customer_contact, customer_phone, destination_province
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """, (so_num, cust_id, loc_id, ord_date, due_date, so_status, payment_status,
+                      calculated_subtotal, order_data['freight'], total_amount, paid_amount, balance_due,
+                      order_data['sales_rep'], order_data['po_number'], order_data['remarks'], invoiced_date, bid,
+                      so_address, so_contact, so_phone, so_prov))
+                so_id = cur.fetchone()['id']
+                existing_so_map[so_num] = {'id': so_id, 'branch_id': bid}
+                existing_so_map[str(so_num).strip().lower()] = {'id': so_id, 'branch_id': bid}
+                imported_cnt += 1
 
                 # Buffer lines for high-throughput batch insertion
                 for l_idx, pline in enumerate(parsed_lines, start=1):
@@ -2163,16 +2217,27 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
         with get_db_cursor(commit=True) as cur:
             for i in range(0, len(all_po_nums), 5000):
                 chunk_nums = all_po_nums[i:i + 5000]
-                cur.execute("SELECT id, order_number FROM purchase_orders WHERE order_number = ANY(%s);", (chunk_nums,))
+                cur.execute("SELECT id, order_number, status FROM purchase_orders WHERE order_number = ANY(%s);", (chunk_nums,))
                 for r in cur.fetchall():
-                    existing_po_map[r['order_number']] = r
-
-            if not is_erase_mode:
-                po_ids_to_clean = [existing_po_map[s]['id'] for s in all_po_nums if s in existing_po_map]
-                for i in range(0, len(po_ids_to_clean), 5000):
-                    cur.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = ANY(%s);", (po_ids_to_clean[i:i + 5000],))
+                    onum = r['order_number']
+                    existing_po_map[onum] = r
+                    existing_po_map[str(onum).strip().lower()] = r
 
             for po_num, order_data in orders_map.items():
+                existing_po = existing_po_map.get(po_num) or existing_po_map.get(str(po_num).strip().lower())
+                po_status = (order_data['status_raw'] or 'DRAFT').upper()
+
+                # KEEP MODE FOR EXISTING PURCHASE ORDERS:
+                if existing_po and not is_erase_mode:
+                    norm_db = normalize_order_status_for_comparison(existing_po.get('status'))
+                    norm_incoming = normalize_order_status_for_comparison(po_status)
+                    if norm_incoming == norm_db:
+                        skipped_orders_cnt += 1
+                        continue
+                    cur.execute("UPDATE purchase_orders SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s;", (norm_incoming, existing_po['id']))
+                    updated_cnt += 1
+                    continue
+
                 v_name = order_data['vendor_name'].strip()
                 vn_clean = v_name.lower()
                 if vn_clean in vend_map:
@@ -2184,26 +2249,16 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
 
                 dt_order = parse_date_val(order_data['order_date_raw'])
                 ord_date = dt_order.date() if dt_order else datetime.now().date()
-                po_status = (order_data['status_raw'] or 'DRAFT').upper()
 
-                existing_po = existing_po_map.get(po_num)
-
-                if existing_po and not is_erase_mode:
-                    po_id = existing_po['id']
-                    cur.execute("""
-                        UPDATE purchase_orders
-                        SET vendor_id = %s, order_date = %s, status = %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE id = %s;
-                    """, (vend_id, ord_date, po_status, po_id))
-                    updated_cnt += 1
-                else:
-                    cur.execute("""
-                        INSERT INTO purchase_orders (order_number, vendor_id, order_date, status)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id;
-                    """, (po_num, vend_id, ord_date, po_status))
-                    po_id = cur.fetchone()['id']
-                    imported_cnt += 1
+                cur.execute("""
+                    INSERT INTO purchase_orders (order_number, vendor_id, order_date, status)
+                    VALUES (%s, %s, %s, %s)
+                    RETURNING id;
+                """, (po_num, vend_id, ord_date, po_status))
+                po_id = cur.fetchone()['id']
+                existing_po_map[po_num] = {'id': po_id, 'status': po_status}
+                existing_po_map[str(po_num).strip().lower()] = {'id': po_id, 'status': po_status}
+                imported_cnt += 1
 
                 total_subtotal = 0.0
                 for l_idx, line in enumerate(order_data['lines'], start=1):
