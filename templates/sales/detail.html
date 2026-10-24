@@ -1859,6 +1859,12 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
     border-radius: 4px !important;
     margin-right: 2px !important;
     flex-shrink: 0 !important;
+    cursor: pointer !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.inflow-backorder-badge:hover {
+    transform: scale(1.12) !important;
+    box-shadow: 0 2px 6px rgba(239, 68, 68, 0.45) !important;
 }
 .so-table-footer-bar {
     padding: 10px 16px !important;
@@ -3960,8 +3966,10 @@ function selectUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
             if (!badge) {
                 badge = document.createElement('span');
                 badge.className = 'inflow-backorder-badge';
-                badge.title = 'Insufficient Stock - Backordered';
+                badge.title = 'Insufficient Stock - Click to view component stock details';
                 badge.innerText = '!';
+                badge.onclick = function(e) { showBackorderNotice(this, e); };
+                badge.onmouseenter = function(e) { showBackorderNotice(this, e); };
                 row.querySelector('.inflow-qty-cell-wrapper')?.prepend(badge);
             }
         } else {
@@ -4007,9 +4015,11 @@ function onQtyNumberChange(inputEl) {
             if (!badge) {
                 badge = document.createElement('span');
                 badge.className = 'inflow-backorder-badge';
-                badge.title = 'Insufficient Stock - Backordered';
+                badge.title = 'Insufficient Stock - Click to view component stock details';
                 badge.innerText = '!';
-                row.querySelector('.inflow-qty-cell-wrapper').prepend(badge);
+                badge.onclick = function(e) { showBackorderNotice(this, e); };
+                badge.onmouseenter = function(e) { showBackorderNotice(this, e); };
+                row.querySelector('.inflow-qty-cell-wrapper')?.prepend(badge);
             }
         } else {
             if (badge) badge.remove();
@@ -5606,6 +5616,214 @@ function onDrawerCustomerType(val) {
 }
 
 /* ==========================================================================
+   Backorder Stock Notice Popover (Kit Components & Single Stock Shortage)
+   ========================================================================== */
+let backorderNoticeTimeout = null;
+
+function closeBackorderNotice() {
+    const popup = document.getElementById('backorderNoticePopup');
+    if (popup) {
+        popup.style.display = 'none';
+    }
+}
+
+function showBackorderNotice(badgeEl, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    const popup = document.getElementById('backorderNoticePopup');
+    if (!popup || !badgeEl || !badgeEl.isConnected) return;
+
+    if (backorderNoticeTimeout) {
+        clearTimeout(backorderNoticeTimeout);
+        backorderNoticeTimeout = null;
+    }
+
+    const row = badgeEl.closest('tr');
+    if (!row) return;
+
+    const pidInput = row.querySelector('input[name*="[product_id]"]');
+    const pid = pidInput ? parseInt(pidInput.value) : (parseInt(row.getAttribute('data-product-id')) || 0);
+    const prod = (pid && window.productsCatalog) ? window.productsCatalog[pid] : null;
+
+    const qtyInput = row.querySelector('.line-qty') || row.querySelector('input[name*="[quantity]"]');
+    const lineQty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+    const lineUom = (row.querySelector('.line-uom')?.value || (prod ? prod.base_uom : 'pcs.')).trim();
+
+    let ratio = 1.0;
+    if (prod) {
+        if (prod.sales_uom && lineUom.toLowerCase() === prod.sales_uom.toLowerCase()) {
+            ratio = prod.sales_ratio || 1.0;
+        } else if (prod.purchasing_uom && lineUom.toLowerCase() === prod.purchasing_uom.toLowerCase()) {
+            ratio = prod.purchasing_ratio || 1.0;
+        }
+    }
+    const stdQty = lineQty * ratio;
+
+    const titleEl = document.getElementById('boPopupTitle');
+    const subEl = document.getElementById('boPopupSubtitle');
+    const alertEl = document.getElementById('boPopupAlertText');
+    const bodyEl = document.getElementById('boPopupBody');
+    const footerEl = document.getElementById('boPopupFooter');
+    const buildableEl = document.getElementById('boPopupBuildable');
+
+    const hasComponents = !!(prod && prod.components && prod.components.length > 0);
+
+    if (hasComponents) {
+        if (titleEl) titleEl.textContent = 'Kit Components Stock Notice';
+        if (subEl) subEl.textContent = `${prod.sku ? prod.sku + ' - ' : ''}${prod.name || 'Kit Product'} (Ordered: ${formatQtyNum(lineQty)} ${lineUom})`;
+        if (alertEl) alertEl.innerHTML = `⚠️ <strong>Combined / Kit Product Shortage:</strong> Insufficient component stock to fulfill <strong>${formatQtyNum(lineQty)} ${lineUom}</strong>. Check Qty in Hand and Reserve of each component below:`;
+        
+        if (bodyEl) {
+            bodyEl.innerHTML = '';
+            let minBuildable = 999999999;
+            prod.components.forEach(c => {
+                const cRatio = parseFloat(c.quantity) || 1.0;
+                const reqQty = stdQty * cRatio;
+                const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
+                const cReserved = parseFloat(c.stock_reserved) || 0.0;
+                const cAvail = Math.max(0, cOnHand - cReserved);
+                const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
+                if (buildable < minBuildable) minBuildable = buildable;
+
+                const isShort = cAvail < reqQty;
+                const card = document.createElement('div');
+                card.style.cssText = `background: ${isShort ? '#FFF5F5' : '#F8FAFC'}; border: 1px solid ${isShort ? '#FCA5A5' : '#E2E8F0'}; border-left: 4px solid ${isShort ? '#EF4444' : '#10B981'}; border-radius: 6px; padding: 7px 10px; font-size: 11px;`;
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                        <span style="font-weight: 700; color: #0F172A; max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.name || c.sku}">
+                            ${c.sku ? `<span style="color: #2563EB;">${c.sku}</span> ` : ''}${c.name || ''}
+                        </span>
+                        <span style="font-size: 10px; color: #64748B; font-weight: 600;">
+                            Ratio: ${formatQtyNum(cRatio)} ${c.uom}/kit
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #FFFFFF; border: 1px solid ${isShort ? '#FECACA' : '#F1F5F9'}; border-radius: 4px; padding: 5px 8px; margin-bottom: 4px;">
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #475569; font-size: 10.5px;">Qty in Hand:</span>
+                            <span style="font-weight: 700; color: ${cOnHand < 0 ? '#DC2626' : '#0F172A'}; font-size: 11px; font-family: monospace;">
+                                ${formatQtyNum(cOnHand)} ${c.uom}
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="color: #475569; font-size: 10.5px;">Reserve:</span>
+                            <span style="font-weight: 700; color: ${cReserved > 0 ? '#D97706' : '#64748B'}; font-size: 11px; font-family: monospace;">
+                                ${formatQtyNum(cReserved)} ${c.uom}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 2px;">
+                        <span style="color: #64748B; font-size: 10px;">
+                            Required: <strong style="color: #0F172A;">${formatQtyNum(reqQty)} ${c.uom}</strong> | Avail: <strong style="color: ${cAvail > 0 ? '#16A34A' : '#DC2626'};">${formatQtyNum(cAvail)} ${c.uom}</strong>
+                        </span>
+                        <span style="font-size: 10px; font-weight: 700; color: ${isShort ? '#DC2626' : '#16A34A'}; background: ${isShort ? '#FEE2E2' : '#DCFCE7'}; border: 1px solid ${isShort ? '#FCA5A5' : '#BBF7D0'}; padding: 1px 6px; border-radius: 4px;">
+                            ${isShort ? `Short: ${formatQtyNum(reqQty - cAvail)}` : 'In Stock'}
+                        </span>
+                    </div>
+                `;
+                bodyEl.appendChild(card);
+            });
+
+            const maxKitCount = minBuildable !== 999999999 ? Math.max(0, minBuildable) : 0;
+            if (footerEl) footerEl.style.display = 'flex';
+            if (buildableEl) {
+                buildableEl.textContent = `Buildable: ${formatQtyNum(maxKitCount)} kits`;
+                buildableEl.style.color = maxKitCount < lineQty ? '#DC2626' : '#16A34A';
+                buildableEl.style.background = maxKitCount < lineQty ? '#FEE2E2' : '#DCFCE7';
+                buildableEl.style.borderColor = maxKitCount < lineQty ? '#FECACA' : '#BBF7D0';
+            }
+        }
+    } else {
+        // Single Product
+        const onHand = prod ? (parseFloat(prod.stock_on_hand) || 0) : 0;
+        const reserved = prod ? (parseFloat(prod.stock_reserved) || 0) : 0;
+        const avail = onHand - reserved;
+        const uom = prod ? prod.base_uom : lineUom;
+
+        if (titleEl) titleEl.textContent = 'Stock Shortage Notice';
+        if (subEl) subEl.textContent = `${prod ? prod.sku + ' - ' : ''}${prod ? prod.name : 'Product'} (Ordered: ${formatQtyNum(lineQty)} ${lineUom})`;
+        if (alertEl) alertEl.innerHTML = `⚠️ <strong>Insufficient Stock:</strong> Ordered quantity exceeds available stock on hand.`;
+
+        if (bodyEl) {
+            bodyEl.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 8px 10px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #475569;">Qty in Hand:</span>
+                        <span style="font-weight: 700; color: ${onHand < 0 ? '#DC2626' : '#0F172A'}; font-family: monospace;">${formatQtyNum(onHand)} ${uom}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #475569;">Reserve:</span>
+                        <span style="font-weight: 700; color: ${reserved > 0 ? '#D97706' : '#64748B'}; font-family: monospace;">${formatQtyNum(reserved)} ${uom}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #475569;">Available:</span>
+                        <span style="font-weight: 700; color: ${avail > 0 ? '#16A34A' : '#DC2626'}; font-family: monospace;">${formatQtyNum(avail)} ${uom}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: #475569;">Shortage:</span>
+                        <span style="font-weight: 700; color: #DC2626; font-family: monospace;">${formatQtyNum(Math.max(0, stdQty - avail))} ${uom}</span>
+                    </div>
+                </div>
+            `;
+        }
+        if (footerEl) footerEl.style.display = 'none';
+    }
+
+    // Position popup cleanly near badgeEl
+    const rect = badgeEl.getBoundingClientRect();
+    popup.style.display = 'block';
+    
+    // Width and positioning
+    const pWidth = 420;
+    let pLeft = rect.left - 10;
+    if (pLeft + pWidth > window.innerWidth - 15) {
+        pLeft = window.innerWidth - pWidth - 15;
+    }
+    if (pLeft < 10) pLeft = 10;
+
+    let pTop = rect.bottom + 6;
+    if (rect.bottom + 320 > window.innerHeight && rect.top > 320) {
+        pTop = rect.top - 330;
+    }
+
+    popup.style.left = Math.round(pLeft) + 'px';
+    popup.style.top = Math.round(pTop) + 'px';
+
+    // Hook mouseleave on popup and badge
+    const onMouseLeave = function() {
+        backorderNoticeTimeout = setTimeout(() => {
+            closeBackorderNotice();
+        }, 350);
+    };
+    const onMouseEnter = function() {
+        if (backorderNoticeTimeout) {
+            clearTimeout(backorderNoticeTimeout);
+            backorderNoticeTimeout = null;
+        }
+    };
+    popup.onmouseenter = onMouseEnter;
+    popup.onmouseleave = onMouseLeave;
+    badgeEl.onmouseenter = onMouseEnter;
+    badgeEl.onmouseleave = onMouseLeave;
+}
+
+function initBackorderNotices() {
+    document.querySelectorAll('.inflow-backorder-badge').forEach(badge => {
+        badge.onclick = function(e) { showBackorderNotice(this, e); };
+        badge.onmouseenter = function(e) { showBackorderNotice(this, e); };
+    });
+
+    document.addEventListener('click', function(e) {
+        const boPopup = document.getElementById('backorderNoticePopup');
+        if (boPopup && boPopup.style.display !== 'none') {
+            if (!boPopup.contains(e.target) && !e.target.classList.contains('inflow-backorder-badge')) {
+                closeBackorderNotice();
+            }
+        }
+    });
+}
+
+/* ==========================================================================
    Item Typing Autocomplete Dropdown (Bigger & Can Over The Sheet)
    ========================================================================== */
 function positionItemDropdown(inputEl) {
@@ -5632,14 +5850,25 @@ function positionItemDropdown(inputEl) {
     const canvasRect = canvasEl.getBoundingClientRect();
     const minLeft = Math.max(10, Math.floor(canvasRect.left + 5));
 
-    // Dynamic width calculation (default 840px for table + Inventory Info preview, bounded by viewport)
+    // Dynamic width calculation (default 840px for table + Inventory Info preview, expands to 1150px when Kit Components panel is visible)
+    const activeRow = document.querySelector('#itemDropdownBody tr.highlighted');
+    const activePid = activeRow ? activeRow.getAttribute('data-pid') : null;
+    const activeProd = (activePid && window.productsCatalog) ? window.productsCatalog[activePid] : null;
+    const hasComps = !!(activeProd && activeProd.components && activeProd.components.length > 0);
+
     const availableWidth = window.innerWidth - minLeft - 20;
-    const popupWidth = Math.min(840, Math.max(500, availableWidth));
+    const targetWidth = hasComps ? 1150 : 840;
+    const popupWidth = Math.min(targetWidth, Math.max(500, availableWidth));
     popup.style.width = popupWidth + 'px';
 
     const previewPanel = document.getElementById('itemDropdownPreviewPanel');
     if (previewPanel) {
         previewPanel.style.display = (popupWidth < 700) ? 'none' : 'flex';
+    }
+
+    const kitPanel = document.getElementById('itemDropdownKitPanel');
+    if (kitPanel) {
+        kitPanel.style.display = (hasComps && popupWidth >= 880) ? 'flex' : 'none';
     }
 
     // Vertical placement: prefer opening below the input
@@ -5698,8 +5927,17 @@ function updateItemDropdownPreview(pid) {
     const imgEl = document.getElementById('previewImage');
     const noImgEl = document.getElementById('previewImagePlaceholder');
 
+    // Kit Components Panel Elements
+    const kitPanel = document.getElementById('itemDropdownKitPanel');
+    const kitList = document.getElementById('previewKitComponentsList');
+    const kitBuildableBadge = document.getElementById('previewKitBuildableBadge');
+    const kitNoticeBanner = document.getElementById('previewKitNoticeBanner');
+    const kitInlineBuildable = document.getElementById('previewKitInlineBuildable');
+
     if (!prod) {
         if (skuNameEl) skuNameEl.textContent = 'Product #' + pid;
+        if (kitPanel) kitPanel.style.display = 'none';
+        if (kitNoticeBanner) kitNoticeBanner.style.display = 'none';
         return;
     }
 
@@ -5742,6 +5980,91 @@ function updateItemDropdownPreview(pid) {
             imgEl.style.display = 'none';
             noImgEl.style.display = 'block';
         }
+    }
+
+    // Populate Kit Components Stock Notice Panel if product has components
+    const hasComponents = !!(prod && prod.components && prod.components.length > 0);
+    if (hasComponents) {
+        if (kitNoticeBanner) kitNoticeBanner.style.display = 'flex';
+        let minBuildable = 999999999;
+
+        if (kitList) {
+            kitList.innerHTML = '';
+            prod.components.forEach(c => {
+                const cRatio = parseFloat(c.quantity) || 1.0;
+                const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
+                const cReserved = parseFloat(c.stock_reserved) || 0.0;
+                const cAvail = Math.max(0, cOnHand - cReserved);
+                const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
+                if (buildable < minBuildable) minBuildable = buildable;
+
+                const isShort = cOnHand <= 0 || cAvail <= 0;
+                const card = document.createElement('div');
+                card.className = 'kit-preview-comp-card';
+                card.style.cssText = `background: #FFFFFF; border: 1px solid ${isShort ? '#FCA5A5' : '#E2E8F0'}; border-left: 3.5px solid ${isShort ? '#EF4444' : '#10B981'}; border-radius: 6px; padding: 6px 8px; font-size: 11px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);`;
+                
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+                        <span style="font-weight: 700; color: #0F172A; max-width: 175px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${c.name || c.sku}">
+                            ${c.sku ? `<span style="color: #2563EB;">${c.sku}</span> ` : ''}${c.name || ''}
+                        </span>
+                        <span style="color: #64748B; font-size: 10px; font-weight: 600; white-space: nowrap;">
+                            ${formatQtyNum(cRatio)} ${c.uom}/kit
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: #F8FAFC; border: 1px solid #F1F5F9; border-radius: 4px; padding: 4px 6px;">
+                        <div style="display: flex; justify-content: space-between; gap: 4px;">
+                            <span style="color: #475569; font-size: 10px; font-weight: 500;">Qty in Hand:</span>
+                            <span style="font-weight: 700; color: ${cOnHand < 0 ? '#DC2626' : '#0F172A'}; font-size: 10.5px; font-family: monospace;">
+                                ${formatQtyNum(cOnHand)} ${c.uom}
+                            </span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; gap: 4px;">
+                            <span style="color: #475569; font-size: 10px; font-weight: 500;">Reserve:</span>
+                            <span style="font-weight: 700; color: ${cReserved > 0 ? '#D97706' : '#64748B'}; font-size: 10.5px; font-family: monospace;">
+                                ${formatQtyNum(cReserved)} ${c.uom}
+                            </span>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; padding: 0 2px;">
+                        <span style="color: #64748B; font-size: 10px;">Available:</span>
+                        <span style="font-weight: 700; color: ${cAvail > 0 ? '#16A34A' : '#DC2626'}; font-size: 10.5px; font-family: monospace;">
+                            ${formatQtyNum(cAvail)} ${c.uom} ${cAvail <= 0 ? '<span style="color: #EF4444; font-size: 9.5px; font-weight: 800; margin-left: 2px;">(Shortage)</span>' : ''}
+                        </span>
+                    </div>
+                `;
+                kitList.appendChild(card);
+            });
+        }
+
+        const maxKitCount = minBuildable !== 999999999 ? Math.max(0, minBuildable) : 0;
+        if (kitBuildableBadge) {
+            kitBuildableBadge.innerText = `Buildable: ${formatQtyNum(maxKitCount)} kits`;
+            if (maxKitCount === 0) {
+                kitBuildableBadge.style.color = '#DC2626';
+                kitBuildableBadge.style.background = '#FEE2E2';
+                kitBuildableBadge.style.borderColor = '#FCA5A5';
+            } else {
+                kitBuildableBadge.style.color = '#16A34A';
+                kitBuildableBadge.style.background = '#DCFCE7';
+                kitBuildableBadge.style.borderColor = '#BBF7D0';
+            }
+        }
+        if (kitInlineBuildable) {
+            kitInlineBuildable.innerText = `Buildable: ${formatQtyNum(maxKitCount)}`;
+            kitInlineBuildable.style.color = maxKitCount === 0 ? '#DC2626' : '#16A34A';
+            kitInlineBuildable.style.borderColor = maxKitCount === 0 ? '#FCA5A5' : '#BBF7D0';
+        }
+        if (kitPanel) {
+            kitPanel.style.display = 'flex';
+        }
+    } else {
+        if (kitPanel) kitPanel.style.display = 'none';
+        if (kitNoticeBanner) kitNoticeBanner.style.display = 'none';
+    }
+
+    if (activeItemInputEl && activeItemInputEl.isConnected) {
+        positionItemDropdown(activeItemInputEl);
     }
 }
 
@@ -9321,6 +9644,7 @@ function initSoOrderHoverPreview() {
 document.addEventListener('DOMContentLoaded', function() {
     initPreviewToolbar();
     initSoOrderHoverPreview();
+    initBackorderNotices();
     const activeRow = document.querySelector('.so-sidebar-card.active, #drawerOrdersListBody .inflow-drawer-row.active, .inflow-expanded-table tbody tr.inflow-expanded-row.active');
     if (activeRow && activeRow.scrollIntoView) {
         activeRow.scrollIntoView({ block: 'nearest', behavior: 'auto' });

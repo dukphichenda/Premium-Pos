@@ -9,7 +9,10 @@ import datetime
 import subprocess
 from urllib.parse import urlparse
 from config import Config
-from database import get_db_connection, get_db_cursor, query_one, query_all, execute, resync_all_sequences
+from database import (
+    get_db_connection, get_db_cursor, query_one, query_all, execute,
+    resync_all_sequences, close_connection_pool, reset_connection_pool
+)
 
 logger = logging.getLogger('inflow.backup')
 
@@ -20,6 +23,12 @@ def get_backup_dir():
     backup_dir = os.path.join(base_dir, BACKUP_DIR_NAME)
     os.makedirs(backup_dir, exist_ok=True)
     return backup_dir
+
+def get_uploads_base_dir():
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    uploads_dir = os.path.join(base_dir, 'static', 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+    return uploads_dir
 
 def find_pg_binary(binary_name):
     """
@@ -57,7 +66,7 @@ def find_pg_binary(binary_name):
 
 def ensure_backup_tables():
     """
-    Ensures backup_settings and backup_logs tables exist in the database.
+    Ensures backup_settings, backup_logs, and app_uploaded_files tables exist in the database.
     """
     try:
         execute("""
@@ -97,6 +106,19 @@ def ensure_backup_tables():
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
         """)
+
+        execute("""
+            CREATE TABLE IF NOT EXISTS app_uploaded_files (
+                id SERIAL PRIMARY KEY,
+                rel_path VARCHAR(500) UNIQUE NOT NULL,
+                file_data BYTEA NOT NULL,
+                file_size BIGINT NOT NULL,
+                mtime DOUBLE PRECISION DEFAULT 0,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+            CREATE INDEX IF NOT EXISTS idx_app_uploaded_files_rel_path ON app_uploaded_files(rel_path);
+        """)
         
         row = query_one("SELECT id FROM backup_settings LIMIT 1")
         if not row:
@@ -111,6 +133,173 @@ def ensure_backup_tables():
             """)
     except Exception as e:
         logger.error(f"Error ensuring backup tables: {e}")
+
+def sync_disk_uploads_to_db(uploads_root=None):
+    """
+    Scans the static/uploads directory and syncs all uploaded images/files
+    into the PostgreSQL app_uploaded_files table so they are included in pg_dump SQL backups.
+    Optimized to only read/upsert files whose size or mtime has changed.
+    """
+    import psycopg2
+    ensure_backup_tables()
+    
+    if not uploads_root:
+        uploads_root = get_uploads_base_dir()
+    uploads_root = os.path.abspath(uploads_root)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    
+    if not os.path.exists(uploads_root):
+        return {'synced': 0, 'total': 0, 'bytes': 0}
+        
+    try:
+        db_records = query_all("SELECT rel_path, file_size, mtime FROM app_uploaded_files;")
+        db_map = {r['rel_path']: (r['file_size'], r.get('mtime') or 0.0) for r in db_records} if db_records else {}
+    except Exception as e:
+        logger.warning(f"Could not read app_uploaded_files metadata: {e}")
+        db_map = {}
+        
+    synced_count = 0
+    total_files = 0
+    total_bytes = 0
+    
+    try:
+        with get_db_cursor(commit=True) as cur:
+            for root, dirs, files in os.walk(uploads_root):
+                for f in files:
+                    if f.startswith('.') or f.endswith('.tmp') or f.endswith('.temp'):
+                        continue
+                    full_path = os.path.join(root, f)
+                    rel_path = os.path.relpath(full_path, base_dir).replace('\\', '/')
+                    
+                    try:
+                        stat = os.stat(full_path)
+                        f_size = stat.st_size
+                        f_mtime = stat.st_mtime
+                        total_files += 1
+                        total_bytes += f_size
+                        
+                        db_info = db_map.get(rel_path)
+                        if db_info and db_info[0] == f_size and abs(db_info[1] - f_mtime) < 1.0:
+                            continue
+                            
+                        with open(full_path, 'rb') as fp:
+                            data = fp.read()
+                            
+                        cur.execute("""
+                            INSERT INTO app_uploaded_files (rel_path, file_data, file_size, mtime, updated_at)
+                            VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                            ON CONFLICT (rel_path) DO UPDATE SET
+                                file_data = EXCLUDED.file_data,
+                                file_size = EXCLUDED.file_size,
+                                mtime = EXCLUDED.mtime,
+                                updated_at = CURRENT_TIMESTAMP;
+                        """, (rel_path, psycopg2.Binary(data), f_size, f_mtime))
+                        synced_count += 1
+                    except Exception as fe:
+                        logger.warning(f"Error syncing uploaded file {rel_path}: {fe}")
+                        
+        logger.info(f"Disk to DB upload sync completed: {synced_count} updated, {total_files} total files ({format_file_size(total_bytes)})")
+        return {'synced': synced_count, 'total': total_files, 'bytes': total_bytes}
+    except Exception as e:
+        logger.error(f"Error syncing uploads to DB: {e}", exc_info=True)
+        return {'synced': synced_count, 'total': total_files, 'bytes': total_bytes, 'error': str(e)}
+
+def sync_file_to_db(rel_path, file_data=None):
+    """
+    Syncs a single uploaded file into app_uploaded_files table immediately.
+    """
+    import psycopg2
+    try:
+        ensure_backup_tables()
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        clean_rel = rel_path.lstrip('/').replace('\\', '/')
+        if not clean_rel.startswith('static/'):
+            clean_rel = f"static/uploads/{clean_rel.split('static/uploads/')[-1]}"
+            
+        full_path = os.path.join(base_dir, clean_rel.replace('/', os.sep))
+        
+        if file_data is None:
+            if not os.path.exists(full_path):
+                return False
+            with open(full_path, 'rb') as fp:
+                file_data = fp.read()
+                
+        stat = os.stat(full_path) if os.path.exists(full_path) else None
+        f_size = len(file_data)
+        f_mtime = stat.st_mtime if stat else time.time()
+        
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("""
+                INSERT INTO app_uploaded_files (rel_path, file_data, file_size, mtime, updated_at)
+                VALUES (%s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (rel_path) DO UPDATE SET
+                    file_data = EXCLUDED.file_data,
+                    file_size = EXCLUDED.file_size,
+                    mtime = EXCLUDED.mtime,
+                    updated_at = CURRENT_TIMESTAMP;
+            """, (clean_rel, psycopg2.Binary(file_data), f_size, f_mtime))
+        return True
+    except Exception as e:
+        logger.warning(f"Could not sync file {rel_path} to DB: {e}")
+        return False
+
+def restore_db_uploaded_files_to_disk(base_dir=None):
+    """
+    Restores all uploaded images and files stored in PostgreSQL app_uploaded_files table
+    back to the local filesystem (static/uploads/...).
+    Returns count of files restored.
+    """
+    if not base_dir:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        
+    restored_count = 0
+    try:
+        with get_db_cursor(commit=False) as cur:
+            cur.execute("""
+                SELECT EXISTS (
+                    SELECT 1 FROM information_schema.tables 
+                    WHERE table_schema = 'public' AND table_name = 'app_uploaded_files'
+                );
+            """)
+            row = cur.fetchone()
+            has_table = row['exists'] if row else False
+            if not has_table:
+                logger.info("No app_uploaded_files table found in database. Skipping disk file recovery.")
+                return 0
+                
+            cur.execute("SELECT rel_path, file_data, file_size, mtime FROM app_uploaded_files;")
+            rows = cur.fetchall()
+            
+            for r in rows:
+                rel_path = r['rel_path']
+                file_data = r['file_data']
+                if not file_data:
+                    continue
+                    
+                target_path = os.path.join(base_dir, rel_path.replace('/', os.sep))
+                target_dir = os.path.dirname(target_path)
+                os.makedirs(target_dir, exist_ok=True)
+                
+                # Check if file exists with matching size
+                if os.path.exists(target_path) and os.path.getsize(target_path) == len(file_data):
+                    continue
+                    
+                with open(target_path, 'wb') as fp:
+                    fp.write(bytes(file_data))
+                    
+                if r.get('mtime'):
+                    try:
+                        os.utime(target_path, (time.time(), float(r['mtime'])))
+                    except Exception:
+                        pass
+                restored_count += 1
+                
+        logger.info(f"Disk file restoration completed: {restored_count} images/files written to disk.")
+        return restored_count
+    except Exception as e:
+        logger.error(f"Error restoring files from DB to disk: {e}", exc_info=True)
+        return restored_count
+
 
 def get_backup_settings():
     ensure_backup_tables()
@@ -218,11 +407,20 @@ def list_backups():
 def create_backup(backup_type='manual', note='', save_to_gdrive=None):
     """
     Creates a PostgreSQL database backup as a .sql file with date/time in the filename.
+    Automatically syncs all uploaded images into the database before export so the SQL backup
+    fully contains all database records AND all uploaded images and attachments.
     Optionally saves automatically to Google Drive.
     """
     ensure_backup_tables()
     b_dir = get_backup_dir()
     settings = get_backup_settings()
+    
+    # 1. Sync all disk uploads into PostgreSQL app_uploaded_files table before export
+    img_sync = {'synced': 0, 'total': 0, 'bytes': 0}
+    try:
+        img_sync = sync_disk_uploads_to_db()
+    except Exception as img_err:
+        logger.warning(f"Image sync before backup warning: {img_err}")
     
     # Filename format with full date and time: inflow_premium_backup_YYYY-MM-DD_HHMMSS.sql
     now = datetime.datetime.now()
@@ -250,6 +448,8 @@ def create_backup(backup_type='manual', note='', save_to_gdrive=None):
     
     env = os.environ.copy()
     env['PGPASSWORD'] = str(db_pass or '')
+    if getattr(Config, 'PG_SSLMODE', None):
+        env['PGSSLMODE'] = str(Config.PG_SSLMODE)
     
     cmd = [
         pg_dump_bin,
@@ -264,9 +464,9 @@ def create_backup(backup_type='manual', note='', save_to_gdrive=None):
         '-f', out_file
     ]
     
-    logger.info(f"Starting PostgreSQL backup to {out_file}...")
+    logger.info(f"Starting PostgreSQL full backup (data + {img_sync.get('total', 0)} images) to {out_file}...")
     try:
-        res = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=120)
+        res = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
         if res.returncode != 0:
             err_msg = res.stderr or "Unknown error running pg_dump."
             logger.error(f"Database backup failed: {err_msg}")
@@ -279,10 +479,9 @@ def create_backup(backup_type='manual', note='', save_to_gdrive=None):
             
         file_size = os.path.getsize(out_file)
         formatted_size = format_file_size(file_size)
-        logger.info(f"Database backup SUCCESSFUL: {filename} ({formatted_size})")
+        logger.info(f"Database backup SUCCESSFUL: {filename} ({formatted_size}, {img_sync.get('total', 0)} images)")
         
         # Decide if we save to Google Drive:
-        # If save_to_gdrive is True or (save_to_gdrive is None and settings.auto_save_gdrive is True)
         should_save_gdrive = save_to_gdrive if save_to_gdrive is not None else settings.get('auto_save_gdrive', False)
         gdrive_res = None
         gdrive_status = 'none'
@@ -341,12 +540,14 @@ def create_backup(backup_type='manual', note='', save_to_gdrive=None):
             'size_bytes': file_size,
             'formatted_size': formatted_size,
             'date_str': date_str,
+            'images_count': img_sync.get('total', 0),
+            'images_synced': img_sync.get('synced', 0),
             'gdrive_saved': should_save_gdrive,
             'gdrive_result': gdrive_res
         }
         
     except subprocess.TimeoutExpired:
-        err = "pg_dump timed out after 120 seconds."
+        err = "pg_dump timed out after 300 seconds."
         logger.error(err)
         return {'success': False, 'error': err}
     except Exception as e:
@@ -355,9 +556,16 @@ def create_backup(backup_type='manual', note='', save_to_gdrive=None):
 
 def restore_backup(sql_filepath, create_safety_backup=True):
     """
-    Restores the PostgreSQL database from a .sql backup file.
+    Restores the PostgreSQL database and all uploaded images from a .sql (or .zip) backup file.
     Creates an automatic safety backup before restoring if requested.
+    Isolates active connections, cleans existing schema public to prevent foreign-key drop failures,
+    executes psql, re-initializes connection pool, resyncs serial sequences,
+    and extracts all uploaded images from app_uploaded_files back to disk.
     """
+    import zipfile
+    import tempfile
+    import psycopg2
+    
     if not os.path.exists(sql_filepath):
         return {'success': False, 'error': f"Backup file not found at: {sql_filepath}"}
         
@@ -368,12 +576,56 @@ def restore_backup(sql_filepath, create_safety_backup=True):
     if not psql_bin:
         return {'success': False, 'error': "psql executable not found on server."}
         
+    temp_extract_dir = None
+    actual_sql_path = sql_filepath
+    
+    # 1. Handle .zip archive if uploaded
+    if zipfile.is_zipfile(sql_filepath) or sql_filepath.lower().endswith('.zip'):
+        try:
+            temp_extract_dir = tempfile.mkdtemp(prefix='inflow_restore_zip_')
+            with zipfile.ZipFile(sql_filepath, 'r') as z:
+                z.extractall(temp_extract_dir)
+                
+            sql_candidates = []
+            for root, dirs, files in os.walk(temp_extract_dir):
+                for f in files:
+                    if f.lower().endswith('.sql'):
+                        sql_candidates.append(os.path.join(root, f))
+                        
+            if not sql_candidates:
+                shutil.rmtree(temp_extract_dir, ignore_errors=True)
+                return {'success': False, 'error': "No .sql database file found inside the uploaded zip archive."}
+                
+            sql_candidates.sort(key=lambda p: os.path.getsize(p), reverse=True)
+            actual_sql_path = sql_candidates[0]
+            
+            # If the zip has an uploads folder, extract to static/uploads
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            uploads_dest = os.path.join(base_dir, 'static', 'uploads')
+            for check_name in ('uploads', 'static/uploads'):
+                check_path = os.path.join(temp_extract_dir, check_name.replace('/', os.sep))
+                if os.path.exists(check_path) and os.path.isdir(check_path):
+                    for r, d, f_list in os.walk(check_path):
+                        for fn in f_list:
+                            src_fp = os.path.join(r, fn)
+                            rel_fn = os.path.relpath(src_fp, check_path)
+                            dest_fp = os.path.join(uploads_dest, rel_fn)
+                            os.makedirs(os.path.dirname(dest_fp), exist_ok=True)
+                            shutil.copy2(src_fp, dest_fp)
+        except Exception as ze:
+            if temp_extract_dir:
+                shutil.rmtree(temp_extract_dir, ignore_errors=True)
+            return {'success': False, 'error': f"Failed to extract zip archive: {ze}"}
+            
     safety_res = None
     if create_safety_backup:
         logger.info("Generating automatic pre-restore safety backup...")
-        safety_res = create_backup(backup_type='pre_restore', note='Auto pre-restore safety snapshot', save_to_gdrive=False)
-        if not safety_res.get('success'):
-            logger.warning(f"Pre-restore safety backup could not be completed: {safety_res.get('error')}")
+        try:
+            safety_res = create_backup(backup_type='pre_restore', note='Auto pre-restore safety snapshot', save_to_gdrive=False)
+            if not safety_res.get('success'):
+                logger.warning(f"Pre-restore safety backup could not be completed: {safety_res.get('error')}")
+        except Exception as sb_err:
+            logger.warning(f"Pre-restore safety backup exception: {sb_err}")
             
     db_host = getattr(Config, 'PG_HOST', '127.0.0.1')
     db_port = str(getattr(Config, 'PG_PORT', 5432))
@@ -381,40 +633,118 @@ def restore_backup(sql_filepath, create_safety_backup=True):
     db_name = getattr(Config, 'PG_DATABASE', 'inflow_premium')
     db_pass = getattr(Config, 'PG_PASSWORD', 'odoo')
     
+    # 2. Close active connection pool to avoid stale connections or lock conflicts
+    try:
+        close_connection_pool()
+    except Exception as cp_err:
+        logger.warning(f"Connection pool close note: {cp_err}")
+        
+    # 3. Terminate other connections and drop/recreate public schema for a 100% clean restore
+    try:
+        clean_conn = psycopg2.connect(
+            host=str(db_host),
+            port=str(db_port),
+            user=str(db_user),
+            password=str(db_pass or ''),
+            dbname=str(db_name),
+            connect_timeout=15
+        )
+        clean_conn.autocommit = True
+        with clean_conn.cursor() as cur:
+            # Terminate other sessions
+            cur.execute("""
+                SELECT pg_terminate_backend(pid) 
+                FROM pg_stat_activity 
+                WHERE datname = %s AND pid <> pg_backend_pid();
+            """, (str(db_name),))
+            # Clean schema public
+            cur.execute("DROP SCHEMA IF EXISTS public CASCADE;")
+            cur.execute("CREATE SCHEMA public;")
+            cur.execute("GRANT ALL ON SCHEMA public TO public;")
+        clean_conn.close()
+    except Exception as prep_err:
+        logger.warning(f"Clean database preparation note: {prep_err}")
+        
     env = os.environ.copy()
     env['PGPASSWORD'] = str(db_pass or '')
-    
+    if getattr(Config, 'PG_SSLMODE', None):
+        env['PGSSLMODE'] = str(Config.PG_SSLMODE)
+        
     cmd = [
         psql_bin,
         '-h', str(db_host),
         '-p', str(db_port),
         '-U', str(db_user),
         '-d', str(db_name),
-        '-f', sql_filepath
+        '-f', actual_sql_path
     ]
     
-    logger.info(f"Starting database restoration from {sql_filepath}...")
+    logger.info(f"Starting database restoration from {actual_sql_path}...")
     try:
-        res = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=300)
+        res = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=600)
         
-        # After restoration, resynchronize all sequences
+        # Verify psql returncode
+        if res.returncode != 0:
+            err_msg = res.stderr or res.stdout or f"psql exited with code {res.returncode}"
+            logger.error(f"psql restore failed: {err_msg}")
+            reset_connection_pool()
+            if temp_extract_dir:
+                shutil.rmtree(temp_extract_dir, ignore_errors=True)
+            return {'success': False, 'error': f"Database restore failed: {err_msg}"}
+            
+        # 4. Re-initialize connection pool
+        reset_connection_pool()
+        
+        # 5. Synchronize all order & ID sequences
         try:
             resync_all_sequences()
         except Exception as seq_err:
             logger.warning(f"Post-restore sequence sync warning: {seq_err}")
             
-        logger.info("Database restoration completed successfully.")
+        # 6. Extract all uploaded images from database back to disk
+        restored_images = 0
+        try:
+            restored_images = restore_db_uploaded_files_to_disk()
+        except Exception as img_err:
+            logger.warning(f"Post-restore image recovery warning: {img_err}")
+            
+        # 7. Ensure backup tables & record restore in logs
+        try:
+            ensure_backup_tables()
+            execute("""
+                INSERT INTO backup_logs (
+                    filename, filepath, file_size_bytes, backup_type, status, error_message
+                ) VALUES (%s, %s, %s, %s, %s, %s);
+            """, (
+                os.path.basename(sql_filepath), sql_filepath, os.path.getsize(sql_filepath),
+                'restore', 'completed', f'Restored database with {restored_images} images'
+            ))
+        except Exception as log_err:
+            logger.warning(f"Could not log restore event: {log_err}")
+            
+        if temp_extract_dir:
+            shutil.rmtree(temp_extract_dir, ignore_errors=True)
+            
+        logger.info(f"Database restoration completed successfully! Restored {restored_images} images.")
         return {
             'success': True,
-            'message': 'Database successfully restored from backup!',
+            'message': f"Database successfully restored from backup! {restored_images} uploaded images recovered.",
+            'restored_images': restored_images,
             'safety_backup': safety_res.get('filename') if safety_res else None,
-            'stdout_tail': (res.stdout or '')[-500:] if res.stdout else ''
+            'stdout_tail': (res.stdout or '')[-300:] if res.stdout else ''
         }
     except subprocess.TimeoutExpired:
-        return {'success': False, 'error': "psql restoration timed out after 300 seconds."}
+        reset_connection_pool()
+        if temp_extract_dir:
+            shutil.rmtree(temp_extract_dir, ignore_errors=True)
+        return {'success': False, 'error': "psql restoration timed out after 600 seconds."}
     except Exception as e:
+        reset_connection_pool()
+        if temp_extract_dir:
+            shutil.rmtree(temp_extract_dir, ignore_errors=True)
         logger.error(f"Error during restore: {e}", exc_info=True)
         return {'success': False, 'error': str(e)}
+
 
 def clean_old_backups(retention_count=15):
     """

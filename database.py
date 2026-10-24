@@ -39,6 +39,21 @@ def get_connection_pool():
             raise
     return _connection_pool
 
+def close_connection_pool():
+    global _connection_pool
+    if _connection_pool is not None:
+        try:
+            _connection_pool.closeall()
+            logger.info("PostgreSQL connection pool closed.")
+        except Exception as e:
+            logger.warning(f"Warning while closing PostgreSQL connection pool: {e}")
+        finally:
+            _connection_pool = None
+
+def reset_connection_pool():
+    close_connection_pool()
+    return get_connection_pool()
+
 @contextmanager
 def get_db_connection():
     p = get_connection_pool()

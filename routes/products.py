@@ -1504,6 +1504,11 @@ def upload_product_picture(id):
                     f.write(img_bytes)
                 image_url = f"/static/uploads/products/{filename}"
                 execute("UPDATE products SET image_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (image_url, id))
+                try:
+                    from services.backup_service import sync_file_to_db
+                    sync_file_to_db(image_url, img_bytes)
+                except Exception:
+                    pass
                 return jsonify({'success': True, 'image_url': image_url})
 
         # 2. Support standard multipart/form-data upload (including pasted blobs)
@@ -1528,10 +1533,16 @@ def upload_product_picture(id):
                 ext = '.png'
             
         filename = f"prod_{id}_{int(time.time())}{ext}"
-        file.save(os.path.join(save_dir, filename))
+        save_path = os.path.join(save_dir, filename)
+        file.save(save_path)
         
         image_url = f"/static/uploads/products/{filename}"
         execute("UPDATE products SET image_url = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (image_url, id))
+        try:
+            from services.backup_service import sync_file_to_db
+            sync_file_to_db(image_url)
+        except Exception:
+            pass
         
         return jsonify({'success': True, 'image_url': image_url})
     except Exception as e:

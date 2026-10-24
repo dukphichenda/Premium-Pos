@@ -2609,7 +2609,7 @@
                     inflow_premium_backup_<span style="color: #0284C7;">YYYY-MM-DD_HHMMSS</span>.sql
                 </div>
                 <div style="font-size: 0.76rem; color: #0284C7; margin-top: 4px;">
-                    Timestamped with the current date & time. Contains complete database tables, sequences, constraints, and data.
+                    Timestamped with the current date & time. Full backup contains 100% database data AND all uploaded product photos, logos, QR codes & attachments.
                 </div>
             </div>
 
@@ -2635,8 +2635,8 @@
 
             <div id="backupProgressBox" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 14px; margin-bottom: 16px; text-align: center;">
                 <div class="spinner" style="display: inline-block; width: 24px; height: 24px; border: 3px solid #E2E8F0; border-top-color: #0284C7; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
-                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;" id="backupProgressText">Generating PostgreSQL SQL Dump...</div>
-                <div style="font-size: 0.78rem; color: #64748B;">Please wait while the database dump is written to disk.</div>
+                <div style="font-size: 0.85rem; font-weight: 700; color: #0F172A;" id="backupProgressText">Syncing uploaded images and generating PostgreSQL SQL dump...</div>
+                <div style="font-size: 0.78rem; color: #64748B;">Please wait while the complete database and image backup is written to disk.</div>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0; padding-top: 18px;">
@@ -2671,7 +2671,7 @@
                             Important Notice: Active Data Overwrite
                         </strong>
                         <span style="font-size: 0.81rem; color: #B91C1C; line-height: 1.4; display: block;">
-                            Restoring will replace the live PostgreSQL database with the contents of the chosen <code>.sql</code> backup. Any orders or records created after that backup will be overwritten.
+                            Restoring will replace the live PostgreSQL database with the chosen backup and recover all uploaded product images, branch logos, QR codes & attachments. Any new data created after that backup will be overwritten.
                         </span>
                     </div>
                 </div>
@@ -2683,7 +2683,7 @@
                     1. Choose from Existing Backups
                 </button>
                 <button type="button" id="tabBtnRestoreUpload" onclick="switchRestoreSource('upload')" class="btn btn-sm btn-outline" style="font-weight: 600; border-radius: 6px; padding: 6px 14px;">
-                    2. Upload .SQL File from Computer
+                    2. Upload .SQL / .ZIP File from Computer
                 </button>
                 <input type="hidden" name="source" id="restoreSourceInput" value="existing">
             </div>
@@ -2709,11 +2709,11 @@
             <!-- Source B: Upload File Input -->
             <div id="restoreSourceUploadBox" style="display: none; margin-bottom: 18px;">
                 <label class="form-label" style="font-weight: 700; font-size: 12px; color: #334155;">
-                    Select .sql Backup File from your computer *
+                    Select .sql or .zip Backup File from your computer *
                 </label>
-                <input type="file" name="backup_file" id="restoreFileInput" accept=".sql,.sgl" class="form-input" style="padding: 8px 12px; font-size: 0.85rem;">
+                <input type="file" name="backup_file" id="restoreFileInput" accept=".sql,.sgl,.zip" class="form-input" style="padding: 8px 12px; font-size: 0.85rem;">
                 <span style="font-size: 0.76rem; color: #64748B; margin-top: 4px; display: block;">
-                    Accepts PostgreSQL SQL dump files (<code>.sql</code>).
+                    Accepts PostgreSQL SQL dump files (<code>.sql</code>) or complete backup archives (<code>.zip</code>).
                 </span>
             </div>
 
@@ -2744,8 +2744,8 @@
             <!-- Restoration Progress Indicator -->
             <div id="restoreProgressBox" style="display: none; background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 16px; margin-bottom: 16px; text-align: center;">
                 <div class="spinner" style="display: inline-block; width: 26px; height: 26px; border: 3px solid #FEF3C7; border-top-color: #D97706; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 8px;"></div>
-                <div style="font-size: 0.90rem; font-weight: 800; color: #92400E;" id="restoreProgressText">Restoring PostgreSQL Database...</div>
-                <div style="font-size: 0.78rem; color: #B45309;">Executing SQL commands and resynchronizing numbering sequences. Do not close browser.</div>
+                <div style="font-size: 0.90rem; font-weight: 800; color: #92400E;" id="restoreProgressText">Restoring PostgreSQL Database & Uploaded Images...</div>
+                <div style="font-size: 0.78rem; color: #B45309;">Executing SQL commands, recovering images, and resynchronizing numbering sequences. Do not close browser.</div>
             </div>
 
             <div style="display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0; padding-top: 18px;">
@@ -2889,6 +2889,21 @@ function checkRestoreConfirmText(input) {
 
 async function submitRestoreBackup(e) {
     e.preventDefault();
+    const source = (document.getElementById('restoreSourceInput') || {}).value || 'existing';
+    if (source === 'upload') {
+        const fileInput = document.getElementById('restoreFileInput');
+        if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+            alert('Please select a .sql or .zip backup file from your computer to restore.');
+            return;
+        }
+    } else {
+        const filenameSelect = document.getElementById('restoreFilenameSelect');
+        if (!filenameSelect || !filenameSelect.value) {
+            alert('Please select an existing backup file to restore.');
+            return;
+        }
+    }
+
     const confirmInput = document.getElementById('restoreConfirmText');
     if (confirmInput.value.trim().toUpperCase() !== 'RESTORE') {
         alert('Please type RESTORE in capital letters to confirm restoration.');
@@ -2902,10 +2917,16 @@ async function submitRestoreBackup(e) {
     const btnSubmit = document.getElementById('btnSubmitRestore');
     const btnCancel = document.getElementById('btnCancelRestore');
     const progressBox = document.getElementById('restoreProgressBox');
+    const progressText = document.getElementById('restoreProgressText');
     
     btnSubmit.disabled = true;
     btnSubmit.style.opacity = '0.5';
     btnCancel.disabled = true;
+    if (progressText) {
+        progressText.innerText = source === 'upload' 
+            ? 'Uploading backup & restoring database with images...' 
+            : 'Restoring database & recovering uploaded images...';
+    }
     progressBox.style.display = 'block';
     
     const formData = new FormData(document.getElementById('restoreBackupForm'));

@@ -34,6 +34,7 @@ def create_app():
         template_folder=os.path.join(base_dir, 'templates')
     )
     app.config.from_object(Config)
+    app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1 GB
 
     # Reverse proxy middleware for Nginx & Hostinger SSL termination
     from werkzeug.middleware.proxy_fix import ProxyFix
@@ -574,6 +575,23 @@ def create_app():
     @app.route('/portal')
     def landing_portal():
         return redirect(url_for('dashboard.index'))
+
+    @app.route('/static/uploads/<path:filename>')
+    def serve_uploaded_media(filename):
+        from flask import send_from_directory
+        uploads_dir = os.path.join(base_dir, 'static', 'uploads')
+        file_path = os.path.join(uploads_dir, filename)
+        if not os.path.exists(file_path):
+            try:
+                rel_path = f"static/uploads/{filename.replace(os.sep, '/')}"
+                row = query_one("SELECT file_data FROM app_uploaded_files WHERE rel_path = %s LIMIT 1", (rel_path,))
+                if row and row.get('file_data'):
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                    with open(file_path, 'wb') as fp:
+                        fp.write(bytes(row['file_data']))
+            except Exception as e:
+                logger.warning(f"Could not auto-recover image {filename} from DB: {e}")
+        return send_from_directory(uploads_dir, filename)
 
     return app
 

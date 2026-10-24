@@ -21,7 +21,14 @@ if not exist "!PGDUMP_BIN!" (
     )
 )
 
-echo [1/2] Exporting database 'inflow_premium'...
+set RUNTIME_BASE=E:\odoo-ai-19.0\odoo-ai-19.0\runtime
+set PYTHON_EXE=%RUNTIME_BASE%\python3\python.exe
+if exist "%PYTHON_EXE%" (
+    echo [*] Syncing all uploaded images into PostgreSQL database...
+    "%PYTHON_EXE%" -c "import sys; sys.path.insert(0, r'%~dp0'); from services.backup_service import sync_disk_uploads_to_db; sync_disk_uploads_to_db()"
+)
+
+echo [1/2] Exporting database 'inflow_premium' (including all data & images)...
 set OUTPUT_FILE=%~dp0inflow_premium_backup.sql
 
 "!PGDUMP_BIN!" -U odoo -h 127.0.0.1 -p 5432 -d inflow_premium --no-owner --no-acl -f "!OUTPUT_FILE!"

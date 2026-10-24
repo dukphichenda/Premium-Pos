@@ -865,7 +865,7 @@ def restore_backup_action():
         
         if source == 'upload':
             if 'backup_file' not in request.files:
-                err_msg = "Please select a .sql database backup file to upload."
+                err_msg = "Please select a .sql or .zip database backup file to upload."
                 if is_ajax: return jsonify({'success': False, 'message': err_msg}), 400
                 flash(err_msg, 'error')
                 return redirect(url_for('settings.general_settings', tab='tabBackup'))
@@ -877,18 +877,25 @@ def restore_backup_action():
                 flash(err_msg, 'error')
                 return redirect(url_for('settings.general_settings', tab='tabBackup'))
                 
-            fname_clean = secure_filename(file.filename)
-            ext = fname_clean.rsplit('.', 1)[-1].lower() if '.' in fname_clean else ''
-            if ext not in ('sql', 'sgl'):
-                err_msg = "Invalid file type. Only PostgreSQL .sql backup files are accepted."
+            raw_fname = os.path.basename(file.filename)
+            ext = raw_fname.rsplit('.', 1)[-1].lower() if '.' in raw_fname else ''
+            if ext not in ('sql', 'sgl', 'zip'):
+                err_msg = "Invalid file type. Only PostgreSQL .sql or .zip backup files are accepted."
                 if is_ajax: return jsonify({'success': False, 'message': err_msg}), 400
                 flash(err_msg, 'error')
                 return redirect(url_for('settings.general_settings', tab='tabBackup'))
                 
+            fname_clean = secure_filename(file.filename)
+            if not fname_clean or fname_clean == f".{ext}":
+                fname_clean = f"uploaded_backup.{ext}"
+                
             now_str = datetime.now().strftime('%Y-%m-%d_%H%M%S')
             saved_name = f"uploaded_restore_{now_str}_{fname_clean}"
-            if not saved_name.endswith('.sql'):
+            if ext == 'zip' and not saved_name.endswith('.zip'):
+                saved_name = saved_name.rsplit('.', 1)[0] + '.zip'
+            elif ext != 'zip' and not saved_name.endswith('.sql'):
                 saved_name = saved_name.rsplit('.', 1)[0] + '.sql'
+                
             target_filepath = os.path.join(b_dir, saved_name)
             file.save(target_filepath)
         else:
@@ -909,9 +916,9 @@ def restore_backup_action():
         res = restore_backup(target_filepath, create_safety_backup=create_safety)
         
         if res.get('success'):
-            msg = "🎉 Database restored successfully!"
+            msg = res.get('message', '🎉 Database restored successfully!')
             if res.get('safety_backup'):
-                msg += f" (Safety snapshot created: {res['safety_backup']})"
+                msg += f" (Safety snapshot: {res['safety_backup']})"
             if is_ajax:
                 return jsonify({'success': True, 'message': msg, 'result': res})
             flash(msg, 'success')
