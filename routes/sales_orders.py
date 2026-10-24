@@ -922,7 +922,7 @@ def create_order():
         flash(f"Error creating order: {e}", "error")
         return redirect(url_for('sales_orders.create_order'))
 
-def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=None):
+def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=None, current_order_id=None):
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
 
@@ -1067,7 +1067,11 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
                 status_clauses = []
                 break
         if status_clauses:
-            drawer_where.append("(" + " OR ".join(status_clauses) + ")")
+            if current_order_id:
+                drawer_where.append("((" + " OR ".join(status_clauses) + ") OR so.id = %s)")
+                drawer_params.append(int(current_order_id))
+            else:
+                drawer_where.append("(" + " OR ".join(status_clauses) + ")")
 
     # Exclude phantom empty orders with no customer and 0 total
     drawer_where.append("NOT (so.customer_id IS NULL AND so.total_amount = 0)")
@@ -1121,6 +1125,50 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         LIMIT {drawer_limit}
     """
     sidebar_orders = query_all(drawer_sql, tuple(drawer_params))
+
+    # Ensure current_order_id is never excluded from sidebar_orders while viewing it
+    if current_order_id and not any(o['id'] == int(current_order_id) for o in sidebar_orders):
+        single_sql = f"""
+            SELECT 
+                so.id, 
+                so.order_number, 
+                so.order_date, 
+                CASE 
+                    WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
+                    WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
+                    WHEN UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS') THEN 'Open'
+                    WHEN UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID' THEN 'Paid'
+                    ELSE 'Open'
+                END as fulfillment_badge,
+                CASE 
+                    WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
+                    WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
+                    WHEN UPPER(so.status) IN ('IN_PROGRESS', 'PICKED', 'PACKED') THEN 'In Progress'
+                    WHEN UPPER(so.status) = 'SHIPPED' THEN 'Fully Shipped'
+                    WHEN UPPER(so.status) = 'OPEN' THEN 'Open'
+                    WHEN UPPER(so.status) IN ('PAID', 'INVOICED') OR UPPER(so.payment_status) = 'PAID' THEN 'Paid'
+                    ELSE 'Open'
+                END as status, 
+                COALESCE(so.po_number, '') as po_number,
+                so.shipped_date,
+                COALESCE(so.total_amount, 0) as total_amount, 
+                COALESCE(so.paid_amount, 0) as paid_amount, 
+                COALESCE(so.balance_due, 0) as balance_due, 
+                COALESCE(so.payment_method, '') as payment_method,
+                COALESCE(so.completed_by, '') as completed_by,
+                COALESCE(so.delivery_man, '') as delivery_man,
+                COALESCE(so.delivery_fee_khr, 0) as delivery_fee_khr,
+                COALESCE(c.name, 'N/A') as customer_name,
+                COALESCE(l.name, '') as location_name
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            LEFT JOIN locations l ON so.location_id = l.id
+            WHERE so.id = %s
+        """
+        single_order = query_one(single_sql, (int(current_order_id),))
+        if single_order:
+            sidebar_orders.insert(0, single_order)
+            sidebar_orders.sort(key=lambda x: x['id'], reverse=True)
 
     # Pre-aggregate items sold preview for instant hover preview ("when mouse over order it will preview total items sell")
     preview_map = {}
@@ -2461,7 +2509,7 @@ def detail_order(id):
             branch_scope = 'main'
 
     scheme_id = order.get('pricing_scheme_id') or 100
-    drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope, search_query=search_query)
+    drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=branch_scope, search_query=search_query, current_order_id=id)
 
     # Mark backorder flag if stock is insufficient and resolve case price / display UOM
     components_map = drawer_data.get('components_map') or _get_product_components_map()
@@ -3111,19 +3159,6 @@ def save_order(id=0):
             session.pop('so_search_query', None)
 
         target_id = id
-        if mark_complete_pay and not is_new:
-            req_upper_id = request.form.get('upper_order_id') or (data.get('upper_order_id') if isinstance(data, dict) else None)
-            upper_target = _find_upper_or_adjacent_order(
-                current_id=id,
-                date_filter=date_filter,
-                status_filter=status_filter,
-                customer_search=cust_search,
-                branch_id=branch_param,
-                requested_upper_id=req_upper_id,
-                search_query=search_param
-            )
-            if upper_target:
-                target_id = upper_target
 
         redirect_kwargs = {
             'id': target_id,
@@ -3238,18 +3273,7 @@ def complete_pay(id):
     elif 'search' in request.form or 'search' in request.args:
         session.pop('so_search_query', None)
 
-    req_upper_id = request.form.get('upper_order_id') or (request.get_json(silent=True) or {}).get('upper_order_id')
-    target_id = _find_upper_or_adjacent_order(
-        current_id=id,
-        date_filter=date_filter,
-        status_filter=status_filter,
-        customer_search=cust_search,
-        branch_id=branch_param,
-        requested_upper_id=req_upper_id,
-        search_query=search_param
-    )
-    if not target_id:
-        target_id = id
+    target_id = id
 
     redirect_kwargs = {
         'id': target_id,

@@ -29,8 +29,8 @@ class TestSoDeleteCompleteMoveUp(unittest.TestCase):
             sess['role'] = 'main_admin'
             sess['branch_id'] = None
 
-    def test_complete_so_moves_up_to_upper_order(self):
-        """When completing an SO, it stays on the detail page and moves up to the upper order."""
+    def test_complete_so_stays_on_current_order(self):
+        """When completing an SO, it stays on the current order so user sees it is completed and paid."""
         from routes.sales_orders import _get_drawer_and_metadata
         with self.app.test_request_context():
             from flask import session
@@ -42,12 +42,9 @@ class TestSoDeleteCompleteMoveUp(unittest.TestCase):
             cust = query_one("SELECT id FROM customers LIMIT 1")
             cust_id = cust['id'] if cust else 1
             o1_id = execute_returning_id("INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-SO-A', %s, 50, 'OPEN', 'UNPAID', CURRENT_DATE) RETURNING id", (cust_id,))
-            o2_id = execute_returning_id("INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-SO-B', %s, 60, 'OPEN', 'UNPAID', CURRENT_DATE) RETURNING id", (cust_id,))
-            upper_order_id = o2_id
             current_order_id = o1_id
         else:
-            upper_order_id = sidebar_orders[0]['id']
-            current_order_id = sidebar_orders[1]['id']
+            current_order_id = sidebar_orders[0]['id']
 
         # Complete current_order_id
         resp = self.client.post(
@@ -62,57 +59,34 @@ class TestSoDeleteCompleteMoveUp(unittest.TestCase):
             follow_redirects=False
         )
         self.assertEqual(resp.status_code, 302)
-        # Verify it redirects to the upper order!
-        self.assertIn(f'/sales/{upper_order_id}', resp.headers['Location'])
+        # Verify it stays on the completed order!
+        self.assertIn(f'/sales/{current_order_id}', resp.headers['Location'])
 
-    def test_complete_so_with_dom_upper_order_id(self):
-        """When frontend passes upper_order_id, complete_pay redirects directly to that upper order."""
-        orders = query_all("SELECT id FROM sales_orders WHERE branch_id IS NULL ORDER BY id DESC LIMIT 3")
-        if len(orders) < 2:
-            self.skipTest("Not enough sales orders to test")
-        target_upper = orders[0]['id']
-        current = orders[1]['id']
-
-        resp = self.client.post(
-            f'/sales/{current}/complete_pay',
-            data={
-                'payment_method': 'Cash',
-                'upper_order_id': str(target_upper),
-                'branch': 'main'
-            },
-            follow_redirects=False
-        )
-        self.assertEqual(resp.status_code, 302)
-        self.assertIn(f'/sales/{target_upper}', resp.headers['Location'])
-
-    def test_complete_so_middle_shifts_to_nearest_open_order_not_top(self):
-        """When completing an open order in the middle, it shifts up to the nearest open order, not the top order."""
+    def test_complete_so_via_save_form_stays_on_current_order(self):
+        """When completing an SO via save_order with mark_complete_pay=1, it stays on current order."""
         cust = query_one("SELECT id FROM customers LIMIT 1")
         cust_id = cust['id'] if cust else 1
 
         import time
         ts = str(int(time.time() * 1000))
-        o1 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-NR-1-{ts}', %s, 10, 'OPEN', 'UNPAID', '2026-10-18') RETURNING id", (cust_id,))
-        o2 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-NR-2-{ts}', %s, 20, 'OPEN', 'UNPAID', '2026-10-19') RETURNING id", (cust_id,))
-        o3 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-NR-3-{ts}', %s, 30, 'OPEN', 'UNPAID', '2026-10-20') RETURNING id", (cust_id,))
-        self.addCleanup(execute, "DELETE FROM sales_orders WHERE id IN (%s, %s, %s)", (o1, o2, o3))
+        o1 = execute_returning_id(f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date) VALUES ('TEST-CP-STAY-{ts}', %s, 10, 'OPEN', 'UNPAID', CURRENT_DATE) RETURNING id", (cust_id,))
+        self.addCleanup(execute, "DELETE FROM sales_orders WHERE id = %s", (o1,))
 
-        # DESC order: o3 (top), o2 (middle/nearest upper to o1), o1 (bottom)
-        # Completing o1 without explicit upper_id should shift to o2 (the nearest order), NOT o3!
         resp = self.client.post(
-            f'/sales/{o1}/complete_pay',
+            f'/sales/{o1}/save',
             data={
-                'payment_method': 'Cash',
-                'date_filter': 'All',
+                'customer_id': str(cust_id),
+                'order_date': '2026-10-24',
+                'mark_complete_pay': '1',
+                'payment_method': 'ABA Bank',
+                'lines_json': '[]',
                 'status_filter': 'Open',
-                'branch': 'main',
-                'search': ts
+                'branch': 'main'
             },
             follow_redirects=False
         )
         self.assertEqual(resp.status_code, 302)
-        self.assertIn(f'/sales/{o2}', resp.headers['Location'])
-        self.assertNotIn(f'/sales/{o3}', resp.headers['Location'])
+        self.assertIn(f'/sales/{o1}', resp.headers['Location'])
 
     def test_delete_so_moves_up_to_upper_order(self):
         """When deleting an SO, it stays on the detail page and moves up to the upper order instead of going to list."""

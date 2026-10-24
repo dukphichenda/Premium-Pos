@@ -4579,6 +4579,30 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         if (matchingCard) matchingCard.classList.add('active');
     }
 
+    // When filtering by Open, any previously completed/paid SO that was kept on screen disappears once user clicks another SO
+    const curStatusFilter = (sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}').toLowerCase().trim();
+    if (curStatusFilter === 'open' || curStatusFilter === 'unfulfilled') {
+        let removedAny = false;
+        document.querySelectorAll('.so-sidebar-card[data-status="paid"]').forEach(card => {
+            const cardOid = parseInt(card.getAttribute('data-order-id'), 10);
+            if (card !== clickedEl && (!targetOrderId || cardOid !== targetOrderId)) {
+                card.remove();
+                removedAny = true;
+            }
+        });
+        if (removedAny) {
+            const visibleCards = document.querySelectorAll('.so-sidebar-card:not([style*="display: none"])');
+            const countDisplay = document.getElementById('soVisibleCountDisplay');
+            if (countDisplay) {
+                countDisplay.innerText = visibleCards.length;
+            }
+            const pillCount = document.getElementById('soStatusPillCount');
+            if (pillCount) {
+                pillCount.innerText = visibleCards.length;
+            }
+        }
+    }
+
     // Clear stale customer search in storage so it never wipes out the orders list
     sessionStorage.removeItem('inflow_so_drawer_customer_search');
     closeSoCustSuggestPopup();
