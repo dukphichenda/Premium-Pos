@@ -327,6 +327,11 @@ def get_backup_settings():
 
 def save_backup_settings(data):
     ensure_backup_tables()
+    existing = query_one("SELECT * FROM backup_settings LIMIT 1") or {}
+    sa_json = (data.get('gdrive_service_account_json') or '').strip()
+    if not sa_json and existing.get('gdrive_service_account_json') and not data.get('clear_sa_json'):
+        sa_json = existing.get('gdrive_service_account_json', '')
+
     execute("""
         UPDATE backup_settings SET
             auto_backup_enabled = %s,
@@ -348,7 +353,7 @@ def save_backup_settings(data):
         data.get('gdrive_mode', 'local_sync'),
         data.get('gdrive_local_path', r'G:\My Drive\inFlow_Backups').strip(),
         data.get('gdrive_folder_id', '').strip(),
-        data.get('gdrive_service_account_json', '').strip(),
+        sa_json,
         int(data.get('retention_count', 15) or 15)
     ))
     return get_backup_settings()
@@ -809,7 +814,25 @@ def _save_to_local_gdrive_folder(filepath, filename, target_dir):
     if not target_dir or not str(target_dir).strip():
         return {'success': False, 'error': "Google Drive folder path is empty. Please enter a valid sync path."}
         
-    target_dir = os.path.expandvars(os.path.expanduser(str(target_dir).strip()))
+    raw_path = str(target_dir).strip()
+    
+    # Cloud Server Protection: If running on Linux Cloud Server (Hostinger VPS),
+    # Windows drive paths (like G:\... or C:\...) cannot sync to the user's PC!
+    if os.name != 'nt':
+        import re
+        if re.match(r'^[a-zA-Z]:', raw_path) or '\\' in raw_path:
+            return {
+                'success': False,
+                'error': (
+                    f"Cloud Server Notice (Hostinger VPS):\n"
+                    f"This inFlow system is hosted on a Linux Cloud Server, so it cannot directly write to your personal PC's drive letters ('{raw_path}').\n\n"
+                    f"To save this backup to Google Drive:\n"
+                    f"• Option 1 (Fastest): Click '⬇️ Download' next to the backup to download it directly to your PC, then save or drag it into your PC's Google Drive folder ({raw_path}).\n"
+                    f"• Option 2 (Automated Cloud Upload): In Google Drive Settings above, switch to 'Google Drive Direct Cloud API' (Option 2) and configure your Google Service Account key."
+                )
+            }
+        
+    target_dir = os.path.expandvars(os.path.expanduser(raw_path))
     
     try:
         os.makedirs(target_dir, exist_ok=True)
@@ -853,7 +876,7 @@ def _get_gdrive_oauth_token(service_account_dict):
     header = {'alg': 'RS256', 'typ': 'JWT'}
     payload = {
         'iss': client_email,
-        'scope': 'https://www.googleapis.com/auth/drive.file',
+        'scope': 'https://www.googleapis.com/auth/drive',
         'aud': token_uri,
         'exp': now + 3600,
         'iat': now
@@ -889,7 +912,14 @@ def _upload_to_gdrive_cloud_api(filepath, filename, sa_json_str, folder_id=None)
     import requests
     
     if not sa_json_str or not sa_json_str.strip():
-        return {'success': False, 'error': "Google Service Account JSON credentials are not configured."}
+        return {
+            'success': False,
+            'error': (
+                "Google Service Account credentials are not configured.\n"
+                "In Settings > Backup & Restore, select 'Google Drive Direct Cloud API' (Option 2) "
+                "and paste your Service Account JSON key or upload the key file."
+            )
+        }
         
     try:
         sa_dict = json.loads(sa_json_str.strip())
@@ -927,13 +957,13 @@ def _upload_to_gdrive_cloud_api(filepath, filename, sa_json_str, folder_id=None)
         if not upload_location:
             return {'success': False, 'error': "Google Drive API did not return an upload location."}
             
-        # Step 2: Stream file content to upload location
+        # Step 2: Stream file content to upload location (timeout 600s for large 400MB+ backups)
         with open(filepath, 'rb') as f:
             upload_headers = {
                 'Content-Length': str(file_size),
                 'Content-Type': 'application/sql'
             }
-            upload_resp = requests.put(upload_location, headers=upload_headers, data=f, timeout=300)
+            upload_resp = requests.put(upload_location, headers=upload_headers, data=f, timeout=600)
             
         if upload_resp.status_code in (200, 201):
             res_data = upload_resp.json()
@@ -967,7 +997,23 @@ def test_gdrive_config(mode=None, local_path=None, sa_json=None, folder_id=None)
     if mode == 'local_sync':
         if not local_path or not str(local_path).strip():
             return {'success': False, 'error': 'Google Drive folder path cannot be blank.'}
-        p = os.path.expandvars(os.path.expanduser(str(local_path).strip()))
+        raw_path = str(local_path).strip()
+        if os.name != 'nt':
+            import re
+            if re.match(r'^[a-zA-Z]:', raw_path) or '\\' in raw_path:
+                return {
+                    'success': False,
+                    'error': (
+                        f"Cloud Server Notice (Hostinger VPS):\n"
+                        f"This inFlow server is hosted on Linux (Ubuntu), not on your personal PC. "
+                        f"The Windows path '{raw_path}' only exists on your computer. "
+                        f"The cloud server cannot write directly to your PC's 'G:\' drive.\n\n"
+                        f"👉 Recommended for Cloud VPS:\n"
+                        f"1. Choose 'Option 2: Google Drive Direct Cloud API' below to upload directly to your Google Drive account from the server.\n"
+                        f"2. Or keep backups local on the server and click '⬇️ Download' in the backups table to save any backup to your PC's Google Drive folder."
+                    )
+                }
+        p = os.path.expandvars(os.path.expanduser(raw_path))
         try:
             os.makedirs(p, exist_ok=True)
             test_file = os.path.join(p, '.inflow_probe_test.tmp')

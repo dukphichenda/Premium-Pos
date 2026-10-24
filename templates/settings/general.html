@@ -1852,16 +1852,23 @@
                 </div>
             </div>
             
-            <div id="gdriveStatusBadge">
-                {% if backup_settings.auto_save_gdrive %}
-                <span style="background: #DCFCE7; color: #166534; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #BBF7D0;">
-                    ✓ Auto-Save Enabled
-                </span>
-                {% else %}
-                <span style="background: #F1F5F9; color: #475569; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #E2E8F0;">
-                    Auto-Save Disabled
+            <div style="display: flex; gap: 8px; align-items: center;">
+                {% if is_linux_server %}
+                <span style="background: #F1F5F9; color: #334155; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #CBD5E1;">
+                    🌐 Hostinger VPS (Linux)
                 </span>
                 {% endif %}
+                <div id="gdriveStatusBadge">
+                    {% if backup_settings.auto_save_gdrive %}
+                    <span style="background: #DCFCE7; color: #166534; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #BBF7D0;">
+                        ✓ Auto-Save Enabled
+                    </span>
+                    {% else %}
+                    <span style="background: #F1F5F9; color: #475569; font-size: 0.78rem; font-weight: 700; padding: 4px 10px; border-radius: 20px; border: 1px solid #E2E8F0;">
+                        Auto-Save Disabled
+                    </span>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
@@ -1904,9 +1911,13 @@
                             <input type="radio" name="gdrive_mode" value="local_sync" {% if backup_settings.gdrive_mode != 'cloud_api' %}checked{% endif %} id="radioModeLocal">
                         </div>
                         <p style="font-size: 0.81rem; color: #64748B; margin: 0 0 8px 0; line-height: 1.4;">
-                            <strong>Recommended for Office PC:</strong> Uses your installed "Google Drive for Desktop" app. Backups are copied to your Google Drive folder and synced to cloud in real time.
+                            <strong>For Local PC:</strong> Uses your computer's "Google Drive for Desktop" app. Copies backups to your PC's local sync folder.
                         </p>
+                        {% if is_linux_server %}
+                        <span style="font-size: 11px; background: #FEE2E2; color: #991B1B; padding: 2px 7px; border-radius: 6px; font-weight: 700;">Local PC Only (Not for Cloud VPS)</span>
+                        {% else %}
                         <span style="font-size: 11px; background: #E0F2FE; color: #0369A1; padding: 2px 7px; border-radius: 6px; font-weight: 700;">Zero setup needed</span>
+                        {% endif %}
                     </div>
 
                     <!-- Option 2: Cloud API Service Account -->
@@ -1921,13 +1932,26 @@
                         <p style="font-size: 0.81rem; color: #64748B; margin: 0 0 8px 0; line-height: 1.4;">
                             <strong>Direct Cloud Upload:</strong> Uses a Google Cloud Service Account JSON key to upload directly to a specific Google Drive Folder ID without requiring desktop sync.
                         </p>
-                        <span style="font-size: 11px; background: #FEF3C7; color: #B45309; padding: 2px 7px; border-radius: 6px; font-weight: 700;">Ideal for VPS/Cloud</span>
+                        <span style="font-size: 11px; background: #DCFCE7; color: #166534; padding: 2px 7px; border-radius: 6px; font-weight: 700;">⭐ Recommended for Cloud VPS</span>
                     </div>
                 </div>
             </div>
 
             <!-- Mode 1 Parameters: Local Sync Folder -->
             <div id="sectionLocalSync" style="{% if backup_settings.gdrive_mode == 'cloud_api' %}display: none;{% endif %} background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+                {% if is_linux_server %}
+                <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; display: flex; gap: 10px; align-items: flex-start;">
+                    <span style="font-size: 18px;">💡</span>
+                    <div style="font-size: 0.81rem; color: #92400E; line-height: 1.4;">
+                        <strong>Cloud Server Notice:</strong> Because inFlow is hosted on a Linux Cloud Server (Hostinger VPS), it cannot directly write files into your personal PC's drive (such as <code>G:\My Drive</code>).
+                        <div style="margin-top: 6px;">
+                            <strong>To get backups into your Google Drive:</strong><br>
+                            1. <strong>Easiest:</strong> Scroll down to the backups table and click <strong>⬇️ Download</strong> next to any backup, then save or drag it into your PC's <code>G:\My Drive\inFlow_Backups</code> folder.<br>
+                            2. <strong>Direct Cloud Upload:</strong> Switch to <strong>Option 2 (Google Drive Direct Cloud API)</strong> to have the cloud server upload directly to your Google Drive account.
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
                 <label class="form-label" style="font-weight: 700; font-size: 0.86rem; color: #334155; margin-bottom: 6px;">
                     Google Drive Sync Folder Path on PC (ផ្លូវថត Google Drive លើម៉ាស៊ីន) *
                 </label>
@@ -1944,6 +1968,29 @@
 
             <!-- Mode 2 Parameters: Cloud API -->
             <div id="sectionCloudApi" style="{% if backup_settings.gdrive_mode != 'cloud_api' %}display: none;{% endif %} background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 10px; padding: 18px; margin-bottom: 20px;">
+                <!-- Setup Guide Accordion -->
+                <details style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; font-size: 0.82rem; color: #334155;">
+                    <summary style="font-weight: 700; color: #0284C7; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                        <span>📋</span> How to set up Google Drive Direct Cloud API (3 Quick Steps)
+                    </summary>
+                    <div style="margin-top: 10px; line-height: 1.5; padding-left: 6px;">
+                        <ol style="margin: 0; padding-left: 18px;">
+                            <li style="margin-bottom: 6px;">
+                                Go to <a href="https://console.cloud.google.com/" target="_blank" rel="noopener" style="color: #0284C7; font-weight: 600;">Google Cloud Console</a> &rarr; APIs & Services &rarr; Enable <strong>Google Drive API</strong>.
+                            </li>
+                            <li style="margin-bottom: 6px;">
+                                In Credentials &rarr; Create <strong>Service Account</strong> &rarr; Click on the created account &rarr; <strong>Keys</strong> tab &rarr; <strong>Add Key &rarr; Create new key (JSON)</strong>. Download the <code>.json</code> file.
+                            </li>
+                            <li style="margin-bottom: 6px;">
+                                Open <a href="https://drive.google.com/" target="_blank" rel="noopener" style="color: #0284C7; font-weight: 600;">Google Drive</a>, create a folder (e.g. <code>inFlow Backups</code>). <strong>Share</strong> that folder with your Service Account's email address (give <strong>Editor</strong> permission).
+                            </li>
+                            <li>
+                                Copy the <strong>Folder ID</strong> from the Google Drive URL (<code>drive.google.com/drive/folders/<strong>[FOLDER_ID]</strong></code>), enter it below, upload or paste your Service Account JSON key, and click <strong>Test Connection</strong>!
+                            </li>
+                        </ol>
+                    </div>
+                </details>
+
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 14px;">
                     <div>
                         <label class="form-label" style="font-weight: 700; font-size: 0.86rem; color: #334155;">
@@ -2105,7 +2152,7 @@
                         </td>
                         <td style="padding: 14px 18px; white-space: nowrap;">
                             {% if b.gdrive_status == 'synced' %}
-                            <span style="font-size: 11.5px; font-weight: 700; background: #DCFCE7; color: #166534; padding: 3px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;">
+                            <span style="font-size: 11.5px; font-weight: 700; background: #DCFCE7; color: #166534; padding: 3px 8px; border-radius: 12px; display: inline-flex; align-items: center; gap: 4px;" title="{{ b.gdrive_details or 'Saved to Google Drive' }}">
                                 ✓ Synced
                             </span>
                             {% elif b.gdrive_status == 'failed' %}
@@ -2121,12 +2168,12 @@
                         <td style="padding: 14px 18px; text-align: right; white-space: nowrap;">
                             <div style="display: flex; gap: 6px; justify-content: flex-end; align-items: center;">
                                 <!-- Download -->
-                                <a href="{{ url_for('settings.download_backup_action', filename=b.filename) }}" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #F8FAFC; color: #0284C7; border: 1px solid #CBD5E1; border-radius: 6px; text-decoration: none; font-weight: 600;" title="Download .sql file to your computer">
+                                <a href="{{ url_for('settings.download_backup_action', filename=b.filename) }}" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #F8FAFC; color: #0284C7; border: 1px solid #CBD5E1; border-radius: 6px; text-decoration: none; font-weight: 600;" title="Download .sql file to your computer (save to your G:\My Drive\inFlow_Backups folder)">
                                     ⬇️ Download
                                 </a>
 
                                 <!-- Sync to Google Drive -->
-                                <button type="button" onclick="syncSingleBackupToGDrive('{{ b.filename }}', this)" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 6px; font-weight: 600;" title="Save / Re-upload to Google Drive">
+                                <button type="button" onclick="syncSingleBackupToGDrive('{{ b.filename }}', this)" class="btn btn-sm" style="padding: 4px 9px; font-size: 11.5px; background: #F0FDF4; color: #166534; border: 1px solid #BBF7D0; border-radius: 6px; font-weight: 600;" title="Save / Upload to Google Drive">
                                     ☁️ Drive
                                 </button>
 
@@ -2977,7 +3024,7 @@ async function syncSingleBackupToGDrive(filename, btn) {
             alert(res.message || `Backup '${filename}' successfully saved to Google Drive!`);
             window.location.reload();
         } else {
-            alert('Google Drive upload failed: ' + (res.message || 'Unknown error'));
+            alert('❌ Google Drive Upload Notice:\n\n' + (res.message || res.error || 'Unknown error'));
             btn.innerHTML = origText;
             btn.disabled = false;
         }

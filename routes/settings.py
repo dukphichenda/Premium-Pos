@@ -127,7 +127,8 @@ def general_settings():
                            backups_count=backups_count,
                            backups_formatted_total_size=backups_formatted_total_size,
                            latest_backup=latest_backup,
-                           active_tab=active_tab)
+                           active_tab=active_tab,
+                           is_linux_server=(os.name != 'nt'))
 
 @settings_bp.route('/settings/currency/update', methods=['POST'])
 def update_currency_settings():
@@ -1005,10 +1006,44 @@ def sync_gdrive_action(filename):
         res = save_backup_to_gdrive(fpath, fname)
         if res.get('success'):
             msg = f"☁️ Backup '{fname}' saved to Google Drive successfully! {res.get('message', '')}"
+            try:
+                execute("""
+                    UPDATE backup_logs SET
+                        gdrive_status = 'synced',
+                        gdrive_details = %s
+                    WHERE filename = %s;
+                """, (res.get('message', ''), fname))
+                execute("""
+                    UPDATE backup_settings SET
+                        last_gdrive_sync_at = CURRENT_TIMESTAMP,
+                        last_gdrive_sync_status = 'synced',
+                        last_gdrive_error = NULL,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = (SELECT id FROM backup_settings LIMIT 1);
+                """)
+            except Exception as log_err:
+                pass
             if is_ajax: return jsonify({'success': True, 'message': msg, 'result': res})
             flash(msg, 'success')
         else:
             err = res.get('error', 'Google Drive sync failed.')
+            try:
+                execute("""
+                    UPDATE backup_logs SET
+                        gdrive_status = 'failed',
+                        gdrive_details = %s
+                    WHERE filename = %s;
+                """, (err, fname))
+                execute("""
+                    UPDATE backup_settings SET
+                        last_gdrive_sync_at = CURRENT_TIMESTAMP,
+                        last_gdrive_sync_status = 'failed',
+                        last_gdrive_error = %s,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = (SELECT id FROM backup_settings LIMIT 1);
+                """)
+            except Exception as log_err:
+                pass
             if is_ajax: return jsonify({'success': False, 'message': err}), 500
             flash(f"❌ Google Drive sync failed: {err}", 'error')
             
