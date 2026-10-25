@@ -444,7 +444,7 @@ def create_app():
 
         # Resolve HQ Invoice Logo URL & Primary Brand Color
         hq_invoice_logo_url = None
-        hq_primary_color = '#112340'
+        hq_primary_color = '#0D9488'
         try:
             inv_row = query_one("SELECT logo_url, primary_color FROM invoice_settings LIMIT 1")
             if inv_row:
@@ -491,13 +491,17 @@ def create_app():
                 'is_branch': True
             }
         else:
+            hq_primary = hq_primary_color or '#0D9488'
+            hq_dark = _shade_hex(hq_primary, 0.80)
+            hq_sidebar_top = _shade_hex(hq_primary, 0.85)
+            hq_sidebar_bottom = _shade_hex(hq_primary, 0.55)
             store_theme = {
-                'primary': '#112340',
-                'dark': '#0A1526',
-                'top_bar_bg': 'linear-gradient(90deg, #1E293B 0%, #0F172A 100%)',
-                'sidebar_bg': '#112340',
-                'accent': '#F59E0B',
-                'button_text': '#F59E0B',
+                'primary': hq_primary,
+                'dark': hq_dark,
+                'top_bar_bg': f'linear-gradient(90deg, {hq_primary} 0%, {hq_dark} 100%)',
+                'sidebar_bg': f'linear-gradient(180deg, {hq_sidebar_top} 0%, {hq_sidebar_bottom} 100%)',
+                'accent': hq_primary,
+                'button_text': hq_primary,
                 'is_branch': False
             }
 
