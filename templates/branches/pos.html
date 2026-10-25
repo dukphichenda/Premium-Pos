@@ -329,6 +329,97 @@
     color: #0F172A;
 }
 
+/* ==================================================================== */
+/* Price Unit Switcher (Per Case / Per Pack / Per Pcs)                  */
+/* ==================================================================== */
+.pos-price-unit-capsule {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 12px;
+    padding: 3px 4px 3px 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.pos-unit-capsule-lbl {
+    font-size: 11px;
+    font-weight: 800;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+
+.pos-unit-segmented-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #F1F5F9;
+    padding: 3px;
+    border-radius: 9px;
+}
+
+.pos-unit-seg-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+    white-space: nowrap;
+    user-select: none;
+}
+
+.pos-unit-seg-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.7);
+    color: #0F172A;
+}
+
+.pos-unit-seg-btn.active {
+    background: var(--pos-primary);
+    color: #FFFFFF;
+    font-weight: 800;
+    box-shadow: 0 2px 6px var(--pos-primary-shadow);
+}
+
+.pos-unit-seg-btn .pos-unit-seg-icon {
+    font-size: 13px;
+    line-height: 1;
+}
+
+.pos-prod-pkg-info {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748B;
+    background: #F1F5F9;
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    margin-left: 4px;
+    white-space: nowrap;
+}
+
+.pos-bills-mode-badge {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--pos-primary);
+    border: 1px solid rgba(16, 185, 129, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
 /* Star Favorite Button */
 .pos-star-btn {
     position: absolute;
@@ -1842,10 +1933,31 @@
                 <h2 class="pos-menu-title" id="posMenuTitle">All Products</h2>
                 <span class="pos-menu-count-badge" id="posMenuCountBadge">{{ products|length }} items</span>
             </div>
-            <div class="pos-subheader-right" id="posFilterResetWrap" style="display: none;">
-                <button type="button" class="pos-filter-reset-btn" onclick="resetAllPosFilters()">
-                    ✕ Reset Filter
-                </button>
+            <div class="pos-subheader-right" style="display: flex; align-items: center; gap: 10px;">
+                <div id="posFilterResetWrap" style="display: none;">
+                    <button type="button" class="pos-filter-reset-btn" onclick="resetAllPosFilters()">
+                        ✕ Reset Filter
+                    </button>
+                </div>
+
+                <!-- Price Unit Switcher: Per Case / Per Pack / Per Pcs -->
+                <div class="pos-price-unit-capsule" title="Switch price display and billing unit">
+                    <span class="pos-unit-capsule-lbl">Price Mode:</span>
+                    <div class="pos-unit-segmented-group" role="group" aria-label="Switch Price Unit">
+                        <button type="button" class="pos-unit-seg-btn active" id="segPriceUnit-Case" onclick="switchPriceUnitMode('Case')" title="Show & bill Price per Case">
+                            <span class="pos-unit-seg-icon">📦</span>
+                            <span class="pos-unit-seg-text">Per Case</span>
+                        </button>
+                        <button type="button" class="pos-unit-seg-btn" id="segPriceUnit-Pack" onclick="switchPriceUnitMode('Pack')" title="Show & bill Price per Pack">
+                            <span class="pos-unit-seg-icon">🛍️</span>
+                            <span class="pos-unit-seg-text">Per Pack</span>
+                        </button>
+                        <button type="button" class="pos-unit-seg-btn" id="segPriceUnit-Pcs" onclick="switchPriceUnitMode('Pcs')" title="Show & bill Price per Pcs">
+                            <span class="pos-unit-seg-icon">🥢</span>
+                            <span class="pos-unit-seg-text">Per Pcs</span>
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -1867,7 +1979,11 @@
                  data-sold-qty="{{ p.total_sold_qty or 0 }}"
                  data-favorite="{% if is_fav %}1{% else %}0{% endif %}"
                  data-image="{{ p.image_url or '' }}"
-                 data-uom="{{ p.sales_uom or 'pcs' }}">
+                 data-uom="{{ p.sales_uom or 'cases' }}"
+                 data-std-uom="{{ p.uom or 'pcs.' }}"
+                 data-ratio-std="{{ p.sales_uom_ratio_std or 0 }}"
+                 data-packs-case="{{ p.packs_per_case or 1 }}"
+                 data-pcs-pack="{{ p.pcs_per_pack or 50 }}">
                 
                 <div>
                     <!-- Product Image -->
@@ -1925,13 +2041,14 @@
                 <!-- Price & Add Button -->
                 <div>
                     <div class="pos-prod-price-row">
-                        <span class="pos-prod-price">${{ '{:.2f}'.format(p.default_price or 0) }}</span>
-                        <span class="pos-prod-uom">/ {{ p.sales_uom or 'portion' }}</span>
+                        <span class="pos-prod-price" id="prod-price-{{ p.id }}">${{ '{:.2f}'.format(p.default_price or 0) }}</span>
+                        <span class="pos-prod-uom" id="prod-uom-{{ p.id }}">/ {{ p.sales_uom or 'cases' }}</span>
+                        <span class="pos-prod-pkg-info" id="prod-pkg-{{ p.id }}" style="display: none;"></span>
                     </div>
 
-                    <button type="button" class="pos-btn-add" 
-                            onclick="addToCart({{ p.id }}, '{{ p.name|replace('\'', '\\\'') }}', {{ p.default_price or 0 }}, '{{ p.image_url or '' }}', {{ stock }})">
-                        <span>+</span> <span class="pos-btn-add-label">Add to Billing</span>
+                    <button type="button" class="pos-btn-add" id="prod-add-btn-{{ p.id }}"
+                            onclick="addToCart({{ p.id }})">
+                        <span>+</span> <span class="pos-btn-add-label" id="prod-btn-lbl-{{ p.id }}">Add to Billing</span>
                     </button>
                 </div>
 
@@ -1948,7 +2065,10 @@
         
         <!-- Header -->
         <div class="pos-bills-header">
-            <h2 class="pos-bills-title">Bills</h2>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <h2 class="pos-bills-title">Bills</h2>
+                <span class="pos-bills-mode-badge" id="posBillsActiveModeBadge">📦 Case Mode</span>
+            </div>
             <div style="display: flex; gap: 6px; align-items: center;">
                 <button type="button" class="pos-btn-header-preview" onclick="previewCurrentReceipt()" title="Preview Receipt / មើលគំរូវិក្កយបត្រ">
                     👁️ Preview
@@ -2412,6 +2532,7 @@ const productsCatalog = [
         image_url: {{ (p.image_url or '')|tojson }},
         default_price: {{ (p.default_price or 0)|float }},
         sales_uom: {{ (p.sales_uom or 'case')|tojson }},
+        uom: {{ (p.uom or 'pcs.')|tojson }},
         sales_uom_ratio_std: {{ (p.sales_uom_ratio_std or 0)|float }},
         packs_per_case: {{ (p.packs_per_case or 0)|float }},
         pcs_per_pack: {{ (p.pcs_per_pack or 0)|float }},
@@ -2462,6 +2583,10 @@ let currentSearch = '';
 let selectedPaymentMethod = 'Cash';
 let selectedCustomer = null; // null = Walk-in Customer (Default)
 let cart = {}; // cart[productId] = { id, qty, uom ('Pack'|'Case'|'Pcs'), pricingSchemeId }
+let currentPriceUnitMode = localStorage.getItem('pos_price_unit_mode') || 'Case';
+if (!['Case', 'Pack', 'Pcs'].includes(currentPriceUnitMode)) {
+    currentPriceUnitMode = 'Case';
+}
 
 // Favorites State
 const SERVER_FAVORITE_IDS = {{ favorite_product_ids|tojson }};
@@ -2855,6 +2980,7 @@ function selectCustomer(custId) {
         });
         renderCart();
     }
+    refreshGridPrices();
 }
 
 function selectWalkinCustomer() {
@@ -2864,6 +2990,7 @@ function selectWalkinCustomer() {
     document.getElementById('posCustSelectedName').textContent = isKm ? 'អតិថិជនទូទៅ (Walk-in Customer)' : 'Walk-in Customer (អតិថិជនទូទៅ)';
     document.getElementById('btnQuickWalkin')?.classList.add('active');
     document.getElementById('posCustDropdown').style.display = 'none';
+    refreshGridPrices();
 }
 
 // -------------------------------------------------------------------------
@@ -2895,8 +3022,10 @@ function onDirectItemSearch(val) {
         return;
     }
 
+    const schemeId = (selectedCustomer && selectedCustomer.default_pricing_scheme_id) ? selectedCustomer.default_pricing_scheme_id : null;
     let html = '';
     matched.forEach(p => {
+        const calc = calculateProductPriceForUnit(p, currentPriceUnitMode, schemeId);
         let thumb = '📦';
         if (p.image_url) {
             thumb = `<img src="${p.image_url}" alt="${p.name}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px;" onerror="this.outerHTML='📦'">`;
@@ -2911,7 +3040,7 @@ function onDirectItemSearch(val) {
                 <div style="font-size: 10.5px; color: #64748B;">${isKm ? 'កូដ: ' : 'SKU: '}${escapeHtml(p.sku || '-')} | ${isKm ? 'ស្តុក: ' : 'Stock: '}${p.stock_qty}</div>
             </div>
             <div style="text-align: right; flex-shrink: 0;">
-                <div style="font-size: 12px; font-weight: 800; color: #0F172A;">$${(p.default_price || 0).toFixed(2)}</div>
+                <div style="font-size: 12px; font-weight: 800; color: #0F172A;">${calc.formattedPrice} <span style="font-size: 10px; color: #64748B;">${calc.uomLabel}</span></div>
                 <div style="font-size: 10px; color: #059669; font-weight: 700;">${isKm ? '+ បញ្ចូល' : '+ Add'}</div>
             </div>
         </div>`;
@@ -3052,19 +3181,184 @@ function calculateItemDetails(item) {
 }
 
 // -------------------------------------------------------------------------
+// Price Unit Mode & Product Calculations (Per Case / Per Pack / Per Pcs)
+// -------------------------------------------------------------------------
+function calculateProductPriceForUnit(p, unitMode, schemeId) {
+    if (!p) return { price: 0, formattedPrice: '$0.00', uomLabel: '/ case', subInfo: '' };
+
+    let pcsPerPack = parseFloat(p.pcs_per_pack) || 50;
+    if (pcsPerPack <= 0) pcsPerPack = 50;
+
+    let pcsPerCase = parseFloat(p.sales_uom_ratio_std) || 0;
+    let packsPerCase = parseFloat(p.packs_per_case) || 0;
+
+    if (pcsPerCase > 1) {
+        if (packsPerCase <= 0 || packsPerCase === 3 || (packsPerCase * pcsPerPack !== pcsPerCase)) {
+            packsPerCase = Math.round(pcsPerCase / pcsPerPack) || (pcsPerCase / pcsPerPack) || 1;
+        }
+    } else if (packsPerCase > 0 && pcsPerPack > 0 && packsPerCase !== 3) {
+        pcsPerCase = packsPerCase * pcsPerPack;
+    } else {
+        pcsPerCase = 1;
+        packsPerCase = 1;
+    }
+
+    let baseCasePrice = p.default_price || 0;
+    const pid = String(p.id);
+    const sid = schemeId ? String(schemeId) : null;
+
+    if (sid && productPricesMap[pid] && productPricesMap[pid][sid] !== undefined && productPricesMap[pid][sid] > 0) {
+        baseCasePrice = productPricesMap[pid][sid];
+    }
+
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
+    let price = baseCasePrice;
+    let uomLabel = '/ ' + (p.sales_uom || 'cases');
+    let subInfo = '';
+
+    if (unitMode === 'Case') {
+        price = baseCasePrice;
+        uomLabel = '/ ' + (p.sales_uom || (isKm ? 'កេស' : 'cases'));
+        if (pcsPerCase > 1) {
+            subInfo = isKm ? `${pcsPerCase} ដុំ/កេស` : `${pcsPerCase} pcs/case`;
+        }
+    } else if (unitMode === 'Pack') {
+        if (pcsPerCase > 1) {
+            const pricePerPcs = baseCasePrice / pcsPerCase;
+            price = pricePerPcs * pcsPerPack;
+            uomLabel = isKm ? '/ កញ្ចប់' : '/ pack';
+            subInfo = isKm ? `${pcsPerPack} ដុំ/កញ្ចប់` : `${pcsPerPack} pcs/pack`;
+        } else {
+            price = baseCasePrice * pcsPerPack;
+            uomLabel = isKm ? '/ កញ្ចប់' : '/ pack';
+            subInfo = isKm ? `${pcsPerPack} ដុំ/កញ្ចប់` : `${pcsPerPack} pcs/pack`;
+        }
+    } else if (unitMode === 'Pcs') {
+        if (pcsPerCase > 1) {
+            price = baseCasePrice / pcsPerCase;
+        } else {
+            price = baseCasePrice;
+        }
+        uomLabel = '/ ' + (isKm ? 'ដុំ' : (p.uom || 'pcs'));
+        subInfo = '';
+    }
+
+    let formattedPrice = '';
+    if (price < 1 && price > 0) {
+        formattedPrice = '$' + price.toFixed(3);
+    } else {
+        const rounded2 = Math.round(price * 100) / 100;
+        if (Math.abs(price - rounded2) > 0.001) {
+            formattedPrice = '$' + price.toFixed(3);
+        } else {
+            formattedPrice = '$' + price.toFixed(2);
+        }
+    }
+
+    return {
+        price,
+        formattedPrice,
+        uomLabel,
+        subInfo
+    };
+}
+
+function switchPriceUnitMode(mode) {
+    if (!['Case', 'Pack', 'Pcs'].includes(mode)) mode = 'Case';
+    currentPriceUnitMode = mode;
+    try {
+        localStorage.setItem('pos_price_unit_mode', mode);
+    } catch (e) {}
+
+    // Update segmented buttons
+    ['Case', 'Pack', 'Pcs'].forEach(u => {
+        const btn = document.getElementById(`segPriceUnit-${u}`);
+        if (btn) {
+            if (u === mode) {
+                btn.classList.add('active');
+                btn.setAttribute('aria-pressed', 'true');
+            } else {
+                btn.classList.remove('active');
+                btn.setAttribute('aria-pressed', 'false');
+            }
+        }
+    });
+
+    // Update Bills active mode badge
+    const badge = document.getElementById('posBillsActiveModeBadge');
+    if (badge) {
+        const icon = mode === 'Case' ? '📦' : (mode === 'Pack' ? '🛍️' : '🥢');
+        badge.innerHTML = `${icon} ${mode} Mode`;
+    }
+
+    // Refresh grid display
+    refreshGridPrices();
+
+    // Sync cart items to the new unit mode if cart has items
+    const cartKeys = Object.keys(cart);
+    if (cartKeys.length > 0) {
+        cartKeys.forEach(id => {
+            cart[id].uom = mode;
+            delete cart[id].customPrice;
+        });
+        renderCart();
+    }
+}
+
+function refreshGridPrices() {
+    const isKm = (document.documentElement.getAttribute('data-lang') === 'km' || (localStorage.getItem('inflow_app_lang') || 'en') === 'km');
+    const schemeId = (selectedCustomer && selectedCustomer.default_pricing_scheme_id) ? selectedCustomer.default_pricing_scheme_id : null;
+
+    productsCatalog.forEach(p => {
+        const calc = calculateProductPriceForUnit(p, currentPriceUnitMode, schemeId);
+        const card = document.getElementById(`product-card-${p.id}`);
+        if (card) {
+            card.dataset.price = calc.price;
+
+            const priceEl = card.querySelector('.pos-prod-price');
+            if (priceEl) priceEl.textContent = calc.formattedPrice;
+
+            const uomEl = card.querySelector('.pos-prod-uom');
+            if (uomEl) uomEl.textContent = calc.uomLabel;
+
+            const pkgEl = document.getElementById(`prod-pkg-${p.id}`);
+            if (pkgEl) {
+                if (calc.subInfo) {
+                    pkgEl.textContent = calc.subInfo;
+                    pkgEl.style.display = 'inline-block';
+                } else {
+                    pkgEl.style.display = 'none';
+                }
+            }
+
+            const btnLbl = document.getElementById(`prod-btn-lbl-${p.id}`);
+            if (btnLbl) {
+                if (isKm) {
+                    btnLbl.textContent = currentPriceUnitMode === 'Case' ? '+ បញ្ចូលកេស' : (currentPriceUnitMode === 'Pack' ? '+ បញ្ចូលកញ្ចប់' : '+ បញ្ចូលដុំ');
+                } else {
+                    btnLbl.textContent = `+ Add ${currentPriceUnitMode}`;
+                }
+            }
+        }
+    });
+
+    if (currentSort === 'price_asc' || currentSort === 'price_desc') {
+        applyFiltersAndSort();
+    }
+}
+
+// -------------------------------------------------------------------------
 // Cart Management
 // -------------------------------------------------------------------------
 function addToCart(id) {
     const p = productsMap[id];
     if (!p) return;
 
+    const targetUom = currentPriceUnitMode || 'Case';
+
     if (cart[id]) {
         cart[id].qty += 1;
     } else {
-        // Default UOM of bill is 'Pack' as requested!
-        const defaultUom = 'Pack';
-
-        // Default Pricing Scheme: Customer's default or first active scheme
         let schemeId = (selectedCustomer && selectedCustomer.default_pricing_scheme_id) 
                        ? selectedCustomer.default_pricing_scheme_id 
                        : (pricingSchemes.length > 0 ? pricingSchemes[0].id : 100);
@@ -3074,7 +3368,7 @@ function addToCart(id) {
             name: p.name,
             image: p.image_url || '',
             qty: 1,
-            uom: defaultUom,
+            uom: targetUom,
             pricingSchemeId: schemeId
         };
     }
@@ -3891,17 +4185,20 @@ document.addEventListener('click', (e) => {
 window.addEventListener('message', (e) => {
     if (e.data && e.data.type === 'INFLOW_LANG_CHANGE') {
         updatePosMenuTitle();
+        refreshGridPrices();
         renderCart();
     }
 });
 window.addEventListener('inflow-lang-changed', () => {
     updatePosMenuTitle();
+    refreshGridPrices();
     renderCart();
 });
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     syncFavoritesUIOnLoad();
+    switchPriceUnitMode(currentPriceUnitMode);
     applyFiltersAndSort();
     recalculateTotals();
 });

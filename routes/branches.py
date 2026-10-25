@@ -854,6 +854,7 @@ def branch_pos(id):
                 ELSE COALESCE(p.packs_per_case, 1)
             END as packs_per_case,
             COALESCE(NULLIF(p.pcs_per_pack, 0), 50) as pcs_per_pack,
+            COALESCE(p.uom, 'pcs.') as uom,
             p.category_id,
             COALESCE(c.name, 'General') as category_name,
             COALESCE(i.quantity, 0) as stock_qty,
