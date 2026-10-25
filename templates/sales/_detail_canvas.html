@@ -1020,7 +1020,6 @@
 
                     <!-- 2. Store / Branch & Delivery Logistics Card -->
                     <div class="so-card so-card-logistics">
-                        <input type="hidden" name="sales_rep" id="salesRepInput" value="{{ order.sales_rep or '' }}">
                         <div class="so-logistics-grid">
                             <!-- Store/Branch Row -->
                             <div class="so-logistics-row">
@@ -1256,6 +1255,31 @@
                                         {{ order.completed_by }}
                                     </span>
                                     {% endif %}
+                                </div>
+                            </div>
+
+                            <!-- Biller Name -->
+                            <div class="so-meta-row">
+                                <div class="so-meta-label">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="12" cy="7" r="4"></circle>
+                                    </svg>
+                                    <span>Biller</span>
+                                </div>
+                                <div class="so-meta-val">
+                                    <input type="text" name="sales_rep" id="salesRepInput" list="billerList" class="so-clean-input" 
+                                           style="width: 140px; font-size: 12px; font-weight: 600; color: #0F172A; text-align: right; padding: 2px 8px; height: 26px; border: 1px solid #CBD5E1; border-radius: 6px; background: #FFFFFF; {% if is_paid %}background: #F8FAFC; cursor: default;{% endif %}" 
+                                           value="{% if is_new %}{{ order.sales_rep or session.get('display_name') or session.get('username') or '' }}{% else %}{{ order.sales_rep or order.completed_by or '' }}{% endif %}" 
+                                           placeholder="Biller name..." 
+                                           title="Biller / Sales Rep name" 
+                                           {% if is_paid %}readonly{% endif %}
+                                           oninput="markOrderDirty()" onchange="markOrderDirty()">
+                                    <datalist id="billerList">
+                                        {% for u in all_users %}
+                                        <option value="{{ u.username }}">{{ u.display_name or u.username }}</option>
+                                        {% endfor %}
+                                    </datalist>
                                 </div>
                             </div>
 

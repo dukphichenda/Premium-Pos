@@ -1356,6 +1356,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     else:
         all_branches = query_all("SELECT id, code, name FROM branches WHERE id = %s", (user_bid,))
     all_delivery_men = query_all("SELECT id, name, phone FROM delivery_men WHERE is_active = TRUE ORDER BY name ASC")
+    all_users = query_all("SELECT id, username, display_name FROM users WHERE is_active = TRUE ORDER BY username ASC")
 
     return {
         'sidebar_orders': sidebar_orders,
@@ -1371,6 +1372,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         'company': company,
         'all_branches': all_branches,
         'all_delivery_men': all_delivery_men,
+        'all_users': all_users,
         'preview_map': preview_map,
         'active_branch_filter': branch_id or ('all' if is_main else 'main')
     }
@@ -2001,7 +2003,7 @@ def new_order():
                 'total_amount': 0.0,
                 'paid_amount': 0.0,
                 'balance_due': 0.0,
-                'sales_rep': (branch.get('manager_name') if branch else '') or '',
+                'sales_rep': (session.get('display_name') or session.get('username') or (branch.get('manager_name') if branch else '') or ''),
                 'po_number': '',
                 'carrier': '',
                 'tracking_number': '',
@@ -2046,7 +2048,7 @@ def new_order():
             'total_amount': 0.0,
             'paid_amount': 0.0,
             'balance_due': 0.0,
-            'sales_rep': (branch.get('manager_name') if branch else '') or '',
+            'sales_rep': (session.get('display_name') or session.get('username') or (branch.get('manager_name') if branch else '') or ''),
             'po_number': '',
             'carrier': '',
             'tracking_number': '',
@@ -2195,6 +2197,7 @@ def new_order():
                            all_products=drawer_data['all_products'],
                            product_prices_map=drawer_data['product_prices_map'],
                            all_delivery_men=drawer_data['all_delivery_men'],
+                           all_users=drawer_data.get('all_users', []),
                            order_payment_method='ABA Bank',
                            payments=[],
                            company=drawer_data['company'],
@@ -2581,6 +2584,7 @@ def detail_order(id):
                            all_products=drawer_data['all_products'],
                            product_prices_map=drawer_data['product_prices_map'],
                            all_delivery_men=drawer_data['all_delivery_men'],
+                           all_users=drawer_data.get('all_users', []),
                            order_payment_method=order_payment_method,
                            company=drawer_data['company'],
                            payments=payments,
@@ -2686,6 +2690,8 @@ def save_order(id=0):
         order_date = _parse_order_date(raw_date, default_date=fallback_date)
 
         sales_rep = (data.get('sales_rep') or (order['sales_rep'] if order else '') or '').strip()
+        if is_new and not sales_rep:
+            sales_rep = (session.get('display_name') or session.get('username') or '').strip()
         
         # When notes are submitted, use submitted value (allowing empty string to delete notes!)
         if 'notes' in data:
