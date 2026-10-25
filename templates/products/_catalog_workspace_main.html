@@ -543,21 +543,25 @@
                             </div>
                         </div>
 
+                        {% set std_clean = (product.uom or 'pcs.')|trim|lower|replace('.', '') %}
+                        {% set sales_clean = (product.sales_uom or 'cases')|trim|lower|replace('.', '') %}
+                        {% set is_same_uom = (std_clean == sales_clean) %}
+
                         <!-- Schemes Table -->
                         <table class="inflow-cat-pricing-table" id="catPricingTable">
                             <thead>
                                 <tr>
-                                    <th style="width: 28%; text-align: left;">PRICING SCHEME</th>
+                                    <th style="{% if is_same_uom %}width: 35%;{% else %}width: 28%;{% endif %} text-align: left;" id="thSchemeName">PRICING SCHEME</th>
                                     {% if can_view_costs %}
-                                    <th style="width: 16%; text-align: right;">MARKUP</th>
+                                    <th style="{% if is_same_uom %}width: 22%;{% else %}width: 16%;{% endif %} text-align: right;" id="thMarkup">MARKUP</th>
                                     {% endif %}
-                                    <th style="{% if can_view_costs %}width: 25%;{% else %}width: 33%;{% endif %} text-align: right;" title="Price per Case ($/case)">PRICE / CASE</th>
-                                    <th style="{% if can_view_costs %}width: 24%;{% else %}width: 32%;{% endif %} text-align: right;" title="Price per Pcs ($/pcs)">PRICE / PCS</th>
+                                    <th class="col-case-price" id="thCasePrice" style="{% if is_same_uom %}display: none; {% endif %}{% if can_view_costs %}width: 25%;{% else %}width: 33%;{% endif %} text-align: right;" title="Price per Case ($/case)">PRICE / CASE</th>
+                                    <th class="col-pcs-price" id="thPcsPrice" style="{% if is_same_uom %}{% if can_view_costs %}width: 36%;{% else %}width: 58%;{% endif %}{% else %}{% if can_view_costs %}width: 24%;{% else %}width: 32%;{% endif %}{% endif %} text-align: right;" title="Price per Pcs ($/pcs)">PRICE / PCS</th>
                                     <th style="width: 7%; text-align: center;"></th>
                                 </tr>
                             </thead>
                             <tbody id="catPricingTableBody">
-                                {% set pcs_in_case = price_card.pcs_per_case if (price_card and price_card.pcs_per_case > 0) else (product.sales_uom_ratio_std if product.sales_uom_ratio_std > 0 else 300) %}
+                                {% set pcs_in_case = 1 if is_same_uom else (price_card.pcs_per_case if (price_card and price_card.pcs_per_case > 0) else (product.sales_uom_ratio_std if product.sales_uom_ratio_std > 0 else 300)) %}
                                 {% for pt in price_tiers %}
                                 <tr id="price_row_{{ pt.pricing_scheme_id }}" data-scheme-id="{{ pt.pricing_scheme_id }}">
                                     <td class="scheme-name">{{ pt.scheme_name }}</td>
@@ -566,7 +570,7 @@
                                         <span class="markup-val" id="markup_text_{{ pt.pricing_scheme_id }}">{{ pt.markup }}%</span>
                                     </td>
                                     {% endif %}
-                                    <td style="text-align: right;">
+                                    <td class="col-case-price" style="text-align: right; {% if is_same_uom %}display: none;{% endif %}">
                                         <div class="inflow-cat-price-cell">
                                             <input type="text" 
                                                    value="{{ ('{:.' ~ item_price_dec ~ 'f}').format(pt.unit_price) }}" 
@@ -581,10 +585,10 @@
                                                    onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"{% endif %}>
                                         </div>
                                     </td>
-                                    <td style="text-align: right;">
+                                    <td class="col-pcs-price" style="text-align: right;">
                                         <div class="inflow-cat-price-cell">
                                             <input type="text" 
-                                                   value="{{ ('{:.' ~ (item_price_dec if item_price_dec > 2 else 3) ~ 'f}').format((pt.unit_price|float) / (pcs_in_case|float) if (pcs_in_case|float) > 0 else (pt.unit_price|float)) }}" 
+                                                   value="{{ ('{:.' ~ (item_price_dec if item_price_dec > 2 else 3) ~ 'f}').format(pt.unit_price if is_same_uom else ((pt.unit_price|float) / (pcs_in_case|float) if (pcs_in_case|float) > 0 else (pt.unit_price|float))) }}" 
                                                    class="inflow-cat-pcs-price-input" 
                                                    id="pcs_price_{{ pt.pricing_scheme_id }}"
                                                    data-scheme-id="{{ pt.pricing_scheme_id }}"

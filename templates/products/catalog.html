@@ -3066,7 +3066,7 @@ function submitAddPrice(prodId) {
                 tr.innerHTML = `
                     <td class="scheme-name">${escapeHtml(data.scheme_name)}</td>
                     ${markupCell}
-                    <td style="text-align: right;">
+                    <td class="col-case-price" style="text-align: right; ${isSameUom() ? 'display: none;' : ''}">
                         <div class="inflow-cat-price-cell">
                             <input type="text" 
                                    value="${Number(data.unit_price).toFixed(currentPriceDec)}" 
@@ -3079,7 +3079,7 @@ function submitAddPrice(prodId) {
                                    onblur="onCasePriceBlur(this, ${data.scheme_id})">
                         </div>
                     </td>
-                    <td style="text-align: right;">
+                    <td class="col-pcs-price" style="text-align: right;">
                         <div class="inflow-cat-price-cell">
                             <input type="text" 
                                    value="${pcsVal.toFixed(Math.max(currentPriceDec, 3))}" 
@@ -3099,6 +3099,7 @@ function submitAddPrice(prodId) {
                     </td>
                 `;
                 tbody.appendChild(tr);
+                updatePricingTableUomColumns();
             }
         } else {
             alert('Failed to add price: ' + (data.message || 'Unknown error'));
@@ -3221,6 +3222,39 @@ function getActiveStdUomBadge() {
 }
 
 /* Unit of Measure & Storage Info Change Handlers */
+function isSameUom() {
+    const std = (document.getElementById('stdUomSelect')?.value || 'pcs.').trim().toLowerCase().replace(/\./g, '');
+    const sales = (document.getElementById('salesUomSelect')?.value || 'cases').trim().toLowerCase().replace(/\./g, '');
+    return std !== '' && std === sales;
+}
+
+function updatePricingTableUomColumns() {
+    const same = isSameUom();
+    const thCase = document.getElementById('thCasePrice');
+    const thPcs = document.getElementById('thPcsPrice');
+    const thScheme = document.getElementById('thSchemeName');
+    const thMarkup = document.getElementById('thMarkup');
+    const canViewCosts = {% if can_view_costs %}true{% else %}false{% endif %};
+
+    if (thCase) {
+        thCase.style.display = same ? 'none' : '';
+    }
+
+    document.querySelectorAll('.col-case-price').forEach(td => {
+        td.style.display = same ? 'none' : '';
+    });
+
+    if (same) {
+        if (thScheme) thScheme.style.width = '35%';
+        if (thMarkup) thMarkup.style.width = '22%';
+        if (thPcs) thPcs.style.width = canViewCosts ? '36%' : '58%';
+    } else {
+        if (thScheme) thScheme.style.width = '28%';
+        if (thMarkup) thMarkup.style.width = '16%';
+        if (thPcs) thPcs.style.width = canViewCosts ? '24%' : '32%';
+    }
+}
+
 function onStandardUomChange(newUom) {
     newUom = (newUom || 'pcs.').trim();
     const suffix = document.getElementById('reorderPointSuffix');
@@ -3238,6 +3272,7 @@ function onStandardUomChange(newUom) {
     syncCardTierInputs();
     markFieldDirty('uom', newUom);
     onConversionRatioChange();
+    updatePricingTableUomColumns();
 }
 
 function onSalesUomChange(newSalesUom) {
@@ -3247,6 +3282,7 @@ function onSalesUomChange(newSalesUom) {
     markFieldDirty('sales_uom', newSalesUom);
     syncPurchasingUomWithSales(true);
     onConversionRatioChange();
+    updatePricingTableUomColumns();
 }
 
 function syncPurchasingUomWithSales(markDirty = false) {
@@ -4607,12 +4643,14 @@ function onCuteCustomDetailInput(val) {
 // DUAL PRICING: PRICE PER CASE & PRICE PER PCS AUTO-CALCULATOR
 // ==========================================================================
 function getPcsPerCase() {
+    if (typeof isSameUom === 'function' && isSameUom()) return 1;
     const convStd = parseFloat(document.getElementById('salesConvStd')?.value);
-    if (!isNaN(convStd) && convStd > 1) return convStd;
+    const convRatio = parseFloat(document.getElementById('salesConvRatio')?.value) || 1;
+    if (!isNaN(convStd) && convStd > 0 && convRatio > 0) return convStd / convRatio;
     const packs = parseFloat(document.getElementById('packsPerCaseInput')?.value) || 0;
     const pcsPack = parseFloat(document.getElementById('pcsPerPackInput')?.value) || 0;
-    if (packs * pcsPack > 1) return packs * pcsPack;
-    return 300;
+    if (packs * pcsPack > 0) return packs * pcsPack;
+    return 1;
 }
 
 function onCasePriceInput(input, schemeId) {
@@ -4810,7 +4848,7 @@ function recalcPacksPerCase(source) {
     const specCutePcsPack = document.getElementById('specCutePcsPackVal');
     if (specCutePcsPack && pcsPack > 0) specCutePcsPack.innerText = pcsPack;
     
-    const displayPcsCase = pcsPerCase > 0 ? pcsPerCase : ((packs > 0 && pcsPack > 0) ? (packs * pcsPack) : 400);
+    const displayPcsCase = (typeof isSameUom === 'function' && isSameUom()) ? 1 : (pcsPerCase > 0 ? pcsPerCase : ((packs > 0 && pcsPack > 0) ? (packs * pcsPack) : 400));
     const specPcsCase = document.getElementById('specPcsCaseVal');
     if (specPcsCase) specPcsCase.innerText = displayPcsCase;
     const specModernPcsCase = document.getElementById('specModernPcsCaseVal');
@@ -7251,6 +7289,11 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
         const initUnit = "{{ price_card.card_unit if price_card else (product.price_card_unit or 'ប្រអប់') }}";
         initPriceCardUnits(initUnit);
+    } catch(e) {}
+    try {
+        if (typeof updatePricingTableUomColumns === 'function') {
+            updatePricingTableUomColumns();
+        }
     } catch(e) {}
 });
 
