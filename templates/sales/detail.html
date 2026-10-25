@@ -4427,6 +4427,18 @@ function handleSoBranchChange(val) {
         markDirty();
     }
 
+    const costLabelEl = document.getElementById('previewCostLabel');
+    if (costLabelEl) {
+        costLabelEl.textContent = (val && val !== 'main' && val !== '0') ? 'Branch Cost' : 'Cost';
+    }
+    const activePreviewRow = document.querySelector('#itemDropdownBody tr.highlighted');
+    if (activePreviewRow) {
+        const activePid = activePreviewRow.getAttribute('data-pid');
+        if (activePid && typeof updateItemDropdownPreview === 'function') {
+            updateItemDropdownPreview(activePid);
+        }
+    }
+
     {% if is_new %}
     fetch('/api/sales/preview-order-number?branch_id=' + encodeURIComponent(val || ''))
         .then(r => r.json())
@@ -5987,6 +5999,28 @@ function goToProductDetail(pid, name, event) {
     }
 }
 
+function isCurrentBranchOrder() {
+    const branchSelect = document.getElementById('soBranchSelect');
+    if (branchSelect) {
+        const val = (branchSelect.value || '').trim();
+        return val !== '' && val !== 'main' && val !== '0';
+    }
+    const branchInput = document.getElementById('orderBranchIdInput');
+    if (branchInput && branchInput.value !== undefined) {
+        const val = (branchInput.value || '').trim();
+        if (val === '' || val === 'main' || val === '0') return false;
+        return true;
+    }
+    const metaEl = document.getElementById('soPartialMeta');
+    if (metaEl && metaEl.hasAttribute('data-branch-id')) {
+        const bId = (metaEl.getAttribute('data-branch-id') || '').trim();
+        if (bId === '' || bId === 'main' || bId === '0') return false;
+        return true;
+    }
+    const isBranchOrderTpl = {{ 'true' if (effective_order_branch or (is_branch_mode and current_branch) or is_branch_user) else 'false' }};
+    return !!isBranchOrderTpl;
+}
+
 function updateItemDropdownPreview(pid) {
     if (!pid) return;
     const prod = window.productsCatalog ? window.productsCatalog[pid] : null;
@@ -5998,6 +6032,7 @@ function updateItemDropdownPreview(pid) {
     const schemeNameEl = document.getElementById('previewSchemeName');
     const priceEl = document.getElementById('previewPrice');
     const costEl = document.getElementById('previewCost');
+    const costLabelEl = document.getElementById('previewCostLabel');
     const imgEl = document.getElementById('previewImage');
     const noImgEl = document.getElementById('previewImagePlaceholder');
 
@@ -6043,7 +6078,34 @@ function updateItemDropdownPreview(pid) {
     if (onOrderEl) onOrderEl.textContent = '0 ' + uom;
     if (schemeNameEl) schemeNameEl.textContent = schemeName;
     if (priceEl) priceEl.textContent = '$' + (typeof formatPriceValue === 'function' ? formatPriceValue(price, prod.price_decimals) : Number(price).toFixed(2));
-    if (costEl) costEl.textContent = '$' + (cost > 0 ? (cost < 1 ? cost.toFixed(5) : cost.toFixed(2)) : '0.00');
+    
+    // For branch SO bills: do not show costing, show price scheme "Branch Cost" instead
+    const isBranch = (typeof isCurrentBranchOrder === 'function') ? isCurrentBranchOrder() : false;
+    if (isBranch) {
+        const branchCostScheme = (window.pricingSchemes || []).find(s => s.name && s.name.trim().toLowerCase().includes('branch cost'));
+        const branchCostSchemeId = branchCostScheme ? branchCostScheme.id : 107;
+        const schemeLabel = branchCostScheme ? branchCostScheme.name : 'Branch Cost';
+
+        if (costLabelEl) costLabelEl.textContent = schemeLabel;
+
+        let branchCostPrice = 0.0;
+        if (window.productPricesMap && window.productPricesMap[pid] && window.productPricesMap[pid][branchCostSchemeId] !== undefined) {
+            branchCostPrice = parseFloat(window.productPricesMap[pid][branchCostSchemeId]) || 0.0;
+        } else if (typeof getProductPriceForScheme === 'function') {
+            branchCostPrice = parseFloat(getProductPriceForScheme(pid, branchCostSchemeId)) || 0.0;
+        }
+
+        if (costEl) {
+            costEl.textContent = '$' + (typeof formatPriceValue === 'function' 
+                ? formatPriceValue(branchCostPrice, prod.price_decimals) 
+                : Number(branchCostPrice).toFixed(2));
+        }
+    } else {
+        if (costLabelEl) costLabelEl.textContent = 'Cost';
+        if (costEl) {
+            costEl.textContent = '$' + (cost > 0 ? (cost < 1 ? cost.toFixed(5) : cost.toFixed(2)) : '0.00');
+        }
+    }
 
     if (imgEl && noImgEl) {
         if (prod.image_url) {
