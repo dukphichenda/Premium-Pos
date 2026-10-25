@@ -2255,25 +2255,25 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 <span id="previewActionLabel">Preview</span>
             </button>
             <button type="button" class="inflow-split-btn-arrow" onclick="togglePreviewDropdown(event)" title="Choose document type or action">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="pointer-events: none;"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
             <div id="previewDropdownMenu" class="inflow-win-menu" style="display: none;">
                 <div class="win-menu-item" onclick="selectAndExecuteDoc('order')">
-                    <span class="win-menu-check"></span>
+                    <span class="win-menu-check" id="checkDocOrder"></span>
                     <span class="win-menu-text">Sales Order</span>
                 </div>
                 <div class="win-menu-separator"></div>
                 <div class="win-menu-item" onclick="selectAndExecuteDoc('pick')">
-                    <span class="win-menu-check"></span>
+                    <span class="win-menu-check" id="checkDocPick"></span>
                     <span class="win-menu-text">Pick List</span>
                 </div>
                 <div class="win-menu-separator"></div>
                 <div class="win-menu-item" onclick="selectAndExecuteDoc('invoice')">
-                    <span class="win-menu-check"></span>
+                    <span class="win-menu-check" id="checkDocInvoice">✓</span>
                     <span class="win-menu-text">Invoice</span>
                 </div>
                 <div class="win-menu-item" onclick="selectAndExecuteDoc('receipt')">
-                    <span class="win-menu-check"></span>
+                    <span class="win-menu-check" id="checkDocReceipt"></span>
                     <span class="win-menu-text">Receipt</span>
                 </div>
                 <div class="win-menu-separator win-separator-etched"></div>
@@ -2298,7 +2298,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 <span id="copyActionLabel">Copy</span>
             </button>
             <button type="button" class="inflow-split-btn-arrow" onclick="toggleCopyDropdown(event)" title="Copy options">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="pointer-events: none;"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
             <div id="copyDropdownMenu" class="inflow-win-menu" style="display: none; min-width: 145px;">
                 <div class="win-menu-item" onclick="executeCopyAction('copy-so')">
@@ -2336,9 +2336,9 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 <span>Share Telegram</span>
             </button>
             <button type="button" class="inflow-split-btn-arrow" onclick="toggleTelegramShareDropdown(event)" title="Telegram share options">
-                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="pointer-events: none;"><polyline points="6 9 12 15 18 9"></polyline></svg>
             </button>
-            <div id="telegramShareDropdownMenu" class="inflow-win-menu" style="display: none; min-width: 250px;">
+            <div id="telegramShareDropdownMenu" class="inflow-win-menu" style="display: none; min-width: 250px; right: 0; left: auto;">
                 <div class="win-menu-item" onclick="directShareOrderTelegram('direct')">
                     <span style="font-size: 14px; margin-right: 6px;">🖨️</span>
                     <span class="win-menu-text">Direct Print Link (No Image Save)</span>
@@ -6841,6 +6841,20 @@ let lastSelectedDocType = localStorage.getItem('inflow_preview_doc') || 'invoice
 
 function initPreviewToolbar() {
     updatePreviewModeUI(currentPreviewMode);
+    updateDocTypeUI(lastSelectedDocType);
+    setupAllToolbarDropdowns();
+}
+
+function updateDocTypeUI(docType) {
+    lastSelectedDocType = docType || 'invoice';
+    const cOrder = document.getElementById('checkDocOrder');
+    const cPick = document.getElementById('checkDocPick');
+    const cInvoice = document.getElementById('checkDocInvoice');
+    const cReceipt = document.getElementById('checkDocReceipt');
+    if (cOrder) cOrder.innerHTML = (lastSelectedDocType === 'order' ? '&#10003;' : '');
+    if (cPick) cPick.innerHTML = (lastSelectedDocType === 'pick' ? '&#10003;' : '');
+    if (cInvoice) cInvoice.innerHTML = (lastSelectedDocType === 'invoice' ? '&#10003;' : '');
+    if (cReceipt) cReceipt.innerHTML = (lastSelectedDocType === 'receipt' ? '&#10003;' : '');
 }
 
 function updatePreviewModeUI(mode) {
@@ -6864,21 +6878,21 @@ function updatePreviewModeUI(mode) {
 
 function setPreviewMode(mode) {
     updatePreviewModeUI(mode);
-    closePreviewDropdown();
+    closeAllToolbarDropdowns();
 }
 
-function togglePreviewDropdown(event) {
-    if (event) {
-        event.stopPropagation();
-        event.preventDefault();
-    }
+function closeAllToolbarDropdowns() {
+    closePreviewDropdown();
+    closeCopyDropdown();
+    closeTelegramShareDropdown();
+}
+
+function openPreviewDropdown() {
+    closeCopyDropdown();
+    closeTelegramShareDropdown();
     const menu = document.getElementById('previewDropdownMenu');
     const wrapper = document.getElementById('previewSplitWrapper');
-    if (!menu) return;
-    const isShown = menu.style.display === 'block';
-    if (isShown) {
-        closePreviewDropdown();
-    } else {
+    if (menu) {
         menu.style.display = 'block';
         if (wrapper) wrapper.classList.add('open');
     }
@@ -6891,19 +6905,26 @@ function closePreviewDropdown() {
     if (wrapper) wrapper.classList.remove('open');
 }
 
-function toggleCopyDropdown(event) {
+function togglePreviewDropdown(event) {
     if (event) {
         event.stopPropagation();
         event.preventDefault();
     }
+    const menu = document.getElementById('previewDropdownMenu');
+    if (!menu) return;
+    if (menu.style.display === 'block') {
+        closePreviewDropdown();
+    } else {
+        openPreviewDropdown();
+    }
+}
+
+function openCopyDropdown() {
+    closePreviewDropdown();
+    closeTelegramShareDropdown();
     const menu = document.getElementById('copyDropdownMenu');
     const wrapper = document.getElementById('copySplitWrapper');
-    if (!menu) return;
-    const isShown = menu.style.display === 'block';
-    if (isShown) {
-        closeCopyDropdown();
-    } else {
-        closePreviewDropdown();
+    if (menu) {
         menu.style.display = 'block';
         if (wrapper) wrapper.classList.add('open');
     }
@@ -6916,20 +6937,26 @@ function closeCopyDropdown() {
     if (wrapper) wrapper.classList.remove('open');
 }
 
-function toggleTelegramShareDropdown(event) {
+function toggleCopyDropdown(event) {
     if (event) {
         event.stopPropagation();
         event.preventDefault();
     }
+    const menu = document.getElementById('copyDropdownMenu');
+    if (!menu) return;
+    if (menu.style.display === 'block') {
+        closeCopyDropdown();
+    } else {
+        openCopyDropdown();
+    }
+}
+
+function openTelegramShareDropdown() {
+    closePreviewDropdown();
+    closeCopyDropdown();
     const menu = document.getElementById('telegramShareDropdownMenu');
     const wrapper = document.getElementById('telegramShareSplitWrapper');
-    if (!menu) return;
-    const isShown = menu.style.display === 'block';
-    if (isShown) {
-        closeTelegramShareDropdown();
-    } else {
-        closePreviewDropdown();
-        closeCopyDropdown();
+    if (menu) {
         menu.style.display = 'block';
         if (wrapper) wrapper.classList.add('open');
     }
@@ -6942,20 +6969,124 @@ function closeTelegramShareDropdown() {
     if (wrapper) wrapper.classList.remove('open');
 }
 
-document.addEventListener('click', function(e) {
-    const previewWrapper = document.getElementById('previewSplitWrapper');
-    if (previewWrapper && !previewWrapper.contains(e.target)) {
-        closePreviewDropdown();
+function toggleTelegramShareDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
     }
-    const copyWrapper = document.getElementById('copySplitWrapper');
-    if (copyWrapper && !copyWrapper.contains(e.target)) {
-        closeCopyDropdown();
-    }
-    const teleWrapper = document.getElementById('telegramShareSplitWrapper');
-    if (teleWrapper && !teleWrapper.contains(e.target)) {
+    const menu = document.getElementById('telegramShareDropdownMenu');
+    if (!menu) return;
+    if (menu.style.display === 'block') {
         closeTelegramShareDropdown();
+    } else {
+        openTelegramShareDropdown();
     }
-});
+}
+
+function bindSplitDropdownHover(wrapperId, menuId, openFn, closeFn) {
+    const wrapper = document.getElementById(wrapperId);
+    const menu = document.getElementById(menuId);
+    if (!wrapper || !menu) return;
+    const arrow = wrapper.querySelector('.inflow-split-btn-arrow');
+
+    let timer = null;
+
+    function clearCloseTimer() {
+        if (timer) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    }
+
+    function scheduleClose() {
+        clearCloseTimer();
+        timer = setTimeout(function() {
+            closeFn();
+        }, 220);
+    }
+
+    // Hover on arrow button opens dropdown immediately
+    if (arrow) {
+        arrow.addEventListener('mouseenter', function() {
+            clearCloseTimer();
+            openFn();
+        });
+        arrow.addEventListener('mouseleave', function(e) {
+            if (e.relatedTarget && (menu.contains(e.relatedTarget) || wrapper.contains(e.relatedTarget))) {
+                return;
+            }
+            scheduleClose();
+        });
+    }
+
+    // Moving mouse inside menu keeps it open
+    menu.addEventListener('mouseenter', function() {
+        clearCloseTimer();
+    });
+
+    menu.addEventListener('mouseleave', function(e) {
+        if (e.relatedTarget && (wrapper.contains(e.relatedTarget) || menu.contains(e.relatedTarget))) {
+            return;
+        }
+        scheduleClose();
+    });
+
+    // Keeping cursor within wrapper while open prevents sudden close
+    wrapper.addEventListener('mouseenter', function() {
+        if (menu.style.display === 'block') {
+            clearCloseTimer();
+        }
+    });
+
+    wrapper.addEventListener('mouseleave', function(e) {
+        if (e.relatedTarget && (menu.contains(e.relatedTarget) || (arrow && arrow.contains(e.relatedTarget)))) {
+            return;
+        }
+        if (menu.style.display === 'block') {
+            scheduleClose();
+        }
+    });
+}
+
+let _toolbarDropdownsInitialized = false;
+function setupAllToolbarDropdowns() {
+    if (_toolbarDropdownsInitialized) return;
+    _toolbarDropdownsInitialized = true;
+
+    bindSplitDropdownHover('previewSplitWrapper', 'previewDropdownMenu', openPreviewDropdown, closePreviewDropdown);
+    bindSplitDropdownHover('copySplitWrapper', 'copyDropdownMenu', openCopyDropdown, closeCopyDropdown);
+    bindSplitDropdownHover('telegramShareSplitWrapper', 'telegramShareDropdownMenu', openTelegramShareDropdown, closeTelegramShareDropdown);
+
+    document.addEventListener('pointerdown', function(e) {
+        const previewWrapper = document.getElementById('previewSplitWrapper');
+        const copyWrapper = document.getElementById('copySplitWrapper');
+        const teleWrapper = document.getElementById('telegramShareSplitWrapper');
+
+        const inPreview = previewWrapper && previewWrapper.contains(e.target);
+        const inCopy = copyWrapper && copyWrapper.contains(e.target);
+        const inTele = teleWrapper && teleWrapper.contains(e.target);
+
+        if (!inPreview) closePreviewDropdown();
+        if (!inCopy) closeCopyDropdown();
+        if (!inTele) closeTelegramShareDropdown();
+    });
+
+    window.addEventListener('blur', closeAllToolbarDropdowns);
+    window.addEventListener('scroll', closeAllToolbarDropdowns, true);
+
+    try {
+        if (window.top && window.top !== window) {
+            window.top.addEventListener('pointerdown', closeAllToolbarDropdowns, { passive: true });
+            window.top.addEventListener('click', closeAllToolbarDropdowns, { passive: true });
+        }
+    } catch (err) {}
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupAllToolbarDropdowns);
+} else {
+    setupAllToolbarDropdowns();
+}
 
 function executeCopyAction(action) {
     closeCopyDropdown();
@@ -7057,11 +7188,13 @@ function executeCopyAction(action) {
 function selectAndExecuteDoc(docType) {
     lastSelectedDocType = docType;
     localStorage.setItem('inflow_preview_doc', docType);
-    closePreviewDropdown();
+    updateDocTypeUI(docType);
+    closeAllToolbarDropdowns();
     executePreviewAction(docType);
 }
 
 function executePreviewAction(docType) {
+    closeAllToolbarDropdowns();
     docType = docType || lastSelectedDocType || 'invoice';
     const orderId = getCurrentOrderId();
     if (!orderId || isNewOrder) {
