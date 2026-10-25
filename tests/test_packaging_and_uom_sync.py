@@ -12,8 +12,13 @@ class TestPackagingAndUomSync(unittest.TestCase):
 
     def test_frontend_template_catalog_has_auto_sync_and_calc(self):
         catalog_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'products', 'catalog.html')
+        workspace_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'products', '_catalog_workspace_main.html')
+        content = ""
         with open(catalog_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+            content += f.read()
+        if os.path.exists(workspace_path):
+            with open(workspace_path, 'r', encoding='utf-8') as f:
+                content += f.read()
 
         # Check Purchasing UOM is locked / auto-synced
         self.assertIn('id="purchasingUomSelect"', content)
@@ -54,7 +59,7 @@ class TestPackagingAndUomSync(unittest.TestCase):
             with self.client.session_transaction() as sess:
                 sess['user_id'] = 1
                 sess['username'] = 'admin'
-                sess['role'] = 'admin'
+                sess['role'] = 'main_admin'
 
             res = self.client.post(
                 f'/products/{pid}/update_ajax',

@@ -4771,6 +4771,12 @@ function recalcPacksPerCase(source) {
         packs = parseFloat(packsInput ? packsInput.value : 0) || 0;
         if (packs > 0) {
             markFieldDirty('packs_per_case', packs);
+            if (pcsPack > 0 && convStdInput) {
+                pcsPerCase = Math.round(packs * pcsPack * 10000) / 10000;
+                convStdInput.value = pcsPerCase;
+                markFieldDirty('sales_uom_ratio_std', pcsPerCase);
+                syncPurchasingUomWithSales(true);
+            }
         }
     } else if (source === 'sales_conv' || source === 'pcs_pack') {
         // Automatically calculate: number pack per case = number pcs per case / pcs per pack
@@ -4837,14 +4843,31 @@ function recalcPacksPerCase(source) {
         }
     }
     
-    // Auto sync all Price per Pcs inputs
+    // Auto sync all Price per Case inputs from fixed Price per Pcs:
+    // When pcs per case changes, keep Price per Pcs fixed, and recalculate:
+    // price per case = price per pcs * new number of pcs per case
+    const ratioSales = parseFloat(document.getElementById('salesConvRatio')?.value) || 1.0;
+    const effectivePcsPerCase = (ratioSales > 0) ? (displayPcsCase / ratioSales) : displayPcsCase;
+
     document.querySelectorAll('.inflow-cat-price-input').forEach(caseInp => {
         const sId = caseInp.getAttribute('data-scheme-id');
-        const caseP = evaluateMathExpression(caseInp.value) || 0;
-        const pcsP = displayPcsCase > 0 ? (caseP / displayPcsCase) : caseP;
         const pcsInp = document.getElementById('pcs_price_' + sId);
-        if (pcsInp) pcsInp.value = pcsP.toFixed(Math.max(currentPriceDec, 3));
-        if (typeof syncTiersFromScheme === 'function') syncTiersFromScheme(sId, caseP, pcsP);
+        let pcsP = pcsInp ? (evaluateMathExpression(pcsInp.value) || 0) : 0;
+        
+        if (pcsP > 0 && effectivePcsPerCase > 0) {
+            // Fix price per pcs and update price per case: price_per_pcs * new number of pcs per case
+            const newCaseP = pcsP * effectivePcsPerCase;
+            caseInp.value = newCaseP.toFixed(currentPriceDec);
+            recalcSchemeMarkup(caseInp, sId);
+            markPriceDirty(sId, newCaseP);
+            if (typeof syncTiersFromScheme === 'function') syncTiersFromScheme(sId, newCaseP, pcsP);
+        } else {
+            // Fallback if price per pcs was 0 or not yet set
+            const caseP = evaluateMathExpression(caseInp.value) || 0;
+            pcsP = effectivePcsPerCase > 0 ? (caseP / effectivePcsPerCase) : caseP;
+            if (pcsInp) pcsInp.value = pcsP.toFixed(Math.max(currentPriceDec, 3));
+            if (typeof syncTiersFromScheme === 'function') syncTiersFromScheme(sId, caseP, pcsP);
+        }
     });
     
     if (typeof recalcCardTiers === 'function') recalcCardTiers();
