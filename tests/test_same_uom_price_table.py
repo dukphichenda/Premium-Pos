@@ -43,7 +43,7 @@ class TestSameUomPriceTable(unittest.TestCase):
                 sess['username'] = 'admin'
                 sess['role'] = 'main_admin'
 
-            res = self.client.get(f'/products/catalog?selected_id={pid}')
+            res = self.client.get(f'/products/{pid}')
             self.assertEqual(res.status_code, 200)
             html = res.get_data(as_text=True)
 
