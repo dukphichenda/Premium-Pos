@@ -1051,7 +1051,10 @@ body {
     font-size: 1.15rem;
     font-weight: 700;
     color: #334155;
-    margin: 0 0 6px 0;
+}
+
+@keyframes catPdfSpin {
+    to { transform: rotate(360deg); }
 }
 
 /* ==========================================================================
@@ -1302,10 +1305,10 @@ body {
                 <span>Select All</span>
             </button>
 
-            <!-- Print / PDF -->
-            <button type="button" class="cat-btn cat-btn-teal" onclick="window.print()" title="Print Catalog (A4 210mm x 297mm) or Save as PDF">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                <span>Print A4 / PDF</span>
+            <!-- Export A4 PDF -->
+            <button type="button" class="cat-btn cat-btn-teal" id="btnExportA4Pdf" onclick="exportCatalogA4Pdf()" title="Export Catalog directly as A4 PDF document (no print dialog)">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                <span>Export A4 PDF</span>
             </button>
 
             <!-- Quick link back to Products list -->
@@ -1333,6 +1336,15 @@ body {
         </button>
         {% endfor %}
     </nav>
+
+    <!-- PDF EXPORT PROGRESS OVERLAY -->
+    <div id="catalogPdfOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(4px); z-index: 99999; align-items: center; justify-content: center; flex-direction: column;">
+        <div style="background: #FFFFFF; border-radius: 14px; padding: 28px 36px; box-shadow: 0 20px 40px rgba(0,0,0,0.25); display: flex; flex-direction: column; align-items: center; max-width: 420px; text-align: center;">
+            <div style="width: 44px; height: 44px; border: 4px solid #E2E8F0; border-top-color: #149e9e; border-radius: 50%; animation: catPdfSpin 0.8s linear infinite; margin-bottom: 16px;"></div>
+            <div id="catalogPdfProgressTitle" style="font-size: 16px; font-weight: 800; color: #0F172A; margin-bottom: 6px;">Generating A4 PDF...</div>
+            <div id="catalogPdfProgressSub" style="font-size: 13px; color: #64748B;">Preparing high-resolution A4 document...</div>
+        </div>
+    </div>
 
     <!-- NO MATCH EMPTY STATE -->
     <div id="catNoMatch" class="cat-no-match">
@@ -1519,6 +1531,7 @@ body {
 {% endblock %}
 
 {% block scripts %}
+<script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
 <script>
 /**
  * Product Catalog Interactivity:
@@ -1934,5 +1947,156 @@ document.addEventListener('DOMContentLoaded', () => {
         applyAllCatalogFilters();
     }
 });
+
+/* ==========================================================================
+   DIRECT A4 PDF EXPORT (NO PRINT DIALOG)
+   ========================================================================== */
+async function exportCatalogA4Pdf() {
+    const btn = document.getElementById('btnExportA4Pdf');
+    const overlay = document.getElementById('catalogPdfOverlay');
+    const titleEl = document.getElementById('catalogPdfProgressTitle');
+    const subEl = document.getElementById('catalogPdfProgressSub');
+
+    if (typeof html2pdf === 'undefined') {
+        alert('PDF generator library is loading, please try again in a moment.');
+        return;
+    }
+
+    // Identify visible A4 pages inside #catalogSpreadView (works whether on Spread or Grid view)
+    const visibleSections = Array.from(document.querySelectorAll('#catalogSpreadView .catalog-category-section:not([style*="display: none"])'));
+    let visibleSheets = [];
+    visibleSections.forEach(sec => {
+        const sheets = Array.from(sec.querySelectorAll('.a4-sheet')).filter(sh => sh.style.display !== 'none');
+        visibleSheets.push(...sheets);
+    });
+
+    if (visibleSheets.length === 0) {
+        alert('No visible product pages found to export. Please adjust your category or search filters.');
+        return;
+    }
+
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = `<span style="display:inline-block; width:13px; height:13px; border:2px solid #ffffff; border-top-color:transparent; border-radius:50%; animation:catPdfSpin 0.8s linear infinite; margin-right:6px; vertical-align:middle;"></span><span>Exporting PDF...</span>`;
+    }
+    if (overlay) {
+        overlay.style.display = 'flex';
+        if (titleEl) titleEl.textContent = 'Generating A4 PDF...';
+        if (subEl) subEl.textContent = `Preparing ${visibleSheets.length} A4 page${visibleSheets.length > 1 ? 's' : ''}...`;
+    }
+
+    // Isolated offscreen container to ensure exact A4 scale independent of viewport
+    const cloneHost = document.createElement('div');
+    cloneHost.id = 'catPdfCloneHost';
+    cloneHost.style.cssText = 'position:fixed; left:0; top:0; width:210mm; background:#ffffff; z-index:-99999; opacity:0; pointer-events:none;';
+    document.body.appendChild(cloneHost);
+
+    try {
+        const clonedSheets = [];
+        visibleSheets.forEach((sheet, idx) => {
+            const clone = sheet.cloneNode(true);
+            // Clean up interactive and hidden elements
+            clone.querySelectorAll('.a4-row-check-label, .cat-prod-check').forEach(el => el.remove());
+            clone.querySelectorAll('.cat-product-item[style*="display: none"]').forEach(el => el.remove());
+
+            // Enforce exact A4 printable dimensions (210mm x 297mm)
+            clone.style.cssText = `
+                width: 210mm !important;
+                height: 297mm !important;
+                min-height: 297mm !important;
+                max-height: 297mm !important;
+                margin: 0 !important;
+                box-shadow: none !important;
+                border: 1px solid #CBD5E1 !important;
+                border-radius: 0 !important;
+                padding: 10mm 12mm 8mm 12mm !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                justify-content: space-between !important;
+                background: #FFFFFF !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
+            `;
+
+            cloneHost.appendChild(clone);
+            clonedSheets.push(clone);
+        });
+
+        // Ensure all product images inside cloned pages are pre-loaded
+        const imgs = Array.from(cloneHost.querySelectorAll('img'));
+        if (imgs.length > 0) {
+            if (subEl) subEl.textContent = `Loading ${imgs.length} product images...`;
+            await Promise.all(imgs.map(img => {
+                if (img.complete) return Promise.resolve();
+                return new Promise(res => {
+                    img.onload = res;
+                    img.onerror = res;
+                });
+            }));
+        }
+
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const filename = `Product_Catalog_A4_${dateStr}.pdf`;
+
+        const opt = {
+            margin: 0,
+            filename: filename,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: {
+                scale: 2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#FFFFFF',
+                logging: false,
+                scrollX: 0,
+                scrollY: 0
+            },
+            jsPDF: {
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait'
+            }
+        };
+
+        if (clonedSheets.length === 1) {
+            if (subEl) subEl.textContent = 'Rendering A4 page 1 of 1...';
+            await html2pdf().set(opt).from(clonedSheets[0]).save();
+        } else {
+            if (subEl) subEl.textContent = `Rendering A4 page 1 of ${clonedSheets.length}...`;
+            const worker = html2pdf().set(opt).from(clonedSheets[0]).toPdf();
+            const pdf = await worker.get('pdf');
+
+            for (let i = 1; i < clonedSheets.length; i++) {
+                if (subEl) subEl.textContent = `Rendering A4 page ${i + 1} of ${clonedSheets.length}...`;
+                pdf.addPage('a4', 'portrait');
+                const pageWorker = html2pdf().set(opt).from(clonedSheets[i]);
+                const canvas = await pageWorker.toCanvas().get('canvas');
+                if (canvas) {
+                    const imgData = canvas.toDataURL('image/jpeg', 0.98);
+                    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+                }
+            }
+
+            if (subEl) subEl.textContent = 'Saving PDF document...';
+            pdf.save(filename);
+        }
+    } catch (err) {
+        console.error('Error generating catalog A4 PDF:', err);
+        alert('Failed to generate A4 PDF directly: ' + (err.message || err));
+    } finally {
+        if (cloneHost && cloneHost.parentNode) {
+            cloneHost.parentNode.removeChild(cloneHost);
+        }
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = origHtml;
+        }
+    }
+}
 </script>
 {% endblock %}
