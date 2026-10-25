@@ -9,6 +9,11 @@
 {% set item_cost_dec = p_cost_dec if p_cost_dec is not none else (company.decimal_places_cost if (company and company.decimal_places_cost is defined and company.decimal_places_cost is not none) else 3) %}
 
 <script>
+window.prefetchCatalogProduct = function(id, url) {
+    if (typeof window._realPrefetchCatalogProduct === 'function') {
+        return window._realPrefetchCatalogProduct(id, url);
+    }
+};
 (function() {
     try {
         var raw = localStorage.getItem('inflow_catalog_filters_v3') || localStorage.getItem('inflow_catalog_filters_v2');
@@ -1932,6 +1937,8 @@ function prefetchCatalogProduct(id, url) {
         window._catProductPendingFetches.set(id, p);
     }, 60);
 }
+window._realPrefetchCatalogProduct = prefetchCatalogProduct;
+window.prefetchCatalogProduct = prefetchCatalogProduct;
 
 function _applyCatalogWorkspace(html, id, url) {
     try {
@@ -2033,7 +2040,7 @@ function _applyCatalogWorkspace(html, id, url) {
         const newTitle = meta ? (meta.getAttribute('data-name') || '').trim() : '';
 
         // Workspace successfully applied: update MDI shell metadata & browser history
-        if (window.top && window.top.inflowMdi) {
+        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
             window.top.inflowMdi.updateActiveTabMeta(cleanUrl, newTitle || 'Product');
         }
         if (window.history && window.history.replaceState) {
