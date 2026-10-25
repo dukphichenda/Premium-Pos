@@ -9025,12 +9025,12 @@ function handleSoLiveSearch(val, isUserTyping) {
                         <tr class="so-suggest-row ${idx === 0 ? 'highlighted' : ''}" 
                             data-id="${c.id}" 
                             data-name="${escName}"
-                            onclick="selectSoCustomerSuggestion(${c.id}, '${escName}')"
+                            onclick="selectSoCustomerSuggestion(${c.id}, this.getAttribute('data-name'))"
                             title="Click to search / filter orders for ${escName}">
                             <td style="font-weight: 500;">${c.name || ''}</td>
                             <td style="color: #64748B;">${c.phone || c.contact || ''}</td>
                             <td style="text-align: center;">
-                                <span class="so-suggest-view-link" onclick="event.stopPropagation();viewSoCustomerDetails(${c.id}, '${escName}')" title="View customer details">View</span>
+                                <span class="so-suggest-view-link" onclick="event.stopPropagation();viewSoCustomerDetails(${c.id}, this.closest('tr').getAttribute('data-name'))" title="View customer details">View</span>
                             </td>
                         </tr>
                     `;
@@ -9124,14 +9124,60 @@ function closeSoCustSuggestPopup() {
     if (popup) popup.style.display = 'none';
 }
 
+function executeSoSearch(query) {
+    closeSoCustSuggestPopup();
+    const input = document.getElementById('soSidebarSearchInput');
+    const val = (query !== undefined && query !== null ? String(query) : (input ? input.value : '')).trim();
+    if (input && input.value !== val) {
+        input.value = val;
+    }
+    const clearBtn = document.getElementById('btnClearSoSearch');
+    if (clearBtn) {
+        clearBtn.style.display = val ? 'flex' : 'none';
+    }
+
+    // Immediately filter orders rendered in DOM for instant visual responsiveness
+    handleSoLiveSearch(val, false);
+
+    const url = new URL(window.location.href);
+    if (val) {
+        url.searchParams.set('search', val);
+        try { sessionStorage.setItem('inflow_so_search_query', val); } catch(err) {}
+    } else {
+        url.searchParams.set('search', '');
+        url.searchParams.delete('q');
+        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(err) {}
+    }
+
+    const doNav = function() {
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
+        } else {
+            window.location.href = url.pathname + url.search;
+        }
+    };
+
+    if (typeof isDirty !== 'undefined' && isDirty) {
+        openSavePromptModal(
+            function() { saveSalesOrder(); },
+            function() {
+                isDirty = false;
+                doNav();
+            },
+            function() { /* cancel: stay */ }
+        );
+    } else {
+        doNav();
+    }
+}
+
 function selectSoCustomerSuggestion(id, name) {
     const input = document.getElementById('soSidebarSearchInput');
     if (input) {
-        input.value = name;
+        input.value = name || '';
     }
     closeSoCustSuggestPopup();
-    handleSoLiveSearch(name, false);
-    if (input) input.focus();
+    executeSoSearch(name || '');
 }
 
 function viewSoCustomerDetails(id, name) {
@@ -9246,21 +9292,7 @@ function handleSoSearchKey(e) {
     if (e.key === 'Enter') {
         closeSoCustSuggestPopup();
         e.preventDefault();
-        const val = (e.target.value || '').trim();
-        const url = new URL(window.location.href);
-        if (val) {
-            url.searchParams.set('search', val);
-            try { sessionStorage.setItem('inflow_so_search_query', val); } catch(err) {}
-        } else {
-            url.searchParams.set('search', '');
-            url.searchParams.delete('q');
-            try { sessionStorage.removeItem('inflow_so_search_query'); } catch(err) {}
-        }
-        if (window.top && window.top.inflowMdi) {
-            window.top.inflowMdi.navigateOrOpenTab(url.pathname + url.search, 'Sales Order', 'sales');
-        } else {
-            window.location.href = url.pathname + url.search;
-        }
+        executeSoSearch(e.target.value);
     }
 }
 

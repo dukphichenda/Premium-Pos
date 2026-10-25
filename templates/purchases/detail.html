@@ -713,6 +713,15 @@ html.is-desktop-view .po-mobile-drawer-backdrop {
 .po-top-action-btn.po-top-save-btn:active {
     background: #52361c;
 }
+.po-top-action-btn.po-top-expense-linked {
+    background: #ECFDF5;
+    color: #047857;
+    font-weight: 700;
+}
+.po-top-action-btn.po-top-expense-linked:hover {
+    background: #D1FAE5;
+    color: #065F46;
+}
 .po-split-dropdown-wrap {
     position: relative;
 }
@@ -1923,6 +1932,10 @@ input:checked + .po-toggle-slider:before {
                     <button type="button" class="po-top-action-btn" onclick="executePoCopyAction()" title="Duplicate this purchase order">
                         📋 Copy order
                     </button>
+                    <button type="button" class="po-top-action-btn {% if linked_expense %}po-top-expense-linked{% endif %}" id="btnPoAddToExpenses" onclick="openAddToExpensesModal()" title="Add or view this purchase order in Monthly Expenses Sheet">
+                        <span style="font-size: 13px;">🧾</span>
+                        <span id="poExpenseBtnText">{% if linked_expense %}In Expenses (${{ "{:,.2f}".format(linked_expense.total_price) }}){% else %}Add to Expenses{% endif %}</span>
+                    </button>
                     {% endif %}
 
                     <!-- Print Split Dropdown -->
@@ -1977,6 +1990,9 @@ input:checked + .po-toggle-slider:before {
                                 <span>📊 Export as Excel</span>
                             </div>
                             <div class="po-menu-separator"></div>
+                            <div class="po-menu-item" onclick="openAddToExpensesModal()">
+                                <span>🧾 Add to Expenses Sheet</span>
+                            </div>
                             <div class="po-menu-item" onclick="openReorderModal()">
                                 <span>⚡ Reorder Suggestions</span>
                             </div>
@@ -2153,9 +2169,23 @@ input:checked + .po-toggle-slider:before {
                         {{ order.total_amount | currency }}
                     </div>
 
-                    <!-- Payment history Link ℹ -->
-                    <div style="margin-top: 4px;">
+                    <!-- Payment history Link ℹ & Expenses Sheet Link -->
+                    <div style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;">
                         <a href="javascript:void(0)" onclick="openPaymentModal()" class="po-fin-link">Payment history ℹ</a>
+                        {% if not is_new %}
+                        <div id="poExpenseMetaWrap">
+                            {% if linked_expense %}
+                            <span class="po-expense-status-tag" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #047857; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 2px 7px; border-radius: 4px;">
+                                ✓ In {{ linked_expense.month_key }} Expenses Sheet
+                                <a href="javascript:void(0)" onclick="openExpenseSheetTab('{{ linked_expense.month_key }}')" style="color: #047857; text-decoration: underline; margin-left: 2px;">View ➔</a>
+                            </span>
+                            {% else %}
+                            <a href="javascript:void(0)" onclick="openAddToExpensesModal()" class="po-fin-link" style="color: #B45309; font-weight: 600;">
+                                🧾 + Add to Expenses Sheet
+                            </a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                     </div>
 
                     <!-- Currency Dropdown -->
@@ -2709,6 +2739,139 @@ input:checked + .po-toggle-slider:before {
             <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 8px;">
                 <button type="button" class="btn btn-secondary" onclick="closePaymentModal()">Cancel</button>
                 <button type="submit" class="btn btn-primary" style="background: #7A5531; border-color: #7A5531;">Record Payment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- 3b. Add to Expenses Sheet Modal -->
+<div class="modal-overlay" id="poAddToExpensesModal" style="display: none;" onclick="if(event.target === this) closeAddToExpensesModal()">
+    <div class="modal-dialog" style="max-width: 520px; border-radius: 8px;">
+        <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">🧾</span>
+                <h2 class="modal-title" style="margin: 0; font-size: 15px; font-weight: 700; color: #0F172A;">
+                    Add to Expenses Sheet
+                </h2>
+                <span style="font-size: 12px; font-weight: 700; color: #7A5531; background: #FDF8F3; border: 1px solid #F0D9C0; padding: 2px 8px; border-radius: 4px;">
+                    {% if order %}{{ order.order_number }}{% endif %}
+                </span>
+            </div>
+            <button type="button" class="modal-close" onclick="closeAddToExpensesModal()" style="background: none; border: none; font-size: 18px; cursor: pointer; color: #64748B;">✕</button>
+        </div>
+
+        <form id="poAddToExpensesForm" onsubmit="handlePoAddToExpensesSubmit(event)">
+            <div style="padding: 16px 20px;">
+                <!-- Existing Expense Alert Banner if already linked -->
+                <div id="poExpenseExistingNotice" style="{% if linked_expense %}display: flex;{% else %}display: none;{% endif %} align-items: flex-start; gap: 8px; background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 6px; padding: 10px 12px; margin-bottom: 14px; font-size: 12px; color: #166534;">
+                    <span style="font-size: 16px;">✓</span>
+                    <div style="flex: 1;">
+                        <span id="poExpenseExistingMsg">
+                            {% if linked_expense %}
+                            Already recorded in <strong>{{ linked_expense.month_key }}</strong> Expenses Sheet (${{ "{:,.2f}".format(linked_expense.total_price) }} on {{ linked_expense.expense_date }}).
+                            {% endif %}
+                        </span>
+                        <div style="margin-top: 4px;">
+                            <a href="javascript:void(0)" onclick="openExpenseSheetTab('{{ linked_expense.month_key if linked_expense else '' }}')" style="font-weight: 700; color: #047857; text-decoration: underline;">
+                                Open {{ linked_expense.month_key if linked_expense else '' }} Expenses Sheet ➔
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                        Item Description (មុខទំនិញ/ការចំណាយ) *
+                    </label>
+                    <input type="text" id="poExpItem" name="item" class="form-control" 
+                           value="{% if order %}{{ order.order_number }} - {{ order.vendor_name or 'Vendor' }}{% endif %}" 
+                           required style="width: 100%; height: 34px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 5px; padding: 0 10px;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                            Expense Date (កាលបរិច្ឆេទ) *
+                        </label>
+                        <input type="date" id="poExpDate" name="expense_date" class="form-control" 
+                               value="{% if order and order.order_date %}{{ order.order_date.strftime('%Y-%m-%d') }}{% endif %}" 
+                               required style="width: 100%; height: 34px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 5px; padding: 0 10px;"
+                               onchange="updatePoExpMonthKey(this.value)">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                            Amount ($ USD) *
+                        </label>
+                        <input type="number" step="0.01" min="0.01" id="poExpAmount" name="amount" class="form-control" 
+                               value="{% if order %}{{ '%.2f'|format(order.total_amount or 0) }}{% endif %}" 
+                               required style="width: 100%; height: 34px; font-size: 13px; font-weight: 700; color: #B91C1C; border: 1px solid #CBD5E1; border-radius: 5px; padding: 0 10px;">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                            Category (ប្រភេទ) *
+                        </label>
+                        <input type="text" id="poExpCategory" name="category" list="poExpCategoriesList" class="form-control" 
+                               value="Purchases" required style="width: 100%; height: 34px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 5px; padding: 0 10px;">
+                        <datalist id="poExpCategoriesList">
+                            {% for c in (expense_categories or ['Purchases', 'Inventory', 'Packaging', 'Raw Materials', 'General']) %}
+                            <option value="{{ c }}">{{ c }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                            Paid By (អ្នកទូទាត់/គណនី)
+                        </label>
+                        <input type="text" id="poExpPaidBy" name="paid_by" list="poExpPayersList" class="form-control" 
+                               value="ABA Bank" style="width: 100%; height: 34px; font-size: 13px; border: 1px solid #CBD5E1; border-radius: 5px; padding: 0 10px;">
+                        <datalist id="poExpPayersList">
+                            {% for p in (expense_payers or ['ABA Bank', 'Cash', 'Bank Transfer', 'Admin']) %}
+                            <option value="{{ p }}">{{ p }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                        Month Sheet Target (សន្លឹកខែ)
+                    </label>
+                    <input type="text" id="poExpMonthKey" name="month_key" class="form-control" 
+                           value="{% if order and order.order_date %}{{ order.order_date.strftime('%Y-%m') }}{% endif %}" 
+                           readonly style="width: 100%; height: 32px; font-size: 12px; font-weight: 700; color: #0F766E; background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 5px; padding: 0 10px;">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 12px;">
+                    <label class="form-label" style="font-size: 12px; font-weight: 600; color: #334155; margin-bottom: 4px; display: block;">
+                        Notes / Remarks
+                    </label>
+                    <textarea id="poExpNotes" name="notes" class="form-control" rows="2" 
+                              style="width: 100%; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 5px; padding: 6px 10px;">{% if order %}PO: {{ order.order_number }} • Vendor: {{ order.vendor_name or 'N/A' }}{% endif %}</textarea>
+                </div>
+
+                {% if order and (order.payment_status != 'PAID' and order.status != 'PAID') %}
+                <div style="background: #FFFBEB; border: 1px solid #FDE68A; border-radius: 6px; padding: 8px 12px; margin-top: 10px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: #92400E; cursor: pointer; margin: 0;">
+                        <input type="checkbox" id="poExpMarkPaid" name="mark_as_paid" checked style="accent-color: #7A5531; width: 15px; height: 15px;">
+                        <span>Also update Purchase Order payment status to <strong>Paid</strong></span>
+                    </label>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center;">
+                <div id="poExpSubmitSpinner" style="display: none; font-size: 12px; color: #0F766E; font-weight: 600;">
+                    <span>⏳ Saving to Expenses Sheet...</span>
+                </div>
+                <div style="display: flex; gap: 8px; margin-left: auto;">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddToExpensesModal()" style="height: 34px; padding: 0 14px; font-size: 12px; border-radius: 5px;">Cancel</button>
+                    <button type="submit" id="btnPoExpSubmit" class="btn btn-primary" style="height: 34px; padding: 0 16px; font-size: 12px; font-weight: 700; background: #0F766E; border-color: #0F766E; border-radius: 5px; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>✓ Add to Expenses Sheet</span>
+                    </button>
+                </div>
             </div>
         </form>
     </div>
@@ -4264,6 +4427,240 @@ function openPaymentModal() { document.getElementById('poRecordPaymentModal').st
 function closePaymentModal() { document.getElementById('poRecordPaymentModal').style.display = 'none'; }
 function openQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'flex'; }
 function closeQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'none'; }
+
+// Add to Expenses Modal & Actions
+function openAddToExpensesModal() {
+    const poId = document.getElementById('poIdHidden')?.value;
+    if (!poId || poId === '0') {
+        alert('Please save the Purchase Order first before adding it to the Expenses Sheet.');
+        return;
+    }
+
+    // Refresh dynamic fields if blank
+    const dateInput = document.getElementById('poExpDate');
+    if (dateInput && !dateInput.value) {
+        const orderDate = document.getElementById('poOrderDateInput')?.value;
+        dateInput.value = orderDate || new Date().toISOString().substring(0, 10);
+    }
+    if (dateInput) {
+        updatePoExpMonthKey(dateInput.value);
+    }
+
+    const amountInput = document.getElementById('poExpAmount');
+    if (amountInput && (!amountInput.value || parseFloat(amountInput.value) <= 0)) {
+        let totalVal = 0;
+        const totalPill = document.getElementById('poHeaderAmountPill');
+        if (totalPill) {
+            const raw = totalPill.innerText.replace(/[^0-9.-]/g, '');
+            totalVal = parseFloat(raw) || 0;
+        }
+        if (totalVal > 0) {
+            amountInput.value = totalVal.toFixed(2);
+        }
+    }
+
+    const modal = document.getElementById('poAddToExpensesModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAddToExpensesModal() {
+    const modal = document.getElementById('poAddToExpensesModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function updatePoExpMonthKey(dateStr) {
+    const mkInput = document.getElementById('poExpMonthKey');
+    if (mkInput && dateStr) {
+        const parts = dateStr.split('-');
+        if (parts.length >= 2) {
+            mkInput.value = `${parts[0]}-${parts[1].padStart(2, '0')}`;
+        }
+    }
+}
+
+function openExpenseSheetTab(monthKey) {
+    if (!monthKey) {
+        monthKey = document.getElementById('poExpMonthKey')?.value;
+    }
+    if (!monthKey) {
+        const now = new Date();
+        monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+
+    const url = `/expenses/monthly?month=${encodeURIComponent(monthKey)}`;
+    const title = `Expenses: ${monthKey}`;
+
+    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.openTab === 'function') {
+        window.top.inflowMdi.openTab(url, title, 'expenses');
+    } else if (window.parent && window.parent.inflowMdi && typeof window.parent.inflowMdi.openTab === 'function') {
+        window.parent.inflowMdi.openTab(url, title, 'expenses');
+    } else {
+        window.open(url, '_blank');
+    }
+}
+
+function handlePoAddToExpensesSubmit(e) {
+    if (e) e.preventDefault();
+
+    const poId = document.getElementById('poIdHidden')?.value;
+    if (!poId || poId === '0') {
+        alert('Please save the Purchase Order first before adding it to expenses.');
+        return;
+    }
+
+    const item = document.getElementById('poExpItem')?.value.trim();
+    const expenseDate = document.getElementById('poExpDate')?.value;
+    const amountVal = document.getElementById('poExpAmount')?.value;
+    const amount = parseFloat(amountVal || 0);
+    const category = document.getElementById('poExpCategory')?.value.trim();
+    const paidBy = document.getElementById('poExpPaidBy')?.value.trim();
+    const monthKey = document.getElementById('poExpMonthKey')?.value.trim();
+    const notes = document.getElementById('poExpNotes')?.value.trim();
+    const markAsPaid = document.getElementById('poExpMarkPaid') ? document.getElementById('poExpMarkPaid').checked : false;
+
+    if (!item) {
+        alert('Please enter an item description.');
+        document.getElementById('poExpItem')?.focus();
+        return;
+    }
+    if (!expenseDate) {
+        alert('Please select an expense date.');
+        document.getElementById('poExpDate')?.focus();
+        return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+        alert('Please enter a valid expense amount greater than 0.');
+        document.getElementById('poExpAmount')?.focus();
+        return;
+    }
+    if (!category) {
+        alert('Please enter or select a category.');
+        document.getElementById('poExpCategory')?.focus();
+        return;
+    }
+
+    const submitBtn = document.getElementById('btnPoExpSubmit');
+    const spinner = document.getElementById('poExpSubmitSpinner');
+    if (submitBtn) submitBtn.disabled = true;
+    if (spinner) spinner.style.display = 'block';
+
+    const payload = {
+        item: item,
+        expense_date: expenseDate,
+        amount: amount,
+        category: category,
+        paid_by: paidBy,
+        month_key: monthKey,
+        notes: notes,
+        mark_as_paid: markAsPaid
+    };
+
+    fetch(`/purchases/${poId}/add-to-expenses`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify(payload)
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(j => { throw new Error(j.message || 'Server error'); });
+        }
+        return res.json();
+    })
+    .then(data => {
+        if (data.success) {
+            closeAddToExpensesModal();
+
+            // 1. Update top bar action button
+            const topBtn = document.getElementById('btnPoAddToExpenses');
+            const btnText = document.getElementById('poExpenseBtnText');
+            if (topBtn) topBtn.classList.add('po-top-expense-linked');
+            if (btnText) btnText.textContent = `In Expenses ($${amount.toFixed(2)})`;
+
+            // 2. Update financial column link
+            const metaWrap = document.getElementById('poExpenseMetaWrap');
+            if (metaWrap) {
+                metaWrap.innerHTML = `
+                    <span class="po-expense-status-tag" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #047857; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 2px 7px; border-radius: 4px;">
+                        ✓ In ${data.month_key} Expenses Sheet
+                        <a href="javascript:void(0)" onclick="openExpenseSheetTab('${data.month_key}')" style="color: #047857; text-decoration: underline; margin-left: 2px;">View ➔</a>
+                    </span>
+                `;
+            }
+
+            // 3. Update existing notice inside modal for future opens
+            const noticeBox = document.getElementById('poExpenseExistingNotice');
+            const noticeMsg = document.getElementById('poExpenseExistingMsg');
+            if (noticeBox && noticeMsg) {
+                noticeMsg.innerHTML = `Already recorded in <strong>${data.month_key}</strong> Expenses Sheet ($${amount.toFixed(2)} on ${expenseDate}).`;
+                noticeBox.style.display = 'flex';
+            }
+
+            // 4. Update payment badge if mark_as_paid was selected
+            if (markAsPaid) {
+                const unpaidBadge = document.querySelector('.po-fin-badge-unpaid, .badge-unpaid');
+                if (unpaidBadge) {
+                    unpaidBadge.textContent = 'Paid';
+                    unpaidBadge.className = 'po-fin-badge-paid';
+                }
+            }
+
+            // 5. Toast notification
+            showPoExpenseSuccessToast(data.message || `Added to ${data.month_key} Expenses Sheet!`, data.month_key);
+        } else {
+            alert(data.message || 'Failed to add to expenses sheet.');
+        }
+    })
+    .catch(err => {
+        console.error('Error adding to expenses:', err);
+        alert(err.message || 'An error occurred while adding to expenses sheet.');
+    })
+    .finally(() => {
+        if (submitBtn) submitBtn.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+    });
+}
+
+function showPoExpenseSuccessToast(msg, monthKey) {
+    const existing = document.querySelector('.po-toast-banner');
+    if (existing) existing.remove();
+
+    const t = document.createElement('div');
+    t.className = 'po-toast-banner';
+    t.style.display = 'flex';
+    t.style.alignItems = 'center';
+    t.style.gap = '12px';
+    t.style.background = '#064E3B';
+    t.style.border = '1px solid #059669';
+    t.style.color = '#FFFFFF';
+    t.style.boxShadow = '0 10px 25px -5px rgba(0,0,0,0.2)';
+
+    t.innerHTML = `
+        <span style="font-size: 16px;">🧾</span>
+        <span style="flex: 1; font-weight: 500;">${msg}</span>
+        <button type="button" onclick="openExpenseSheetTab('${monthKey}'); this.closest('.po-toast-banner').remove();" 
+                style="background: #10B981; color: #FFFFFF; border: none; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 4px; cursor: pointer; white-space: nowrap;">
+            Open Sheet ➔
+        </button>
+        <button type="button" onclick="this.closest('.po-toast-banner').remove()" 
+                style="background: transparent; color: #A7F3D0; border: none; font-size: 14px; cursor: pointer; margin-left: -4px;">
+            ✕
+        </button>
+    `;
+
+    document.body.appendChild(t);
+    setTimeout(() => {
+        if (t.parentNode) {
+            t.style.opacity = '0';
+            t.style.transition = 'opacity 0.4s ease';
+            setTimeout(() => t.remove(), 400);
+        }
+    }, 6000);
+}
+
 
 function saveQuickVendor() {
     const name = document.getElementById('quickVendorName')?.value.trim();

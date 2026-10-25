@@ -591,6 +591,9 @@ def create_purchase():
                                receiving_percent=0,
                                attachments=[],
                                attachment_count=0,
+                               linked_expense=None,
+                               expense_categories=['Purchases', 'Inventory', 'Packaging', 'Raw Materials', 'General'],
+                               expense_payers=['ABA Bank', 'Cash', 'Bank Transfer'],
                                company=company,
                                date_filter=date_filter,
                                status_filter=status_filter,
@@ -835,6 +838,25 @@ def detail_purchase(id):
         ORDER BY id DESC
     """, (id,))
 
+    # Check if this PO is already linked to an expense
+    linked_expense = query_one("""
+        SELECT id, expense_date, total_price, category, paid_by, month_key 
+        FROM expenses 
+        WHERE notes ILIKE %s OR item ILIKE %s
+        ORDER BY id DESC LIMIT 1
+    """, (f"%{order['order_number']}%", f"%{order['order_number']}%"))
+
+    # Expense categories and payers for the Add to Expenses modal
+    exp_cats_rows = query_all("SELECT DISTINCT category FROM expenses WHERE category IS NOT NULL AND category != '' ORDER BY category ASC")
+    expense_categories = [r['category'] for r in exp_cats_rows] if exp_cats_rows else []
+    if 'Purchases' not in expense_categories:
+        expense_categories.insert(0, 'Purchases')
+
+    exp_payers_rows = query_all("SELECT DISTINCT paid_by FROM expenses WHERE paid_by IS NOT NULL AND paid_by != '' ORDER BY paid_by ASC")
+    expense_payers = [r['paid_by'] for r in exp_payers_rows] if exp_payers_rows else []
+    if 'ABA Bank' not in expense_payers:
+        expense_payers.insert(0, 'ABA Bank')
+
     return render_template('purchases/detail.html', 
                            is_new=False,
                            order=order, 
@@ -843,6 +865,9 @@ def detail_purchase(id):
                            inventory_logs=inventory_logs,
                            attachments=attachments,
                            attachment_count=len(attachments),
+                           linked_expense=linked_expense,
+                           expense_categories=expense_categories,
+                           expense_payers=expense_payers,
                            company=company,
                            total_qty_ordered=total_qty_ordered,
                            total_qty_received=total_qty_received,
@@ -1461,6 +1486,106 @@ def record_payment(id):
 
     except Exception as e:
         flash(f"Error recording payment: {e}", "error")
+        return redirect(url_for('purchase_orders.detail_purchase', id=id))
+
+@purchase_orders_bp.route('/purchases/<int:id>/add-to-expenses', methods=['POST'])
+def add_po_to_expenses(id):
+    order = query_one("""
+        SELECT po.*, v.name as vendor_name 
+        FROM purchase_orders po 
+        LEFT JOIN vendors v ON po.vendor_id = v.id 
+        WHERE po.id = %s
+    """, (id,))
+    if not order:
+        return jsonify({'success': False, 'message': 'Purchase order not found.'}), 404
+
+    try:
+        data = request.get_json(silent=True) or request.form
+        
+        vendor_name = order.get('vendor_name') or 'Vendor'
+        default_item = f"{order['order_number']} - {vendor_name}"
+        item = (data.get('item') or default_item).strip()
+        if not item:
+            item = default_item
+
+        raw_date = data.get('expense_date')
+        exp_date = None
+        if raw_date:
+            for fmt in ('%Y-%m-%d', '%d-%b-%y', '%d-%b-%Y', '%d/%m/%Y', '%m/%d/%Y', '%Y/%m/%d'):
+                try:
+                    exp_date = datetime.strptime(str(raw_date).strip(), fmt).date()
+                    break
+                except (ValueError, TypeError):
+                    pass
+        if not exp_date:
+            if order.get('order_date'):
+                exp_date = order['order_date']
+            else:
+                exp_date = date.today()
+
+        month_key = (data.get('month_key') or exp_date.strftime('%Y-%m')).strip()
+
+        raw_amount = data.get('amount')
+        if raw_amount is not None and str(raw_amount).strip() != '':
+            total_price = max(0.0, float(raw_amount))
+        else:
+            total_price = float(order.get('total_amount') or 0.0)
+
+        category = (data.get('category') or 'Purchases').strip()
+        paid_by = (data.get('paid_by') or 'ABA Bank').strip()
+        
+        default_notes = f"Purchase Order: {order['order_number']} • Vendor: {vendor_name}"
+        notes = (data.get('notes') or default_notes).strip()
+
+        branch_id = order.get('branch_id')
+        recorded_by = session.get('username') or 'Admin'
+
+        new_expense_id = execute_returning_id("""
+            INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, payment_account, notes, month_key, branch_id, recorded_by)
+            VALUES (%s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
+        """, (exp_date, item, category, total_price, total_price, paid_by, paid_by, notes, month_key, branch_id, recorded_by))
+
+        from routes.expenses import _get_or_create_monthly_summary
+        _get_or_create_monthly_summary(month_key, branch_id=str(branch_id) if branch_id else 'main')
+
+        mark_as_paid = data.get('mark_as_paid') in (True, 'true', '1', 1, 'on')
+        if mark_as_paid and float(order.get('balance_due') or 0.0) > 0:
+            pay_amount = min(total_price, float(order.get('balance_due') or 0.0))
+            new_paid = float(order.get('paid_amount') or 0.0) + pay_amount
+            new_bal = max(0.0, float(order.get('total_amount') or 0.0) - new_paid)
+            new_stat = 'PAID' if new_bal <= 0 else 'PARTIAL'
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("""
+                    UPDATE purchase_orders 
+                    SET paid_amount = %s, balance_due = %s, payment_status = %s, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (new_paid, new_bal, new_stat, id))
+                cur.execute("""
+                    INSERT INTO order_payments (order_type, order_id, amount, payment_method, reference, notes)
+                    VALUES ('PO', %s, %s, %s, %s, %s)
+                """, (id, pay_amount, paid_by, f"Expense #{new_expense_id}", f"Added to Expenses Sheet ({month_key})"))
+
+        msg = f"Successfully added {order['order_number']} (${total_price:,.2f}) to {month_key} Expenses Sheet!"
+
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
+        if is_ajax:
+            return jsonify({
+                'success': True,
+                'message': msg,
+                'expense_id': new_expense_id,
+                'month_key': month_key,
+                'total_price': total_price
+            })
+
+        flash(msg, 'success')
+        return redirect(url_for('purchase_orders.detail_purchase', id=id))
+
+    except Exception as e:
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
+        if is_ajax:
+            return jsonify({'success': False, 'message': f"Error adding to expenses: {e}"}), 500
+        flash(f"Error adding to expenses: {e}", "error")
         return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
 @purchase_orders_bp.route('/purchases/<int:id>/print')
