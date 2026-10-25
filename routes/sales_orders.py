@@ -2003,7 +2003,7 @@ def new_order():
                 'total_amount': 0.0,
                 'paid_amount': 0.0,
                 'balance_due': 0.0,
-                'sales_rep': (session.get('display_name') or session.get('username') or (branch.get('manager_name') if branch else '') or ''),
+                'sales_rep': (session.get('username') or ''),
                 'po_number': '',
                 'carrier': '',
                 'tracking_number': '',
@@ -2048,7 +2048,7 @@ def new_order():
             'total_amount': 0.0,
             'paid_amount': 0.0,
             'balance_due': 0.0,
-            'sales_rep': (session.get('display_name') or session.get('username') or (branch.get('manager_name') if branch else '') or ''),
+            'sales_rep': (session.get('username') or ''),
             'po_number': '',
             'carrier': '',
             'tracking_number': '',
@@ -2310,6 +2310,16 @@ def detail_order(id):
         user_bid = _get_user_branch_id()
         if user_bid:
             return redirect(url_for('sales_orders.list_orders', status='PAID', branch=user_bid))
+    order = dict(order)
+    # Ensure biller name shows only login name (username)
+    raw_rep = (order.get('sales_rep') or order.get('completed_by') or '').strip()
+    if raw_rep:
+        u_match = query_one("SELECT username FROM users WHERE display_name = %s OR username = %s LIMIT 1", (raw_rep, raw_rep))
+        if u_match and u_match.get('username'):
+            order['sales_rep'] = u_match['username']
+        else:
+            order['sales_rep'] = raw_rep
+
     if 'date_filter' in request.args:
         date_filter = request.args.get('date_filter') or 'All'
         session['so_date_filter'] = date_filter
@@ -2475,6 +2485,7 @@ def detail_order(id):
                                all_locations=all_locations,
                                pricing_schemes=pricing_schemes,
                                all_delivery_men=all_delivery_men,
+                               all_users=query_all("SELECT id, username, display_name FROM users WHERE is_active = TRUE ORDER BY username ASC"),
                                all_customers=partial_custs,
                                all_products=[],
                                company=company,
@@ -2691,7 +2702,11 @@ def save_order(id=0):
 
         sales_rep = (data.get('sales_rep') or (order['sales_rep'] if order else '') or '').strip()
         if is_new and not sales_rep:
-            sales_rep = (session.get('display_name') or session.get('username') or '').strip()
+            sales_rep = (session.get('username') or '').strip()
+        elif sales_rep:
+            u_match = query_one("SELECT username FROM users WHERE display_name = %s OR username = %s LIMIT 1", (sales_rep, sales_rep))
+            if u_match and u_match.get('username'):
+                sales_rep = u_match['username']
         
         # When notes are submitted, use submitted value (allowing empty string to delete notes!)
         if 'notes' in data:
