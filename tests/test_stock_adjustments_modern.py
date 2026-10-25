@@ -39,6 +39,22 @@ class ModernStockAdjustmentsTestCase(unittest.TestCase):
         self.assertIn("Remove stock", html)
         self.assertIn("Add stock", html)
 
+        # Multi-category dropdown elements
+        self.assertIn("adjCategoryTriggerBtn", html)
+        self.assertIn("catMultiSelectContainer", html)
+        self.assertIn("adjCategoryDropdownMenu", html)
+        self.assertIn("adj-cat-cb", html)
+        self.assertIn("Select All", html)
+
+        # Arrangement modal elements
+        self.assertIn("adjArrangeModal", html)
+        self.assertIn("By Category", html)
+        self.assertIn("By Letter / Alphabetical", html)
+        self.assertIn("Lowest Stock First", html)
+        self.assertIn("Highest Stock First", html)
+        self.assertIn("Confirm & Add All Products", html)
+        self.assertIn("adjTableArrangeSelect", html)
+
     def test_api_products_for_adjustment_endpoint(self):
         """Test API returning products with on_hand_qty and reserved_qty."""
         res = self.client.get('/api/inventory/products-for-adjustment?all=true')
@@ -110,5 +126,56 @@ class ModernStockAdjustmentsTestCase(unittest.TestCase):
         self.assertIn(p1['sku'], detail_html)
         self.assertIn("A-5", detail_html)
 
+    def test_multi_category_products_selection(self):
+        """Test API allows selecting multiple categories simultaneously."""
+        cats = query_one("SELECT id FROM categories LIMIT 2")
+        if not cats:
+            self.skipTest("No categories found in database")
+        
+        # Test comma-separated category_ids
+        res = self.client.get(f'/api/inventory/products-for-adjustment?category_ids=101,102')
+        self.assertEqual(res.status_code, 200)
+        data = json.loads(res.data)
+        self.assertTrue(data['success'])
+        
+        # All returned products must belong to one of the selected categories
+        for p in data['products']:
+            self.assertIn(p['category_id'], [101, 102])
+
+    def test_add_all_products_sorting_options(self):
+        """Test API sorting by category, letter/latter, lowest stock, and highest stock."""
+        # 1. By Category
+        res_cat = self.client.get('/api/inventory/products-for-adjustment?all=true&sort_by=category')
+        self.assertEqual(res_cat.status_code, 200)
+        prods_cat = json.loads(res_cat.data)['products']
+        if len(prods_cat) >= 2:
+            cat_names = [p['category_name'].lower() for p in prods_cat]
+            self.assertEqual(cat_names, sorted(cat_names))
+
+        # 2. By Letter (A-Z)
+        res_letter = self.client.get('/api/inventory/products-for-adjustment?all=true&sort_by=letter')
+        self.assertEqual(res_letter.status_code, 200)
+        prods_letter = json.loads(res_letter.data)['products']
+        if len(prods_letter) >= 2:
+            names = [p['name'].lower() for p in prods_letter]
+            self.assertEqual(names, sorted(names))
+
+        # 3. By Lowest Stock
+        res_low = self.client.get('/api/inventory/products-for-adjustment?all=true&sort_by=lowest_stock')
+        self.assertEqual(res_low.status_code, 200)
+        prods_low = json.loads(res_low.data)['products']
+        if len(prods_low) >= 2:
+            quantities = [p['on_hand_qty'] for p in prods_low]
+            self.assertEqual(quantities, sorted(quantities))
+
+        # 4. By Highest Stock
+        res_high = self.client.get('/api/inventory/products-for-adjustment?all=true&sort_by=highest_stock')
+        self.assertEqual(res_high.status_code, 200)
+        prods_high = json.loads(res_high.data)['products']
+        if len(prods_high) >= 2:
+            quantities = [p['on_hand_qty'] for p in prods_high]
+            self.assertEqual(quantities, sorted(quantities, reverse=True))
+
 if __name__ == '__main__':
     unittest.main()
+

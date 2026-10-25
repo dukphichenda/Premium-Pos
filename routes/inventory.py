@@ -263,7 +263,8 @@ def detail_adjustment(id):
 def api_products_for_adjustment():
     """
     API returning products for stock adjustment selection:
-    Supports One-by-One query, Category batching, or All products.
+    Supports One-by-One query, Multi-Category batching, or All products.
+    Supports ordering/sorting by category, letter/latter, lowest stock, or highest stock.
     Includes on_hand_qty, reserved_qty, available_qty, unit_cost, and UOM ratios.
     """
     location_id = request.args.get('location_id', type=int)
@@ -271,24 +272,50 @@ def api_products_for_adjustment():
         def_loc = query_one("SELECT id FROM locations WHERE is_default = TRUE LIMIT 1") or query_one("SELECT id FROM locations LIMIT 1")
         location_id = def_loc['id'] if def_loc else 100
 
-    category_id = request.args.get('category_id', type=int)
+    # Parse single or multiple category IDs (supports ?category_id=1&category_id=2 or ?category_ids=1,2)
+    raw_cat_ids = request.args.getlist('category_id') + request.args.getlist('category_ids') + request.args.getlist('category_ids[]')
+    selected_cat_ids = []
+    for raw in raw_cat_ids:
+        for p in str(raw).split(','):
+            p = p.strip()
+            if p.isdigit():
+                selected_cat_ids.append(int(p))
+    selected_cat_ids = list(dict.fromkeys(selected_cat_ids))
+
     q = (request.args.get('q') or '').strip()
     fetch_all = request.args.get('all', 'false').lower() in ('1', 'true', 'yes')
+    sort_by = (request.args.get('sort_by') or '').strip().lower()
 
     where_clauses = ["p.is_active = TRUE", "p.is_sellable = TRUE"]
     params = [location_id, location_id, location_id]
 
-    if category_id:
-        where_clauses.append("p.category_id = %s")
-        params.append(category_id)
+    if selected_cat_ids:
+        where_clauses.append("p.category_id = ANY(%s)")
+        params.append(selected_cat_ids)
 
     if q:
         where_clauses.append("(p.name ILIKE %s OR p.sku ILIKE %s OR p.barcode ILIKE %s)")
         term = f"%{q}%"
         params.extend([term, term, term])
 
+    # Dynamic arrangement / sorting requested by user:
+    # 1. By category: COALESCE(c.name, 'General') ASC, p.name ASC
+    # 2. By letter / latter: p.name ASC
+    # 3. By lowest stock: COALESCE(i.quantity, 0) ASC, p.name ASC
+    # 4. By highest stock: COALESCE(i.quantity, 0) DESC, p.name ASC
+    if sort_by in ('category', 'by_category'):
+        order_by_sql = "ORDER BY COALESCE(c.name, 'General') ASC, p.name ASC"
+    elif sort_by in ('lowest', 'lowest_stock', 'stock_asc', 'low_stock'):
+        order_by_sql = "ORDER BY COALESCE(i.quantity, 0) ASC, p.name ASC"
+    elif sort_by in ('highest', 'highest_stock', 'stock_desc', 'high_stock'):
+        order_by_sql = "ORDER BY COALESCE(i.quantity, 0) DESC, p.name ASC"
+    elif sort_by in ('letter', 'latter', 'name', 'alphabetical', 'name_asc'):
+        order_by_sql = "ORDER BY p.name ASC"
+    else:
+        order_by_sql = "ORDER BY p.name ASC"
+
     where_sql = " AND ".join(where_clauses)
-    limit_sql = "" if (fetch_all or category_id) else "LIMIT 60"
+    limit_sql = "" if (fetch_all or selected_cat_ids) else "LIMIT 60"
 
     sql = f"""
         SELECT 
@@ -314,7 +341,7 @@ def api_products_for_adjustment():
             GROUP BY sol.product_id
         ) open_so ON p.id = open_so.product_id
         WHERE {where_sql}
-        ORDER BY p.name ASC
+        {order_by_sql}
         {limit_sql}
     """
     products = query_all(sql, tuple(params))

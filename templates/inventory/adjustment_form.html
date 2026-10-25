@@ -257,16 +257,49 @@
                 <div id="adjLiveSearchResults" class="inflow-live-search-dropdown" style="display: none;"></div>
             </div>
 
-            <!-- Mode 2: Add by Category -->
+            <!-- Mode 2: Add by Category (Supports Multiple Category Selection) -->
             <div class="inflow-adj-mode-category">
-                <select id="adjCategorySelect" class="form-select form-select-sm" style="max-width: 220px; font-size: 13px;">
+                <div class="inflow-cat-multiselect-container" id="catMultiSelectContainer">
+                    <button type="button" class="inflow-cat-picker-btn" id="adjCategoryTriggerBtn" onclick="toggleCategoryMultiDropdown(event)" title="Click to select one or multiple categories">
+                        <span id="adjCategoryTriggerLabel">-- Choose Category --</span>
+                        <span class="cat-picker-arrow">▾</span>
+                    </button>
+                    <!-- Floating Popover Dropdown -->
+                    <div id="adjCategoryDropdownMenu" class="inflow-cat-popover" style="display: none;" onclick="event.stopPropagation()">
+                        <div class="inflow-cat-popover-header">
+                            <input type="text" id="catSearchInput" class="form-input form-input-sm" placeholder="Filter categories..." oninput="filterCategoryDropdownList(this.value)" autocomplete="off">
+                            <div class="inflow-cat-quick-actions">
+                                <button type="button" class="cat-quick-btn" onclick="toggleAllCategoryCheckboxes(true)">Select All</button>
+                                <span style="color: #CBD5E1;">•</span>
+                                <button type="button" class="cat-quick-btn" onclick="toggleAllCategoryCheckboxes(false)">Clear</button>
+                            </div>
+                        </div>
+                        <div class="inflow-cat-list" id="catMenuList">
+                            {% for c in categories %}
+                            <label class="inflow-cat-item-row" data-name="{{ c.name|lower }}">
+                                <input type="checkbox" class="adj-cat-cb" value="{{ c.id }}" data-name="{{ c.name }}" data-count="{{ c.product_count }}" onchange="onCategoryCheckboxChange()">
+                                <span class="cat-row-name">{{ c.name }}</span>
+                                <span class="cat-row-count badge badge-neutral">({{ c.product_count }})</span>
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <div class="inflow-cat-popover-footer">
+                            <span id="catSelectedSummaryText" class="cat-footer-summary">0 categories selected</span>
+                            <button type="button" class="btn btn-xs btn-primary" onclick="closeCategoryDropdown()" style="font-weight: 700; padding: 3px 10px;">Done</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hidden select maintaining compatibility with existing tests/references -->
+                <select id="adjCategorySelect" style="display: none;">
                     <option value="">-- Choose Category --</option>
                     {% for c in categories %}
                     <option value="{{ c.id }}">{{ c.name }} ({{ c.product_count }})</option>
                     {% endfor %}
                 </select>
-                <button type="button" class="btn btn-sm btn-secondary" onclick="addProductsByCategory()" title="Add all products belonging to the selected category">
-                    <span>📁 Add by Category</span>
+
+                <button type="button" class="btn btn-sm btn-secondary" id="adjAddCategoryBtn" onclick="addProductsByCategory()" title="Add all products belonging to selected category/categories">
+                    <span id="adjAddCategoryBtnText">📁 Add by Category</span>
                 </button>
             </div>
 
@@ -279,6 +312,13 @@
 
             <!-- Utility Tools -->
             <div class="inflow-adj-mode-tools">
+                <select id="adjTableArrangeSelect" class="form-select form-select-sm" style="font-size: 12px; width: 145px; height: 31px;" onchange="onTableArrangeChanged(this.value)" title="Re-arrange loaded products in table">
+                    <option value="">⇅ Arrange by...</option>
+                    <option value="category">📁 Category</option>
+                    <option value="letter">🔤 Letter (A-Z)</option>
+                    <option value="lowest_stock">📉 Lowest Stock</option>
+                    <option value="highest_stock">📈 Highest Stock</option>
+                </select>
                 <input type="text" id="tableFilterInput" class="form-input form-input-sm" placeholder="Filter loaded items..." style="width: 150px; font-size: 12px;" oninput="filterTableRows(this.value)">
                 <button type="button" class="btn btn-sm btn-ghost" onclick="clearUnadjustedItems()" title="Remove rows where Change is zero">
                     <span>Clean 0s</span>
@@ -449,6 +489,87 @@
             </button>
             <button type="button" class="btn btn-primary inflow-adj-btn-continue" onclick="dismissDiscardModal()" autofocus style="border-radius: 8px; font-weight: 700;">
                 <span>Continue Editing (បន្តការកែសម្រួល)</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Add All Products - Choose Arrangement (Requested by User) -->
+<div id="adjArrangeModal" class="inflow-adj-modal-backdrop" style="display: none;" onclick="if(event.target===this)closeAddAllProductsModal()">
+    <div class="inflow-adj-modal-card" style="max-width: 520px;" role="dialog" aria-modal="true" aria-labelledby="arrangeModalTitle">
+        <!-- Header -->
+        <div class="inflow-adj-modal-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="inflow-adj-modal-icon-wrap" style="background: #E0F2FE; border-color: #BAE6FD;">
+                    <span style="font-size: 22px;">📦</span>
+                </div>
+                <div>
+                    <h3 id="arrangeModalTitle" class="inflow-adj-modal-title">Add All Products ({{ total_active_prods }})</h3>
+                    <p class="inflow-adj-modal-subtitle">Choose how to arrange products on this adjustment sheet</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeAddAllProductsModal()" style="background: none; border: none; font-size: 24px; cursor: pointer; color: #94A3B8; line-height: 1; padding: 2px 6px;">&times;</button>
+        </div>
+
+        <!-- Body / Options -->
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 13px; font-weight: 700; color: #334155; margin-bottom: 2px;">
+                Arrange & Sort Products by:
+            </div>
+
+            <!-- Option 1: By Category -->
+            <label class="adj-arrange-card active" data-val="category" onclick="selectArrangeOption(this, 'category')">
+                <input type="radio" name="adjArrangeChoice" value="category" checked style="display: none;">
+                <div class="arrange-card-icon" style="background: #EEF2FF; color: #4F46E5;">📁</div>
+                <div class="arrange-card-info">
+                    <div class="arrange-card-title">By Category</div>
+                    <div class="arrange-card-desc">Grouped alphabetically by category name, then product name</div>
+                </div>
+                <div class="arrange-card-radio-indicator">●</div>
+            </label>
+
+            <!-- Option 2: By Letter / Alphabetical (A to Z) / Latter -->
+            <label class="adj-arrange-card" data-val="letter" onclick="selectArrangeOption(this, 'letter')">
+                <input type="radio" name="adjArrangeChoice" value="letter" style="display: none;">
+                <div class="arrange-card-icon" style="background: #F0FDF4; color: #16A34A;">🔤</div>
+                <div class="arrange-card-info">
+                    <div class="arrange-card-title">By Letter / Alphabetical (A → Z)</div>
+                    <div class="arrange-card-desc">Sorted alphabetically from A to Z by product name</div>
+                </div>
+                <div class="arrange-card-radio-indicator">○</div>
+            </label>
+
+            <!-- Option 3: Lowest Stock First -->
+            <label class="adj-arrange-card" data-val="lowest_stock" onclick="selectArrangeOption(this, 'lowest_stock')">
+                <input type="radio" name="adjArrangeChoice" value="lowest_stock" style="display: none;">
+                <div class="arrange-card-icon" style="background: #FEF2F2; color: #DC2626;">📉</div>
+                <div class="arrange-card-info">
+                    <div class="arrange-card-title">Lowest Stock First</div>
+                    <div class="arrange-card-desc">Products with zero (0) or lowest on-hand stock count appear first</div>
+                </div>
+                <div class="arrange-card-radio-indicator">○</div>
+            </label>
+
+            <!-- Option 4: Highest Stock First -->
+            <label class="adj-arrange-card" data-val="highest_stock" onclick="selectArrangeOption(this, 'highest_stock')">
+                <input type="radio" name="adjArrangeChoice" value="highest_stock" style="display: none;">
+                <div class="arrange-card-icon" style="background: #ECFEFF; color: #0891B2;">📈</div>
+                <div class="arrange-card-info">
+                    <div class="arrange-card-title">Highest Stock First</div>
+                    <div class="arrange-card-desc">Products with the largest on-hand stock count appear first</div>
+                </div>
+                <div class="arrange-card-radio-indicator">○</div>
+            </label>
+        </div>
+
+        <!-- Footer Actions -->
+        <div style="display: flex; gap: 8px; justify-content: flex-end; align-items: center; margin-top: 8px;">
+            <button type="button" class="btn btn-secondary" onclick="closeAddAllProductsModal()" style="border-radius: 8px; font-weight: 600; padding: 8px 16px;">
+                Cancel
+            </button>
+            <button type="button" class="btn btn-primary" id="btnConfirmAddAll" onclick="confirmAddAllProductsWithArrangement()" style="border-radius: 8px; font-weight: 700; padding: 8px 20px; display: flex; align-items: center; gap: 6px;">
+                <span id="addAllBtnLabel">Confirm & Add All Products</span>
+                <span id="addAllSpinner" style="display: none;">⏳</span>
             </button>
         </div>
     </div>
@@ -1233,7 +1354,218 @@
     display: flex;
     align-items: center;
     gap: 6px;
+    position: relative;
 }
+
+/* Multi-select Category Dropdown */
+.inflow-cat-multiselect-container {
+    position: relative;
+}
+.inflow-cat-picker-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    padding: 5px 10px;
+    font-size: 13px;
+    color: #1E293B;
+    cursor: pointer;
+    min-width: 175px;
+    max-width: 220px;
+    height: 31px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: all 0.15s ease;
+}
+.inflow-cat-picker-btn:hover {
+    border-color: #00A3E0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.inflow-cat-picker-btn:focus {
+    outline: none;
+    border-color: #00A3E0;
+    box-shadow: 0 0 0 2px rgba(0, 163, 224, 0.15);
+}
+.inflow-cat-picker-btn .cat-picker-arrow {
+    color: #94A3B8;
+    font-size: 11px;
+    flex-shrink: 0;
+}
+.inflow-cat-popover {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    width: 280px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    box-shadow: 0 12px 28px -4px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.04);
+    z-index: 1050;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: popoverFadeIn 0.15s ease-out;
+}
+@keyframes popoverFadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.inflow-cat-popover-header {
+    padding: 8px 10px;
+    background: #F8FAFC;
+    border-bottom: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.inflow-cat-popover-header input {
+    width: 100%;
+    font-size: 12px;
+    padding: 5px 8px;
+    border: 1px solid #CBD5E1;
+    border-radius: 5px;
+}
+.inflow-cat-popover-header input:focus {
+    outline: none;
+    border-color: #00A3E0;
+    box-shadow: 0 0 0 2px rgba(0, 163, 224, 0.15);
+}
+.inflow-cat-quick-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    font-size: 11px;
+}
+.cat-quick-btn {
+    background: none;
+    border: none;
+    color: #00A3E0;
+    font-weight: 700;
+    cursor: pointer;
+    padding: 0;
+    font-size: 11px;
+}
+.cat-quick-btn:hover {
+    text-decoration: underline;
+}
+.inflow-cat-list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 4px 0;
+}
+.inflow-cat-item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    font-size: 12.5px;
+    color: #334155;
+    transition: background 0.1s ease;
+    user-select: none;
+    margin: 0;
+}
+.inflow-cat-item-row:hover {
+    background: #F1F5F9;
+}
+.inflow-cat-item-row input[type="checkbox"] {
+    cursor: pointer;
+    margin: 0;
+    width: 14px;
+    height: 14px;
+    accent-color: #00A3E0;
+}
+.inflow-cat-item-row .cat-row-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 500;
+}
+.inflow-cat-item-row .cat-row-count {
+    font-size: 11px;
+    color: #64748B;
+    flex-shrink: 0;
+}
+.inflow-cat-popover-footer {
+    padding: 6px 10px;
+    background: #F8FAFC;
+    border-top: 1px solid #E2E8F0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.cat-footer-summary {
+    font-size: 11.5px;
+    color: #64748B;
+    font-weight: 600;
+}
+
+/* Add All Products Arrangement Cards */
+.adj-arrange-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    background: #FFFFFF;
+    user-select: none;
+    margin: 0;
+}
+.adj-arrange-card:hover {
+    border-color: #93C5FD;
+    background: #F8FAFC;
+}
+.adj-arrange-card.active {
+    border-color: #00A3E0;
+    background: #F0F9FF;
+    box-shadow: 0 0 0 1px #00A3E0;
+}
+.arrange-card-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+}
+.arrange-card-info {
+    flex: 1;
+}
+.arrange-card-title {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0F172A;
+    margin-bottom: 2px;
+}
+.adj-arrange-card.active .arrange-card-title {
+    color: #0369A1;
+}
+.arrange-card-desc {
+    font-size: 12px;
+    color: #64748B;
+    line-height: 1.3;
+}
+.arrange-card-radio-indicator {
+    font-size: 18px;
+    color: #CBD5E1;
+    padding-right: 4px;
+}
+.adj-arrange-card.active .arrange-card-radio-indicator {
+    color: #00A3E0;
+    font-weight: 800;
+}
+
 .inflow-adj-mode-all {
     display: flex;
     align-items: center;
@@ -2131,45 +2463,277 @@ function onPickProductFromSearch(product) {
     }, 50);
 }
 
-// Add by Category
-async function addProductsByCategory() {
-    const catSelect = document.getElementById('adjCategorySelect');
-    const catId = catSelect.value;
-    if (!catId) {
-        alert("Please select a category first.");
-        return;
+// ==========================================================================
+// Category Selection & Multi-Category Batching (Requested by User)
+// ==========================================================================
+function toggleCategoryMultiDropdown(e) {
+    if (e) {
+        e.preventDefault();
+        e.stopPropagation();
     }
-    const locId = document.getElementById('adjLocationSelect').value;
-
-    try {
-        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&category_id=${catId}`);
-        const data = await res.json();
-        if (data.success && data.products) {
-            data.products.forEach(p => addProductRowToTable(p));
-            showToast(`${data.products.length} product(s) added from category!`);
+    const menu = document.getElementById('adjCategoryDropdownMenu');
+    if (!menu) return;
+    const isVisible = menu.style.display !== 'none';
+    if (isVisible) {
+        closeCategoryDropdown();
+    } else {
+        menu.style.display = 'flex';
+        const searchInput = document.getElementById('catSearchInput');
+        if (searchInput) {
+            searchInput.value = '';
+            filterCategoryDropdownList('');
+            setTimeout(() => searchInput.focus(), 50);
         }
-    } catch (e) {
-        alert("Error loading category products: " + e);
     }
 }
 
-// Add All Products
-async function addAllCatalogProducts() {
-    const locId = document.getElementById('adjLocationSelect').value;
-    if (!confirm(`Are you sure you want to load all catalog products for physical audit into this adjustment sheet?`)) {
+function closeCategoryDropdown() {
+    const menu = document.getElementById('adjCategoryDropdownMenu');
+    if (menu) menu.style.display = 'none';
+}
+
+// Global click-outside listener to close category dropdown
+document.addEventListener('click', function(e) {
+    const container = document.getElementById('catMultiSelectContainer');
+    if (container && !container.contains(e.target)) {
+        closeCategoryDropdown();
+    }
+});
+
+function filterCategoryDropdownList(query) {
+    const term = (query || '').toLowerCase().trim();
+    const items = document.querySelectorAll('.inflow-cat-item-row');
+    items.forEach(item => {
+        const name = item.dataset.name || '';
+        item.style.display = (!term || name.includes(term)) ? 'flex' : 'none';
+    });
+}
+
+function toggleAllCategoryCheckboxes(checked) {
+    const cbs = document.querySelectorAll('.adj-cat-cb');
+    cbs.forEach(cb => {
+        const parentRow = cb.closest('.inflow-cat-item-row');
+        if (!parentRow || parentRow.style.display !== 'none') {
+            cb.checked = checked;
+        }
+    });
+    onCategoryCheckboxChange();
+}
+
+function onCategoryCheckboxChange() {
+    const cbs = Array.from(document.querySelectorAll('.adj-cat-cb:checked'));
+    const count = cbs.length;
+    const triggerLabel = document.getElementById('adjCategoryTriggerLabel');
+    const summaryText = document.getElementById('catSelectedSummaryText');
+    const addBtnText = document.getElementById('adjAddCategoryBtnText');
+    const singleSelect = document.getElementById('adjCategorySelect');
+
+    let totalProds = 0;
+    cbs.forEach(cb => {
+        totalProds += parseInt(cb.dataset.count || 0) || 0;
+    });
+
+    if (count === 0) {
+        if (triggerLabel) triggerLabel.innerText = '-- Choose Category --';
+        if (summaryText) summaryText.innerText = '0 categories selected';
+        if (addBtnText) addBtnText.innerText = '📁 Add by Category';
+        if (singleSelect) singleSelect.value = '';
+    } else if (count === 1) {
+        const name = cbs[0].dataset.name;
+        const pCount = cbs[0].dataset.count;
+        if (triggerLabel) triggerLabel.innerText = `${name} (${pCount})`;
+        if (summaryText) summaryText.innerText = `1 category selected (${pCount} prods)`;
+        if (addBtnText) addBtnText.innerText = `📁 Add Category (1)`;
+        if (singleSelect) singleSelect.value = cbs[0].value;
+    } else {
+        if (triggerLabel) triggerLabel.innerText = `${count} Categories (${totalProds})`;
+        if (summaryText) summaryText.innerText = `${count} categories selected (${totalProds} prods)`;
+        if (addBtnText) addBtnText.innerText = `📁 Add Categories (${count})`;
+        if (singleSelect) singleSelect.value = cbs[0].value;
+    }
+}
+
+// Add by Category (Supports Multiple Selected Categories)
+async function addProductsByCategory() {
+    const checkedBoxes = Array.from(document.querySelectorAll('.adj-cat-cb:checked'));
+    let catIds = checkedBoxes.map(cb => cb.value);
+
+    // Fallback if none checked via checkboxes but single select has a value
+    if (catIds.length === 0) {
+        const catSelect = document.getElementById('adjCategorySelect');
+        if (catSelect && catSelect.value) {
+            catIds.push(catSelect.value);
+        }
+    }
+
+    if (catIds.length === 0) {
+        toggleCategoryMultiDropdown();
+        showToast("Please select one or more categories first.");
         return;
     }
 
+    closeCategoryDropdown();
+    const locId = document.getElementById('adjLocationSelect')?.value || '';
+
     try {
-        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&all=true`);
+        const addBtn = document.getElementById('adjAddCategoryBtn');
+        if (addBtn) addBtn.disabled = true;
+
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&category_ids=${catIds.join(',')}&sort_by=category`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            let addedCount = 0;
+            data.products.forEach(p => {
+                const pid = p.id || p.product_id;
+                if (!loadedProductsMap.has(pid)) {
+                    addProductRowToTable(p);
+                    addedCount++;
+                }
+            });
+            showToast(`${data.products.length} product(s) added from ${catIds.length} categor${catIds.length > 1 ? 'ies' : 'y'}!`);
+        } else {
+            showToast("No products found in selected categories.");
+        }
+    } catch (e) {
+        alert("Error loading category products: " + e);
+    } finally {
+        const addBtn = document.getElementById('adjAddCategoryBtn');
+        if (addBtn) addBtn.disabled = false;
+    }
+}
+
+// ==========================================================================
+// Add All Products with Arrangement Dialog (Requested by User)
+// "For add all product ask to arrange by category, latter or lowest or highest stock"
+// ==========================================================================
+let currentArrangeChoice = 'category';
+
+function addAllCatalogProducts() {
+    openAddAllProductsModal();
+}
+
+function openAddAllProductsModal() {
+    const modal = document.getElementById('adjArrangeModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        // Highlight active card
+        const targetCard = document.querySelector(`.adj-arrange-card[data-val="${currentArrangeChoice}"]`) || document.querySelector('.adj-arrange-card');
+        selectArrangeOption(targetCard, currentArrangeChoice);
+    }
+}
+
+function closeAddAllProductsModal() {
+    const modal = document.getElementById('adjArrangeModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function selectArrangeOption(el, choice) {
+    currentArrangeChoice = choice;
+    document.querySelectorAll('.adj-arrange-card').forEach(card => {
+        card.classList.remove('active');
+        const ind = card.querySelector('.arrange-card-radio-indicator');
+        if (ind) ind.innerText = '○';
+        const radio = card.querySelector('input[type="radio"]');
+        if (radio) radio.checked = false;
+    });
+
+    if (el) {
+        el.classList.add('active');
+        const ind = el.querySelector('.arrange-card-radio-indicator');
+        if (ind) ind.innerText = '●';
+        const radio = el.querySelector('input[type="radio"]');
+        if (radio) radio.checked = true;
+    }
+}
+
+async function confirmAddAllProductsWithArrangement() {
+    const locId = document.getElementById('adjLocationSelect')?.value || '';
+    const btnConfirm = document.getElementById('btnConfirmAddAll');
+    const spinner = document.getElementById('addAllSpinner');
+    const label = document.getElementById('addAllBtnLabel');
+
+    if (btnConfirm) btnConfirm.disabled = true;
+    if (spinner) spinner.style.display = 'inline-block';
+    if (label) label.innerText = 'Loading products...';
+
+    try {
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&all=true&sort_by=${currentArrangeChoice}`);
         const data = await res.json();
         if (data.success && data.products) {
             data.products.forEach(p => addProductRowToTable(p));
-            showToast(`All ${data.products.length} products loaded into adjustment sheet!`);
+            // Ensure all DOM table rows reflect the requested arrangement
+            sortTableRowsInDom(currentArrangeChoice);
+
+            const labels = {
+                'category': 'Category',
+                'letter': 'Letter (A-Z)',
+                'lowest_stock': 'Lowest Stock First',
+                'highest_stock': 'Highest Stock First'
+            };
+            const sortLabel = labels[currentArrangeChoice] || currentArrangeChoice;
+            showToast(`All ${data.products.length} products loaded arranged by ${sortLabel}!`);
+            closeAddAllProductsModal();
+        } else {
+            showToast("No products found in catalog.");
         }
     } catch (e) {
         alert("Error loading all products: " + e);
+    } finally {
+        if (btnConfirm) btnConfirm.disabled = false;
+        if (spinner) spinner.style.display = 'none';
+        if (label) label.innerText = 'Confirm & Add All Products';
     }
+}
+
+// ==========================================================================
+// Table Row Rearrangement Tool
+// ==========================================================================
+function onTableArrangeChanged(sortBy) {
+    if (!sortBy) return;
+    sortTableRowsInDom(sortBy);
+    const labels = {
+        'category': 'Category',
+        'letter': 'Letter (A-Z)',
+        'lowest_stock': 'Lowest Stock First',
+        'highest_stock': 'Highest Stock First'
+    };
+    showToast(`Table arranged by ${labels[sortBy] || sortBy}`);
+}
+
+function sortTableRowsInDom(sortBy) {
+    const tbody = document.getElementById('adjProductTableBody');
+    if (!tbody) return;
+    const rows = Array.from(tbody.querySelectorAll('tr.inflow-adj-row'));
+    if (rows.length <= 1) return;
+
+    rows.sort((rowA, rowB) => {
+        const idA = parseInt(rowA.dataset.productId);
+        const idB = parseInt(rowB.dataset.productId);
+        const itemA = loadedProductsMap.get(idA) || {};
+        const itemB = loadedProductsMap.get(idB) || {};
+
+        if (sortBy === 'category') {
+            const catComp = (itemA.category_name || '').localeCompare(itemB.category_name || '');
+            if (catComp !== 0) return catComp;
+            return (itemA.name || '').localeCompare(itemB.name || '');
+        } else if (sortBy === 'letter' || sortBy === 'latter' || sortBy === 'name') {
+            return (itemA.name || '').localeCompare(itemB.name || '');
+        } else if (sortBy === 'lowest_stock' || sortBy === 'lowest') {
+            const diff = (itemA.on_hand_qty_base || 0) - (itemB.on_hand_qty_base || 0);
+            if (diff !== 0) return diff;
+            return (itemA.name || '').localeCompare(itemB.name || '');
+        } else if (sortBy === 'highest_stock' || sortBy === 'highest') {
+            const diff = (itemB.on_hand_qty_base || 0) - (itemA.on_hand_qty_base || 0);
+            if (diff !== 0) return diff;
+            return (itemA.name || '').localeCompare(itemB.name || '');
+        }
+        return 0;
+    });
+
+    // Re-append in sorted order without destroying element state
+    rows.forEach(r => tbody.appendChild(r));
 }
 
 // ==========================================================================
