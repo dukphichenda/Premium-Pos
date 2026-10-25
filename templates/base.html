@@ -950,14 +950,17 @@
             flyout.style.maxHeight = maxH + 'px';
         }
 
-        function toggleSidebarFlyout(menuKey, triggerEl) {
+        function openSidebarFlyout(menuKey, triggerEl) {
             const flyout = document.getElementById('inflowSidebarFlyout');
             if (!flyout) return;
 
-            const isCurrentlyActive = triggerEl && triggerEl.classList.contains('active') && flyout.classList.contains('show');
-            if (isCurrentlyActive) {
-                closeSidebarFlyout();
-                return;
+            const targetSec = document.getElementById('flyout-' + menuKey);
+            if (!targetSec) return;
+
+            // Clear any pending close timers
+            if (window._sidebarFlyoutCloseTimer) {
+                clearTimeout(window._sidebarFlyoutCloseTimer);
+                window._sidebarFlyoutCloseTimer = null;
             }
 
             // Deactivate other items
@@ -970,10 +973,7 @@
             document.querySelectorAll('.flyout-section').forEach(sec => sec.style.display = 'none');
 
             // Show selected section
-            const targetSec = document.getElementById('flyout-' + menuKey);
-            if (targetSec) {
-                targetSec.style.display = 'block';
-            }
+            targetSec.style.display = 'block';
 
             flyout.classList.add('show');
 
@@ -982,6 +982,26 @@
                 requestAnimationFrame(() => positionSidebarFlyout(triggerEl));
             }
         }
+        window.openSidebarFlyout = openSidebarFlyout;
+
+        function toggleSidebarFlyout(menuKey, triggerEl) {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            if (!flyout) return;
+
+            if (window._sidebarFlyoutHoverTimer) {
+                clearTimeout(window._sidebarFlyoutHoverTimer);
+                window._sidebarFlyoutHoverTimer = null;
+            }
+
+            const isCurrentlyActive = triggerEl && triggerEl.classList.contains('active') && flyout.classList.contains('show');
+            if (isCurrentlyActive) {
+                closeSidebarFlyout();
+                return;
+            }
+
+            openSidebarFlyout(menuKey, triggerEl);
+        }
+        window.toggleSidebarFlyout = toggleSidebarFlyout;
 
         window.addEventListener('resize', function() {
             const flyout = document.getElementById('inflowSidebarFlyout');
@@ -994,14 +1014,119 @@
         });
 
         function closeSidebarFlyout() {
+            if (window._sidebarFlyoutHoverTimer) {
+                clearTimeout(window._sidebarFlyoutHoverTimer);
+                window._sidebarFlyoutHoverTimer = null;
+            }
+            if (window._sidebarFlyoutCloseTimer) {
+                clearTimeout(window._sidebarFlyoutCloseTimer);
+                window._sidebarFlyoutCloseTimer = null;
+            }
             const flyout = document.getElementById('inflowSidebarFlyout');
             if (flyout) {
                 flyout.classList.remove('show');
             }
             document.querySelectorAll('.inflow-sidebar-nav-item').forEach(el => el.classList.remove('active'));
         }
-
         window.closeSidebarFlyout = closeSidebarFlyout;
+
+        function scheduleSidebarFlyoutClose(delay = 220) {
+            if (window._sidebarFlyoutHoverTimer) {
+                clearTimeout(window._sidebarFlyoutHoverTimer);
+                window._sidebarFlyoutHoverTimer = null;
+            }
+            if (window._sidebarFlyoutCloseTimer) {
+                clearTimeout(window._sidebarFlyoutCloseTimer);
+            }
+            window._sidebarFlyoutCloseTimer = setTimeout(() => {
+                closeSidebarFlyout();
+            }, delay);
+        }
+
+        function cancelSidebarFlyoutClose() {
+            if (window._sidebarFlyoutCloseTimer) {
+                clearTimeout(window._sidebarFlyoutCloseTimer);
+                window._sidebarFlyoutCloseTimer = null;
+            }
+        }
+
+        function isSidebarMobileMode() {
+            return document.documentElement.classList.contains('is-mobile-view') || 
+                   (!document.documentElement.classList.contains('is-desktop-view') && window.innerWidth <= 768);
+        }
+
+        function initSidebarHoverFlyouts() {
+            const flyout = document.getElementById('inflowSidebarFlyout');
+            const navItems = document.querySelectorAll('.inflow-sidebar-nav-item[data-menu]');
+
+            navItems.forEach(item => {
+                const menuKey = item.getAttribute('data-menu');
+                if (!menuKey) return;
+
+                // Mouse enters sidebar icon: pop up flyout on hover without requiring click
+                item.addEventListener('mouseenter', function() {
+                    if (isSidebarMobileMode()) return;
+                    cancelSidebarFlyoutClose();
+
+                    const isAnyOpen = flyout && flyout.classList.contains('show');
+                    if (isAnyOpen) {
+                        // Switch immediately when moving between sidebar icons
+                        if (window._sidebarFlyoutHoverTimer) {
+                            clearTimeout(window._sidebarFlyoutHoverTimer);
+                            window._sidebarFlyoutHoverTimer = null;
+                        }
+                        openSidebarFlyout(menuKey, item);
+                    } else {
+                        // Snappy 60ms delay when first hovering from outside to avoid accidental swipes
+                        if (window._sidebarFlyoutHoverTimer) {
+                            clearTimeout(window._sidebarFlyoutHoverTimer);
+                        }
+                        window._sidebarFlyoutHoverTimer = setTimeout(() => {
+                            openSidebarFlyout(menuKey, item);
+                        }, 60);
+                    }
+                });
+
+                // Mouse leaves sidebar icon
+                item.addEventListener('mouseleave', function() {
+                    if (isSidebarMobileMode()) return;
+                    if (window._sidebarFlyoutHoverTimer) {
+                        clearTimeout(window._sidebarFlyoutHoverTimer);
+                        window._sidebarFlyoutHoverTimer = null;
+                    }
+                    scheduleSidebarFlyoutClose(220);
+                });
+            });
+
+            // Top logo item closes flyout when hovered
+            const logoItem = document.querySelector('.inflow-sidebar-logo-item');
+            if (logoItem) {
+                logoItem.addEventListener('mouseenter', function() {
+                    if (isSidebarMobileMode()) return;
+                    scheduleSidebarFlyoutClose(80);
+                });
+            }
+
+            if (flyout) {
+                // Keep flyout open while hovering inside it
+                flyout.addEventListener('mouseenter', function() {
+                    if (isSidebarMobileMode()) return;
+                    cancelSidebarFlyoutClose();
+                });
+
+                // Close flyout when mouse leaves it
+                flyout.addEventListener('mouseleave', function() {
+                    if (isSidebarMobileMode()) return;
+                    scheduleSidebarFlyoutClose(200);
+                });
+            }
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initSidebarHoverFlyouts);
+        } else {
+            initSidebarHoverFlyouts();
+        }
 
         function handleLogoutClick(event, linkEl) {
             if (event) {
