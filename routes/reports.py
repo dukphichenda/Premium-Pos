@@ -163,6 +163,12 @@ REPORT_CATALOG = {
                 'title': 'Branch Sales Summary',
                 'description': 'Summary of branch sales by product, total money sold, and Branch Costing sheet calculation.',
                 'icon': '🏬'
+            },
+            {
+                'key': 'hq-branch-earnings',
+                'title': 'HQ Branch Earnings',
+                'description': 'HQ earnings from branch sales: Qty Sold × (Branch Cost - HQ Costing). Restricted to Headquarters only.',
+                'icon': '🏢'
             }
         ]
     }
@@ -474,28 +480,6 @@ def reports_center():
 def view_report(report_key):
     meta, cat = get_report_meta(report_key)
 
-    # Filter parameters
-    customer_id = request.args.get('customer_id', '').strip()
-    customer_search = request.args.get('customer_search', '').strip()
-    if customer_search == '<All>':
-        customer_search = ''
-    sale_amount = request.args.get('sale_amount', '').strip()
-    if not sale_amount:
-        sale_amount = request.args.get('sales_amount', '').strip()
-    vendor_id = request.args.get('vendor_id', '')
-    category_id = request.args.get('category_id', '')
-    location_id = request.args.get('location_id', '')
-    movement_type = request.args.get('movement_type', '')
-    date_range = request.args.get('date_range', 'This Month')
-    custom_from = request.args.get('date_from', '')
-    custom_to = request.args.get('date_to', '')
-    status = request.args.get('status', 'Paid' if report_key == 'sales-order-profit' else 'All')
-    sort_by = request.args.get('sort_by', 'Total Sales' if report_key == 'branch-sales-summary' else 'Order Number')
-    orientation = request.args.get('orientation', 'Landscape' if report_key in ['sales-order-operational', 'sales-by-product-details', 'inventory-valuation', 'branch-sales-summary'] else 'Portrait')
-    group_by = request.args.get('group_by', 'None')
-    page = max(1, int(request.args.get('page', 1)))
-    per_page = 150 if (group_by == 'Category' or report_key == 'customer-order-history') else 36 # Rows per page matching printed sheet size
-    
     # Store Scope: Branch users strictly locked to their branch; HQ can view main, branch, or all
     user_role = session.get('role')
     user_bid = session.get('branch_id')
@@ -512,10 +496,38 @@ def view_report(report_key):
         branch_scope = req_branch
     elif active_bid:
         branch_scope = str(active_bid)
-    elif report_key == 'branch-sales-summary':
+    elif report_key in ('branch-sales-summary', 'hq-branch-earnings'):
         branch_scope = 'all'
     else:
         branch_scope = 'main'
+
+    # Security guard: HQ Branch Earnings is strictly restricted to Headquarters administrators only
+    if report_key == 'hq-branch-earnings':
+        if is_branch_user or session.get('is_branch_mode'):
+            flash("Access denied: HQ Branch Earnings is restricted to Headquarters administrators only.", "warning")
+            return redirect(url_for('reports.view_report', report_key='branch-sales-summary', branch=branch_scope))
+
+    # Filter parameters
+    customer_id = request.args.get('customer_id', '').strip()
+    customer_search = request.args.get('customer_search', '').strip()
+    if customer_search == '<All>':
+        customer_search = ''
+    sale_amount = request.args.get('sale_amount', '').strip()
+    if not sale_amount:
+        sale_amount = request.args.get('sales_amount', '').strip()
+    vendor_id = request.args.get('vendor_id', '')
+    category_id = request.args.get('category_id', '')
+    location_id = request.args.get('location_id', '')
+    movement_type = request.args.get('movement_type', '')
+    date_range = request.args.get('date_range', 'This Month')
+    custom_from = request.args.get('date_from', '')
+    custom_to = request.args.get('date_to', '')
+    status = request.args.get('status', 'Paid' if report_key == 'sales-order-profit' else 'All')
+    sort_by = request.args.get('sort_by', 'HQ Earnings' if report_key == 'hq-branch-earnings' else ('Total Sales' if report_key == 'branch-sales-summary' else 'Order Number'))
+    orientation = request.args.get('orientation', 'Landscape' if report_key in ['sales-order-operational', 'sales-by-product-details', 'inventory-valuation', 'branch-sales-summary', 'hq-branch-earnings'] else 'Portrait')
+    group_by = request.args.get('group_by', 'None')
+    page = max(1, int(request.args.get('page', 1)))
+    per_page = 150 if (group_by == 'Category' or report_key == 'customer-order-history') else 36 # Rows per page matching printed sheet size
 
     # Costing Tier / Price Sheet selection (Defaults to Branch Costing)
     all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Cost%%' THEN 0 ELSE 1 END, name ASC")
@@ -1856,8 +1868,8 @@ def view_report(report_key):
         """
         rows = query_all(data_sql, tuple(query_params))
 
-    # 17. BRANCH SALES SUMMARY REPORT
-    elif report_key == 'branch-sales-summary':
+    # 17. BRANCH SALES SUMMARY & HQ BRANCH EARNINGS REPORT
+    elif report_key in ('branch-sales-summary', 'hq-branch-earnings'):
         base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
         params = [start_date, end_date]
 
@@ -1904,6 +1916,20 @@ def view_report(report_key):
                     THEN (pp.unit_price / p.sales_uom_ratio_std) 
                 WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 
                     THEN pp.unit_price 
+                WHEN p.costing_method = 'Average' AND p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
+                WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0 
+                    THEN p.standard_cost 
+                WHEN p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
+                ELSE 0 
+            END
+        """
+
+        hq_cost_unit_expr = """
+            CASE 
+                WHEN p.costing_method = 'Average' AND p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
                 WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0 
                     THEN p.standard_cost 
                 WHEN p.average_cost IS NOT NULL AND p.average_cost > 0 
@@ -1917,7 +1943,9 @@ def view_report(report_key):
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
                 COALESCE(SUM(sol.subtotal), 0) as total_sales,
                 COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN sol.subtotal ELSE sol.quantity * ({cost_unit_expr}) END), 0) as total_branch_cost,
-                COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN 0 ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END), 0) as total_branch_profit
+                COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN 0 ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END), 0) as total_branch_profit,
+                COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN sol.subtotal ELSE sol.quantity * ({hq_cost_unit_expr}) END), 0) as total_hq_cost,
+                COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN 0 ELSE (sol.quantity * ({cost_unit_expr})) - (sol.quantity * ({hq_cost_unit_expr})) END), 0) as total_hq_earning
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -1930,7 +1958,10 @@ def view_report(report_key):
         raw_sales = float(t['total_sales'] or 0)
         raw_cost = float(t['total_branch_cost'] or 0)
         raw_profit = float(t['total_branch_profit'] or 0)
+        raw_hq_cost = float(t['total_hq_cost'] or 0)
+        raw_hq_earning = float(t['total_hq_earning'] or 0)
         margin_pct = (raw_profit / raw_sales * 100.0) if raw_sales > 0 else 0.0
+        hq_margin_pct = (raw_hq_earning / raw_cost * 100.0) if raw_cost > 0 else 0.0
 
         totals = {
             'quantity': raw_qty,
@@ -1941,7 +1972,12 @@ def view_report(report_key):
             'total_branch_cost': raw_cost * curr_multiplier,
             'profit': raw_profit * curr_multiplier,
             'branch_profit': raw_profit * curr_multiplier,
-            'margin_pct': margin_pct
+            'margin_pct': margin_pct,
+            'hq_cost': raw_hq_cost * curr_multiplier,
+            'total_hq_cost': raw_hq_cost * curr_multiplier,
+            'hq_earning': raw_hq_earning * curr_multiplier,
+            'total_hq_earning': raw_hq_earning * curr_multiplier,
+            'hq_margin_pct': hq_margin_pct
         }
 
         if sort_by in ['Order Number', 'SKU', 'Order Number / SKU']:
@@ -1956,10 +1992,14 @@ def view_report(report_key):
             sort_order = "(SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) DESC"
         elif sort_by in ['Total Cost', 'Branch Cost', 'Total Branch Cost']:
             sort_order = "total_branch_cost DESC"
+        elif sort_by in ['HQ Cost', 'Total HQ Cost', 'HQ Costing']:
+            sort_order = "total_hq_cost DESC"
+        elif sort_by in ['HQ Earnings', 'HQ Earning', 'Earnings']:
+            sort_order = "hq_earning DESC"
         elif sort_by in ['Gross Profit', 'Profit', 'Gross Profit / Asset Value']:
             sort_order = "branch_profit DESC"
         else:
-            sort_order = "sales_amount DESC"
+            sort_order = "hq_earning DESC" if report_key == 'hq-branch-earnings' else "sales_amount DESC"
 
         if group_by == 'Category':
             order_clause = f"COALESCE(c.name, 'General') ASC, {sort_order}"
@@ -1979,19 +2019,28 @@ def view_report(report_key):
                 CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
                      THEN (SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) 
                      ELSE {cost_unit_expr} END as raw_branch_cost_pc,
+                CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                     THEN (SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) 
+                     ELSE {hq_cost_unit_expr} END as raw_hq_cost_pc,
                 SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
                          THEN sol.subtotal 
                          ELSE sol.quantity * ({cost_unit_expr}) END) as total_branch_cost,
                 SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN sol.subtotal 
+                         ELSE sol.quantity * ({hq_cost_unit_expr}) END) as total_hq_cost,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
                          THEN 0 
-                         ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END) as branch_profit
+                         ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END) as branch_profit,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN 0 
+                         ELSE (sol.quantity * ({cost_unit_expr})) - (sol.quantity * ({hq_cost_unit_expr})) END) as hq_earning
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
             WHERE {where_sql}
-            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost, p.is_adaptive_cost, pp.is_adaptive
+            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost, p.costing_method, p.is_adaptive_cost, pp.is_adaptive
             ORDER BY {order_clause}
             LIMIT %s OFFSET %s
         """
@@ -2003,16 +2052,23 @@ def view_report(report_key):
             qty_pcs = float(r['quantity_sold'] or 0)
             sales = float(r['sales_amount'] or 0)
             cost_pc = float(r['raw_branch_cost_pc'] or 0)
+            hq_cost_pc = float(r['raw_hq_cost_pc'] or 0)
             total_cost = float(r['total_branch_cost'] or 0)
+            total_hq_cost = float(r['total_hq_cost'] or 0)
             profit = float(r['branch_profit'] or 0)
+            hq_earning = float(r['hq_earning'] or 0)
             price_pc = (sales / qty_pcs) if qty_pcs > 0 else 0.0
             m_pct = (profit / sales * 100.0) if sales > 0 else 0.0
+            hq_m_pct = (hq_earning / total_cost * 100.0) if total_cost > 0 else 0.0
+            hq_spread_pc = cost_pc - hq_cost_pc
 
             pcs_ratio = float(r['pcs_per_case'] or 1.0)
             case_sheet_price = float(r['sheet_price'] or 0.0)
             cases_equivalent = (qty_pcs / pcs_ratio) if pcs_ratio > 1 else None
             price_case = (price_pc * pcs_ratio) if pcs_ratio > 1 else None
             cost_case = (cost_pc * pcs_ratio) if pcs_ratio > 1 else None
+            hq_cost_case = (hq_cost_pc * pcs_ratio) if pcs_ratio > 1 else None
+            hq_spread_case = (hq_spread_pc * pcs_ratio) if pcs_ratio > 1 else None
 
             rows.append({
                 'id': r['id'],
@@ -2033,9 +2089,16 @@ def view_report(report_key):
                 'branch_unit_cost': cost_pc * curr_multiplier,
                 'branch_cost_pc': cost_pc * curr_multiplier,
                 'branch_cost_case': cost_case * curr_multiplier if cost_case else None,
+                'hq_cost_pc': hq_cost_pc * curr_multiplier,
+                'hq_cost_case': hq_cost_case * curr_multiplier if hq_cost_case else None,
+                'hq_spread_pc': hq_spread_pc * curr_multiplier,
+                'hq_spread_case': hq_spread_case * curr_multiplier if hq_spread_case else None,
                 'total_branch_cost': total_cost * curr_multiplier,
+                'total_hq_cost': total_hq_cost * curr_multiplier,
                 'branch_profit': profit * curr_multiplier,
-                'margin_pct': m_pct
+                'hq_earning': hq_earning * curr_multiplier,
+                'margin_pct': m_pct,
+                'hq_margin_pct': hq_m_pct
             })
 
         if group_by == 'Category':
@@ -2051,23 +2114,32 @@ def view_report(report_key):
                         'subtotal_cost': 0.0,
                         'subtotal_profit': 0.0,
                         'subtotal_margin': 0.0,
+                        'subtotal_hq_cost': 0.0,
+                        'subtotal_hq_earning': 0.0,
+                        'subtotal_hq_margin': 0.0,
                         'avg_price_pc': 0.0,
-                        'avg_cost_pc': 0.0
+                        'avg_cost_pc': 0.0,
+                        'avg_hq_cost_pc': 0.0
                     }
                 cat_groups[cname]['lines'].append(r)
                 cat_groups[cname]['subtotal_qty'] += float(r.get('quantity_sold') or 0)
                 cat_groups[cname]['subtotal_sales'] += float(r.get('sales_amount') or 0)
                 cat_groups[cname]['subtotal_cost'] += float(r.get('total_branch_cost') or 0)
                 cat_groups[cname]['subtotal_profit'] += float(r.get('branch_profit') or 0)
+                cat_groups[cname]['subtotal_hq_cost'] += float(r.get('total_hq_cost') or 0)
+                cat_groups[cname]['subtotal_hq_earning'] += float(r.get('hq_earning') or 0)
 
             for cg in cat_groups.values():
                 sqty = cg['subtotal_qty']
                 ssales = cg['subtotal_sales']
                 scost = cg['subtotal_cost']
                 sprofit = cg['subtotal_profit']
+                shq_earn = cg['subtotal_hq_earning']
                 cg['subtotal_margin'] = (sprofit / ssales * 100.0) if ssales > 0 else 0.0
+                cg['subtotal_hq_margin'] = (shq_earn / scost * 100.0) if scost > 0 else 0.0
                 cg['avg_price_pc'] = (ssales / sqty) if sqty > 0 else 0.0
                 cg['avg_cost_pc'] = (scost / sqty) if sqty > 0 else 0.0
+                cg['avg_hq_cost_pc'] = (cg['subtotal_hq_cost'] / sqty) if sqty > 0 else 0.0
 
             category_groups = list(cat_groups.values())
 
@@ -2473,7 +2545,11 @@ def export_report(report_key):
             ])
         filename = f"Sales_Order_Summary_{start_date}_{end_date}.csv"
 
-    elif report_key == 'branch-sales-summary':
+    elif report_key in ('branch-sales-summary', 'hq-branch-earnings'):
+        if report_key == 'hq-branch-earnings' and (is_branch_user or session.get('is_branch_mode')):
+            flash("Access denied: HQ Branch Earnings is restricted to Headquarters administrators only.", "warning")
+            return redirect(url_for('reports.reports_center'))
+
         costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
         default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
         default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
@@ -2490,7 +2566,10 @@ def export_report(report_key):
         curr_mult = khr_rate if currency == 'KHR' else 1.0
         curr_sym = '៛' if currency == 'KHR' else '$'
 
-        writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'Packaging', f'Sale Price / Pcs ({curr_sym})', f'Branch Unit Cost ({curr_sym})', f'Total Sales ({curr_sym})', f'Total Branch Cost ({curr_sym})', f'Branch Profit ({curr_sym})', 'Margin %'])
+        if report_key == 'hq-branch-earnings':
+            writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'Packaging', f'Branch Cost / Pc ({curr_sym})', f'HQ Costing / Pc ({curr_sym})', f'HQ Earning / Pc ({curr_sym})', f'Total Billed to Branch ({curr_sym})', f'Total HQ Cost ({curr_sym})', f'HQ Net Earnings ({curr_sym})', 'HQ Margin %'])
+        else:
+            writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'Packaging', f'Sale Price / Pcs ({curr_sym})', f'Branch Unit Cost ({curr_sym})', f'Total Sales ({curr_sym})', f'Total Branch Cost ({curr_sym})', f'Branch Profit ({curr_sym})', 'Margin %'])
 
         where_branch = "1=1"
         if branch_scope == 'main':
@@ -2513,6 +2592,20 @@ def export_report(report_key):
                     THEN (pp.unit_price / p.sales_uom_ratio_std) 
                 WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 
                     THEN pp.unit_price 
+                WHEN p.costing_method = 'Average' AND p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
+                WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0 
+                    THEN p.standard_cost 
+                WHEN p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
+                ELSE 0 
+            END
+        """
+
+        hq_cost_unit_expr = """
+            CASE 
+                WHEN p.costing_method = 'Average' AND p.average_cost IS NOT NULL AND p.average_cost > 0 
+                    THEN p.average_cost 
                 WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0 
                     THEN p.standard_cost 
                 WHEN p.average_cost IS NOT NULL AND p.average_cost > 0 
@@ -2533,10 +2626,14 @@ def export_report(report_key):
             sort_order = "(SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) DESC"
         elif sort_by in ['Total Cost', 'Branch Cost', 'Total Branch Cost']:
             sort_order = "total_branch_cost DESC"
+        elif sort_by in ['HQ Cost', 'Total HQ Cost', 'HQ Costing']:
+            sort_order = "total_hq_cost DESC"
+        elif sort_by in ['HQ Earnings', 'HQ Earning', 'Earnings']:
+            sort_order = "hq_earning DESC"
         elif sort_by in ['Gross Profit', 'Profit', 'Gross Profit / Asset Value']:
             sort_order = "branch_profit DESC"
         else:
-            sort_order = "sales_amount DESC"
+            sort_order = "hq_earning DESC" if report_key == 'hq-branch-earnings' else "sales_amount DESC"
 
         if group_by == 'Category':
             order_clause = f"COALESCE(c.name, 'General') ASC, {sort_order}"
@@ -2551,9 +2648,24 @@ def export_report(report_key):
                 COALESCE(p.sales_uom_ratio_std, 1.0) as pcs_per_case,
                 SUM(sol.quantity) as quantity_sold,
                 SUM(sol.subtotal) as sales_amount,
-                {cost_unit_expr} as raw_branch_cost_pc,
-                SUM(sol.quantity * ({cost_unit_expr})) as total_branch_cost,
-                SUM(sol.subtotal) - SUM(sol.quantity * ({cost_unit_expr})) as branch_profit
+                CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                     THEN (SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) 
+                     ELSE {cost_unit_expr} END as raw_branch_cost_pc,
+                CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                     THEN (SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) 
+                     ELSE {hq_cost_unit_expr} END as raw_hq_cost_pc,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN sol.subtotal 
+                         ELSE sol.quantity * ({cost_unit_expr}) END) as total_branch_cost,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN sol.subtotal 
+                         ELSE sol.quantity * ({hq_cost_unit_expr}) END) as total_hq_cost,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN 0 
+                         ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END) as branch_profit,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN 0 
+                         ELSE (sol.quantity * ({cost_unit_expr})) - (sol.quantity * ({hq_cost_unit_expr})) END) as hq_earning
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -2561,7 +2673,7 @@ def export_report(report_key):
             LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
             WHERE so.order_date >= %s AND so.order_date <= %s AND so.status != 'CANCELLED'
               AND {where_branch} AND {where_cat} AND {where_stat}
-            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost
+            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost, p.costing_method, p.is_adaptive_cost, pp.is_adaptive
             ORDER BY {order_clause}
         """, (costing_scheme_id, start_date, end_date))
 
@@ -2569,30 +2681,53 @@ def export_report(report_key):
             qty_pcs = float(r['quantity_sold'] or 0)
             sales = float(r['sales_amount'] or 0) * curr_mult
             b_cost = float(r['raw_branch_cost_pc'] or 0) * curr_mult
+            hq_c = float(r['raw_hq_cost_pc'] or 0) * curr_mult
             tot_cost = float(r['total_branch_cost'] or 0) * curr_mult
+            tot_hq_cost = float(r['total_hq_cost'] or 0) * curr_mult
             profit = float(r['branch_profit'] or 0) * curr_mult
+            hq_earn = float(r['hq_earning'] or 0) * curr_mult
+            spread_pc = b_cost - hq_c
             price_pc = (sales / qty_pcs) if qty_pcs > 0 else 0.0
             m_pct = (profit / sales * 100.0) if sales > 0 else 0.0
+            hq_m_pct = (hq_earn / tot_cost * 100.0) if tot_cost > 0 else 0.0
             pcs_ratio = float(r['pcs_per_case'] or 1.0)
             pack_str = f"{pcs_ratio:.0f} pcs/cs" if pcs_ratio > 1 else "1 pc"
 
             price_pc_str = f"{price_pc:,.3f}" if currency == 'USD' else f"{price_pc:,.0f}"
             cost_pc_str = f"{b_cost:,.3f}" if currency == 'USD' else f"{b_cost:,.0f}"
+            hq_cost_pc_str = f"{hq_c:,.3f}" if currency == 'USD' else f"{hq_c:,.0f}"
+            spread_pc_str = f"{spread_pc:,.3f}" if currency == 'USD' else f"{spread_pc:,.0f}"
 
-            writer.writerow([
-                r['category_name'],
-                r['sku'],
-                r['item_name'],
-                f"{qty_pcs:.0f}",
-                pack_str,
-                price_pc_str,
-                cost_pc_str,
-                f"{sales:,.2f}" if currency == 'USD' else f"{sales:,.0f}",
-                f"{tot_cost:,.2f}" if currency == 'USD' else f"{tot_cost:,.0f}",
-                f"{profit:,.2f}" if currency == 'USD' else f"{profit:,.0f}",
-                f"{m_pct:.1f}%"
-            ])
-        filename = f"Branch_Sales_Summary_{start_date}_{end_date}.csv"
+            if report_key == 'hq-branch-earnings':
+                writer.writerow([
+                    r['category_name'],
+                    r['sku'],
+                    r['item_name'],
+                    f"{qty_pcs:.0f}",
+                    pack_str,
+                    cost_pc_str,
+                    hq_cost_pc_str,
+                    spread_pc_str,
+                    f"{tot_cost:,.2f}" if currency == 'USD' else f"{tot_cost:,.0f}",
+                    f"{tot_hq_cost:,.2f}" if currency == 'USD' else f"{tot_hq_cost:,.0f}",
+                    f"{hq_earn:,.2f}" if currency == 'USD' else f"{hq_earn:,.0f}",
+                    f"{hq_m_pct:.1f}%"
+                ])
+            else:
+                writer.writerow([
+                    r['category_name'],
+                    r['sku'],
+                    r['item_name'],
+                    f"{qty_pcs:.0f}",
+                    pack_str,
+                    price_pc_str,
+                    cost_pc_str,
+                    f"{sales:,.2f}" if currency == 'USD' else f"{sales:,.0f}",
+                    f"{tot_cost:,.2f}" if currency == 'USD' else f"{tot_cost:,.0f}",
+                    f"{profit:,.2f}" if currency == 'USD' else f"{profit:,.0f}",
+                    f"{m_pct:.1f}%"
+                ])
+        filename = f"HQ_Branch_Earnings_{start_date}_{end_date}.csv" if report_key == 'hq-branch-earnings' else f"Branch_Sales_Summary_{start_date}_{end_date}.csv"
 
     else:
         writer.writerow(['Order Number', 'Date', 'Customer', 'Status', 'Total Amount ($)'])

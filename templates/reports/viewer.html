@@ -781,6 +781,23 @@
         </div>
     </div>
 
+    <!-- HQ / Branch Report Tab Navigation -->
+    {% if report_key in ('branch-sales-summary', 'hq-branch-earnings') and (not is_branch_user and not session.get('is_branch_mode')) %}
+    <div style="display: flex; gap: 6px; padding: 10px 24px 0; background: #FFFFFF; border-bottom: 1px solid #E5E7EB;">
+        <a href="{{ url_for('reports.view_report', report_key='branch-sales-summary', branch=branch_scope, date_range=date_range, date_from=date_from, date_to=date_to, costing_scheme_id=costing_scheme_id, currency=currency, group_by=group_by, sort_by='Total Sales' if sort_by == 'HQ Earnings' else sort_by) }}" 
+           style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; text-decoration: none; border-radius: 6px 6px 0 0; transition: all 0.15s ease; {% if report_key == 'branch-sales-summary' %}background: #4C1D95; color: #FFFFFF; border: 1px solid #4C1D95; border-bottom: 2px solid #4C1D95;{% else %}background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; border-bottom: 1px solid #E5E7EB;{% endif %}">
+            <span>🏬</span>
+            <span>Branch Sales & Profit</span>
+        </a>
+        <a href="{{ url_for('reports.view_report', report_key='hq-branch-earnings', branch=branch_scope, date_range=date_range, date_from=date_from, date_to=date_to, costing_scheme_id=costing_scheme_id, currency=currency, group_by=group_by, sort_by='HQ Earnings' if sort_by == 'Total Sales' else sort_by) }}" 
+           style="display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; text-decoration: none; border-radius: 6px 6px 0 0; transition: all 0.15s ease; {% if report_key == 'hq-branch-earnings' %}background: #4C1D95; color: #FFFFFF; border: 1px solid #4C1D95; border-bottom: 2px solid #4C1D95;{% else %}background: #F8FAFC; color: #64748B; border: 1px solid #E2E8F0; border-bottom: 1px solid #E5E7EB;{% endif %}">
+            <span>🏢</span>
+            <span>HQ Earnings from Branches</span>
+            <span style="font-size: 10px; padding: 2px 7px; border-radius: 9999px; background: {% if report_key == 'hq-branch-earnings' %}rgba(255,255,255,0.22){% else %}#EDE9FE{% endif %}; color: {% if report_key == 'hq-branch-earnings' %}#FFFFFF{% else %}#6D28D9{% endif %}; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">HQ Only</span>
+        </a>
+    </div>
+    {% endif %}
+
     <!-- Hidden Form for Parameter Submissions -->
     <form id="reportFilterForm" method="GET" action="{{ url_for('reports.view_report', report_key=report_key) }}">
         <input type="hidden" name="branch" id="formBranchInput" value="{{ branch_scope }}">
@@ -1033,6 +1050,45 @@
             <div style="font-size: 13px; font-weight: 700; color: #1E293B;">
                 <span>Branch Costing</span> • <span>USD ($)</span>
             </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- HQ Branch Earnings KPI Summary Cards (for hq-branch-earnings) -->
+    {% if report_key == 'hq-branch-earnings' %}
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 24px 0; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px;">
+        <div style="border-left: 3px solid #2563EB; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Quantity Sold</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0F172A;">
+                {{ "{:,.2f}".format(totals.quantity_sold or 0) if (totals.quantity_sold or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or 0) }} <span style="font-size: 11px; font-weight: 600; color: #2563EB;">pcs</span>
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Items sold by branch</div>
+        </div>
+        <div style="border-left: 3px solid #D97706; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Billed to Branch</div>
+            <div style="font-size: 16px; font-weight: 700; color: #D97706;">
+                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Qty × Branch Cost</div>
+        </div>
+        <div style="border-left: 3px solid #64748B; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total HQ Costing</div>
+            <div style="font-size: 16px; font-weight: 700; color: #475569;">
+                {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_hq_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_hq_cost or 0) }}{% endif %}
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Qty × HQ Costing</div>
+        </div>
+        <div style="border-left: 3px solid {% if (totals.total_hq_earning or 0) < 0 %}#DC2626{% else %}#047857{% endif %}; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">HQ Net Earnings</div>
+            <div style="font-size: 16px; font-weight: 700; color: {% if (totals.total_hq_earning or 0) < 0 %}#DC2626{% else %}#047857{% endif %};">
+                {% if currency == 'KHR' %}
+                    {{ "{:,.0f}".format(totals.total_hq_earning or 0) }} ៛
+                {% else %}
+                    {% if (totals.total_hq_earning or 0) < 0 %}-${{ "{:,.2f}".format(-(totals.total_hq_earning or 0)) }}{% else %}${{ "{:,.2f}".format(totals.total_hq_earning or 0) }}{% endif %}
+                {% endif %}
+                <span style="font-size: 11px; font-weight: 600; margin-left: 4px;">({{ "%.1f"|format(totals.hq_margin_pct or 0) }}%)</span>
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Billed - HQ Costing</div>
         </div>
     </div>
     {% endif %}
@@ -1369,6 +1425,221 @@
                 </tr>
             </tfoot>
             {% endif %}
+
+            {% elif report_key == 'hq-branch-earnings' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 11%;">CATEGORY</th>
+                    <th style="width: 11%;">SKU</th>
+                    <th style="width: 18%;">ITEM NAME</th>
+                    <th style="width: 10%; text-align: right;">QTY SOLD</th>
+                    <th style="width: 11%; text-align: right;">BRANCH COST</th>
+                    <th style="width: 11%; text-align: right;">HQ COSTING</th>
+                    <th style="width: 13%; text-align: right;">TOTAL BILLED</th>
+                    <th style="width: 15%; text-align: right;">HQ NET EARNINGS</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% if group_by == 'Category' and category_groups %}
+                    {% for grp in category_groups %}
+                    <tr class="inflow-rep-cat-banner">
+                        <td colspan="9">
+                            <div style="display: flex; align-items: center; justify-content: space-between;">
+                                <span style="font-size: 13.5px; font-weight: 700; color: #4C1D95;">📁 Category: {{ grp.category_name }}</span>
+                                <span style="font-size: 11px; font-weight: 500; color: #475569;">{{ grp.lines|length }} item{% if grp.lines|length > 1 %}s{% endif %}</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% for r in grp.lines %}
+                    <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                        <td class="wrench-th"></td>
+                        <td>{{ r.category_name or 'General' }}</td>
+                        <td style="font-weight: 500;">
+                            <a href="{{ url_for('products.detail_product', id=r.id) }}" style="color: #4C1D95; text-decoration: none;">{{ r.sku }}</a>
+                        </td>
+                        <td style="font-weight: 500;">
+                            <div>{{ r.item_name }}</div>
+                            {% if r.pcs_per_case > 1 %}
+                            <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">
+                            <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
+                            {% if r.cases_equivalent %}
+                            <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #047857; font-weight: 600;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.branch_cost_case %}
+                            <div style="font-size: 10.5px; color: #047857;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #475569; font-weight: 600;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.hq_cost_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.4f}".format(r.hq_cost_pc) if r.hq_cost_pc < 1 else "{:,.2f}".format(r.hq_cost_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.hq_cost_case %}
+                            <div style="font-size: 10.5px; color: #64748B;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.hq_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.hq_cost_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                            <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
+                            <div style="font-size: 10px; color: #64748B;">Qty × Branch Cost</div>
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: {% if r.hq_earning < 0 %}#DC2626{% else %}#047857{% endif %};">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.hq_earning) }} ៛
+                                {% else %}
+                                    {% if r.hq_earning < 0 %}-${{ "{:,.2f}".format(-r.hq_earning) }}{% else %}${{ "{:,.2f}".format(r.hq_earning) }}{% endif %}
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 10.5px; color: {% if r.hq_earning < 0 %}#DC2626{% else %}#64748B{% endif %}; font-weight: {% if r.hq_earning < 0 %}700{% else %}500{% endif %};">
+                                {% if r.hq_spread_pc < 0 %}-${{ "{:,.2f}".format(-r.hq_spread_pc) }}{% else %}+${{ "{:,.2f}".format(r.hq_spread_pc) }}{% endif %}/pc ({{ "%.1f"|format(r.hq_margin_pct) }}%)
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <!-- Category Subtotal Row -->
+                    <tr class="inflow-rep-subtotal-row">
+                        <td colspan="4" style="text-align: right; font-style: italic; font-weight: 600; color: #1E3A8A;">Subtotal for {{ grp.category_name }}:</td>
+                        <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                            {{ "{:,.2f}".format(grp.subtotal_qty) if grp.subtotal_qty % 1 != 0 else "{:,.0f}".format(grp.subtotal_qty) }} pcs
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #047857;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_cost_pc) }} ៛{% else %}${{ "{:,.4f}".format(grp.avg_cost_pc) if grp.avg_cost_pc < 1 else "{:,.2f}".format(grp.avg_cost_pc) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #475569;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.avg_hq_cost_pc) }} ៛{% else %}${{ "{:,.4f}".format(grp.avg_hq_cost_pc) if grp.avg_hq_cost_pc < 1 else "{:,.2f}".format(grp.avg_hq_cost_pc) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: #1E3A8A;">
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_cost) }} ៛{% else %}${{ "{:,.2f}".format(grp.subtotal_cost) }}{% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: {% if grp.subtotal_hq_earning < 0 %}#DC2626{% else %}#047857{% endif %};">
+                            <div>
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(grp.subtotal_hq_earning) }} ៛{% else %}{% if grp.subtotal_hq_earning < 0 %}-${{ "{:,.2f}".format(-grp.subtotal_hq_earning) }}{% else %}${{ "{:,.2f}".format(grp.subtotal_hq_earning) }}{% endif %}{% endif %}
+                            </div>
+                            <div style="font-size: 10.5px; font-weight: {% if grp.subtotal_hq_earning < 0 %}700{% else %}600{% endif %}; color: {% if grp.subtotal_hq_earning < 0 %}#DC2626{% else %}#4B5563{% endif %};">
+                                Margin: {{ "%.1f"|format(grp.subtotal_hq_margin) }}%
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    {% for r in rows %}
+                    <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                        <td class="wrench-th"></td>
+                        <td>{{ r.category_name or 'General' }}</td>
+                        <td style="font-weight: 500;">
+                            <a href="{{ url_for('products.detail_product', id=r.id) }}" style="color: #4C1D95; text-decoration: none;">{{ r.sku }}</a>
+                        </td>
+                        <td style="font-weight: 500;">
+                            <div>{{ r.item_name }}</div>
+                            {% if r.pcs_per_case > 1 %}
+                            <div style="font-size: 10.5px; color: #64748B;">Packaging: {{ "{:,.0f}".format(r.pcs_per_case) }} pcs/case</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600;">
+                            <div>{{ "{:,.2f}".format(r.quantity_sold) if r.quantity_sold % 1 != 0 else "{:,.0f}".format(r.quantity_sold) }} <span style="font-size: 11px; color: #2563EB; font-weight: 600;">pcs</span></div>
+                            {% if r.cases_equivalent %}
+                            <div style="font-size: 10.5px; color: #64748B;">({{ "{:,.1f}".format(r.cases_equivalent) }} cs)</div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #047857; font-weight: 600;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.branch_cost_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.4f}".format(r.branch_cost_pc) if r.branch_cost_pc < 1 else "{:,.2f}".format(r.branch_cost_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.branch_cost_case %}
+                            <div style="font-size: 10.5px; color: #047857;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.branch_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.branch_cost_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; color: #475569; font-weight: 600;">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.hq_cost_pc) }} ៛
+                                {% else %}
+                                    ${{ "{:,.4f}".format(r.hq_cost_pc) if r.hq_cost_pc < 1 else "{:,.2f}".format(r.hq_cost_pc) }}
+                                {% endif %}
+                            </div>
+                            {% if r.hq_cost_case %}
+                            <div style="font-size: 10.5px; color: #64748B;">
+                                {% if currency == 'KHR' %}{{ "{:,.0f}".format(r.hq_cost_case) }} ៛/cs{% else %}${{ "{:,.2f}".format(r.hq_cost_case) }}/cs{% endif %}
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td style="text-align: right; font-weight: 600; color: #1E3A8A;">
+                            <div>{% if currency == 'KHR' %}{{ "{:,.0f}".format(r.total_branch_cost) }} ៛{% else %}${{ "{:,.2f}".format(r.total_branch_cost) }}{% endif %}</div>
+                            <div style="font-size: 10px; color: #64748B;">Qty × Branch Cost</div>
+                        </td>
+                        <td style="text-align: right; font-weight: 700; color: {% if r.hq_earning < 0 %}#DC2626{% else %}#047857{% endif %};">
+                            <div>
+                                {% if currency == 'KHR' %}
+                                    {{ "{:,.0f}".format(r.hq_earning) }} ៛
+                                {% else %}
+                                    {% if r.hq_earning < 0 %}-${{ "{:,.2f}".format(-r.hq_earning) }}{% else %}${{ "{:,.2f}".format(r.hq_earning) }}{% endif %}
+                                {% endif %}
+                            </div>
+                            <div style="font-size: 10.5px; color: {% if r.hq_earning < 0 %}#DC2626{% else %}#64748B{% endif %}; font-weight: {% if r.hq_earning < 0 %}700{% else %}500{% endif %};">
+                                {% if r.hq_spread_pc < 0 %}-${{ "{:,.2f}".format(-r.hq_spread_pc) }}{% else %}+${{ "{:,.2f}".format(r.hq_spread_pc) }}{% endif %}/pc ({{ "%.1f"|format(r.hq_margin_pct) }}%)
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+            <tfoot>
+                <tr class="inflow-crys-totals-row">
+                    <td colspan="4" style="font-weight: bold; text-align: right;">GRAND TOTALS:</td>
+                    <td style="text-align: right; font-weight: bold;">
+                        {{ "{:,.2f}".format(totals.quantity_sold or totals.quantity or 0) if (totals.quantity_sold or totals.quantity or 0) % 1 != 0 else "{:,.0f}".format(totals.quantity_sold or totals.quantity or 0) }} pcs
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #047857;">
+                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_branch_cost / totals.quantity_sold) }}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #475569;">
+                        {% if totals.quantity_sold and totals.quantity_sold > 0 %}
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_hq_cost / totals.quantity_sold) }} ៛{% else %}${{ "{:,.3f}".format(totals.total_hq_cost / totals.quantity_sold) }}{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: #1E3A8A;">
+                        {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_branch_cost or 0) }} ៛{% else %}${{ "{:,.2f}".format(totals.total_branch_cost or 0) }}{% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: bold; color: {% if (totals.total_hq_earning or 0) < 0 %}#DC2626{% else %}#047857{% endif %};">
+                        <div>
+                            {% if currency == 'KHR' %}{{ "{:,.0f}".format(totals.total_hq_earning or 0) }} ៛{% else %}{% if (totals.total_hq_earning or 0) < 0 %}-${{ "{:,.2f}".format(-(totals.total_hq_earning or 0)) }}{% else %}${{ "{:,.2f}".format(totals.total_hq_earning or 0) }}{% endif %}{% endif %}
+                        </div>
+                        <div style="font-size: 10.5px; font-weight: {% if (totals.total_hq_earning or 0) < 0 %}700{% else %}600{% endif %}; color: {% if (totals.total_hq_earning or 0) < 0 %}#DC2626{% else %}#4B5563{% endif %};">
+                            Margin: {{ "%.1f"|format(totals.hq_margin_pct or 0) }}%
+                        </div>
+                    </td>
+                </tr>
+            </tfoot>
+            {% endif %}
             {% elif report_key == 'customer-order-history' %}
             <thead>
                 <tr class="inflow-crys-th-row">
@@ -1642,6 +1913,10 @@
                     <option value="Sales Amount" {% if sort_by in ['Sales Amount', 'Total Sales'] %}selected{% endif %}>Sales Amount</option>
                     <option value="Costing" {% if sort_by in ['Total Cost', 'Costing', 'Branch Cost'] %}selected{% endif %}>{% if branch_scope not in ['main', 'all'] %}Branch Cost{% else %}Costing{% endif %}</option>
                     <option value="Gross Profit" {% if sort_by in ['Gross Profit', 'Profit'] %}selected{% endif %}>{% if branch_scope not in ['main', 'all'] %}Profit{% else %}Gross Profit{% endif %}</option>
+                    {% if report_key == 'hq-branch-earnings' %}
+                    <option value="HQ Earnings" {% if sort_by in ['HQ Earnings', 'HQ Earning', 'Earnings'] %}selected{% endif %}>HQ Net Earnings</option>
+                    <option value="HQ Costing" {% if sort_by in ['HQ Costing', 'HQ Cost', 'Total HQ Cost'] %}selected{% endif %}>HQ Costing</option>
+                    {% endif %}
                     <option value="Order Date" {% if sort_by == 'Order Date' %}selected{% endif %}>Order Date</option>
                     <option value="Customer" {% if sort_by == 'Customer' %}selected{% endif %}>Customer</option>
                 </select>
