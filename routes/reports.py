@@ -1020,10 +1020,10 @@ def view_report(report_key):
                 sol.product_id,
                 COALESCE(p.name, sol.description, 'Item') as item_name,
                 p.sku,
-                sol.quantity,
+                COALESCE(sol.quantity_display, sol.quantity, 1) as quantity,
                 sol.unit_price,
                 sol.subtotal as amount,
-                p.uom
+                COALESCE(sol.uom, p.uom, 'pcs.') as uom
             FROM sales_orders so
             JOIN customers c ON so.customer_id = c.id
             JOIN sales_order_lines sol ON sol.sales_order_id = so.id
@@ -2134,7 +2134,9 @@ def export_report(report_key):
                 c.name as customer_name, so.order_number, so.order_date,
                 initcap(so.status) as status_display,
                 COALESCE(p.name, sol.description, 'Item') as item_name, p.sku,
-                sol.quantity, p.uom, sol.unit_price, sol.subtotal as amount
+                COALESCE(sol.quantity_display, sol.quantity, 1) as quantity,
+                COALESCE(sol.uom, p.uom, 'pcs.') as uom,
+                sol.unit_price, sol.subtotal as amount
             FROM sales_orders so
             JOIN customers c ON so.customer_id = c.id
             JOIN sales_order_lines sol ON sol.sales_order_id = so.id

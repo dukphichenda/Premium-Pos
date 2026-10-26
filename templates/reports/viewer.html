@@ -1127,10 +1127,11 @@
             {% elif report_key == 'customer-order-history' %}
             <thead>
                 <tr class="inflow-crys-th-row">
-                    <th style="width: 48%; text-align: left;">ITEM</th>
+                    <th style="width: 38%; text-align: left;">ITEM</th>
                     <th style="width: 14%; text-align: left;">ORDER DATE</th>
-                    <th style="width: 11%; text-align: left;">STATUS</th>
-                    <th style="width: 13%; text-align: right;">QUANTITY</th>
+                    <th style="width: 10%; text-align: left;">STATUS</th>
+                    <th style="width: 12%; text-align: right;">QUANTITY</th>
+                    <th style="width: 12%; text-align: right;">UNIT PRICE</th>
                     <th style="width: 14%; text-align: right;">AMOUNT</th>
                 </tr>
             </thead>
@@ -1139,7 +1140,7 @@
                 {% for grp in customer_groups %}
                 <!-- Customer Name Banner (Italic, Blue) -->
                 <tr>
-                    <td colspan="5" style="padding: 22px 8px 6px 8px; border: none; background: transparent;">
+                    <td colspan="6" style="padding: 22px 8px 6px 8px; border: none; background: transparent;">
                         <span class="inflow-crys-cust-name">{{ grp.customer_name }}</span>
                     </td>
                 </tr>
@@ -1147,7 +1148,7 @@
                 {% for ord in grp.orders %}
                 <!-- Sales Order Header (Italic, Blue) -->
                 <tr>
-                    <td colspan="5" style="padding: 12px 8px 6px 8px; border: none; background: transparent;">
+                    <td colspan="6" style="padding: 12px 8px 6px 8px; border: none; background: transparent;">
                         <a href="{{ url_for('sales_orders.detail_order', id=ord.sales_order_id) }}" class="inflow-crys-order-num" title="View order {{ ord.order_number }}" data-no-tab="true">{{ ord.order_number }}</a>
                     </td>
                 </tr>
@@ -1165,7 +1166,10 @@
                         {{ line.status_display }}
                     </td>
                     <td class="inflow-crys-item-cell" style="text-align: right; white-space: nowrap; font-size: 15px; font-weight: 600;">
-                        {{ "{:,.0f}".format(line.quantity) if line.quantity % 1 == 0 else "{:,.2f}".format(line.quantity) }} {{ line.uom or 'pcs.' if (line.uom and line.uom.endswith('.')) else (line.uom ~ '.' if line.uom else 'pcs.') }}
+                        {{ "{:,.0f}".format(line.quantity) if line.quantity % 1 == 0 else "{:,.2f}".format(line.quantity) }} {{ 'pcs.' if line.uom == 'pcs' else (line.uom or 'pcs.') }}
+                    </td>
+                    <td class="inflow-crys-item-cell" style="text-align: right; white-space: nowrap; font-size: 15px; font-weight: 600;">
+                        ${{ "{:,.4f}".format(line.unit_price|float).rstrip('0').rstrip('.') if (line.unit_price|float * 100) % 1 != 0 else "%.2f"|format(line.unit_price|float) }}
                     </td>
                     <td class="inflow-crys-item-cell" style="text-align: right; white-space: nowrap; font-size: 15px; font-weight: 600;">
                         ${{ "%.2f"|format(line.amount) }}
@@ -1178,9 +1182,8 @@
                     <td style="border: none; background: transparent; padding: 0;"></td>
                     <td style="border: none; background: transparent; padding: 0;"></td>
                     <td style="border: none; background: transparent; padding: 0;"></td>
-                    <td class="inflow-crys-subtotal-val" style="text-align: right; border: none; border-top: 2px solid #E06D53; font-weight: 800; font-size: 16.5px; color: #000000; padding: 8px 8px 12px 8px; white-space: nowrap;">
-                        {{ "{:,.2f}".format(ord.subtotal_qty) }}
-                    </td>
+                    <td style="border: none; background: transparent; padding: 0;"></td>
+                    <td style="border: none; background: transparent; padding: 0;"></td>
                     <td class="inflow-crys-subtotal-val" style="text-align: right; border: none; border-top: 2px solid #E06D53; font-weight: 800; font-size: 16.5px; color: #000000; padding: 8px 8px 12px 8px; white-space: nowrap;">
                         ${{ "%.2f"|format(ord.subtotal_amount) }}
                     </td>
@@ -1192,9 +1195,8 @@
                     <td style="border: none; background: transparent; padding: 0;"></td>
                     <td style="border: none; background: transparent; padding: 0;"></td>
                     <td style="border: none; background: transparent; padding: 0;"></td>
-                    <td class="inflow-crys-total-val" style="text-align: right; border: none; border-top: 2.5px solid #E06D53; border-bottom: 4px double #E06D53; font-weight: 900; font-size: 18.5px; color: #000000; padding: 10px 8px 16px 8px; white-space: nowrap;">
-                        {{ "{:,.2f}".format(grp.total_qty) }}
-                    </td>
+                    <td style="border: none; background: transparent; padding: 0;"></td>
+                    <td style="border: none; background: transparent; padding: 0;"></td>
                     <td class="inflow-crys-total-val" style="text-align: right; border: none; border-top: 2.5px solid #E06D53; border-bottom: 4px double #E06D53; font-weight: 900; font-size: 18.5px; color: #000000; padding: 10px 8px 16px 8px; white-space: nowrap;">
                         ${{ "%.2f"|format(grp.total_amount) }}
                     </td>
@@ -1204,12 +1206,7 @@
             {% if customer_groups|length > 1 %}
             <tfoot>
                 <tr>
-                    <td style="border: none; background: transparent; padding: 0;"></td>
-                    <td style="border: none; background: transparent; padding: 0;"></td>
-                    <td style="border: none; background: transparent; text-align: right; font-weight: 800; font-size: 16px; color: #E06D53; padding: 12px 8px;">Grand Total:</td>
-                    <td class="inflow-crys-grand-val" style="text-align: right; border: none; border-top: 2.5px solid #E06D53; border-bottom: 4px double #E06D53; font-weight: 900; font-size: 19px; color: #000000; padding: 12px 8px 18px 8px; white-space: nowrap;">
-                        {{ "{:,.2f}".format(totals.quantity or 0) }}
-                    </td>
+                    <td colspan="5" style="border: none; background: transparent; text-align: right; font-weight: 800; font-size: 16px; color: #E06D53; padding: 12px 8px;">Grand Total:</td>
                     <td class="inflow-crys-grand-val" style="text-align: right; border: none; border-top: 2.5px solid #E06D53; border-bottom: 4px double #E06D53; font-weight: 900; font-size: 19px; color: #000000; padding: 12px 8px 18px 8px; white-space: nowrap;">
                         ${{ "%.2f"|format(totals.amount or 0) }}
                     </td>

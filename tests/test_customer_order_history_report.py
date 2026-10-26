@@ -38,11 +38,18 @@ class TestCustomerOrderHistoryReport(unittest.TestCase):
         self.assertIn('>ORDER DATE<', self.viewer_content)
         self.assertIn('>STATUS<', self.viewer_content)
         self.assertIn('>QUANTITY<', self.viewer_content)
+        self.assertIn('>UNIT PRICE<', self.viewer_content)
         self.assertIn('>AMOUNT<', self.viewer_content)
         self.assertIn('inflow-crys-cust-name', self.viewer_content)
         self.assertIn('inflow-crys-order-num', self.viewer_content)
         self.assertIn('inflow-crys-subtotal-val', self.viewer_content)
         self.assertIn('inflow-crys-total-val', self.viewer_content)
+
+        # Base template navigation must contain Customer order history in Reports flyout
+        base_path = os.path.join(self.base_dir, 'templates', 'base.html')
+        with open(base_path, 'r', encoding='utf-8') as f:
+            base_content = f.read()
+        self.assertIn("report_key='customer-order-history'", base_content)
 
     def test_customer_order_history_view_endpoint(self):
         # 3. Test GET /reports/view/customer-order-history endpoint rendering
@@ -71,13 +78,14 @@ class TestCustomerOrderHistoryReport(unittest.TestCase):
             self.assertIn('Park Cafe Airport', html_cust)
             self.assertIn('SO-022765', html_cust)
             self.assertIn('SO-022843', html_cust)
-            self.assertIn('800.00', html_cust)
-            self.assertIn('93.75', html_cust)
-            self.assertIn('650.00', html_cust)
-            self.assertIn('55.00', html_cust)
-            self.assertIn('1,450.00', html_cust)
-            self.assertIn('148.75', html_cust)
+            # Line items with UNIT PRICE and AMOUNT
+            self.assertIn('$0.14', html_cust)
+            self.assertIn('$93.75', html_cust)
+            self.assertIn('$55.00', html_cust)
+            self.assertIn('$148.75', html_cust)
             self.assertIn('#D0E4F7', html_cust)
+            # Verify no quantity total/subtotal is rendered (only amount totals)
+            self.assertNotIn('1,450.00', html_cust)
 
     def test_print_styles_defined(self):
         # 4. Media print rules must be defined to preserve print fidelity
