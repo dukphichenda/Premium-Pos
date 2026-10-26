@@ -28,6 +28,7 @@
                 <rect x="4.5" y="8.5" width="7" height="4.5" rx="0.5" fill="#FFFFFF"/>
             </svg>
             <span>Save</span>
+            <span id="btnCustomerSaveDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
         </button>
 
         <!-- Copy Dropdown Button -->
@@ -676,7 +677,27 @@
 </style>
 
 <script>
-let isDirty = false;
+let _custIsDirty = false;
+Object.defineProperty(window, 'isDirty', {
+    get: function() { return _custIsDirty; },
+    set: function(val) {
+        _custIsDirty = !!val;
+        updateCustomerSaveDot();
+    },
+    configurable: true
+});
+
+function updateCustomerSaveDot() {
+    const dot = document.getElementById('btnCustomerSaveDot');
+    if (dot) dot.style.display = _custIsDirty ? 'inline-block' : 'none';
+    const btn = document.getElementById('btnSaveCustomer');
+    if (btn) {
+        if (_custIsDirty) btn.classList.add('has-unsaved');
+        else btn.classList.remove('has-unsaved');
+    }
+}
+window.updateCustomerSaveDot = updateCustomerSaveDot;
+
 let pendingNavigateUrl = null;
 
 // Address Management

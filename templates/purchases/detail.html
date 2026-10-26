@@ -1921,6 +1921,7 @@ input:checked + .po-toggle-slider:before {
                 <div class="po-canvas-topbar-right">
                     <button type="submit" class="po-top-action-btn po-top-save-btn" id="poSaveBtn" title="Save Purchase Order (Ctrl+S)">
                         <span>💾</span> Save
+                        <span id="poSaveDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
                     </button>
                     <button type="button" class="po-top-action-btn danger" onclick="cancelPoOrderAction()" title="Cancel this purchase order">
                         <span style="color: #DC2626;">🚫</span> Cancel order
@@ -2968,19 +2969,36 @@ input:checked + .po-toggle-slider:before {
 <!-- JAVASCRIPT: Dynamic inFlow Cloud PO Controller                            -->
 <!-- ========================================================================= -->
 <script>
-let isPoDirty = false;
+let _poIsDirty = false;
+Object.defineProperty(window, 'isPoDirty', {
+    get: function() { return _poIsDirty; },
+    set: function(val) {
+        _poIsDirty = !!val;
+        updatePoSaveDot();
+    },
+    configurable: true
+});
 let currentPoDoc = 'order';
+
+function updatePoSaveDot() {
+    const badge = document.getElementById('poDirtyBadge');
+    if (badge) badge.style.display = _poIsDirty ? 'inline-block' : 'none';
+    const dot = document.getElementById('poSaveDot');
+    if (dot) dot.style.display = _poIsDirty ? 'inline-block' : 'none';
+    const btn = document.getElementById('poSaveBtn');
+    if (btn) {
+        if (_poIsDirty) btn.classList.add('has-unsaved');
+        else btn.classList.remove('has-unsaved');
+    }
+}
+window.updatePoSaveDot = updatePoSaveDot;
 
 function markPoDirty() {
     isPoDirty = true;
-    const badge = document.getElementById('poDirtyBadge');
-    if (badge) badge.style.display = 'inline-block';
 }
 
 function clearPoDirty() {
     isPoDirty = false;
-    const badge = document.getElementById('poDirtyBadge');
-    if (badge) badge.style.display = 'none';
 }
 
 // Master Sidebar Search & Filter

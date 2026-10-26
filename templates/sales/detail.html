@@ -2305,6 +2305,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
         <button type="button" class="inflow-tb-btn btn-so-save" onclick="saveSalesOrder()" title="Save changes (Ctrl+S)">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
             <span>Save</span>
+            <span id="btnSoSaveDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
         </button>
         <!-- inFlow Desktop Split Button: Preview -->
         <div class="inflow-split-btn-wrapper split-so-preview" id="previewSplitWrapper">
@@ -3464,7 +3465,15 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
 let isNewOrder = {{ 'true' if is_new else 'false' }};
 const isCopiedDraft = {{ 'true' if is_copied_draft else 'false' }};
 const canEditPrices = {{ 'true' if can_edit_prices else 'false' }};
-let isDirty = isCopiedDraft ? true : false;
+let _soIsDirty = isCopiedDraft ? true : false;
+Object.defineProperty(window, 'isDirty', {
+    get: function() { return _soIsDirty; },
+    set: function(val) {
+        _soIsDirty = !!val;
+        if (typeof updateSoSaveDot === 'function') updateSoSaveDot();
+    },
+    configurable: true
+});
 window.isCurrentOrderPaid = {{ 'true' if is_paid else 'false' }};
 
 function isOrderPaid() {
@@ -3492,11 +3501,33 @@ let pendingNavigationTarget = null;
 let activeGridRowEl = null;
 let activeItemInputEl = null;
 
+function updateSoSaveDot() {
+    const dot = document.getElementById('btnSoSaveDot') || document.querySelector('.btn-so-save .inflow-unsaved-dot');
+    const btn = document.querySelector('.btn-so-save');
+    if (dot) dot.style.display = isDirty ? 'inline-block' : 'none';
+    if (btn) {
+        if (isDirty) btn.classList.add('has-unsaved');
+        else btn.classList.remove('has-unsaved');
+    }
+}
+window.updateSoSaveDot = updateSoSaveDot;
+
 function markDirty() {
     isDirty = true;
+    updateSoSaveDot();
 }
 window.markDirty = markDirty;
 window.markOrderDirty = markDirty;
+
+function clearDirty() {
+    isDirty = false;
+    updateSoSaveDot();
+}
+window.clearDirty = clearDirty;
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateSoSaveDot();
+});
 
 // Injected product catalog with UOM conversion ratios and live stock data
 window.productsCatalog = {

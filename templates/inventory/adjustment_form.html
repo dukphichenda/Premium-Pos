@@ -100,6 +100,7 @@
                 </button>
                 <button type="button" id="topBtnSaveDraft" class="btn btn-sm btn-secondary btn-save-draft" onclick="saveStockAdjustmentDraft()" title="Save as Draft to resume and adjust later without modifying live inventory">
                     <span>💾 Save</span>
+                    <span id="topBtnSaveDraftDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
                 </button>
                 <button type="button" id="topBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
                     <span>Adjust stock</span>
@@ -447,6 +448,7 @@
                 </button>
                 <button type="button" id="bottomBtnSaveDraft" class="btn btn-secondary btn-save-draft" onclick="saveStockAdjustmentDraft()" title="Save as Draft to resume and adjust later without modifying live inventory">
                     <span>💾 Save Draft</span>
+                    <span id="bottomBtnSaveDraftDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
                 </button>
                 <button type="button" id="bottomBtnAdjustStock" class="btn btn-primary btn-adjust-stock" onclick="submitStockAdjustmentForm()">
                     <span>Adjust stock</span>
@@ -2130,6 +2132,32 @@ function isAdjustmentDirty() {
 
     return false;
 }
+
+function updateAdjustmentDirtyDot() {
+    const dirty = isAdjustmentDirty();
+    const d1 = document.getElementById('topBtnSaveDraftDot');
+    const d2 = document.getElementById('bottomBtnSaveDraftDot');
+    if (d1) d1.style.display = dirty ? 'inline-block' : 'none';
+    if (d2) d2.style.display = dirty ? 'inline-block' : 'none';
+    const b1 = document.getElementById('topBtnSaveDraft');
+    const b2 = document.getElementById('bottomBtnSaveDraft');
+    if (b1) {
+        if (dirty) b1.classList.add('has-unsaved');
+        else b1.classList.remove('has-unsaved');
+    }
+    if (b2) {
+        if (dirty) b2.classList.add('has-unsaved');
+        else b2.classList.remove('has-unsaved');
+    }
+}
+window.updateAdjustmentDirtyDot = updateAdjustmentDirtyDot;
+
+document.addEventListener('DOMContentLoaded', () => {
+    updateAdjustmentDirtyDot();
+    document.addEventListener('input', updateAdjustmentDirtyDot);
+    document.addEventListener('change', updateAdjustmentDirtyDot);
+    setInterval(updateAdjustmentDirtyDot, 1000);
+});
 
 function openDiscardModal() {
     const modal = document.getElementById('inflowAdjDiscardModal');
