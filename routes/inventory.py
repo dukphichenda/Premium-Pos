@@ -339,7 +339,7 @@ def api_products_for_adjustment():
               AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
               AND (
                   COALESCE(
-                      CASE WHEN so.location_id IN (SELECT id FROM locations WHERE name LIKE '<%>') THEN NULL ELSE so.location_id END,
+                      CASE WHEN so.location_id IN (SELECT id FROM locations WHERE name LIKE '<%%>') THEN NULL ELSE so.location_id END,
                       (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)
                   ) = %s
               )
