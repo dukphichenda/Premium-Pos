@@ -5464,6 +5464,11 @@ function toggleCustomerDropdown() {
     }
 }
 
+function closeCustomerDropdown() {
+    const popup = document.getElementById('customerDropdownPopup');
+    if (popup) popup.classList.remove('show');
+}
+
 function filterCustomerDropdown(val) {
     const popup = document.getElementById('customerDropdownPopup');
     if (popup && !popup.classList.contains('show')) {
@@ -8025,11 +8030,18 @@ function openQuickAddCustomerModal(presetName) {
     }
 }
 
+function closeCustomerDropdown() {
+    const popup = document.getElementById('customerDropdownPopup');
+    if (popup) popup.classList.remove('show');
+}
+
 function closeQuickAddCustomerModal() {
     const modal = document.getElementById('modalQuickAddCustomer');
     if (modal) modal.style.display = 'none';
     const dupNotice = document.getElementById('quickAddCustDupNotice');
     if (dupNotice) { dupNotice.style.display = 'none'; dupNotice.innerText = ''; }
+    const errBox = document.getElementById('quickAddCustomerError');
+    if (errBox) { errBox.style.display = 'none'; errBox.innerText = ''; }
 }
 
 function submitQuickAddCustomerAjax() {
@@ -8099,80 +8111,85 @@ function submitQuickAddCustomerAjax() {
     .then(({ status, data }) => {
         if (status === 200 && data.success && data.customer) {
             const cust = data.customer;
-            // 1. Populate main sales order fields
-            const custInput = document.getElementById('customerSearchInput');
-            const custIdHidden = document.getElementById('customerIdHidden');
-            const contactInput = document.getElementById('contactInput');
-            const phoneInput = document.getElementById('phoneInput');
-            const addressInput = document.getElementById('addressInput');
+            try {
+                // 1. Populate main sales order fields
+                const custInput = document.getElementById('customerSearchInput');
+                const custIdHidden = document.getElementById('customerIdHidden');
+                const contactInput = document.getElementById('contactInput');
+                const phoneInput = document.getElementById('phoneInput');
+                const addressInput = document.getElementById('addressInput');
 
-            const cAddr = cust.address || cust.address1 || cust.shipping_address || cust.display_address || '';
-            if (custInput) custInput.value = cust.name;
-            if (custIdHidden) custIdHidden.value = cust.id;
-            if (contactInput) contactInput.value = cust.contact_name || '';
-            if (phoneInput) phoneInput.value = cust.phone || '';
-            if (addressInput) addressInput.value = cAddr;
+                const cAddr = cust.address || cust.address1 || cust.shipping_address || cust.display_address || '';
+                if (custInput) custInput.value = cust.name;
+                if (custIdHidden) custIdHidden.value = cust.id;
+                if (contactInput) contactInput.value = cust.contact_name || '';
+                if (phoneInput) phoneInput.value = cust.phone || '';
+                if (addressInput) addressInput.value = cAddr;
 
-            const custBranchAttr = (cust.branch_id !== null && cust.branch_id !== undefined) ? String(cust.branch_id) : '';
+                const custBranchAttr = (cust.branch_id !== null && cust.branch_id !== undefined) ? String(cust.branch_id) : '';
 
-            // 2. Add row to main customer dropdown table
-            const tbody = document.getElementById('customerDropdownBody');
-            if (tbody) {
-                const tr = document.createElement('tr');
-                tr.className = 'main-cust-row';
-                tr.setAttribute('data-id', cust.id);
-                tr.setAttribute('data-branch-id', custBranchAttr);
-                tr.setAttribute('data-cname', cust.name);
-                tr.setAttribute('data-name', cust.name.toLowerCase());
-                tr.setAttribute('data-contact', (cust.contact_name || '').toLowerCase());
-                tr.setAttribute('data-ccontact', cust.contact_name || '');
-                tr.setAttribute('data-phone', (cust.phone || '').toLowerCase());
-                tr.setAttribute('data-cphone', cust.phone || '');
-                tr.setAttribute('data-caddress', cAddr);
-                tr.onclick = function() { selectCustomerFromRow(this); };
-                tr.innerHTML = `
-                    <td style="font-weight: 500;">${cust.name}</td>
-                    <td style="color: #4B5563;">${cust.contact_name || ''}</td>
-                    <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
-                `;
-                tbody.insertBefore(tr, tbody.firstChild);
-            }
+                // 2. Add row to main customer dropdown table
+                const tbody = document.getElementById('customerDropdownBody');
+                if (tbody) {
+                    const tr = document.createElement('tr');
+                    tr.className = 'main-cust-row';
+                    tr.setAttribute('data-id', cust.id);
+                    tr.setAttribute('data-branch-id', custBranchAttr);
+                    tr.setAttribute('data-cname', cust.name);
+                    tr.setAttribute('data-name', cust.name.toLowerCase());
+                    tr.setAttribute('data-contact', (cust.contact_name || '').toLowerCase());
+                    tr.setAttribute('data-ccontact', cust.contact_name || '');
+                    tr.setAttribute('data-phone', (cust.phone || '').toLowerCase());
+                    tr.setAttribute('data-cphone', cust.phone || '');
+                    tr.setAttribute('data-caddress', cAddr);
+                    tr.onclick = function() { if (typeof selectCustomerFromRow === 'function') selectCustomerFromRow(this); };
+                    tr.innerHTML = `
+                        <td style="font-weight: 500;">${cust.name}</td>
+                        <td style="color: #4B5563;">${cust.contact_name || ''}</td>
+                        <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
+                    `;
+                    tbody.insertBefore(tr, tbody.firstChild);
+                }
 
-            // 3. Add row to drawer customer dropdown table
-            const drawerTbody = document.getElementById('drawerCustomerDropdownBody');
-            if (drawerTbody) {
-                const dtr = document.createElement('tr');
-                dtr.className = 'drawer-cust-row';
-                dtr.setAttribute('data-id', cust.id);
-                dtr.setAttribute('data-branch-id', custBranchAttr);
-                dtr.setAttribute('data-cname', cust.name);
-                dtr.setAttribute('data-name', cust.name.toLowerCase());
-                dtr.setAttribute('data-contact', (cust.contact_name || '').toLowerCase());
-                dtr.setAttribute('data-phone', (cust.phone || '').toLowerCase());
-                dtr.onclick = function() { selectDrawerCustomerRow(this); };
-                dtr.innerHTML = `
-                    <td style="font-weight: 500;">${cust.name}</td>
-                    <td style="color: #4B5563;">${cust.contact_name || ''}</td>
-                    <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
-                `;
-                drawerTbody.insertBefore(dtr, drawerTbody.firstChild);
-            }
+                // 3. Add row to drawer customer dropdown table
+                const drawerTbody = document.getElementById('drawerCustomerDropdownBody');
+                if (drawerTbody) {
+                    const dtr = document.createElement('tr');
+                    dtr.className = 'drawer-cust-row';
+                    dtr.setAttribute('data-id', cust.id);
+                    dtr.setAttribute('data-branch-id', custBranchAttr);
+                    dtr.setAttribute('data-cname', cust.name);
+                    dtr.setAttribute('data-name', cust.name.toLowerCase());
+                    dtr.setAttribute('data-contact', (cust.contact_name || '').toLowerCase());
+                    dtr.setAttribute('data-phone', (cust.phone || '').toLowerCase());
+                    dtr.onclick = function() { if (typeof selectDrawerCustomerRow === 'function') selectDrawerCustomerRow(this); };
+                    dtr.innerHTML = `
+                        <td style="font-weight: 500;">${cust.name}</td>
+                        <td style="color: #4B5563;">${cust.contact_name || ''}</td>
+                        <td style="text-align: center;"><span class="inflow-blue-link">View</span></td>
+                    `;
+                    drawerTbody.insertBefore(dtr, drawerTbody.firstChild);
+                }
 
-            closeCustomerDropdown();
-            closeQuickAddCustomerModal();
-            markDirty();
+                if (typeof markDirty === 'function') markDirty();
 
-            // Re-filter dropdown to keep strict branch isolation
-            if (typeof filterCustomerDropdown === 'function') {
-                filterCustomerDropdown(cust.name);
-                const popup = document.getElementById('customerDropdownPopup');
-                if (popup) popup.classList.remove('show');
-            }
+                // Re-filter dropdown to keep strict branch isolation
+                if (typeof filterCustomerDropdown === 'function') {
+                    filterCustomerDropdown(cust.name);
+                }
 
-            // Flash visual feedback
-            if (custInput) {
-                custInput.style.backgroundColor = '#ECFDF5';
-                setTimeout(() => { custInput.style.backgroundColor = ''; }, 1200);
+                // Flash visual feedback on sales order page
+                if (custInput) {
+                    custInput.style.backgroundColor = '#ECFDF5';
+                    setTimeout(() => { custInput.style.backgroundColor = ''; }, 1200);
+                    custInput.focus();
+                }
+            } catch(domErr) {
+                console.warn('Post-save customer DOM sync notice:', domErr);
+            } finally {
+                // Guarantee the modal disappears and returns immediately to the sales order page
+                closeQuickAddCustomerModal();
+                closeCustomerDropdown();
             }
         } else {
             const errMsg = data.message || 'Error creating customer';

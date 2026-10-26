@@ -136,6 +136,7 @@ class TestCustomerDuplicateNameAndAiRemoval(unittest.TestCase):
         self.assertIn('id="quickAddCustDupNotice"', html)
         self.assertIn('checkQuickAddNameDuplicate', html)
         self.assertIn('findClientSideDuplicateCustomer', html)
+        self.assertIn('function closeCustomerDropdown()', html)
 
 if __name__ == '__main__':
     unittest.main()
