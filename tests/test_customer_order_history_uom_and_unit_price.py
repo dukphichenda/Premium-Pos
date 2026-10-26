@@ -66,18 +66,18 @@ class TestCustomerOrderHistoryUomAndUnitPrice(unittest.TestCase):
             sess['username'] = 'admin'
             sess['role'] = 'main_admin'
 
-        # Find order with 'cases' UOM
+        # Find active order with 'cases' UOM
         case_line = query_one("""
             SELECT so.order_number, so.customer_id, so.order_date, sol.quantity_display, sol.uom, sol.unit_price, sol.subtotal
             FROM sales_orders so
             JOIN sales_order_lines sol ON sol.sales_order_id = so.id
-            WHERE sol.uom = 'cases' AND sol.quantity_display IS NOT NULL
+            WHERE sol.uom = 'cases' AND sol.quantity_display IS NOT NULL AND so.status != 'CANCELLED'
             LIMIT 1
         """)
         if case_line:
             cid = case_line['customer_id']
             odate = str(case_line['order_date'])
-            res = self.client.get(f'/reports/view/customer-order-history?customer_id={cid}&date_range=Custom&date_from={odate}&date_to={odate}')
+            res = self.client.get(f'/reports/view/customer-order-history?customer_id={cid}&branch=all&date_range=Custom&date_from={odate}&date_to={odate}')
             self.assertEqual(res.status_code, 200)
             html = res.data.decode('utf-8')
 
