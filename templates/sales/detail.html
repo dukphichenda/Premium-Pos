@@ -6826,6 +6826,12 @@ function strNotNone(v) {
 
 function handleBillDateChange(input) {
     markDirty();
+    // Do not record previous bill date for new orders or copied drafts
+    if (typeof isNewOrder !== 'undefined' && isNewOrder) return;
+    if (typeof isCopiedDraft !== 'undefined' && isCopiedDraft) return;
+    const orderId = typeof getCurrentOrderId === 'function' ? getCurrentOrderId() : null;
+    if (!orderId || orderId === '0' || orderId === 0) return;
+
     const origDate = input.getAttribute('data-original-date');
     const newDate = (input.value || '').trim();
     if (origDate && newDate && origDate !== newDate) {
@@ -6855,17 +6861,20 @@ function saveSalesOrder() {
         return;
     }
 
-    // Ensure previous bill date is recorded if changed
-    const dateInput = document.getElementById('orderDateInput');
-    if (dateInput) {
-        const origDate = dateInput.getAttribute('data-original-date');
-        const newDate = (dateInput.value || '').trim();
-        if (origDate && newDate && origDate !== newDate) {
-            const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
-            if (remarksEl) {
-                const dateNote = `Previous bill date: ${origDate}`;
-                if (!remarksEl.value.includes(dateNote)) {
-                    remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
+    // Ensure previous bill date is recorded if changed (only for existing saved orders)
+    const orderId = typeof getCurrentOrderId === 'function' ? getCurrentOrderId() : null;
+    if (!isNewOrder && !isCopiedDraft && orderId && orderId !== '0' && orderId !== 0) {
+        const dateInput = document.getElementById('orderDateInput');
+        if (dateInput) {
+            const origDate = dateInput.getAttribute('data-original-date');
+            const newDate = (dateInput.value || '').trim();
+            if (origDate && newDate && origDate !== newDate) {
+                const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
+                if (remarksEl) {
+                    const dateNote = `Previous bill date: ${origDate}`;
+                    if (!remarksEl.value.includes(dateNote)) {
+                        remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
+                    }
                 }
             }
         }

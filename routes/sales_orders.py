@@ -1951,7 +1951,13 @@ def new_order():
 
             import re
             raw_notes = (order.get('notes') or '').strip()
-            order['notes'] = re.sub(r'^Copied from SO-\d+(\.\s*)?', '', raw_notes).strip()
+            # When copying SO, do not include system previous bill date or copy metadata in remark
+            cleaned_lines = [
+                line for line in raw_notes.splitlines()
+                if not re.match(r'^\s*previous\s+bill\s+date\s*:', line, re.IGNORECASE)
+                and not re.match(r'^\s*copied\s+from\s+so-\d+', line, re.IGNORECASE)
+            ]
+            order['notes'] = "\n".join(cleaned_lines).strip()
 
             lines = query_all("""
                 SELECT 
@@ -2745,7 +2751,7 @@ def save_order(id=0):
         else:
             notes = (order.get('notes') if order else '') or ''
 
-        # When change date of the bill the previous date must add to remark
+        # When change date of the bill the previous date must add to remark (ONLY for existing orders)
         if not is_new and order and order.get('order_date'):
             old_date = order['order_date']
             if old_date and order_date and old_date != order_date:
@@ -2753,6 +2759,14 @@ def save_order(id=0):
                 date_note = f"Previous bill date: {old_date_str}"
                 if date_note not in notes:
                     notes = f"{notes}\n{date_note}".strip() if notes else date_note
+        elif is_new and notes:
+            # Strip any accidental 'Previous bill date: ...' from new or copied orders
+            import re
+            cleaned_lines = [
+                line for line in notes.splitlines()
+                if not re.match(r'^\s*previous\s+bill\s+date\s*:', line, re.IGNORECASE)
+            ]
+            notes = "\n".join(cleaned_lines).strip()
 
         if 'address' in data or 'customer_address' in data:
             customer_address = str(data.get('address') or data.get('customer_address') or '').strip()
@@ -4580,8 +4594,12 @@ def copy_order(id):
 
     import re
     raw_notes = (req_data.get('notes') if 'notes' in req_data else order.get('notes') or '').strip()
-    cleaned_notes = re.sub(r'^Copied from SO-\d+(\.\s*)?', '', raw_notes).strip()
-    combined_notes = cleaned_notes
+    cleaned_lines = [
+        line for line in raw_notes.splitlines()
+        if not re.match(r'^\s*previous\s+bill\s+date\s*:', line, re.IGNORECASE)
+        and not re.match(r'^\s*copied\s+from\s+so-\d+', line, re.IGNORECASE)
+    ]
+    combined_notes = "\n".join(cleaned_lines).strip()
 
     client_lines = req_data.get('lines')
     pricing_scheme_id = int(req_data.get('pricing_scheme_id') or order.get('pricing_scheme_id') or 100)

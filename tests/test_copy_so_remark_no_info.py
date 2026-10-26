@@ -1,0 +1,67 @@
+import unittest
+import re
+from app import app
+from database import query_one, execute_returning_id
+
+class TestCopySoRemarkNoInfo(unittest.TestCase):
+    def setUp(self):
+        self.client = app.test_client()
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['role'] = 'main_admin'
+
+    def test_copied_draft_removes_previous_bill_date_info_from_remark(self):
+        """When copying an SO, previous bill date info must NOT be included in remarks."""
+        cust = query_one("SELECT id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+        import time
+        t_str = str(int(time.time() * 1000))
+        
+        # Create an order with both a user note and a historical 'Previous bill date' note
+        source_id = execute_returning_id(
+            f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date, notes) "
+            f"VALUES ('TEST-COPY-{t_str}', %s, 50, 'OPEN', 'UNPAID', '2026-10-08', 'Customer remark here\\nPrevious bill date: 26-Oct-26') RETURNING id",
+            (cust_id,)
+        )
+
+        resp = self.client.get(f'/sales/new?copy_from={source_id}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        # The user's actual remark must be retained
+        self.assertIn('Customer remark here', html)
+        # But 'Previous bill date: 26-Oct-26' must NOT be in the textarea / remark
+        self.assertNotIn('Previous bill date: 26-Oct-26', html)
+
+        # The data-original-date must be empty for copied drafts
+        self.assertIn('data-original-date=""', html)
+
+    def test_new_order_date_change_does_not_save_previous_bill_date_note(self):
+        """Saving a new order must never add 'Previous bill date' note even if date is changed or passed."""
+        cust = query_one("SELECT id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+        import time
+        t_str = str(int(time.time() * 1000))
+
+        post_data = {
+            'order_id': 0,
+            'customer_id': cust_id,
+            'order_date': '2026-10-27',
+            'notes': 'Call before deliver\nPrevious bill date: 26-Oct-26',
+            'lines_json': '[]',
+            'subtotal': 0.0,
+            'total_amount': 0.0
+        }
+
+        resp = self.client.post('/sales/save', data=post_data, follow_redirects=True)
+        self.assertEqual(resp.status_code, 200)
+
+        # Fetch the newly saved order
+        new_order = query_one("SELECT id, notes FROM sales_orders WHERE customer_id = %s ORDER BY id DESC LIMIT 1", (cust_id,))
+        self.assertIsNotNone(new_order)
+        self.assertIn('Call before deliver', new_order['notes'])
+        self.assertNotIn('Previous bill date', new_order['notes'])
+
+if __name__ == '__main__':
+    unittest.main()
