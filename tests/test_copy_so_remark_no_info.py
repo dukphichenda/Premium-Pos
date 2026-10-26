@@ -13,16 +13,17 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
 
     def test_copied_draft_removes_previous_bill_date_info_from_remark(self):
         """When copying an SO, previous bill date info must NOT be included in remarks."""
-        cust = query_one("SELECT id FROM customers LIMIT 1")
+        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
         cust_id = cust['id'] if cust else 1
+        branch_id = cust.get('branch_id') if cust else None
         import time
         t_str = str(int(time.time() * 1000))
         
         # Create an order with both a user note and a historical 'Previous bill date' note
         source_id = execute_returning_id(
-            f"INSERT INTO sales_orders (order_number, customer_id, total_amount, status, payment_status, order_date, notes) "
-            f"VALUES ('TEST-COPY-{t_str}', %s, 50, 'OPEN', 'UNPAID', '2026-10-08', 'Customer remark here\\nPrevious bill date: 26-Oct-26') RETURNING id",
-            (cust_id,)
+            "INSERT INTO sales_orders (order_number, customer_id, branch_id, total_amount, status, payment_status, order_date, notes) "
+            "VALUES (%s, %s, %s, 50, 'OPEN', 'UNPAID', '2026-10-08', %s) RETURNING id",
+            (f'TEST-COPY-{t_str}', cust_id, branch_id, "Customer remark here\nPrevious bill date: 26-Oct-26")
         )
 
         resp = self.client.get(f'/sales/new?copy_from={source_id}')
@@ -39,14 +40,16 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
 
     def test_new_order_date_change_does_not_save_previous_bill_date_note(self):
         """Saving a new order must never add 'Previous bill date' note even if date is changed or passed."""
-        cust = query_one("SELECT id FROM customers LIMIT 1")
+        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
         cust_id = cust['id'] if cust else 1
+        branch_id = cust.get('branch_id') if cust else None
         import time
         t_str = str(int(time.time() * 1000))
 
         post_data = {
             'order_id': 0,
             'customer_id': cust_id,
+            'branch_id': branch_id or '',
             'order_date': '2026-10-27',
             'notes': 'Call before deliver\nPrevious bill date: 26-Oct-26',
             'lines_json': '[]',
