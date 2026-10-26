@@ -1,6 +1,19 @@
 import unittest
 import csv
 import io
+import os
+from pathlib import Path
+
+# Auto-load .env if needed
+env_path = Path(__file__).resolve().parent.parent / '.env'
+if env_path.exists():
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
 from app import create_app
 from database import query_one, query_all
 
@@ -27,12 +40,12 @@ class TestBranchSalesReportBranchCost(unittest.TestCase):
         self.assertIn('PROFIT', html)
 
         # Check SO-STM-00001 specifically:
-        # Sales = $185.50, Branch Cost = $162.38, Profit = $23.13
+        # Sales = $185.50, Branch Cost = $162.38, Profit = $23.12
         # (HQ standard cost was $143.90, gross profit $41.60)
         self.assertIn('SO-STM-00001', html)
         self.assertIn('$185.50', html)
         self.assertIn('$162.38', html)
-        self.assertIn('$23.13', html)
+        self.assertIn('$23.12', html)
 
     def test_main_store_profit_report_retains_hq_costing(self):
         """
@@ -68,7 +81,7 @@ class TestBranchSalesReportBranchCost(unittest.TestCase):
                 profit = float(row[7])
                 self.assertAlmostEqual(sales, 185.50, places=2)
                 self.assertAlmostEqual(cost, 162.38, places=2)
-                self.assertAlmostEqual(profit, 23.13, places=2)
+                self.assertAlmostEqual(profit, 23.12, places=2)
                 self.assertAlmostEqual(profit, round(sales - cost, 2), places=2)
                 break
         self.assertTrue(found_stm1, "SO-STM-00001 was not found in branch export")
