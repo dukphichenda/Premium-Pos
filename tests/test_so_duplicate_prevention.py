@@ -1,13 +1,26 @@
 import unittest
 import uuid
 import json
-from app import create_app
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+env_path = os.path.join(os.path.dirname(__file__), '..', '.env')
+if os.path.exists(env_path):
+    with open(env_path, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                os.environ[k.strip()] = v.strip().strip('"').strip("'")
+
+from app import app
 from database import query_one, query_all, execute, get_db_cursor
 
 class TestSoDuplicatePrevention(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.app = create_app()
+        cls.app = app
         cls.app.config['TESTING'] = True
         cls.client = cls.app.test_client()
 
