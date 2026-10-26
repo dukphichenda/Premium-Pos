@@ -40,7 +40,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
 
     def test_new_order_date_change_does_not_save_previous_bill_date_note(self):
         """Saving a new order must never add 'Previous bill date' note even if date is changed or passed."""
-        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
+        cust = query_one("SELECT id, branch_id FROM customers ORDER BY id DESC LIMIT 1 OFFSET 1") or query_one("SELECT id, branch_id FROM customers LIMIT 1")
         cust_id = cust['id'] if cust else 1
         branch_id = cust.get('branch_id') if cust else None
         import time
