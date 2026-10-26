@@ -4538,7 +4538,7 @@ function getCurrentOrderId() {
     if (window.currentActiveOrderId) return window.currentActiveOrderId;
     const form = document.getElementById('salesOrderForm');
     if (form) {
-        const m = (form.getAttribute('action') || '').match(/\/sales\/save\/(\d+)/);
+        const m = (form.getAttribute('action') || '').match(/\/sales\/(?:save\/)?(\d+)(?:\/save)?/);
         if (m && m[1] && m[1] !== '0') return parseInt(m[1], 10);
     }
     return {{ order.id if order and order.id else 0 }};
@@ -5112,6 +5112,19 @@ document.addEventListener('DOMContentLoaded', function () {
             url: {% if is_new %}'/sales/new'{% else %}'{{ url_for("sales_orders.detail_order", id=order.id) }}'{% endif %}
         });
     }
+
+    // Immediately update MDI tab metadata if loaded an existing order (e.g. after saving new order)
+    {% if not is_new and order and order.id %}
+    try {
+        const curOrderNum = "{{ order.order_number or '' }}";
+        const curOrderTitle = curOrderNum ? `Sales Order: ${curOrderNum}` : document.title;
+        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+            window.top.inflowMdi.updateActiveTabMeta(window.location.pathname + window.location.search, curOrderTitle);
+        } else if (window.top && window.top.history && window.top.history.replaceState) {
+            window.top.history.replaceState(null, curOrderTitle, window.location.pathname + window.location.search);
+        }
+    } catch(e) {}
+    {% endif %}
 
     // Initialize status filter checkboxes
     initStatusCheckboxes();

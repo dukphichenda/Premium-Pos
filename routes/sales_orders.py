@@ -94,6 +94,9 @@ def _ensure_so_tables_exist():
                 created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
             );
             CREATE INDEX IF NOT EXISTS idx_so_versions_order_id ON sales_order_versions(sales_order_id);
+
+            ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS submission_token VARCHAR(64);
+            CREATE INDEX IF NOT EXISTS idx_sales_orders_sub_token ON sales_orders(submission_token);
         """)
     except Exception as e:
         logger.warning(f"Error ensuring SO auxiliary tables: {e}")
@@ -2909,50 +2912,69 @@ def save_order(id=0):
                           request.form.get('form_submission_token') or request.form.get('submission_token') or '').strip()
 
         if is_new:
-            # Check 1: Idempotency token in session
+            # Check 1: Idempotency token in persistent database & session
             if form_sub_token:
-                cached_order_id = session.get(f'so_sub_{form_sub_token}')
-                if cached_order_id:
-                    existing_ord = query_one("SELECT id, order_number FROM sales_orders WHERE id = %s", (cached_order_id,))
-                    if existing_ord:
-                        logger.info(f"Duplicate submission prevented via session submission_token '{form_sub_token}'. Order {existing_ord['order_number']} (id={cached_order_id})")
-                        target_id = existing_ord['id']
-                        order_number = existing_ord['order_number']
-                        redirect_kwargs = {
-                            'id': target_id,
-                            'branch': request.form.get('branch') or request.args.get('branch') or (str(branch_id) if branch_id else 'main'),
-                            'date_filter': request.form.get('date_filter') or request.args.get('date_filter') or 'All',
-                            'status_filter': request.form.get('status_filter') or request.args.get('status_filter') or 'Open, In Progress, Paid'
-                        }
-                        redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
-                        if request.is_json:
-                            return jsonify({'success': True, 'message': 'Saved successfully', 'order_id': target_id, 'order_number': order_number, 'redirect_url': redirect_url})
-                        flash(f"Sales Order {order_number} saved successfully!", "success")
-                        return redirect(redirect_url)
+                existing_ord = query_one("SELECT id, order_number FROM sales_orders WHERE submission_token = %s", (form_sub_token,))
+                if not existing_ord:
+                    cached_order_id = session.get(f'so_sub_{form_sub_token}')
+                    if cached_order_id:
+                        existing_ord = query_one("SELECT id, order_number FROM sales_orders WHERE id = %s", (cached_order_id,))
+                if existing_ord:
+                    logger.info(f"Duplicate submission prevented via submission_token '{form_sub_token}'. Order {existing_ord['order_number']} (id={existing_ord['id']})")
+                    target_id = existing_ord['id']
+                    order_number = existing_ord['order_number']
+                    redirect_kwargs = {
+                        'id': target_id,
+                        'branch': request.form.get('branch') or request.args.get('branch') or (str(branch_id) if branch_id else 'main'),
+                        'date_filter': request.form.get('date_filter') or request.args.get('date_filter') or 'All',
+                        'status_filter': request.form.get('status_filter') or request.args.get('status_filter') or 'Open, In Progress, Paid'
+                    }
+                    redirect_url = url_for('sales_orders.detail_order', **redirect_kwargs)
+                    if request.is_json:
+                        return jsonify({'success': True, 'message': 'Saved successfully', 'order_id': target_id, 'order_number': order_number, 'redirect_url': redirect_url})
+                    flash(f"Sales Order {order_number} saved successfully!", "success")
+                    return redirect(redirect_url)
 
-            # Check 2: Rapid deduplication guard (protects against concurrent requests within 8 seconds for same customer & branch)
+            # Check 2: Rapid deduplication guard (protects against concurrent requests within 60 seconds for same customer & branch)
             if customer_id:
                 recent_order = query_one("""
                     SELECT id, order_number, EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - created_at)) as seconds_ago
                     FROM sales_orders
                     WHERE customer_id = %s
                       AND ((branch_id IS NULL AND %s IS NULL) OR branch_id = %s)
-                      AND created_at >= (CURRENT_TIMESTAMP - INTERVAL '8 seconds')
+                      AND created_at >= (CURRENT_TIMESTAMP - INTERVAL '60 seconds')
                     ORDER BY id DESC
                     LIMIT 1
                 """, (customer_id, branch_id, branch_id))
                 if recent_order:
                     recent_id = recent_order['id']
-                    recent_lines = query_all("SELECT product_id, quantity FROM sales_order_lines WHERE sales_order_id = %s ORDER BY line_num", (recent_id,))
+                    recent_lines = query_all("SELECT product_id, quantity, quantity_display FROM sales_order_lines WHERE sales_order_id = %s ORDER BY line_num", (recent_id,))
                     current_items = [(int(it.get('product_id')), float(it.get('quantity') or 1)) for it in (lines_data or []) if it.get('product_id')]
-                    recent_items = [(int(rl['product_id']), float(rl['quantity'] or 1)) for rl in recent_lines]
-                    if current_items == recent_items or (len(current_items) == 0 and len(recent_items) == 0):
+                    # In recent_lines, quantity_display is user display qty (e.g. 5 cases), while quantity is std pcs (2800)
+                    recent_items_display = [(int(rl['product_id']), float(rl.get('quantity_display') or rl['quantity'] or 1)) for rl in recent_lines]
+                    recent_items_std = [(int(rl['product_id']), float(rl['quantity'] or 1)) for rl in recent_lines]
+
+                    is_match = False
+                    if len(current_items) == 0 and len(recent_lines) == 0:
+                        is_match = True
+                    elif current_items == recent_items_display or current_items == recent_items_std:
+                        is_match = True
+                    elif len(current_items) == len(recent_lines) and sorted(current_items) == sorted(recent_items_display):
+                        is_match = True
+                    elif len(current_items) == len(recent_lines) and sorted(current_items) == sorted(recent_items_std):
+                        is_match = True
+
+                    if is_match:
                         logger.warning(f"Rapid duplicate sales order prevented for customer {customer_id} (within {recent_order.get('seconds_ago', 0):.1f}s). Returning existing order {recent_order['order_number']}")
                         target_id = recent_id
                         order_number = recent_order['order_number']
                         if form_sub_token:
                             session[f'so_sub_{form_sub_token}'] = target_id
                             session.modified = True
+                            try:
+                                execute("UPDATE sales_orders SET submission_token = %s WHERE id = %s AND (submission_token IS NULL OR submission_token = '')", (form_sub_token, target_id))
+                            except Exception:
+                                pass
                         redirect_kwargs = {
                             'id': target_id,
                             'branch': request.form.get('branch') or request.args.get('branch') or (str(branch_id) if branch_id else 'main'),
@@ -2993,10 +3015,10 @@ def save_order(id=0):
                         discount_amount, shipping_fee, total_amount, paid_amount, balance_due,
                         sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone,
                         branch_id, delivery_man, delivery_helper, delivery_fee_khr, delivery_notes, payment_method,
-                        carrier, package_count, cod_amount
-                    ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', 0, 0, 0, 0, 0, 0, 0, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        carrier, package_count, cod_amount, submission_token
+                    ) VALUES (%s, %s, %s, %s, 'OPEN', 'UNPAID', 0, 0, 0, 0, 0, 0, 0, 0, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id;
-                """, (order_number, customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, branch_id, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, carrier or None, package_count, cod_amount))
+                """, (order_number, customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, branch_id, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, carrier or None, package_count, cod_amount, form_sub_token or None))
                 id = cur.fetchone()['id']
                 if form_sub_token:
                     session[f'so_sub_{form_sub_token}'] = id

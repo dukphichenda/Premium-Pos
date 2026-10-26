@@ -549,10 +549,17 @@
 
                             tab.url = newPath + iframe.contentWindow.location.search;
 
+                            // Sync top window browser address bar so F5 / reload reloads the current document URL, NOT the initial /sales/new
+                            if (tab.id === MdiShell.activeTabId && window.history && window.history.replaceState) {
+                                const cleanPath = tab.url.replace(/[?&]embed=1/, '');
+                                window.history.replaceState(null, '', cleanPath || '/');
+                            }
+
                             const docTitle = frameDoc.title || '';
                             const pageTitle = docTitle.split('|')[0].split('-')[0].trim();
-                            if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || tab.title === 'New Sales Order') {
-                                // Preserve dedicated category tab identities
+                            const isStillNewOrder = (tab.title === 'New Sales Order' && (newPath.includes('/sales/new') || newPath.includes('/orders/new')));
+                            if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || isStillNewOrder) {
+                                // Preserve dedicated category tab identities only if still on category list or /sales/new
                             } else if (pageTitle && pageTitle.toLowerCase() !== 'inflow premium' && pageTitle.length > 0) {
                                 tab.origTitleEn = pageTitle;
                                 const curL = MdiShell.getLanguage ? MdiShell.getLanguage() : (localStorage.getItem('inflow_app_lang') || 'en');
@@ -561,6 +568,8 @@
                                 tab.label = finalTitle;
                                 const lbl = document.getElementById(`tab-label-${tab.id}`);
                                 if (lbl) lbl.textContent = finalTitle;
+                                const tabElem = document.getElementById(`tab-item-${tab.id}`);
+                                if (tabElem) tabElem.title = finalTitle;
                             }
 
                             // Ensure newly loaded iframe receives current language immediately
