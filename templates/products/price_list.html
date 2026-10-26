@@ -2403,7 +2403,7 @@
                 <div class="pl-title-row">
                     <h1 class="pl-title-en">Product Price List</h1>
                     <span class="pl-title-km font-khmer">(តារាងតម្លៃទំនិញ)</span>
-                    <span class="pl-badge-count" id="visibleCounter">Showing {{ total_products }} of {{ total_products }}</span>
+                    <span class="pl-badge-count" id="visibleCounter">Showing 0 of {{ total_products }}</span>
                 </div>
                 <p class="pl-header-sub">
                     Clean customer price table cards with 3 pricing tiers and packaging breakdown.
@@ -2486,13 +2486,13 @@
         <div class="pl-toolbar-left">
             <!-- 1. Scope Option: [ All Products | By Category | Selected Products ] -->
             <div class="pl-scope-pills">
-                <button type="button" class="pl-scope-btn active" id="scopeAll" onclick="setScopeMode('all')">
+                <button type="button" class="pl-scope-btn" id="scopeAll" onclick="setScopeMode('all')">
                     <span>🌐 All Products</span>
                 </button>
                 <button type="button" class="pl-scope-btn" id="scopeCategory" onclick="setScopeMode('category')">
                     <span>📁 By Category</span>
                 </button>
-                <button type="button" class="pl-scope-btn" id="scopeSelected" onclick="setScopeMode('selected')">
+                <button type="button" class="pl-scope-btn active" id="scopeSelected" onclick="setScopeMode('selected')">
                     <span>☑️ Selected</span>
                     <span class="pl-selected-pill" id="selectedCountPill">0</span>
                 </button>
@@ -2654,13 +2654,21 @@
     </div>
 
     <!-- Empty State Message -->
-    <div class="pl-empty-state" id="emptyState" style="display: none;">
+    <div class="pl-empty-state" id="emptyState" style="display: none; padding: 60px 20px; text-align: center;">
         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.5" style="margin: 0 auto 12px; display: block;">
             <circle cx="11" cy="11" r="8"></circle>
             <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <h3 style="font-size: 1.1rem; font-weight: 700; color: #1E293B; margin: 0 0 6px 0;">No Products Found</h3>
-        <p style="margin: 0; font-size: 0.9rem;">Try adjusting your search terms, selecting another category, or selecting products.</p>
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #1E293B; margin: 0 0 6px 0;">No Products Selected</h3>
+        <p style="margin: 0 0 18px 0; font-size: 0.92rem; color: #64748B;">Choose products to generate your price list, or browse by category.</p>
+        <div style="display: inline-flex; gap: 10px; justify-content: center;">
+            <button type="button" class="pl-btn pl-btn-primary" onclick="openProductPickerModal()" style="height: 36px; padding: 0 16px;">
+                <span>☑️ Select Products</span>
+            </button>
+            <button type="button" class="pl-btn pl-btn-secondary" onclick="setScopeMode('all')" style="height: 36px; padding: 0 16px;">
+                <span>🌐 Browse All Products</span>
+            </button>
+        </div>
     </div>
 
 </div>
@@ -2777,12 +2785,12 @@ const ALL_PRODUCTS_DATA = {{ items|tojson }};
 const CATEGORIES_DATA = {{ categories|tojson }};
 
 // State
-let currentScope = 'all'; // 'all' | 'category' | 'selected'
+let currentScope = 'selected'; // Default to 'selected' (blank until chosen by user)
 let currentCategory = 'all';
 let currentGroupBy = 'category'; // 'category' | 'uom' | 'none'
 let currentSearch = '';
 let currentThemeColor = '#3B4B64';
-let selectedProductIds = new Set();
+let selectedProductIds = new Set(); // Start empty: no pre-selected products, user chooses later
 let currentViewMode = 'table'; // Default: 'table' view matching user request
 let currentSchemeId = {{ (pricing_schemes|selectattr('is_default')|first).id if pricing_schemes and (pricing_schemes|selectattr('is_default')|list) else (pricing_schemes[0].id if pricing_schemes else 100) }};
 let currentUom = 'pack'; // 'pack' | 'case' | 'pcs' | 'auto'
@@ -2797,13 +2805,22 @@ function onCardStyleChange() {
 
 // Initialize on Load
 document.addEventListener('DOMContentLoaded', function() {
-    // Default: all products selected initially in the picker set
-    ALL_PRODUCTS_DATA.forEach(p => selectedProductIds.add(p.id));
+    // Start blank: no pre-selected products, user chooses later
+    selectedProductIds = new Set();
     updateSelectedBadges();
 
-    // Check URL parameters for view preference (?view=table or ?view=cards)
+    // Check URL parameters for scope and view preference
     try {
         const urlParams = new URLSearchParams(window.location.search);
+        const s = urlParams.get('scope');
+        if (s === 'all') {
+            currentScope = 'all';
+        } else if (s === 'category') {
+            currentScope = 'category';
+        } else if (s === 'selected') {
+            currentScope = 'selected';
+        }
+
         const v = urlParams.get('view');
         if (v === 'cards') {
             currentViewMode = 'cards';
@@ -2811,6 +2828,14 @@ document.addEventListener('DOMContentLoaded', function() {
             currentViewMode = 'table';
         }
     } catch(e) {}
+
+    // Synchronize UI scope buttons
+    const scopeAll = document.getElementById('scopeAll');
+    const scopeCat = document.getElementById('scopeCategory');
+    const scopeSel = document.getElementById('scopeSelected');
+    if (scopeAll) scopeAll.classList.toggle('active', currentScope === 'all');
+    if (scopeCat) scopeCat.classList.toggle('active', currentScope === 'category');
+    if (scopeSel) scopeSel.classList.toggle('active', currentScope === 'selected');
 
     // Synchronize UI view buttons
     const btnTable = document.getElementById('btnViewTable');
@@ -2846,6 +2871,10 @@ function setScopeMode(mode) {
     if (mode === 'category') {
         catSelect.style.borderColor = '#0284C7';
         catSelect.focus();
+    } else if (mode === 'all') {
+        catSelect.style.borderColor = '#CBD5E1';
+        catSelect.value = 'all';
+        currentCategory = 'all';
     } else {
         catSelect.style.borderColor = '#CBD5E1';
     }
@@ -2882,6 +2911,10 @@ function onSchemeOrUomChange() {
 // Generate Table Trigger Button
 function generatePriceTable() {
     switchViewMode('table');
+    if (currentScope === 'selected' && selectedProductIds.size === 0) {
+        openProductPickerModal();
+        return;
+    }
     applyFiltersAndRender();
 
     const card = document.querySelector('.pl-table-card');
@@ -3079,10 +3112,20 @@ function applyFiltersAndRender() {
     }
 
     if (filtered.length === 0) {
-        if (tableWrapper) tableWrapper.style.display = 'none';
-        if (cardsContainer) cardsContainer.style.display = 'none';
-        if (emptyState) emptyState.style.display = 'block';
-        return;
+        if (currentViewMode === 'table') {
+            if (tableWrapper) tableWrapper.style.display = 'block';
+            if (cardsContainer) cardsContainer.style.display = 'none';
+            if (groupByWrap) groupByWrap.style.display = 'none';
+            if (cardStyleWrap) cardStyleWrap.style.display = 'none';
+            if (emptyState) emptyState.style.display = 'none';
+            renderTableView([]);
+            return;
+        } else {
+            if (tableWrapper) tableWrapper.style.display = 'none';
+            if (cardsContainer) cardsContainer.style.display = 'none';
+            if (emptyState) emptyState.style.display = 'block';
+            return;
+        }
     }
     if (emptyState) emptyState.style.display = 'none';
 
@@ -3126,6 +3169,30 @@ function renderTableView(items) {
     if (metaCount) metaCount.textContent = `${items.length} Products`;
     if (metaDetail) {
         metaDetail.innerHTML = `Scheme: <strong>${escapeHtml(schemeText)}</strong> | Target UOM: <strong>${escapeHtml(uomText)}</strong>`;
+    }
+
+    if (items.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" style="text-align: center; padding: 60px 20px; background: #FFFFFF;">
+                    <div style="font-size: 38px; margin-bottom: 12px; opacity: 0.85;">📋</div>
+                    <div style="font-size: 16px; font-weight: 700; color: #1E293B; margin-bottom: 6px;">No Products Selected Yet</div>
+                    <div style="font-size: 13px; color: #64748B; margin-bottom: 18px;">Choose products to generate your custom price table, or browse by category.</div>
+                    <div style="display: inline-flex; gap: 10px; justify-content: center;">
+                        <button type="button" class="pl-btn pl-btn-primary" onclick="openProductPickerModal()" style="height: 36px; padding: 0 16px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                            <span>Select Products</span>
+                        </button>
+                        <button type="button" class="pl-btn pl-btn-secondary" onclick="setScopeMode('all')" style="height: 36px; padding: 0 16px;">
+                            <span>🌐 Browse All Products</span>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        const selectAllChk = document.getElementById('selectAllRowsChk');
+        if (selectAllChk) selectAllChk.checked = false;
+        return;
     }
 
     let allChecked = items.length > 0;

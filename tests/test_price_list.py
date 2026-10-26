@@ -114,5 +114,26 @@ class TestPriceList(unittest.TestCase):
         self.assertIn('/products/price-list', html)
         self.assertIn('Price List Table (តារាងតម្លៃទំនិញ)', html)
 
+    def test_price_list_starts_blank_without_preselection(self):
+        """Verify when opening price list page, products are not pre-selected and table starts blank."""
+        resp = self.client.get('/products/price-list')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Scope selected is active on initial load
+        self.assertIn('class="pl-scope-btn active" id="scopeSelected"', html)
+        self.assertIn('id="selectedCountPill">0<', html)
+
+        # Counter shows 0 products on initial load
+        self.assertIn('id="visibleCounter">Showing 0 of ', html)
+
+        # Client-side state defaults to empty set and selected scope
+        self.assertIn("let currentScope = 'selected';", html)
+        self.assertIn('selectedProductIds = new Set();', html)
+        self.assertNotIn('ALL_PRODUCTS_DATA.forEach(p => selectedProductIds.add(p.id));', html)
+
+        # Empty state prompt row present
+        self.assertIn('No Products Selected Yet', html)
+
 if __name__ == '__main__':
     unittest.main()
