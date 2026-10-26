@@ -422,6 +422,25 @@ def api_purchase_data(id):
     else:
         badge = 'Unfulfilled'
 
+    # Check if this PO is already linked to an expense
+    linked_expense = query_one("""
+        SELECT id, expense_date, total_price, category, paid_by, month_key 
+        FROM expenses 
+        WHERE notes ILIKE %s OR item ILIKE %s
+        ORDER BY id DESC LIMIT 1
+    """, (f"%{order['order_number']}%", f"%{order['order_number']}%"))
+
+    linked_expense_data = None
+    if linked_expense:
+        linked_expense_data = {
+            'id': linked_expense['id'],
+            'expense_date': linked_expense['expense_date'].strftime('%Y-%m-%d') if linked_expense['expense_date'] else '',
+            'total_price': float(linked_expense['total_price'] or 0),
+            'category': linked_expense['category'] or 'Purchases',
+            'paid_by': linked_expense['paid_by'] or 'ABA Bank',
+            'month_key': linked_expense['month_key'] or ''
+        }
+
     return jsonify({
         'success': True,
         'order': {
@@ -479,7 +498,8 @@ def api_purchase_data(id):
         'total_qty_ordered': total_qty_ordered,
         'total_qty_received': total_qty_received,
         'receiving_percent': receiving_percent,
-        'attachment_count': attachment_count
+        'attachment_count': attachment_count,
+        'linked_expense': linked_expense_data
     })
 
 @purchase_orders_bp.route('/purchases/new')
@@ -923,8 +943,37 @@ def update_purchase(id):
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
             """, (expected_date, carrier, vendor_invoice_no, notes, contact, phone, vendor_address, non_vendor_costs, currency_code, id))
+
+            linked_exp = query_one("""
+                SELECT id, month_key, total_price, branch_id 
+                FROM expenses 
+                WHERE notes ILIKE %s OR item ILIKE %s
+                ORDER BY id DESC LIMIT 1
+            """, (f"%{order['order_number']}%", f"%{order['order_number']}%"))
+            cur_po_total = float(order.get('total_amount') or 0)
+            if linked_exp and float(linked_exp['total_price'] or 0) != cur_po_total:
+                execute("""
+                    UPDATE expenses 
+                    SET unit_price = %s, total_price = %s, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = %s
+                """, (cur_po_total, cur_po_total, linked_exp['id']))
+                try:
+                    from routes.expenses import _get_or_create_monthly_summary
+                    _get_or_create_monthly_summary(linked_exp['month_key'], branch_id=str(linked_exp.get('branch_id') or 'main'))
+                except Exception:
+                    pass
+
             if is_ajax:
-                return jsonify({'success': True, 'message': 'Purchase order updated successfully!'})
+                return jsonify({
+                    'success': True,
+                    'message': 'Purchase order updated successfully!',
+                    'total_amount': cur_po_total,
+                    'linked_expense': {
+                        'id': linked_exp['id'],
+                        'total_price': cur_po_total,
+                        'month_key': linked_exp['month_key']
+                    } if linked_exp else None
+                })
             flash("Purchase order notes and details updated.", "success")
             return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
@@ -1039,8 +1088,37 @@ def update_purchase(id):
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                 """, (id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], rcv_qty, line[8]))
 
+            # If this PO is linked to an expense in expenses table, sync its amount to the updated total_amount
+            cur.execute("""
+                SELECT id, month_key, total_price, branch_id 
+                FROM expenses 
+                WHERE notes ILIKE %s OR item ILIKE %s
+                ORDER BY id DESC LIMIT 1
+            """, (f"%{order['order_number']}%", f"%{order['order_number']}%"))
+            linked_exp = cur.fetchone()
+            if linked_exp and float(linked_exp['total_price'] or 0) != total_amount:
+                cur.execute("""
+                    UPDATE expenses 
+                    SET unit_price = %s, total_price = %s, updated_at = CURRENT_TIMESTAMP 
+                    WHERE id = %s
+                """, (total_amount, total_amount, linked_exp['id']))
+                try:
+                    from routes.expenses import _get_or_create_monthly_summary
+                    _get_or_create_monthly_summary(linked_exp['month_key'], branch_id=str(linked_exp.get('branch_id') or 'main'))
+                except Exception:
+                    pass
+
         if is_ajax:
-            return jsonify({'success': True, 'message': 'Purchase order saved successfully!'})
+            return jsonify({
+                'success': True,
+                'message': 'Purchase order saved successfully!',
+                'total_amount': total_amount,
+                'linked_expense': {
+                    'id': linked_exp['id'],
+                    'total_price': total_amount,
+                    'month_key': linked_exp['month_key']
+                } if linked_exp else None
+            })
         flash("Purchase order updated successfully!", "success")
         return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
@@ -1540,33 +1618,43 @@ def add_po_to_expenses(id):
         branch_id = order.get('branch_id')
         recorded_by = session.get('username') or 'Admin'
 
-        new_expense_id = execute_returning_id("""
-            INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, payment_account, notes, month_key, branch_id, recorded_by)
-            VALUES (%s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """, (exp_date, item, category, total_price, total_price, paid_by, paid_by, notes, month_key, branch_id, recorded_by))
+        # Check if an expense already exists for this PO
+        existing_exp = query_one("""
+            SELECT id, month_key, branch_id 
+            FROM expenses 
+            WHERE notes ILIKE %s OR item ILIKE %s
+            ORDER BY id DESC LIMIT 1
+        """, (f"%{order['order_number']}%", f"%{order['order_number']}%"))
 
         from routes.expenses import _get_or_create_monthly_summary
-        _get_or_create_monthly_summary(month_key, branch_id=str(branch_id) if branch_id else 'main')
 
-        mark_as_paid = data.get('mark_as_paid') in (True, 'true', '1', 1, 'on')
-        if mark_as_paid and float(order.get('balance_due') or 0.0) > 0:
-            pay_amount = min(total_price, float(order.get('balance_due') or 0.0))
-            new_paid = float(order.get('paid_amount') or 0.0) + pay_amount
-            new_bal = max(0.0, float(order.get('total_amount') or 0.0) - new_paid)
-            new_stat = 'PAID' if new_bal <= 0 else 'PARTIAL'
-            with get_db_cursor(commit=True) as cur:
-                cur.execute("""
-                    UPDATE purchase_orders 
-                    SET paid_amount = %s, balance_due = %s, payment_status = %s, updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s
-                """, (new_paid, new_bal, new_stat, id))
-                cur.execute("""
-                    INSERT INTO order_payments (order_type, order_id, amount, payment_method, reference, notes)
-                    VALUES ('PO', %s, %s, %s, %s, %s)
-                """, (id, pay_amount, paid_by, f"Expense #{new_expense_id}", f"Added to Expenses Sheet ({month_key})"))
-
-        msg = f"Successfully added {order['order_number']} (${total_price:,.2f}) to {month_key} Expenses Sheet!"
+        if existing_exp:
+            new_expense_id = existing_exp['id']
+            execute("""
+                UPDATE expenses 
+                SET expense_date = %s, item = %s, category = %s, unit_price = %s, quantity = 1,
+                    total_price = %s, paid_by = %s, payment_account = %s, notes = %s,
+                    month_key = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, (exp_date, item, category, total_price, total_price, paid_by, paid_by, notes, month_key, new_expense_id))
+            try:
+                if existing_exp.get('month_key') and existing_exp['month_key'] != month_key:
+                    _get_or_create_monthly_summary(existing_exp['month_key'], branch_id=str(branch_id) if branch_id else 'main')
+                _get_or_create_monthly_summary(month_key, branch_id=str(branch_id) if branch_id else 'main')
+            except Exception:
+                pass
+            msg = f"Successfully updated {order['order_number']} (${total_price:,.2f}) in {month_key} Expenses Sheet!"
+        else:
+            new_expense_id = execute_returning_id("""
+                INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, payment_account, notes, month_key, branch_id, recorded_by)
+                VALUES (%s, %s, %s, %s, 1, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (exp_date, item, category, total_price, total_price, paid_by, paid_by, notes, month_key, branch_id, recorded_by))
+            try:
+                _get_or_create_monthly_summary(month_key, branch_id=str(branch_id) if branch_id else 'main')
+            except Exception:
+                pass
+            msg = f"Successfully added {order['order_number']} (${total_price:,.2f}) to {month_key} Expenses Sheet!"
 
         is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.is_json
         if is_ajax:

@@ -3196,7 +3196,7 @@ function selectPurchaseOrder(id) {
             if (res.success && res.order) {
                 currentActiveOrder = res.order;
                 currentActiveLines = res.lines;
-                renderPoDetailsInCanvas(res.order, res.lines, res.receiving_percent);
+                renderPoDetailsInCanvas(res.order, res.lines, res.receiving_percent, res.linked_expense);
                 clearPoDirty();
             } else {
                 window.location.href = '/purchases/' + id;
@@ -3208,7 +3208,7 @@ function selectPurchaseOrder(id) {
 }
 
 // Render dynamic data into canvas
-function renderPoDetailsInCanvas(order, lines, receivePct) {
+function renderPoDetailsInCanvas(order, lines, receivePct, linkedExpense) {
     currentActivePoId = order.id;
     currentActiveOrder = order;
     currentActiveLines = lines;
@@ -3272,6 +3272,68 @@ function renderPoDetailsInCanvas(order, lines, receivePct) {
     document.getElementById('poPaidText').innerText = formatCurrency(order.paid_amount);
     document.getElementById('poBalanceText').innerText = formatCurrency(order.balance_due);
     document.getElementById('poPaymentTermsInput').value = order.payment_terms || 'Net 30';
+
+    // Update Add to Expenses Button, Financial Tag & Modal
+    const topExpBtn = document.getElementById('btnPoAddToExpenses');
+    const expBtnText = document.getElementById('poExpenseBtnText');
+    const metaWrap = document.getElementById('poExpenseMetaWrap');
+    const noticeBox = document.getElementById('poExpenseExistingNotice');
+    const noticeMsg = document.getElementById('poExpenseExistingMsg');
+    const amountInput = document.getElementById('poExpAmount');
+    const itemInput = document.getElementById('poExpItem');
+    const dateInput = document.getElementById('poExpDate');
+    const catInput = document.getElementById('poExpCategory');
+    const paidByInput = document.getElementById('poExpPaidBy');
+    const monthKeyInput = document.getElementById('poExpMonthKey');
+    const notesInput = document.getElementById('poExpNotes');
+
+    const poVendorName = order.vendor_name || 'Vendor';
+    if (itemInput) itemInput.value = `${order.order_number} - ${poVendorName}`;
+    if (notesInput) notesInput.value = `Purchase Order: ${order.order_number} • Vendor: ${poVendorName}`;
+
+    if (linkedExpense) {
+        const expAmount = parseFloat(linkedExpense.total_price || 0);
+        if (topExpBtn) topExpBtn.classList.add('po-top-expense-linked');
+        if (expBtnText) expBtnText.textContent = `In Expenses ($${expAmount.toFixed(2)})`;
+        if (metaWrap) {
+            metaWrap.innerHTML = `
+                <span class="po-expense-status-tag" style="display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; color: #047857; background: #ECFDF5; border: 1px solid #A7F3D0; padding: 2px 7px; border-radius: 4px;">
+                    ✓ In ${linkedExpense.month_key} Expenses Sheet
+                    <a href="javascript:void(0)" onclick="openExpenseSheetTab('${linkedExpense.month_key}')" style="color: #047857; text-decoration: underline; margin-left: 2px;">View ➔</a>
+                </span>
+            `;
+        }
+        if (noticeBox && noticeMsg) {
+            noticeMsg.innerHTML = `Already recorded in <strong>${linkedExpense.month_key}</strong> Expenses Sheet ($${expAmount.toFixed(2)} on ${linkedExpense.expense_date || ''}).`;
+            noticeBox.style.display = 'flex';
+        }
+        if (amountInput) amountInput.value = expAmount.toFixed(2);
+        if (dateInput && linkedExpense.expense_date) {
+            dateInput.value = linkedExpense.expense_date;
+            updatePoExpMonthKey(dateInput.value);
+        }
+        if (catInput && linkedExpense.category) catInput.value = linkedExpense.category;
+        if (paidByInput && linkedExpense.paid_by) paidByInput.value = linkedExpense.paid_by;
+        if (monthKeyInput && linkedExpense.month_key) monthKeyInput.value = linkedExpense.month_key;
+    } else {
+        if (topExpBtn) topExpBtn.classList.remove('po-top-expense-linked');
+        if (expBtnText) expBtnText.textContent = 'Add to Expenses';
+        if (metaWrap) {
+            metaWrap.innerHTML = `
+                <a href="javascript:void(0)" onclick="openAddToExpensesModal()" class="po-fin-link" style="color: #B45309; font-weight: 600;">
+                    🧾 + Add to Expenses Sheet
+                </a>
+            `;
+        }
+        if (noticeBox) noticeBox.style.display = 'none';
+        if (amountInput) amountInput.value = parseFloat(order.total_amount || 0).toFixed(2);
+        if (dateInput) {
+            dateInput.value = order.order_date_raw || new Date().toISOString().substring(0, 10);
+            updatePoExpMonthKey(dateInput.value);
+        }
+        if (catInput) catInput.value = 'Purchases';
+        if (paidByInput) paidByInput.value = 'ABA Bank';
+    }
 
     // Stepper
     document.getElementById('poStepProductCount').innerText = lines.length;
@@ -3855,6 +3917,17 @@ function recalculatePoTotals() {
     document.getElementById('poSubtotalText').innerText = formatCurrency(subtotal);
     document.getElementById('poTotalText').innerText = formatCurrency(total);
     document.getElementById('poBalanceText').innerText = formatCurrency(balance);
+
+    // Sync expense input and button if linked
+    const expAmtInput = document.getElementById('poExpAmount');
+    if (expAmtInput) {
+        expAmtInput.value = total.toFixed(2);
+    }
+    const topExpBtn = document.getElementById('btnPoAddToExpenses');
+    const expBtnText = document.getElementById('poExpenseBtnText');
+    if (topExpBtn && topExpBtn.classList.contains('po-top-expense-linked') && expBtnText) {
+        expBtnText.textContent = `In Expenses ($${total.toFixed(2)})`;
+    }
 }
 
 function toggleTotalsPopover(e) {
@@ -4447,12 +4520,16 @@ function openAddToExpensesModal() {
     }
 
     const amountInput = document.getElementById('poExpAmount');
-    if (amountInput && (!amountInput.value || parseFloat(amountInput.value) <= 0)) {
+    if (amountInput) {
         let totalVal = 0;
-        const totalPill = document.getElementById('poHeaderAmountPill');
-        if (totalPill) {
-            const raw = totalPill.innerText.replace(/[^0-9.-]/g, '');
-            totalVal = parseFloat(raw) || 0;
+        const totalHidden = document.getElementById('poTotalAmountHidden');
+        if (totalHidden && parseFloat(totalHidden.value) > 0) {
+            totalVal = parseFloat(totalHidden.value);
+        } else {
+            const totalPill = document.getElementById('poHeaderAmountPill');
+            if (totalPill) {
+                totalVal = parseFloat(totalPill.innerText.replace(/[^0-9.-]/g, '')) || 0;
+            }
         }
         if (totalVal > 0) {
             amountInput.value = totalVal.toFixed(2);
