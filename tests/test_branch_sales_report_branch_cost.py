@@ -102,5 +102,15 @@ class TestBranchSalesReportBranchCost(unittest.TestCase):
             self.assertIn('monthly_labels', chart_data)
             self.assertIn('monthly_profit', chart_data)
 
+    def test_negative_profit_rendered_red(self):
+        """
+        Verify that negative profit rows and totals are highlighted in red (#DC2626).
+        """
+        resp = self.client.get('/reports/view/branch-sales-summary?branch=1')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+        # Check that red color styling #DC2626 exists for negative profit
+        self.assertIn('#DC2626', html)
+
 if __name__ == '__main__':
     unittest.main()
