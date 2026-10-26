@@ -494,6 +494,107 @@ def sync_customers_from_latest_orders(cur=None, customer_ids=None):
         with get_db_cursor(commit=True) as c:
             return _sync(c)
 
+def sync_inventory_reserved_quantities(cur=None, product_ids=None):
+    """
+    Recalculates and synchronizes inventory.reserved_quantity to accurately match
+    active, unfulfilled sales orders (including kit BOM components and add-on products).
+    Unfulfilled orders are:
+    status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED') AND (payment_status IS NULL OR payment_status != 'PAID').
+    """
+    def _sync(c):
+        p_filter = ""
+        params = []
+        if product_ids is not None:
+            clean_ids = [int(pid) for pid in product_ids if pid]
+            if not clean_ids:
+                return 0
+            p_filter = "AND (sol.product_id = ANY(%s) OR sol.addon_product_id = ANY(%s) OR EXISTS (SELECT 1 FROM product_boms pb_sub WHERE pb_sub.product_id = sol.product_id AND pb_sub.component_product_id = ANY(%s)))"
+            params = [clean_ids, clean_ids, clean_ids]
+            c.execute("UPDATE inventory SET reserved_quantity = 0 WHERE product_id = ANY(%s) AND reserved_quantity != 0;", (clean_ids,))
+        else:
+            c.execute("UPDATE inventory SET reserved_quantity = 0 WHERE reserved_quantity != 0;")
+
+        sync_sql = f"""
+            WITH open_so_lines AS (
+                SELECT sol.product_id, sol.addon_product_id, sol.quantity, COALESCE(sol.addon_quantity, 1.0) as addon_qty,
+                       COALESCE(so.location_id, (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)) as loc_id
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON sol.sales_order_id = so.id
+                WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')
+                  AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+                  {p_filter}
+            ),
+            all_res AS (
+                -- 1. Direct products on sales order lines
+                SELECT product_id, loc_id, quantity as res_qty FROM open_so_lines
+                UNION ALL
+                -- 2. Add-on products on sales order lines
+                SELECT addon_product_id as product_id, loc_id, (quantity * addon_qty) as res_qty 
+                FROM open_so_lines WHERE addon_product_id IS NOT NULL
+                UNION ALL
+                -- 3. Kit BOM components
+                SELECT pb.component_product_id as product_id, l.loc_id, (l.quantity * pb.quantity) as res_qty
+                FROM open_so_lines l
+                JOIN product_boms pb ON l.product_id = pb.product_id
+            ),
+            loc_res AS (
+                SELECT product_id, loc_id, SUM(res_qty) as total_res
+                FROM all_res
+                WHERE product_id IS NOT NULL
+                GROUP BY product_id, loc_id
+            )
+            UPDATE inventory i
+            SET reserved_quantity = lr.total_res,
+                updated_at = CURRENT_TIMESTAMP
+            FROM loc_res lr
+            WHERE i.id = (
+                SELECT id FROM inventory
+                WHERE product_id = lr.product_id AND location_id = lr.loc_id
+                ORDER BY (sublocation = '') DESC, id ASC
+                LIMIT 1
+            );
+
+            WITH open_so_lines AS (
+                SELECT sol.product_id, sol.addon_product_id, sol.quantity, COALESCE(sol.addon_quantity, 1.0) as addon_qty,
+                       COALESCE(so.location_id, (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)) as loc_id
+                FROM sales_order_lines sol
+                JOIN sales_orders so ON sol.sales_order_id = so.id
+                WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')
+                  AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+                  {p_filter}
+            ),
+            all_res AS (
+                SELECT product_id, loc_id, quantity as res_qty FROM open_so_lines
+                UNION ALL
+                SELECT addon_product_id as product_id, loc_id, (quantity * addon_qty) as res_qty 
+                FROM open_so_lines WHERE addon_product_id IS NOT NULL
+                UNION ALL
+                SELECT pb.component_product_id as product_id, l.loc_id, (l.quantity * pb.quantity) as res_qty
+                FROM open_so_lines l
+                JOIN product_boms pb ON l.product_id = pb.product_id
+            ),
+            loc_res AS (
+                SELECT product_id, loc_id, SUM(res_qty) as total_res
+                FROM all_res
+                WHERE product_id IS NOT NULL
+                GROUP BY product_id, loc_id
+            )
+            INSERT INTO inventory (product_id, location_id, sublocation, quantity, reserved_quantity)
+            SELECT lr.product_id, lr.loc_id, '', 0, lr.total_res
+            FROM loc_res lr
+            WHERE NOT EXISTS (
+                SELECT 1 FROM inventory WHERE product_id = lr.product_id AND location_id = lr.loc_id
+            );
+        """
+        c.execute(sync_sql, tuple(params) if params else None)
+        return getattr(c, 'rowcount', 0) or 0
+
+    if cur is not None:
+        return _sync(cur)
+    else:
+        with get_db_cursor(commit=True) as c:
+            return _sync(c)
+
 def init_db():
     schema_file = os.path.join(os.path.dirname(__file__), 'schema.sql')
     if not os.path.exists(schema_file):
@@ -595,6 +696,11 @@ def init_db():
                 sync_customers_from_latest_orders(cur=cur)
             except Exception as sync_err:
                 logger.warning(f"Customer latest bill sync notice: {sync_err}")
+
+            try:
+                sync_inventory_reserved_quantities(cur=cur)
+            except Exception as inv_err:
+                logger.warning(f"Inventory reserved quantities sync notice: {inv_err}")
 
         conn.commit()
     logger.info("inFlow Premium PostgreSQL database schema initialized successfully.")

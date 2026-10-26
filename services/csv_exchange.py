@@ -2154,8 +2154,10 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     sync_count += sync_customers_from_latest_orders(cur=cur, customer_ids=set(aff_list[i:i + 1000]))
                 logger.info(f"Synchronized customer profile info from latest bill for {sync_count} customers.")
 
-            # Automatically resynchronize sequences after importing sales orders
+            # Automatically resynchronize sequences and inventory reservations after importing sales orders
             resync_all_sequences(cur=cur)
+            from database import sync_inventory_reserved_quantities
+            sync_inventory_reserved_quantities(cur=cur)
 
     # =========================================================================
     # 6. PURCHASE ORDER IMPORT

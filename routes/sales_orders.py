@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session
-from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number, resync_all_sequences
+from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val, get_next_order_number, preview_order_number, resync_all_sequences, sync_inventory_reserved_quantities
 from datetime import datetime, date, timedelta
 import re, os, time, json, mimetypes, logging, uuid, hmac, hashlib
 from werkzeug.utils import secure_filename
@@ -899,14 +899,8 @@ def create_order():
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
                 """, (order_id, line[0], line[1], line[2], line[3], line[4], line[5], line[6], line[7], line[8], line[9], line[10]))
 
-                # Reserve inventory (auto-reserves components if combined kit)
-                if location_id:
-                    _reserve_order_stock(cur, location_id, line[1], line[3])
-
-                    # Also reserve inventory for add-on product if present
-                    if line[8]:
-                        addon_tot = line[3] * line[9]
-                        _reserve_order_stock(cur, location_id, line[8], addon_tot)
+            # Synchronize live inventory reservations
+            sync_inventory_reserved_quantities(cur=cur)
 
             # Update customer balance
             cur.execute("""
@@ -1320,14 +1314,29 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             COALESCE(pp.unit_price, p.default_price, 0) as price,
             p.price_decimals,
             COALESCE(p.costing_sheet_cost, p.standard_cost, p.average_cost, p.last_purchase_cost, 0) as cost,
-            COALESCE(SUM(inv.quantity), 0) as stock_on_hand,
-            COALESCE(SUM(inv.reserved_quantity), 0) as stock_reserved
+            COALESCE(inv.stock_on_hand, 0) as stock_on_hand,
+            COALESCE(inv.stock_reserved, 0) as stock_reserved,
+            COALESCE(po_ord.stock_on_order, 0) as stock_on_order
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN product_prices pp ON p.id = pp.product_id AND pp.pricing_scheme_id = %s
-        LEFT JOIN inventory inv ON p.id = inv.product_id
+        LEFT JOIN (
+            SELECT product_id,
+                   SUM(quantity) as stock_on_hand,
+                   SUM(reserved_quantity) as stock_reserved
+            FROM inventory
+            GROUP BY product_id
+        ) inv ON p.id = inv.product_id
+        LEFT JOIN (
+            SELECT pol.product_id,
+                   SUM(pol.quantity - COALESCE(pol.received_qty, 0)) as stock_on_order
+            FROM purchase_order_lines pol
+            JOIN purchase_orders po ON pol.purchase_order_id = po.id
+            WHERE po.status NOT IN ('RECEIVED', 'CANCELLED', 'CLOSED')
+              AND COALESCE(pol.received_qty, 0) < pol.quantity
+            GROUP BY pol.product_id
+        ) po_ord ON p.id = po_ord.product_id
         WHERE p.is_active = TRUE
-        GROUP BY p.id, p.sku, p.name, p.description, p.combine_type, p.image_url, p.uom, p.sales_uom, p.sales_uom_ratio_std, p.purchasing_uom, p.purchasing_uom_ratio_std, c.name, pp.unit_price, p.default_price, p.price_decimals, p.costing_sheet_cost, p.standard_cost, p.average_cost, p.last_purchase_cost
         ORDER BY p.sku ASC
     """, (scheme_id,))
 
@@ -1968,7 +1977,13 @@ def new_order():
                 FROM sales_order_lines sol
                 JOIN products p ON sol.product_id = p.id
                 LEFT JOIN sales_orders so ON sol.sales_order_id = so.id
-                LEFT JOIN inventory inv ON p.id = inv.product_id AND inv.location_id = %s
+                LEFT JOIN (
+                    SELECT product_id, location_id,
+                           SUM(quantity) as quantity,
+                           SUM(reserved_quantity) as reserved_quantity
+                    FROM inventory
+                    GROUP BY product_id, location_id
+                ) inv ON p.id = inv.product_id AND inv.location_id = %s
                 LEFT JOIN products addon_p ON sol.addon_product_id = addon_p.id
                 LEFT JOIN product_combine_options pco ON sol.combine_option_id = pco.id
                 WHERE sol.sales_order_id = %s
@@ -2394,12 +2409,18 @@ def detail_order(id):
         FROM sales_order_lines sol
         JOIN products p ON sol.product_id = p.id
         LEFT JOIN sales_orders so ON sol.sales_order_id = so.id
-        LEFT JOIN inventory inv ON p.id = inv.product_id AND inv.location_id = %s
+        LEFT JOIN (
+            SELECT product_id, location_id,
+                   SUM(quantity) as quantity,
+                   SUM(reserved_quantity) as reserved_quantity
+            FROM inventory
+            GROUP BY product_id, location_id
+        ) inv ON p.id = inv.product_id AND inv.location_id = %s
         LEFT JOIN products addon_p ON sol.addon_product_id = addon_p.id
         LEFT JOIN product_combine_options pco ON sol.combine_option_id = pco.id
         WHERE sol.sales_order_id = %s
         ORDER BY sol.line_num ASC
-    """, (order['location_id'], id))
+    """, (order.get('location_id') or 100, id))
 
     if is_partial:
         # Fast partial response: avoids running heavy drawer queries for 500 orders and customer/product catalogs (~15ms)
@@ -3057,16 +3078,6 @@ def save_order(id=0):
                         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (id, idx + 1, pid, desc, std_qty, unit_price, disc, line_sub, uom, display_qty, line_scheme_id, addon_pid, addon_qty, combine_opt_id))
 
-                    # Reserve inventory with standard quantity (auto-reserves components if combined kit)
-                    # For already completed/shipped orders, inventory was already deducted upon completion.
-                    if location_id and not is_already_completed:
-                        _reserve_order_stock(cur, location_id, pid, std_qty)
-
-                        # Also reserve inventory for add-on product if present
-                        if addon_pid:
-                            addon_tot_qty = std_qty * addon_qty
-                            _reserve_order_stock(cur, location_id, addon_pid, addon_tot_qty)
-
                 total_amount = subtotal
                 if mark_complete_pay:
                     status = 'PAID'
@@ -3148,6 +3159,9 @@ def save_order(id=0):
                         SET balance = balance + %s, updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s
                     """, (balance_due, customer_id))
+
+                # Synchronize live inventory reservations
+                sync_inventory_reserved_quantities(cur=cur)
 
         # Record version snapshot
         try:
@@ -3435,6 +3449,8 @@ def cancel_order_direct(id):
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (id,))
+
+        sync_inventory_reserved_quantities(cur=cur)
 
     try:
         _record_order_version(id, change_summary="Order Cancelled")
@@ -3725,6 +3741,8 @@ def update_status(id):
                 """, (order['balance_due'], order['customer_id']))
 
             cur.execute("UPDATE sales_orders SET status = 'CANCELLED', balance_due = 0, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (id,))
+
+        sync_inventory_reserved_quantities(cur=cur)
 
     date_filter = request.form.get('date_filter') or request.args.get('date_filter') or session.get('so_date_filter') or 'All'
     status_filter = request.form.get('status_filter') or request.args.get('status_filter') or session.get('so_status_filter') or 'Open, In Progress, Paid'

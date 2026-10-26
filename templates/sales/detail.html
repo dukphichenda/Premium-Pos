@@ -3571,6 +3571,7 @@ window.productsCatalog = {
         image_url: {{ (p.image_url or '')|tojson }},
         stock_on_hand: {{ (p.stock_on_hand or 0.0)|float }},
         stock_reserved: {{ (p.stock_reserved or 0.0)|float }},
+        stock_on_order: {{ (p.stock_on_order or 0.0)|float }},
         combine_type: {{ (p.combine_type or 'single')|tojson }},
         is_kit: {{ 'true' if p.is_kit else 'false' }},
         max_kits_buildable: {{ p.max_kits_buildable or 0 }},
@@ -3853,6 +3854,7 @@ function openQtyDropdown(event, btnEl) {
     const onHand = prod ? (prod.stock_on_hand || 0) : 0;
     const reserved = prod ? (prod.stock_reserved || 0) : 0;
     const avail = onHand - reserved;
+    const onOrder = prod ? (prod.stock_on_order || 0) : 0;
     const hasComponents = !!(prod && prod.components && prod.components.length > 0);
 
     const onHandEl = document.getElementById('qtyOnHandVal');
@@ -3921,13 +3923,13 @@ function openQtyDropdown(event, btnEl) {
         if (onHandEl) onHandEl.innerHTML = `<u>${formatQtyNum(onHand)} ${baseUom}</u>`;
         if (availEl) availEl.innerHTML = `<u>${formatQtyNum(maxKitCount)} ${baseUom}</u> <span style="font-size: 9.5px; color: #16A34A; font-weight: 600;">(Kit)</span>`;
         if (reservedEl) reservedEl.innerHTML = `<u>${formatQtyNum(reserved)} ${baseUom}</u>`;
-        if (onOrderEl) onOrderEl.innerHTML = `<u>0 ${baseUom}</u>`;
+        if (onOrderEl) onOrderEl.innerHTML = `<u>${formatQtyNum(onOrder)} ${baseUom}</u>`;
     } else {
         if (kitContainer) kitContainer.style.display = 'none';
         if (onHandEl) onHandEl.innerHTML = prod ? `<u>${formatQtyNum(onHand)} ${baseUom}</u>` : `-`;
         if (availEl) availEl.innerHTML = prod ? `<u>${formatQtyNum(avail)} ${baseUom}</u>` : `-`;
         if (reservedEl) reservedEl.innerHTML = prod ? `<u>${formatQtyNum(reserved)} ${baseUom}</u>` : `-`;
-        if (onOrderEl) onOrderEl.innerHTML = prod ? `<u>0 ${baseUom}</u>` : `-`;
+        if (onOrderEl) onOrderEl.innerHTML = prod ? `<u>${formatQtyNum(onOrder)} ${baseUom}</u>` : `-`;
     }
 
     // Position popup cleanly using fixed viewport coordinates
@@ -6054,6 +6056,7 @@ function updateItemDropdownPreview(pid) {
     const onHand = parseFloat(prod.stock_on_hand) || 0;
     const reserved = parseFloat(prod.stock_reserved) || 0;
     const available = onHand - reserved;
+    const onOrder = parseFloat(prod.stock_on_order) || 0;
 
     let schemeName = 'Retail 1';
     let schemeId = 100;
@@ -6075,7 +6078,7 @@ function updateItemDropdownPreview(pid) {
     if (onHandEl) onHandEl.textContent = fmtQty(onHand);
     if (availEl) availEl.textContent = fmtQty(available);
     if (resEl) resEl.textContent = fmtQty(reserved);
-    if (onOrderEl) onOrderEl.textContent = '0 ' + uom;
+    if (onOrderEl) onOrderEl.textContent = fmtQty(onOrder);
     if (schemeNameEl) schemeNameEl.textContent = schemeName;
     if (priceEl) priceEl.textContent = '$' + (typeof formatPriceValue === 'function' ? formatPriceValue(price, prod.price_decimals) : Number(price).toFixed(2));
     
