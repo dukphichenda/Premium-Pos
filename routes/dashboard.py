@@ -285,15 +285,19 @@ def chart_data():
         branch_filter = "AND (so.branch_id IS NULL OR so.branch_id = 0)"
         params = ()
 
-    # 1. Monthly Financial Breakdown (Last 12 months) - Scoped to selected store using canonical COGS
-    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+    # 1. Monthly Financial Breakdown (Last 12 months) - Scoped to selected store using canonical COGS (with Branch Cost for branch sales)
+    default_costing_scheme = query_one("SELECT id FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
+    branch_cost_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
     monthly_sales = query_all(f"""
         WITH order_costs AS (
             SELECT 
                 sol.sales_order_id,
                 COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
             FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
             LEFT JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
             GROUP BY sol.sales_order_id
         )
         SELECT 

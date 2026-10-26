@@ -263,18 +263,15 @@ def calculate_date_range(preset, custom_from='', custom_to=''):
     else:  # 'All' or 'All Dates' or unrecognized
         return date(2020, 1, 1), date(2035, 12, 31)
 
-def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p'):
+def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p', pp_alias=None, so_alias=None):
     """
     Computes accurate Cost of Goods Sold (COGS) for a sales order line:
-    Focuses on UOM and costing compared to the pricing of the Sales Order:
-    - If cost is already in the same UOM as the line unit price (e.g. packs, pcs, cases),
-      uses quantity_display * cost.
-    - If unit price is per case while cost is per piece, converts to case cost.
-    - If unit price is per piece while cost is per case/pack, converts to piece cost.
-    - Resolves inflated base quantity vs display quantity anomalies.
+    - If pp_alias and so_alias are provided and the order belongs to a branch (so.branch_id IS NOT NULL AND so.branch_id > 0),
+      replaces costing by Branch Cost in the Pricing Scheme (product_prices table).
+    - Otherwise, computes canonical HQ COGS based on unit price / ratio / standard_cost / average_cost.
     """
     base_cost = f"COALESCE(NULLIF({sol_alias}.cost_price, 0), NULLIF({p_alias}.standard_cost, 0), NULLIF({p_alias}.average_cost, 0), 0)"
-    return f"""
+    standard_cogs = f"""
     CASE 
         WHEN {base_cost} = 0 THEN 0
 
@@ -302,6 +299,32 @@ def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p'):
         ELSE COALESCE({sol_alias}.quantity_display, {sol_alias}.quantity, 1) * {base_cost}
     END
     """
+
+    if pp_alias and so_alias:
+        return f"""
+        CASE 
+            WHEN {so_alias}.branch_id IS NOT NULL AND {so_alias}.branch_id > 0 
+                 AND {pp_alias}.unit_price IS NOT NULL AND {pp_alias}.unit_price > 0 
+                 AND {p_alias}.sales_uom_ratio_std > 1 
+                 THEN COALESCE({sol_alias}.quantity, 1) * ({pp_alias}.unit_price / {p_alias}.sales_uom_ratio_std)
+            WHEN {so_alias}.branch_id IS NOT NULL AND {so_alias}.branch_id > 0 
+                 AND {pp_alias}.unit_price IS NOT NULL AND {pp_alias}.unit_price > 0 
+                 THEN COALESCE({sol_alias}.quantity, 1) * {pp_alias}.unit_price
+            ELSE ({standard_cogs})
+        END
+        """
+    elif pp_alias:
+        return f"""
+        CASE 
+            WHEN {pp_alias}.unit_price IS NOT NULL AND {pp_alias}.unit_price > 0 
+                 AND {p_alias}.sales_uom_ratio_std > 1 
+                 THEN COALESCE({sol_alias}.quantity, 1) * ({pp_alias}.unit_price / {p_alias}.sales_uom_ratio_std)
+            WHEN {pp_alias}.unit_price IS NOT NULL AND {pp_alias}.unit_price > 0 
+                 THEN COALESCE({sol_alias}.quantity, 1) * {pp_alias}.unit_price
+            ELSE ({standard_cogs})
+        END
+        """
+    return standard_cogs
 
 def apply_sale_amount_filter(base_where, params, sale_amount_str, col_expr="so.total_amount"):
     """
@@ -483,8 +506,8 @@ def view_report(report_key):
         branch_scope = 'main'
 
     # Costing Tier / Price Sheet selection (Defaults to Branch Costing)
-    all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Costing%%' THEN 0 ELSE 1 END, name ASC")
-    default_costing_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE name ILIKE '%%Branch Costing%%' LIMIT 1")
+    all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Cost%%' THEN 0 ELSE 1 END, name ASC")
+    default_costing_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
     default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
     costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
     try:
@@ -494,7 +517,7 @@ def view_report(report_key):
 
     active_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE id = %s", (costing_scheme_id,))
     if not active_scheme:
-        active_scheme = default_costing_scheme or {'id': default_costing_scheme_id, 'name': 'Branch Costing', 'currency': 'US Dollar ($)'}
+        active_scheme = default_costing_scheme or {'id': default_costing_scheme_id, 'name': 'Branch Cost', 'currency': 'US Dollar ($)'}
 
     # Currency selection (USD or KHR)
     currency = request.args.get('currency', 'USD').strip().upper()
@@ -613,14 +636,17 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
-        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+        branch_cost_scheme_id = costing_scheme_id or 107
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
         totals_sql = f"""
             WITH order_costs AS (
                 SELECT 
                     sol.sales_order_id,
                     COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
                 FROM sales_order_lines sol
+                JOIN sales_orders so ON sol.sales_order_id = so.id
                 LEFT JOIN products p ON sol.product_id = p.id
+                LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
                 GROUP BY sol.sales_order_id
             )
             SELECT 
@@ -650,7 +676,7 @@ def view_report(report_key):
             order_col = "so.total_amount DESC"
         elif sort_by in ('Total Cost', 'Costing', 'Branch Cost'):
             order_col = "costing DESC"
-        elif sort_by == 'Gross Profit':
+        elif sort_by in ('Gross Profit', 'Profit'):
             order_col = "gross_profit DESC"
 
         query_params = list(params) + [per_page, offset]
@@ -660,7 +686,9 @@ def view_report(report_key):
                     sol.sales_order_id,
                     COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
                 FROM sales_order_lines sol
+                JOIN sales_orders so ON sol.sales_order_id = so.id
                 LEFT JOIN products p ON sol.product_id = p.id
+                LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
                 GROUP BY sol.sales_order_id
             )
             SELECT 
@@ -709,7 +737,8 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
-        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+        branch_cost_scheme_id = costing_scheme_id or 107
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
         totals_sql = f"""
             SELECT 
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
@@ -718,6 +747,7 @@ def view_report(report_key):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
             WHERE {where_sql}
         """
         t = query_one(totals_sql, tuple(params))
@@ -757,6 +787,7 @@ def view_report(report_key):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE {where_sql}
             GROUP BY p.id, p.sku, p.name, c.name, COALESCE(sol.uom, p.uom, 'pcs')
@@ -809,7 +840,8 @@ def view_report(report_key):
         page = min(page, total_pages)
         offset = (page - 1) * per_page
 
-        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+        branch_cost_scheme_id = costing_scheme_id or 107
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
         totals_sql = f"""
             SELECT 
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
@@ -818,6 +850,7 @@ def view_report(report_key):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
             WHERE {where_sql}
         """
         t = query_one(totals_sql, tuple(params))
@@ -845,6 +878,7 @@ def view_report(report_key):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
             LEFT JOIN customers c ON so.customer_id = c.id
             WHERE {where_sql}
             ORDER BY so.order_date DESC, so.order_number DESC, sol.line_num ASC
@@ -2133,7 +2167,17 @@ def export_report(report_key):
     writer = csv.writer(output)
 
     if report_key == 'sales-order-profit':
-        writer.writerow(['Order Number', 'Status', 'Customer', 'Billing Address', 'Order Date', 'Sales Amount ($)', 'Costing ($)', 'Gross Profit ($)'])
+        costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
+        default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
+        default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+        try:
+            costing_scheme_id = int(costing_scheme_id_param) if costing_scheme_id_param else default_costing_scheme_id
+        except ValueError:
+            costing_scheme_id = default_costing_scheme_id
+
+        cost_col_name = 'Branch Cost ($)' if branch_scope not in ['main', 'all'] else 'Costing ($)'
+        profit_col_name = 'Profit ($)' if branch_scope not in ['main', 'all'] else 'Gross Profit ($)'
+        writer.writerow(['Order Number', 'Status', 'Customer', 'Billing Address', 'Order Date', 'Sales Amount ($)', cost_col_name, profit_col_name])
         base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
         params = [start_date, end_date]
         if branch_scope == 'main':
@@ -2163,14 +2207,16 @@ def export_report(report_key):
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
         where_sql = " AND ".join(base_where)
-        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
         rows = query_all(f"""
             WITH order_costs AS (
                 SELECT 
                     sol.sales_order_id,
                     COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
                 FROM sales_order_lines sol
+                JOIN sales_orders so ON sol.sales_order_id = so.id
                 LEFT JOIN products p ON sol.product_id = p.id
+                LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {costing_scheme_id}
                 GROUP BY sol.sales_order_id
             )
             SELECT 
@@ -2203,6 +2249,14 @@ def export_report(report_key):
         filename = f"Sales_Order_Profit_Report_{start_date}_{end_date}.csv"
 
     elif report_key == 'sales-by-product-summary':
+        costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
+        default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
+        default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+        try:
+            costing_scheme_id = int(costing_scheme_id_param) if costing_scheme_id_param else default_costing_scheme_id
+        except ValueError:
+            costing_scheme_id = default_costing_scheme_id
+
         writer.writerow(['Category', 'Item SKU', 'Item Name', 'Quantity Sold', 'UOM', 'Total Sales ($)', 'Gross Profit ($)'])
         where_branch = "so.branch_id IS NULL" if branch_scope == 'main' else (f"so.branch_id = {int(branch_scope)}" if branch_scope.isdigit() else "1=1")
 
@@ -2224,7 +2278,7 @@ def export_report(report_key):
         else:
             prod_order_clause = prod_sort
 
-        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+        line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
         rows = query_all(f"""
             SELECT 
                 COALESCE(c.name, 'General') as category_name, p.sku, p.name as item_name,
@@ -2235,6 +2289,7 @@ def export_report(report_key):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {costing_scheme_id}
             LEFT JOIN categories c ON p.category_id = c.id
             WHERE so.order_date >= %s AND so.order_date <= %s AND so.status != 'CANCELLED' AND {where_branch}
             GROUP BY c.name, p.sku, p.name, COALESCE(sol.uom, p.uom, 'pcs')
@@ -2402,7 +2457,7 @@ def export_report(report_key):
 
     elif report_key == 'branch-sales-summary':
         costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()
-        default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Costing%%' LIMIT 1")
+        default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
         default_costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
         try:
             costing_scheme_id = int(costing_scheme_id_param) if costing_scheme_id_param else default_costing_scheme_id
@@ -2617,16 +2672,19 @@ def sales_report():
 
     where_sql = " AND ".join(where_clauses)
 
-    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
+    default_costing_scheme = query_one("SELECT id, name FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
+    costing_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
     summary = query_one(f"""
         WITH filtered_so AS (
-            SELECT id, total_amount FROM sales_orders so WHERE {where_sql}
+            SELECT id, total_amount, branch_id FROM sales_orders so WHERE {where_sql}
         ),
         lines_cogs AS (
             SELECT COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
             FROM sales_order_lines sol
+            JOIN filtered_so so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
-            JOIN filtered_so ON sol.sales_order_id = filtered_so.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {costing_scheme_id}
         )
         SELECT 
             COUNT(*) as total_orders,
@@ -2649,6 +2707,7 @@ def sales_report():
         FROM sales_order_lines sol
         JOIN sales_orders so ON sol.sales_order_id = so.id
         JOIN products p ON sol.product_id = p.id
+        LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {costing_scheme_id}
         WHERE {where_sql}
         GROUP BY p.id, p.sku, p.name
         ORDER BY revenue DESC
