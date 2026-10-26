@@ -623,6 +623,28 @@
                             <span style="font-size: 10.5px; color: #94A3B8;">(Direct formula calculation supported. Formulations are retained automatically for editing later.)</span>
                         </span>
                     </div>
+
+                    <!-- Adaptive Costing Toggle Card (Break-even delivery / zero margin) -->
+                    <div id="detailAdaptiveCostCard" style="margin-top: 10px; margin-left: 10px; padding: 8px 12px; background: {% if product.is_adaptive_cost %}#F0FDF4{% else %}#F8FAFC{% endif %}; border: 1px solid {% if product.is_adaptive_cost %}#86EFAC{% else %}#E2E8F0{% endif %}; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; max-width: 440px; transition: all 0.2s;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span style="font-size: 16px;">⚡</span>
+                            <div>
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <span style="font-size: 12px; font-weight: 700; color: #0F172A;">Adaptive Costing (ថ្លៃដើមស្មើតម្លៃលក់)</span>
+                                    <span id="detailAdaptiveCostBadge" style="display: {% if product.is_adaptive_cost %}inline-block{% else %}none{% endif %}; font-size: 10px; background: #10B981; color: #fff; padding: 1px 6px; border-radius: 999px; font-weight: 600;">ACTIVE</span>
+                                    <span id="detailAdaptiveCostStatus" style="display: none; font-size: 10.5px; color: #16A34A; font-weight: 600;">✓ Saved</span>
+                                </div>
+                                <div style="font-size: 11px; color: #64748B; margin-top: 1px;">
+                                    Cost always equals sale price in SO (Profit = $0). Ideal for delivery like VET, Virak Buntham, Grab.
+                                </div>
+                            </div>
+                        </div>
+                        <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; margin: 0;" title="Toggle adaptive costing for this product">
+                            <input type="checkbox" id="chkAdaptiveCostDetail" {% if product.is_adaptive_cost %}checked{% endif %} 
+                                   onchange="toggleAdaptiveCostDetail({{ product.id }}, this.checked)"
+                                   style="width: 17px; height: 17px; cursor: pointer; accent-color: #10B981;">
+                        </label>
+                    </div>
                     {% else %}
                     <!-- Costing Info (Branch Hidden) -->
                     <div class="inflow-title-blue" style="color: #94A3B8;">Costing Info (Locked)</div>
@@ -4282,4 +4304,34 @@ function deleteCombineOption(productId, optId) {
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAdaptiveCostDetail(productId, isChecked) {
+    fetch('/api/products/' + productId + '/toggle_adaptive_cost', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_adaptive_cost: isChecked })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data && data.success) {
+            const badge = document.getElementById('detailAdaptiveCostBadge');
+            const status = document.getElementById('detailAdaptiveCostStatus');
+            const card = document.getElementById('detailAdaptiveCostCard');
+            if (badge) badge.style.display = isChecked ? 'inline-block' : 'none';
+            if (card) {
+                card.style.background = isChecked ? '#F0FDF4' : '#F8FAFC';
+                card.style.borderColor = isChecked ? '#86EFAC' : '#E2E8F0';
+            }
+            if (status) {
+                status.style.display = 'inline';
+                setTimeout(() => { status.style.display = 'none'; }, 2000);
+            }
+        }
+    })
+    .catch(err => console.error('Error toggling adaptive cost in detail:', err));
+}
+</script>
 {% endblock %}

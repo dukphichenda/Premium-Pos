@@ -554,7 +554,8 @@ def _get_product_detail_bundle(product_id, is_partial=False):
     price_tiers = query_all("""
         SELECT 
             ps.id as pricing_scheme_id, ps.name as scheme_name,
-            pp.unit_price
+            pp.unit_price,
+            COALESCE(pp.is_adaptive, FALSE) as is_adaptive
         FROM product_prices pp
         JOIN pricing_schemes ps ON pp.pricing_scheme_id = ps.id
         WHERE pp.product_id = %s AND ps.is_active = TRUE
@@ -574,7 +575,8 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             price_tiers = query_all("""
                 SELECT 
                     ps.id as pricing_scheme_id, ps.name as scheme_name,
-                    pp.unit_price
+                    pp.unit_price,
+                    COALESCE(pp.is_adaptive, FALSE) as is_adaptive
                 FROM product_prices pp
                 JOIN pricing_schemes ps ON pp.pricing_scheme_id = ps.id
                 WHERE pp.product_id = %s AND ps.is_active = TRUE
@@ -641,13 +643,15 @@ def _get_product_detail_bundle(product_id, is_partial=False):
 
     for pt in price_tiers:
         price = float(pt['unit_price'] or 0)
-        if effective_cost > 0:
+        if product.get('is_adaptive_cost') or pt.get('is_adaptive'):
+            pt['markup'] = '0'
+        elif effective_cost > 0:
             markup = ((price - effective_cost) / effective_cost) * 100
+            rounded = f"{markup:.2f}"
+            pt['markup'] = rounded.rstrip('0').rstrip('.') if '.' in rounded else rounded
+            if pt['markup'] == '' or pt['markup'] == '-0':
+                pt['markup'] = '0'
         else:
-            markup = 0.0
-        rounded = f"{markup:.2f}"
-        pt['markup'] = rounded.rstrip('0').rstrip('.') if '.' in rounded else rounded
-        if pt['markup'] == '' or pt['markup'] == '-0':
             pt['markup'] = '0'
 
     # Product version history
@@ -1131,7 +1135,8 @@ def update_product_ajax(id):
             'costing_sheet_pcs', 'costing_sheet_pcs_formula',
             'costing_sheet_cost', 'costing_sheet_formula',
             'combine_type',
-            'price_decimals', 'cost_decimals', 'qty_decimals'
+            'price_decimals', 'cost_decimals', 'qty_decimals',
+            'is_adaptive_cost'
         ]
         
         # Handle 'cost_formula' and formula evaluation
@@ -1281,10 +1286,11 @@ def api_add_product_price(id):
             return jsonify({'success': False, 'message': 'Pricing scheme not found.'}), 404
 
         existing_price = query_one("SELECT id FROM product_prices WHERE product_id = %s AND pricing_scheme_id = %s", (id, scheme_id))
+        is_adaptive = bool(data.get('is_adaptive', False))
         if existing_price:
-            execute("UPDATE product_prices SET unit_price = %s WHERE id = %s", (price, existing_price['id']))
+            execute("UPDATE product_prices SET unit_price = %s, is_adaptive = %s WHERE id = %s", (price, is_adaptive, existing_price['id']))
         else:
-            execute("INSERT INTO product_prices (product_id, pricing_scheme_id, unit_price) VALUES (%s, %s, %s)", (id, scheme_id, price))
+            execute("INSERT INTO product_prices (product_id, pricing_scheme_id, unit_price, is_adaptive) VALUES (%s, %s, %s, %s)", (id, scheme_id, price, is_adaptive))
 
         # Calculate markup
         prod = query_one("SELECT standard_cost, average_cost, sales_uom, uom, sales_uom_ratio, sales_uom_ratio_std FROM products WHERE id = %s", (id,))
@@ -1304,8 +1310,37 @@ def api_add_product_price(id):
             'scheme_id': scheme['id'],
             'scheme_name': scheme['name'],
             'unit_price': price,
+            'is_adaptive': is_adaptive,
             'markup': markup_str
         })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@products_bp.route('/api/products/<int:id>/toggle_adaptive_cost', methods=['POST'])
+def api_toggle_adaptive_cost(id):
+    if not user_can_edit_product():
+        return jsonify({'success': False, 'message': 'Permission denied.'}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        is_adaptive = bool(data.get('is_adaptive_cost', False))
+        execute("UPDATE products SET is_adaptive_cost = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (is_adaptive, id))
+        return jsonify({'success': True, 'is_adaptive_cost': is_adaptive})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 400
+
+@products_bp.route('/api/products/<int:id>/toggle_scheme_adaptive/<int:scheme_id>', methods=['POST'])
+def api_toggle_scheme_adaptive(id, scheme_id):
+    if not user_can_edit_prices():
+        return jsonify({'success': False, 'message': 'Permission denied.'}), 403
+    try:
+        data = request.get_json(force=True) or {}
+        is_adaptive = bool(data.get('is_adaptive', False))
+        existing_price = query_one("SELECT id FROM product_prices WHERE product_id = %s AND pricing_scheme_id = %s", (id, scheme_id))
+        if existing_price:
+            execute("UPDATE product_prices SET is_adaptive = %s WHERE id = %s", (is_adaptive, existing_price['id']))
+        else:
+            execute("INSERT INTO product_prices (product_id, pricing_scheme_id, unit_price, is_adaptive) VALUES (%s, %s, 0, %s)", (id, scheme_id, is_adaptive))
+        return jsonify({'success': True, 'is_adaptive': is_adaptive, 'scheme_id': scheme_id})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 400
 

@@ -564,7 +564,18 @@
                                 {% set pcs_in_case = 1 if is_same_uom else (price_card.pcs_per_case if (price_card and price_card.pcs_per_case > 0) else (product.sales_uom_ratio_std if product.sales_uom_ratio_std > 0 else 300)) %}
                                 {% for pt in price_tiers %}
                                 <tr id="price_row_{{ pt.pricing_scheme_id }}" data-scheme-id="{{ pt.pricing_scheme_id }}">
-                                    <td class="scheme-name">{{ pt.scheme_name }}</td>
+                                    <td class="scheme-name">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 4px;">
+                                            <span>{{ pt.scheme_name }}</span>
+                                            {% set is_branch_scheme = 'branch' in pt.scheme_name|lower %}
+                                            {% if is_branch_scheme or pt.is_adaptive %}
+                                            <label style="display: inline-flex; align-items: center; gap: 3px; font-size: 10px; font-weight: 600; cursor: pointer; color: {% if pt.is_adaptive %}#047857{% else %}#64748B{% endif %}; background: {% if pt.is_adaptive %}#DCFCE7{% else %}#F1F5F9{% endif %}; border: 1px solid {% if pt.is_adaptive %}#86EFAC{% else %}#CBD5E1{% endif %}; padding: 1px 6px; border-radius: 4px;" title="Adaptive Branch Cost: Automatically matches sales order price">
+                                                <input type="checkbox" class="scheme-adaptive-check" data-scheme-id="{{ pt.pricing_scheme_id }}" {% if pt.is_adaptive %}checked{% endif %} onchange="onToggleSchemeAdaptive({{ product.id }}, {{ pt.pricing_scheme_id }}, this.checked)" style="width: 11px; height: 11px; margin: 0; cursor: pointer;">
+                                                <span>Adaptive</span>
+                                            </label>
+                                            {% endif %}
+                                        </div>
+                                    </td>
                                     {% if can_view_costs %}
                                     <td style="text-align: right;">
                                         <span class="markup-val" id="markup_text_{{ pt.pricing_scheme_id }}">{{ pt.markup }}%</span>
@@ -669,6 +680,28 @@
                                 ប្រអប់ថ្លៃដើម (Cost) នេះអាចគណនារូបមន្តដោយផ្ទាល់បាន (ឧ. <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">=9.66+100</code>, <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">=(100/7.2)+3.5</code>, <code style="background:#E2E8F0; padding:1px 4px; border-radius:3px; color:#0F172A; font-family:monospace;">15/12</code>) ហើយរក្សារូបមន្តទុកកែប្រែពេលក្រោយបានគ្រប់ពេល។<br>
                                 <span style="font-size: 10.5px; color: #94A3B8;">(Direct formula calculation supported. Formulations are retained automatically for editing later.)</span>
                             </span>
+                        </div>
+
+                        <!-- Adaptive Costing Toggle Card (Break-even delivery / zero margin) -->
+                        <div id="catAdaptiveCostCard" style="margin-top: 10px; margin-bottom: 4px; padding: 8px 12px; background: {% if product.is_adaptive_cost %}#F0FDF4{% else %}#F8FAFC{% endif %}; border: 1px solid {% if product.is_adaptive_cost %}#86EFAC{% else %}#E2E8F0{% endif %}; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; transition: all 0.2s;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 16px;">⚡</span>
+                                <div>
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 12px; font-weight: 700; color: #0F172A;">Adaptive Costing (ថ្លៃដើមស្មើតម្លៃលក់)</span>
+                                        <span id="adaptiveCostBadge" style="display: {% if product.is_adaptive_cost %}inline-block{% else %}none{% endif %}; font-size: 10px; background: #10B981; color: #fff; padding: 1px 6px; border-radius: 999px; font-weight: 600;">ACTIVE</span>
+                                        <span id="adaptiveCostSaveStatus" style="display: none; font-size: 10.5px; color: #16A34A; font-weight: 600;">✓ Saved</span>
+                                    </div>
+                                    <div style="font-size: 11px; color: #64748B; margin-top: 1px;">
+                                        Cost always equals sale price in SO (Profit = $0). Ideal for delivery like VET, Virak Buntham, Grab.
+                                    </div>
+                                </div>
+                            </div>
+                            <label style="position: relative; display: inline-flex; align-items: center; cursor: pointer; margin: 0;" title="Toggle adaptive costing for this product">
+                                <input type="checkbox" id="chkAdaptiveCost" {% if product.is_adaptive_cost %}checked{% endif %} 
+                                       onchange="toggleProductAdaptiveCost({{ product.id }}, this.checked)"
+                                       style="width: 17px; height: 17px; cursor: pointer; accent-color: #10B981;">
+                            </label>
                         </div>
                         {% else %}
                         <div style="margin-top: 10px; padding: 10px 14px; background: #F8FAFC; border: 1px dashed #CBD5E1; border-radius: 6px; display: flex; align-items: center; justify-content: space-between;">

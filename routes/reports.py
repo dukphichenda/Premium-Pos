@@ -266,13 +266,21 @@ def calculate_date_range(preset, custom_from='', custom_to=''):
 def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p', pp_alias=None, so_alias=None):
     """
     Computes accurate Cost of Goods Sold (COGS) for a sales order line:
+    - If adaptive costing is enabled (p.is_adaptive_cost = TRUE or pp.is_adaptive = TRUE),
+      costing always equals the sold price (sol.subtotal) so profit = 0 (break-even delivery & pass-through).
     - If pp_alias and so_alias are provided and the order belongs to a branch (so.branch_id IS NOT NULL AND so.branch_id > 0),
       replaces costing by Branch Cost in the Pricing Scheme (product_prices table).
     - Otherwise, computes canonical HQ COGS based on unit price / ratio / standard_cost / average_cost.
     """
+    adaptive_cogs = f"COALESCE({sol_alias}.subtotal, ({sol_alias}.quantity * {sol_alias}.unit_price), 0)"
+    adaptive_cond = f"({p_alias}.is_adaptive_cost = TRUE)" if not pp_alias else f"({p_alias}.is_adaptive_cost = TRUE OR {pp_alias}.is_adaptive = TRUE)"
+
     base_cost = f"COALESCE(NULLIF({sol_alias}.cost_price, 0), NULLIF({p_alias}.standard_cost, 0), NULLIF({p_alias}.average_cost, 0), 0)"
     standard_cogs = f"""
     CASE 
+        -- 0. Adaptive Costing: Cost always equals selling price
+        WHEN {adaptive_cond} THEN {adaptive_cogs}
+
         WHEN {base_cost} = 0 THEN 0
 
         -- 1. Cost is already matching the SO pricing UOM:
@@ -303,6 +311,9 @@ def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p', pp_alias=None, so_alia
     if pp_alias and so_alias:
         return f"""
         CASE 
+            -- 0. Adaptive Costing: Cost always equals selling price
+            WHEN {adaptive_cond} THEN {adaptive_cogs}
+
             WHEN {so_alias}.branch_id IS NOT NULL AND {so_alias}.branch_id > 0 
                  AND {pp_alias}.unit_price IS NOT NULL AND {pp_alias}.unit_price > 0 
                  AND {p_alias}.sales_uom_ratio_std > 1 
@@ -316,6 +327,7 @@ def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p', pp_alias=None, so_alia
     elif pp_alias:
         return f"""
         CASE 
+            WHEN {adaptive_cond} THEN {adaptive_cogs}
             WHEN {pp_alias}.unit_price IS NOT NULL AND {pp_alias}.unit_price > 0 
                  AND {p_alias}.sales_uom_ratio_std > 1 
                  THEN COALESCE({sol_alias}.quantity, 1) * ({pp_alias}.unit_price / {p_alias}.sales_uom_ratio_std)
@@ -1904,8 +1916,8 @@ def view_report(report_key):
             SELECT 
                 COALESCE(SUM(sol.quantity), 0) as total_qty,
                 COALESCE(SUM(sol.subtotal), 0) as total_sales,
-                COALESCE(SUM(sol.quantity * ({cost_unit_expr})), 0) as total_branch_cost,
-                COALESCE(SUM(sol.subtotal - (sol.quantity * ({cost_unit_expr}))), 0) as total_branch_profit
+                COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN sol.subtotal ELSE sol.quantity * ({cost_unit_expr}) END), 0) as total_branch_cost,
+                COALESCE(SUM(CASE WHEN p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE THEN 0 ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END), 0) as total_branch_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
@@ -1964,16 +1976,22 @@ def view_report(report_key):
                 COALESCE(pp.unit_price, 0) as sheet_price,
                 SUM(sol.quantity) as quantity_sold,
                 SUM(sol.subtotal) as sales_amount,
-                {cost_unit_expr} as raw_branch_cost_pc,
-                SUM(sol.quantity * ({cost_unit_expr})) as total_branch_cost,
-                SUM(sol.subtotal) - SUM(sol.quantity * ({cost_unit_expr})) as branch_profit
+                CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                     THEN (SUM(sol.subtotal) / NULLIF(SUM(sol.quantity), 0)) 
+                     ELSE {cost_unit_expr} END as raw_branch_cost_pc,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN sol.subtotal 
+                         ELSE sol.quantity * ({cost_unit_expr}) END) as total_branch_cost,
+                SUM(CASE WHEN (p.is_adaptive_cost = TRUE OR pp.is_adaptive = TRUE) 
+                         THEN 0 
+                         ELSE sol.subtotal - (sol.quantity * ({cost_unit_expr})) END) as branch_profit
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             JOIN products p ON sol.product_id = p.id
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = %s
             WHERE {where_sql}
-            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost
+            GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom, p.sales_uom_ratio_std, pp.unit_price, p.standard_cost, p.average_cost, p.is_adaptive_cost, pp.is_adaptive
             ORDER BY {order_clause}
             LIMIT %s OFFSET %s
         """

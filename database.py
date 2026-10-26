@@ -701,9 +701,10 @@ def init_db():
                 cur.execute("ALTER TABLE stock_adjustment_lines ADD COLUMN IF NOT EXISTS sublocation VARCHAR(100) DEFAULT '';")
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_1 DROP DEFAULT;")
                 cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_2 DROP DEFAULT;")
-                cur.execute("ALTER TABLE products ALTER COLUMN tier_qty_3 DROP DEFAULT;")
                 cur.execute("ALTER TABLE categories ADD COLUMN IF NOT EXISTS price_table_style VARCHAR(20) DEFAULT 'classic';")
                 cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_style VARCHAR(20) DEFAULT NULL;")
+                cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS is_adaptive_cost BOOLEAN DEFAULT FALSE;")
+                cur.execute("ALTER TABLE product_prices ADD COLUMN IF NOT EXISTS is_adaptive BOOLEAN DEFAULT FALSE;")
                 cur.execute("""
                     INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
                     VALUES ('default_price_table_style', 'classic', 'Default style for product price cards (classic or modern)', CURRENT_TIMESTAMP)
