@@ -287,7 +287,7 @@ def api_products_for_adjustment():
     sort_by = (request.args.get('sort_by') or '').strip().lower()
 
     where_clauses = ["p.is_active = TRUE", "p.is_sellable = TRUE"]
-    params = [location_id, location_id, location_id]
+    params = [location_id, location_id]
 
     if selected_cat_ids:
         where_clauses.append("p.category_id = ANY(%s)")
@@ -324,8 +324,8 @@ def api_products_for_adjustment():
             p.purchasing_uom, p.purchasing_uom_ratio, p.purchasing_uom_ratio_std,
             COALESCE(c.name, 'General') as category_name,
             COALESCE(i.quantity, 0) as on_hand_qty,
-            COALESCE(open_so.reserved_qty, 0) as reserved_qty,
-            COALESCE(i.quantity - COALESCE(open_so.reserved_qty, 0), 0) as available_qty,
+            COALESCE(NULLIF(i.reserved_quantity, 0), open_so.reserved_qty, 0) as reserved_qty,
+            COALESCE(i.quantity - COALESCE(NULLIF(i.reserved_quantity, 0), open_so.reserved_qty, 0), 0) as available_qty,
             COALESCE(i.sublocation, '') as sublocation,
             COALESCE(NULLIF(p.average_cost, 0), p.standard_cost, 0) as unit_cost
         FROM products p
@@ -335,9 +335,14 @@ def api_products_for_adjustment():
             SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
-            WHERE so.status = 'OPEN' 
+            WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')
               AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
-              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+              AND (
+                  COALESCE(
+                      CASE WHEN so.location_id IN (SELECT id FROM locations WHERE name LIKE '<%>') THEN NULL ELSE so.location_id END,
+                      (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)
+                  ) = %s
+              )
             GROUP BY sol.product_id
         ) open_so ON p.id = open_so.product_id
         WHERE {where_sql}

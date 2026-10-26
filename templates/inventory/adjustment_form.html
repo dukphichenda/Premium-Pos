@@ -386,11 +386,11 @@
                             <!-- Qty on Hand -->
                             {% set factor = line.uom_factor if (line.uom_factor and line.uom_factor > 0) else 1.0 %}
                             <td style="text-align: center; font-weight: 700; color: #0F172A;">
-                                {{ "{:,.0f}".format((line.new_qty - line.reserved_qty) / factor) }}
+                                {{ "{:,.0f}".format(line.new_qty / factor) }}
                             </td>
                             <!-- Qty Reserved (from bills) -->
                             <td style="text-align: right;">
-                                <span class="badge badge-neutral" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">
+                                <span class="badge badge-neutral" style="background: #E0F2FE; color: #0369A1; font-weight: 700;" title="Reserved: {{ "{:,.0f}".format(line.reserved_qty / factor) }} | Available: {{ "{:,.0f}".format((line.new_qty - line.reserved_qty) / factor) }}">
                                     {{ "{:,.0f}".format(line.reserved_qty / factor) }}
                                 </span>
                             </td>
@@ -619,7 +619,7 @@
                 <td style="padding: 6px 8px; font-family: monospace;">{{ line.product_sku }}</td>
                 <td style="padding: 6px 8px;">{{ line.sublocation or '-' }}</td>
                 <td style="padding: 6px 8px; text-align: center; font-weight: 600;">{{ line.uom or line.product_uom or 'Pcs' }}</td>
-                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format((line.new_qty - line.reserved_qty) / factor) }}</td>
+                <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.new_qty / factor) }}</td>
                 <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.reserved_qty / factor) }}</td>
                 <td style="padding: 6px 8px; text-align: right;">{{ "{:,.0f}".format(line.old_qty / factor) }}</td>
                 <td style="padding: 6px 8px; text-align: right; font-weight: 700;">{{ "{:+,.0f}".format(line.diff_qty / factor) }}</td>
@@ -2831,7 +2831,7 @@ function addProductRowToTable(product) {
         ? `<img src="${item.image_url}" alt="${item.sku}">`
         : `<div class="inflow-thumb-placeholder">📦</div>`;
 
-    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const onHandDisp = item.final_qty_base / factor;
     const resDisp = item.reserved_qty_base / factor;
     const initialDisp = item.on_hand_qty_base / factor;
     const changeDisp = item.change_qty_base / factor;
@@ -2877,7 +2877,7 @@ function addProductRowToTable(product) {
 
         <!-- Qty Reserved (in chosen UOM) -->
         <td style="text-align: right;" id="reserved_${item.product_id}">
-            <span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;" title="Reserved on active customer orders">
+            <span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;" title="Reserved: ${formatNum(resDisp)} | Available: ${formatNum((item.final_qty_base - item.reserved_qty_base) / factor)}">
                 ${formatNum(resDisp)}
             </span>
         </td>
@@ -2942,7 +2942,7 @@ function numVal(n) {
 }
 
 // 1. When user edits Qty on Hand directly:
-//    Final = (newOnHand * factor) + reserved_qty_base
+//    Final = newOnHand * factor
 //    Change = Final - Initial
 function onOnHandQtyInput(productId, val) {
     const item = loadedProductsMap.get(productId);
@@ -2951,7 +2951,7 @@ function onOnHandQtyInput(productId, val) {
     const factor = item.uom_factor || 1.0;
     const inputOnHand = parseQty(val);
     const newOnHandBase = inputOnHand * factor;
-    item.final_qty_base = newOnHandBase + item.reserved_qty_base;
+    item.final_qty_base = newOnHandBase;
     item.change_qty_base = item.final_qty_base - item.on_hand_qty_base;
 
     const changeDisp = item.change_qty_base / factor;
@@ -2983,7 +2983,7 @@ function onChangeQtyInput(productId, val) {
     item.change_qty_base = diffInput * factor;
     item.final_qty_base = item.on_hand_qty_base + item.change_qty_base;
 
-    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const onHandDisp = item.final_qty_base / factor;
     const finalDisp = item.final_qty_base / factor;
 
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
@@ -3012,7 +3012,7 @@ function onFinalQtyInput(productId, val) {
     item.final_qty_base = finalValInput * factor;
     item.change_qty_base = item.final_qty_base - item.on_hand_qty_base;
 
-    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const onHandDisp = item.final_qty_base / factor;
     const changeDisp = item.change_qty_base / factor;
 
     const onHandInput = document.getElementById(`on_hand_input_${productId}`);
@@ -3037,7 +3037,7 @@ function onInputBlur(productId, fieldType) {
 
     if (fieldType === 'on_hand') {
         const input = document.getElementById(`on_hand_input_${productId}`);
-        if (input) input.value = numVal((item.final_qty_base - item.reserved_qty_base) / factor);
+        if (input) input.value = numVal(item.final_qty_base / factor);
     } else if (fieldType === 'change') {
         const input = document.getElementById(`change_input_${productId}`);
         const changeDisp = item.change_qty_base / factor;
@@ -3082,7 +3082,7 @@ function updateRowVisuals(productId) {
     if (!item) return;
     const factor = item.uom_factor || 1.0;
 
-    const onHandDisp = (item.final_qty_base - item.reserved_qty_base) / factor;
+    const onHandDisp = item.final_qty_base / factor;
     const resDisp = item.reserved_qty_base / factor;
     const initialDisp = item.on_hand_qty_base / factor;
     const changeDisp = item.change_qty_base / factor;
@@ -3095,7 +3095,7 @@ function updateRowVisuals(productId) {
     }
 
     const resEl = document.getElementById(`reserved_${productId}`);
-    if (resEl) resEl.innerHTML = `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">${formatNum(resDisp)}</span>`;
+    if (resEl) resEl.innerHTML = `<span class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;" title="Reserved: ${formatNum(resDisp)} | Available: ${formatNum((item.final_qty_base - item.reserved_qty_base) / factor)}">${formatNum(resDisp)}</span>`;
 
     const initPill = document.getElementById(`initial_pill_${productId}`);
     if (initPill) initPill.innerText = formatNum(initialDisp);
@@ -3322,7 +3322,7 @@ function printAdjustmentSheet() {
                     <td style="padding: 6px 8px; font-family: monospace;">${item.sku}</td>
                     <td style="padding: 6px 8px;">${item.sublocation || '-'}</td>
                     <td style="padding: 6px 8px; text-align: center; font-weight: 600;">${item.uom || item.base_uom || 'Pcs'}</td>
-                    <td style="padding: 6px 8px; text-align: right;">${formatNum((item.final_qty_base - item.reserved_qty_base) / factor)}</td>
+                    <td style="padding: 6px 8px; text-align: right;">${formatNum(item.final_qty_base / factor)}</td>
                     <td style="padding: 6px 8px; text-align: right;">${formatNum(item.reserved_qty_base / factor)}</td>
                     <td style="padding: 6px 8px; text-align: right;">${formatNum(item.on_hand_qty_base / factor)}</td>
                     <td style="padding: 6px 8px; text-align: right; font-weight: 700;">${item.change_qty_base > 0 ? '+' : ''}${formatNum(item.change_qty_base / factor)}</td>
@@ -3354,7 +3354,7 @@ function copyAdjustmentData() {
                 item.name,
                 item.sublocation || '-',
                 item.uom || item.base_uom || 'Pcs',
-                formatNum((item.final_qty_base - item.reserved_qty_base) / factor),
+                formatNum(item.final_qty_base / factor),
                 formatNum(item.reserved_qty_base / factor),
                 formatNum(item.on_hand_qty_base / factor),
                 item.change_qty_base > 0 ? `+${formatNum(item.change_qty_base / factor)}` : formatNum(item.change_qty_base / factor),

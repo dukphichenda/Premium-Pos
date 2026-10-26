@@ -566,7 +566,10 @@ def sync_inventory_reserved_quantities(cur=None, product_ids=None):
         sync_sql = f"""
             WITH open_so_lines AS (
                 SELECT sol.product_id, sol.addon_product_id, sol.quantity, COALESCE(sol.addon_quantity, 1.0) as addon_qty,
-                       COALESCE(so.location_id, (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)) as loc_id
+                       COALESCE(
+                           CASE WHEN so.location_id IN (SELECT id FROM locations WHERE name LIKE '<%>') THEN NULL ELSE so.location_id END,
+                           (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)
+                       ) as loc_id
                 FROM sales_order_lines sol
                 JOIN sales_orders so ON sol.sales_order_id = so.id
                 WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')
@@ -605,7 +608,10 @@ def sync_inventory_reserved_quantities(cur=None, product_ids=None):
 
             WITH open_so_lines AS (
                 SELECT sol.product_id, sol.addon_product_id, sol.quantity, COALESCE(sol.addon_quantity, 1.0) as addon_qty,
-                       COALESCE(so.location_id, (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)) as loc_id
+                       COALESCE(
+                           CASE WHEN so.location_id IN (SELECT id FROM locations WHERE name LIKE '<%>') THEN NULL ELSE so.location_id END,
+                           (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)
+                       ) as loc_id
                 FROM sales_order_lines sol
                 JOIN sales_orders so ON sol.sales_order_id = so.id
                 WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')

@@ -1288,8 +1288,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         WHERE {' AND '.join(cust_where)}
         ORDER BY name ASC
     """, tuple(cust_params))
-    print(f"DEBUG DRAWER: is_main={is_main}, branch_id={branch_id}, effective_bid={effective_bid}, len_custs={len(all_customers)}")
-    all_locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY id")
+    all_locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     pricing_schemes = query_all("SELECT id, name, is_active FROM pricing_schemes WHERE is_active = TRUE ORDER BY id")
     if not pricing_schemes:
         pricing_schemes = query_all("SELECT id, name, is_active FROM pricing_schemes ORDER BY id")
@@ -2428,7 +2427,7 @@ def detail_order(id):
     if is_partial:
         # Fast partial response: avoids running heavy drawer queries for 500 orders and customer/product catalogs (~15ms)
         all_branches = query_all("SELECT id, name, code FROM branches ORDER BY name ASC")
-        all_locations = query_all("SELECT id, name FROM locations ORDER BY name ASC")
+        all_locations = query_all("SELECT id, name, is_default FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
         pricing_schemes = query_all("SELECT id, name FROM pricing_schemes ORDER BY id ASC")
         all_delivery_men = query_all("SELECT * FROM delivery_men ORDER BY name ASC")
         company = query_one("SELECT * FROM companies LIMIT 1") or {}
@@ -2718,6 +2717,14 @@ def save_order(id=0):
     try:
         customer_id = int(data.get('customer_id') or (order['customer_id'] if order else 0) or 0) or None
         location_id = int(data.get('location_id') or (order['location_id'] if order else 0) or 0) or None
+        if location_id:
+            loc_valid = query_one("SELECT id FROM locations WHERE id = %s AND is_active = TRUE AND name NOT LIKE '<%%>'", (location_id,))
+            if not loc_valid:
+                def_loc = query_one("SELECT id FROM locations WHERE is_default = TRUE LIMIT 1") or query_one("SELECT id FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' LIMIT 1")
+                location_id = def_loc['id'] if def_loc else 100
+        else:
+            def_loc = query_one("SELECT id FROM locations WHERE is_default = TRUE LIMIT 1") or query_one("SELECT id FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' LIMIT 1")
+            location_id = def_loc['id'] if def_loc else 100
         
         raw_date = data.get('order_date')
         from datetime import date
