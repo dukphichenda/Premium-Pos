@@ -3465,6 +3465,28 @@ let isNewOrder = {{ 'true' if is_new else 'false' }};
 const isCopiedDraft = {{ 'true' if is_copied_draft else 'false' }};
 const canEditPrices = {{ 'true' if can_edit_prices else 'false' }};
 let isDirty = isCopiedDraft ? true : false;
+window.isCurrentOrderPaid = {{ 'true' if is_paid else 'false' }};
+
+function isOrderPaid() {
+    if (typeof window.isCurrentOrderPaid === 'boolean') {
+        return window.isCurrentOrderPaid;
+    }
+    const meta = document.getElementById('soPartialMeta') || document.getElementById('soPartialMetaInner');
+    if (meta) {
+        const val = meta.getAttribute('data-is-paid');
+        if (val === '1' || val === 'true') return true;
+        if (val === '0' || val === 'false') return false;
+        const status = (meta.getAttribute('data-status') || '').toUpperCase();
+        if (['PAID', 'FULLY SHIPPED', 'INVOICED', 'COMPLETED'].includes(status)) return true;
+    }
+    const statusPill = document.querySelector('.so-status-pill');
+    if (statusPill && statusPill.classList.contains('paid')) return true;
+    const reopenBtn = document.querySelector('.so-btn-reopen');
+    if (reopenBtn && reopenBtn.offsetParent !== null) return true;
+    return false;
+}
+window.isOrderPaid = isOrderPaid;
+
 let promptCallbacks = { onSave: null, onDiscard: null, onCancel: null };
 let pendingNavigationTarget = null;
 let activeGridRowEl = null;
@@ -4818,8 +4840,34 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
             }
         }
 
-        // Reset dirty flag and re-bind input change listeners
+        // Reset dirty flag and save locks
         isDirty = false;
+        window.isSavingOrder = false;
+
+        // Restore any disabled save / complete buttons
+        document.querySelectorAll('.inflow-tb-btn, .inflow-action-btn-save, .btn-save-order, button[onclick*="saveSalesOrder"], .so-btn-complete').forEach(btn => {
+            btn.disabled = false;
+            btn.style.opacity = '';
+            btn.style.cursor = '';
+            const origHtml = btn.getAttribute('data-orig-html');
+            if (origHtml) {
+                btn.innerHTML = origHtml;
+                btn.removeAttribute('data-orig-html');
+            }
+        });
+
+        // Synchronize paid status flag and meta
+        const isPaid = meta ? (meta.getAttribute('data-is-paid') === '1') : false;
+        window.isCurrentOrderPaid = isPaid;
+
+        const curMeta = document.getElementById('soPartialMeta');
+        const newMeta = doc.getElementById('soPartialMeta');
+        if (newMeta && curMeta && curMeta !== newMeta) {
+            curMeta.replaceWith(newMeta);
+        } else if (newMeta && !curMeta) {
+            document.body.appendChild(newMeta);
+        }
+
         const soForm = document.getElementById('salesOrderForm');
         if (soForm) {
             soForm.querySelectorAll('input, select, textarea').forEach(el => {
@@ -5164,22 +5212,22 @@ document.addEventListener('DOMContentLoaded', function () {
             if (window.isSavingOrder) return;
             saveSalesOrder();
         } else if (e.key === 'Delete') {
-            {% if not is_paid %}
-            const activeEl = document.activeElement;
-            const isTextInput = activeEl && (
-                (activeEl.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(activeEl.type)) ||
-                activeEl.tagName === 'TEXTAREA' ||
-                activeEl.isContentEditable
-            );
-            if (!isTextInput) {
-                const hasChecked = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked').length > 0;
-                const hasActive = activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index');
-                if (hasChecked || hasActive) {
-                    e.preventDefault();
-                    deleteSelectedLine();
+            if (!isOrderPaid()) {
+                const activeEl = document.activeElement;
+                const isTextInput = activeEl && (
+                    (activeEl.tagName === 'INPUT' && !['checkbox', 'radio', 'button', 'submit'].includes(activeEl.type)) ||
+                    activeEl.tagName === 'TEXTAREA' ||
+                    activeEl.isContentEditable
+                );
+                if (!isTextInput) {
+                    const hasChecked = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked').length > 0;
+                    const hasActive = activeGridRowEl && activeGridRowEl.hasAttribute('data-line-index');
+                    if (hasChecked || hasActive) {
+                        e.preventDefault();
+                        deleteSelectedLine();
+                    }
                 }
             }
-            {% endif %}
         }
     });
 
@@ -6468,9 +6516,9 @@ document.addEventListener('focusin', function(e) {
 });
 
 function addNewBlankLine() {
-    {% if is_paid %}
-    return;
-    {% endif %}
+    if (isOrderPaid()) {
+        return;
+    }
     const newRow = document.getElementById('newRowEntry');
     const input = document.getElementById('newItemTextInput');
     if (newRow) {
@@ -6504,9 +6552,9 @@ function deleteSpecificSoLine(btn, event) {
         event.stopPropagation();
         event.preventDefault();
     }
-    {% if is_paid %}
-    return;
-    {% endif %}
+    if (isOrderPaid()) {
+        return;
+    }
     const row = btn.closest('tr');
     if (!row) return;
 
@@ -6521,9 +6569,9 @@ function deleteSpecificSoLine(btn, event) {
 }
 
 function deleteSelectedLine() {
-    {% if is_paid %}
-    return;
-    {% endif %}
+    if (isOrderPaid()) {
+        return;
+    }
     // 1. If any row checkboxes are checked, delete all checked rows
     const checkedBoxes = document.querySelectorAll('#lineItemsBody tr[data-line-index] .line-select-chk:checked');
     if (checkedBoxes.length > 0) {
@@ -6568,9 +6616,9 @@ function deleteSelectedLine() {
 }
 
 function toggleSelectAllSoLines(checked) {
-    {% if is_paid %}
-    return;
-    {% endif %}
+    if (isOrderPaid()) {
+        return;
+    }
     const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
     rows.forEach(r => {
         const chk = r.querySelector('.line-select-chk');
@@ -6618,9 +6666,9 @@ function getTargetRowForShift() {
 }
 
 function moveSelectedLineUp() {
-    {% if is_paid %}
-    return;
-    {% endif %}
+    if (isOrderPaid()) {
+        return;
+    }
     const row = getTargetRowForShift();
     if (row && row.previousElementSibling && row.previousElementSibling.hasAttribute('data-line-index')) {
         row.parentNode.insertBefore(row, row.previousElementSibling);
@@ -6632,9 +6680,9 @@ function moveSelectedLineUp() {
 }
 
 function moveSelectedLineDown() {
-    {% if is_paid %}
-    return;
-    {% endif %}
+    if (isOrderPaid()) {
+        return;
+    }
     const row = getTargetRowForShift();
     if (row && row.nextElementSibling && row.nextElementSibling.hasAttribute('data-line-index')) {
         row.parentNode.insertBefore(row.nextElementSibling, row);
@@ -6670,16 +6718,19 @@ function recalculateTotals() {
     });
 
     const paidEl = document.getElementById('paidAmountInput');
-    {% if is_paid %}
-    if (paidEl) {
-        paidEl.value = subtotal.toFixed(2);
+    const orderIsPaid = isOrderPaid();
+    let paid = 0.0;
+    let balance = 0.0;
+    if (orderIsPaid) {
+        if (paidEl) {
+            paidEl.value = subtotal.toFixed(2);
+        }
+        paid = subtotal;
+        balance = 0.0;
+    } else {
+        paid = parseFloat(paidEl ? paidEl.value : 0) || 0;
+        balance = Math.max(0, subtotal - paid);
     }
-    const paid = subtotal;
-    const balance = 0.0;
-    {% else %}
-    const paid = parseFloat(paidEl ? paidEl.value : 0) || 0;
-    const balance = Math.max(0, subtotal - paid);
-    {% endif %}
 
     document.getElementById('dispSubtotal').innerText = '$' + subtotal.toFixed(2);
     document.getElementById('dispTotal').innerText = '$' + subtotal.toFixed(2);
@@ -6786,13 +6837,16 @@ function saveSalesOrder() {
     if (form) {
         window.isSavingOrder = true;
         // Visual indicator and disable save buttons to prevent multiple clicks
-        document.querySelectorAll('.inflow-tb-btn, .inflow-action-btn-save, .btn-save-order, button[onclick*="saveSalesOrder"]').forEach(btn => {
+        document.querySelectorAll('.inflow-tb-btn, .inflow-action-btn-save, .btn-save-order, button[onclick*="saveSalesOrder"], .so-btn-complete').forEach(btn => {
             btn.disabled = true;
             btn.style.opacity = '0.65';
             btn.style.cursor = 'wait';
             if (btn.querySelector('.inflow-tb-text') || (btn.innerText && btn.innerText.includes('Save'))) {
                 btn.setAttribute('data-orig-html', btn.innerHTML);
                 btn.innerHTML = '⏳ Saving...';
+            } else if (btn.classList.contains('so-btn-complete') || btn.innerText.includes('Complete')) {
+                btn.setAttribute('data-orig-html', btn.innerHTML);
+                btn.innerHTML = '<span>⏳ Processing...</span>';
             }
         });
 
@@ -8253,11 +8307,13 @@ function openCompletePayModal() {
     const labelEl = document.getElementById('completePaySelectedMethodLabel');
     if (labelEl) labelEl.innerText = 'ABA Bank';
 
-    document.getElementById('modalCompletePay').style.display = 'flex';
+    const modal = document.getElementById('modalCompletePay');
+    if (modal) modal.style.display = 'flex';
 }
 
 function closeCompletePayModal() {
-    document.getElementById('modalCompletePay').style.display = 'none';
+    const modal = document.getElementById('modalCompletePay');
+    if (modal) modal.style.display = 'none';
 }
 
 function selectPayMethodTile(tileEl, method) {
@@ -8306,6 +8362,9 @@ function confirmCompletePayAction() {
     syncDrawerFiltersToStorage();
 
     isDirty = false;
+
+    // Reset saving flag so save is never blocked
+    window.isSavingOrder = false;
 
     // Mark complete pay on main form and submit via saveSalesOrder()
     const cpInput = document.getElementById('markCompletePayInput');

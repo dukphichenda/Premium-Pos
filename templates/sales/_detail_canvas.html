@@ -1861,6 +1861,16 @@
                         </div>
                     </div>
                 </div>
+                <!-- Hidden Meta Information inside Canvas -->
+                <div id="soPartialMetaInner" style="display:none;"
+                     data-order-id="{{ order.id if order and order.id else 0 }}"
+                     data-order-num="{{ order.order_number if order else '' }}"
+                     data-status="{{ order.status if order else '' }}"
+                     data-is-paid="{{ '1' if is_paid else '0' }}"
+                     data-is-new="{{ '1' if is_new else '0' }}"
+                     data-branch-id="{{ effective_order_branch }}"
+                     data-total-amount="{{ '%.2f'|format(order.total_amount or 0) }}">
+                </div>
             </div>
         </form>
     </main>
@@ -2005,11 +2015,32 @@
         markDirty();
     }
 
+    if (typeof isOrderPaid !== 'function') {
+        window.isOrderPaid = function() {
+            if (typeof window.isCurrentOrderPaid === 'boolean') {
+                return window.isCurrentOrderPaid;
+            }
+            const meta = document.getElementById('soPartialMeta');
+            if (meta) {
+                const val = meta.getAttribute('data-is-paid');
+                if (val === '1' || val === 'true') return true;
+                if (val === '0' || val === 'false') return false;
+                const status = (meta.getAttribute('data-status') || '').toUpperCase();
+                if (['PAID', 'FULLY SHIPPED', 'INVOICED', 'COMPLETED'].includes(status)) return true;
+            }
+            const statusPill = document.querySelector('.so-status-pill');
+            if (statusPill && statusPill.classList.contains('paid')) return true;
+            const reopenBtn = document.querySelector('.so-btn-reopen');
+            if (reopenBtn && reopenBtn.offsetParent !== null) return true;
+            return false;
+        };
+    }
+
     function handleCanvasCompletePay() {
-        {% if is_paid %}
-        return;
-        {% endif %}
-        if (isNewOrder) {
+        if (typeof isOrderPaid === 'function' && isOrderPaid()) {
+            return;
+        }
+        if (typeof isNewOrder !== 'undefined' && isNewOrder) {
             const custId = document.getElementById('customerIdHidden');
             if (!custId || !custId.value) {
                 alert('Please select a Customer before completing payment.');
@@ -2035,6 +2066,11 @@
             confirmCompletePayAction();
         } else if (typeof completePayAction === 'function') {
             completePayAction();
+        } else {
+            const form = document.getElementById('salesOrderForm');
+            const cpInput = document.getElementById('markCompletePayInput');
+            if (cpInput) cpInput.value = '1';
+            if (form) form.submit();
         }
     }
 
@@ -2083,10 +2119,10 @@
     }, true);
 
     function handleLineDragStart(e) {
-        {% if is_paid %}
-        e.preventDefault();
-        return false;
-        {% endif %}
+        if (typeof isOrderPaid === 'function' && isOrderPaid()) {
+            e.preventDefault();
+            return false;
+        }
         // Strictly allow drag ONLY when mouse was pressed on the drag handle icon!
         if (!isDragHandlePressed) {
             e.preventDefault();
