@@ -439,6 +439,13 @@ def resync_all_sequences(cur=None):
             m_trf = _row_val(c.fetchone(), 'm', 0) or 0
             if m_trf > 0:
                 c.execute("SELECT setval('trf_number_seq', %s, true);", (m_trf,))
+
+            # 5. Customers sequence
+            _ensure_sequence_exists(c, 'customers_id_seq')
+            c.execute("SELECT COALESCE(MAX(id), 0) as m FROM customers;")
+            m_cust = _row_val(c.fetchone(), 'm', 0) or 0
+            if m_cust > 0:
+                c.execute("SELECT setval('customers_id_seq', %s, true);", (m_cust,))
         except Exception:
             pass
 
@@ -447,6 +454,48 @@ def resync_all_sequences(cur=None):
     else:
         with get_db_cursor(commit=True) as c:
             _resync(c)
+
+def check_duplicate_customer_name(name, exclude_id=None, cur=None):
+    """
+    Checks if a customer with the given name already exists (active customers only).
+    Handles both English and Khmer (case-insensitive, trims, collapsed whitespace,
+    zero-width space stripping, and Unicode NFC normalization).
+    Returns the existing customer record (dict/row) if duplicated, or None.
+    """
+    if not name or not str(name).strip():
+        return None
+    import unicodedata, re
+
+    clean_name = unicodedata.normalize('NFC', str(name).strip().replace('\u200b', ''))
+    norm_name = ' '.join(clean_name.split())
+    no_space_name = clean_name.replace(' ', '').lower()
+    has_khmer = bool(re.search(r'[\u1780-\u17FF]', clean_name))
+
+    sql = """
+        SELECT id, name, phone, contact_name, branch_id
+        FROM customers
+        WHERE is_active = TRUE
+          AND (
+              LOWER(TRIM(name)) = LOWER(TRIM(%s))
+              OR REGEXP_REPLACE(REPLACE(LOWER(TRIM(name)), chr(8203), ''), '\\s+', ' ', 'g') = LOWER(%s)
+              OR (%s = TRUE AND REPLACE(REPLACE(LOWER(TRIM(name)), chr(8203), ''), ' ', '') = %s)
+          )
+          AND (%s IS NULL OR id != %s)
+        LIMIT 1;
+    """
+    params = (clean_name, norm_name, has_khmer, no_space_name, exclude_id, exclude_id)
+
+    if cur is not None:
+        cur.execute(sql, params)
+        row = cur.fetchone()
+        if not row:
+            return None
+        if hasattr(row, 'keys'):
+            return dict(row)
+        return {'id': row[0], 'name': row[1], 'phone': row[2], 'contact_name': row[3], 'branch_id': row[4]}
+    else:
+        row = query_one(sql, params)
+        return dict(row) if row else None
 
 def sync_customers_from_latest_orders(cur=None, customer_ids=None):
     """

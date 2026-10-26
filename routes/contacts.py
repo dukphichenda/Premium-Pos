@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, Response
-from database import query_one, query_all, execute, execute_returning_id
+from database import query_one, query_all, execute, execute_returning_id, check_duplicate_customer_name
 import re
 import csv
 import io
@@ -8,7 +8,7 @@ from services.csv_exchange import resolve_customer_phone_and_name
 contacts_bp = Blueprint('contacts', __name__)
 
 def _is_main_admin():
-    return session.get('role') == 'main_admin'
+    return session.get('role') in ('main_admin', 'admin') or not session.get('branch_id')
 
 def _get_user_branch_id():
     if _is_main_admin():
@@ -679,8 +679,18 @@ def save_customer(id):
 
         if not name:
             if is_ajax:
-                return jsonify({'success': False, 'message': 'Customer Name is required.'}), 400
-            flash("Customer Name is required.", "error")
+                return jsonify({'success': False, 'message': 'Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន'}), 400
+            flash("Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន", "error")
+            return redirect(url_for('contacts.detail_customer', id=id))
+
+        # Duplicate customer name check (English & Khmer, case-insensitive, spacing-normalized)
+        dup = check_duplicate_customer_name(name, exclude_id=id)
+        if dup:
+            phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
+            msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
+            if is_ajax:
+                return jsonify({'success': False, 'message': msg, 'duplicate': True, 'existing_customer': dup}), 400
+            flash(msg, "error")
             return redirect(url_for('contacts.detail_customer', id=id))
 
         tax_number = (data.get('tax_number') or '').strip()
@@ -786,9 +796,19 @@ def create_customer():
 
         if not name:
             if is_ajax:
-                return jsonify({'success': False, 'message': 'Customer Name is required.'}), 400
-            flash("Customer Name is required.", "error")
+                return jsonify({'success': False, 'message': 'Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន'}), 400
+            flash("Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន", "error")
             return redirect(url_for('contacts.list_customers'))
+
+        # Duplicate customer name check (English & Khmer, case-insensitive, spacing-normalized)
+        dup = check_duplicate_customer_name(name)
+        if dup:
+            phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
+            msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
+            if is_ajax:
+                return jsonify({'success': False, 'message': msg, 'duplicate': True, 'existing_customer': dup}), 400
+            flash(msg, "error")
+            return redirect(url_for('contacts.new_customer'))
 
         if is_main_admin:
             raw_b = data.get('branch_id')
@@ -1282,12 +1302,29 @@ def search_customers_json():
     return jsonify([dict(r) for r in results])
 
 
+@contacts_bp.route('/api/customers/check-duplicate-name')
+def api_check_duplicate_customer_name():
+    name = (request.args.get('name') or '').strip()
+    exclude_id = request.args.get('exclude_id')
+    ex_id = int(exclude_id) if exclude_id and str(exclude_id).isdigit() else None
+    dup = check_duplicate_customer_name(name, exclude_id=ex_id)
+    if dup:
+        phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
+        return jsonify({
+            'duplicate': True,
+            'existing_name': dup['name'],
+            'phone': dup.get('phone') or '',
+            'message': f"Customer name '{dup['name']}'{phone_info} already exists! / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ!"
+        })
+    return jsonify({'duplicate': False})
+
+
 @contacts_bp.route('/api/customers/quick-add', methods=['POST'])
 def quick_add_customer_ajax():
     try:
         user_role = session.get('role', 'branch_admin')
         user_bid = session.get('branch_id')
-        is_main_admin = (user_role == 'main_admin')
+        is_main_admin = (user_role in ('main_admin', 'admin')) or not user_bid
 
         data = request.get_json(silent=True) or request.form
         name = (data.get('name') or '').strip()
@@ -1305,7 +1342,25 @@ def quick_add_customer_ajax():
         discount_percent = float(data.get('discount_percent') or 0)
 
         if not name:
-            return jsonify({'success': False, 'message': 'Customer name is required'}), 400
+            return jsonify({'success': False, 'message': 'Customer name is required / សូមបញ្ចូលឈ្មោះអតិថិជន'}), 400
+
+        # Duplicate customer name check (English & Khmer, case-insensitive, spacing-normalized)
+        dup = check_duplicate_customer_name(name)
+        if dup:
+            phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
+            msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
+            return jsonify({
+                'success': False,
+                'message': msg,
+                'duplicate': True,
+                'existing_customer': dup
+            }), 400
+
+        # Safely validate pricing_scheme_id exists
+        chk_scheme = query_one("SELECT id FROM pricing_schemes WHERE id = %s", (pricing_scheme_id,))
+        if not chk_scheme:
+            fallback_ps = query_one("SELECT id FROM pricing_schemes ORDER BY id ASC LIMIT 1")
+            pricing_scheme_id = fallback_ps['id'] if fallback_ps else 100
 
         if not is_main_admin:
             branch_id = user_bid
@@ -1316,6 +1371,12 @@ def quick_add_customer_ajax():
             if raw_b and str(raw_b).lower() not in ('main', 'none', '', 'all', '0', 'null') and str(raw_b).isdigit():
                 branch_id = int(raw_b)
             else:
+                branch_id = None
+
+        # Safely validate branch_id exists if specified
+        if branch_id:
+            chk_b = query_one("SELECT id FROM branches WHERE id = %s", (branch_id,))
+            if not chk_b:
                 branch_id = None
 
         new_id = execute_returning_id("""

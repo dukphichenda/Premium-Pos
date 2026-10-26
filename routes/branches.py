@@ -7,7 +7,7 @@ import uuid
 import json
 from datetime import datetime
 from flask import Blueprint, render_template, request, jsonify, redirect, url_for, flash, session, send_file, current_app
-from database import query_one, query_all, execute, get_db_cursor, get_next_sequence_val, execute_returning_id, get_next_order_number
+from database import query_one, query_all, execute, get_db_cursor, get_next_sequence_val, execute_returning_id, get_next_order_number, check_duplicate_customer_name
 from services.csv_exchange import resolve_customer_phone_and_name
 
 branches_bp = Blueprint('branches', __name__)
@@ -1435,8 +1435,17 @@ def branch_create_customer(id):
 
         if not name:
             if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                return jsonify({'success': False, 'message': 'Customer Name is required'}), 400
-            flash("Customer Name is required.", "error")
+                return jsonify({'success': False, 'message': 'Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន'}), 400
+            flash("Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន", "error")
+            return redirect(url_for('contacts.list_customers', branch=id))
+
+        dup = check_duplicate_customer_name(name)
+        if dup:
+            phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
+            msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
+            if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return jsonify({'success': False, 'message': msg, 'duplicate': True, 'existing_customer': dup}), 400
+            flash(msg, "error")
             return redirect(url_for('contacts.list_customers', branch=id))
 
         new_id = execute_returning_id("""
