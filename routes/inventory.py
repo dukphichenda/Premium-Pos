@@ -304,15 +304,15 @@ def api_products_for_adjustment():
     # 3. By lowest stock: COALESCE(i.quantity, 0) ASC, p.name ASC
     # 4. By highest stock: COALESCE(i.quantity, 0) DESC, p.name ASC
     if sort_by in ('category', 'by_category'):
-        order_by_sql = "ORDER BY COALESCE(c.name, 'General') ASC, p.name ASC"
+        order_by_sql = "ORDER BY LOWER(COALESCE(c.name, 'General')) ASC, LOWER(p.name) ASC"
     elif sort_by in ('lowest', 'lowest_stock', 'stock_asc', 'low_stock'):
-        order_by_sql = "ORDER BY COALESCE(i.quantity, 0) ASC, p.name ASC"
+        order_by_sql = "ORDER BY COALESCE(i.quantity, 0) ASC, LOWER(p.name) ASC"
     elif sort_by in ('highest', 'highest_stock', 'stock_desc', 'high_stock'):
-        order_by_sql = "ORDER BY COALESCE(i.quantity, 0) DESC, p.name ASC"
+        order_by_sql = "ORDER BY COALESCE(i.quantity, 0) DESC, LOWER(p.name) ASC"
     elif sort_by in ('letter', 'latter', 'name', 'alphabetical', 'name_asc'):
-        order_by_sql = "ORDER BY p.name ASC"
+        order_by_sql = "ORDER BY LOWER(p.name) ASC"
     else:
-        order_by_sql = "ORDER BY p.name ASC"
+        order_by_sql = "ORDER BY LOWER(p.name) ASC"
 
     where_sql = " AND ".join(where_clauses)
     limit_sql = "" if (fetch_all or selected_cat_ids) else "LIMIT 60"

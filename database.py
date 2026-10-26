@@ -558,7 +558,7 @@ def sync_inventory_reserved_quantities(cur=None, product_ids=None):
             if not clean_ids:
                 return 0
             p_filter = "AND (sol.product_id = ANY(%s) OR sol.addon_product_id = ANY(%s) OR EXISTS (SELECT 1 FROM product_boms pb_sub WHERE pb_sub.product_id = sol.product_id AND pb_sub.component_product_id = ANY(%s)))"
-            params = [clean_ids, clean_ids, clean_ids]
+            params = [clean_ids] * 6
             c.execute("UPDATE inventory SET reserved_quantity = 0 WHERE product_id = ANY(%s) AND reserved_quantity != 0;", (clean_ids,))
         else:
             c.execute("UPDATE inventory SET reserved_quantity = 0 WHERE reserved_quantity != 0;")
