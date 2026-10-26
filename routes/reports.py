@@ -183,30 +183,84 @@ def get_report_meta(report_key):
 
 def calculate_date_range(preset, custom_from='', custom_to=''):
     now = datetime.now().date()
-    if preset == 'Today':
+    p = (preset or '').strip()
+    if p == 'Today':
         return now, now
-    elif preset == 'This Week':
+    elif p == 'This Week':
         start = now - timedelta(days=now.weekday())
         return start, start + timedelta(days=6)
-    elif preset == 'This Month':
+    elif p == 'This Month':
         start = now.replace(day=1)
         _, last_day = calendar.monthrange(now.year, now.month)
         return start, now.replace(day=last_day)
-    elif preset == 'Last Month':
+    elif p == 'This Quarter':
+        q = (now.month - 1) // 3 + 1
+        q_start = 3 * (q - 1) + 1
+        q_end = q_start + 2
+        _, last_day = calendar.monthrange(now.year, q_end)
+        return date(now.year, q_start, 1), date(now.year, q_end, last_day)
+    elif p == 'This Year':
+        return date(now.year, 1, 1), date(now.year, 12, 31)
+    elif p == 'Yesterday':
+        y = now - timedelta(days=1)
+        return y, y
+    elif p == 'Last Week':
+        start_this = now - timedelta(days=now.weekday())
+        start = start_this - timedelta(days=7)
+        return start, start + timedelta(days=6)
+    elif p == 'Last Month':
         first_this = now.replace(day=1)
         last_prev = first_this - timedelta(days=1)
         start = last_prev.replace(day=1)
         return start, last_prev
-    elif preset == 'This Year':
-        return now.replace(month=1, day=1), now.replace(month=12, day=31)
-    elif preset == 'Custom':
+    elif p == 'Last Quarter':
+        cur_q = (now.month - 1) // 3 + 1
+        prev_q = 4 if cur_q == 1 else cur_q - 1
+        q_year = now.year - 1 if cur_q == 1 else now.year
+        q_start = 3 * (prev_q - 1) + 1
+        q_end = q_start + 2
+        _, last_day = calendar.monthrange(q_year, q_end)
+        return date(q_year, q_start, 1), date(q_year, q_end, last_day)
+    elif p == 'Last Year':
+        return date(now.year - 1, 1, 1), date(now.year - 1, 12, 31)
+    elif p == 'Last 7 Days':
+        return now - timedelta(days=7), now
+    elif p == 'Last 30 Days':
+        return now - timedelta(days=30), now
+    elif p == 'Last 90 Days':
+        return now - timedelta(days=90), now
+    elif p == 'Last 365 Days':
+        return now - timedelta(days=365), now
+    elif p == 'Tomorrow':
+        t = now + timedelta(days=1)
+        return t, t
+    elif p == 'Next Week':
+        start_this = now - timedelta(days=now.weekday())
+        start = start_this + timedelta(days=7)
+        return start, start + timedelta(days=6)
+    elif p == 'Next Month':
+        _, last_day_cur = calendar.monthrange(now.year, now.month)
+        first_next = now.replace(day=last_day_cur) + timedelta(days=1)
+        _, last_day_next = calendar.monthrange(first_next.year, first_next.month)
+        return first_next, first_next.replace(day=last_day_next)
+    elif p == 'Next Quarter':
+        cur_q = (now.month - 1) // 3 + 1
+        next_q = 1 if cur_q == 4 else cur_q + 1
+        q_year = now.year + 1 if cur_q == 4 else now.year
+        q_start = 3 * (next_q - 1) + 1
+        q_end = q_start + 2
+        _, last_day = calendar.monthrange(q_year, q_end)
+        return date(q_year, q_start, 1), date(q_year, q_end, last_day)
+    elif p == 'Next Year':
+        return date(now.year + 1, 1, 1), date(now.year + 1, 12, 31)
+    elif p in ('Custom', 'Custom Date Range'):
         try:
             d_from = datetime.strptime(custom_from, '%Y-%m-%d').date() if custom_from else now.replace(day=1)
             d_to = datetime.strptime(custom_to, '%Y-%m-%d').date() if custom_to else now
             return d_from, d_to
         except Exception:
             return now.replace(day=1), now
-    else: # 'All'
+    else:  # 'All' or 'All Dates' or unrecognized
         return date(2020, 1, 1), date(2035, 12, 31)
 
 def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p'):

@@ -231,6 +231,109 @@
   color: #5B21B6;
   font-weight: 600;
 }
+/* Authentic inFlow Windows Date Picker Dropdown (matching Screenshot 2) */
+.popover-date-dropdown {
+  min-width: 250px;
+  border: 1px solid #7F9DB9;
+  border-radius: 0;
+  box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.22);
+  background: #FFFFFF;
+  padding: 0;
+}
+.popover-date-dropdown .popover-search-wrap {
+  padding: 3px;
+  border-bottom: 1px solid #A0A0A0;
+  background: #FFFFFF;
+}
+.popover-date-dropdown .popover-search-input {
+  height: 24px;
+  border: 1px solid #7F9DB9;
+  border-radius: 0;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+  color: #000000;
+  box-shadow: none;
+}
+.popover-date-dropdown .popover-search-input:focus {
+  border-color: #0078D7;
+  outline: none;
+  box-shadow: none;
+}
+.popover-date-dropdown .popover-list {
+  max-height: 480px;
+  overflow-y: auto;
+  padding: 1px 0;
+}
+.popover-date-dropdown .popover-item {
+  padding: 3px 10px;
+  font-size: 12px;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+  color: #000000;
+  border-radius: 0;
+  font-weight: 400;
+}
+.popover-date-dropdown .popover-item:hover {
+  background: #E5F3FF;
+  color: #000000;
+}
+.popover-date-dropdown .popover-item.selected {
+  background: #0078D7 !important;
+  color: #FFFFFF !important;
+  font-weight: 400;
+}
+.popover-date-sep {
+  height: 1px;
+  background: #D1D5DB;
+  margin: 3px 0;
+}
+.popover-date-custom-wrap {
+  padding: 6px 10px 8px;
+  border-top: 1px solid #D1D5DB;
+  background: #FAFAFA;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
+}
+.popover-date-custom-title {
+  font-size: 12px;
+  color: #000000;
+  margin-bottom: 6px;
+}
+.popover-date-custom-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 5px;
+  font-size: 12px;
+}
+.popover-date-custom-label {
+  width: 44px;
+  color: #475569;
+  font-size: 12px;
+}
+.popover-date-custom-input {
+  flex: 1;
+  height: 24px;
+  font-size: 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 2px;
+  padding: 0 6px;
+  background: #FFFFFF;
+  font-family: inherit;
+}
+.popover-date-custom-btn {
+  width: 100%;
+  height: 26px;
+  background: #0078D7;
+  color: #FFFFFF;
+  border: 1px solid #005A9E;
+  border-radius: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 4px;
+}
+.popover-date-custom-btn:hover {
+  background: #005A9E;
+}
 .inflow-pregenerate-canvas {
   flex: 1;
   display: flex;
@@ -658,20 +761,66 @@
                 </div>
             </div>
 
-            <!-- 2. Invoice Date Filter Chip -->
+            <!-- 2. Invoice Date Filter Chip (matching Screenshot 2) -->
             <div class="inflow-filter-chip-wrapper" id="chipWrapDate">
                 <button type="button" class="inflow-chip-btn" onclick="toggleChipPopover('popoverDate', event)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                    <span id="chipDateLabel">{% if report_key == 'customer-order-history' %}Order Date{% else %}Invoice Date{% endif %}: {{ date_range or 'This Month' }}</span>
+                    <span id="chipDateLabel">{% if report_key == 'customer-order-history' %}Order Date{% else %}Invoice Date{% endif %}: {% if date_range == 'Custom' and (date_from or date_to) %}{{ date_from | format_inflow_date }} - {{ date_to | format_inflow_date }}{% else %}{{ date_range or 'This Month' }}{% endif %}</span>
                 </button>
-                <div id="popoverDate" class="inflow-popover-dropdown">
-                    <div class="popover-list">
-                        <div class="popover-item {% if date_range == 'This Month' %}selected{% endif %}" onclick="selectFilterDate('This Month')">This Month</div>
-                        <div class="popover-item {% if date_range == 'Today' %}selected{% endif %}" onclick="selectFilterDate('Today')">Today</div>
-                        <div class="popover-item {% if date_range == 'This Week' %}selected{% endif %}" onclick="selectFilterDate('This Week')">This Week</div>
-                        <div class="popover-item {% if date_range == 'Last Month' %}selected{% endif %}" onclick="selectFilterDate('Last Month')">Last Month</div>
-                        <div class="popover-item {% if date_range == 'This Year' %}selected{% endif %}" onclick="selectFilterDate('This Year')">This Year</div>
-                        <div class="popover-item {% if date_range == 'All' %}selected{% endif %}" onclick="selectFilterDate('All')">All Dates</div>
+                <div id="popoverDate" class="inflow-popover-dropdown popover-date-dropdown">
+                    <div class="popover-search-wrap">
+                        <input type="text" id="reportDateSearchInput" class="popover-search-input" value="{% if date_range %}{{ date_range }}{% else %}This Month{% endif %}" onfocus="this.select()" oninput="filterPopoverList(this, 'popoverDateList')" onkeydown="handleDateSearchKey(event)">
+                    </div>
+                    <div class="popover-list" id="popoverDateList">
+                        <!-- Group 1: All, Today, This Week, This Month, This Quarter, This Year -->
+                        <div class="popover-item {% if date_range == 'All' %}selected{% endif %}" data-name="All" onclick="selectFilterDate('All')">All</div>
+                        <div class="popover-item {% if date_range == 'Today' %}selected{% endif %}" data-name="Today" onclick="selectFilterDate('Today')">Today</div>
+                        <div class="popover-item {% if date_range == 'This Week' %}selected{% endif %}" data-name="This Week" onclick="selectFilterDate('This Week')">This Week</div>
+                        <div class="popover-item {% if date_range == 'This Month' or not date_range %}selected{% endif %}" data-name="This Month" onclick="selectFilterDate('This Month')">This Month</div>
+                        <div class="popover-item {% if date_range == 'This Quarter' %}selected{% endif %}" data-name="This Quarter" onclick="selectFilterDate('This Quarter')">This Quarter</div>
+                        <div class="popover-item {% if date_range == 'This Year' %}selected{% endif %}" data-name="This Year" onclick="selectFilterDate('This Year')">This Year</div>
+
+                        <div class="popover-separator popover-date-sep"></div>
+
+                        <!-- Group 2: Yesterday, Last Week, Last Month, Last Quarter, Last Year -->
+                        <div class="popover-item {% if date_range == 'Yesterday' %}selected{% endif %}" data-name="Yesterday" onclick="selectFilterDate('Yesterday')">Yesterday</div>
+                        <div class="popover-item {% if date_range == 'Last Week' %}selected{% endif %}" data-name="Last Week" onclick="selectFilterDate('Last Week')">Last Week</div>
+                        <div class="popover-item {% if date_range == 'Last Month' %}selected{% endif %}" data-name="Last Month" onclick="selectFilterDate('Last Month')">Last Month</div>
+                        <div class="popover-item {% if date_range == 'Last Quarter' %}selected{% endif %}" data-name="Last Quarter" onclick="selectFilterDate('Last Quarter')">Last Quarter</div>
+                        <div class="popover-item {% if date_range == 'Last Year' %}selected{% endif %}" data-name="Last Year" onclick="selectFilterDate('Last Year')">Last Year</div>
+
+                        <div class="popover-separator popover-date-sep"></div>
+
+                        <!-- Group 3: Last 7 Days, Last 30 Days, Last 90 Days, Last 365 Days -->
+                        <div class="popover-item {% if date_range == 'Last 7 Days' %}selected{% endif %}" data-name="Last 7 Days" onclick="selectFilterDate('Last 7 Days')">Last 7 Days</div>
+                        <div class="popover-item {% if date_range == 'Last 30 Days' %}selected{% endif %}" data-name="Last 30 Days" onclick="selectFilterDate('Last 30 Days')">Last 30 Days</div>
+                        <div class="popover-item {% if date_range == 'Last 90 Days' %}selected{% endif %}" data-name="Last 90 Days" onclick="selectFilterDate('Last 90 Days')">Last 90 Days</div>
+                        <div class="popover-item {% if date_range == 'Last 365 Days' %}selected{% endif %}" data-name="Last 365 Days" onclick="selectFilterDate('Last 365 Days')">Last 365 Days</div>
+
+                        <div class="popover-separator popover-date-sep"></div>
+
+                        <!-- Group 4: Tomorrow, Next Week, Next Month, Next Quarter, Next Year -->
+                        <div class="popover-item {% if date_range == 'Tomorrow' %}selected{% endif %}" data-name="Tomorrow" onclick="selectFilterDate('Tomorrow')">Tomorrow</div>
+                        <div class="popover-item {% if date_range == 'Next Week' %}selected{% endif %}" data-name="Next Week" onclick="selectFilterDate('Next Week')">Next Week</div>
+                        <div class="popover-item {% if date_range == 'Next Month' %}selected{% endif %}" data-name="Next Month" onclick="selectFilterDate('Next Month')">Next Month</div>
+                        <div class="popover-item {% if date_range == 'Next Quarter' %}selected{% endif %}" data-name="Next Quarter" onclick="selectFilterDate('Next Quarter')">Next Quarter</div>
+                        <div class="popover-item {% if date_range == 'Next Year' %}selected{% endif %}" data-name="Next Year" onclick="selectFilterDate('Next Year')">Next Year</div>
+
+                        <div class="popover-separator popover-date-sep"></div>
+
+                        <!-- Group 5: Custom Date Range -->
+                        <div class="popover-custom-range-box popover-date-custom-wrap" onclick="event.stopPropagation()">
+                            <div class="popover-date-custom-title" onclick="selectFilterDate('Custom')" style="cursor: pointer; font-weight: 600;">Custom Date Range</div>
+                            <div class="popover-date-custom-row">
+                                <span class="popover-date-custom-label">From</span>
+                                <input type="date" id="reportDateFrom" class="popover-date-custom-input" value="{{ date_from or '' }}" onkeydown="if(event.key==='Enter'){event.preventDefault(); applyReportCustomDate();}">
+                            </div>
+                            <div class="popover-date-custom-row">
+                                <span class="popover-date-custom-label">To</span>
+                                <input type="date" id="reportDateTo" class="popover-date-custom-input" value="{{ date_to or '' }}" onkeydown="if(event.key==='Enter'){event.preventDefault(); applyReportCustomDate();}">
+                            </div>
+                            <button type="button" class="popover-date-custom-btn" onclick="applyReportCustomDate()">Apply</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1328,14 +1477,43 @@
             <!-- Date Range -->
             <div>
                 <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Date Range</label>
-                <select class="popover-search-input" onchange="document.getElementById('formDateRangeInput').value = this.value">
-                    <option value="This Month" {% if date_range == 'This Month' %}selected{% endif %}>This Month</option>
+                <select class="popover-search-input" onchange="handleDrawerDateChange(this.value)">
+                    <option value="All" {% if date_range == 'All' %}selected{% endif %}>All</option>
                     <option value="Today" {% if date_range == 'Today' %}selected{% endif %}>Today</option>
                     <option value="This Week" {% if date_range == 'This Week' %}selected{% endif %}>This Week</option>
-                    <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
+                    <option value="This Month" {% if date_range == 'This Month' or not date_range %}selected{% endif %}>This Month</option>
+                    <option value="This Quarter" {% if date_range == 'This Quarter' %}selected{% endif %}>This Quarter</option>
                     <option value="This Year" {% if date_range == 'This Year' %}selected{% endif %}>This Year</option>
-                    <option value="All" {% if date_range == 'All' %}selected{% endif %}>All Dates</option>
+                    <option disabled>──────────</option>
+                    <option value="Yesterday" {% if date_range == 'Yesterday' %}selected{% endif %}>Yesterday</option>
+                    <option value="Last Week" {% if date_range == 'Last Week' %}selected{% endif %}>Last Week</option>
+                    <option value="Last Month" {% if date_range == 'Last Month' %}selected{% endif %}>Last Month</option>
+                    <option value="Last Quarter" {% if date_range == 'Last Quarter' %}selected{% endif %}>Last Quarter</option>
+                    <option value="Last Year" {% if date_range == 'Last Year' %}selected{% endif %}>Last Year</option>
+                    <option disabled>──────────</option>
+                    <option value="Last 7 Days" {% if date_range == 'Last 7 Days' %}selected{% endif %}>Last 7 Days</option>
+                    <option value="Last 30 Days" {% if date_range == 'Last 30 Days' %}selected{% endif %}>Last 30 Days</option>
+                    <option value="Last 90 Days" {% if date_range == 'Last 90 Days' %}selected{% endif %}>Last 90 Days</option>
+                    <option value="Last 365 Days" {% if date_range == 'Last 365 Days' %}selected{% endif %}>Last 365 Days</option>
+                    <option disabled>──────────</option>
+                    <option value="Tomorrow" {% if date_range == 'Tomorrow' %}selected{% endif %}>Tomorrow</option>
+                    <option value="Next Week" {% if date_range == 'Next Week' %}selected{% endif %}>Next Week</option>
+                    <option value="Next Month" {% if date_range == 'Next Month' %}selected{% endif %}>Next Month</option>
+                    <option value="Next Quarter" {% if date_range == 'Next Quarter' %}selected{% endif %}>Next Quarter</option>
+                    <option value="Next Year" {% if date_range == 'Next Year' %}selected{% endif %}>Next Year</option>
+                    <option disabled>──────────</option>
+                    <option value="Custom" {% if date_range == 'Custom' %}selected{% endif %}>Custom Date Range</option>
                 </select>
+            </div>
+            <div id="drawerCustomDateBox" style="display: {% if date_range == 'Custom' %}flex{% else %}none{% endif %}; gap: 8px; margin-top: 6px;">
+                <div style="flex: 1;">
+                    <label style="font-size: 11px; color: #64748B;">From</label>
+                    <input type="date" class="popover-search-input" value="{{ date_from or '' }}" onchange="document.getElementById('formDateFromInput').value = this.value">
+                </div>
+                <div style="flex: 1;">
+                    <label style="font-size: 11px; color: #64748B;">To</label>
+                    <input type="date" class="popover-search-input" value="{{ date_to or '' }}" onchange="document.getElementById('formDateToInput').value = this.value">
+                </div>
             </div>
 
             <!-- Status -->
@@ -1429,7 +1607,13 @@ function toggleChipPopover(id, e) {
     if (target && !wasOpen) {
         target.classList.add('show');
         const input = target.querySelector('.popover-search-input');
-        if (input) input.focus();
+        if (input) {
+            input.focus();
+            if (id === 'popoverDate') {
+                input.select();
+                filterPopoverList(input, 'popoverDateList');
+            }
+        }
     }
 }
 
@@ -1440,6 +1624,22 @@ function filterPopoverList(input, listId) {
         const text = (it.getAttribute('data-name') || it.innerText).toLowerCase();
         it.style.display = (!val || text.includes(val)) ? 'flex' : 'none';
     });
+    const seps = document.querySelectorAll('#' + listId + ' .popover-separator');
+    seps.forEach(s => s.style.display = val ? 'none' : 'block');
+    const customBox = document.querySelector('#' + listId + ' .popover-custom-range-box');
+    if (customBox) {
+        customBox.style.display = (!val || 'custom date range'.includes(val)) ? 'block' : 'none';
+    }
+}
+
+function handleDateSearchKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const visibleItems = Array.from(document.querySelectorAll('#popoverDateList .popover-item')).filter(it => it.style.display !== 'none');
+        if (visibleItems.length > 0) {
+            visibleItems[0].click();
+        }
+    }
 }
 
 function selectFilterStatus(statusVal) {
@@ -1449,7 +1649,31 @@ function selectFilterStatus(statusVal) {
 
 function selectFilterDate(rangeVal) {
     document.getElementById('formDateRangeInput').value = rangeVal;
+    if (rangeVal !== 'Custom') {
+        document.getElementById('formDateFromInput').value = '';
+        document.getElementById('formDateToInput').value = '';
+    }
     submitReportForm();
+}
+
+function applyReportCustomDate() {
+    const fromEl = document.getElementById('reportDateFrom');
+    const toEl = document.getElementById('reportDateTo');
+    const fromVal = fromEl ? fromEl.value.trim() : '';
+    const toVal = toEl ? toEl.value.trim() : '';
+
+    document.getElementById('formDateRangeInput').value = 'Custom';
+    document.getElementById('formDateFromInput').value = fromVal;
+    document.getElementById('formDateToInput').value = toVal;
+    submitReportForm();
+}
+
+function handleDrawerDateChange(val) {
+    document.getElementById('formDateRangeInput').value = val;
+    const box = document.getElementById('drawerCustomDateBox');
+    if (box) {
+        box.style.display = val === 'Custom' ? 'flex' : 'none';
+    }
 }
 
 function selectFilterCategory(catIdOrEl, catName) {

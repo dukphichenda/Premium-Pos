@@ -87,5 +87,72 @@ class TestCustomerOrderHistoryUomAndUnitPrice(unittest.TestCase):
             qty_disp_str = f"{float(case_line['quantity_display']):,.0f}" if float(case_line['quantity_display']) % 1 == 0 else f"{float(case_line['quantity_display']):,.2f}"
             self.assertIn(qty_disp_str, html)
 
+    def test_calculate_date_range_presets(self):
+        """Verify calculate_date_range correctly computes all 21 presets matching Screenshot 2."""
+        from routes.reports import calculate_date_range
+        from datetime import datetime, date, timedelta
+
+        now = datetime.now().date()
+        presets = [
+            'All', 'Today', 'This Week', 'This Month', 'This Quarter', 'This Year',
+            'Yesterday', 'Last Week', 'Last Month', 'Last Quarter', 'Last Year',
+            'Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 365 Days',
+            'Tomorrow', 'Next Week', 'Next Month', 'Next Quarter', 'Next Year',
+            'Custom'
+        ]
+        for p in presets:
+            s, e = calculate_date_range(p, '2026-05-01', '2026-05-20')
+            self.assertIsInstance(s, date, f"{p} start date must be a date")
+            self.assertIsInstance(e, date, f"{p} end date must be a date")
+            self.assertLessEqual(s, e, f"{p} start {s} must be <= end {e}")
+
+        # Specific tests
+        s_today, e_today = calculate_date_range('Today')
+        self.assertEqual(s_today, now)
+        self.assertEqual(e_today, now)
+
+        s_yest, e_yest = calculate_date_range('Yesterday')
+        self.assertEqual(s_yest, now - timedelta(days=1))
+        self.assertEqual(e_yest, now - timedelta(days=1))
+
+        s_7d, e_7d = calculate_date_range('Last 7 Days')
+        self.assertEqual(s_7d, now - timedelta(days=7))
+        self.assertEqual(e_7d, now)
+
+        s_cust, e_cust = calculate_date_range('Custom', '2026-07-04', '2026-07-10')
+        self.assertEqual(s_cust, date(2026, 7, 4))
+        self.assertEqual(e_cust, date(2026, 7, 10))
+
+    def test_viewer_date_dropdown_structure_and_presets(self):
+        """Verify the report viewer date popover includes all Screenshot 2 options and custom range inputs."""
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['role'] = 'main_admin'
+
+        res = self.client.get('/reports/view/customer-order-history?date_range=This+Month')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+
+        # Dropdown container and search input
+        self.assertIn('popover-date-dropdown', html)
+        self.assertIn('id="reportDateSearchInput"', html)
+
+        # All 21 presets
+        expected_presets = [
+            'All', 'Today', 'This Week', 'This Month', 'This Quarter', 'This Year',
+            'Yesterday', 'Last Week', 'Last Month', 'Last Quarter', 'Last Year',
+            'Last 7 Days', 'Last 30 Days', 'Last 90 Days', 'Last 365 Days',
+            'Tomorrow', 'Next Week', 'Next Month', 'Next Quarter', 'Next Year'
+        ]
+        for p in expected_presets:
+            self.assertIn(f'data-name="{p}"', html, f"Preset {p} must be present in popover list")
+
+        # Custom date range section
+        self.assertIn('Custom Date Range', html)
+        self.assertIn('id="reportDateFrom"', html)
+        self.assertIn('id="reportDateTo"', html)
+        self.assertIn('applyReportCustomDate()', html)
+
 if __name__ == '__main__':
     unittest.main()
