@@ -134,6 +134,75 @@
   position: relative;
   display: inline-block;
 }
+.inflow-amount-chip-input-wrap {
+  height: 30px;
+  padding: 0 8px 0 10px;
+  border: 1px solid #E5E7EB;
+  border-radius: 6px;
+  background: #FFFFFF;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.12s ease;
+  box-sizing: border-box;
+}
+.inflow-amount-chip-input-wrap:hover {
+  border-color: #CBD5E1;
+  background: #F9FAFB;
+}
+.inflow-amount-chip-input-wrap:focus-within {
+  border-color: #5B21B6;
+  box-shadow: 0 0 0 2px rgba(91, 33, 182, 0.15);
+  background: #FFFFFF;
+}
+.inflow-amount-chip-input-wrap.active-purple {
+  border-color: #5B21B6;
+  background: #F5F3FF;
+}
+.inflow-amount-chip-icon {
+  font-size: 13px;
+  font-weight: 700;
+  color: #5B21B6;
+  user-select: none;
+  line-height: 1;
+}
+.inflow-amount-chip-input {
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1E293B;
+  width: 105px;
+  padding: 0;
+  font-family: inherit;
+  transition: width 0.15s ease;
+}
+.inflow-amount-chip-input:focus {
+  width: 135px;
+}
+.inflow-amount-chip-input::placeholder {
+  color: #94A3B8;
+  font-size: 11.5px;
+  font-weight: 400;
+}
+.inflow-amount-clear-btn {
+  background: none;
+  border: none;
+  color: #94A3B8;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.inflow-amount-clear-btn:hover {
+  color: #EF4444;
+  background: #FEE2E2;
+}
 .inflow-web-generate-btn {
   height: 30px;
   padding: 0 16px;
@@ -721,6 +790,7 @@
         <input type="hidden" name="date_to" id="formDateToInput" value="{{ date_to }}">
         <input type="hidden" name="customer_id" id="repCustomerId" value="{{ customer_id or '' }}">
         <input type="hidden" name="customer_search" id="formCustomerSearchInput" value="{{ customer_search or '' }}">
+        <input type="hidden" name="sale_amount" id="formSaleAmountInput" value="{{ sale_amount or '' }}">
         <input type="hidden" name="category_id" id="formCategoryIdInput" value="{{ category_id }}">
         <input type="hidden" name="costing_scheme_id" id="formCostingSchemeInput" value="{{ costing_scheme_id }}">
         <input type="hidden" name="currency" id="formCurrencyInput" value="{{ currency }}">
@@ -888,6 +958,27 @@
                 </div>
             </div>
 
+            <!-- 6. Sale Amount Filter Chip & Direct Typing Input -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapAmount">
+                <div class="inflow-amount-chip-input-wrap {% if sale_amount %}active-purple{% endif %}" title="Filter orders by typing sale amount (e.g. 27, 27.00, 50-100, >50)">
+                    <span class="inflow-amount-chip-icon">$</span>
+                    <input type="text" 
+                           id="repSaleAmountInput" 
+                           class="inflow-amount-chip-input" 
+                           placeholder="Sale Amount..." 
+                           value="{{ sale_amount or '' }}" 
+                           autocomplete="off"
+                           oninput="onSaleAmountTyping(this.value)" 
+                           onkeydown="handleSaleAmountKey(event)">
+                    <button type="button" 
+                            id="repSaleAmountClearBtn" 
+                            class="inflow-amount-clear-btn" 
+                            onclick="clearSaleAmountFilter(event)"
+                            style="display: {% if sale_amount %}inline-flex{% else %}none{% endif %};" 
+                            title="Clear sale amount">✕</button>
+                </div>
+            </div>
+
             <!-- Top Filterbar Quick Generate Button -->
             <button type="button" class="inflow-web-generate-btn" onclick="submitReportForm()">
                 Generate
@@ -905,7 +996,7 @@
                     <span>Export ▾</span>
                 </button>
                 <div id="reportExportMenu" class="inflow-popover-dropdown" style="right: 0; left: auto;">
-                    <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, customer_search=customer_search, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by) }}" download data-no-tab="true" class="popover-item" style="text-decoration: none;">
+                    <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, customer_search=customer_search, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by, sale_amount=sale_amount) }}" download data-no-tab="true" class="popover-item" style="text-decoration: none;">
                         📊 Microsoft Excel (*.csv)
                     </a>
                     <a href="javascript:void(0)" onclick="window.print()" class="popover-item" style="text-decoration: none;">
@@ -972,7 +1063,7 @@
                     <th style="width: 22%;">CUSTOMER</th>
                     <th style="width: 23%;">BILLING ADDRESS</th>
                     <th style="width: 10%;">ORDER DATE</th>
-                    <th style="width: 8%; text-align: right;">SALES AMOUNT</th>
+                    <th style="width: 8%; text-align: right; cursor: pointer; user-select: none;" onclick="toggleSortBySalesAmount()" title="Click to sort by Sales Amount">SALES AMOUNT {% if sort_by == 'Sales Amount' %}▼{% endif %}</th>
                     <th style="width: 8%; text-align: right;">COSTING</th>
                     <th style="width: 8%; text-align: right;">GROSS PROFIT</th>
                 </tr>
@@ -980,7 +1071,7 @@
             {% if rows %}
             <tbody>
                 {% for r in rows %}
-                <tr>
+                <tr class="inflow-report-row" data-sales-amount="{{ r.sales_amount }}" data-costing="{{ r.costing or 0 }}" data-profit="{{ r.gross_profit or 0 }}">
                     <td class="wrench-th"></td>
                     <td style="font-weight: 600;">
                         <a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" style="color: #4C1D95; text-decoration: none;">{{ r.order_number }}</a>
@@ -993,18 +1084,23 @@
                     <td style="font-weight: 500;">{{ r.customer_name or '' }}</td>
                     <td style="font-size: 11.5px; color: #4B5563;">{{ r.billing_address or '' }}</td>
                     <td>{{ r.order_date | format_inflow_date }}</td>
-                    <td style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
-                    <td style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.costing or 0) }}</td>
-                    <td style="text-align: right; font-weight: 600; color: #047857;">${{ "%.2f"|format(r.gross_profit) }}</td>
+                    <td class="rep-cell-sales-amount" style="text-align: right; font-weight: 500;">${{ "%.2f"|format(r.sales_amount) }}</td>
+                    <td class="rep-cell-costing" style="text-align: right; font-weight: 500; color: #475569;">${{ "%.2f"|format(r.costing or 0) }}</td>
+                    <td class="rep-cell-profit" style="text-align: right; font-weight: 600; color: #047857;">${{ "%.2f"|format(r.gross_profit) }}</td>
                 </tr>
                 {% endfor %}
+                <tr id="repNoAmountMatchRow" style="display: none;">
+                    <td colspan="9" style="text-align: center; padding: 24px 16px; color: #64748B; font-style: italic; background: #F8FAFC;">
+                        🔍 No orders on this page match "<span id="repNoMatchQuery"></span>". Press <strong>Generate</strong> to search across all pages.
+                    </td>
+                </tr>
             </tbody>
             <tfoot>
-                <tr>
-                    <td colspan="6" style="text-align: right; font-weight: 700;">Grand Totals ({{ total_count }} orders):</td>
-                    <td style="text-align: right; font-weight: 700; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
-                    <td style="text-align: right; font-weight: 700; font-size: 13px; color: #475569;">${{ "%.2f"|format(totals.costing or 0) }}</td>
-                    <td style="text-align: right; font-weight: 700; font-size: 13px; color: #047857;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
+                <tr id="repGrandTotalsRow">
+                    <td colspan="6" id="repGrandTotalsLabel" style="text-align: right; font-weight: 700;">Grand Totals ({{ total_count }} orders):</td>
+                    <td id="repTotalSalesVal" style="text-align: right; font-weight: 700; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
+                    <td id="repTotalCostVal" style="text-align: right; font-weight: 700; font-size: 13px; color: #475569;">${{ "%.2f"|format(totals.costing or 0) }}</td>
+                    <td id="repTotalProfitVal" style="text-align: right; font-weight: 700; font-size: 13px; color: #047857;">${{ "%.2f"|format(totals.gross_profit or 0) }}</td>
                 </tr>
             </tfoot>
             {% endif %}
@@ -1527,6 +1623,15 @@
                 </select>
             </div>
 
+            <!-- Sale Amount -->
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Sale Amount</label>
+                <div style="position: relative;">
+                    <span style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); font-weight: 700; color: #5B21B6; font-size: 13px;">$</span>
+                    <input type="text" id="drawerSaleAmountInput" class="popover-search-input" style="padding-left: 26px;" placeholder="e.g. 27, 27.00, 50-100, >50" value="{{ sale_amount or '' }}" oninput="syncDrawerSaleAmount(this.value)">
+                </div>
+            </div>
+
             <!-- First Sort By -->
             <div>
                 <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Sort By</label>
@@ -1586,6 +1691,11 @@ function submitReportForm() {
     const hidSearch = document.getElementById('formCustomerSearchInput');
     if (custSearch && hidSearch) {
         hidSearch.value = custSearch.value === '<All>' ? '' : custSearch.value;
+    }
+    const saleAmtInput = document.getElementById('repSaleAmountInput');
+    const hidSaleAmt = document.getElementById('formSaleAmountInput');
+    if (saleAmtInput && hidSaleAmt) {
+        hidSaleAmt.value = saleAmtInput.value.trim();
     }
     const pageInput = document.getElementById('reportPageInput');
     if (pageInput) pageInput.value = '1';
@@ -1948,6 +2058,179 @@ function handleRepCustomerKey(e) {
     } else if (e.key === 'Escape') {
         menu.classList.remove('show');
     }
+}
+
+// =========================================================================
+// Real-Time Sale Amount Typing Filter & Sorting
+// =========================================================================
+function onSaleAmountTyping(rawVal) {
+    const trimmed = (rawVal || '').trim();
+    const clearBtn = document.getElementById('repSaleAmountClearBtn');
+    if (clearBtn) clearBtn.style.display = trimmed ? 'inline-flex' : 'none';
+
+    const wrap = document.querySelector('.inflow-amount-chip-input-wrap');
+    if (wrap) {
+        if (trimmed) wrap.classList.add('active-purple');
+        else wrap.classList.remove('active-purple');
+    }
+
+    const hiddenInput = document.getElementById('formSaleAmountInput');
+    if (hiddenInput) hiddenInput.value = trimmed;
+
+    const drawerInput = document.getElementById('drawerSaleAmountInput');
+    if (drawerInput && drawerInput.value !== rawVal) {
+        drawerInput.value = rawVal;
+    }
+
+    liveFilterTableByAmount(trimmed);
+}
+
+function syncDrawerSaleAmount(val) {
+    const mainInput = document.getElementById('repSaleAmountInput');
+    if (mainInput) mainInput.value = val;
+    onSaleAmountTyping(val);
+}
+
+function handleSaleAmountKey(e) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        submitReportForm();
+    } else if (e.key === 'Escape') {
+        clearSaleAmountFilter(e);
+    }
+}
+
+function clearSaleAmountFilter(e) {
+    if (e) e.stopPropagation();
+    const input = document.getElementById('repSaleAmountInput');
+    if (input) input.value = '';
+    const drawerInput = document.getElementById('drawerSaleAmountInput');
+    if (drawerInput) drawerInput.value = '';
+    const hiddenInput = document.getElementById('formSaleAmountInput');
+    if (hiddenInput) hiddenInput.value = '';
+    const clearBtn = document.getElementById('repSaleAmountClearBtn');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    const wrap = document.querySelector('.inflow-amount-chip-input-wrap');
+    if (wrap) wrap.classList.remove('active-purple');
+
+    // If server filter is currently in URL, reload by submitting to get clean data,
+    // otherwise instantly show all rows locally
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('sale_amount') || urlParams.get('sales_amount')) {
+        submitReportForm();
+    } else {
+        liveFilterTableByAmount('');
+    }
+}
+
+function liveFilterTableByAmount(rawVal) {
+    const str = (rawVal || '').trim().replace('$', '').replace(/,/g, '');
+    const rows = document.querySelectorAll('#reportDataTable tbody tr.inflow-report-row');
+    const noMatch = document.getElementById('repNoAmountMatchRow');
+    const noMatchQ = document.getElementById('repNoMatchQuery');
+    if (!rows.length) return;
+
+    if (!str) {
+        rows.forEach(r => r.style.display = '');
+        if (noMatch) noMatch.style.display = 'none';
+        updateLiveSummaryTotals();
+        return;
+    }
+
+    let filterFn = null;
+    // 1. Range: e.g. 50-100 or 50..100 or 50 to 100
+    const rangeMatch = str.match(/^([\d.]+)\s*(?:-|–|to|\.\.)\s*([\d.]+)$/i);
+    if (rangeMatch) {
+        const low = Math.min(parseFloat(rangeMatch[1]), parseFloat(rangeMatch[2]));
+        const high = Math.max(parseFloat(rangeMatch[1]), parseFloat(rangeMatch[2]));
+        if (!isNaN(low) && !isNaN(high)) {
+            filterFn = (amt) => amt >= low && amt <= high;
+        }
+    }
+
+    // 2. Operators: >=, <=, >, <, =
+    if (!filterFn) {
+        const opMatch = str.match(/^(>=|<=|>|<|=)\s*([\d.]+)$/);
+        if (opMatch) {
+            const op = opMatch[1];
+            const val = parseFloat(opMatch[2]);
+            if (!isNaN(val)) {
+                if (op === '>=') filterFn = (amt) => amt >= val;
+                else if (op === '<=') filterFn = (amt) => amt <= val;
+                else if (op === '>') filterFn = (amt) => amt > val;
+                else if (op === '<') filterFn = (amt) => amt < val;
+                else if (op === '=') filterFn = (amt) => Math.abs(amt - val) < 0.01;
+            }
+        }
+    }
+
+    // 3. Single Number
+    if (!filterFn) {
+        const val = parseFloat(str);
+        if (!isNaN(val)) {
+            if (str.includes('.')) {
+                // Exact decimal: e.g. 27.00
+                filterFn = (amt, amtStr) => Math.abs(amt - val) < 0.01 || amtStr.includes(str);
+            } else {
+                // Whole integer: e.g. 27 -> matches 27.00, or 27.xx (>=27 and <28), or text containing "27"
+                filterFn = (amt, amtStr) => Math.abs(amt - val) < 0.01 || (amt >= val && amt < val + 1.0) || amtStr.includes(str);
+            }
+        }
+    }
+
+    let visibleCount = 0;
+    rows.forEach(r => {
+        const amt = parseFloat(r.getAttribute('data-sales-amount') || '0');
+        const amtCell = r.querySelector('.rep-cell-sales-amount');
+        const amtStr = ((amtCell ? amtCell.textContent : '') + ' ' + (r.getAttribute('data-sales-amount') || '')).replace('$', '').trim();
+        let show = true;
+        if (filterFn) {
+            show = filterFn(amt, amtStr);
+        } else {
+            // General text match on amount string
+            show = amtStr.includes(str);
+        }
+        r.style.display = show ? '' : 'none';
+        if (show) visibleCount++;
+    });
+
+    if (noMatch) {
+        noMatch.style.display = (visibleCount === 0) ? '' : 'none';
+        if (noMatchQ) noMatchQ.textContent = rawVal;
+    }
+
+    updateLiveSummaryTotals();
+}
+
+function updateLiveSummaryTotals() {
+    const visibleRows = Array.from(document.querySelectorAll('#reportDataTable tbody tr.inflow-report-row')).filter(r => r.style.display !== 'none');
+    const totalSalesEl = document.getElementById('repTotalSalesVal');
+    const totalCostEl = document.getElementById('repTotalCostVal');
+    const totalProfitEl = document.getElementById('repTotalProfitVal');
+    const labelEl = document.getElementById('repGrandTotalsLabel');
+
+    if (!totalSalesEl) return;
+
+    let sumSales = 0, sumCost = 0, sumProfit = 0;
+    visibleRows.forEach(r => {
+        sumSales += parseFloat(r.getAttribute('data-sales-amount') || '0');
+        sumCost += parseFloat(r.getAttribute('data-costing') || '0');
+        sumProfit += parseFloat(r.getAttribute('data-profit') || '0');
+    });
+
+    totalSalesEl.textContent = '$' + sumSales.toFixed(2);
+    if (totalCostEl) totalCostEl.textContent = '$' + sumCost.toFixed(2);
+    if (totalProfitEl) totalProfitEl.textContent = '$' + sumProfit.toFixed(2);
+    if (labelEl) {
+        labelEl.textContent = 'Grand Totals (' + visibleRows.length + ' orders):';
+    }
+}
+
+function toggleSortBySalesAmount() {
+    const curSort = document.getElementById('formSortByInput')?.value || '';
+    document.getElementById('formSortByInput').value = (curSort === 'Sales Amount') ? 'Order Number' : 'Sales Amount';
+    submitReportForm();
 }
 </script>
 {% endblock %}

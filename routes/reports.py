@@ -303,6 +303,67 @@ def _get_line_cogs_sql_expr(sol_alias='sol', p_alias='p'):
     END
     """
 
+def apply_sale_amount_filter(base_where, params, sale_amount_str, col_expr="so.total_amount"):
+    """
+    Applies sales amount filter to SQL query:
+    Supports:
+    - Single numbers: '27', '27.00', '$27.00' (exact or matching whole dollar amount)
+    - Ranges: '50-100', '50 - 100', '50..100', '50 to 100'
+    - Comparisons: '>50', '>=50', '<100', '<=100', '=27'
+    """
+    if not sale_amount_str:
+        return
+    s = str(sale_amount_str).strip().replace('$', '').replace(',', '')
+    if not s:
+        return
+
+    import re
+    # 1. Range: e.g. "50 - 100", "50-100", "50..100", "50 to 100"
+    range_match = re.match(r'^([\d.]+)\s*(?:-|–|to|\.\.)\s*([\d.]+)$', s, re.IGNORECASE)
+    if range_match:
+        try:
+            val1 = float(range_match.group(1))
+            val2 = float(range_match.group(2))
+            low = min(val1, val2)
+            high = max(val1, val2)
+            base_where.append(f"{col_expr} >= %s AND {col_expr} <= %s")
+            params.extend([low, high])
+            return
+        except ValueError:
+            pass
+
+    # 2. Operators: >=, <=, >, <, =
+    op_match = re.match(r'^(>=|<=|>|<|=)\s*([\d.]+)$', s)
+    if op_match:
+        op = op_match.group(1)
+        try:
+            val = float(op_match.group(2))
+            if op == '=':
+                base_where.append(f"ABS({col_expr} - %s) < 0.01")
+                params.append(val)
+            else:
+                base_where.append(f"{col_expr} {op} %s")
+                params.append(val)
+            return
+        except ValueError:
+            pass
+
+    # 3. Single number: e.g. "27", "27.00", "27.5"
+    try:
+        val = float(s)
+        if '.' in s:
+            # Explicit decimal specified by user (e.g. 27.50 or 27.00)
+            base_where.append(f"ABS({col_expr} - %s) < 0.01")
+            params.append(val)
+        else:
+            # Whole integer entered (e.g. 27):
+            # Matches exact 27.00 OR any amount in the 27.xx range (e.g. 27.00 - 27.99)
+            base_where.append(f"((ABS({col_expr} - %s) < 0.01) OR ({col_expr} >= %s AND {col_expr} < %s + 1.0))")
+            params.extend([val, val, val])
+        return
+    except ValueError:
+        pass
+
 # -------------------------------------------------------------------------
 # Report List / Report Center (Matching screenshot0028.JPEG - screenshot0032.JPEG)
 # -------------------------------------------------------------------------
@@ -383,6 +444,9 @@ def view_report(report_key):
     customer_search = request.args.get('customer_search', '').strip()
     if customer_search == '<All>':
         customer_search = ''
+    sale_amount = request.args.get('sale_amount', '').strip()
+    if not sale_amount:
+        sale_amount = request.args.get('sales_amount', '').strip()
     vendor_id = request.args.get('vendor_id', '')
     category_id = request.args.get('category_id', '')
     location_id = request.args.get('location_id', '')
@@ -538,6 +602,9 @@ def view_report(report_key):
         elif status != 'All':
             base_where.append("so.status = %s")
             params.append(status)
+
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
         where_sql = " AND ".join(base_where)
 
@@ -801,6 +868,9 @@ def view_report(report_key):
                 base_where.append("so.status = %s")
                 params.append(status.upper())
 
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
         where_sql = " AND ".join(base_where)
 
         total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so WHERE {where_sql}", tuple(params))['cnt']
@@ -859,6 +929,9 @@ def view_report(report_key):
             base_where.append("so.status = %s")
             params.append(status.upper())
 
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
         where_sql = " AND ".join(base_where)
 
         total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so WHERE {where_sql}", tuple(params))['cnt']
@@ -900,6 +973,9 @@ def view_report(report_key):
         if customer_id and customer_id != 'all':
             base_where.append("so.customer_id = %s")
             params.append(int(customer_id))
+
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
         where_sql = " AND ".join(base_where)
 
@@ -2007,6 +2083,7 @@ def view_report(report_key):
                            khr_rate=khr_rate,
                            category_groups=locals().get('category_groups', []),
                            customer_groups=locals().get('customer_groups', []),
+                           sale_amount=sale_amount,
                            today_str=today_str)
 
 # -------------------------------------------------------------------------
@@ -2030,6 +2107,7 @@ def export_report(report_key):
     location_id = request.args.get('location_id', '')
     sort_by = request.args.get('sort_by', 'Sales Amount').strip()
     group_by = request.args.get('group_by', '').strip()
+    sale_amount = request.args.get('sale_amount', '').strip() or request.args.get('sales_amount', '').strip()
 
     # Store Scope resolution: branch users strictly locked to their branch; HQ can view main, branch, or all
     user_role = session.get('role')
@@ -2080,6 +2158,9 @@ def export_report(report_key):
         elif status != 'All':
             base_where.append("so.status = %s")
             params.append(status)
+
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
         where_sql = " AND ".join(base_where)
         line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p')
