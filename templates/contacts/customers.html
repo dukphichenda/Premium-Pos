@@ -1546,6 +1546,7 @@
                 <button type="button" class="cust-save-btn" id="btnSaveCustomer" onclick="saveCustomerData()" title="Save changes (Ctrl+S)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                     <span>Save</span>
+                    <span id="btnCustomerSaveDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
                 </button>
             </div>
         </div>
@@ -2421,6 +2422,7 @@ function renderCustomerDetails(data) {
     // Render Order History Table
     renderOrderHistoryRows(orders);
     dirtyFields.clear();
+    updateCustomerDirtyDot();
 }
 
 // Render Order History Table Rows
@@ -2552,9 +2554,22 @@ function toggleOrderLinesDrawer(orderId) {
     }
 }
 
+function updateCustomerDirtyDot() {
+    const dot = document.getElementById('btnCustomerSaveDot');
+    const isDirty = (typeof dirtyFields !== 'undefined' && dirtyFields.size > 0);
+    if (dot) dot.style.display = isDirty ? 'inline-block' : 'none';
+    const btn = document.getElementById('btnSaveCustomer');
+    if (btn) {
+        if (isDirty) btn.classList.add('has-unsaved');
+        else btn.classList.remove('has-unsaved');
+    }
+}
+window.updateCustomerDirtyDot = updateCustomerDirtyDot;
+
 // Mark field dirty on input
 function markFieldDirty(fieldName) {
     dirtyFields.add(fieldName);
+    updateCustomerDirtyDot();
 }
 
 // Copy phone number to clipboard
@@ -2668,6 +2683,7 @@ function saveCustomerData() {
         if (data.success) {
             showToast('✓ ' + (data.message || 'Customer saved successfully!'));
             dirtyFields.clear();
+            updateCustomerDirtyDot();
             // Update left sidebar card if name, phone or contact changed
             const activeCard = document.getElementById('custCard_' + currentCustomerId);
             if (activeCard && data.customer) {

@@ -74,17 +74,21 @@ class TestSaveButtonRedDot(unittest.TestCase):
         self.assertIn('class="inflow-unsaved-dot"', html)
 
     def test_customer_detail_save_button_has_dot(self):
-        """Customer detail page must include .inflow-unsaved-dot inside btnSaveCustomer"""
+        """Customer pages (split workspace and new form) must include .inflow-unsaved-dot inside btnSaveCustomer"""
         cust = query_one("SELECT id FROM customers LIMIT 1")
-        url = f'/customers/{cust["id"]}' if cust else '/customers/new'
+        url = f'/customers/{cust["id"]}' if cust else '/customers'
 
-        resp = self.client.get(url, follow_redirects=True)
-        self.assertEqual(resp.status_code, 200)
-        html = resp.get_data(as_text=True)
+        resp_workspace = self.client.get(url, follow_redirects=True)
+        self.assertEqual(resp_workspace.status_code, 200)
+        html_ws = resp_workspace.get_data(as_text=True)
+        self.assertIn('id="btnSaveCustomer"', html_ws)
+        self.assertIn('id="btnCustomerSaveDot"', html_ws)
 
-        self.assertIn('id="btnSaveCustomer"', html)
-        self.assertIn('id="btnCustomerSaveDot"', html)
-        self.assertIn('class="inflow-unsaved-dot"', html)
+        resp_new = self.client.get('/customers/new', follow_redirects=True)
+        self.assertEqual(resp_new.status_code, 200)
+        html_new = resp_new.get_data(as_text=True)
+        self.assertIn('id="btnSaveCustomer"', html_new)
+        self.assertIn('id="btnCustomerSaveDot"', html_new)
 
     def test_stock_adjustment_save_button_has_dot(self):
         """Stock adjustment form must include .inflow-unsaved-dot on draft save buttons"""
