@@ -153,6 +153,8 @@ class TestCustomerOrderHistoryUomAndUnitPrice(unittest.TestCase):
         self.assertIn('id="reportDateFrom"', html)
         self.assertIn('id="reportDateTo"', html)
         self.assertIn('applyReportCustomDate()', html)
+        self.assertIn('resetDatePopoverList', html)
+        self.assertIn('filterDatePopoverList', html)
 
 if __name__ == '__main__':
     unittest.main()

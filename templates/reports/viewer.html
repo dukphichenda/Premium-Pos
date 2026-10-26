@@ -769,7 +769,7 @@
                 </button>
                 <div id="popoverDate" class="inflow-popover-dropdown popover-date-dropdown">
                     <div class="popover-search-wrap">
-                        <input type="text" id="reportDateSearchInput" class="popover-search-input" value="{% if date_range %}{{ date_range }}{% else %}This Month{% endif %}" onfocus="this.select()" oninput="filterPopoverList(this, 'popoverDateList')" onkeydown="handleDateSearchKey(event)">
+                        <input type="text" id="reportDateSearchInput" class="popover-search-input" value="{% if date_range %}{{ date_range }}{% else %}This Month{% endif %}" onfocus="this.select()" oninput="filterDatePopoverList(this)" onkeydown="handleDateSearchKey(event)">
                     </div>
                     <div class="popover-list" id="popoverDateList">
                         <!-- Group 1: All, Today, This Week, This Month, This Quarter, This Year -->
@@ -1606,14 +1606,69 @@ function toggleChipPopover(id, e) {
     document.querySelectorAll('.inflow-popover-dropdown').forEach(p => p.classList.remove('show'));
     if (target && !wasOpen) {
         target.classList.add('show');
-        const input = target.querySelector('.popover-search-input');
-        if (input) {
-            input.focus();
-            if (id === 'popoverDate') {
+        if (id === 'popoverDate') {
+            resetDatePopoverList();
+            const input = document.getElementById('reportDateSearchInput');
+            if (input) {
+                input.focus();
                 input.select();
-                filterPopoverList(input, 'popoverDateList');
             }
+        } else {
+            const input = target.querySelector('.popover-search-input');
+            if (input) input.focus();
         }
+    }
+}
+
+function resetDatePopoverList() {
+    const currentVal = document.getElementById('formDateRangeInput')?.value || 'This Month';
+    const input = document.getElementById('reportDateSearchInput');
+    if (input) {
+        input.value = currentVal;
+    }
+    const items = document.querySelectorAll('#popoverDateList .popover-item');
+    items.forEach(it => {
+        it.style.display = 'flex';
+    });
+    const seps = document.querySelectorAll('#popoverDateList .popover-separator');
+    seps.forEach(s => {
+        s.style.display = 'block';
+    });
+    const customBox = document.querySelector('#popoverDateList .popover-custom-range-box');
+    if (customBox) {
+        customBox.style.display = 'block';
+    }
+    const selected = document.querySelector('#popoverDateList .popover-item.selected');
+    if (selected) {
+        try { selected.scrollIntoView({ block: 'nearest' }); } catch(err) {}
+    }
+}
+
+function filterDatePopoverList(input) {
+    const rawVal = (input.value || '').trim();
+    const val = rawVal.toLowerCase();
+    const items = document.querySelectorAll('#popoverDateList .popover-item');
+    const seps = document.querySelectorAll('#popoverDateList .popover-separator');
+    const customBox = document.querySelector('#popoverDateList .popover-custom-range-box');
+
+    if (!val) {
+        items.forEach(it => it.style.display = 'flex');
+        seps.forEach(s => s.style.display = 'block');
+        if (customBox) customBox.style.display = 'block';
+        return;
+    }
+
+    let matchCount = 0;
+    items.forEach(it => {
+        const text = (it.getAttribute('data-name') || it.innerText).toLowerCase();
+        const matches = text.includes(val);
+        it.style.display = matches ? 'flex' : 'none';
+        if (matches) matchCount++;
+    });
+
+    seps.forEach(s => s.style.display = 'none');
+    if (customBox) {
+        customBox.style.display = 'custom date range'.includes(val) ? 'block' : 'none';
     }
 }
 
