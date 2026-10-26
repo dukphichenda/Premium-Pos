@@ -1253,7 +1253,7 @@ def receive_goods(id):
                 # Check product for packaging UOM ratio
                 cur.execute("""
                     SELECT uom, purchasing_uom, purchasing_uom_ratio_std, sales_uom, sales_uom_ratio_std,
-                           standard_cost, average_cost, last_purchase_cost, costing_sheet_cost
+                           standard_cost, average_cost, last_purchase_cost, costing_sheet_cost, name
                     FROM products WHERE id = %s FOR UPDATE
                 """, (pid,))
                 cur_p = cur.fetchone()
@@ -1268,44 +1268,118 @@ def receive_goods(id):
                         ratio = float(cur_p.get('purchasing_uom_ratio_std') or cur_p.get('sales_uom_ratio_std') or 1.0)
 
                 base_qty_to_receive = qty_to_receive * ratio
-
-                cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s FOR UPDATE", (pid, order['location_id']))
-                cur_inv = cur.fetchone()
-                old_qty = float(cur_inv['qty']) if cur_inv else 0.0
-
-                # Increment stock in warehouse (standard base units)
-                cur.execute("""
-                    INSERT INTO inventory (product_id, location_id, sublocation, quantity)
-                    VALUES (%s, %s, '', %s)
-                    ON CONFLICT (product_id, location_id, sublocation)
-                    DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
-                """, (pid, order['location_id'], base_qty_to_receive))
-
-                # Recalculate moving average cost (cost per base unit = cost / ratio)
                 base_unit_cost = (cost / ratio) if ratio > 0 else cost
-                cur_avg = float(cur_p['average_cost'] or base_unit_cost) if cur_p else base_unit_cost
-                new_total_qty = old_qty + base_qty_to_receive
-                if new_total_qty > 0:
-                    new_avg = ((old_qty * cur_avg) + (base_qty_to_receive * base_unit_cost)) / new_total_qty
+
+                # Check if kit product (has BOM components)
+                cur.execute("""
+                    SELECT pb.component_product_id, pb.quantity, pb.cost,
+                           cp.name as comp_name, cp.sku as comp_sku, cp.uom as comp_uom,
+                           cp.average_cost as comp_avg_cost, cp.standard_cost as comp_std_cost
+                    FROM product_boms pb
+                    JOIN products cp ON pb.component_product_id = cp.id
+                    WHERE pb.product_id = %s
+                    ORDER BY pb.id ASC
+                """, (pid,))
+                kit_comps = cur.fetchall()
+
+                if kit_comps:
+                    total_bom_weight = sum(float(c.get('cost') or c.get('comp_std_cost') or 0.0) * float(c.get('quantity') or 1.0) for c in kit_comps)
+                    for c in kit_comps:
+                        c_pid = c['component_product_id']
+                        c_ratio = float(c.get('quantity') or 1.0)
+                        comp_qty = base_qty_to_receive * c_ratio
+
+                        c_bom_cost = float(c.get('cost') or c.get('comp_std_cost') or 0.0)
+                        if total_bom_weight > 0 and c_bom_cost > 0:
+                            comp_unit_cost = (c_bom_cost / total_bom_weight) * base_unit_cost / c_ratio
+                        else:
+                            comp_unit_cost = (base_unit_cost / len(kit_comps)) / c_ratio
+
+                        cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s FOR UPDATE", (c_pid, order['location_id']))
+                        cur_c_inv = cur.fetchone()
+                        old_c_qty = float(cur_c_inv['qty']) if cur_c_inv else 0.0
+
+                        # Increment stock for component in warehouse
+                        cur.execute("""
+                            INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                            VALUES (%s, %s, '', %s)
+                            ON CONFLICT (product_id, location_id, sublocation)
+                            DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                        """, (c_pid, order['location_id'], comp_qty))
+
+                        # Recalculate moving average cost for component
+                        cur_c_avg = float(c['comp_avg_cost'] or comp_unit_cost)
+                        new_c_total_qty = old_c_qty + comp_qty
+                        if new_c_total_qty > 0:
+                            new_c_avg = ((old_c_qty * cur_c_avg) + (comp_qty * comp_unit_cost)) / new_c_total_qty
+                        else:
+                            new_c_avg = comp_unit_cost
+
+                        cur.execute("""
+                            UPDATE products 
+                            SET last_purchase_cost = %s,
+                                average_cost = %s,
+                                updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (comp_unit_cost, new_c_avg, c_pid))
+
+                        # Audit ledger for component
+                        comp_name = c.get('comp_name') or f"Product #{c_pid}"
+                        parent_name = cur_p.get('name') if cur_p else f"Kit #{pid}"
+                        comp_uom = c.get('comp_uom') or 'pcs.'
+                        comp_log_reason = f"Purchase Order Received (Kit Component for {parent_name}: {comp_name} x{comp_qty:g} {comp_uom})"
+
+                        cur.execute("""
+                            INSERT INTO inventory_logs (
+                                product_id, movement_type, reference_type, reference_id,
+                                to_location_id, quantity, qty_before, qty_after, unit_cost, reason
+                            ) VALUES (%s, 'PO_RECEIVE', 'PO', %s, %s, %s, %s, %s, %s, %s);
+                        """, (c_pid, order['order_number'], order['location_id'], comp_qty, old_c_qty, old_c_qty + comp_qty, comp_unit_cost, comp_log_reason))
+
+                    # Update parent kit's last_purchase_cost for reference (no inventory added to parent)
+                    cur.execute("""
+                        UPDATE products 
+                        SET last_purchase_cost = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s;
+                    """, (base_unit_cost, pid))
                 else:
-                    new_avg = base_unit_cost
+                    cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s FOR UPDATE", (pid, order['location_id']))
+                    cur_inv = cur.fetchone()
+                    old_qty = float(cur_inv['qty']) if cur_inv else 0.0
 
-                cur.execute("""
-                    UPDATE products 
-                    SET last_purchase_cost = %s,
-                        average_cost = %s,
-                        updated_at = CURRENT_TIMESTAMP
-                    WHERE id = %s;
-                """, (base_unit_cost, new_avg, pid))
+                    # Increment stock in warehouse (standard base units)
+                    cur.execute("""
+                        INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                        VALUES (%s, %s, '', %s)
+                        ON CONFLICT (product_id, location_id, sublocation)
+                        DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                    """, (pid, order['location_id'], base_qty_to_receive))
 
-                # Audit ledger
-                log_reason = f"Purchase Order Received ({qty_to_receive} {line_uom}" + (f" = {base_qty_to_receive} {cur_p.get('uom','pcs.')})" if ratio > 1 else ")")
-                cur.execute("""
-                    INSERT INTO inventory_logs (
-                        product_id, movement_type, reference_type, reference_id,
-                        to_location_id, quantity, qty_before, qty_after, unit_cost, reason
-                    ) VALUES (%s, 'PO_RECEIVE', 'PO', %s, %s, %s, %s, %s, %s, %s);
-                """, (pid, order['order_number'], order['location_id'], base_qty_to_receive, old_qty, old_qty + base_qty_to_receive, base_unit_cost, log_reason))
+                    # Recalculate moving average cost (cost per base unit = cost / ratio)
+                    cur_avg = float(cur_p['average_cost'] or base_unit_cost) if cur_p else base_unit_cost
+                    new_total_qty = old_qty + base_qty_to_receive
+                    if new_total_qty > 0:
+                        new_avg = ((old_qty * cur_avg) + (base_qty_to_receive * base_unit_cost)) / new_total_qty
+                    else:
+                        new_avg = base_unit_cost
+
+                    cur.execute("""
+                        UPDATE products 
+                        SET last_purchase_cost = %s,
+                            average_cost = %s,
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE id = %s;
+                    """, (base_unit_cost, new_avg, pid))
+
+                    # Audit ledger
+                    log_reason = f"Purchase Order Received ({qty_to_receive} {line_uom}" + (f" = {base_qty_to_receive} {cur_p.get('uom','pcs.')})" if ratio > 1 else ")")
+                    cur.execute("""
+                        INSERT INTO inventory_logs (
+                            product_id, movement_type, reference_type, reference_id,
+                            to_location_id, quantity, qty_before, qty_after, unit_cost, reason
+                        ) VALUES (%s, 'PO_RECEIVE', 'PO', %s, %s, %s, %s, %s, %s, %s);
+                    """, (pid, order['order_number'], order['location_id'], base_qty_to_receive, old_qty, old_qty + base_qty_to_receive, base_unit_cost, log_reason))
 
                 # Update line received_qty
                 cur.execute("UPDATE purchase_order_lines SET received_qty = %s WHERE id = %s", (new_rcv_total, lid))
@@ -1373,7 +1447,7 @@ def unfulfill_purchase(id):
             if rcv > 0:
                 pid = l['product_id']
                 line_uom = (l.get('uom') or 'pcs.').strip()
-                cur.execute("SELECT uom, purchasing_uom, purchasing_uom_ratio_std, sales_uom, sales_uom_ratio_std FROM products WHERE id = %s", (pid,))
+                cur.execute("SELECT name, uom, purchasing_uom, purchasing_uom_ratio_std, sales_uom, sales_uom_ratio_std FROM products WHERE id = %s", (pid,))
                 cur_p = cur.fetchone()
                 ratio = 1.0
                 if cur_p:
@@ -1385,13 +1459,40 @@ def unfulfill_purchase(id):
                         ratio = float(cur_p.get('purchasing_uom_ratio_std') or cur_p.get('sales_uom_ratio_std') or 1.0)
 
                 base_qty = rcv * ratio
-                cur.execute("UPDATE inventory SET quantity = GREATEST(0, quantity - %s), updated_at = CURRENT_TIMESTAMP WHERE product_id = %s AND location_id = %s", (base_qty, pid, order['location_id']))
+
+                # Check if kit product (has BOM components)
                 cur.execute("""
-                    INSERT INTO inventory_logs (
-                        product_id, movement_type, reference_type, reference_id,
-                        from_location_id, quantity, unit_cost, reason
-                    ) VALUES (%s, 'PO_UNRECEIVE', 'PO', %s, %s, %s, %s, 'PO Receiving Reversal (Unfulfilled)');
-                """, (pid, order['order_number'], order['location_id'], base_qty, l['unit_cost']))
+                    SELECT pb.component_product_id, pb.quantity, pb.cost,
+                           cp.name as comp_name, cp.sku as comp_sku, cp.uom as comp_uom
+                    FROM product_boms pb
+                    JOIN products cp ON pb.component_product_id = cp.id
+                    WHERE pb.product_id = %s
+                    ORDER BY pb.id ASC
+                """, (pid,))
+                kit_comps = cur.fetchall()
+
+                if kit_comps:
+                    for c in kit_comps:
+                        c_pid = c['component_product_id']
+                        c_ratio = float(c.get('quantity') or 1.0)
+                        comp_qty = base_qty * c_ratio
+                        cur.execute("UPDATE inventory SET quantity = GREATEST(0, quantity - %s), updated_at = CURRENT_TIMESTAMP WHERE product_id = %s AND location_id = %s", (comp_qty, c_pid, order['location_id']))
+                        comp_name = c.get('comp_name') or f"Product #{c_pid}"
+                        parent_name = cur_p.get('name') if cur_p else f"Kit #{pid}"
+                        cur.execute("""
+                            INSERT INTO inventory_logs (
+                                product_id, movement_type, reference_type, reference_id,
+                                from_location_id, quantity, unit_cost, reason
+                            ) VALUES (%s, 'PO_UNRECEIVE', 'PO', %s, %s, %s, %s, %s);
+                        """, (c_pid, order['order_number'], order['location_id'], comp_qty, c.get('cost') or 0.0, f"PO Receiving Reversal (Kit Component for {parent_name}: {comp_name} x{comp_qty:g})"))
+                else:
+                    cur.execute("UPDATE inventory SET quantity = GREATEST(0, quantity - %s), updated_at = CURRENT_TIMESTAMP WHERE product_id = %s AND location_id = %s", (base_qty, pid, order['location_id']))
+                    cur.execute("""
+                        INSERT INTO inventory_logs (
+                            product_id, movement_type, reference_type, reference_id,
+                            from_location_id, quantity, unit_cost, reason
+                        ) VALUES (%s, 'PO_UNRECEIVE', 'PO', %s, %s, %s, %s, 'PO Receiving Reversal (Unfulfilled)');
+                    """, (pid, order['order_number'], order['location_id'], base_qty, l['unit_cost']))
 
                 cur.execute("UPDATE purchase_order_lines SET received_qty = 0 WHERE id = %s", (l['id'],))
 

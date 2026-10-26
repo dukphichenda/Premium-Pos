@@ -679,7 +679,8 @@ def _get_product_detail_bundle(product_id, is_partial=False):
                    sol.uom, 
                    sol.unit_price, 
                    COALESCE(sol.subtotal, (COALESCE(sol.quantity_display, sol.quantity) * sol.unit_price)) as total_amount,
-                   so.status
+                   so.status,
+                   NULL::text as parent_kit_sku
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             LEFT JOIN customers c ON so.customer_id = c.id
@@ -692,14 +693,40 @@ def _get_product_detail_bundle(product_id, is_partial=False):
                    pol.uom, 
                    pol.unit_cost as unit_price, 
                    COALESCE(pol.subtotal, (pol.quantity * pol.unit_cost)) as total_amount,
-                   po.status
+                   po.status,
+                   NULL::text as parent_kit_sku
             FROM purchase_order_lines pol
             JOIN purchase_orders po ON pol.purchase_order_id = po.id
             LEFT JOIN vendors v ON po.vendor_id = v.id
             WHERE pol.product_id = %s
         )
+        UNION ALL
+        (
+            SELECT 'PO' as order_type, po.id as order_id, po.order_number as order_number, po.order_date, v.name as party_name, 
+                   ROUND(pol.quantity * pb.quantity * CASE 
+                       WHEN (pol.uom ILIKE '%%case%%' OR (parent_p.purchasing_uom IS NOT NULL AND pol.uom = parent_p.purchasing_uom)) 
+                       THEN COALESCE(NULLIF(parent_p.purchasing_uom_ratio_std, 0), 1.0) 
+                       ELSE 1.0 
+                   END, 4) as quantity, 
+                   p.uom, 
+                   COALESCE(NULLIF(pb.cost, 0), pol.unit_cost) as unit_price, 
+                   ROUND((pol.quantity * pb.quantity * CASE 
+                       WHEN (pol.uom ILIKE '%%case%%' OR (parent_p.purchasing_uom IS NOT NULL AND pol.uom = parent_p.purchasing_uom)) 
+                       THEN COALESCE(NULLIF(parent_p.purchasing_uom_ratio_std, 0), 1.0) 
+                       ELSE 1.0 
+                   END) * COALESCE(NULLIF(pb.cost, 0), pol.unit_cost), 4) as total_amount,
+                   po.status,
+                   parent_p.sku as parent_kit_sku
+            FROM product_boms pb
+            JOIN purchase_order_lines pol ON pb.product_id = pol.product_id
+            JOIN purchase_orders po ON pol.purchase_order_id = po.id
+            JOIN products parent_p ON pb.product_id = parent_p.id
+            JOIN products p ON pb.component_product_id = p.id
+            LEFT JOIN vendors v ON po.vendor_id = v.id
+            WHERE pb.component_product_id = %s
+        )
         ORDER BY order_date DESC LIMIT 25
-    """, (product_id, product_id))
+    """, (product_id, product_id, product_id))
 
     # Dedicated Sales Order History
     sales_history = query_all("""
@@ -723,25 +750,66 @@ def _get_product_detail_bundle(product_id, is_partial=False):
 
     # Dedicated Purchase Order History
     purchase_history = query_all("""
-        SELECT 
-            'PO' as order_type, 
-            po.id as order_id, 
-            po.order_number, 
-            po.order_date, 
-            po.received_date,
-            v.name as vendor_name, 
-            pol.quantity, 
-            COALESCE(pol.received_qty, 0) as received_qty,
-            pol.uom,
-            pol.unit_cost, 
-            COALESCE(pol.subtotal, (pol.quantity * pol.unit_cost)) as total_amount,
-            po.status
-        FROM purchase_order_lines pol
-        JOIN purchase_orders po ON pol.purchase_order_id = po.id
-        LEFT JOIN vendors v ON po.vendor_id = v.id
-        WHERE pol.product_id = %s
-        ORDER BY po.order_date DESC, po.id DESC LIMIT 30
-    """, (product_id,))
+        (
+            SELECT 
+                'PO' as order_type, 
+                po.id as order_id, 
+                po.order_number, 
+                po.order_date, 
+                po.received_date,
+                v.name as vendor_name, 
+                pol.quantity, 
+                COALESCE(pol.received_qty, 0) as received_qty,
+                pol.uom,
+                pol.unit_cost, 
+                COALESCE(pol.subtotal, (pol.quantity * pol.unit_cost)) as total_amount,
+                po.status,
+                NULL::text as parent_kit_name,
+                NULL::text as parent_kit_sku
+            FROM purchase_order_lines pol
+            JOIN purchase_orders po ON pol.purchase_order_id = po.id
+            LEFT JOIN vendors v ON po.vendor_id = v.id
+            WHERE pol.product_id = %s
+        )
+        UNION ALL
+        (
+            SELECT 
+                'PO' as order_type, 
+                po.id as order_id, 
+                po.order_number, 
+                po.order_date, 
+                po.received_date,
+                v.name as vendor_name, 
+                ROUND(pol.quantity * pb.quantity * CASE 
+                    WHEN (pol.uom ILIKE '%%case%%' OR (parent_p.purchasing_uom IS NOT NULL AND pol.uom = parent_p.purchasing_uom)) 
+                    THEN COALESCE(NULLIF(parent_p.purchasing_uom_ratio_std, 0), 1.0) 
+                    ELSE 1.0 
+                END, 4) as quantity, 
+                ROUND(COALESCE(pol.received_qty, 0) * pb.quantity * CASE 
+                    WHEN (pol.uom ILIKE '%%case%%' OR (parent_p.purchasing_uom IS NOT NULL AND pol.uom = parent_p.purchasing_uom)) 
+                    THEN COALESCE(NULLIF(parent_p.purchasing_uom_ratio_std, 0), 1.0) 
+                    ELSE 1.0 
+                END, 4) as received_qty,
+                p.uom as uom,
+                COALESCE(NULLIF(pb.cost, 0), pol.unit_cost) as unit_cost, 
+                ROUND((pol.quantity * pb.quantity * CASE 
+                    WHEN (pol.uom ILIKE '%%case%%' OR (parent_p.purchasing_uom IS NOT NULL AND pol.uom = parent_p.purchasing_uom)) 
+                    THEN COALESCE(NULLIF(parent_p.purchasing_uom_ratio_std, 0), 1.0) 
+                    ELSE 1.0 
+                END) * COALESCE(NULLIF(pb.cost, 0), pol.unit_cost), 4) as total_amount,
+                po.status,
+                parent_p.name as parent_kit_name,
+                parent_p.sku as parent_kit_sku
+            FROM product_boms pb
+            JOIN purchase_order_lines pol ON pb.product_id = pol.product_id
+            JOIN purchase_orders po ON pol.purchase_order_id = po.id
+            JOIN products parent_p ON pb.product_id = parent_p.id
+            JOIN products p ON pb.component_product_id = p.id
+            LEFT JOIN vendors v ON po.vendor_id = v.id
+            WHERE pb.component_product_id = %s
+        )
+        ORDER BY order_date DESC, order_id DESC LIMIT 30
+    """, (product_id, product_id))
 
     # Product vendors
     product_vendors = query_all("""
