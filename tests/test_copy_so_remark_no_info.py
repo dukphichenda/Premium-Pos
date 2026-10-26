@@ -54,7 +54,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             'total_amount': 0.0
         }
 
-        resp = self.client.post('/sales/save', data=post_data, follow_redirects=True)
+        resp = self.client.post('/sales/new/save', data=post_data, follow_redirects=True)
         self.assertEqual(resp.status_code, 200)
 
         # Fetch the newly saved order
