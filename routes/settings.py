@@ -48,6 +48,7 @@ def get_mobile_app_config():
             saved = json.loads(row['setting_value'])
             cfg = dict(DEFAULT_MOBILE_CONFIG)
             cfg.update(saved)
+            return cfg
     except Exception as e:
         logger.warning(f"Error fetching mobile_app_config: {e}")
     return dict(DEFAULT_MOBILE_CONFIG)
