@@ -1,6 +1,8 @@
 import os
 import time
 import uuid
+import json
+import logging
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session, send_file
 from werkzeug.utils import secure_filename
 from database import query_one, query_all, execute
@@ -10,7 +12,47 @@ from services.backup_service import (
     save_backup_to_gdrive, get_backup_dir, format_file_size
 )
 
+logger = logging.getLogger('inflow.settings')
 settings_bp = Blueprint('settings', __name__)
+
+DEFAULT_MOBILE_CONFIG = {
+    "app_name": "inFlow Premium",
+    "theme_color": "#4C1D95",
+    "accent_color": "#10B981",
+    "app_icon_emoji": "🛵",
+    "custom_icon_url": "",
+    "header_style": "gradient",
+    "default_landing": "delivery",
+    "enable_bottom_nav": True,
+    "bottom_nav_shortcuts": [
+        {"id": "nav_delivery", "title": "Delivery", "icon": "🛵", "url": "/reports/view/delivery-person-assign", "enabled": True},
+        {"id": "nav_orders", "title": "Orders", "icon": "📦", "url": "/sales", "enabled": True},
+        {"id": "nav_reports", "title": "Reports", "icon": "📊", "url": "/reports", "enabled": True},
+        {"id": "nav_scanner", "title": "Scan QR", "icon": "📷", "url": "/sales/new", "enabled": True},
+        {"id": "nav_more", "title": "Settings", "icon": "⚙️", "url": "/settings", "enabled": True}
+    ],
+    "layout_density": "comfortable",
+    "font_size_scale": "100%",
+    "border_radius": "rounded",
+    "hide_cost_profit_mobile": True,
+    "enable_tel_dialer": True,
+    "enable_quick_pay": True,
+    "enable_pull_refresh": True,
+    "custom_mobile_css": ""
+}
+
+def get_mobile_app_config():
+    try:
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
+        if row and row.get('setting_value'):
+            saved = json.loads(row['setting_value'])
+            cfg = dict(DEFAULT_MOBILE_CONFIG)
+            cfg.update(saved)
+            return cfg
+    except Exception as e:
+        logger.warning(f"Error fetching mobile_app_config: {e}")
+    return dict(DEFAULT_MOBILE_CONFIG)
+
 
 def get_invoice_settings():
     inv = query_one("SELECT * FROM invoice_settings LIMIT 1")
@@ -108,6 +150,7 @@ def general_settings():
     latest_backup = backups[0] if backups else None
 
     active_tab = request.args.get('tab', 'tabCompany')
+    mobile_config = get_mobile_app_config()
 
     return render_template('settings/general.html',
                            company=company,
@@ -128,7 +171,87 @@ def general_settings():
                            backups_formatted_total_size=backups_formatted_total_size,
                            latest_backup=latest_backup,
                            active_tab=active_tab,
+                           mobile_config=mobile_config,
                            is_linux_server=(os.name != 'nt'))
+
+@settings_bp.route('/settings/mobile-app/update', methods=['POST'])
+def update_mobile_app_settings():
+    try:
+        current_cfg = get_mobile_app_config()
+
+        app_name = (request.form.get('app_name') or 'inFlow Premium').strip()
+        theme_color = (request.form.get('theme_color') or '#4C1D95').strip()
+        accent_color = (request.form.get('accent_color') or '#10B981').strip()
+        app_icon_emoji = (request.form.get('app_icon_emoji') or '🛵').strip()
+        header_style = (request.form.get('header_style') or 'gradient').strip()
+        default_landing = (request.form.get('default_landing') or 'delivery').strip()
+        layout_density = (request.form.get('layout_density') or 'comfortable').strip()
+        font_size_scale = (request.form.get('font_size_scale') or '100%').strip()
+        border_radius = (request.form.get('border_radius') or 'rounded').strip()
+        custom_mobile_css = request.form.get('custom_mobile_css', '').strip()
+
+        enable_bottom_nav = (request.form.get('enable_bottom_nav') in ('1', 'on', 'true'))
+        hide_cost_profit_mobile = (request.form.get('hide_cost_profit_mobile') in ('1', 'on', 'true'))
+        enable_tel_dialer = (request.form.get('enable_tel_dialer') in ('1', 'on', 'true'))
+        enable_quick_pay = (request.form.get('enable_quick_pay') in ('1', 'on', 'true'))
+        enable_pull_refresh = (request.form.get('enable_pull_refresh') in ('1', 'on', 'true'))
+
+        # Shortcuts
+        shortcuts = []
+        shortcut_ids = ['nav_delivery', 'nav_orders', 'nav_reports', 'nav_scanner', 'nav_more']
+        default_map = {s['id']: s for s in DEFAULT_MOBILE_CONFIG['bottom_nav_shortcuts']}
+        for s_id in shortcut_ids:
+            title = (request.form.get(f'shortcut_{s_id}_title') or default_map[s_id]['title']).strip()
+            icon = (request.form.get(f'shortcut_{s_id}_icon') or default_map[s_id]['icon']).strip()
+            url = (request.form.get(f'shortcut_{s_id}_url') or default_map[s_id]['url']).strip()
+            enabled = (request.form.get(f'shortcut_{s_id}_enabled') in ('1', 'on', 'true'))
+            shortcuts.append({
+                'id': s_id,
+                'title': title,
+                'icon': icon,
+                'url': url,
+                'enabled': enabled
+            })
+
+        new_config = {
+            "app_name": app_name,
+            "theme_color": theme_color,
+            "accent_color": accent_color,
+            "app_icon_emoji": app_icon_emoji,
+            "custom_icon_url": current_cfg.get('custom_icon_url', ''),
+            "header_style": header_style,
+            "default_landing": default_landing,
+            "enable_bottom_nav": enable_bottom_nav,
+            "bottom_nav_shortcuts": shortcuts,
+            "layout_density": layout_density,
+            "font_size_scale": font_size_scale,
+            "border_radius": border_radius,
+            "hide_cost_profit_mobile": hide_cost_profit_mobile,
+            "enable_tel_dialer": enable_tel_dialer,
+            "enable_quick_pay": enable_quick_pay,
+            "enable_pull_refresh": enable_pull_refresh,
+            "custom_mobile_css": custom_mobile_css
+        }
+
+        execute("""
+            INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
+            VALUES ('mobile_app_config', %s, 'Custom redesign configuration for Android app and mobile view', CURRENT_TIMESTAMP)
+            ON CONFLICT (setting_key) DO UPDATE
+            SET setting_value = EXCLUDED.setting_value,
+                updated_at = CURRENT_TIMESTAMP;
+        """, (json.dumps(new_config, ensure_ascii=False),))
+
+        flash("Android app & mobile interface settings updated successfully! / បានកែប្រែចំណុចប្រទាក់កម្មវិធីទូរស័ព្ទដោយជោគជ័យ!", "success")
+    except Exception as e:
+        logger.error(f"Failed to update mobile app settings: {e}")
+        flash(f"Failed to update mobile app settings: {e}", "error")
+
+    return redirect(url_for('settings.general_settings', tab='tabMobileApp'))
+
+@settings_bp.route('/api/mobile-config', methods=['GET'])
+def api_mobile_config():
+    cfg = get_mobile_app_config()
+    return jsonify(cfg)
 
 @settings_bp.route('/settings/currency/update', methods=['POST'])
 def update_currency_settings():

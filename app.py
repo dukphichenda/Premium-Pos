@@ -531,7 +531,8 @@ def create_app():
             'app_logo_url': (company_data.get('app_logo_url') if company_data else None),
             'hq_logo_url': hq_invoice_logo_url,
             'store_theme': store_theme,
-            'active_store_primary_color': store_theme['primary']
+            'active_store_primary_color': store_theme['primary'],
+            'mobile_config': (lambda: __import__('routes.settings', fromlist=['get_mobile_app_config']).get_mobile_app_config())()
         }
 
 

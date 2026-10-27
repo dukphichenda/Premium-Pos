@@ -3137,5 +3137,110 @@
         });
     </script>
     {% block scripts %}{% endblock %}
+
+    <!-- ======================================================= -->
+    <!-- Mobile Bottom Navigation Bar & Mobile Redesign Theme    -->
+    <!-- ======================================================= -->
+    {% if mobile_config %}
+    <style id="inflowMobileAppThemeStyles">
+        :root {
+            --inflow-mobile-theme: {{ mobile_config.theme_color or '#4C1D95' }};
+            --inflow-mobile-accent: {{ mobile_config.accent_color or '#10B981' }};
+        }
+        @media (max-width: 768px) {
+            {% if mobile_config.font_size_scale and mobile_config.font_size_scale != '100%' %}
+            html {
+                font-size: {{ mobile_config.font_size_scale }} !important;
+            }
+            {% endif %}
+
+            {% if mobile_config.layout_density == 'comfortable' %}
+            /* Comfortable Touch Targets for Mobile Phones & Drivers */
+            button, .btn, a.btn, input[type="button"], input[type="submit"] {
+                min-height: 42px;
+            }
+            {% endif %}
+
+            {% if mobile_config.hide_cost_profit_mobile %}
+            /* Hide unit costs and profit margins on mobile phones / staff view */
+            .cost-column, .profit-column, .margin-column,
+            [data-sensitive-cost="true"], .sensitive-cost-val, .sensitive-profit-val {
+                display: none !important;
+            }
+            {% endif %}
+
+            {% if mobile_config.enable_bottom_nav and session.get('user_id') %}
+            body {
+                padding-bottom: 68px !important;
+            }
+            {% endif %}
+
+            {% if mobile_config.custom_mobile_css %}
+            /* Custom Mobile CSS Overrides */
+            {{ mobile_config.custom_mobile_css | safe }}
+            {% endif %}
+        }
+
+        /* Mobile Bottom Navigation Bar */
+        .inflow-mobile-bottom-nav {
+            display: none;
+        }
+        @media (max-width: 768px) {
+            .inflow-mobile-bottom-nav {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: 58px;
+                background: #FFFFFF;
+                border-top: 1px solid #E2E8F0;
+                display: flex;
+                justify-content: space-around;
+                align-items: center;
+                z-index: 99999;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.06);
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+            }
+            .inflow-mobile-bottom-nav .mobile-nav-item {
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                text-decoration: none;
+                color: #64748B;
+                padding: 4px 0;
+                gap: 2px;
+                transition: color 0.15s ease;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .inflow-mobile-bottom-nav .mobile-nav-item.active {
+                color: var(--inflow-mobile-theme, #4C1D95);
+                font-weight: 700;
+            }
+            .inflow-mobile-bottom-nav .mobile-nav-icon {
+                font-size: 19px;
+                line-height: 1;
+            }
+            .inflow-mobile-bottom-nav .mobile-nav-label {
+                font-size: 10px;
+                line-height: 1.1;
+            }
+        }
+    </style>
+
+    {% if mobile_config.enable_bottom_nav and session.get('user_id') %}
+    <nav class="inflow-mobile-bottom-nav" id="inflowMobileBottomNav" aria-label="Mobile Navigation">
+        {% for item in mobile_config.bottom_nav_shortcuts %}
+            {% if item.enabled %}
+            <a href="{{ item.url }}" class="mobile-nav-item {% if request.path == item.url or (item.url != '/' and item.url != '/sales' and request.path.startswith(item.url)) or (item.url == '/sales' and request.path == '/sales') %}active{% endif %}">
+                <span class="mobile-nav-icon">{{ item.icon }}</span>
+                <span class="mobile-nav-label">{{ item.title }}</span>
+            </a>
+            {% endif %}
+        {% endfor %}
+    </nav>
+    {% endif %}
+    {% endif %}
 </body>
 </html>
