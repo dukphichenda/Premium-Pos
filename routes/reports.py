@@ -806,6 +806,73 @@ def view_report(report_key):
             'unassigned_orders': totals_row['unassigned_orders'] or 0
         }
 
+        # Calculate exact earnings per delivery person across all matching orders
+        earning_orders = query_all(f"""
+            SELECT 
+                so.id,
+                COALESCE(so.delivery_man, '') as delivery_man,
+                COALESCE(so.delivery_helper, '') as delivery_helper,
+                COALESCE(so.delivery_fee_khr, 0) as delivery_fee_khr
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE {where_sql}
+        """, tuple(params))
+
+        active_delivery_names = [dm['name'] for dm in all_delivery_men if dm.get('name')]
+        driver_earnings = {}
+        for dm in all_delivery_men:
+            driver_earnings[dm['name']] = {
+                'name': dm['name'],
+                'phone': dm.get('phone') or '',
+                'orders_count': 0,
+                'fee_khr': 0.0
+            }
+
+        total_delivery_fee_khr = 0.0
+
+        for eo in earning_orders:
+            fee = float(eo['delivery_fee_khr'] or 0)
+            raw_man = (eo['delivery_man'] or '').strip()
+            raw_helper = (eo['delivery_helper'] or '').strip()
+
+            participants = []
+            if raw_man.upper() in ('ALL', 'ALL DELIVERY PERSONS', 'ALL ACTIVE'):
+                participants = list(active_delivery_names)
+            else:
+                if ',' in raw_man:
+                    parts = [p.strip() for p in raw_man.split(',') if p.strip()]
+                    participants.extend(parts)
+                elif raw_man:
+                    participants.append(raw_man)
+
+            if raw_helper and raw_helper not in participants:
+                participants.append(raw_helper)
+
+            unique_p = []
+            for p in participants:
+                if p and p not in unique_p:
+                    unique_p.append(p)
+
+            if unique_p:
+                total_delivery_fee_khr += fee
+                split_fee = fee / len(unique_p) if len(unique_p) > 0 else fee
+                for p_name in unique_p:
+                    if p_name not in driver_earnings:
+                        driver_earnings[p_name] = {'name': p_name, 'phone': '', 'orders_count': 0, 'fee_khr': 0.0}
+                    driver_earnings[p_name]['orders_count'] += 1
+                    driver_earnings[p_name]['fee_khr'] += split_fee
+            elif fee > 0:
+                total_delivery_fee_khr += fee
+
+        driver_summary_list = sorted(
+            driver_earnings.values(),
+            key=lambda d: (d['fee_khr'] > 0 or d['orders_count'] > 0, d['fee_khr'], d['orders_count']),
+            reverse=True
+        )
+
+        totals['total_delivery_fee_khr'] = total_delivery_fee_khr
+        totals['driver_summary'] = driver_summary_list
+
         order_col = "so.order_date DESC, so.order_number DESC"
         if sort_by == 'Order Number':
             order_col = "so.order_number ASC"
@@ -2522,8 +2589,44 @@ def export_report(report_key):
                 f"{float(r['sales_amount'] or 0):.2f}",
                 r['delivery_man'] or '',
                 r['delivery_fee_khr'] or 0,
-                r['delivery_notes'] or ''
             ])
+
+        # Delivery Earnings Summary Breakdown in CSV
+        all_dms = query_all("SELECT name FROM delivery_men WHERE is_active = TRUE ORDER BY name ASC")
+        active_dm_names = [dm['name'] for dm in all_dms if dm.get('name')]
+        dm_summary_map = {d['name']: {'orders': 0, 'fee': 0.0} for d in all_dms}
+
+        total_del_fee = 0.0
+        for r in rows:
+            fee = float(r.get('delivery_fee_khr') or 0)
+            man = (r.get('delivery_man') or '').strip()
+            parts = []
+            if man.upper() in ('ALL', 'ALL DELIVERY PERSONS', 'ALL ACTIVE'):
+                parts = list(active_dm_names)
+            elif ',' in man:
+                parts = [p.strip() for p in man.split(',') if p.strip()]
+            elif man:
+                parts = [man]
+            if parts:
+                total_del_fee += fee
+                s_fee = fee / len(parts) if len(parts) > 0 else fee
+                for p in parts:
+                    if p not in dm_summary_map:
+                        dm_summary_map[p] = {'orders': 0, 'fee': 0.0}
+                    dm_summary_map[p]['orders'] += 1
+                    dm_summary_map[p]['fee'] += s_fee
+            elif fee > 0:
+                total_del_fee += fee
+
+        writer.writerow([])
+        writer.writerow(['--- DELIVERY PERSON EARNINGS SUMMARY ---'])
+        writer.writerow(['Delivery Person', 'Orders Delivered', 'Total Fee Earned (KHR)', 'Approx. (USD)'])
+        for name, data in sorted(dm_summary_map.items(), key=lambda x: (x[1]['fee'] > 0, x[1]['fee']), reverse=True):
+            if data['orders'] > 0 or data['fee'] > 0:
+                writer.writerow([name, data['orders'], f"{data['fee']:,.0f} KHR", f"${(data['fee'] / 4100.0):.2f}"])
+        assigned_cnt = len([r for r in rows if (r.get('delivery_man') or '').strip()])
+        writer.writerow(['TOTAL ALL DRIVERS', assigned_cnt, f"{total_del_fee:,.0f} KHR", f"${(total_del_fee / 4100.0):.2f}"])
+
         filename = f"Delivery_Person_Assign_{start_date}_{end_date}.csv"
 
     elif report_key == 'sales-by-product-summary':

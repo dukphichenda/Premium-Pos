@@ -111,5 +111,31 @@ class TestDeliveryPersonAssignReport(unittest.TestCase):
         self.assertNotIn('Cost', header_line)
         self.assertNotIn('Profit', header_line)
 
+        # Verify Delivery Earnings Summary block in CSV
+        self.assertIn('--- DELIVERY PERSON EARNINGS SUMMARY ---', csv_text)
+        self.assertIn('Delivery Person,Orders Delivered,Total Fee Earned (KHR),Approx. (USD)', csv_text)
+        self.assertIn('TOTAL ALL DRIVERS', csv_text)
+
+    def test_delivery_person_earnings_summary_rendering(self):
+        """Ensure delivery person earnings summary elements are present in template and live view."""
+        # 1. Template contains footer total fee and driver summary pills
+        self.assertIn('repTotalDeliveryFeeVal', self.viewer_html)
+        self.assertIn('repDriversBreakdownRow', self.viewer_html)
+        self.assertIn('repDriverEarningsList', self.viewer_html)
+        self.assertIn('inflow-delivery-earnings-card', self.viewer_html)
+        self.assertIn('repEarningsTableBody', self.viewer_html)
+
+        # 2. Live route renders earnings summary
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1
+            sess['username'] = 'admin'
+            sess['role'] = 'admin'
+
+        res = self.client.get('/reports/view/delivery-person-assign')
+        self.assertEqual(res.status_code, 200)
+        html = res.data.decode('utf-8')
+        self.assertIn('Delivery Person Earnings Summary', html)
+        self.assertIn('repTotalDeliveryFeeVal', html)
+
 if __name__ == '__main__':
     unittest.main()

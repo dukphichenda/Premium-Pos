@@ -1438,7 +1438,71 @@
                     <td id="repTotalSalesVal" style="text-align: right; font-weight: 700; font-size: 13px; color: #0F172A;">
                         ${{ "%.2f"|format(totals.sales_amount or 0) }}
                     </td>
-                    <td></td>
+                    <td id="repTotalDeliveryFeeVal" style="text-align: right; font-weight: 700; font-size: 12px; color: #4338CA; padding-right: 12px; white-space: nowrap;" title="Total Delivery Fee in KHR">
+                        <div id="repFooterFeeKhr" style="font-size: 13px; font-weight: 800; color: #4338CA;">{{ "{:,}".format((totals.total_delivery_fee_khr or 0)|int) }} ៛</div>
+                        <div id="repFooterFeeUsd" style="font-size: 11px; font-weight: 600; color: #6366F1;">(~${{ "%.2f"|format((totals.total_delivery_fee_khr or 0) / (khr_rate or 4100.0)) }})</div>
+                    </td>
+                </tr>
+                <tr id="repDriversBreakdownRow" style="background: #F8FAFC; border-top: 1px solid #E2E8F0;">
+                    <td colspan="8" style="padding: 12px 18px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span style="font-size: 15px;">🛵</span>
+                                <span style="font-size: 12.5px; font-weight: 700; color: #1E1B4B;">Delivery Person Earnings Summary:</span>
+                                <span style="font-size: 12px; color: #64748B;">
+                                    Total Delivery Fees: <strong id="repSummaryTotalFeeKhr" style="color: #4C1D95;">{{ "{:,}".format((totals.total_delivery_fee_khr or 0)|int) }} ៛</strong> 
+                                    <span id="repSummaryTotalFeeUsd" style="color: #6D28D9; font-weight: 600;">(~${{ "%.2f"|format((totals.total_delivery_fee_khr or 0) / (khr_rate or 4100.0)) }})</span>
+                                    across <strong id="repSummaryAssignedOrders" style="color: #047857;">{{ totals.assigned_orders or 0 }} assigned orders</strong>
+                                </span>
+                            </div>
+                            <div style="font-size: 11px; background: #EDE9FE; color: #5B21B6; font-weight: 600; padding: 2px 8px; border-radius: 9999px;">
+                                Rate: 1 USD = {{ "{:,}".format((khr_rate or 4100)|int) }} ៛
+                            </div>
+                        </div>
+                        <div id="repDriverEarningsList" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            {% set earners_count = namespace(value=0) %}
+                            {% for d in totals.driver_summary or [] %}
+                            {% if d.orders_count > 0 or d.fee_khr > 0 %}
+                            {% set earners_count.value = earners_count.value + 1 %}
+                            <div class="rep-driver-pill" data-driver-name="{{ d.name }}" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: #FFFFFF; border: 1px solid #DDD6FE; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                                <div style="display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #EDE9FE; color: #5B21B6; font-weight: 700; font-size: 11px;">
+                                    {{ d.name[0]|upper if d.name else '?' }}
+                                </div>
+                                <div style="display: flex; flex-direction: column;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <strong style="font-size: 12px; color: #1E1B4B;">{{ d.name }}</strong>
+                                        {% if d.phone %}
+                                        <span style="font-size: 10.5px; color: #64748B;">({{ d.phone }})</span>
+                                        {% endif %}
+                                    </div>
+                                    <div style="font-size: 11px; color: #475569; display: flex; align-items: center; gap: 6px;">
+                                        <span class="rep-driver-orders-cnt" style="color: #047857; font-weight: 600;">{{ d.orders_count }} orders</span>
+                                        <span style="color: #CBD5E1;">•</span>
+                                        <span class="rep-driver-fee-khr" style="color: #4C1D95; font-weight: 700;">{{ "{:,}".format(d.fee_khr|int) }} ៛</span>
+                                        <span class="rep-driver-fee-usd" style="color: #7C3AED; font-size: 10.5px;">(~${{ "%.2f"|format(d.fee_khr / (khr_rate or 4100.0)) }})</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                            {% if totals.unassigned_orders and totals.unassigned_orders > 0 %}
+                            <div class="rep-driver-pill rep-unassigned-pill" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: #FFFBEB; border: 1px dashed #FCD34D; border-radius: 8px;">
+                                <div style="display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #FEF3C7; color: #B45309; font-weight: 700; font-size: 11px;">
+                                    !
+                                </div>
+                                <div style="display: flex; flex-direction: column;">
+                                    <strong style="font-size: 12px; color: #92400E;">Unassigned</strong>
+                                    <span style="font-size: 11px; color: #B45309; font-weight: 600;"><span id="repSummaryUnassignedOrders">{{ totals.unassigned_orders }}</span> orders waiting for delivery person</span>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% if earners_count.value == 0 and (not totals.assigned_orders or totals.assigned_orders == 0) %}
+                            <div style="font-size: 12px; color: #94A3B8; font-style: italic; padding: 4px 0;">
+                                No delivery persons assigned yet. Use the dropdown in the table or the batch bar above to assign delivery persons.
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
                 </tr>
             </tfoot>
             {% endif %}
@@ -2077,6 +2141,93 @@
                     <button type="button" class="pregenerate-gold-btn" onclick="submitReportForm()">
                         Generate
                     </button>
+                </div>
+            </div>
+        </div>
+        {% if report_key == 'delivery-person-assign' and rows %}
+        <!-- Delivery Person Earnings Detailed Breakdown Card -->
+        <div class="inflow-delivery-earnings-card" style="margin-top: 24px; margin-bottom: 16px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; box-shadow: 0 2px 8px -2px rgba(15, 23, 42, 0.06); overflow: hidden;">
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%); border-bottom: 1px solid #EDE9FE;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 32px; height: 32px; border-radius: 8px; background: #7C3AED; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-size: 16px;">
+                        🛵
+                    </div>
+                    <div>
+                        <h3 style="font-size: 14px; font-weight: 700; color: #1E1B4B; margin: 0;">Delivery Person Earnings Summary &amp; Payout Breakdown</h3>
+                        <p style="font-size: 12px; color: #6B7280; margin: 2px 0 0 0;">Total delivery fees earned by each delivery person for the selected period.</p>
+                    </div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="text-align: right;">
+                        <div style="font-size: 11px; font-weight: 600; color: #6B7280; text-transform: uppercase;">Total Delivery Fees</div>
+                        <div style="font-size: 16px; font-weight: 800; color: #4C1D95;">
+                            <span id="repCardTotalFeeKhr">{{ "{:,}".format((totals.total_delivery_fee_khr or 0)|int) }} ៛</span>
+                            <span id="repCardTotalFeeUsd" style="font-size: 13px; font-weight: 600; color: #7C3AED;">(~${{ "%.2f"|format((totals.total_delivery_fee_khr or 0) / (khr_rate or 4100.0)) }})</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="padding: 16px 20px;">
+                <div style="overflow-x: auto;">
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12.5px;">
+                        <thead>
+                            <tr style="border-bottom: 2px solid #F1F5F9; text-align: left;">
+                                <th style="padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase;">Delivery Person</th>
+                                <th style="padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase;">Phone</th>
+                                <th style="padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; text-align: center;">Orders Delivered</th>
+                                <th style="padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; text-align: right;">Total Fee Earned (KHR)</th>
+                                <th style="padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; text-align: right;">Approx. USD</th>
+                                <th style="padding: 8px 12px; font-size: 11px; font-weight: 700; color: #64748B; text-transform: uppercase; width: 22%;">Share of Total Fees</th>
+                            </tr>
+                        </thead>
+                        <tbody id="repEarningsTableBody">
+                            {% for d in totals.driver_summary or [] %}
+                            {% set pct = ((d.fee_khr / totals.total_delivery_fee_khr * 100) if totals.total_delivery_fee_khr and totals.total_delivery_fee_khr > 0 else 0) %}
+                            <tr style="border-bottom: 1px solid #F1F5F9; {% if d.orders_count == 0 and d.fee_khr == 0 %}opacity: 0.55;{% endif %}">
+                                <td style="padding: 10px 12px; font-weight: 600; color: #0F172A;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="width: 28px; height: 28px; border-radius: 50%; background: #EDE9FE; color: #5B21B6; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px;">
+                                            {{ d.name[0]|upper if d.name else '?' }}
+                                        </div>
+                                        <span>{{ d.name }}</span>
+                                    </div>
+                                </td>
+                                <td style="padding: 10px 12px; color: #64748B;">
+                                    {{ d.phone or '--' }}
+                                </td>
+                                <td style="padding: 10px 12px; text-align: center;">
+                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: 700; font-size: 11px; background: {% if d.orders_count > 0 %}#ECFDF5; color: #047857;{% else %}#F1F5F9; color: #64748B;{% endif %}">
+                                        {{ d.orders_count }} orders
+                                    </span>
+                                </td>
+                                <td style="padding: 10px 12px; text-align: right; font-weight: 700; color: #4C1D95; font-size: 13px;">
+                                    {{ "{:,}".format(d.fee_khr|int) }} ៛
+                                </td>
+                                <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #6D28D9;">
+                                    ${{ "%.2f"|format(d.fee_khr / (khr_rate or 4100.0)) }}
+                                </td>
+                                <td style="padding: 10px 12px;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <div style="flex: 1; height: 8px; background: #F1F5F9; border-radius: 9999px; overflow: hidden;">
+                                            <div style="height: 100%; width: {{ '%.1f'|format(pct) }}%; background: linear-gradient(90deg, #7C3AED, #4F46E5); border-radius: 9999px;"></div>
+                                        </div>
+                                        <span style="font-size: 11px; font-weight: 600; color: #64748B; width: 42px; text-align: right;">{{ '%.1f'|format(pct) }}%</span>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot>
+                            <tr style="background: #F8FAFC; border-top: 2px solid #CBD5E1; font-weight: 700;">
+                                <td style="padding: 10px 12px; color: #0F172A;">TOTAL ALL DRIVERS</td>
+                                <td></td>
+                                <td id="repCardTotalOrders" style="padding: 10px 12px; text-align: center; color: #047857;">{{ totals.assigned_orders or 0 }} orders</td>
+                                <td id="repCardTotalFeeKhrFoot" style="padding: 10px 12px; text-align: right; color: #4C1D95; font-size: 13px;">{{ "{:,}".format((totals.total_delivery_fee_khr or 0)|int) }} ៛</td>
+                                <td id="repCardTotalFeeUsdFoot" style="padding: 10px 12px; text-align: right; color: #6D28D9;">${{ "%.2f"|format((totals.total_delivery_fee_khr or 0) / (khr_rate or 4100.0)) }}</td>
+                                <td style="padding: 10px 12px; color: #64748B; font-size: 11px;">100.0%</td>
+                            </tr>
+                        </tfoot>
+                    </table>
                 </div>
             </div>
         </div>
@@ -3507,15 +3658,190 @@ function recalcDeliveryKpis() {
     const rows = document.querySelectorAll('.inflow-report-row[data-order-id]');
     let assigned = 0;
     let unassigned = 0;
+    let totalFeeKhr = 0;
+
+    let dmList = [];
+    try {
+        const rawDm = document.getElementById('allDeliveryMenData')?.textContent;
+        if (rawDm) dmList = JSON.parse(rawDm);
+    } catch(e) {}
+
+    const activeNames = dmList.map(d => d.name).filter(Boolean);
+    const earningsMap = {};
+    dmList.forEach(d => {
+        earningsMap[d.name] = { name: d.name, phone: d.phone || '', orders: 0, fee: 0 };
+    });
+
+    const khrRate = parseFloat("{{ khr_rate or 4100 }}") || 4100;
+
     rows.forEach(r => {
         const dm = (r.getAttribute('data-delivery-man') || '').trim();
-        if (dm) assigned++;
-        else unassigned++;
+        const fee = parseFloat(r.getAttribute('data-delivery-fee') || 0) || 0;
+        if (dm) {
+            assigned++;
+            totalFeeKhr += fee;
+            let parts = [];
+            if (dm.toUpperCase() === 'ALL' || dm.toUpperCase() === 'ALL DELIVERY PERSONS' || dm.toUpperCase() === 'ALL ACTIVE') {
+                parts = [...activeNames];
+            } else if (dm.includes(',')) {
+                parts = dm.split(',').map(s => s.trim()).filter(Boolean);
+            } else {
+                parts = [dm];
+            }
+            if (parts.length > 0) {
+                const splitFee = fee / parts.length;
+                parts.forEach(p => {
+                    let matchedKey = p;
+                    for (const k in earningsMap) {
+                        if (k.toLowerCase() === p.toLowerCase()) {
+                            matchedKey = k;
+                            break;
+                        }
+                    }
+                    if (!earningsMap[matchedKey]) {
+                        earningsMap[matchedKey] = { name: matchedKey, phone: '', orders: 0, fee: 0 };
+                    }
+                    earningsMap[matchedKey].orders++;
+                    earningsMap[matchedKey].fee += splitFee;
+                });
+            }
+        } else {
+            unassigned++;
+            if (fee > 0) totalFeeKhr += fee;
+        }
     });
+
+    // Update Top KPI counters
     const elAssigned = document.getElementById('repKpiAssignedOrders');
     if (elAssigned) elAssigned.innerText = assigned;
     const elUnassigned = document.getElementById('repKpiUnassignedOrders');
     if (elUnassigned) elUnassigned.innerText = unassigned;
+
+    // Update Footer Grand Totals Label
+    const grandTotalsLabel = document.getElementById('repGrandTotalsLabel');
+    if (grandTotalsLabel) {
+        grandTotalsLabel.innerHTML = `Grand Totals (${rows.length} orders: <span style="color: #047857;">${assigned} Assigned</span>, <span style="color: #D97706;">${unassigned} Unassigned</span>):`;
+    }
+
+    // Update Table Footer Delivery Fee Total
+    const feeKhrEl = document.getElementById('repFooterFeeKhr');
+    if (feeKhrEl) feeKhrEl.innerText = Math.round(totalFeeKhr).toLocaleString() + ' ៛';
+    const feeUsdEl = document.getElementById('repFooterFeeUsd');
+    if (feeUsdEl) feeUsdEl.innerText = `(~$${(totalFeeKhr / khrRate).toFixed(2)})`;
+
+    // Update Summary Row Header
+    const sumFeeKhr = document.getElementById('repSummaryTotalFeeKhr');
+    if (sumFeeKhr) sumFeeKhr.innerText = Math.round(totalFeeKhr).toLocaleString() + ' ៛';
+    const sumFeeUsd = document.getElementById('repSummaryTotalFeeUsd');
+    if (sumFeeUsd) sumFeeUsd.innerText = `(~$${(totalFeeKhr / khrRate).toFixed(2)})`;
+    const sumAssignedOrders = document.getElementById('repSummaryAssignedOrders');
+    if (sumAssignedOrders) sumAssignedOrders.innerText = `${assigned} assigned orders`;
+    const sumUnassignedOrders = document.getElementById('repSummaryUnassignedOrders');
+    if (sumUnassignedOrders) sumUnassignedOrders.innerText = unassigned;
+
+    // Sort Drivers by fee and order activity
+    const sortedDrivers = Object.values(earningsMap).sort((a, b) => {
+        const aActive = (a.fee > 0 || a.orders > 0);
+        const bActive = (b.fee > 0 || b.orders > 0);
+        if (aActive && !bActive) return -1;
+        if (!aActive && bActive) return 1;
+        return b.fee - a.fee;
+    });
+
+    // Update Footer Pills
+    const pillsList = document.getElementById('repDriverEarningsList');
+    if (pillsList) {
+        let pillsHtml = '';
+        sortedDrivers.forEach(d => {
+            if (d.orders > 0 || d.fee > 0) {
+                pillsHtml += `
+                    <div class="rep-driver-pill" data-driver-name="${d.name}" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: #FFFFFF; border: 1px solid #DDD6FE; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
+                        <div style="display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #EDE9FE; color: #5B21B6; font-weight: 700; font-size: 11px;">
+                            ${(d.name[0] || '?').toUpperCase()}
+                        </div>
+                        <div style="display: flex; flex-direction: column;">
+                            <div style="display: flex; align-items: center; gap: 6px;">
+                                <strong style="font-size: 12px; color: #1E1B4B;">${d.name}</strong>
+                                ${d.phone ? `<span style="font-size: 10.5px; color: #64748B;">(${d.phone})</span>` : ''}
+                            </div>
+                            <div style="font-size: 11px; color: #475569; display: flex; align-items: center; gap: 6px;">
+                                <span class="rep-driver-orders-cnt" style="color: #047857; font-weight: 600;">${d.orders} orders</span>
+                                <span style="color: #CBD5E1;">•</span>
+                                <span class="rep-driver-fee-khr" style="color: #4C1D95; font-weight: 700;">${Math.round(d.fee).toLocaleString()} ៛</span>
+                                <span class="rep-driver-fee-usd" style="color: #7C3AED; font-size: 10.5px;">(~$${(d.fee / khrRate).toFixed(2)})</span>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+        });
+        if (unassigned > 0) {
+            pillsHtml += `
+                <div class="rep-driver-pill rep-unassigned-pill" style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; background: #FFFBEB; border: 1px dashed #FCD34D; border-radius: 8px;">
+                    <div style="display: flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 50%; background: #FEF3C7; color: #B45309; font-weight: 700; font-size: 11px;">!</div>
+                    <div style="display: flex; flex-direction: column;">
+                        <strong style="font-size: 12px; color: #92400E;">Unassigned</strong>
+                        <span style="font-size: 11px; color: #B45309; font-weight: 600;">${unassigned} orders waiting for delivery person</span>
+                    </div>
+                </div>`;
+        }
+        if (!pillsHtml) {
+            pillsHtml = `<div style="font-size: 12px; color: #94A3B8; font-style: italic; padding: 4px 0;">No delivery persons assigned yet.</div>`;
+        }
+        pillsList.innerHTML = pillsHtml;
+    }
+
+    // Update Detailed Earnings Table Body
+    const cardFeeKhr = document.getElementById('repCardTotalFeeKhr');
+    if (cardFeeKhr) cardFeeKhr.innerText = Math.round(totalFeeKhr).toLocaleString() + ' ៛';
+    const cardFeeUsd = document.getElementById('repCardTotalFeeUsd');
+    if (cardFeeUsd) cardFeeUsd.innerText = `(~$${(totalFeeKhr / khrRate).toFixed(2)})`;
+    const cardTotalOrders = document.getElementById('repCardTotalOrders');
+    if (cardTotalOrders) cardTotalOrders.innerText = `${assigned} orders`;
+    const cardTotalFeeKhrFoot = document.getElementById('repCardTotalFeeKhrFoot');
+    if (cardTotalFeeKhrFoot) cardTotalFeeKhrFoot.innerText = Math.round(totalFeeKhr).toLocaleString() + ' ៛';
+    const cardTotalFeeUsdFoot = document.getElementById('repCardTotalFeeUsdFoot');
+    if (cardTotalFeeUsdFoot) cardTotalFeeUsdFoot.innerText = `$${(totalFeeKhr / khrRate).toFixed(2)}`;
+
+    const earningsBody = document.getElementById('repEarningsTableBody');
+    if (earningsBody) {
+        let tableRowsHtml = '';
+        sortedDrivers.forEach(d => {
+            const pct = totalFeeKhr > 0 ? ((d.fee / totalFeeKhr) * 100) : 0;
+            const isZero = d.orders === 0 && d.fee === 0;
+            tableRowsHtml += `
+                <tr style="border-bottom: 1px solid #F1F5F9; ${isZero ? 'opacity: 0.55;' : ''}">
+                    <td style="padding: 10px 12px; font-weight: 600; color: #0F172A;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 28px; height: 28px; border-radius: 50%; background: #EDE9FE; color: #5B21B6; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 11px;">
+                                ${(d.name[0] || '?').toUpperCase()}
+                            </div>
+                            <span>${d.name}</span>
+                        </div>
+                    </td>
+                    <td style="padding: 10px 12px; color: #64748B;">${d.phone || '--'}</td>
+                    <td style="padding: 10px 12px; text-align: center;">
+                        <span style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-weight: 700; font-size: 11px; background: ${d.orders > 0 ? '#ECFDF5; color: #047857;' : '#F1F5F9; color: #64748B;'}">
+                            ${d.orders} orders
+                        </span>
+                    </td>
+                    <td style="padding: 10px 12px; text-align: right; font-weight: 700; color: #4C1D95; font-size: 13px;">
+                        ${Math.round(d.fee).toLocaleString()} ៛
+                    </td>
+                    <td style="padding: 10px 12px; text-align: right; font-weight: 600; color: #6D28D9;">
+                        $${(d.fee / khrRate).toFixed(2)}
+                    </td>
+                    <td style="padding: 10px 12px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="flex: 1; height: 8px; background: #F1F5F9; border-radius: 9999px; overflow: hidden;">
+                                <div style="height: 100%; width: ${pct.toFixed(1)}%; background: linear-gradient(90deg, #7C3AED, #4F46E5); border-radius: 9999px;"></div>
+                            </div>
+                            <span style="font-size: 11px; font-weight: 600; color: #64748B; width: 42px; text-align: right;">${pct.toFixed(1)}%</span>
+                        </div>
+                    </td>
+                </tr>`;
+        });
+        earningsBody.innerHTML = tableRowsHtml;
+    }
 }
 
 function openNewDeliveryManReportModal() {
