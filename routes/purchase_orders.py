@@ -448,6 +448,7 @@ def api_purchase_data(id):
             'order_number': order['order_number'],
             'order_date': order['order_date'].strftime('%b %d, %Y') if order['order_date'] else '',
             'order_date_raw': order['order_date'].strftime('%Y-%m-%d') if order['order_date'] else '',
+            'order_date_inflow': order['order_date'].strftime('%d-%b-%Y') if order['order_date'] else '',
             'expected_date': order['expected_date'].strftime('%b %d, %Y') if order['expected_date'] else '',
             'expected_date_raw': order['expected_date'].strftime('%Y-%m-%d') if order['expected_date'] else '',
             'status': order['status'],
@@ -1619,9 +1620,10 @@ def record_payment(id):
             flash("Payment amount must be greater than zero.", "error")
             return redirect(url_for('purchase_orders.detail_purchase', id=id))
 
-        method = request.form.get('method', 'Bank Transfer').strip()
-        reference = request.form.get('reference', '').strip()
-        notes = request.form.get('notes', '').strip()
+        method = (request.form.get('payment_method') or request.form.get('method') or 'Bank Transfer (ABA / Prasac)').strip()
+        reference = (request.form.get('reference_no') or request.form.get('reference') or '').strip()
+        notes = (request.form.get('payment_notes') or request.form.get('notes') or '').strip()
+        payment_date = (request.form.get('payment_date') or '').strip() or None
 
         order = query_one("SELECT * FROM purchase_orders WHERE id = %s", (id,))
         if not order:
@@ -1648,9 +1650,9 @@ def record_payment(id):
 
             cur.execute("""
                 INSERT INTO order_payments (
-                    order_type, order_id, amount, payment_method, reference, notes
-                ) VALUES ('PO', %s, %s, %s, %s, %s);
-            """, (id, amount, method, reference, notes))
+                    order_type, order_id, amount, payment_method, reference, notes, payment_date, branch_id
+                ) VALUES ('PO', %s, %s, %s, %s, %s, COALESCE(%s::timestamptz, CURRENT_TIMESTAMP), %s);
+            """, (id, amount, method, reference, notes, payment_date, order.get('branch_id')))
 
             # Deduct from vendor balance
             if order['vendor_id']:

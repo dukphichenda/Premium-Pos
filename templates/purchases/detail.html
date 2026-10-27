@@ -569,7 +569,7 @@ html.is-desktop-view .po-mobile-drawer-backdrop {
 }
 .po-list-card {
     content-visibility: auto;
-    contain-intrinsic-size: 0 68px;
+    contain-intrinsic-size: 0 88px;
     padding: 10px 14px;
     border-bottom: 1px solid #F1ECE5;
     cursor: pointer;
@@ -618,13 +618,42 @@ html.is-desktop-view .po-mobile-drawer-backdrop {
     background: #94A3B8;
     color: #FFFFFF;
 }
-.po-card-bottom-row {
+.po-card-vendor-row {
+    display: flex;
+    align-items: center;
+    gap: 5px;
     margin-top: 3px;
+    font-size: 12px;
+    color: #5C5248;
+    overflow: hidden;
+}
+.po-card-vendor-icon {
+    font-size: 11px;
+    opacity: 0.8;
+    flex-shrink: 0;
+}
+.po-card-vendor {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+}
+.po-card-bottom-row {
+    margin-top: 4px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 .po-card-amount {
     font-size: 12.5px;
     font-weight: 700;
     color: #C58B43;
+}
+.po-card-date {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8C827A;
+    white-space: nowrap;
 }
 
 /* Detail Canvas (Right) */
@@ -1829,6 +1858,7 @@ input:checked + .po-toggle-slider:before {
                  data-vendor-id="{{ o.vendor_id or '' }}"
                  data-location-id="{{ o.location_id or '' }}"
                  data-status="{{ o_badge }}"
+                 data-order-date="{{ (o.order_date | format_inflow_date)|lower if o.order_date else '' }}"
                  onclick="selectPurchaseOrder({{ o.id }})">
                 <div class="po-card-top-row">
                     <span class="po-card-number">{{ o.order_number }}</span>
@@ -1842,8 +1872,15 @@ input:checked + .po-toggle-slider:before {
                         <span class="po-card-badge badge-unfulfilled">Unfulfilled</span>
                     {% endif %}
                 </div>
+                <div class="po-card-vendor-row" title="{{ o.vendor_name or 'No vendor' }}">
+                    <span class="po-card-vendor-icon">🏪</span>
+                    <span class="po-card-vendor">{{ o.vendor_name or 'No vendor' }}</span>
+                </div>
                 <div class="po-card-bottom-row">
                     <span class="po-card-amount">{{ o.total_amount | currency }}</span>
+                    {% if o.order_date %}
+                    <span class="po-card-date" title="Order date: {{ o.order_date }}">{{ o.order_date | format_inflow_date }}</span>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
@@ -2663,13 +2700,13 @@ input:checked + .po-toggle-slider:before {
                 </div>
                 <div class="po-attachments-grid" id="poAttachmentsGrid">
                     {% for a in attachments %}
-                    {% set is_img = a.file_type == 'image' or (a.file_path and (a.file_path.endswith('.png') or a.file_path.endswith('.jpg') or a.file_path.endswith('.jpeg') or a.file_path.endswith('.webp'))) %}
+                    {% set is_img = a.file_type == 'image' or (a.file_path and (a.file_path.endswith('.png') or a.file_path.endswith('.jpg') or a.file_path.endswith('.jpeg') or a.file_path.endswith('.webp') or a.file_path.endswith('.gif'))) %}
                     <div class="po-attachment-card">
                         <div class="po-attachment-thumb-wrap">
                             {% if is_img %}
-                            <img src="{{ a.file_path }}" alt="" class="po-attachment-thumb-img" onclick="window.open('{{ a.file_path }}', '_blank')">
+                            <img src="{{ a.file_path }}" alt="" class="po-attachment-thumb-img" style="cursor: pointer;" onclick="openPoAttachmentPreview('{{ a.file_path }}', '{{ a.file_name|escape }}')">
                             {% else %}
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8" style="cursor: pointer;" onclick="openPoAttachmentPreview('{{ a.file_path }}', '{{ a.file_name|escape }}')">
                                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                                 <polyline points="14 2 14 8 20 8"></polyline>
                                 <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -2683,7 +2720,7 @@ input:checked + .po-toggle-slider:before {
                                 <div class="po-attachment-meta">{{ a.created_at.strftime('%b %d, %H:%M') if a.created_at else '' }}</div>
                             </div>
                             <div class="po-attachment-actions">
-                                <a href="{{ a.file_path }}" target="_blank" class="po-attachment-act-btn" style="color: #2563EB;">View</a>
+                                <a href="javascript:void(0)" onclick="openPoAttachmentPreview('{{ a.file_path }}', '{{ a.file_name|escape }}')" class="po-attachment-act-btn" style="color: #2563EB;">View</a>
                                 <button type="button" class="po-attachment-act-btn" style="color: #DC2626;" onclick="deletePoAttachment({{ order.id }}, {{ a.id }})">Delete</button>
                             </div>
                         </div>
@@ -2709,32 +2746,32 @@ input:checked + .po-toggle-slider:before {
             <h2 class="modal-title">Record Payment to Vendor</h2>
             <button class="modal-close" onclick="closePaymentModal()">✕</button>
         </div>
-        <form method="POST" action="{% if not is_new %}{{ url_for('purchase_orders.record_payment', id=order.id) }}{% endif %}">
+        <form method="POST" id="poRecordPaymentForm" action="{% if not is_new and order %}{{ url_for('purchase_orders.record_payment', id=order.id) }}{% endif %}">
             <div style="padding: 16px 20px;">
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Payment Date:</label>
-                    <input type="date" name="payment_date" class="form-control" value="{{ (order.order_date or '').strftime('%Y-%m-%d') if order.order_date else '' }}" required>
+                    <input type="date" name="payment_date" id="poPaymentDateInput" class="form-control" value="{{ (order.order_date or '').strftime('%Y-%m-%d') if (order and order.order_date) else '' }}" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Amount (USD):</label>
-                    <input type="number" step="0.01" min="0.01" name="amount" class="form-control" value="{{ order.balance_due or 0 }}" required>
+                    <input type="number" step="0.01" min="0.01" name="amount" id="poPaymentAmountInput" class="form-control" value="{{ '%.2f'|format(order.balance_due if (order and order.balance_due and order.balance_due > 0) else (order.total_amount if (order and order.total_amount) else 0)) }}" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Payment Method:</label>
-                    <select name="payment_method" class="form-control">
-                        <option value="CASH">Cash</option>
-                        <option value="BANK_TRANSFER">Bank Transfer (ABA / Prasac)</option>
-                        <option value="CHEQUE">Cheque</option>
-                        <option value="CREDIT">Vendor Credit</option>
+                    <select name="payment_method" id="poPaymentMethodSelect" class="form-control">
+                        <option value="Bank Transfer (ABA / Prasac)">Bank Transfer (ABA / Prasac)</option>
+                        <option value="Cash">Cash</option>
+                        <option value="Cheque">Cheque</option>
+                        <option value="Vendor Credit">Vendor Credit</option>
                     </select>
                 </div>
                 <div class="form-group" style="margin-bottom: 12px;">
                     <label class="form-label">Reference / Receipt #:</label>
-                    <input type="text" name="reference_no" class="form-control" placeholder="Cheque # or transfer reference">
+                    <input type="text" name="reference_no" id="poPaymentRefInput" class="form-control" placeholder="Cheque # or transfer reference">
                 </div>
                 <div class="form-group">
                     <label class="form-label">Notes:</label>
-                    <textarea name="payment_notes" class="form-control" rows="2" placeholder="Optional payment remarks..."></textarea>
+                    <textarea name="payment_notes" id="poPaymentNotesInput" class="form-control" rows="2" placeholder="Optional payment remarks..."></textarea>
                 </div>
             </div>
             <div class="modal-footer" style="padding: 12px 20px; border-top: 1px solid #E2E8F0; display: flex; justify-content: flex-end; gap: 8px;">
@@ -2742,6 +2779,21 @@ input:checked + .po-toggle-slider:before {
                 <button type="submit" class="btn btn-primary" style="background: #7A5531; border-color: #7A5531;">Record Payment</button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- PO Attachment Lightbox Modal (Same-Tab Popup) -->
+<div id="poAttachmentLightboxModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100005; align-items: center; justify-content: center; backdrop-filter: blur(4px);" onclick="closePoAttachmentPreview()">
+    <div style="position: relative; max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center;" onclick="event.stopPropagation()">
+        <img id="poLightboxImg" src="" alt="Attachment preview" style="max-width: 92vw; max-height: 82vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: none; background: #000000;">
+        <iframe id="poLightboxFrame" src="" style="width: 85vw; height: 82vh; border: none; border-radius: 8px; display: none; background: #FFFFFF;"></iframe>
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 10px; gap: 12px;">
+            <div id="poLightboxCaption" style="color: #FFFFFF; font-size: 13px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"></div>
+            <a id="poLightboxDownloadBtn" href="#" download class="btn btn-secondary btn-sm" style="background: rgba(255,255,255,0.2); color: #FFF; border: 1px solid rgba(255,255,255,0.4); text-decoration: none; padding: 4px 12px; font-size: 12px; border-radius: 4px; display: inline-flex; align-items: center; gap: 4px;">
+                ⬇ Download
+            </a>
+        </div>
+        <button type="button" onclick="closePoAttachmentPreview()" style="position: absolute; top: -14px; right: -14px; width: 32px; height: 32px; border-radius: 50%; background: #FFFFFF; color: #1E293B; font-size: 16px; font-weight: 700; border: none; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;" title="Close preview (Esc)">✕</button>
     </div>
 </div>
 
@@ -3162,12 +3214,13 @@ function filterPoSidebarOrders() {
     document.querySelectorAll('#poMasterList .po-list-card').forEach(card => {
         const num = card.dataset.orderNumber || '';
         const vendor = card.dataset.vendor || '';
+        const orderDate = card.dataset.orderDate || '';
         const vendorId = card.dataset.vendorId || '';
         const locId = card.dataset.locationId || '';
         const st = card.dataset.status || '';
 
         let match = true;
-        if (liveVal && !num.includes(liveVal) && !vendor.includes(liveVal)) {
+        if (liveVal && !num.includes(liveVal) && !vendor.includes(liveVal) && !orderDate.includes(liveVal)) {
             match = false;
         }
         if (statusVal !== 'All' && st !== statusVal) {
@@ -3248,7 +3301,7 @@ function renderPoDetailsInCanvas(order, lines, receivePct, linkedExpense) {
     else if (order.status_badge === 'Cancelled') bClass = 'badge-cancelled';
     badgeWrap.innerHTML = `<span class="po-header-badge ${bClass}">${order.status_badge}</span>`;
 
-    // Update active card badge and amount in sidebar
+    // Update active card badge, vendor, date, and amount in sidebar
     const activeCard = document.getElementById('poCard_' + order.id);
     if (activeCard) {
         activeCard.dataset.status = order.status_badge;
@@ -3259,6 +3312,11 @@ function renderPoDetailsInCanvas(order, lines, receivePct, linkedExpense) {
         }
         const cardAmt = activeCard.querySelector('.po-card-amount');
         if (cardAmt) cardAmt.innerText = formatCurrency(order.total_amount);
+        const cardVendor = activeCard.querySelector('.po-card-vendor');
+        if (cardVendor && order.vendor_name) cardVendor.innerText = order.vendor_name;
+        const cardDate = activeCard.querySelector('.po-card-date');
+        const formattedDate = order.order_date_inflow || order.order_date;
+        if (cardDate && formattedDate) cardDate.innerText = formattedDate;
     }
 
     // Dates
@@ -3290,6 +3348,32 @@ function renderPoDetailsInCanvas(order, lines, receivePct, linkedExpense) {
     document.getElementById('poPaidText').innerText = formatCurrency(order.paid_amount);
     document.getElementById('poBalanceText').innerText = formatCurrency(order.balance_due);
     document.getElementById('poPaymentTermsInput').value = order.payment_terms || 'Net 30';
+
+    // Keep hidden financial inputs in sync
+    if (document.getElementById('poBalanceDueHidden')) {
+        document.getElementById('poBalanceDueHidden').value = (order.balance_due != null ? parseFloat(order.balance_due) : 0).toFixed(4);
+    }
+    if (document.getElementById('poTotalAmountHidden')) {
+        document.getElementById('poTotalAmountHidden').value = (order.total_amount != null ? parseFloat(order.total_amount) : 0).toFixed(4);
+    }
+    if (document.getElementById('poPaidAmountHidden')) {
+        document.getElementById('poPaidAmountHidden').value = (order.paid_amount != null ? parseFloat(order.paid_amount) : 0).toFixed(4);
+    }
+
+    // Sync Payment Modal form action & auto-amount
+    const payForm = document.getElementById('poRecordPaymentForm');
+    if (payForm) payForm.action = '/purchases/' + order.id + '/pay';
+    const payAmtInput = document.getElementById('poPaymentAmountInput');
+    if (payAmtInput) {
+        const bal = parseFloat(order.balance_due || 0);
+        const tot = parseFloat(order.total_amount || 0);
+        const autoAmt = bal > 0 ? bal : (tot > 0 ? tot : 0);
+        payAmtInput.value = autoAmt > 0 ? autoAmt.toFixed(2) : '';
+    }
+    const payDateInput = document.getElementById('poPaymentDateInput');
+    if (payDateInput && order.order_date_raw) {
+        payDateInput.value = order.order_date_raw;
+    }
 
     // Update Add to Expenses Button, Financial Tag & Modal
     const topExpBtn = document.getElementById('btnPoAddToExpenses');
@@ -4290,12 +4374,13 @@ function renderAttachmentsList(atts, poId) {
 
     atts.forEach(a => {
         const isImg = a.file_type === 'image' || (/\.(png|jpe?g|webp|gif)$/i).test(a.file_path);
+        const safeName = (a.file_name || '').replace(/['"\\]/g, '');
         const card = document.createElement('div');
         card.className = 'po-attachment-card';
         card.innerHTML = `
             <div class="po-attachment-thumb-wrap">
-                ${isImg ? `<img src="${a.file_path}" alt="" class="po-attachment-thumb-img" onclick="window.open('${a.file_path}', '_blank')">` : `
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8">
+                ${isImg ? `<img src="${a.file_path}" alt="" class="po-attachment-thumb-img" style="cursor: pointer;" onclick="openPoAttachmentPreview('${a.file_path}', '${safeName}')">` : `
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.8" style="cursor: pointer;" onclick="openPoAttachmentPreview('${a.file_path}', '${safeName}')">
                         <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
                         <polyline points="14 2 14 8 20 8"></polyline>
                         <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -4309,7 +4394,7 @@ function renderAttachmentsList(atts, poId) {
                     <div class="po-attachment-meta">${a.file_size_formatted || ''} • ${a.created_at || ''}</div>
                 </div>
                 <div class="po-attachment-actions">
-                    <a href="${a.file_path}" target="_blank" class="po-attachment-act-btn" style="color: #2563EB;">View</a>
+                    <a href="javascript:void(0)" onclick="openPoAttachmentPreview('${a.file_path}', '${safeName}')" class="po-attachment-act-btn" style="color: #2563EB;">View</a>
                     <button type="button" class="po-attachment-act-btn" style="color: #DC2626;" onclick="deletePoAttachment(${poId}, ${a.id})">Delete</button>
                 </div>
             </div>
@@ -4513,9 +4598,98 @@ function showPoToast(msg) {
     }, 3500);
 }
 
-// Modals: Payment, Quick Vendor, Reorder
-function openPaymentModal() { document.getElementById('poRecordPaymentModal').style.display = 'flex'; }
+// Modals: Payment, Attachment Lightbox, Quick Vendor, Reorder
+function openPaymentModal() {
+    const poId = document.getElementById('poIdHidden')?.value;
+    if (!poId || poId === '0') {
+        alert('Please save the Purchase Order first before recording a payment.');
+        return;
+    }
+    const paymentForm = document.getElementById('poRecordPaymentForm');
+    if (paymentForm) {
+        paymentForm.action = '/purchases/' + poId + '/pay';
+    }
+
+    const amtInput = document.getElementById('poPaymentAmountInput');
+    if (amtInput) {
+        const bal = parseFloat(document.getElementById('poBalanceDueHidden')?.value || 0);
+        const tot = parseFloat(document.getElementById('poTotalAmountHidden')?.value || 0);
+        let suggested = 0;
+        if (bal > 0) {
+            suggested = bal;
+        } else if (tot > 0) {
+            suggested = tot;
+        }
+        if (suggested > 0) {
+            amtInput.value = suggested.toFixed(2);
+        }
+    }
+
+    const dateInput = document.getElementById('poPaymentDateInput');
+    if (dateInput) {
+        const orderDate = document.getElementById('poOrderDateInput')?.value;
+        dateInput.value = orderDate || new Date().toISOString().substring(0, 10);
+    }
+
+    document.getElementById('poRecordPaymentModal').style.display = 'flex';
+}
 function closePaymentModal() { document.getElementById('poRecordPaymentModal').style.display = 'none'; }
+
+function openPoAttachmentPreview(url, name) {
+    if (!url) return;
+    const modal = document.getElementById('poAttachmentLightboxModal');
+    const img = document.getElementById('poLightboxImg');
+    const frame = document.getElementById('poLightboxFrame');
+    const cap = document.getElementById('poLightboxCaption');
+    const dl = document.getElementById('poLightboxDownloadBtn');
+    if (!modal) return;
+
+    const isImg = (/\.(png|jpe?g|webp|gif|svg|bmp)(\?.*)?$/i).test(url) || url.startsWith('data:image/');
+    const isPdf = (/\.pdf(\?.*)?$/i).test(url);
+
+    if (isImg) {
+        if (img) {
+            img.src = url;
+            img.style.display = 'block';
+        }
+        if (frame) {
+            frame.src = '';
+            frame.style.display = 'none';
+        }
+    } else if (isPdf) {
+        if (img) {
+            img.src = '';
+            img.style.display = 'none';
+        }
+        if (frame) {
+            frame.src = url;
+            frame.style.display = 'block';
+        }
+    } else {
+        if (img) {
+            img.src = url;
+            img.style.display = 'block';
+        }
+        if (frame) frame.style.display = 'none';
+    }
+
+    if (cap) cap.innerText = name || 'Attachment';
+    if (dl) {
+        dl.href = url;
+        dl.setAttribute('download', name || 'attachment');
+    }
+    modal.style.display = 'flex';
+}
+
+function closePoAttachmentPreview() {
+    const modal = document.getElementById('poAttachmentLightboxModal');
+    const img = document.getElementById('poLightboxImg');
+    const frame = document.getElementById('poLightboxFrame');
+    if (img) img.src = '';
+    if (frame) frame.src = '';
+    if (modal) modal.style.display = 'none';
+}
+
 function openQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'flex'; }
 function closeQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'none'; }
 
@@ -5023,8 +5197,15 @@ function togglePoSidebarCollapse(forceState) {
     if (expandBtn) expandBtn.style.display = willCollapse ? 'inline-flex' : 'none';
 }
 
-// Shortcut Ctrl+[ to toggle PO sidebar
+// Shortcut Ctrl+[ to toggle PO sidebar, and Escape to close preview lightbox
 document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const lb = document.getElementById('poAttachmentLightboxModal');
+        if (lb && lb.style.display !== 'none') {
+            closePoAttachmentPreview();
+            return;
+        }
+    }
     if ((e.ctrlKey || e.metaKey) && (e.key === '[' || e.key === '{')) {
         const activeTag = (document.activeElement && document.activeElement.tagName) || '';
         if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
