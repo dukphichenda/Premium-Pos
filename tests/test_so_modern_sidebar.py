@@ -144,10 +144,39 @@ class TestSoModernSidebar(unittest.TestCase):
 
         # Confirm compact CSS rules are present
         self.assertIn('.so-sidebar-card {', html)
-        self.assertIn('padding: 4px 10px;', html)
+        self.assertIn('padding: 3.5px 8px;', html)
         self.assertIn('flex-wrap: nowrap;', html)
 
         # Product catalog protection: zero mutations
+        p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+        self.assertEqual(p_cnt_before, p_cnt_after)
+
+    def test_active_so_card_dark_pearl_green_and_white_details(self):
+        """Verify that the active sales order uses dark pearl green background (#0D4A3E) with crisp white detail text and smaller fonts"""
+        p_cnt_before = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # 1. Dark pearl green active background
+        self.assertIn('background: #0D4A3E !important;', html)
+
+        # 2. White text on active details
+        self.assertIn('.so-sidebar-card.active .so-card-order-num', html)
+        self.assertIn('.so-sidebar-card.active .so-card-order-date', html)
+        self.assertIn('.so-sidebar-card.active .so-card-price-pill', html)
+        self.assertIn('.so-sidebar-card.active .so-card-items-pill', html)
+        self.assertIn('.so-sidebar-card.active .so-card-cust-name', html)
+        self.assertIn('.so-sidebar-card.active .so-card-completed-pill', html)
+
+        # 3. Smaller cleaner typography
+        self.assertIn('font-size: 11px;', html)
+        self.assertIn('font-size: 9px;', html)
+        self.assertIn('font-size: 9.5px;', html)
+        self.assertIn('font-size: 8.5px;', html)
+
+        # Product catalog protection
         p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
         self.assertEqual(p_cnt_before, p_cnt_after)
 
