@@ -741,10 +741,11 @@
                 // Update DOM tab item in tab bar
                 const tabElem = document.getElementById(`tab-item-${tab.id}`);
                 if (tabElem) {
+                    const rawTitle = tab.origTitleEn || tab.label || tab.title || title || displayTitle;
                     tabElem.className = `inflow-tab-item tab-${detectedType} ${isActive ? 'active' : ''}`.trim();
                     tabElem.title = displayTitle;
                     tabElem.innerHTML = `
-                        ${getTabIconSvg(detectedType, origTitleEn || title)}
+                        ${getTabIconSvg(detectedType, rawTitle)}
                         <span class="inflow-tab-label" id="tab-label-${tab.id}">${displayTitle}</span>
                         <button type="button" class="inflow-tab-close" 
                                 onclick="window.inflowMdi.closeTab('${tab.id}', event)" title="Close tab">✕</button>

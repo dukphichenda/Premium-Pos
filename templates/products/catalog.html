@@ -1120,7 +1120,9 @@ function proceedNavigation() {
     if (window.top && window.top.inflowMdi) {
         const clean = url.split('?')[0].split('#')[0];
         if (clean.includes('/products/new')) {
-            window.top.inflowMdi.openTab(url, 'New Product', 'product');
+            window.top.inflowMdi.openTab(url, 'New Product', 'product', true);
+        } else if (clean.includes('/copy')) {
+            window.location.href = url;
         } else if (clean.includes('/products/merge-duplicates')) {
             window.top.inflowMdi.openTab(url, 'Merge Duplicates', 'product');
         } else if (clean.includes('/products/price-list')) {
@@ -1156,7 +1158,9 @@ function handleNavClick(event, url) {
         }
         const clean = url.split('?')[0].split('#')[0];
         if (clean.includes('/products/new')) {
-            window.top.inflowMdi.openTab(url, 'New Product', 'product');
+            window.top.inflowMdi.openTab(url, 'New Product', 'product', true);
+        } else if (clean.includes('/copy')) {
+            window.location.href = url;
         } else if (clean.includes('/products/merge-duplicates')) {
             window.top.inflowMdi.openTab(url, 'Merge Duplicates', 'product');
         } else if (clean.includes('/products/price-list')) {
@@ -1173,6 +1177,32 @@ function handleNavClick(event, url) {
         return false;
     }
     return true;
+}
+
+function confirmCopyProduct(event, url) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (isDirty) {
+        if (!confirm('You have unsaved changes. Do you want to discard changes and duplicate this product?')) {
+            return false;
+        }
+    } else {
+        if (!confirm('Duplicate this product with all specifications and pricing schemes?')) {
+            return false;
+        }
+    }
+    window.location.href = url;
+    return false;
+}
+
+function openAttachmentsModal() {
+    openModal('attachmentModal');
+}
+
+function closeAttachmentsModal() {
+    closeModal('attachmentModal');
 }
 
 window.handleTabCloseAttempt = function(targetUrl) {

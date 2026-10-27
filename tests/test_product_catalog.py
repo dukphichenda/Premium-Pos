@@ -227,7 +227,41 @@ class TestProductCatalog(unittest.TestCase):
         self.assertIn('rechunkCatalogPages', self.catalog_html)
         self.assertIn('categoryCardsStore', self.catalog_html)
 
+    def test_product_actions_add_copy_attachments(self):
+        """Verify Add New Product, Copy Product, and Attachments action handlers and modals."""
+        workspace_main_path = os.path.join(self.base_dir, 'templates', 'products', '_catalog_workspace_main.html')
+        workspace_modals_path = os.path.join(self.base_dir, 'templates', 'products', '_catalog_workspace_modals.html')
+        tabs_js_path = os.path.join(self.base_dir, 'static', 'js', 'inflow_tabs.js')
+
+        with open(workspace_main_path, 'r', encoding='utf-8') as f:
+            ws_main = f.read()
+        with open(workspace_modals_path, 'r', encoding='utf-8') as f:
+            ws_modals = f.read()
+        with open(self.catalog_editor_path, 'r', encoding='utf-8') as f:
+            cat_html = f.read()
+        with open(tabs_js_path, 'r', encoding='utf-8') as f:
+            tabs_js = f.read()
+
+        # 1. Attachments modal exists and is wired
+        self.assertIn('id="attachmentModal"', ws_modals)
+        self.assertIn("openAttachmentsModal()", ws_main)
+        self.assertIn("function openAttachmentsModal()", cat_html)
+        self.assertIn("upload_attachment", ws_modals)
+        self.assertIn("delete_attachment", ws_modals)
+
+        # 2. Copy product has confirmation and valid handler
+        self.assertIn('id="btnCopyProduct"', ws_main)
+        self.assertIn("confirmCopyProduct", ws_main)
+        self.assertIn("function confirmCopyProduct", cat_html)
+
+        # 3. Add new product opens with forceNew=True
+        self.assertIn("window.top.inflowMdi.openTab(url, 'New Product', 'product', true)", cat_html)
+
+        # 4. inflow_tabs.js has no undeclared origTitleEn in transformTab
+        self.assertNotIn("origTitleEn || title", tabs_js)
+
 if __name__ == '__main__':
     unittest.main()
+
 
 
