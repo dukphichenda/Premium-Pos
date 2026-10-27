@@ -51,8 +51,24 @@ class TestMobileAppSettings(unittest.TestCase):
         self.assertIn('switchSimulatorTab', html)
         self.assertIn('triggerSimCall', html)
         self.assertIn('toggleSimOrderPaid', html)
-        self.assertIn('completeSimDelivery', html)
-        self.assertIn('simulateBarcodeScan', html)
+        # Real system data assertions
+        self.assertIn('Real System Invoices', html)
+        self.assertIn('Recent Sales (Last 7 Days)', html)
+        self.assertIn('SIM_SAMPLE_PRODUCT', html)
+
+    def test_mobile_simulator_real_data(self):
+        from routes.settings import get_mobile_simulator_real_data
+        # Ensure products baseline count
+        p_cnt_before = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+        data = get_mobile_simulator_real_data()
+        self.assertIn('orders_dict', data)
+        self.assertIn('orders_list', data)
+        self.assertIn('driver_stats', data)
+        self.assertIn('recent_summary', data)
+        self.assertIn('sample_product', data)
+        self.assertTrue(isinstance(data['orders_list'], list))
+        p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+        self.assertEqual(p_cnt_before, p_cnt_after)
 
     def test_api_mobile_config(self):
         resp = self.client.get('/api/mobile-config')

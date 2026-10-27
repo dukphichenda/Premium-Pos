@@ -3116,7 +3116,7 @@
                                 <div id="mockupAppName" style="font-size: 0.90rem; font-weight: 800; line-height: 1.1; color: #FFFFFF;">
                                     {{ mobile_config.app_name or 'inFlow Premium' }}
                                 </div>
-                                <div style="font-size: 0.65rem; color: #E0E7FF; opacity: 0.9;">Main Branch (Phnom Penh)</div>
+                                <div style="font-size: 0.65rem; color: #E0E7FF; opacity: 0.9;">{{ company.name or 'Main Branch (Phnom Penh)' }}</div>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center; gap: 8px;">
@@ -3129,23 +3129,22 @@
                     <!-- Notifications Drawer Overlay -->
                     <div id="simNotifDrawer" style="display: none; position: absolute; top: 76px; left: 10px; right: 10px; background: #FFFFFF; border-radius: 12px; padding: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); border: 1px solid #E2E8F0; z-index: 50;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <strong style="font-size: 0.78rem; color: #0F172A;">🔔 Recent Notifications</strong>
+                            <strong style="font-size: 0.78rem; color: #0F172A;">🔔 Real Recent Orders</strong>
                             <button type="button" onclick="toggleSimNotifs()" style="background: none; border: none; font-size: 12px; cursor: pointer; color: #64748B;">✕</button>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 6px; font-size: 0.72rem;">
+                            {% for o in sim_delivery_orders[:2] %}
                             <div style="background: #F8FAFC; padding: 6px 8px; border-radius: 6px;">
-                                <strong>🛵 Order #SO-1092</strong> assigned to you (3m ago)
+                                <strong>🛵 Order {{ o.title }}</strong>: {{ o.client }} ({{ o.total }})
                             </div>
-                            <div style="background: #F8FAFC; padding: 6px 8px; border-radius: 6px;">
-                                <strong>💰 Payment Received</strong> $128.50 via KHQR
-                            </div>
+                            {% endfor %}
                         </div>
                     </div>
 
                     <!-- Simulator Screens Container (Scrollable) -->
                     <div id="simScreensContainer" style="flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; position: relative;">
                         
-                        <!-- 1. DELIVERIES SCREEN -->
+                        <!-- 1. DELIVERIES SCREEN (Real System Orders) -->
                         <div id="simScreen_nav_delivery" class="sim-screen" style="display: flex; flex-direction: column; gap: 10px;">
                             <!-- Task & Filter Pills Header -->
                             <div id="mockupHeroBanner" style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; align-items: center; justify-content: space-between;">
@@ -3154,169 +3153,128 @@
                                     <div style="font-size: 0.82rem; font-weight: 800; color: #0F172A;" id="mockupLandingLabel">🛵 Delivery Assignments</div>
                                 </div>
                                 <span id="mockupBadgeCount" style="background: #10B981; color: #FFFFFF; font-size: 0.70rem; font-weight: 800; padding: 2px 8px; border-radius: 12px;">
-                                    3 Orders
+                                    {{ sim_delivery_orders|length }} Orders
                                 </span>
                             </div>
 
                             <!-- Filter Pills: All / Pending / Completed -->
+                            {% set pending_orders = sim_delivery_orders|rejectattr('status', 'equalto', 'completed')|list %}
+                            {% set completed_orders = sim_delivery_orders|selectattr('status', 'equalto', 'completed')|list %}
                             <div style="display: flex; gap: 6px; font-size: 0.72rem;">
                                 <button type="button" onclick="filterSimOrders('all')" class="btn btn-sm sim-filter-pill active" id="simFilterAll" style="background: #7C3AED; color: #FFFFFF; border: none; padding: 3px 8px; border-radius: 12px; font-weight: 700;">
-                                    All (3)
+                                    All ({{ sim_delivery_orders|length }})
                                 </button>
                                 <button type="button" onclick="filterSimOrders('pending')" class="btn btn-sm sim-filter-pill" id="simFilterPending" style="background: #F1F5F9; color: #475569; border: none; padding: 3px 8px; border-radius: 12px; font-weight: 600;">
-                                    🛵 Pending (2)
+                                    🛵 Pending ({{ pending_orders|length }})
                                 </button>
                                 <button type="button" onclick="filterSimOrders('completed')" class="btn btn-sm sim-filter-pill" id="simFilterCompleted" style="background: #F1F5F9; color: #475569; border: none; padding: 3px 8px; border-radius: 12px; font-weight: 600;">
-                                    ✅ Done (1)
+                                    ✅ Done ({{ completed_orders|length }})
                                 </button>
                             </div>
 
-                            <!-- Interactive Order Card 1: Pending -->
-                            <div class="sim-order-card" id="simOrderCard_1092" data-status="pending" onclick="openSimOrderModal(1092)" style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1.5px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.15s ease;">
+                            <!-- Real Interactive Order Cards -->
+                            {% for order in sim_delivery_orders %}
+                            <div class="sim-order-card" id="simOrderCard_{{ order.id }}" data-status="{{ order.status }}" onclick="openSimOrderModal({{ order.id }})" style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1.5px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.15s ease;">
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                    <strong style="font-size: 0.80rem; color: #0F172A;">#SO-2026-1092</strong>
-                                    <span id="simStatusBadge_1092" style="background: #FEF3C7; color: #92400E; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">🛵 On Delivery</span>
+                                    <strong style="font-size: 0.80rem; color: #0F172A;">{{ order.title }}</strong>
+                                    <span id="simStatusBadge_{{ order.id }}" style="background: {% if order.status == 'completed' %}#DCFCE7{% else %}#FEF3C7{% endif %}; color: {% if order.status == 'completed' %}#166534{% else %}#92400E{% endif %}; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">
+                                        {{ order.status_label }}
+                                    </span>
                                 </div>
-                                <div style="font-size: 0.74rem; color: #334155; font-weight: 700;">Sokha Supermart</div>
-                                <div style="font-size: 0.68rem; color: #64748B;">📍 Borey Peng Huoth, Boeung Snor</div>
+                                <div style="font-size: 0.74rem; color: #334155; font-weight: 700;">{{ order.client }}</div>
+                                <div style="font-size: 0.68rem; color: #64748B;">📍 {{ order.address }}</div>
                                 
                                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #E2E8F0;">
                                     <div>
-                                        <span style="font-size: 0.84rem; font-weight: 800; color: #0F172A;">$45.00</span>
-                                        <span id="simPaidTag_1092" style="font-size: 0.62rem; color: #D97706; margin-left: 4px; font-weight: 600;">Due</span>
+                                        <span style="font-size: 0.84rem; font-weight: 800; color: #0F172A;">{{ order.total }}</span>
+                                        <span id="simPaidTag_{{ order.id }}" style="font-size: 0.62rem; color: {% if order.paid %}#059669{% else %}#D97706{% endif %}; margin-left: 4px; font-weight: {% if order.paid %}700{% else %}600{% endif %};">
+                                            {% if order.paid %}Paid KHQR ✓{% else %}Due{% endif %}
+                                        </span>
                                     </div>
                                     <div style="display: flex; gap: 4px;">
-                                        <button type="button" onclick="event.stopPropagation(); triggerSimCall('Sokha Supermart', '+855 12 345 678')" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 8px; display: inline-flex; align-items: center; gap: 2px; cursor: pointer;">
+                                        <button type="button" onclick="event.stopPropagation(); triggerSimCall('{{ order.client|replace('\'', '\\\'') }}', '{{ order.phone }}')" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 8px; display: inline-flex; align-items: center; gap: 2px; cursor: pointer;">
                                             📞 Call
                                         </button>
-                                        <button type="button" onclick="event.stopPropagation(); toggleSimOrderPaid(1092)" style="background: #F8FAFC; color: #334155; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 7px; cursor: pointer;">
+                                        <button type="button" onclick="event.stopPropagation(); toggleSimOrderPaid({{ order.id }})" style="background: #F8FAFC; color: #334155; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 7px; cursor: pointer;">
                                             ⚡ Pay
                                         </button>
                                     </div>
                                 </div>
                             </div>
-
-                            <!-- Interactive Order Card 2: Completed -->
-                            <div class="sim-order-card" id="simOrderCard_1093" data-status="completed" onclick="openSimOrderModal(1093)" style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1.5px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.15s ease;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                    <strong style="font-size: 0.80rem; color: #0F172A;">#SO-2026-1093</strong>
-                                    <span id="simStatusBadge_1093" style="background: #DCFCE7; color: #166534; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">✅ Completed</span>
-                                </div>
-                                <div style="font-size: 0.74rem; color: #334155; font-weight: 700;">Angkor Pharmacy</div>
-                                <div style="font-size: 0.68rem; color: #64748B;">📍 Toul Kork St. 315</div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #E2E8F0;">
-                                    <div>
-                                        <span style="font-size: 0.84rem; font-weight: 800; color: #0F172A;">$128.50</span>
-                                        <span id="simPaidTag_1093" style="font-size: 0.62rem; color: #059669; margin-left: 4px; font-weight: 700;">Paid KHQR ✓</span>
-                                    </div>
-                                    <div style="display: flex; gap: 4px;">
-                                        <button type="button" onclick="event.stopPropagation(); triggerSimCall('Angkor Pharmacy', '+855 23 999 444')" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 8px; display: inline-flex; align-items: center; gap: 2px; cursor: pointer;">
-                                            📞 Call
-                                        </button>
-                                        <button type="button" onclick="event.stopPropagation(); toggleSimOrderPaid(1093)" style="background: #F8FAFC; color: #334155; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 7px; cursor: pointer;">
-                                            ⚡ Pay
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Interactive Order Card 3: Pending -->
-                            <div class="sim-order-card" id="simOrderCard_1094" data-status="pending" onclick="openSimOrderModal(1094)" style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1.5px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.15s ease;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                                    <strong style="font-size: 0.80rem; color: #0F172A;">#SO-2026-1094</strong>
-                                    <span id="simStatusBadge_1094" style="background: #FEF3C7; color: #92400E; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 4px;">🛵 On Delivery</span>
-                                </div>
-                                <div style="font-size: 0.74rem; color: #334155; font-weight: 700;">Bayon Bakery &amp; Cafe</div>
-                                <div style="font-size: 0.68rem; color: #64748B;">📍 BKK1 St. 282</div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px; padding-top: 6px; border-top: 1px dashed #E2E8F0;">
-                                    <div>
-                                        <span style="font-size: 0.84rem; font-weight: 800; color: #0F172A;">$34.00</span>
-                                        <span id="simPaidTag_1094" style="font-size: 0.62rem; color: #D97706; margin-left: 4px; font-weight: 600;">Due</span>
-                                    </div>
-                                    <div style="display: flex; gap: 4px;">
-                                        <button type="button" onclick="event.stopPropagation(); triggerSimCall('Bayon Bakery', '+855 23 888 123')" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 8px; display: inline-flex; align-items: center; gap: 2px; cursor: pointer;">
-                                            📞 Call
-                                        </button>
-                                        <button type="button" onclick="event.stopPropagation(); toggleSimOrderPaid(1094)" style="background: #F8FAFC; color: #334155; border: 1px solid #CBD5E1; border-radius: 6px; font-size: 0.66rem; font-weight: 700; padding: 3px 7px; cursor: pointer;">
-                                            ⚡ Pay
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            {% endfor %}
                         </div>
 
-                        <!-- 2. ORDERS SCREEN -->
+                        <!-- 2. ORDERS SCREEN (Real Invoices) -->
                         <div id="simScreen_nav_orders" class="sim-screen" style="display: none; flex-direction: column; gap: 10px;">
                             <div style="position: relative;">
-                                <input type="text" placeholder="🔍 Search orders..." style="width: 100%; box-sizing: border-box; padding: 7px 10px; font-size: 0.76rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+                                <input type="text" id="simOrderSearchInput" oninput="searchSimOrders(this.value)" placeholder="🔍 Search real orders &amp; invoices..." style="width: 100%; box-sizing: border-box; padding: 7px 10px; font-size: 0.76rem; border-radius: 8px; border: 1px solid #CBD5E1;">
                             </div>
                             <div style="display: flex; justify-content: space-between; align-items: center;">
-                                <strong style="font-size: 0.82rem; color: #0F172A;">Sales Invoices</strong>
-                                <span style="font-size: 0.68rem; color: #64748B;">Showing 3 orders</span>
+                                <strong style="font-size: 0.82rem; color: #0F172A;">Real System Invoices</strong>
+                                <span style="font-size: 0.68rem; color: #64748B;">Showing {{ sim_delivery_orders|length }} orders</span>
                             </div>
-                            <div style="background: #FFFFFF; border-radius: 8px; padding: 8px 10px; border: 1px solid #E2E8F0; font-size: 0.74rem;">
-                                <div style="display: flex; justify-content: space-between;">
-                                    <strong>#SO-1095</strong>
-                                    <span style="color: #059669; font-weight: 700;">$240.00</span>
+                            <div id="simOrdersListContainer" style="display: flex; flex-direction: column; gap: 6px;">
+                                {% for order in sim_delivery_orders %}
+                                <div class="sim-invoice-row" onclick="openSimOrderModal({{ order.id }})" style="background: #FFFFFF; border-radius: 8px; padding: 8px 10px; border: 1px solid #E2E8F0; font-size: 0.74rem; cursor: pointer; transition: background 0.15s ease;">
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <strong style="color: #0F172A;">{{ order.title }}</strong>
+                                        <span style="color: #059669; font-weight: 700;">{{ order.total }}</span>
+                                    </div>
+                                    <div style="display: flex; justify-content: space-between; color: #64748B; font-size: 0.68rem; margin-top: 2px;">
+                                        <span>{{ order.client }}</span>
+                                        <span>{{ order.order_date }}</span>
+                                    </div>
                                 </div>
-                                <div style="color: #64748B; font-size: 0.68rem;">Sok Heng Mart • Today 11:20 AM</div>
+                                {% endfor %}
                             </div>
-                            <div style="background: #FFFFFF; border-radius: 8px; padding: 8px 10px; border: 1px solid #E2E8F0; font-size: 0.74rem;">
-                                <div style="display: flex; justify-content: space-between;">
-                                    <strong>#SO-1094</strong>
-                                    <span style="color: #059669; font-weight: 700;">$34.00</span>
-                                </div>
-                                <div style="color: #64748B; font-size: 0.68rem;">Bayon Bakery • Today 10:45 AM</div>
-                            </div>
-                            <button type="button" onclick="showSimToast('📝 Creating new order...')" style="background: #7C3AED; color: #FFFFFF; border: none; padding: 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer;">
+                            <a href="/sales/new" target="_blank" style="text-align: center; background: #7C3AED; color: #FFFFFF; border: none; padding: 8px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; text-decoration: none; display: block;">
                                 + Create New Sales Order
-                            </button>
+                            </a>
                         </div>
 
-                        <!-- 3. REPORTS SCREEN -->
+                        <!-- 3. REPORTS SCREEN (Real System Stats) -->
                         <div id="simScreen_nav_reports" class="sim-screen" style="display: none; flex-direction: column; gap: 10px;">
                             <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0; text-align: center;">
-                                <span style="font-size: 0.68rem; color: #64748B; text-transform: uppercase; font-weight: 700;">Driver Earnings Today</span>
-                                <div style="font-size: 1.4rem; font-weight: 800; color: #059669; margin: 4px 0;">$38.50</div>
-                                <span style="font-size: 0.72rem; color: #475569;">14 Completed Deliveries</span>
+                                <span style="font-size: 0.68rem; color: #64748B; text-transform: uppercase; font-weight: 700;">Recent Sales (Last 7 Days)</span>
+                                <div style="font-size: 1.4rem; font-weight: 800; color: #059669; margin: 4px 0;">{{ sim_recent_summary.total_rev }}</div>
+                                <span style="font-size: 0.72rem; color: #475569;">{{ sim_recent_summary.orders_count }} Completed Orders in System</span>
                             </div>
                             <div style="background: #FFFFFF; border-radius: 10px; padding: 10px; border: 1px solid #E2E8F0; font-size: 0.72rem;">
-                                <strong style="display: block; margin-bottom: 6px; color: #0F172A;">Per-Driver Breakdown:</strong>
-                                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #F1F5F9;">
-                                    <span>🛵 Sokha (8 orders)</span>
-                                    <strong>$18.00</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #F1F5F9;">
-                                    <span>🛵 Dara (5 orders)</span>
-                                    <strong>$12.50</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                                    <span>🛵 Vicheka (3 orders)</span>
-                                    <strong>$8.00</strong>
-                                </div>
+                                <strong style="display: block; margin-bottom: 6px; color: #0F172A;">Per-Driver Assignment Breakdown:</strong>
+                                {% if sim_driver_stats %}
+                                    {% for d in sim_driver_stats %}
+                                    <div style="display: flex; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid #F1F5F9;">
+                                        <span>🛵 {{ d.name }} ({{ d.count }} orders)</span>
+                                        <strong>{{ d.revenue }}</strong>
+                                    </div>
+                                    {% endfor %}
+                                {% else %}
+                                    <div style="color: #64748B; padding: 6px 0; text-align: center;">No driver assignment records yet.</div>
+                                {% endif %}
                             </div>
                         </div>
 
-                        <!-- 4. SCANNER SCREEN -->
+                        <!-- 4. SCANNER SCREEN (Real System SKU) -->
                         <div id="simScreen_nav_scanner" class="sim-screen" style="display: none; flex-direction: column; gap: 10px;">
-                            <div style="background: #0F172A; border-radius: 10px; height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; color: #FFFFFF;">
+                            <div style="background: #0F172A; border-radius: 10px; height: 260px; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; overflow: hidden; color: #FFFFFF; text-align: center; padding: 10px;">
                                 <!-- Target Reticle -->
-                                <div style="width: 140px; height: 140px; border: 2px dashed #10B981; border-radius: 12px; position: relative;">
+                                <div style="width: 140px; height: 140px; border: 2px dashed #10B981; border-radius: 12px; position: relative; margin: 0 auto;">
                                     <!-- Animated Laser Line -->
                                     <div class="sim-scanner-laser"></div>
                                 </div>
-                                <span style="font-size: 0.68rem; color: #94A3B8; margin-top: 12px;">Align barcode or KHQR inside frame</span>
+                                <span style="font-size: 0.68rem; color: #94A3B8; margin-top: 10px;">Align barcode or KHQR inside frame</span>
+                                <span style="font-size: 0.66rem; color: #34D399; font-weight: 600; margin-top: 3px;">Catalog SKU: {{ sim_sample_product.sku }}</span>
                             </div>
                             <button type="button" onclick="simulateBarcodeScan()" style="background: #10B981; color: #FFFFFF; border: none; padding: 9px; border-radius: 6px; font-size: 0.74rem; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                                ⚡ Simulate Barcode Scan
+                                ⚡ Scan Real Product ({{ sim_sample_product.sku }})
                             </button>
                         </div>
 
-                        <!-- 5. SETTINGS SCREEN -->
+                        <!-- 5. SETTINGS SCREEN (Real Staff Info) -->
                         <div id="simScreen_nav_more" class="sim-screen" style="display: none; flex-direction: column; gap: 10px;">
                             <div style="background: #FFFFFF; border-radius: 10px; padding: 12px; border: 1px solid #E2E8F0; font-size: 0.74rem;">
-                                <div style="font-weight: 700; color: #0F172A; margin-bottom: 4px;">Staff Profile: Sokha (Driver)</div>
-                                <div style="color: #64748B; font-size: 0.68rem;">Main Branch • inFlow v1.0.0</div>
+                                <div style="font-weight: 700; color: #0F172A; margin-bottom: 4px;">Staff Profile: {{ session.get('username') or 'admin' }} (Active)</div>
+                                <div style="color: #64748B; font-size: 0.68rem;">{{ company.name or 'inFlow Premium' }} • Official v1.0.0</div>
                             </div>
                             <div style="background: #FFFFFF; border-radius: 10px; padding: 10px 12px; border: 1px solid #E2E8F0; font-size: 0.74rem; display: flex; justify-content: space-between; align-items: center;">
                                 <span>🔊 Audio Beep Feedback</span>
@@ -5884,56 +5842,8 @@ window.simCallInterval = null;
 window.simCallSeconds = 0;
 window.simToastTimeout = null;
 
-const SIM_ORDERS = {
-    1092: {
-        id: 1092,
-        title: '#SO-2026-1092',
-        client: 'Sokha Supermart',
-        phone: '+855 12 345 678',
-        address: 'Borey Peng Huoth, Boeung Snor',
-        note: 'Deliver before 11:30 AM',
-        items: [
-            { name: '2x Coca Cola 330ml', price: '$3.00' },
-            { name: '1x Jasmine Premium Rice 5kg', price: '$12.00' },
-            { name: '3x Evian Mineral Water 1.5L', price: '$9.00' },
-            { name: '1x Cooking Oil 5L', price: '$21.00' }
-        ],
-        total: '$45.00',
-        paid: false,
-        status: 'pending'
-    },
-    1093: {
-        id: 1093,
-        title: '#SO-2026-1093',
-        client: 'Angkor Pharmacy',
-        phone: '+855 23 999 444',
-        address: 'Toul Kork St. 315',
-        note: 'Call upon arrival at pharmacy reception',
-        items: [
-            { name: '5x Sanitizer Gel 500ml', price: '$25.00' },
-            { name: '10x Medical Face Masks 50pcs', price: '$40.00' },
-            { name: '4x First Aid Emergency Kit', price: '$63.50' }
-        ],
-        total: '$128.50',
-        paid: true,
-        status: 'completed'
-    },
-    1094: {
-        id: 1094,
-        title: '#SO-2026-1094',
-        client: 'Bayon Bakery & Cafe',
-        phone: '+855 23 888 123',
-        address: 'BKK1 St. 282',
-        note: 'Backdoor delivery into kitchen storage',
-        items: [
-            { name: '2x Premium Bread Flour 10kg', price: '$22.00' },
-            { name: '4x Unsalted Butter 250g', price: '$12.00' }
-        ],
-        total: '$34.00',
-        paid: false,
-        status: 'pending'
-    }
-};
+const SIM_ORDERS = {{ sim_orders_json | safe }};
+const SIM_SAMPLE_PRODUCT = {{ sim_sample_product_json | safe }};
 
 function setSimulatorMode(mode) {
     const screensContainer = document.getElementById('simScreensContainer');
@@ -5991,6 +5901,15 @@ function switchSimulatorTab(tabId) {
     updateMobileAppPreview();
 }
 
+function searchSimOrders(query) {
+    query = (query || '').toLowerCase().trim();
+    const rows = document.querySelectorAll('.sim-invoice-row');
+    rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = (!query || text.includes(query)) ? 'block' : 'none';
+    });
+}
+
 function filterSimOrders(status) {
     ['simFilterAll', 'simFilterPending', 'simFilterCompleted'].forEach(id => {
         const btn = document.getElementById(id);
@@ -6009,7 +5928,7 @@ function filterSimOrders(status) {
         activeBtn.style.fontWeight = '700';
     }
 
-    [1092, 1093, 1094].forEach(id => {
+    Object.keys(SIM_ORDERS).forEach(id => {
         const card = document.getElementById(`simOrderCard_${id}`);
         const order = SIM_ORDERS[id];
         if (card && order) {
@@ -6046,14 +5965,23 @@ function openSimOrderModal(orderId) {
     const itemsContainer = modal.querySelector('div[style*="border-top: 1px solid #F1F5F9"]');
     if (itemsContainer) {
         let itemsHtml = '';
-        order.items.forEach(it => {
+        if (order.items && order.items.length) {
+            order.items.forEach(it => {
+                itemsHtml += `
+                    <div style="display: flex; justify-content: space-between; color: #64748B; margin-bottom: 2px;">
+                        <span>${it.name}</span>
+                        <span>${it.price}</span>
+                    </div>
+                `;
+            });
+        } else {
             itemsHtml += `
                 <div style="display: flex; justify-content: space-between; color: #64748B; margin-bottom: 2px;">
-                    <span>${it.name}</span>
-                    <span>${it.price}</span>
+                    <span>1x Order Items</span>
+                    <span>${order.total}</span>
                 </div>
             `;
-        });
+        }
         itemsHtml += `
             <div style="display: flex; justify-content: space-between; font-weight: 800; color: #0F172A; margin-top: 4px; padding-top: 4px; border-top: 1px dashed #E2E8F0;">
                 <span>Total Payable</span>
@@ -6064,10 +5992,11 @@ function openSimOrderModal(orderId) {
     }
 
     // Action buttons inside modal
+    const safeClient = (order.client || '').replace(/'/g, "\\'");
     const btnGrid = modal.querySelector('div[style*="grid-template-columns"]');
     if (btnGrid) {
         btnGrid.innerHTML = `
-            <button type="button" onclick="triggerSimCall('${order.client}', '${order.phone}')" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.70rem; font-weight: 700; padding: 7px; cursor: pointer;">
+            <button type="button" onclick="triggerSimCall('${safeClient}', '${order.phone}')" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.70rem; font-weight: 700; padding: 7px; cursor: pointer;">
                 📞 Call Client
             </button>
             <button type="button" onclick="toggleSimOrderPaid(${order.id}); closeSimOrderModal();" style="background: #F59E0B; color: #FFFFFF; border: none; border-radius: 6px; font-size: 0.70rem; font-weight: 700; padding: 7px; cursor: pointer;">
@@ -6131,15 +6060,15 @@ function toggleSimOrderPaid(orderId) {
             tag.textContent = 'Paid KHQR ✓';
             tag.style.color = '#059669';
             tag.style.fontWeight = '700';
-            showSimToast(`💰 Order #${orderId} marked Paid KHQR ✓`);
+            showSimToast(`💰 Order #${order.title} marked Paid KHQR ✓`);
         } else {
             tag.textContent = 'Due';
             tag.style.color = '#D97706';
             tag.style.fontWeight = '600';
-            showSimToast(`⚠️ Order #${orderId} marked Due`);
+            showSimToast(`⚠️ Order #${order.title} marked Due`);
         }
     } else {
-        showSimToast(`💰 Order #${orderId} payment updated`);
+        showSimToast(`💰 Order #${order.title} payment updated`);
     }
 }
 
@@ -6169,7 +6098,8 @@ function completeSimDelivery(orderId) {
 
     // Update pending badge count
     let pendingCount = 0;
-    Object.values(SIM_ORDERS).forEach(o => {
+    const allOrders = Object.values(SIM_ORDERS);
+    allOrders.forEach(o => {
         if (o.status !== 'completed') pendingCount++;
     });
     const badgeCount = document.getElementById('mockupBadgeCount');
@@ -6180,9 +6110,9 @@ function completeSimDelivery(orderId) {
     const filterPending = document.getElementById('simFilterPending');
     const filterCompleted = document.getElementById('simFilterCompleted');
     if (filterPending) filterPending.textContent = `🛵 Pending (${pendingCount})`;
-    if (filterCompleted) filterCompleted.textContent = `✅ Done (${3 - pendingCount})`;
+    if (filterCompleted) filterCompleted.textContent = `✅ Done (${allOrders.length - pendingCount})`;
 
-    showSimToast(`🛵 Order #${orderId} Delivered!`);
+    showSimToast(`🛵 Order ${order.title} Delivered!`);
 }
 
 function simulateBarcodeScan() {
@@ -6197,7 +6127,10 @@ function simulateBarcodeScan() {
             }, 300);
         }
     }
-    showSimToast('📷 Scanned: Jasmine Rice 5kg ($12.00) Added!');
+    const pSku = (SIM_SAMPLE_PRODUCT && SIM_SAMPLE_PRODUCT.sku) || 'SKU';
+    const pName = (SIM_SAMPLE_PRODUCT && SIM_SAMPLE_PRODUCT.name) || 'Store Product';
+    const pPrice = (SIM_SAMPLE_PRODUCT && SIM_SAMPLE_PRODUCT.price) || '$0.00';
+    showSimToast(`📷 Scanned: [${pSku}] ${pName} (${pPrice}) Added!`);
 }
 
 function toggleSimNotifs() {

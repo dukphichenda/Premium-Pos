@@ -48,10 +48,154 @@ def get_mobile_app_config():
             saved = json.loads(row['setting_value'])
             cfg = dict(DEFAULT_MOBILE_CONFIG)
             cfg.update(saved)
-            return cfg
     except Exception as e:
         logger.warning(f"Error fetching mobile_app_config: {e}")
     return dict(DEFAULT_MOBILE_CONFIG)
+
+
+def get_mobile_simulator_real_data():
+    """
+    Fetches real system data from PostgreSQL database to populate the live Android simulator:
+    - Real sales orders / delivery assignments
+    - Real customer names, real phone numbers, real addresses, notes
+    - Real line items with product names, quantities, and prices
+    - Real sales invoices list for Orders view
+    - Real driver stats & revenue for Reports view
+    - Real product SKU/name for Scanner view
+    """
+    try:
+        orders_raw = query_all("""
+            SELECT so.id, so.order_number, 
+                   COALESCE(c.name, so.customer_contact, 'Customer #' || so.customer_id, 'Walk-in Customer') as customer_name,
+                   COALESCE(so.customer_phone, c.phone, '') as customer_phone,
+                   COALESCE(so.customer_address, c.address1, c.city, '') as customer_address,
+                   COALESCE(so.total_amount, 0) as total_amount,
+                   COALESCE(so.paid_amount, 0) as paid_amount,
+                   COALESCE(so.balance_due, 0) as balance_due,
+                   COALESCE(so.status, 'OPEN') as status,
+                   COALESCE(so.payment_status, 'UNPAID') as payment_status,
+                   COALESCE(so.delivery_man, '') as delivery_person,
+                   COALESCE(so.delivery_notes, so.notes, '') as notes,
+                   so.order_date
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            ORDER BY so.id DESC
+            LIMIT 8
+        """)
+        
+        oids = [o['id'] for o in orders_raw]
+        order_lines = {}
+        if oids:
+            placeholders = ','.join(['%s'] * len(oids))
+            lines_raw = query_all(f"""
+                SELECT sol.sales_order_id, 
+                       COALESCE(p.name, sol.description, 'Item') as product_name,
+                       sol.quantity, sol.unit_price, sol.subtotal
+                FROM sales_order_lines sol
+                LEFT JOIN products p ON sol.product_id = p.id
+                WHERE sol.sales_order_id IN ({placeholders})
+                ORDER BY sol.id ASC
+            """, tuple(oids))
+            for l in lines_raw:
+                order_lines.setdefault(l['sales_order_id'], []).append(l)
+
+        sim_orders_dict = {}
+        sim_orders_list = []
+        for o in orders_raw:
+            oid = o['id']
+            items_list = []
+            for l in order_lines.get(oid, []):
+                qty = float(l['quantity']) if l['quantity'] is not None else 1.0
+                price = float(l['unit_price']) if l['unit_price'] is not None else 0.0
+                qty_str = f"{int(qty)}x" if qty.is_integer() else f"{qty:.2f}x"
+                items_list.append({
+                    "name": f"{qty_str} {l['product_name']}",
+                    "price": f"${price:.2f}"
+                })
+            if not items_list:
+                items_list.append({
+                    "name": "1x Order Package",
+                    "price": f"${float(o['total_amount']):.2f}"
+                })
+            
+            is_paid = (str(o['payment_status']).upper() in ('PAID', 'SETTLED'))
+            status_code = 'completed' if (str(o['status']).upper() in ('COMPLETED', 'DELIVERED', 'PAID') or is_paid) else 'pending'
+            status_label = '✅ Completed' if status_code == 'completed' else '🛵 On Delivery'
+
+            order_data = {
+                "id": oid,
+                "title": f"#{o['order_number']}",
+                "client": o['customer_name'] or 'General Customer',
+                "phone": o['customer_phone'] or 'N/A',
+                "address": o['customer_address'] or 'Phnom Penh, Cambodia',
+                "note": o['notes'] or 'Standard delivery',
+                "items": items_list,
+                "total": f"${float(o['total_amount']):.2f}",
+                "paid": is_paid,
+                "status": status_code,
+                "status_label": status_label,
+                "delivery_person": o['delivery_person'] or 'Unassigned',
+                "order_date": str(o['order_date'] or '')
+            }
+            sim_orders_dict[oid] = order_data
+            sim_orders_list.append(order_data)
+
+        # Real Driver Stats for Reports tab
+        driver_stats = query_all("""
+            SELECT delivery_man, COUNT(*) as cnt, COALESCE(SUM(total_amount), 0) as total_rev
+            FROM sales_orders
+            WHERE delivery_man IS NOT NULL AND delivery_man != ''
+            GROUP BY delivery_man
+            ORDER BY cnt DESC
+            LIMIT 5
+        """)
+        
+        # Summary totals for last 7 days / today
+        recent_summary = query_one("""
+            SELECT COUNT(*) as orders_count, COALESCE(SUM(total_amount), 0) as total_rev
+            FROM sales_orders
+            WHERE order_date >= CURRENT_DATE - INTERVAL '7 days'
+        """)
+        
+        # Real product for scanner simulation
+        sample_prod = query_one("""
+            SELECT id, sku, name, default_price
+            FROM products
+            WHERE is_active = TRUE AND sku IS NOT NULL AND sku != ''
+            ORDER BY id DESC
+            LIMIT 1
+        """)
+        sample_prod_data = {
+            "sku": sample_prod['sku'] if sample_prod else '88471928',
+            "name": sample_prod['name'] if sample_prod else 'Jasmine Rice 5kg',
+            "price": f"${float(sample_prod['default_price'] or 0):.2f}" if sample_prod else '$12.00'
+        }
+
+        return {
+            "orders_dict": sim_orders_dict,
+            "orders_list": sim_orders_list,
+            "driver_stats": [
+                {
+                    "name": d['delivery_man'],
+                    "count": int(d['cnt']),
+                    "revenue": f"${float(d['total_rev']):.2f}"
+                } for d in driver_stats
+            ],
+            "recent_summary": {
+                "orders_count": int(recent_summary['orders_count']) if recent_summary else len(sim_orders_list),
+                "total_rev": f"${float(recent_summary['total_rev']):.2f}" if recent_summary else "$0.00"
+            },
+            "sample_product": sample_prod_data
+        }
+    except Exception as e:
+        logger.error(f"Error fetching mobile simulator real data: {e}", exc_info=True)
+        return {
+            "orders_dict": {},
+            "orders_list": [],
+            "driver_stats": [],
+            "recent_summary": {"orders_count": 0, "total_rev": "$0.00"},
+            "sample_product": {"sku": "POS-ITEM", "name": "Standard Store Product", "price": "$10.00"}
+        }
 
 
 def get_invoice_settings():
@@ -151,6 +295,7 @@ def general_settings():
 
     active_tab = request.args.get('tab', 'tabCompany')
     mobile_config = get_mobile_app_config()
+    mobile_sim_data = get_mobile_simulator_real_data()
 
     return render_template('settings/general.html',
                            company=company,
@@ -172,6 +317,13 @@ def general_settings():
                            latest_backup=latest_backup,
                            active_tab=active_tab,
                            mobile_config=mobile_config,
+                           mobile_sim_data=mobile_sim_data,
+                           sim_delivery_orders=mobile_sim_data.get('orders_list', []),
+                           sim_orders_json=json.dumps(mobile_sim_data.get('orders_dict', {})),
+                           sim_driver_stats=mobile_sim_data.get('driver_stats', []),
+                           sim_recent_summary=mobile_sim_data.get('recent_summary', {}),
+                           sim_sample_product=mobile_sim_data.get('sample_product', {}),
+                           sim_sample_product_json=json.dumps(mobile_sim_data.get('sample_product', {})),
                            is_linux_server=(os.name != 'nt'))
 
 @settings_bp.route('/settings/mobile-app/update', methods=['POST'])
