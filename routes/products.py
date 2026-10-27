@@ -3946,7 +3946,14 @@ def product_catalog_view():
             'description': (prod.get('description') or '').strip(),
             'primary_detail': primary_detail,
             'uom': prod.get('uom') or '',
-            'barcode': prod.get('barcode') or ''
+            'barcode': prod.get('barcode') or '',
+            'packs_per_case': prod.get('packs_per_case') or None,
+            'pcs_per_pack': prod.get('pcs_per_pack') or None,
+            'card_unit': prod.get('price_card_unit') or prod.get('uom') or 'ប្រអប់',
+            'custom_detail': (prod.get('price_card_custom_detail') or '').strip(),
+            'capacity': (prod.get('capacity') or '').strip(),
+            'material': (prod.get('material') or '').strip(),
+            'brand': (prod.get('brand') or '').strip()
         }
         all_items.append(item)
 
@@ -3994,13 +4001,19 @@ def product_catalog_view():
         cat['a4_pages'] = a4_pages
         cat['spreads'] = a4_pages  # maintain backwards compatibility
 
+    inv_settings = query_one("""
+        SELECT shop_name_kh, shop_name_en, phone, email, logo_url, qr_code_url 
+        FROM invoice_settings LIMIT 1
+    """) or {}
+
     return render_template('products/product_catalog.html',
                            categories=arranged_categories,
                            all_items=all_items,
                            total_products=len(all_items),
                            cols=cols,
                            rows=rows,
-                           chunk_size=chunk_size)
+                           chunk_size=chunk_size,
+                           inv_settings=inv_settings)
 
 DEFAULT_PRICE_CARD_UNITS = ['ប្រអប់', 'គូរ', 'បេ', 'ឈុត', 'កែវ', 'សម']
 

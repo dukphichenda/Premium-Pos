@@ -88,7 +88,45 @@ class TestProductCatalog(unittest.TestCase):
         self.assertIn('id="catalogSearchInput"', self.catalog_html)
         self.assertIn('class="catalog-categories-bar"', self.catalog_html)
         self.assertIn('switchCatalogView', self.catalog_html)
-        self.assertIn('window.print()', self.catalog_html)
+        self.assertIn('exportCatalogA4Pdf', self.catalog_html)
+
+    def test_card_mode_styles_branding_and_facebook_export(self):
+        """Verify Card Mode: style selection, shop logo & phone branding box, and Facebook JPG export."""
+        # 1. Card Mode Button and Switcher
+        self.assertIn('Card Mode', self.catalog_html)
+        self.assertIn('id="btnViewGrid"', self.catalog_html)
+        self.assertIn('id="catCardControls"', self.catalog_html)
+
+        # 2. Card Style Options (Modern, Classic, Cute Look, Gen Z)
+        self.assertIn('id="catCardStyleSelect"', self.catalog_html)
+        self.assertIn('value="modern"', self.catalog_html)
+        self.assertIn('value="classic"', self.catalog_html)
+        self.assertIn('value="cute"', self.catalog_html)
+        self.assertIn('value="gen_z"', self.catalog_html)
+        self.assertIn('onCardStyleChange', self.catalog_html)
+        self.assertIn('renderAllCardModeProducts', self.catalog_html)
+
+        # 3. Shop Branding Modal (Logo & Phone)
+        self.assertIn('id="catalogBrandingModal"', self.catalog_html)
+        self.assertIn('id="brandLogoUrlInput"', self.catalog_html)
+        self.assertIn('id="brandShopNameKh"', self.catalog_html)
+        self.assertIn('id="brandShopNameEn"', self.catalog_html)
+        self.assertIn('id="brandPhone"', self.catalog_html)
+        self.assertIn('openCatalogBrandingModal', self.catalog_html)
+        self.assertIn('saveCatalogBranding', self.catalog_html)
+
+        # 4. Branding Box on each card
+        self.assertIn('cat-card-brand-box', self.catalog_html)
+        self.assertIn('cat-brand-phone-pill', self.catalog_html)
+        self.assertIn('cat-brand-logo-frame', self.catalog_html)
+        self.assertIn('cat-dyn-phone', self.catalog_html)
+
+        # 5. Facebook JPG Export (Single and Batch ZIP)
+        self.assertIn('exportSingleCardJpg', self.catalog_html)
+        self.assertIn('exportSelectedCardsZip', self.catalog_html)
+        self.assertIn('exportVisibleCardsZip', self.catalog_html)
+        self.assertIn('id="catBatchExportModal"', self.catalog_html)
+        self.assertIn('id="catBatchExportStage"', self.catalog_html)
 
     def test_khmer_category_and_collection_title(self):
         """Verify Khmer category mapping and collection title banner."""
@@ -191,4 +229,5 @@ class TestProductCatalog(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
 
