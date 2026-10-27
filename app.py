@@ -196,7 +196,7 @@ def create_app():
         # Public endpoints and static assets
         if request.endpoint in ('static', 'health_check', 'auth.login', 'auth.logout', 'auth.quick_login', 'download_app_page'):
             return None
-        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language') or request.path.startswith('/download') or request.path.startswith('/app'):
+        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language') or request.path.startswith('/download') or request.path.startswith('/app') or request.path.startswith('/api/mobile-config'):
             return None
 
         # Allow public direct print for sales orders with valid share token
