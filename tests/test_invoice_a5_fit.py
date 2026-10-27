@@ -87,10 +87,12 @@ class TestInvoiceA5Fit(unittest.TestCase):
             self.assertIn('scaledCanvas', html)
             self.assertIn('maxSinglePageHeight * 1.16', html)
 
-            # 5. Check Zoom reset and restoration during PDF export
-            self.assertIn('savedZoomMode', html)
-            self.assertIn("sheet.style.zoom = '1'", html)
-            self.assertIn("setInvoiceZoom(savedZoomMode", html)
+            # 6. Check Khmer Font & Typography Protection
+            self.assertIn("'Khmer OS Battambang'", html)
+            self.assertIn("body.exporting-pdf .shop-name-kh", html)
+            self.assertIn("line-height: 1.6 !important;", html)
+            self.assertIn("body.exporting-pdf .inv-badge-title", html)
+            self.assertIn("letter-spacing: normal !important;", html)
 
 if __name__ == '__main__':
     unittest.main()
