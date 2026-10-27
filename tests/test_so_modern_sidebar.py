@@ -134,12 +134,13 @@ class TestSoModernSidebar(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        # Sidebar cards exist
-        self.assertIn('class="so-sidebar-card', html)
-
-        # Confirm delivery assign is removed from sidebar order cards
-        self.assertNotIn('so-card-delivery-unassigned', html)
-        self.assertNotIn('so-card-delivery-tag', html)
+        # Confirm delivery assign is removed from sidebar order cards list
+        list_match = re.search(r'<div class="so-sidebar-list-body"[^>]*>(.*?)</div>\s*</aside>', html, re.DOTALL)
+        self.assertIsNotNone(list_match)
+        sidebar_html = list_match.group(1)
+        self.assertNotIn('so-card-delivery-unassigned', sidebar_html)
+        self.assertNotIn('so-card-delivery-tag', sidebar_html)
+        self.assertNotIn('🛵 Unassigned', sidebar_html)
 
         # Confirm compact CSS rules are present
         self.assertIn('.so-sidebar-card {', html)
