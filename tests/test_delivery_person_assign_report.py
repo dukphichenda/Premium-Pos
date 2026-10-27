@@ -1,6 +1,10 @@
 import unittest
 import os
 import re
+from dotenv import load_dotenv
+
+load_dotenv(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '.env')))
+
 from app import create_app
 from database import query_one, query_all
 
@@ -78,7 +82,7 @@ class TestDeliveryPersonAssignReport(unittest.TestCase):
             sess['username'] = 'admin'
             sess['role'] = 'admin'
 
-        res = self.client.get('/reports/delivery-person-assign')
+        res = self.client.get('/reports/view/delivery-person-assign')
         self.assertEqual(res.status_code, 200)
         html = res.data.decode('utf-8')
         self.assertIn('Delivery Person Assign', html)
