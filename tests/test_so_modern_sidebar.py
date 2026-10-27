@@ -125,5 +125,30 @@ class TestSoModernSidebar(unittest.TestCase):
             self.assertNotIn('>Photo</th>', html_print)
             self.assertNotIn('line-pic-cell', html_print)
 
+    def test_sidebar_so_cards_compact_and_no_delivery_assign(self):
+        """Verify each sales order card in sidebar is compact and delivery assignment is removed"""
+        # Product catalog baseline
+        p_cnt_before = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Sidebar cards exist
+        self.assertIn('class="so-sidebar-card', html)
+
+        # Confirm delivery assign is removed from sidebar order cards
+        self.assertNotIn('so-card-delivery-unassigned', html)
+        self.assertNotIn('so-card-delivery-tag', html)
+
+        # Confirm compact CSS rules are present
+        self.assertIn('.so-sidebar-card {', html)
+        self.assertIn('padding: 4px 10px;', html)
+        self.assertIn('flex-wrap: nowrap;', html)
+
+        # Product catalog protection: zero mutations
+        p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+        self.assertEqual(p_cnt_before, p_cnt_after)
+
 if __name__ == '__main__':
     unittest.main()
