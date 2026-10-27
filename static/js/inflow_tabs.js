@@ -37,6 +37,8 @@
         const full = (url || '').toLowerCase();
         if (clean === '/' || clean === '') return 'home';
         if (clean.includes('/dashboard') || clean.includes('/workspace')) return 'dashboard';
+        if (clean.includes('/reports')) return 'reports';
+        if (clean.includes('/expenses')) return 'expenses';
         if (clean.includes('/sales/new') || clean.includes('/sales/create') || clean.includes('/orders/new') || clean.includes('/order/new')) return 'sales_new';
         if (clean.includes('/sales') || clean.includes('/customers') || clean.includes('/contacts/customers') || (clean.includes('/branches/') && clean.includes('/orders'))) {
             if (full.includes('status=paid') || full.includes('status_filter=paid')) return 'sales_paid';
@@ -46,8 +48,6 @@
         }
         if (clean.includes('/purchase') || clean.includes('/vendors') || clean.includes('/contacts/vendors')) return 'purchase';
         if (clean.includes('/product') || clean.includes('/inventory') || clean.includes('/locations')) return 'product';
-        if (clean.includes('/reports')) return 'reports';
-        if (clean.includes('/expenses')) return 'expenses';
         if (clean.includes('/settings') || clean.includes('/migration') || clean.includes('/data')) return 'settings';
         return 'default';
     }
@@ -556,7 +556,12 @@
                             }
 
                             const docTitle = frameDoc.title || '';
-                            const pageTitle = docTitle.split('|')[0].split('-')[0].trim();
+                            let pageTitle = docTitle.split('|')[0].trim();
+                            if (pageTitle.includes(' - inFlow')) {
+                                pageTitle = pageTitle.split(' - inFlow')[0].trim();
+                            } else if (pageTitle.includes(' - ')) {
+                                pageTitle = pageTitle.split(' - ')[0].trim();
+                            }
                             const isStillNewOrder = (tab.title === 'New Sales Order' && (newPath.includes('/sales/new') || newPath.includes('/orders/new')));
                             if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || isStillNewOrder) {
                                 // Preserve dedicated category tab identities only if still on category list or /sales/new
@@ -1510,9 +1515,22 @@
                 const text = link.textContent.trim().replace(/^[+\s]+/u, '');
                 const targetCategory = detectTypeFromUrl(href);
 
+                const currentPath = window.location.pathname.toLowerCase();
+                const isFromReport = currentPath.includes('/reports');
+                const isFromProduct = currentPath.includes('/product');
+                const isSalesOrder = (href.includes('/sales/') || targetCategory.startsWith('sales')) && !href.includes('/sales/export') && !href.includes('/sales/list');
+                const isPurchaseOrder = (href.includes('/purchase/') || targetCategory === 'purchase') && !href.includes('/purchase/export') && !href.includes('/purchase/list');
+
+                const forceNewTab = (isFromReport || isFromProduct) && (isSalesOrder || isPurchaseOrder);
+
                 if (window.top && window.top.inflowMdi) {
                     e.preventDefault();
-                    window.top.inflowMdi.navigateOrOpenTab(href, text, targetCategory);
+                    if (forceNewTab) {
+                        const tabTitle = isSalesOrder ? (text.startsWith('SO') ? `Sales Order ${text}` : (text || 'Sales Order')) : (text.startsWith('PO') ? `PO ${text}` : (text || 'Purchase Order'));
+                        window.top.inflowMdi.openTab(href, tabTitle, isSalesOrder ? 'sales' : 'purchase', true);
+                    } else {
+                        window.top.inflowMdi.navigateOrOpenTab(href, text, targetCategory);
+                    }
                 }
             });
         });
