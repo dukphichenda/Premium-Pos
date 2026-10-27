@@ -38,7 +38,13 @@ DEFAULT_MOBILE_CONFIG = {
     "enable_tel_dialer": True,
     "enable_quick_pay": True,
     "enable_pull_refresh": True,
-    "custom_mobile_css": ""
+    "custom_mobile_css": "",
+    "published_version": "v1.0.0",
+    "published_at": "2026-10-27 22:30",
+    "published_by": "System Admin",
+    "publish_notes": "Initial mobile release with delivery tracker and quick dialer",
+    "publish_count": 1,
+    "ota_update_available": True
 }
 
 def get_mobile_app_config():
@@ -383,8 +389,23 @@ def update_mobile_app_settings():
             "enable_tel_dialer": enable_tel_dialer,
             "enable_quick_pay": enable_quick_pay,
             "enable_pull_refresh": enable_pull_refresh,
-            "custom_mobile_css": custom_mobile_css
+            "custom_mobile_css": custom_mobile_css,
+            "published_version": current_cfg.get('published_version', 'v1.0.0'),
+            "published_at": current_cfg.get('published_at', '2026-10-27 22:30'),
+            "published_by": current_cfg.get('published_by', 'System Admin'),
+            "publish_notes": current_cfg.get('publish_notes', 'Initial mobile release'),
+            "publish_count": current_cfg.get('publish_count', 1),
+            "ota_update_available": current_cfg.get('ota_update_available', True)
         }
+
+        # If user explicitly opted to publish immediately from the save form
+        if request.form.get('publish_now') in ('1', 'on', 'true'):
+            from datetime import datetime
+            new_config["published_version"] = bump_mobile_version(new_config["published_version"])
+            new_config["published_at"] = datetime.now().strftime('%Y-%m-%d %H:%M')
+            new_config["published_by"] = session.get('display_name') or session.get('username') or 'System Admin'
+            new_config["publish_count"] = int(new_config["publish_count"]) + 1
+            new_config["ota_update_available"] = True
 
         execute("""
             INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
@@ -394,17 +415,107 @@ def update_mobile_app_settings():
                 updated_at = CURRENT_TIMESTAMP;
         """, (json.dumps(new_config, ensure_ascii=False),))
 
-        flash("Android app & mobile interface settings updated successfully! / បានកែប្រែចំណុចប្រទាក់កម្មវិធីទូរស័ព្ទដោយជោគជ័យ!", "success")
+        if request.form.get('publish_now') in ('1', 'on', 'true'):
+            flash(f"🚀 Settings saved & published {new_config['published_version']} to installed mobile devices! / បានរក្សាទុក និងផ្សព្វផ្សាយកំណែ {new_config['published_version']} ទៅកាន់ទូរស័ព្ទជោគជ័យ!", "success")
+        else:
+            flash("Android app & mobile interface settings updated successfully! / បានកែប្រែចំណុចប្រទាក់កម្មវិធីទូរស័ព្ទដោយជោគជ័យ!", "success")
     except Exception as e:
         logger.error(f"Failed to update mobile app settings: {e}")
         flash(f"Failed to update mobile app settings: {e}", "error")
 
     return redirect(url_for('settings.general_settings', tab='tabMobileApp'))
 
+def bump_mobile_version(ver_str):
+    """
+    Increments a semver string like 'v1.0.0' -> 'v1.0.1' or 'v1.0.9' -> 'v1.0.10'.
+    """
+    if not ver_str:
+        return "v1.0.1"
+    import re
+    match = re.search(r'v?(\d+)\.(\d+)\.(\d+)', ver_str)
+    if match:
+        major, minor, patch = map(int, match.groups())
+        return f"v{major}.{minor}.{patch + 1}"
+    match = re.search(r'v?(\d+)\.(\d+)', ver_str)
+    if match:
+        major, minor = map(int, match.groups())
+        return f"v{major}.{minor + 1}.0"
+    return "v1.0.1"
+
+@settings_bp.route('/settings/mobile-app/publish', methods=['POST'])
+def publish_mobile_app_update():
+    """
+    Broadcasts the latest mobile redesign & app configuration to all staff Android devices
+    that already have the APK installed without requiring manual re-installation.
+    """
+    try:
+        from datetime import datetime
+        cfg = get_mobile_app_config()
+        current_ver = cfg.get('published_version', 'v1.0.0')
+
+        data = request.get_json(silent=True) or {}
+        custom_ver = request.form.get('version') or data.get('version')
+        notes = (request.form.get('notes') or data.get('notes') or 'Live OTA update to installed mobile devices').strip()
+
+        new_ver = custom_ver.strip() if (custom_ver and custom_ver.strip()) else bump_mobile_version(current_ver)
+        published_at = datetime.now().strftime('%Y-%m-%d %H:%M')
+        published_by = session.get('display_name') or session.get('username') or 'System Admin'
+        publish_count = int(cfg.get('publish_count', 0)) + 1
+
+        cfg['published_version'] = new_ver
+        cfg['published_at'] = published_at
+        cfg['published_by'] = published_by
+        cfg['publish_notes'] = notes
+        cfg['publish_count'] = publish_count
+        cfg['ota_update_available'] = True
+
+        execute("""
+            INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
+            VALUES ('mobile_app_config', %s, 'Custom redesign configuration for Android app and mobile view', CURRENT_TIMESTAMP)
+            ON CONFLICT (setting_key) DO UPDATE
+            SET setting_value = EXCLUDED.setting_value,
+                updated_at = CURRENT_TIMESTAMP;
+        """, (json.dumps(cfg, ensure_ascii=False),))
+
+        msg = f"🚀 Published version {new_ver} to all installed mobile devices! / បានផ្សព្វផ្សាយកំណែ {new_ver} ទៅកាន់ទូរស័ព្ទដែលបានដំឡើង APK ដោយជោគជ័យ!"
+
+        if request.is_json or request.headers.get('Accept') == 'application/json' or request.args.get('format') == 'json':
+            return jsonify({
+                'success': True,
+                'published_version': new_ver,
+                'published_at': published_at,
+                'published_by': published_by,
+                'publish_count': publish_count,
+                'message': msg
+            })
+
+        flash(msg, "success")
+        return redirect(request.referrer or url_for('settings.general_settings', tab='tabMobileApp'))
+    except Exception as e:
+        logger.error(f"Failed to publish mobile app update: {e}", exc_info=True)
+        if request.is_json or request.headers.get('Accept') == 'application/json':
+            return jsonify({'success': False, 'error': str(e)}), 500
+        flash(f"Error publishing mobile app update: {e}", "error")
+        return redirect(request.referrer or url_for('settings.general_settings', tab='tabMobileApp'))
+
 @settings_bp.route('/api/mobile-config', methods=['GET'])
 def api_mobile_config():
     cfg = get_mobile_app_config()
     return jsonify(cfg)
+
+@settings_bp.route('/api/mobile-config/version', methods=['GET'])
+def api_mobile_config_version():
+    """
+    Lightweight version check endpoint for installed Android APKs.
+    """
+    cfg = get_mobile_app_config()
+    return jsonify({
+        "published_version": cfg.get("published_version", "v1.0.0"),
+        "published_at": cfg.get("published_at"),
+        "published_by": cfg.get("published_by", "System Admin"),
+        "ota_update_available": cfg.get("ota_update_available", True),
+        "app_name": cfg.get("app_name", "inFlow Premium")
+    })
 
 @settings_bp.route('/settings/currency/update', methods=['POST'])
 def update_currency_settings():

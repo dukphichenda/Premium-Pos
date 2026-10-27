@@ -138,5 +138,54 @@ class TestMobileAppSettings(unittest.TestCase):
         p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
         self.assertEqual(p_cnt_before, p_cnt_after)
 
+    def test_download_app_page_publish_button(self):
+        resp = self.client.get('/download-app')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+        self.assertIn('id="installedApkCard"', html)
+        self.assertIn('id="btnPublishMobileUpdate"', html)
+        self.assertIn('Already Installed This APK', html)
+        self.assertIn('id="publishModalOverlay"', html)
+        self.assertIn('id="btnOpenApp"', html)
+
+    def test_mobile_app_publish_endpoint(self):
+        # Product Catalog Protection: count products before
+        p_cnt_before = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+
+        # 1. Custom Version Publish
+        resp = self.client.post('/settings/mobile-app/publish',
+                                json={'version': 'v1.5.0', 'notes': 'Tested staff delivery update'})
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.get_data(as_text=True))
+        self.assertTrue(data.get('success'))
+        self.assertEqual(data.get('published_version'), 'v1.5.0')
+
+        # Verify DB
+        cfg = get_mobile_app_config()
+        self.assertEqual(cfg.get('published_version'), 'v1.5.0')
+        self.assertTrue(cfg.get('ota_update_available'))
+
+        # Check lightweight version API
+        resp_ver = self.client.get('/api/mobile-config/version')
+        self.assertEqual(resp_ver.status_code, 200)
+        data_ver = json.loads(resp_ver.get_data(as_text=True))
+        self.assertEqual(data_ver.get('published_version'), 'v1.5.0')
+
+        # 2. Auto-increment bump publish
+        resp_bump = self.client.post('/settings/mobile-app/publish', json={})
+        self.assertEqual(resp_bump.status_code, 200)
+        data_bump = json.loads(resp_bump.get_data(as_text=True))
+        self.assertTrue(data_bump.get('success'))
+        self.assertEqual(data_bump.get('published_version'), 'v1.5.1')
+
+        # Verify DB auto-bump
+        cfg_bump = get_mobile_app_config()
+        self.assertEqual(cfg_bump.get('published_version'), 'v1.5.1')
+
+        # Product Catalog Protection: strictly zero product mutations
+        p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+        self.assertEqual(p_cnt_before, p_cnt_after)
+
 if __name__ == '__main__':
     unittest.main()
+
