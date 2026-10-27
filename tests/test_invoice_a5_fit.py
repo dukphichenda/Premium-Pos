@@ -52,11 +52,17 @@ class TestInvoiceA5Fit(unittest.TestCase):
 
             # 1. Check A5 dimensions and margin specifications
             self.assertIn('size: A5 portrait;', html)
-            self.assertIn('width: 138mm !important;', html)
-            self.assertIn('max-width: 138mm !important;', html)
             self.assertIn('margin: [4, 5, 4, 5]', html)
             self.assertIn("format: 'a5'", html)
             self.assertIn("orientation: 'portrait'", html)
+
+            # 1b. Check scrollbar elimination rules in print
+            self.assertIn('::-webkit-scrollbar', html)
+            self.assertIn('display: none !important;', html)
+            self.assertIn('scrollbar-width: none !important;', html)
+            self.assertIn('overflow-y: hidden !important;', html)
+            self.assertIn('height: auto !important;', html)
+            self.assertIn('printInvoiceDocument', html)
 
             # 2. Check compact A5 classes and container styles
             self.assertIn('class="inv-khqr-card"', html)

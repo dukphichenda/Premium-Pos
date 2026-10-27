@@ -734,6 +734,30 @@
             align-items: center;
         }
 
+        /* Clean Non-Print Studio Scrollbars */
+        .invoice-studio-sidebar::-webkit-scrollbar,
+        .invoice-studio-main::-webkit-scrollbar,
+        .invoice-zoom-container::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .invoice-studio-sidebar::-webkit-scrollbar-track,
+        .invoice-studio-main::-webkit-scrollbar-track,
+        .invoice-zoom-container::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .invoice-studio-sidebar::-webkit-scrollbar-thumb,
+        .invoice-studio-main::-webkit-scrollbar-thumb,
+        .invoice-zoom-container::-webkit-scrollbar-thumb {
+            background: #CBD5E1;
+            border-radius: 4px;
+        }
+        .invoice-studio-sidebar::-webkit-scrollbar-thumb:hover,
+        .invoice-studio-main::-webkit-scrollbar-thumb:hover,
+        .invoice-zoom-container::-webkit-scrollbar-thumb:hover {
+            background: #94A3B8;
+        }
+
         /* Printable Paper Canvas (A5 Standard: 148mm x 210mm) */
         .invoice-paper {
             width: 100%;
@@ -1515,14 +1539,30 @@
                 size: A5 portrait;
                 margin: 4mm 6mm 4mm 6mm;
             }
-            * {
+            *, *::before, *::after {
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
                 color-adjust: exact !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
+            }
+            *::-webkit-scrollbar,
+            ::-webkit-scrollbar {
+                display: none !important;
+                width: 0 !important;
+                height: 0 !important;
+                background: transparent !important;
             }
             html, body {
                 width: 100% !important;
-                height: 100% !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                overflow-x: hidden !important;
+                overflow-y: hidden !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
                 background: #FFFFFF !important;
                 padding: 0 !important;
                 margin: 0 !important;
@@ -1544,13 +1584,28 @@
                 padding: 0 !important;
                 margin: 0 !important;
                 width: 100% !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
+                overflow-x: hidden !important;
+                overflow-y: hidden !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
                 background: transparent !important;
             }
             .invoice-zoom-container {
                 padding: 0 !important;
                 margin: 0 !important;
                 overflow: visible !important;
+                overflow-x: hidden !important;
+                overflow-y: hidden !important;
                 width: 100% !important;
+                height: auto !important;
+                min-height: auto !important;
+                max-height: none !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
                 background: transparent !important;
                 display: block !important;
             }
@@ -1571,6 +1626,11 @@
                 background: #FFFFFF !important;
                 page-break-after: avoid !important;
                 break-after: avoid !important;
+                overflow: visible !important;
+                overflow-x: hidden !important;
+                overflow-y: hidden !important;
+                scrollbar-width: none !important;
+                -ms-overflow-style: none !important;
             }
             .top-accent-bar {
                 display: none !important;
@@ -1902,7 +1962,7 @@
                     <span>Actions / សកម្មភាព</span>
                 </div>
                 
-                <button type="button" class="sidebar-action-btn btn-print" onclick="window.print()" title="Print A5 Invoice directly (or Save as PDF with selectable vector text)">
+                <button type="button" class="sidebar-action-btn btn-print" onclick="printInvoiceDocument()" title="Print A5 Invoice directly (or Save as PDF with selectable vector text)">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                     <span>Print Invoice (A5)</span>
                 </button>
@@ -2830,11 +2890,41 @@
         }
         {% endif %}
 
+        // Scroll reset & clean print execution
+        function printInvoiceDocument() {
+            window.scrollTo(0, 0);
+            const zoomContainer = document.getElementById('invoiceZoomContainer');
+            if (zoomContainer) {
+                zoomContainer.scrollLeft = 0;
+                zoomContainer.scrollTop = 0;
+            }
+            const main = document.querySelector('.invoice-studio-main');
+            if (main) {
+                main.scrollLeft = 0;
+                main.scrollTop = 0;
+            }
+            window.print();
+        }
+
+        window.addEventListener('beforeprint', function() {
+            window.scrollTo(0, 0);
+            const zoomContainer = document.getElementById('invoiceZoomContainer');
+            if (zoomContainer) {
+                zoomContainer.scrollLeft = 0;
+                zoomContainer.scrollTop = 0;
+            }
+            const main = document.querySelector('.invoice-studio-main');
+            if (main) {
+                main.scrollLeft = 0;
+                main.scrollTop = 0;
+            }
+        });
+
         // Auto-print support if requested via ?autoprint=1
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('autoprint') === '1') {
             window.addEventListener('load', () => {
-                setTimeout(() => window.print(), 400);
+                setTimeout(() => printInvoiceDocument(), 400);
             });
         }
         if (urlParams.get('token') || urlParams.get('share_token') || urlParams.get('shared') === '1' || urlParams.get('nosettings') === '1') {
