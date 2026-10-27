@@ -580,6 +580,12 @@ def create_app():
     def landing_portal():
         return redirect(url_for('dashboard.index'))
 
+    @app.route('/download/app')
+    @app.route('/download-app')
+    @app.route('/app')
+    def download_app_page():
+        return render_template('download_app.html')
+
     @app.route('/static/uploads/<path:filename>')
     def serve_uploaded_media(filename):
         from flask import send_from_directory
