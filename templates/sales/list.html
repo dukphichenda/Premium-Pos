@@ -25,6 +25,10 @@
         </p>
     </div>
     <div style="display: flex; gap: 10px;">
+        <button type="button" onclick="window.location.reload()" class="btn btn-secondary" title="Refresh Sales Orders (F5 / Reload)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span>Refresh</span>
+        </button>
         <a href="{{ url_for('data_exchange.import_data', type='sales_order') }}" class="btn btn-secondary" title="Import Sales Orders from CSV file">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             <span>Import CSV</span>
@@ -244,9 +248,25 @@
                         {% endif %}
                     </td>
                     <td style="text-align: center;">
-                        <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" class="btn btn-secondary btn-sm" style="padding: 4px 8px;">
-                            Manage →
-                        </a>
+                        <div style="display: flex; gap: 4px; justify-content: center; align-items: center;">
+                            {% if o.payment_status != 'PAID' and o.status != 'CANCELLED' %}
+                            <button type="button" 
+                                    class="btn btn-sm" 
+                                    data-order-id="{{ o.id }}"
+                                    data-order-number="{{ o.order_number }}"
+                                    data-amount="{{ '%.2f'|format(o.balance_due if o.balance_due > 0 else o.total_amount) }}"
+                                    data-customer="{{ o.customer_name or '' }}"
+                                    data-method="{{ o.payment_method or 'ABA Bank' }}"
+                                    onclick="openSalesListQuickPayFromBtn(this)"
+                                    style="padding: 3px 8px; font-weight: 700; font-size: 11px; background: #059669; border-color: #059669; color: white;" 
+                                    title="Complete & Pay directly">
+                                ✓ Pay
+                            </button>
+                            {% endif %}
+                            <a href="{{ url_for('sales_orders.detail_order', id=o.id) }}" class="btn btn-secondary btn-sm" style="padding: 3px 8px; font-size: 11px;">
+                                Manage →
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
@@ -273,4 +293,284 @@
     </div>
     {% endif %}
 </div>
+
+<!-- Modal: Quick Complete & Pay from Sales List -->
+<div id="salesListQuickPayModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div class="inflow-modal-box" style="max-width: 500px; width: 95%; border-radius: 10px; box-shadow: 0 20px 48px rgba(0,0,0,0.35); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: linear-gradient(135deg, #065F46, #047857); color: #FFFFFF; padding: 14px 20px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">💳</span>
+                <span>Complete & Pay Order (បញ្ចប់ការលក់ និងទូទាត់ប្រាក់)</span>
+            </div>
+            <button type="button" onclick="closeSalesListQuickPay()" style="color: #A7F3D0; font-size: 18px; background: none; border: none; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 18px 22px; background: #FFFFFF; display: flex !important; flex-direction: column !important; align-items: stretch !important; gap: 14px !important; width: 100%; box-sizing: border-box;">
+            <!-- Order Total Callout Banner -->
+            <div style="background: #ECFDF5; border: 1.5px solid #A7F3D0; border-radius: 8px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; width: 100%; box-sizing: border-box;">
+                <div>
+                    <div style="font-size: 11px; text-transform: uppercase; color: #047857; font-weight: 700; letter-spacing: 0.04em;">Amount Due / ចំនួនទឹកប្រាក់</div>
+                    <div style="font-size: 12px; color: #065F46; margin-top: 2px;">
+                        Order: <b id="listQuickPayOrderNum" style="font-size: 13px;">SO-00000</b>
+                        <span id="listQuickPayCustWrap" style="margin-left: 6px; color: #047857;">(<span id="listQuickPayCustName">Customer</span>)</span>
+                    </div>
+                </div>
+                <div style="text-align: right;">
+                    <div id="listQuickPayTotalUsd" style="font-size: 24px; font-weight: 800; color: #047857; line-height: 1.1;">$0.00</div>
+                </div>
+            </div>
+
+            <!-- Payment Method Selection Tiles -->
+            <div style="width: 100%; box-sizing: border-box;">
+                <label style="display: block; font-weight: 700; font-size: 12px; color: #1E293B; margin-bottom: 8px;">
+                    Choose Payment Method / ជ្រើសរើសវិធីសាស្ត្រទូទាត់:
+                </label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; box-sizing: border-box;" id="listPayMethodTiles">
+                    <!-- ABA Bank Tile (Default First Tile) -->
+                    <div class="list-pay-tile active" data-method="ABA Bank" onclick="selectListPayTile(this, 'ABA Bank')"
+                         style="border: 2px solid #059669; background: #ECFDF5; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
+                        <div style="font-size: 22px; line-height: 1;">🏦</div>
+                        <div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #065F46;">ABA Bank</div>
+                            <div class="method-sub" style="font-size: 11px; color: #047857;">ធនាគារ ABA / QR</div>
+                        </div>
+                    </div>
+
+                    <!-- Cash Tile -->
+                    <div class="list-pay-tile" data-method="Cash" onclick="selectListPayTile(this, 'Cash')"
+                         style="border: 2px solid #CBD5E1; background: #FFFFFF; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
+                        <div style="font-size: 22px; line-height: 1;">💵</div>
+                        <div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #0F172A;">Cash</div>
+                            <div class="method-sub" style="font-size: 11px; color: #64748B;">លុយសុទ្ធ</div>
+                        </div>
+                    </div>
+
+                    <!-- ACLEDA Bank Tile -->
+                    <div class="list-pay-tile" data-method="ACLEDA Bank" onclick="selectListPayTile(this, 'ACLEDA Bank')"
+                         style="border: 2px solid #CBD5E1; background: #FFFFFF; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
+                        <div style="font-size: 22px; line-height: 1;">🏦</div>
+                        <div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #0F172A;">ACLEDA Bank</div>
+                            <div class="method-sub" style="font-size: 11px; color: #64748B;">អេស៊ីលីដា / KHQR</div>
+                        </div>
+                    </div>
+
+                    <!-- KB PRASAC Tile -->
+                    <div class="list-pay-tile" data-method="KB PRASAC" onclick="selectListPayTile(this, 'KB PRASAC')"
+                         style="border: 2px solid #CBD5E1; background: #FFFFFF; border-radius: 8px; padding: 10px 12px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
+                        <div style="font-size: 22px; line-height: 1;">🏦</div>
+                        <div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #0F172A;">KB PRASAC</div>
+                            <div class="method-sub" style="font-size: 11px; color: #64748B;">KB ប្រាសាក់ / KHQR</div>
+                        </div>
+                    </div>
+
+                    <!-- Other Tile (spans 2 columns) -->
+                    <div class="list-pay-tile" data-method="Other" onclick="selectListPayTile(this, 'Other')"
+                         style="grid-column: span 2; border: 2px solid #CBD5E1; background: #FFFFFF; border-radius: 8px; padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.15s ease;">
+                        <div style="font-size: 22px; line-height: 1;">💳</div>
+                        <div>
+                            <div class="method-title" style="font-weight: 800; font-size: 13px; color: #0F172A;">Other Bank</div>
+                            <div class="method-sub" style="font-size: 11px; color: #64748B;">ធនាគារផ្សេងៗ (Wing, Canadia, Sathapana...)</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custom Method Input -->
+            <div id="listCustomPayBox" style="display: none; width: 100%; box-sizing: border-box;">
+                <label style="display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 4px;">Specific Bank / Method Name:</label>
+                <input type="text" id="listCustomPayInput" placeholder="e.g. Wing Bank, TrueMoney, Canadia..." style="width: 100%; height: 32px; font-size: 12px; padding: 4px 10px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;">
+            </div>
+
+            <!-- Completed By Input (Who completed the order) -->
+            <div style="width: 100%; box-sizing: border-box;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">
+                    👤 Completed By / អ្នកបញ្ចប់ការលក់:
+                </label>
+                <input type="text" id="listQuickPayCompletedByInput" 
+                       value="{{ session.get('display_name') or session.get('username') or 'admin' }}" 
+                       placeholder="Enter name of cashier or user completing order..." 
+                       style="width: 100%; height: 32px; font-size: 12px; font-weight: 600; padding: 4px 10px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box; background: #F8FAFC;">
+            </div>
+
+            <!-- Notice / Summary -->
+            <div style="width: 100%; font-size: 11.5px; color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; box-sizing: border-box; line-height: 1.55;">
+                <div>✓ Order status will change to <b>PAID</b> and fulfillment completed</div>
+                <div>✓ Physical inventory stock will be deducted immediately</div>
+                <div>✓ Payment method: <b style="color: #065F46;"><span id="listQuickPaySelectedMethodLabel">ABA Bank</span></b></div>
+            </div>
+            
+            <div id="listQuickPayErrorAlert" style="display: none; color: #DC2626; background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 8px 12px; font-size: 12px;"></div>
+        </div>
+        <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0;">
+            <button type="button" class="inflow-dlg-btn" onclick="closeSalesListQuickPay()" style="padding: 6px 16px; font-size: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; cursor: pointer;">Cancel</button>
+            <button type="button" id="btnConfirmListQuickPay" onclick="confirmListQuickPay()" style="background: #059669; color: #FFFFFF; font-weight: 700; font-size: 12px; padding: 6px 18px; border: none; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                <span>✓ Confirm Complete & Pay</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentListOrderId = null;
+let selectedListPayMethod = 'ABA Bank';
+
+function openSalesListQuickPayFromBtn(btn) {
+    if (!btn) return;
+    const orderId = btn.getAttribute('data-order-id');
+    const orderNum = btn.getAttribute('data-order-number');
+    const amount = btn.getAttribute('data-amount');
+    const custName = btn.getAttribute('data-customer');
+    const method = btn.getAttribute('data-method');
+    openSalesListQuickPay(orderId, orderNum, amount, custName, method);
+}
+
+function openSalesListQuickPay(orderId, orderNum, amount, custName, prevMethod) {
+    currentListOrderId = orderId;
+    document.getElementById('listQuickPayOrderNum').innerText = orderNum || ('SO #' + orderId);
+    document.getElementById('listQuickPayTotalUsd').innerText = '$' + (parseFloat(amount) || 0).toFixed(2);
+    
+    const custWrap = document.getElementById('listQuickPayCustWrap');
+    const custSpan = document.getElementById('listQuickPayCustName');
+    if (custName && custName.trim()) {
+        custSpan.innerText = custName.trim();
+        custWrap.style.display = 'inline';
+    } else {
+        custWrap.style.display = 'none';
+    }
+
+    const errBox = document.getElementById('listQuickPayErrorAlert');
+    if (errBox) errBox.style.display = 'none';
+
+    // Set initial payment method (ABA Bank by default)
+    selectedListPayMethod = prevMethod && ['ABA Bank', 'Cash', 'ACLEDA Bank', 'KB PRASAC'].includes(prevMethod) ? prevMethod : 'ABA Bank';
+    
+    document.querySelectorAll('.list-pay-tile').forEach(t => {
+        const isMatch = (t.getAttribute('data-method') === selectedListPayMethod);
+        const titleEl = t.querySelector('.method-title');
+        const subEl = t.querySelector('.method-sub');
+        if (isMatch) {
+            t.classList.add('active');
+            t.style.borderColor = '#059669';
+            t.style.background = '#ECFDF5';
+            if (titleEl) titleEl.style.color = '#065F46';
+            if (subEl) subEl.style.color = '#047857';
+        } else {
+            t.classList.remove('active');
+            t.style.borderColor = '#CBD5E1';
+            t.style.background = '#FFFFFF';
+            if (titleEl) titleEl.style.color = '#0F172A';
+            if (subEl) subEl.style.color = '#64748B';
+        }
+    });
+
+    const customBox = document.getElementById('listCustomPayBox');
+    if (customBox) customBox.style.display = 'none';
+    const labelEl = document.getElementById('listQuickPaySelectedMethodLabel');
+    if (labelEl) labelEl.innerText = selectedListPayMethod;
+
+    const modal = document.getElementById('salesListQuickPayModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeSalesListQuickPay() {
+    const modal = document.getElementById('salesListQuickPayModal');
+    if (modal) modal.style.display = 'none';
+    currentListOrderId = null;
+}
+
+function selectListPayTile(tileEl, method) {
+    document.querySelectorAll('.list-pay-tile').forEach(t => {
+        t.classList.remove('active');
+        t.style.borderColor = '#CBD5E1';
+        t.style.background = '#FFFFFF';
+        const titleEl = t.querySelector('.method-title');
+        if (titleEl) titleEl.style.color = '#0F172A';
+        const subEl = t.querySelector('.method-sub');
+        if (subEl) subEl.style.color = '#64748B';
+    });
+    tileEl.classList.add('active');
+    tileEl.style.borderColor = '#059669';
+    tileEl.style.background = '#ECFDF5';
+    const activeTitle = tileEl.querySelector('.method-title');
+    if (activeTitle) activeTitle.style.color = '#065F46';
+    const activeSub = tileEl.querySelector('.method-sub');
+    if (activeSub) activeSub.style.color = '#047857';
+
+    selectedListPayMethod = method;
+    const customBox = document.getElementById('listCustomPayBox');
+    if (method === 'Other') {
+        if (customBox) customBox.style.display = 'block';
+        const cinput = document.getElementById('listCustomPayInput');
+        if (cinput) cinput.focus();
+    } else {
+        if (customBox) customBox.style.display = 'none';
+    }
+
+    const labelEl = document.getElementById('listQuickPaySelectedMethodLabel');
+    if (labelEl) labelEl.innerText = method;
+}
+
+function confirmListQuickPay() {
+    if (!currentListOrderId) return;
+
+    let finalMethod = selectedListPayMethod;
+    if (finalMethod === 'Other') {
+        const customVal = (document.getElementById('listCustomPayInput')?.value || '').trim();
+        finalMethod = customVal ? customVal : 'Other Bank';
+    }
+
+    const completedBy = (document.getElementById('listQuickPayCompletedByInput')?.value || '').trim();
+    const btn = document.getElementById('btnConfirmListQuickPay');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Processing...</span>';
+    }
+
+    fetch('/sales/' + currentListOrderId + '/complete_pay', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            payment_method: finalMethod,
+            completed_by: completedBy
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>✓ Confirm Complete & Pay</span>';
+        }
+        if (data.success) {
+            closeSalesListQuickPay();
+            window.location.reload();
+        } else {
+            const errBox = document.getElementById('listQuickPayErrorAlert');
+            if (errBox) {
+                errBox.innerText = data.message || 'Error completing order';
+                errBox.style.display = 'block';
+            } else {
+                alert(data.message || 'Error completing order');
+            }
+        }
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>✓ Confirm Complete & Pay</span>';
+        }
+        const errBox = document.getElementById('listQuickPayErrorAlert');
+        if (errBox) {
+            errBox.innerText = 'Network error: ' + err.message;
+            errBox.style.display = 'block';
+        } else {
+            alert('Network error: ' + err.message);
+        }
+    });
+}
+</script>
 {% endblock %}

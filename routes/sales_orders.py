@@ -3128,7 +3128,8 @@ def save_order(id=0):
                     paid_amount = total_amount
                     balance_due = 0.0
                     pay_method = payment_method or 'ABA Bank'
-                    user_login_name = session.get('username') or session.get('display_name') or 'admin'
+                    custom_cb = (request.form.get('completed_by') or '').strip()
+                    user_login_name = custom_cb or session.get('username') or session.get('display_name') or 'admin'
                     cur.execute("""
                         UPDATE sales_orders
                         SET subtotal = %s, total_amount = %s, paid_amount = %s, balance_due = %s,
@@ -3253,7 +3254,7 @@ def save_order(id=0):
         if request.is_json:
             return jsonify({'success': True, 'message': 'Saved successfully', 'order_id': id, 'order_number': order_number, 'redirect_url': redirect_url})
         if mark_complete_pay:
-            user_login_name = session.get('username') or session.get('display_name') or 'admin'
+            user_login_name = (request.form.get('completed_by') or '').strip() or session.get('username') or session.get('display_name') or 'admin'
             flash(f"Sales Order {order_number} marked Complete & Paid by {user_login_name}!", "success")
         else:
             flash(f"Sales Order {order_number} saved successfully!", "success")
@@ -3292,7 +3293,8 @@ def complete_pay(id):
 
     data = request.get_json(silent=True) or request.form or {}
     payment_method = (data.get('payment_method') or order.get('payment_method') or 'ABA Bank').strip()
-    user_login_name = session.get('username') or session.get('display_name') or 'admin'
+    custom_completed_by = (data.get('completed_by') or '').strip()
+    user_login_name = custom_completed_by or session.get('username') or session.get('display_name') or 'admin'
 
     total = float(order['total_amount'] or 0)
     with get_db_cursor(commit=True) as cur:
@@ -3373,8 +3375,13 @@ def complete_pay(id):
     if request.is_json:
         return jsonify({
             'success': True,
-            'message': f"Order {order['order_number']} completed and marked paid by {payment_method}!",
+            'message': f"Order {order['order_number']} completed and marked paid by {payment_method} (Completed by: {user_login_name})!",
             'payment_method': payment_method,
+            'completed_by': user_login_name,
+            'status': 'PAID',
+            'payment_status': 'PAID',
+            'order_id': id,
+            'order_number': order['order_number'],
             'redirect_url': redirect_url,
             'next_order_id': target_id
         })

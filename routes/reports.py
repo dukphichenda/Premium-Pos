@@ -718,6 +718,10 @@ def view_report(report_key):
             SELECT 
                 so.id,
                 so.order_number,
+                so.status,
+                so.payment_status,
+                so.payment_method,
+                COALESCE(so.completed_by, '') as completed_by,
                 CASE WHEN so.payment_status = 'PAID' THEN 'Paid' ELSE initcap(so.status) END as status_display,
                 c.name as customer_name,
                 COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), c.city, '') as billing_address,

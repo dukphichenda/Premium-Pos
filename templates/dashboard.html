@@ -684,132 +684,166 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+    // If running in the top host window where direct content is emptied for MDI iframes,
+    // do not initialize charts in the host shell (the iframe loads its own charts).
+    const trendCanvas = document.getElementById('revenueTrendChart');
+    const catCanvas = document.getElementById('categoryShareChart');
+    if (!trendCanvas && !catCanvas) {
+        if (window.initInflowTabs) {
+            window.initInflowTabs({
+                type: 'home',
+                title: 'Main Store Dashboard',
+                label: 'Dashboard',
+                url: '/'
+            });
+        }
+        return;
+    }
+
     fetch('/api/dashboard/charts?branch=' + encodeURIComponent('{{ branch_scope }}'))
         .then(res => res.json())
         .then(data => {
-            // 3-Column Monthly Financial Breakdown Chart (Total Paid Sale, Open Sale, Profit)
-            const ctxTrend = document.getElementById('revenueTrendChart').getContext('2d');
-            const trendDatasets = [
-                {
-                    label: 'Total Paid Sale',
-                    data: data.monthly_paid || data.monthly_revenue,
-                    backgroundColor: '#0284C7',
-                    borderColor: '#0284C7',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                    barPercentage: 0.85,
-                    categoryPercentage: 0.82
-                },
-                {
-                    label: 'Open Sale',
-                    data: data.monthly_open || [],
-                    backgroundColor: '#F59E0B',
-                    borderColor: '#F59E0B',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                    barPercentage: 0.85,
-                    categoryPercentage: 0.82
+            if (!data) return;
+
+            // 1. 3-Column Monthly Financial Breakdown Chart (Total Paid Sale, Open Sale, Profit)
+            const currentTrendCanvas = document.getElementById('revenueTrendChart');
+            if (currentTrendCanvas && typeof Chart !== 'undefined' && data.monthly_labels) {
+                if (window.revenueTrendChartInstance) {
+                    try { window.revenueTrendChartInstance.destroy(); } catch (e) {}
                 }
-            ];
-
-            if (data.monthly_profit && data.monthly_profit.length > 0) {
-                trendDatasets.push({
-                    label: 'Profit',
-                    data: data.monthly_profit,
-                    backgroundColor: '#10B981',
-                    borderColor: '#10B981',
-                    borderWidth: 1,
-                    borderRadius: 4,
-                    barPercentage: 0.85,
-                    categoryPercentage: 0.82
-                });
-            }
-
-            new Chart(ctxTrend, {
-                type: 'bar',
-                data: {
-                    labels: data.monthly_labels,
-                    datasets: trendDatasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false
-                    },
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top',
-                            align: 'end',
-                            labels: {
-                                usePointStyle: true,
-                                pointStyle: 'circle',
-                                boxWidth: 7,
-                                padding: 14,
-                                font: { size: 11.5, weight: '600' }
-                            }
+                const ctxTrend = currentTrendCanvas.getContext('2d');
+                if (ctxTrend) {
+                    const trendDatasets = [
+                        {
+                            label: 'Total Paid Sale',
+                            data: data.monthly_paid || data.monthly_revenue || [],
+                            backgroundColor: '#0284C7',
+                            borderColor: '#0284C7',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.85,
+                            categoryPercentage: 0.82
                         },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    let val = context.parsed.y || 0;
-                                    return ' ' + context.dataset.label + ': $' + Number(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                                },
-                                afterBody: function(items) {
-                                    if (!items || !items.length) return '';
-                                    const idx = items[0].dataIndex;
-                                    const openSale = data.monthly_open && data.monthly_open[idx];
-                                    const totProf = data.monthly_total_profit && data.monthly_total_profit[idx];
-                                    if (openSale > 0 && totProf !== undefined) {
-                                        return ['', ' Total (Paid + Open) Profit: $' + Number(totProf).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})];
+                        {
+                            label: 'Open Sale',
+                            data: data.monthly_open || [],
+                            backgroundColor: '#F59E0B',
+                            borderColor: '#F59E0B',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.85,
+                            categoryPercentage: 0.82
+                        }
+                    ];
+
+                    if (data.monthly_profit && data.monthly_profit.length > 0) {
+                        trendDatasets.push({
+                            label: 'Profit',
+                            data: data.monthly_profit,
+                            backgroundColor: '#10B981',
+                            borderColor: '#10B981',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            barPercentage: 0.85,
+                            categoryPercentage: 0.82
+                        });
+                    }
+
+                    window.revenueTrendChartInstance = new Chart(ctxTrend, {
+                        type: 'bar',
+                        data: {
+                            labels: data.monthly_labels,
+                            datasets: trendDatasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: {
+                                mode: 'index',
+                                intersect: false
+                            },
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top',
+                                    align: 'end',
+                                    labels: {
+                                        usePointStyle: true,
+                                        pointStyle: 'circle',
+                                        boxWidth: 7,
+                                        padding: 14,
+                                        font: { size: 11.5, weight: '600' }
                                     }
-                                    return '';
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            let val = context.parsed.y || 0;
+                                            return ' ' + context.dataset.label + ': $' + Number(val).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                        },
+                                        afterBody: function(items) {
+                                            if (!items || !items.length) return '';
+                                            const idx = items[0].dataIndex;
+                                            const openSale = data.monthly_open && data.monthly_open[idx];
+                                            const totProf = data.monthly_total_profit && data.monthly_total_profit[idx];
+                                            if (openSale > 0 && totProf !== undefined) {
+                                                return ['', ' Total (Paid + Open) Profit: $' + Number(totProf).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})];
+                                            }
+                                            return '';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: val => '$' + Number(val).toLocaleString()
+                                    },
+                                    grid: { color: '#F1F5F9' }
+                                },
+                                x: {
+                                    grid: { display: false }
                                 }
                             }
                         }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: val => '$' + Number(val).toLocaleString()
-                            },
-                            grid: { color: '#F1F5F9' }
-                        },
-                        x: {
-                            grid: { display: false }
-                        }
-                    }
+                    });
                 }
-            });
+            }
 
-            // Category Share Doughnut
-            const ctxCat = document.getElementById('categoryShareChart').getContext('2d');
-            new Chart(ctxCat, {
-                type: 'doughnut',
-                data: {
-                    labels: data.category_labels,
-                    datasets: [{
-                        data: data.category_values,
-                        backgroundColor: [
-                            '#0284C7', '#10B981', '#6366F1', '#818CF8',
-                            '#F59E0B', '#EC4899', '#94A3B8'
-                        ],
-                        borderWidth: 2,
-                        borderColor: '#FFFFFF'
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
-                    },
-                    cutout: '68%'
+            // 2. Category Share Doughnut
+            const currentCatCanvas = document.getElementById('categoryShareChart');
+            if (currentCatCanvas && typeof Chart !== 'undefined' && data.category_labels) {
+                if (window.categoryShareChartInstance) {
+                    try { window.categoryShareChartInstance.destroy(); } catch (e) {}
                 }
-            });
+                const ctxCat = currentCatCanvas.getContext('2d');
+                if (ctxCat) {
+                    window.categoryShareChartInstance = new Chart(ctxCat, {
+                        type: 'doughnut',
+                        data: {
+                            labels: data.category_labels,
+                            datasets: [{
+                                data: data.category_values || [],
+                                backgroundColor: [
+                                    '#0284C7', '#10B981', '#6366F1', '#818CF8',
+                                    '#F59E0B', '#EC4899', '#94A3B8'
+                                ],
+                                borderWidth: 2,
+                                borderColor: '#FFFFFF'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } }
+                            },
+                            cutout: '68%'
+                        }
+                    });
+                }
+            }
         })
         .catch(err => console.error("Error loading dashboard charts:", err));
 

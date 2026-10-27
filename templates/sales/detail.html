@@ -2307,6 +2307,10 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
             <span>Save</span>
             <span id="btnSoSaveDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
         </button>
+        <button type="button" class="inflow-tb-btn btn-so-refresh" onclick="refreshSalesOrderView()" title="Refresh Sales Order & List (F5 / Reload)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span>Refresh</span>
+        </button>
         <!-- inFlow Desktop Split Button: Preview -->
         <div class="inflow-split-btn-wrapper split-so-preview" id="previewSplitWrapper">
             <button type="button" class="inflow-split-btn-action" onclick="executePreviewAction()" title="Preview selected document">
@@ -2604,8 +2608,13 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 </div>
             </div>
 
-            <!-- Top Action Buttons: [ + ] and [ ◀ Minimize ] -->
+            <!-- Top Action Buttons: [ 🔄 Refresh ] [ + ] and [ ◀ Minimize ] -->
             <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                <button type="button" class="so-icon-btn" id="btnRefreshSoList" onclick="refreshSalesOrderView()" title="Refresh Sales Orders List (F5 / Reload)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                    </svg>
+                </button>
                 <button type="button" class="so-icon-btn" id="btnStartNewOrder" onclick="createNewOrderInTab()" title="Create New Sales Order (+)">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -3178,14 +3187,22 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                 <input type="text" id="customPayMethodInput" placeholder="e.g. Wing Bank, TrueMoney, Canadia..." style="width: 100%; height: 32px; font-size: 12px; padding: 4px 10px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;">
             </div>
 
+            <!-- Completed By Input (Who completed the order) -->
+            <div style="width: 100%; box-sizing: border-box;">
+                <label style="display: block; font-size: 11px; font-weight: 700; color: #1E293B; margin-bottom: 4px;">
+                    👤 Completed By / អ្នកបញ្ចប់ការលក់:
+                </label>
+                <input type="text" id="completePayCompletedByInput" 
+                       value="{{ session.get('display_name') or session.get('username') or 'admin' }}" 
+                       placeholder="Enter name of cashier or user completing order..." 
+                       style="width: 100%; height: 32px; font-size: 12px; font-weight: 600; padding: 4px 10px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box; background: #F8FAFC;">
+            </div>
+
             <!-- Order Completion Notice -->
             <div style="width: 100%; font-size: 11.5px; color: #475569; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px; box-sizing: border-box; line-height: 1.55;">
                 <div>✓ Order status will change to <b>PAID</b> and fulfillment completed</div>
                 <div>✓ Inventory stock will be deducted immediately</div>
-                <div>✓ Payment method: <b style="color: #065F46;"><span id="completePaySelectedMethodLabel">Cash</span></b></div>
-                <div style="color: #64748B; font-size: 11px; margin-top: 4px; border-top: 1px dashed #E2E8F0; padding-top: 4px;">
-                    👤 Completing as user: <b style="color: #0F172A;">{{ session.get('username') or session.get('display_name') or 'admin' }}</b>
-                </div>
+                <div>✓ Payment method: <b style="color: #065F46;"><span id="completePaySelectedMethodLabel">ABA Bank</span></b></div>
             </div>
         </div>
         <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 12px 20px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0;">
@@ -8407,10 +8424,25 @@ function confirmCompletePayAction() {
         const customVal = (document.getElementById('customPayMethodInput')?.value || '').trim();
         finalMethod = customVal ? customVal : 'Other Bank';
     }
+    const finalCompletedBy = (document.getElementById('completePayCompletedByInput')?.value || '').trim();
 
     // Set hidden payment_method on main form
     const methodHidden = document.getElementById('orderPaymentMethodHidden');
     if (methodHidden) methodHidden.value = finalMethod;
+
+    // Set hidden completed_by on main form
+    let cbHidden = document.getElementById('orderCompletedByHidden');
+    if (!cbHidden) {
+        const mf = document.getElementById('salesOrderForm');
+        if (mf) {
+            cbHidden = document.createElement('input');
+            cbHidden.type = 'hidden';
+            cbHidden.name = 'completed_by';
+            cbHidden.id = 'orderCompletedByHidden';
+            mf.appendChild(cbHidden);
+        }
+    }
+    if (cbHidden) cbHidden.value = finalCompletedBy;
 
     syncDrawerFiltersToStorage();
 
@@ -8442,10 +8474,29 @@ function confirmCompletePayAction() {
             cpForm.appendChild(pInput);
         }
         pInput.value = finalMethod;
+
+        let cbInput = cpForm.querySelector('input[name="completed_by"]');
+        if (!cbInput) {
+            cbInput = document.createElement('input');
+            cbInput.type = 'hidden';
+            cbInput.name = 'completed_by';
+            cpForm.appendChild(cbInput);
+        }
+        cbInput.value = finalCompletedBy;
+
         attachFiltersToForm(cpForm);
         isDirty = false;
         cpForm.submit();
     }
+}
+
+function refreshSalesOrderView() {
+    if (window.isDirty) {
+        if (!confirm("You have unsaved changes on this sales order. Do you want to discard them and refresh?")) {
+            return;
+        }
+    }
+    window.location.reload();
 }
 
 // Dummy stubs to prevent any legacy caller error
