@@ -678,14 +678,28 @@
                 const activeTab = this.tabs.find(t => t.id === this.activeTabId);
                 const currentCategory = activeTab ? (activeTab.type || 'home') : 'home';
 
+                const getBaseCategory = (cat) => {
+                    if (!cat) return 'home';
+                    if (cat === 'sales' || cat.startsWith('sales_') || cat.startsWith('sales')) return 'sales';
+                    if (cat === 'purchase' || cat.startsWith('purchase_') || cat.startsWith('purchase')) return 'purchase';
+                    if (cat === 'product' || cat.startsWith('product_') || cat.startsWith('product')) return 'product';
+                    if (cat === 'reports' || cat.startsWith('report')) return 'reports';
+                    if (cat === 'expenses' || cat.startsWith('expense')) return 'expenses';
+                    if (cat === 'settings' || cat.startsWith('setting')) return 'settings';
+                    return cat;
+                };
+
+                const currentBase = getBaseCategory(currentCategory);
+                const targetBase = getBaseCategory(targetCategory);
+
                 // Rule A: On Homepage tab -> transform tab to selected category below
-                if (currentCategory === 'home') {
+                if (currentCategory === 'home' || currentBase === 'home') {
                     this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
 
-                // Rule B: Staying in same category -> navigate/transform within current tab
-                if (currentCategory === targetCategory) {
+                // Rule B: Staying in same category -> navigate/transform within current tab (no new tab created!)
+                if (currentCategory === targetCategory || currentBase === targetBase) {
                     this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
@@ -1429,14 +1443,14 @@
                     window.location.href = url;
                 }
             },
-            navigateOrOpenTab: function (url, title, type, forceNew) {
+            navigateOrOpenTab: function (url, title, type, forceNew, forceReload) {
                 if (url && url.includes('/logout')) {
                     if (window.top) window.top.location.href = url;
                     else window.location.href = url;
                     return;
                 }
                 if (window.top && window.top.inflowMdi) {
-                    window.top.inflowMdi.navigateOrOpenTab(url, title, type, forceNew);
+                    window.top.inflowMdi.navigateOrOpenTab(url, title, type, forceNew, forceReload);
                 } else {
                     window.location.href = url;
                 }

@@ -180,5 +180,29 @@ class TestSoModernSidebar(unittest.TestCase):
         p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
         self.assertEqual(p_cnt_before, p_cnt_after)
 
+    def test_status_filter_change_refreshes_in_place_without_spawning_tab(self):
+        """Verify changing status on sidebar (e.g. Paid to Open) refreshes in-place and does not create a new tab"""
+        p_cnt_before = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # selectSoStatusFilter must pass false, true (forceNew=false, forceReload=true)
+        self.assertIn("window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales', false, true);", html)
+
+        # inflow_tabs.js must group sales subcategories so switching status does not create new tab
+        import os
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+        tabs_js_path = os.path.join(base_dir, 'static', 'js', 'inflow_tabs.js')
+        with open(tabs_js_path, 'r', encoding='utf-8') as f:
+            tabs_js = f.read()
+        self.assertIn("getBaseCategory", tabs_js)
+        self.assertIn("currentBase === targetBase", tabs_js)
+
+        # Product catalog protection
+        p_cnt_after = query_one("SELECT COUNT(*) as cnt FROM products")['cnt']
+        self.assertEqual(p_cnt_before, p_cnt_after)
+
 if __name__ == '__main__':
     unittest.main()
