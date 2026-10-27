@@ -39,6 +39,12 @@ REPORT_CATALOG = {
                 'icon': '💰'
             },
             {
+                'key': 'delivery-person-assign',
+                'title': 'Delivery Person Assign',
+                'description': 'Assign and track delivery persons for sales orders with customer and delivery details.',
+                'icon': '🛵'
+            },
+            {
                 'key': 'sales-order-operational',
                 'title': 'Sales Order Operational Report',
                 'description': 'Picking, packing, and shipping fulfillment status of sales orders.',
@@ -529,6 +535,9 @@ def view_report(report_key):
     page = max(1, int(request.args.get('page', 1)))
     per_page = 150 if (group_by == 'Category' or report_key == 'customer-order-history') else 36 # Rows per page matching printed sheet size
 
+    delivery_man_filter = request.args.get('delivery_man_filter', '').strip()
+    all_delivery_men = query_all("SELECT * FROM delivery_men WHERE is_active = TRUE ORDER BY name ASC")
+
     # Costing Tier / Price Sheet selection (Defaults to Branch Costing)
     all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Cost%%' THEN 0 ELSE 1 END, name ASC")
     default_costing_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
@@ -732,6 +741,104 @@ def view_report(report_key):
             FROM sales_orders so
             LEFT JOIN customers c ON so.customer_id = c.id
             LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
+            WHERE {where_sql}
+            ORDER BY {order_col}
+            LIMIT %s OFFSET %s
+        """
+        rows = query_all(data_sql, tuple(query_params))
+
+    # 1B. DELIVERY PERSON ASSIGN REPORT (No costing / profit, allows assigning delivery person like SO page)
+    elif report_key == 'delivery-person-assign':
+        base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
+        params = [start_date, end_date]
+        apply_branch_scope(base_where, params)
+
+        if customer_id and customer_id != 'all' and str(customer_id).isdigit():
+            base_where.append("so.customer_id = %s")
+            params.append(int(customer_id))
+        elif customer_search:
+            base_where.append("c.name ILIKE %s")
+            params.append(f"%{customer_search}%")
+
+        if status == 'Paid':
+            base_where.append("(so.payment_status = 'PAID' OR so.status = 'PAID')")
+        elif status == 'Open':
+            base_where.append("so.status = 'OPEN'")
+        elif status == 'Invoiced':
+            base_where.append("so.status = 'INVOICED'")
+        elif status != 'All':
+            base_where.append("so.status = %s")
+            params.append(status)
+
+        if delivery_man_filter == 'unassigned':
+            base_where.append("(so.delivery_man IS NULL OR TRIM(so.delivery_man) = '')")
+        elif delivery_man_filter == 'assigned':
+            base_where.append("(so.delivery_man IS NOT NULL AND TRIM(so.delivery_man) != '')")
+        elif delivery_man_filter and delivery_man_filter != 'all':
+            base_where.append("(so.delivery_man ILIKE %s OR so.delivery_man = 'ALL')")
+            params.append(f"%{delivery_man_filter}%")
+
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
+        where_sql = " AND ".join(base_where)
+
+        total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so LEFT JOIN customers c ON so.customer_id = c.id WHERE {where_sql}", tuple(params))['cnt']
+        total_pages = max(1, math.ceil(total_count / per_page))
+        page = min(page, total_pages)
+        offset = (page - 1) * per_page
+
+        totals_sql = f"""
+            SELECT 
+                COUNT(*) as total_orders,
+                COALESCE(SUM(so.total_amount), 0) as total_sales,
+                COALESCE(COUNT(CASE WHEN so.delivery_man IS NOT NULL AND TRIM(so.delivery_man) != '' THEN 1 END), 0) as assigned_orders,
+                COALESCE(COUNT(CASE WHEN so.delivery_man IS NULL OR TRIM(so.delivery_man) = '' THEN 1 END), 0) as unassigned_orders
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE {where_sql}
+        """
+        totals_row = query_one(totals_sql, tuple(params))
+        totals = {
+            'total_orders': totals_row['total_orders'] or 0,
+            'sales_amount': float(totals_row['total_sales'] or 0),
+            'assigned_orders': totals_row['assigned_orders'] or 0,
+            'unassigned_orders': totals_row['unassigned_orders'] or 0
+        }
+
+        order_col = "so.order_date DESC, so.order_number DESC"
+        if sort_by == 'Order Number':
+            order_col = "so.order_number ASC"
+        elif sort_by == 'Order Date':
+            order_col = "so.order_date ASC, so.order_number ASC"
+        elif sort_by == 'Customer':
+            order_col = "c.name ASC, so.order_number ASC"
+        elif sort_by == 'Sales Amount':
+            order_col = "so.total_amount DESC"
+        elif sort_by == 'Delivery Person':
+            order_col = "COALESCE(so.delivery_man, '') ASC, so.order_date DESC"
+
+        query_params = list(params) + [per_page, offset]
+        data_sql = f"""
+            SELECT 
+                so.id,
+                so.order_number,
+                so.status,
+                so.payment_status,
+                so.payment_method,
+                COALESCE(so.completed_by, '') as completed_by,
+                CASE WHEN so.payment_status = 'PAID' THEN 'Paid' ELSE initcap(so.status) END as status_display,
+                c.name as customer_name,
+                COALESCE(c.phone, '') as customer_phone,
+                COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), c.city, '') as billing_address,
+                so.order_date,
+                so.total_amount as sales_amount,
+                COALESCE(so.delivery_man, '') as delivery_man,
+                COALESCE(so.delivery_helper, '') as delivery_helper,
+                COALESCE(so.delivery_fee_khr, 0) as delivery_fee_khr,
+                COALESCE(so.delivery_notes, '') as delivery_notes
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
             WHERE {where_sql}
             ORDER BY {order_col}
             LIMIT %s OFFSET %s
@@ -2212,6 +2319,8 @@ def view_report(report_key):
                            category_groups=locals().get('category_groups', []),
                            customer_groups=locals().get('customer_groups', []),
                            sale_amount=sale_amount,
+                           all_delivery_men=all_delivery_men,
+                           delivery_man_filter=delivery_man_filter,
                            today_str=today_str)
 
 # -------------------------------------------------------------------------
@@ -2341,6 +2450,81 @@ def export_report(report_key):
                 f"{float(r['gross_profit'] or 0):.2f}"
             ])
         filename = f"Sales_Order_Profit_Report_{start_date}_{end_date}.csv"
+
+    elif report_key == 'delivery-person-assign':
+        writer.writerow(['Order Number', 'Status', 'Payment Method', 'Customer', 'Phone', 'Delivery Address', 'Order Date', 'Sales Amount ($)', 'Delivery Person', 'Delivery Fee (KHR)', 'Delivery Notes'])
+        base_where = ["so.order_date >= %s", "so.order_date <= %s", "so.status != 'CANCELLED'"]
+        params = [start_date, end_date]
+        if branch_scope == 'main':
+            base_where.append("(so.branch_id IS NULL OR so.branch_id = 0)")
+        elif branch_scope != 'all' and str(branch_scope).isdigit():
+            base_where.append("so.branch_id = %s")
+            params.append(int(branch_scope))
+
+        if customer_id and customer_id != 'all' and str(customer_id).isdigit():
+            base_where.append("so.customer_id = %s")
+            params.append(int(customer_id))
+        elif customer_search:
+            base_where.append("c.name ILIKE %s")
+            params.append(f"%{customer_search}%")
+
+        if status == 'Paid':
+            base_where.append("(so.payment_status = 'PAID' OR so.status = 'PAID')")
+        elif status == 'Open':
+            base_where.append("so.status = 'OPEN'")
+        elif status == 'Invoiced':
+            base_where.append("so.status = 'INVOICED'")
+        elif status != 'All':
+            base_where.append("so.status = %s")
+            params.append(status)
+
+        delivery_man_filter = request.args.get('delivery_man_filter', '').strip()
+        if delivery_man_filter == 'unassigned':
+            base_where.append("(so.delivery_man IS NULL OR TRIM(so.delivery_man) = '')")
+        elif delivery_man_filter == 'assigned':
+            base_where.append("(so.delivery_man IS NOT NULL AND TRIM(so.delivery_man) != '')")
+        elif delivery_man_filter and delivery_man_filter != 'all':
+            base_where.append("(so.delivery_man ILIKE %s OR so.delivery_man = 'ALL')")
+            params.append(f"%{delivery_man_filter}%")
+
+        if sale_amount:
+            apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
+        where_sql = " AND ".join(base_where)
+        rows = query_all(f"""
+            SELECT 
+                so.order_number,
+                CASE WHEN so.payment_status = 'PAID' THEN 'Paid' ELSE initcap(so.status) END as status_display,
+                COALESCE(so.payment_method, '') as payment_method,
+                c.name as customer_name,
+                COALESCE(c.phone, '') as customer_phone,
+                COALESCE(NULLIF(c.address1, ''), NULLIF(c.shipping_address, ''), c.city, '') as billing_address,
+                so.order_date,
+                so.total_amount as sales_amount,
+                COALESCE(so.delivery_man, '') as delivery_man,
+                COALESCE(so.delivery_fee_khr, 0) as delivery_fee_khr,
+                COALESCE(so.delivery_notes, '') as delivery_notes
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE {where_sql}
+            ORDER BY so.order_date DESC, so.order_number ASC
+        """, tuple(params))
+
+        for r in rows:
+            writer.writerow([
+                r['order_number'],
+                r['status_display'],
+                r['payment_method'],
+                r['customer_name'] or '',
+                r['customer_phone'] or '',
+                r['billing_address'] or '',
+                str(r['order_date']),
+                f"{float(r['sales_amount'] or 0):.2f}",
+                r['delivery_man'] or '',
+                r['delivery_fee_khr'] or 0,
+                r['delivery_notes'] or ''
+            ])
+        filename = f"Delivery_Person_Assign_{start_date}_{end_date}.csv"
 
     elif report_key == 'sales-by-product-summary':
         costing_scheme_id_param = request.args.get('costing_scheme_id', '').strip()

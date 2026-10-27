@@ -850,6 +850,7 @@
         <input type="hidden" name="customer_id" id="repCustomerId" value="{{ customer_id or '' }}">
         <input type="hidden" name="customer_search" id="formCustomerSearchInput" value="{{ customer_search or '' }}">
         <input type="hidden" name="sale_amount" id="formSaleAmountInput" value="{{ sale_amount or '' }}">
+        <input type="hidden" name="delivery_man_filter" id="formDeliveryManFilterInput" value="{{ delivery_man_filter or '' }}">
         <input type="hidden" name="category_id" id="formCategoryIdInput" value="{{ category_id }}">
         <input type="hidden" name="costing_scheme_id" id="formCostingSchemeInput" value="{{ costing_scheme_id }}">
         <input type="hidden" name="currency" id="formCurrencyInput" value="{{ currency }}">
@@ -1038,6 +1039,38 @@
                 </div>
             </div>
 
+            <!-- 7. Delivery Person Filter Chip -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapDeliveryMan" {% if report_key != 'delivery-person-assign' %}style="display: none;"{% endif %}>
+                <button type="button" class="inflow-chip-pill {% if delivery_man_filter and delivery_man_filter != 'all' %}active-purple{% endif %}" onclick="toggleChipPopover('popoverDeliveryMan', event)">
+                    <span>🛵</span>
+                    <span id="chipDeliveryManLabel">
+                        {% if not delivery_man_filter or delivery_man_filter == 'all' %}
+                            Driver: All
+                        {% elif delivery_man_filter == 'unassigned' %}
+                            Driver: ⚠️ Unassigned
+                        {% elif delivery_man_filter == 'assigned' %}
+                            Driver: ✓ Assigned
+                        {% else %}
+                            Driver: {{ delivery_man_filter }}
+                        {% endif %}
+                    </span>
+                </button>
+                <div id="popoverDeliveryMan" class="inflow-popover-dropdown" style="min-width: 210px;">
+                    <div class="popover-search-wrap">
+                        <input type="text" class="popover-search-input" placeholder="Search driver..." oninput="filterPopoverList(this, 'popoverDeliveryManList')">
+                    </div>
+                    <div class="popover-list" id="popoverDeliveryManList">
+                        <div class="popover-item {% if not delivery_man_filter or delivery_man_filter == 'all' %}selected{% endif %}" onclick="selectFilterDeliveryMan('all')">🌐 All Drivers</div>
+                        <div class="popover-item {% if delivery_man_filter == 'unassigned' %}selected{% endif %}" onclick="selectFilterDeliveryMan('unassigned')">⚠️ Unassigned Only</div>
+                        <div class="popover-item {% if delivery_man_filter == 'assigned' %}selected{% endif %}" onclick="selectFilterDeliveryMan('assigned')">✓ Assigned Only</div>
+                        <div class="popover-separator popover-date-sep"></div>
+                        {% for dm in (all_delivery_men or []) %}
+                        <div class="popover-item {% if delivery_man_filter == dm.name %}selected{% endif %}" onclick="selectFilterDeliveryMan('{{ dm.name|e }}')">🛵 {{ dm.name }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
             <!-- Top Filterbar Quick Generate & Refresh Buttons -->
             <button type="button" class="inflow-web-generate-btn" onclick="submitReportForm()">
                 Generate
@@ -1073,6 +1106,40 @@
             </div>
         </div>
     </div>
+
+    <!-- Delivery Person Assign KPI Summary Cards -->
+    {% if report_key == 'delivery-person-assign' %}
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 24px 0; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px; padding: 10px 14px;">
+        <div style="border-left: 3px solid #4C1D95; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Orders</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0F172A;">
+                <span id="repKpiTotalOrders">{{ totals.total_orders or 0 }}</span> <span style="font-size: 11px; font-weight: 600; color: #4C1D95;">orders</span>
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Filtered period</div>
+        </div>
+        <div style="border-left: 3px solid #059669; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Assigned Drivers</div>
+            <div style="font-size: 16px; font-weight: 700; color: #059669;">
+                <span id="repKpiAssignedOrders">{{ totals.assigned_orders or 0 }}</span> <span style="font-size: 11px; font-weight: 600; color: #059669;">orders</span>
+            </div>
+            <div style="font-size: 10px; color: #059669; margin-top: 2px;">✓ Driver assigned</div>
+        </div>
+        <div style="border-left: 3px solid #D97706; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Unassigned</div>
+            <div style="font-size: 16px; font-weight: 700; color: #D97706;">
+                <span id="repKpiUnassignedOrders">{{ totals.unassigned_orders or 0 }}</span> <span style="font-size: 11px; font-weight: 600; color: #D97706;">orders</span>
+            </div>
+            <div style="font-size: 10px; color: #D97706; margin-top: 2px;">⚠️ Pending driver assignment</div>
+        </div>
+        <div style="border-left: 3px solid #2563EB; padding-left: 8px;">
+            <div style="font-size: 10px; color: #64748B; text-transform: uppercase; font-weight: 600;">Total Sales Amount</div>
+            <div style="font-size: 16px; font-weight: 700; color: #0F172A;">
+                ${{ "{:,.2f}".format(totals.sales_amount or 0) }}
+            </div>
+            <div style="font-size: 10px; color: #64748B; margin-top: 2px;">Order total revenue</div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Branch Sales Report KPI Summary Cards (for branch-sales-summary) -->
     {% if report_key == 'branch-sales-summary' %}
@@ -1239,6 +1306,139 @@
                     <td id="repTotalSalesVal" style="text-align: right; font-weight: 700; font-size: 13px;">${{ "%.2f"|format(totals.sales_amount or 0) }}</td>
                     <td id="repTotalCostVal" style="text-align: right; font-weight: 700; font-size: 13px; color: #475569;">${{ "%.2f"|format(totals.costing or 0) }}</td>
                     <td id="repTotalProfitVal" style="text-align: right; font-weight: 700; font-size: 13px; color: {% if (totals.gross_profit or 0) < 0 %}#DC2626{% else %}#047857{% endif %};">{% if (totals.gross_profit or 0) < 0 %}-${{ "%.2f"|format(-(totals.gross_profit or 0)) }}{% else %}${{ "%.2f"|format(totals.gross_profit or 0) }}{% endif %}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+
+            {% elif report_key == 'delivery-person-assign' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th" style="width: 38px; text-align: center;">
+                        <input type="checkbox" id="repDeliverySelectAll" onchange="toggleSelectAllDeliveryRows(this)" title="Select all orders on this page" style="cursor: pointer; accent-color: #4C1D95; width: 15px; height: 15px;">
+                    </th>
+                    <th style="width: 12%;">ORDER NUMBER</th>
+                    <th style="width: 13%;">STATUS / ACTION</th>
+                    <th style="width: 17%;">CUSTOMER</th>
+                    <th style="width: 21%;">DELIVERY ADDRESS &amp; PHONE</th>
+                    <th style="width: 9%;">ORDER DATE</th>
+                    <th style="width: 9%; text-align: right; cursor: pointer; user-select: none;" onclick="toggleSortBySalesAmount()" title="Click to sort by Sales Amount">SALES AMOUNT {% if sort_by == 'Sales Amount' %}▼{% endif %}</th>
+                    <th style="width: 19%;">DELIVERY PERSON ASSIGN</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% for r in rows %}
+                <tr class="inflow-report-row" id="rep-del-row-{{ r.id }}" data-order-id="{{ r.id }}" data-sales-amount="{{ r.sales_amount }}" data-delivery-man="{{ r.delivery_man or '' }}" data-delivery-fee="{{ (r.delivery_fee_khr or 0)|int }}" data-delivery-notes="{{ r.delivery_notes or '' }}">
+                    <td class="wrench-th" style="text-align: center;">
+                        <input type="checkbox" class="rep-del-order-chk" value="{{ r.id }}" data-order-num="{{ r.order_number }}" onchange="onDeliveryOrderChkChange()" style="cursor: pointer; accent-color: #4C1D95; width: 15px; height: 15px;">
+                    </td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('sales_orders.detail_order', id=r.id) }}" 
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=r.id) }}', 'Sales Order {{ r.order_number }}', 'sales', true); }" 
+                           style="color: #4C1D95; text-decoration: none;">{{ r.order_number }}</a>
+                    </td>
+                    <td id="repSoStatusCell-{{ r.id }}" class="rep-so-status-cell">
+                        {% if r.status_display == 'Paid' or r.payment_status == 'PAID' %}
+                        <div style="display: flex; flex-direction: column; gap: 2px;">
+                            <span class="rep-paid-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 700; background: #ECFDF5; color: #047857; width: fit-content; border: 1px solid #A7F3D0;">
+                                <span>✓ Paid</span>
+                                {% if r.payment_method %}
+                                <span style="font-size: 10px; font-weight: 600; color: #065F46; background: #D1FAE5; padding: 1px 5px; border-radius: 4px;">{{ r.payment_method }}</span>
+                                {% endif %}
+                            </span>
+                            {% if r.completed_by %}
+                            <span style="font-size: 10.5px; color: #64748B; padding-left: 2px;" title="Completed by {{ r.completed_by }}">
+                                by <strong style="color: #334155;">{{ r.completed_by }}</strong>
+                            </span>
+                            {% endif %}
+                        </div>
+                        {% else %}
+                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                            <span class="rep-status-badge" style="display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 11px; font-weight: 600; background: #F1F5F9; color: #475569; border: 1px solid #E2E8F0;">
+                                {{ r.status_display }}
+                            </span>
+                            <button type="button" 
+                                    class="rep-quick-complete-btn" 
+                                    data-order-id="{{ r.id }}"
+                                    data-order-number="{{ r.order_number }}"
+                                    data-sales-amount="{{ '%.2f'|format(r.sales_amount) }}"
+                                    data-customer="{{ r.customer_name or '' }}"
+                                    data-method="{{ r.payment_method or 'ABA Bank' }}"
+                                    onclick="openReportQuickPayFromBtn(this)"
+                                    title="Complete & Pay this order directly">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Pay</span>
+                            </button>
+                        </div>
+                        {% endif %}
+                    </td>
+                    <td style="font-weight: 500;">
+                        <div style="color: #0F172A; font-weight: 600;">{{ r.customer_name or 'No Customer' }}</div>
+                    </td>
+                    <td style="font-size: 11.5px; color: #4B5563;">
+                        {% if r.customer_phone %}
+                        <div style="display: flex; align-items: center; gap: 4px; font-weight: 600; color: #1E293B; margin-bottom: 2px;">
+                            <span style="font-size: 12px;">📞</span>
+                            <a href="tel:{{ r.customer_phone }}" style="color: #0284C7; text-decoration: none;">{{ r.customer_phone }}</a>
+                        </div>
+                        {% endif %}
+                        {% if r.billing_address %}
+                        <div style="color: #64748B; line-height: 1.3;" title="{{ r.billing_address }}">
+                            📍 {{ r.billing_address }}
+                        </div>
+                        {% else %}
+                        <span style="color: #94A3B8; font-style: italic;">No address</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ r.order_date | format_inflow_date }}</td>
+                    <td class="rep-cell-sales-amount" style="text-align: right; font-weight: 600; color: #0F172A;">
+                        ${{ "%.2f"|format(r.sales_amount) }}
+                    </td>
+                    <td class="rep-cell-delivery" style="padding: 6px 10px;">
+                        <div class="rep-delivery-cell-wrap" id="repDeliveryCellWrap-{{ r.id }}" style="position: relative;">
+                            <div class="rep-delivery-trigger-btn" 
+                                 id="repDelTriggerBtn-{{ r.id }}"
+                                 onclick="openRowDeliveryPicker(event, {{ r.id }}, '{{ r.order_number }}', '{{ (r.delivery_man or '')|replace("'", "\\'") }}', {{ (r.delivery_fee_khr or 0)|int }}, '{{ (r.delivery_notes or '')|replace("'", "\\'") }}')" 
+                                 style="display: inline-flex; align-items: center; justify-content: space-between; gap: 6px; width: 100%; max-width: 240px; padding: 4px 8px; border-radius: 6px; border: 1.5px solid {% if r.delivery_man %}#CBD5E1{% else %}#FCD34D{% endif %}; background: {% if r.delivery_man %}#FFFFFF{% else %}#FFFBEB{% endif %}; cursor: pointer; transition: all 0.15s ease;"
+                                 onmouseover="this.style.borderColor='#9333EA'; this.style.boxShadow='0 2px 6px rgba(0,0,0,0.08)';"
+                                 onmouseout="this.style.borderColor='{% if r.delivery_man %}#CBD5E1{% else %}#FCD34D{% endif %}'; this.style.boxShadow='none';"
+                                 title="Click to assign delivery person or change logistics">
+                                <div style="display: flex; align-items: center; gap: 5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                    <span style="font-size: 13px;">🛵</span>
+                                    <span id="repDelNameDisp-{{ r.id }}" style="font-size: 11.5px; font-weight: 600; color: {% if r.delivery_man %}#0F172A{% else %}#B45309{% endif %}; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                        {% if r.delivery_man %}
+                                            {% if r.delivery_man == 'ALL' %}👥 ALL Drivers{% else %}{{ r.delivery_man }}{% endif %}
+                                        {% else %}
+                                            -- Unassigned --
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                                    {% if r.delivery_fee_khr and r.delivery_fee_khr > 0 %}
+                                    <span id="repDelFeeDisp-{{ r.id }}" style="font-size: 10px; font-weight: 700; color: #0284C7; background: #E0F2FE; padding: 1px 5px; border-radius: 4px;" title="Delivery fee: {{ "{:,}".format(r.delivery_fee_khr|int) }} KHR">
+                                        {{ "{:,}".format(r.delivery_fee_khr|int) }}៛
+                                    </span>
+                                    {% else %}
+                                    <span id="repDelFeeDisp-{{ r.id }}" style="display: none; font-size: 10px; font-weight: 700; color: #0284C7; background: #E0F2FE; padding: 1px 5px; border-radius: 4px;"></span>
+                                    {% endif %}
+                                    <span style="font-size: 10px; color: #64748B;">▾</span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr id="repGrandTotalsRow">
+                    <td colspan="5" id="repGrandTotalsLabel" style="text-align: right; font-weight: 700;">
+                        Grand Totals ({{ total_count }} orders: <span style="color: #047857;">{{ totals.assigned_orders or 0 }} Assigned</span>, <span style="color: #D97706;">{{ totals.unassigned_orders or 0 }} Unassigned</span>):
+                    </td>
+                    <td></td>
+                    <td id="repTotalSalesVal" style="text-align: right; font-weight: 700; font-size: 13px; color: #0F172A;">
+                        ${{ "%.2f"|format(totals.sales_amount or 0) }}
+                    </td>
+                    <td></td>
                 </tr>
             </tfoot>
             {% endif %}
@@ -2131,8 +2331,164 @@
     </div>
 </div>
 
+<!-- Modal: Row-Level Delivery Person Assignment (Matching SO page logistics selector) -->
+<div id="repRowDeliveryModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100050; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div class="inflow-modal-box" style="max-width: 440px; width: 95%; border-radius: 10px; box-shadow: 0 20px 48px rgba(0,0,0,0.3); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: linear-gradient(135deg, #4C1D95, #6D28D9); color: #FFFFFF; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                <span style="font-size: 18px;">🛵</span>
+                <span>Assign Delivery Person (<span id="repRowDelModalOrderNum">SO</span>)</span>
+            </div>
+            <button type="button" onclick="closeRowDeliveryModal()" style="color: #E9D5FF; font-size: 18px; background: none; border: none; cursor: pointer; padding: 0 4px; line-height: 1;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 16px 20px; background: #FFFFFF; display: flex; flex-direction: column; gap: 14px; width: 100%; box-sizing: border-box;">
+            <!-- Delivery Person Selection List -->
+            <div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                    <label style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em;">
+                        Select Delivery Driver(s)
+                    </label>
+                    <button type="button" onclick="openNewDeliveryManReportModal()" style="border: none; background: #EDE9FE; color: #6D28D9; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; cursor: pointer;">
+                        + New Driver
+                    </button>
+                </div>
+                
+                <div style="border: 1.5px solid #CBD5E1; border-radius: 8px; overflow: hidden; background: #FFFFFF;">
+                    <!-- None option -->
+                    <div class="rep-dm-modal-item" onclick="selectRowDeliveryNone()" style="padding: 8px 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #64748B; border-bottom: 1px solid #F1F5F9;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+                        <input type="radio" name="rep_row_dm_radio" id="rep_row_dm_none" style="pointer-events: none;">
+                        <span>-- None (Unassigned) --</span>
+                    </div>
+
+                    <!-- ALL option -->
+                    <div class="rep-dm-modal-item" onclick="selectRowDeliveryAll()" style="padding: 8px 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; background: #F0FDF4; font-weight: 700; color: #15803D; border-bottom: 1px solid #E2E8F0;" onmouseover="this.style.background='#DCFCE7'" onmouseout="this.style.background='#F0FDF4'">
+                        <input type="checkbox" id="rep_row_dm_all" style="pointer-events: none; accent-color: #16A34A;">
+                        <div style="flex: 1;">
+                            <div>👥 ALL Delivery Persons</div>
+                            <div style="font-size: 10px; font-weight: 500; color: #166534;">Divide delivery fee equally to all</div>
+                        </div>
+                    </div>
+
+                    <!-- Individual drivers -->
+                    <div style="max-height: 160px; overflow-y: auto;" id="repRowDeliveryChecklist">
+                        {% for dm in (all_delivery_men or []) %}
+                        <div class="rep-dm-modal-item rep-row-dm-chk-item" data-name="{{ dm.name|e }}" onclick="toggleRowDeliverySingle('{{ dm.name|replace("'", "\\'") }}')" style="padding: 7px 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #0F172A; border-bottom: 1px solid #F8FAFC;" onmouseover="this.style.background='#F8FAFC'" onmouseout="this.style.background='transparent'">
+                            <input type="checkbox" class="rep-row-dm-person-chk" data-name="{{ dm.name|e }}" style="pointer-events: none; accent-color: #7C3AED;">
+                            <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <span style="font-weight: 600;">{{ dm.name }}</span>
+                                {% if dm.phone %}<span style="font-size: 10.5px; color: #64748B; font-family: monospace;"> ({{ dm.phone }})</span>{% endif %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div id="repRowDmSelectionSummary" style="font-size: 11px; color: #6D28D9; font-weight: 600; margin-top: 4px; padding-left: 2px;"></div>
+            </div>
+
+            <!-- Delivery Fee (KHR) Input & Presets -->
+            <div>
+                <label style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 5px;">
+                    Delivery Fee (KHR)
+                </label>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <input type="number" id="repRowDeliveryFeeInput" min="0" step="100" placeholder="0" 
+                           style="width: 140px; height: 32px; font-size: 14px; font-weight: 700; color: #0F172A; padding: 4px 10px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;">
+                    <span style="font-size: 12px; font-weight: 600; color: #64748B;">៛ (Riels)</span>
+                </div>
+                <!-- Quick Fee Presets -->
+                <div style="display: flex; gap: 5px; margin-top: 6px; flex-wrap: wrap;">
+                    <button type="button" onclick="setRowDeliveryFeePreset(0)" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 10.5px; cursor: pointer; color: #475569;">0 ៛</button>
+                    <button type="button" onclick="setRowDeliveryFeePreset(2000)" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 10.5px; cursor: pointer; color: #475569;">2,000 ៛</button>
+                    <button type="button" onclick="setRowDeliveryFeePreset(3000)" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 10.5px; cursor: pointer; color: #475569;">3,000 ៛</button>
+                    <button type="button" onclick="setRowDeliveryFeePreset(4000)" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 10.5px; cursor: pointer; color: #475569;">4,000 ៛</button>
+                    <button type="button" onclick="setRowDeliveryFeePreset(5000)" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 10.5px; cursor: pointer; color: #475569;">5,000 ៛</button>
+                    <button type="button" onclick="setRowDeliveryFeePreset(8000)" style="background: #F1F5F9; border: 1px solid #CBD5E1; border-radius: 4px; padding: 2px 7px; font-size: 10.5px; cursor: pointer; color: #475569;">8,000 ៛</button>
+                </div>
+            </div>
+
+            <!-- Delivery Notes Input -->
+            <div>
+                <label style="font-size: 11.5px; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 5px;">
+                    Delivery Notes (Optional)
+                </label>
+                <input type="text" id="repRowDeliveryNotesInput" placeholder="e.g. Call before delivery, gate code 1234..." 
+                       style="width: 100%; height: 32px; font-size: 12px; padding: 4px 10px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;">
+            </div>
+
+            <div id="repRowDeliveryErrorAlert" style="display: none; color: #DC2626; background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 8px 12px; font-size: 12px;"></div>
+        </div>
+        <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 12px 18px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid #E2E8F0;">
+            <button type="button" onclick="closeRowDeliveryModal()" style="padding: 6px 14px; font-size: 12px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; cursor: pointer;">Cancel</button>
+            <button type="button" id="btnSaveRowDelivery" onclick="saveRowDeliveryLogistics()" style="background: #4C1D95; color: #FFFFFF; font-weight: 700; font-size: 12px; padding: 6px 18px; border: none; border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                <span>✓ Save &amp; Apply</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Quick Add New Delivery Person -->
+<div id="newDeliveryManReportModal" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100060; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+    <div class="inflow-modal-box" style="max-width: 360px; width: 95%; border-radius: 10px; box-shadow: 0 20px 48px rgba(0,0,0,0.3); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
+        <div class="inflow-modal-header" style="background: #1E293B; color: #FFFFFF; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+            <div style="font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                <span>🛵</span>
+                <span>Add Delivery Person</span>
+            </div>
+            <button type="button" onclick="closeNewDeliveryManReportModal()" style="color: #94A3B8; font-size: 16px; background: none; border: none; cursor: pointer;">✕</button>
+        </div>
+        <div class="inflow-modal-body" style="padding: 16px; background: #FFFFFF; display: flex; flex-direction: column; gap: 12px; box-sizing: border-box;">
+            <div id="repNewDmError" style="display: none; color: #DC2626; background: #FEE2E2; border: 1px solid #FCA5A5; border-radius: 6px; padding: 6px 10px; font-size: 11.5px;"></div>
+            <div>
+                <label style="font-size: 11.5px; font-weight: 600; color: #334155; display: block; margin-bottom: 4px;">Name *</label>
+                <input type="text" id="repNewDmNameInput" placeholder="Driver name (e.g. Dara)" style="width: 100%; height: 32px; font-size: 12.5px; padding: 4px 8px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;">
+            </div>
+            <div>
+                <label style="font-size: 11.5px; font-weight: 600; color: #334155; display: block; margin-bottom: 4px;">Phone (optional)</label>
+                <input type="text" id="repNewDmPhoneInput" placeholder="e.g. 012 345 678" style="width: 100%; height: 32px; font-size: 12.5px; padding: 4px 8px; border: 1.5px solid #CBD5E1; border-radius: 6px; box-sizing: border-box;">
+            </div>
+        </div>
+        <div class="inflow-modal-footer" style="background: #F8FAFC; padding: 10px 16px; display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid #E2E8F0;">
+            <button type="button" onclick="closeNewDeliveryManReportModal()" style="padding: 5px 12px; font-size: 11.5px; border: 1px solid #CBD5E1; background: #FFFFFF; border-radius: 4px; cursor: pointer;">Cancel</button>
+            <button type="button" onclick="submitNewDeliveryManReport()" style="background: #4C1D95; color: #FFFFFF; font-weight: 700; font-size: 11.5px; padding: 5px 14px; border: none; border-radius: 4px; cursor: pointer;">Save Driver</button>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Batch Delivery Assignment Bar -->
+<div id="repDeliveryBatchBar" style="display: none; position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1E1B4B; color: #FFFFFF; border-radius: 10px; box-shadow: 0 12px 36px rgba(0,0,0,0.35); padding: 10px 18px; z-index: 100040; align-items: center; gap: 14px; border: 1px solid #4338CA; animation: repSlideUp 0.2s ease-out;">
+    <div style="display: flex; align-items: center; gap: 8px;">
+        <span style="background: #6D28D9; color: #FFFFFF; padding: 2px 8px; border-radius: 9999px; font-weight: 700; font-size: 12px;" id="repBatchSelectedCount">0</span>
+        <span style="font-weight: 600; font-size: 12.5px;">orders selected</span>
+    </div>
+    <div style="height: 18px; width: 1px; background: rgba(255,255,255,0.25);"></div>
+    <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 12px; color: #C7D2FE;">Assign To:</span>
+        <select id="repBatchDriverSelect" style="background: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; border-radius: 6px; padding: 4px 8px; font-size: 12px; font-weight: 600; outline: none;">
+            <option value="">-- Choose Driver --</option>
+            <option value="none">-- None (Unassigned) --</option>
+            <option value="ALL">👥 ALL Delivery Persons</option>
+            {% for dm in (all_delivery_men or []) %}
+            <option value="{{ dm.name }}">{{ dm.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div style="display: flex; align-items: center; gap: 6px;">
+        <span style="font-size: 12px; color: #C7D2FE;">Fee (៛):</span>
+        <input type="number" id="repBatchFeeInput" placeholder="0" min="0" step="100" style="width: 80px; background: #FFFFFF; color: #0F172A; border: 1px solid #CBD5E1; border-radius: 6px; padding: 4px 6px; font-size: 12px; outline: none;">
+    </div>
+    <button type="button" onclick="applyBatchDeliveryAssign()" id="btnRepBatchApply" style="background: #10B981; color: #FFFFFF; border: none; border-radius: 6px; padding: 6px 14px; font-weight: 700; font-size: 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;">
+        <span>✓ Apply</span>
+    </button>
+    <button type="button" onclick="clearBatchDeliverySelection()" style="background: transparent; color: #94A3B8; border: 1px solid #4B5563; border-radius: 6px; padding: 5px 10px; font-size: 11px; cursor: pointer;">
+        ✕ Clear
+    </button>
+</div>
+
 <script id="allCustomersData" type="application/json">
 {{ all_customers | tojson }}
+</script>
+<script id="allDeliveryMenData" type="application/json">
+{{ (all_delivery_men or []) | tojson }}
 </script>
 
 <script>
@@ -2937,6 +3293,416 @@ function showReportFloatingToast(message, type = 'success') {
         toast.style.opacity = '0';
         toast.style.transform = 'translateY(15px)';
     }, 4500);
+}
+
+/* ==========================================================================
+   Delivery Person Assign - Interactive Logistics & Batch Functions
+   ========================================================================== */
+function selectFilterDeliveryMan(val) {
+    const hiddenInput = document.getElementById('formDeliveryManFilterInput');
+    if (hiddenInput) hiddenInput.value = val;
+    const pageInput = document.getElementById('reportPageInput');
+    if (pageInput) pageInput.value = '1';
+    submitReportForm();
+}
+
+let currentDelOrderId = null;
+let currentDelOrderNum = '';
+let currentDelSelectedDrivers = [];
+
+function openRowDeliveryPicker(e, orderId, orderNum, currentDriver, currentFee, currentNotes) {
+    if (e) e.stopPropagation();
+    currentDelOrderId = orderId;
+    currentDelOrderNum = orderNum;
+
+    const numSpan = document.getElementById('repRowDelModalOrderNum');
+    if (numSpan) numSpan.innerText = orderNum || ('SO #' + orderId);
+
+    const feeInput = document.getElementById('repRowDeliveryFeeInput');
+    if (feeInput) feeInput.value = parseInt(currentFee) || 0;
+
+    const notesInput = document.getElementById('repRowDeliveryNotesInput');
+    if (notesInput) notesInput.value = currentNotes || '';
+
+    const errAlert = document.getElementById('repRowDeliveryErrorAlert');
+    if (errAlert) errAlert.style.display = 'none';
+
+    // Parse current driver
+    const driverStr = (currentDriver || '').trim();
+    if (!driverStr) {
+        currentDelSelectedDrivers = [];
+    } else if (driverStr.toUpperCase() === 'ALL' || driverStr.toUpperCase() === 'ALL DELIVERY PERSONS') {
+        currentDelSelectedDrivers = ['ALL'];
+    } else {
+        currentDelSelectedDrivers = driverStr.split(',').map(s => s.trim()).filter(Boolean);
+    }
+
+    renderRowDeliveryChecklistState();
+
+    const modal = document.getElementById('repRowDeliveryModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeRowDeliveryModal() {
+    const modal = document.getElementById('repRowDeliveryModal');
+    if (modal) modal.style.display = 'none';
+    currentDelOrderId = null;
+    currentDelOrderNum = '';
+    currentDelSelectedDrivers = [];
+}
+
+function renderRowDeliveryChecklistState() {
+    const isNone = (currentDelSelectedDrivers.length === 0);
+    const isAll = (currentDelSelectedDrivers.length === 1 && currentDelSelectedDrivers[0] === 'ALL');
+
+    const noneRadio = document.getElementById('rep_row_dm_none');
+    if (noneRadio) noneRadio.checked = isNone;
+
+    const allChk = document.getElementById('rep_row_dm_all');
+    if (allChk) allChk.checked = isAll;
+
+    document.querySelectorAll('.rep-row-dm-person-chk').forEach(chk => {
+        const name = chk.getAttribute('data-name');
+        chk.checked = !isNone && !isAll && currentDelSelectedDrivers.includes(name);
+    });
+
+    const summary = document.getElementById('repRowDmSelectionSummary');
+    if (summary) {
+        if (isNone) {
+            summary.innerText = 'No delivery person assigned';
+            summary.style.color = '#B45309';
+        } else if (isAll) {
+            summary.innerText = '👥 ALL Active Delivery Persons (Fee divides equally)';
+            summary.style.color = '#15803D';
+        } else {
+            summary.innerText = '✓ Assigned to: ' + currentDelSelectedDrivers.join(', ');
+            summary.style.color = '#6D28D9';
+        }
+    }
+}
+
+function selectRowDeliveryNone() {
+    currentDelSelectedDrivers = [];
+    renderRowDeliveryChecklistState();
+}
+
+function selectRowDeliveryAll() {
+    currentDelSelectedDrivers = ['ALL'];
+    renderRowDeliveryChecklistState();
+}
+
+function toggleRowDeliverySingle(name) {
+    if (!name) return;
+    if (currentDelSelectedDrivers.length === 1 && currentDelSelectedDrivers[0] === 'ALL') {
+        currentDelSelectedDrivers = [];
+    }
+    const idx = currentDelSelectedDrivers.indexOf(name);
+    if (idx >= 0) {
+        currentDelSelectedDrivers.splice(idx, 1);
+    } else {
+        currentDelSelectedDrivers.push(name);
+    }
+    renderRowDeliveryChecklistState();
+}
+
+function setRowDeliveryFeePreset(fee) {
+    const feeInput = document.getElementById('repRowDeliveryFeeInput');
+    if (feeInput) feeInput.value = fee;
+}
+
+function saveRowDeliveryLogistics() {
+    if (!currentDelOrderId) return;
+    const orderId = currentDelOrderId;
+    const orderNum = currentDelOrderNum;
+
+    let driverVal = '';
+    if (currentDelSelectedDrivers.length === 1 && currentDelSelectedDrivers[0] === 'ALL') {
+        driverVal = 'ALL';
+    } else if (currentDelSelectedDrivers.length > 0) {
+        driverVal = currentDelSelectedDrivers.join(', ');
+    }
+
+    const feeVal = parseFloat(document.getElementById('repRowDeliveryFeeInput')?.value || 0) || 0;
+    const notesVal = (document.getElementById('repRowDeliveryNotesInput')?.value || '').trim();
+
+    const saveBtn = document.getElementById('btnSaveRowDelivery');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span>Saving...</span>';
+    }
+
+    fetch('/sales/' + orderId + '/update-delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            delivery_man: driverVal,
+            delivery_fee_khr: feeVal,
+            delivery_notes: notesVal
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span>✓ Save & Apply</span>';
+        }
+        if (data.success) {
+            updateRowDeliveryUI(orderId, driverVal, feeVal, notesVal);
+            recalcDeliveryKpis();
+            closeRowDeliveryModal();
+            showReportFloatingToast(`Delivery logistics saved for ${orderNum}!`, 'success');
+        } else {
+            const errAlert = document.getElementById('repRowDeliveryErrorAlert');
+            if (errAlert) {
+                errAlert.innerText = data.error || 'Failed to save delivery info.';
+                errAlert.style.display = 'block';
+            } else {
+                alert(data.error || 'Failed to save delivery info.');
+            }
+        }
+    })
+    .catch(err => {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span>✓ Save & Apply</span>';
+        }
+        alert('Network error updating delivery info: ' + err.message);
+    });
+}
+
+function updateRowDeliveryUI(orderId, driverVal, feeVal, notesVal) {
+    const row = document.getElementById('rep-del-row-' + orderId);
+    if (row) {
+        row.setAttribute('data-delivery-man', driverVal);
+        row.setAttribute('data-delivery-fee', feeVal);
+        row.setAttribute('data-delivery-notes', notesVal);
+    }
+    const nameDisp = document.getElementById('repDelNameDisp-' + orderId);
+    if (nameDisp) {
+        if (driverVal) {
+            nameDisp.innerText = (driverVal === 'ALL') ? '👥 ALL Drivers' : driverVal;
+            nameDisp.style.color = '#0F172A';
+        } else {
+            nameDisp.innerText = '-- Unassigned --';
+            nameDisp.style.color = '#B45309';
+        }
+    }
+    const triggerBtn = document.getElementById('repDelTriggerBtn-' + orderId);
+    if (triggerBtn) {
+        triggerBtn.style.borderColor = driverVal ? '#CBD5E1' : '#FCD34D';
+        triggerBtn.style.background = driverVal ? '#FFFFFF' : '#FFFBEB';
+    }
+    const feeDisp = document.getElementById('repDelFeeDisp-' + orderId);
+    if (feeDisp) {
+        if (feeVal > 0) {
+            feeDisp.innerText = feeVal.toLocaleString() + '៛';
+            feeDisp.style.display = 'inline-block';
+        } else {
+            feeDisp.style.display = 'none';
+        }
+    }
+}
+
+function recalcDeliveryKpis() {
+    const rows = document.querySelectorAll('.inflow-report-row[data-order-id]');
+    let assigned = 0;
+    let unassigned = 0;
+    rows.forEach(r => {
+        const dm = (r.getAttribute('data-delivery-man') || '').trim();
+        if (dm) assigned++;
+        else unassigned++;
+    });
+    const elAssigned = document.getElementById('repKpiAssignedOrders');
+    if (elAssigned) elAssigned.innerText = assigned;
+    const elUnassigned = document.getElementById('repKpiUnassignedOrders');
+    if (elUnassigned) elUnassigned.innerText = unassigned;
+}
+
+function openNewDeliveryManReportModal() {
+    const err = document.getElementById('repNewDmError');
+    if (err) err.style.display = 'none';
+    const nameInput = document.getElementById('repNewDmNameInput');
+    if (nameInput) {
+        nameInput.value = '';
+        setTimeout(() => nameInput.focus(), 100);
+    }
+    const phoneInput = document.getElementById('repNewDmPhoneInput');
+    if (phoneInput) phoneInput.value = '';
+
+    const modal = document.getElementById('newDeliveryManReportModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeNewDeliveryManReportModal() {
+    const modal = document.getElementById('newDeliveryManReportModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function submitNewDeliveryManReport() {
+    const name = (document.getElementById('repNewDmNameInput')?.value || '').trim();
+    const phone = (document.getElementById('repNewDmPhoneInput')?.value || '').trim();
+    const errBox = document.getElementById('repNewDmError');
+
+    if (!name) {
+        if (errBox) {
+            errBox.innerText = 'Please enter delivery person name.';
+            errBox.style.display = 'block';
+        }
+        return;
+    }
+
+    fetch('{{ url_for("sales_orders.add_delivery_man_ajax") }}', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name, phone: phone })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            const checklist = document.getElementById('repRowDeliveryChecklist');
+            if (checklist) {
+                const itemDiv = document.createElement('div');
+                itemDiv.className = 'rep-dm-modal-item rep-row-dm-chk-item';
+                itemDiv.setAttribute('data-name', name);
+                itemDiv.style.cssText = 'padding: 7px 12px; font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #0F172A; border-bottom: 1px solid #F8FAFC;';
+                itemDiv.onmouseover = () => itemDiv.style.background = '#F8FAFC';
+                itemDiv.onmouseout = () => itemDiv.style.background = 'transparent';
+                itemDiv.onclick = () => toggleRowDeliverySingle(name);
+                itemDiv.innerHTML = `
+                    <input type="checkbox" class="rep-row-dm-person-chk" data-name="${escapeHtml(name)}" style="pointer-events: none; accent-color: #7C3AED;">
+                    <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <span style="font-weight: 600;">${escapeHtml(name)}</span>
+                        ${phone ? `<span style="font-size: 10.5px; color: #64748B; font-family: monospace;"> (${escapeHtml(phone)})</span>` : ''}
+                    </div>
+                `;
+                checklist.appendChild(itemDiv);
+            }
+
+            const batchSel = document.getElementById('repBatchDriverSelect');
+            if (batchSel) {
+                const opt = document.createElement('option');
+                opt.value = name;
+                opt.text = name;
+                batchSel.appendChild(opt);
+            }
+
+            if (currentDelSelectedDrivers.length === 1 && currentDelSelectedDrivers[0] === 'ALL') {
+                currentDelSelectedDrivers = [];
+            }
+            if (!currentDelSelectedDrivers.includes(name)) {
+                currentDelSelectedDrivers.push(name);
+            }
+            renderRowDeliveryChecklistState();
+
+            closeNewDeliveryManReportModal();
+            showReportFloatingToast(`Driver '${name}' added successfully!`, 'success');
+        } else {
+            if (errBox) {
+                errBox.innerText = data.message || 'Error saving delivery person.';
+                errBox.style.display = 'block';
+            }
+        }
+    })
+    .catch(err => {
+        if (errBox) {
+            errBox.innerText = 'Network error: ' + err.message;
+            errBox.style.display = 'block';
+        }
+    });
+}
+
+function toggleSelectAllDeliveryRows(masterChk) {
+    const isChecked = masterChk.checked;
+    document.querySelectorAll('.rep-del-order-chk').forEach(chk => {
+        chk.checked = isChecked;
+    });
+    onDeliveryOrderChkChange();
+}
+
+function onDeliveryOrderChkChange() {
+    const checkedBoxes = document.querySelectorAll('.rep-del-order-chk:checked');
+    const totalBoxes = document.querySelectorAll('.rep-del-order-chk');
+    const masterChk = document.getElementById('repDeliverySelectAll');
+    if (masterChk) {
+        masterChk.checked = (checkedBoxes.length > 0 && checkedBoxes.length === totalBoxes.length);
+        masterChk.indeterminate = (checkedBoxes.length > 0 && checkedBoxes.length < totalBoxes.length);
+    }
+
+    const batchBar = document.getElementById('repDeliveryBatchBar');
+    const countSpan = document.getElementById('repBatchSelectedCount');
+    if (checkedBoxes.length > 0) {
+        if (countSpan) countSpan.innerText = checkedBoxes.length;
+        if (batchBar) batchBar.style.display = 'flex';
+    } else {
+        if (batchBar) batchBar.style.display = 'none';
+    }
+}
+
+function clearBatchDeliverySelection() {
+    document.querySelectorAll('.rep-del-order-chk').forEach(c => c.checked = false);
+    const masterChk = document.getElementById('repDeliverySelectAll');
+    if (masterChk) {
+        masterChk.checked = false;
+        masterChk.indeterminate = false;
+    }
+    const batchBar = document.getElementById('repDeliveryBatchBar');
+    if (batchBar) batchBar.style.display = 'none';
+}
+
+function applyBatchDeliveryAssign() {
+    const checkedBoxes = document.querySelectorAll('.rep-del-order-chk:checked');
+    if (!checkedBoxes.length) return;
+
+    const orderIds = Array.from(checkedBoxes).map(c => parseInt(c.value));
+    const selDriver = document.getElementById('repBatchDriverSelect')?.value;
+    if (!selDriver) {
+        alert('Please choose a delivery person or select unassigned.');
+        return;
+    }
+
+    const driverVal = (selDriver === 'none') ? '' : selDriver;
+    const feeVal = parseFloat(document.getElementById('repBatchFeeInput')?.value || 0) || 0;
+
+    const btn = document.getElementById('btnRepBatchApply');
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>Updating...</span>';
+    }
+
+    fetch('/sales/batch-update-delivery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            order_ids: orderIds,
+            delivery_man: driverVal,
+            delivery_fee_khr: feeVal,
+            delivery_notes: ''
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>✓ Apply</span>';
+        }
+        if (data.success) {
+            orderIds.forEach(id => {
+                updateRowDeliveryUI(id, driverVal, feeVal, '');
+            });
+            recalcDeliveryKpis();
+            clearBatchDeliverySelection();
+            showReportFloatingToast(`Assigned delivery to ${orderIds.length} orders successfully!`, 'success');
+        } else {
+            alert(data.error || 'Failed to batch update delivery.');
+        }
+    })
+    .catch(err => {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = '<span>✓ Apply</span>';
+        }
+        alert('Network error during batch assignment: ' + err.message);
+    });
 }
 </script>
 {% endblock %}

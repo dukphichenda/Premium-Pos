@@ -4503,6 +4503,54 @@ def update_sales_delivery(id):
         return jsonify({'success': False, 'error': str(e)}), 400
 
 
+@sales_orders_bp.route('/sales/batch-update-delivery', methods=['POST'])
+def batch_update_sales_delivery():
+    try:
+        data = request.get_json(silent=True) or request.form
+        order_ids = data.get('order_ids') or []
+        if isinstance(order_ids, str):
+            order_ids = [int(x.strip()) for x in order_ids.split(',') if x.strip().isdigit()]
+        elif isinstance(order_ids, list):
+            order_ids = [int(x) for x in order_ids if str(x).isdigit()]
+
+        if not order_ids:
+            return jsonify({'success': False, 'error': 'No orders selected.'}), 400
+
+        delivery_man = (data.get('delivery_man') or '').strip()
+        if delivery_man.lower() in ('none', '-- none (unassigned) --', 'null', ''):
+            delivery_man = ''
+        delivery_fee_khr = float(data.get('delivery_fee_khr') or 0.0)
+        delivery_notes = (data.get('delivery_notes') or '').strip()
+
+        with get_db_cursor(commit=True) as cur:
+            if delivery_man and delivery_man.upper() not in ('ALL', 'ALL DELIVERY PERSONS', 'ALL ACTIVE'):
+                names = [p.strip() for p in delivery_man.split(',') if p.strip()] if ',' in delivery_man else [delivery_man]
+                for dm_name in names:
+                    if dm_name and dm_name.upper() not in ('ALL', 'ALL DELIVERY PERSONS'):
+                        cur.execute("""
+                            INSERT INTO delivery_men (name, is_active)
+                            VALUES (%s, TRUE)
+                            ON CONFLICT (name) DO UPDATE SET is_active = TRUE;
+                        """, (dm_name,))
+
+            cur.execute("""
+                UPDATE sales_orders
+                SET delivery_man = %s,
+                    delivery_fee_khr = %s,
+                    delivery_notes = COALESCE(NULLIF(%s, ''), delivery_notes),
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE id = ANY(%s)
+            """, (delivery_man or None, delivery_fee_khr, delivery_notes or None, order_ids))
+
+        return jsonify({
+            'success': True,
+            'message': f"Assigned delivery person to {len(order_ids)} orders successfully.",
+            'updated_count': len(order_ids)
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+
 @sales_orders_bp.route('/sales/<int:id>/export')
 def export_sales_order(id):
     import csv, io
