@@ -27,6 +27,33 @@ class TestMobileAppSettings(unittest.TestCase):
         self.assertIn('inFlow-Premium.apk', html)
         self.assertIn('/settings/mobile-app/update', html)
 
+        # Step-by-Step Wizard assertions
+        self.assertIn('id="mobileStep1"', html)
+        self.assertIn('id="mobileStep2"', html)
+        self.assertIn('id="mobileStep3"', html)
+        self.assertIn('id="mobileStep4"', html)
+        self.assertIn('id="mobileStep5"', html)
+        self.assertIn('id="mobileStep6"', html)
+        self.assertIn('id="wizardPill1"', html)
+        self.assertIn('id="wizardPill6"', html)
+        self.assertIn('Continue to Step 2: Colors', html)
+        self.assertIn('goToWizardStep(1)', html)
+        self.assertIn('toggleWizardMode()', html)
+
+        # Interactive Simulator assertions
+        self.assertIn('id="simScreen_nav_delivery"', html)
+        self.assertIn('id="simScreen_nav_orders"', html)
+        self.assertIn('id="simScreen_nav_reports"', html)
+        self.assertIn('id="simScreen_nav_scanner"', html)
+        self.assertIn('id="simScreen_nav_more"', html)
+        self.assertIn('id="simOrderModal"', html)
+        self.assertIn('id="simCallOverlay"', html)
+        self.assertIn('switchSimulatorTab', html)
+        self.assertIn('triggerSimCall', html)
+        self.assertIn('toggleSimOrderPaid', html)
+        self.assertIn('completeSimDelivery', html)
+        self.assertIn('simulateBarcodeScan', html)
+
     def test_api_mobile_config(self):
         resp = self.client.get('/api/mobile-config')
         self.assertEqual(resp.status_code, 200)
