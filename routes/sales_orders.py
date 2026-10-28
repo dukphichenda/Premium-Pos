@@ -2394,7 +2394,8 @@ def detail_order(id):
     if 'status_filter' in request.args:
         status_filter = request.args.get('status_filter', 'Open').strip()
         session['so_status_filter'] = status_filter
-        if status_filter and status_filter.lower() not in ('all', 'all orders'):
+        has_search = bool((request.args.get('search') or request.args.get('q') or session.get('so_search_query') or '').strip())
+        if not has_search and status_filter and status_filter.lower() not in ('all', 'all orders'):
             if not request.args.get('just_saved') and not _order_matches_status_filter(order, status_filter):
                 return redirect(url_for('sales_orders.list_orders',
                                         status=status_filter,

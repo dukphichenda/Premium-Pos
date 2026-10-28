@@ -4782,21 +4782,17 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     url.searchParams.delete('customer_id');
     url.searchParams.delete('customer_search');
 
-    // Preserve sale status (e.g. Open sale stays Open)
-    if (!url.searchParams.has('status_filter')) {
+    // Preserve sale status (e.g. Open sale stays Open) only if user is not actively searching
+    if (!activeSearch && !url.searchParams.has('status_filter')) {
         const curStatus = sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}';
         if (curStatus) url.searchParams.set('status_filter', curStatus);
     }
 
     const finalUrl = url.pathname + url.search;
 
-    // If not a sales order detail URL (e.g. /sales/new or branch switch), do normal navigation
+    // If not a sales order detail URL (e.g. /sales/new or branch switch), do normal navigation in current tab
     if (!targetOrderId) {
-        if (window.top && window.top.inflowMdi) {
-            window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
-        } else {
-            window.location.href = finalUrl;
-        }
+        window.location.href = finalUrl;
         return;
     }
 
@@ -4821,11 +4817,7 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         const doc = parser.parseFromString(html, 'text/html');
         const newCanvas = doc.querySelector('main.inflow-document-canvas');
         if (!newCanvas) {
-            if (window.top && window.top.inflowMdi) {
-                window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
-            } else {
-                window.location.href = finalUrl;
-            }
+            window.location.href = finalUrl;
             return;
         }
 
@@ -5046,11 +5038,7 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         const pBar = document.getElementById('soFastNavProgressBar');
         if (pBar) { pBar.style.display = 'none'; pBar.style.width = '0'; }
         console.warn('Fast partial swap error, falling back to full navigation:', err);
-        if (window.top && window.top.inflowMdi) {
-            window.top.inflowMdi.navigateOrOpenTab(finalUrl, 'Sales Order', 'sales');
-        } else {
-            window.location.href = finalUrl;
-        }
+        window.location.href = finalUrl;
     });
 }
 

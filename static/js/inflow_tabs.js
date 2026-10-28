@@ -661,7 +661,7 @@
              * 2. If staying in same category -> Transform / navigate current tab (NO new tab).
              * 3. Only create new tab when stepping to another category (e.g. Product -> Order History -> Sales Order).
              */
-            navigateOrOpenTab: function (url, title, type, forceNew = false, forceReload = false) {
+            navigateOrOpenTab: function (url, title, type, forceNew = false, forceReload = false, preferredTabId = null) {
                 if (!url) url = '/';
                 const cleanUrl = url.replace(/[?&]embed=1/, '');
 
@@ -692,7 +692,12 @@
                     return;
                 }
 
-                const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+                let callingTab = null;
+                if (preferredTabId) {
+                    callingTab = this.tabs.find(t => t.id === preferredTabId);
+                }
+                const activeTab = callingTab || this.tabs.find(t => t.id === this.activeTabId);
+                const targetTabId = activeTab ? activeTab.id : this.activeTabId;
                 const currentCategory = activeTab ? (activeTab.type || 'home') : 'home';
 
                 const getBaseCategory = (cat) => {
@@ -711,7 +716,7 @@
 
                 // Rule A: On Homepage tab -> transform tab to selected category below
                 if (currentCategory === 'home' || currentBase === 'home') {
-                    this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                    this.transformTab(targetTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
 
@@ -722,7 +727,7 @@
                 if (targetReportKey) {
                     // 1. If currently viewing the exact same report, refresh/navigate in current tab
                     if (currentReportKey && currentReportKey === targetReportKey) {
-                        this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                        this.transformTab(targetTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                         return;
                     }
 
@@ -745,17 +750,27 @@
                 }
 
                 // Rule B: Staying in same category -> navigate/transform within current tab (no new tab created!)
-                if (currentCategory === targetCategory || currentBase === targetBase) {
-                    this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                if (currentCategory === targetCategory || currentBase === targetBase || (currentBase === 'sales' && targetBase === 'sales')) {
+                    this.transformTab(targetTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
 
-                // Rule C: Stepping to others (different category) -> Create new tab
+                // Rule C: Stepping to others (different category)
                 // First check if an existing tab already has this specific URL open
                 const existing = this.tabs.find(t => t.url.replace(/[?&]embed=1/, '') === cleanUrl);
                 if (existing) {
                     this.switchTab(existing.id);
                     return;
+                }
+
+                // If target is sales (e.g. from customer or search) and a sales tab already exists, reload in that sales tab!
+                if (targetBase === 'sales') {
+                    const existingSalesTab = this.tabs.find(t => getBaseCategory(t.type) === 'sales');
+                    if (existingSalesTab) {
+                        this.switchTab(existingSalesTab.id);
+                        this.transformTab(existingSalesTab.id, cleanUrl, displayTitle, targetCategory, forceReload);
+                        return;
+                    }
                 }
 
                 // Create new tab for the foreign category document
@@ -789,7 +804,10 @@
                 }
 
                 const detectedType = newType || detectTypeFromUrl(cleanUrl);
-                const displayTitle = title || this.guessTitle(cleanUrl, detectedType);
+                let displayTitle = title || this.guessTitle(cleanUrl, detectedType);
+                if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order') {
+                    displayTitle = tab.title;
+                }
 
                 tab.url = cleanUrl;
                 tab.type = detectedType;
@@ -1489,14 +1507,23 @@
                     window.location.href = url;
                 }
             },
-            navigateOrOpenTab: function (url, title, type, forceNew, forceReload) {
+            navigateOrOpenTab: function (url, title, type, forceNew, forceReload, callingTabId) {
                 if (url && url.includes('/logout')) {
                     if (window.top) window.top.location.href = url;
                     else window.location.href = url;
                     return;
                 }
+                let detectedCaller = callingTabId || null;
+                try {
+                    if (!detectedCaller && window.frameElement) {
+                        const vp = window.frameElement.closest('.inflow-tab-viewport');
+                        if (vp && vp.id && vp.id.startsWith('viewport-')) {
+                            detectedCaller = vp.id.replace('viewport-', '');
+                        }
+                    }
+                } catch (e) {}
                 if (window.top && window.top.inflowMdi) {
-                    window.top.inflowMdi.navigateOrOpenTab(url, title, type, forceNew, forceReload);
+                    window.top.inflowMdi.navigateOrOpenTab(url, title, type, forceNew, forceReload, detectedCaller);
                 } else {
                     window.location.href = url;
                 }
