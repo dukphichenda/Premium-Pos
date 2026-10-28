@@ -843,7 +843,16 @@
                 if (vp) {
                     const ifr = vp.querySelector('iframe');
                     if (ifr) {
-                        ifr.src = appendEmbedParam(cleanUrl);
+                        const targetSrc = appendEmbedParam(cleanUrl);
+                        if (ifr.contentWindow) {
+                            try {
+                                ifr.contentWindow.location.href = targetSrc;
+                            } catch (e) {
+                                ifr.src = targetSrc;
+                            }
+                        } else {
+                            ifr.src = targetSrc;
+                        }
                     }
                 }
 
@@ -1577,7 +1586,7 @@
                 const href = link.getAttribute('href');
                 if (!href || href.startsWith('javascript:') || href.startsWith('#')) return;
                 if (link.getAttribute('target') === '_blank' || link.hasAttribute('download')) return;
-                if (link.getAttribute('data-no-tab') === 'true') return;
+                if (link.getAttribute('data-no-tab') === 'true' || link.classList.contains('sheet-tab-item') || link.closest('.sheet-tabs-container')) return;
                 if (href.includes('/export') || href.includes('/download') || href.includes('.xlsx') || href.includes('.pdf') || href.includes('.csv') || href.includes('.zip')) return;
 
                 // If link already had custom handler that called preventDefault, don't re-handle
