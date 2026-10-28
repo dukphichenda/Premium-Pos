@@ -978,7 +978,13 @@
             <div class="inflow-filter-chip-wrapper" id="repCustomerComboboxWrap">
                 <button type="button" class="inflow-chip-btn" onclick="toggleRepCustomerDropdown(event)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                    <span id="chipCustomerLabel">{% if selected_customer_name and selected_customer_name != '<All>' %}Customer: {{ selected_customer_name }}{% else %}Products / Customer{% endif %}</span>
+                    <span id="chipCustomerLabel">
+                        {% if 'purchase-order' in report_key or 'vendor' in report_key or 'purchas' in report_key %}
+                            {% if selected_vendor_name and selected_vendor_name != '<All>' %}Vendor: {{ selected_vendor_name }}{% else %}Vendor{% endif %}
+                        {% else %}
+                            {% if selected_customer_name and selected_customer_name != '<All>' %}Customer: {{ selected_customer_name }}{% else %}Products / Customer{% endif %}
+                        {% endif %}
+                    </span>
                 </button>
                 <div id="repCustomerDropdownMenu" class="inflow-popover-dropdown" style="min-width: 280px;">
                     <div class="popover-search-wrap" style="position: relative;">
@@ -2084,7 +2090,7 @@
                 <tr>
                     <th class="wrench-th">🔧</th>
                     <th style="width: 25%;">IDENTIFIER / ORDER #</th>
-                    <th style="width: 25%;">NAME / CUSTOMER</th>
+                    <th style="width: 25%;">{% if 'purchase-order' in report_key or 'purchas' in report_key or 'vendor' in report_key %}VENDOR NAME{% else %}NAME / CUSTOMER{% endif %}</th>
                     <th style="width: 15%;">DATE</th>
                     <th style="width: 15%;">STATUS</th>
                     <th style="width: 20%; text-align: right;">TOTAL AMOUNT</th>
@@ -2095,14 +2101,41 @@
                 {% for r in rows %}
                 <tr>
                     <td class="wrench-th"></td>
-                    <td style="font-weight: 600;">{{ r.order_number or r.sku or r.id }}</td>
-                    <td>{{ r.customer_name or r.name or r.item_name or '' }}</td>
+                    <td style="font-weight: 600;">
+                        {% if 'purchase-order' in report_key and r.id %}
+                        <a href="{{ url_for('purchase_orders.detail_purchase', id=r.id) }}" 
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.detail_purchase', id=r.id) }}', 'Purchase Order {{ r.order_number }}', 'purchase', true); }"
+                           style="color: #4C1D95; text-decoration: none; font-weight: 700;">{{ r.order_number }}</a>
+                        {% elif r.sales_order_id %}
+                        <a href="{{ url_for('sales_orders.detail_order', id=r.sales_order_id) }}"
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=r.sales_order_id) }}', 'Sales Order {{ r.order_number }}', 'sales', true); }"
+                           style="color: #4C1D95; text-decoration: none; font-weight: 700;">{{ r.order_number }}</a>
+                        {% else %}
+                        {{ r.order_number or r.sku or r.id }}
+                        {% endif %}
+                    </td>
+                    <td>{{ r.vendor_name or r.customer_name or r.name or r.item_name or '' }}</td>
                     <td>{{ r.order_date or r.created_at or today_str }}</td>
-                    <td>{{ r.status or 'Active' }}</td>
+                    <td>{{ r.status_display or r.status or 'Active' }}</td>
                     <td style="text-align: right; font-weight: 600;">${{ "%.2f"|format(r.total_amount or r.sales_amount or 0) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
+            <tfoot>
+                <tr style="background: #F8FAFC; border-top: 2px solid #CBD5E1; border-bottom: 2.5px solid #94A3B8;">
+                    <td class="wrench-th"></td>
+                    <td colspan="4" style="text-align: right; font-weight: 800; font-size: 13.5px; color: #1E293B; padding: 12px 14px;">
+                        {% if 'purchase-order' in report_key %}
+                        Total of All PO Amount ({{ total_count if total_count is defined else rows|length }} orders):
+                        {% else %}
+                        Total ({{ total_count if total_count is defined else rows|length }} records):
+                        {% endif %}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 15px; color: #0F172A; padding: 12px 14px; white-space: nowrap;">
+                        ${{ "%.2f"|format(totals.total_amount if (totals and totals.total_amount is defined) else (totals.amount if (totals and totals.amount is defined) else (totals.total_po if (totals and totals.total_po is defined) else (rows | sum(attribute='total_amount'))))) }}
+                    </td>
+                </tr>
+            </tfoot>
             {% endif %}
             {% endif %}
         </table>

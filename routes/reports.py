@@ -1528,6 +1528,8 @@ def view_report(report_key):
         t = query_one(totals_sql, tuple(params))
         totals = {
             'total_amount': float(t['total_po'] or 0),
+            'total_po': float(t['total_po'] or 0),
+            'amount': float(t['total_po'] or 0),
             'paid_amount': float(t['total_paid'] or 0),
             'balance_due': float(t['total_balance'] or 0)
         }
@@ -1535,8 +1537,8 @@ def view_report(report_key):
         query_params = list(params) + [per_page, offset]
         data_sql = f"""
             SELECT 
-                po.id, po.order_number, po.order_date, initcap(po.status) as status_display,
-                v.name as vendor_name,
+                po.id, po.order_number, po.order_date, po.status, initcap(po.status) as status_display,
+                COALESCE(v.name, 'N/A') as vendor_name,
                 po.total_amount, po.paid_amount, po.balance_due
             FROM purchase_orders po
             LEFT JOIN vendors v ON po.vendor_id = v.id
@@ -2344,6 +2346,14 @@ def view_report(report_key):
                 selected_category_name = c_item['name']
                 break
 
+    selected_vendor_name = ''
+    if vendor_id and str(vendor_id).lower() != 'all':
+        if str(vendor_id).isdigit():
+            for v_item in (all_vendors or []):
+                if str(v_item['id']) == str(vendor_id):
+                    selected_vendor_name = v_item['name']
+                    break
+
     return render_template('reports/viewer.html',
                            report_key=report_key,
                            meta=meta,
@@ -2358,6 +2368,7 @@ def view_report(report_key):
                            customer_search=customer_search,
                            selected_customer_name=selected_customer_name,
                            selected_category_name=selected_category_name,
+                           selected_vendor_name=selected_vendor_name,
                            vendor_id=vendor_id,
                            category_id=category_id,
                            location_id=location_id,
@@ -2792,8 +2803,18 @@ def export_report(report_key):
             WHERE po.order_date >= %s AND po.order_date <= %s
             ORDER BY po.order_date DESC
         """, (start_date, end_date))
+        total_export_amt = 0.0
+        total_export_paid = 0.0
+        total_export_bal = 0.0
         for r in rows:
-            writer.writerow([r['order_number'], r['vendor_name'] or '', str(r['order_date']), r['status'], f"{float(r['total_amount'] or 0):.2f}", f"{float(r['paid_amount'] or 0):.2f}", f"{float(r['balance_due'] or 0):.2f}"])
+            tot = float(r['total_amount'] or 0)
+            paid = float(r['paid_amount'] or 0)
+            bal = float(r['balance_due'] or 0)
+            total_export_amt += tot
+            total_export_paid += paid
+            total_export_bal += bal
+            writer.writerow([r['order_number'], r['vendor_name'] or '', str(r['order_date']), r['status'], f"{tot:.2f}", f"{paid:.2f}", f"{bal:.2f}"])
+        writer.writerow(['Total of All PO Amount', '', '', '', f"{total_export_amt:.2f}", f"{total_export_paid:.2f}", f"{total_export_bal:.2f}"])
         filename = f"Purchase_Order_Summary_{start_date}_{end_date}.csv"
 
     elif report_key == 'vendor-list':
