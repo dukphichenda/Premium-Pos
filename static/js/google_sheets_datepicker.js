@@ -447,6 +447,16 @@
     function attachToInput(input) {
         if (!input) return;
 
+        // Skip inputs that are hidden, native date inputs (unless explicitly requested), ghost inputs, or opted-out
+        if (input.type === 'hidden' || 
+            (input.type === 'date' && !input.classList.contains('gs-datepicker-input')) ||
+            input.classList.contains('po-ghost-date-input') ||
+            input.dataset.noDatepicker === 'true' ||
+            input.dataset.datepicker === 'none' ||
+            (input.closest && input.closest('.po-meta-field-row'))) {
+            return;
+        }
+
         input.classList.add('gs-datepicker-input');
 
         // Check if already in wrapper; if not, wrap cleanly
