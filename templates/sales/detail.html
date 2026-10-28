@@ -9466,6 +9466,7 @@ function clearSoLiveSearch() {
     }
     try {
         sessionStorage.removeItem('inflow_so_search_query');
+        sessionStorage.removeItem('inflow_so_drawer_customer_search');
     } catch(e) {}
 
     const btn = document.getElementById('btnClearSoSearch');
@@ -9474,9 +9475,10 @@ function clearSoLiveSearch() {
     handleSoLiveSearch('');
 
     const url = new URL(window.location.href);
-    url.searchParams.delete('search');
+    url.searchParams.set('search', '');
     url.searchParams.delete('q');
     url.searchParams.delete('customer_id');
+    url.searchParams.delete('customer_search');
 
     let curStatus = '';
     try {
@@ -9500,34 +9502,13 @@ function clearSoLiveSearch() {
         {% endif %}
     }
 
-    const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
-
-    // Sync search clear to server session
+    const targetUrl = '/sales' + url.search;
     try {
-        fetch(url.pathname + '?search=&partial=canvas', {
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-        }).catch(function() {});
+        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+            window.top.inflowMdi.updateActiveTabMeta(targetUrl, 'Sales Order');
+        }
     } catch(e) {}
-
-    if (hadServerSearch) {
-        const targetUrl = '/sales' + url.search;
-        try {
-            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
-                window.top.inflowMdi.updateActiveTabMeta(targetUrl, 'Sales Order');
-            }
-        } catch(e) {}
-        window.location.href = targetUrl;
-    } else {
-        try {
-            if (window.history && window.history.replaceState) {
-                window.history.replaceState(null, document.title, url.pathname + url.search);
-            }
-            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
-                window.top.inflowMdi.updateActiveTabMeta(url.pathname + url.search, document.title);
-            }
-        } catch(e) {}
-        if (inp) inp.focus();
-    }
+    window.location.href = targetUrl;
 }
 
 function handleSoSearchKey(e) {

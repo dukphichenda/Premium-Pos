@@ -574,21 +574,28 @@ def list_orders():
     # redirect directly to Sales Order workspace with modern sidebar.
     status_filter = request.args.get('status_filter') or request.args.get('status') or 'Open'
     date_filter = request.args.get('date_filter') or 'All'
-    search = request.args.get('search') or ''
+    search = (request.args.get('search') or request.args.get('q') or '').strip()
     customer_id = request.args.get('customer_id') or None
+
+    curr_user = (session.get('username') or '').strip().lower()
+    if not search or (curr_user and search.lower() == curr_user):
+        session.pop('so_search_query', None)
+        search = ''
+    else:
+        session['so_search_query'] = search
 
     latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=search, customer_id=customer_id)
 
     if latest:
         redirect_kwargs = {'id': latest['id'], 'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter, '_from_list': '1'}
-        if search:
+        if 'search' in request.args or 'q' in request.args:
             redirect_kwargs['search'] = search
         if customer_id:
             redirect_kwargs['customer_id'] = customer_id
         return redirect(url_for('sales_orders.detail_order', **redirect_kwargs))
 
     new_kwargs = {'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter}
-    if search:
+    if 'search' in request.args or 'q' in request.args:
         new_kwargs['search'] = search
     if customer_id:
         new_kwargs['customer_id'] = customer_id
@@ -1078,6 +1085,8 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     if search_query is None:
         if 'search' in request.args or 'q' in request.args:
             search_query = (request.args.get('search') or request.args.get('q') or '').strip()
+            if not search_query:
+                session.pop('so_search_query', None)
         else:
             search_query = (session.get('so_search_query') or '').strip()
 

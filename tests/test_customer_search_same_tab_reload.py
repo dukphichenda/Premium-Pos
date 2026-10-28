@@ -54,5 +54,10 @@ class TestCustomerSearchSameTabReload(unittest.TestCase):
         self.assertIn("def _order_matches_search(order, query):", self.routes_content)
         self.assertIn("if not search_query or _order_matches_search(single_order, search_query):", self.routes_content)
 
+    def test_clear_so_live_search_reloads_all_customers(self):
+        """Verify clearSoLiveSearch sets search='' and reloads /sales to restore all customers"""
+        self.assertIn("url.searchParams.set('search', '');", self.detail_content)
+        self.assertIn("session.pop('so_search_query', None)", self.routes_content)
+
 if __name__ == '__main__':
     unittest.main()
