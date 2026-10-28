@@ -412,9 +412,12 @@
         .so-modern-table-wrap {
             width: 100% !important;
             overflow-x: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            box-sizing: border-box !important;
         }
         .so-modern-table {
             width: 100% !important;
+            min-width: 820px !important;
             border-collapse: collapse !important;
             text-align: left !important;
         }
@@ -441,15 +444,45 @@
             vertical-align: middle !important;
             font-size: 12.5px !important;
         }
+        .line-item-thumb,
+        .line-item-thumb-placeholder {
+            width: 44px !important;
+            height: 44px !important;
+            border-radius: 8px !important;
+            object-fit: cover !important;
+        }
         .so-qty-wrapper {
             display: flex !important;
+            flex-direction: column !important;
             align-items: center !important;
-            gap: 4px !important;
-            width: 100% !important;
+            gap: 2px !important;
+            width: 68px !important;
+            margin: 0 auto !important;
+        }
+        .so-qty-input {
+            width: 64px !important;
+            height: 32px !important;
+            text-align: center !important;
+            font-weight: 700 !important;
+            font-size: 13px !important;
+            border: 1px solid #CBD5E1 !important;
+            border-radius: 6px !important;
+            padding: 2px 4px !important;
+            box-sizing: border-box !important;
+        }
+        .so-uom-badge {
+            font-size: 11px !important;
+            color: #64748B !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 2px !important;
+            margin-top: 1px !important;
         }
         .so-qty-trash-btn {
-            width: 24px !important;
-            height: 26px !important;
+            width: 32px !important;
+            height: 32px !important;
             background: #EF4444 !important;
             color: #FFFFFF !important;
             border: none !important;
@@ -458,7 +491,7 @@
             align-items: center !important;
             justify-content: center !important;
             cursor: pointer !important;
-            flex-shrink: 0 !important;
+            box-shadow: 0 1px 2px rgba(239, 68, 68, 0.25) !important;
             transition: background 0.15s ease !important;
         }
         .so-qty-trash-btn:hover {
@@ -904,9 +937,40 @@
         .so-mobile-slot {
             width: 100% !important;
         }
-        .so-mobile-slot .so-clean-input,
-        .so-mobile-slot .so-clean-select {
+        .so-mobile-slot .so-meta-row,
+        .so-mobile-slot .so-field-icon-wrap,
+        .so-mobile-slot .so-field-group,
+        .so-mobile-slot .so-logistics-row {
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            background: transparent !important;
             width: 100% !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .so-mobile-slot .so-meta-label,
+        .so-mobile-slot .so-input-icon,
+        .so-mobile-slot .so-logistics-label {
+            display: none !important;
+        }
+        .so-mobile-slot .so-meta-val,
+        .so-mobile-slot .so-logistics-control {
+            width: 100% !important;
+            text-align: left !important;
+        }
+        .so-mobile-slot .so-clean-input,
+        .so-mobile-slot .so-clean-select,
+        .so-mobile-slot .inflow-combobox-wrapper {
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+        .so-mobile-slot .gs-datepicker-wrapper {
+            width: 100% !important;
+        }
+        .so-mobile-slot #salesRepInput {
+            width: 100% !important;
+            text-align: left !important;
         }
         .so-mobile-order-no-row {
             display: flex !important;
@@ -1703,29 +1767,29 @@
                                 <table class="so-modern-table" id="lineItemsTable">
                                     <thead>
                                         <tr>
-                                            <th style="width: 32px; text-align: center;">No.</th>
-                                            <th style="width: 40px; text-align: center;">Photo</th>
-                                            <th style="width: 27%;">Item</th>
-                                            <th style="width: 15%;">Description</th>
-                                            <th style="width: 17%; min-width: 185px;">Quantity</th>
-                                            <th style="width: 12%;">Price Tier</th>
-                                            <th style="width: 10%; text-align: right;">Unit Price</th>
-                                            <th style="width: 7%; text-align: right;">Discount</th>
-                                            <th style="width: 10%; text-align: right;">Sub-Total</th>
-                                            <th style="width: 52px; text-align: center;" title="Actions & Reorder"></th>
+                                            <th style="width: 32px; text-align: center;">#</th>
+                                            <th style="width: 54px; text-align: center;">Photo</th>
+                                            <th style="min-width: 210px;">Item</th>
+                                            <th style="display: none;">Description</th>
+                                            <th style="width: 78px; text-align: center;">Qty</th>
+                                            <th style="width: 100px;">Price Tier</th>
+                                            <th style="width: 85px; text-align: center;">Unit Price</th>
+                                            <th style="width: 65px; text-align: center;">Discount</th>
+                                            <th style="width: 90px; text-align: right;">Sub-Total</th>
+                                            <th style="width: 44px; text-align: center;" title="Actions"></th>
                                         </tr>
                                     </thead>
                                     <tbody id="lineItemsBody">
                                         {% for l in lines %}
                                         <tr data-line-index="{{ loop.index0 }}" {% if not is_paid %}draggable="true" ondragstart="handleLineDragStart(event)" ondragover="handleLineDragOver(event)" ondragleave="handleLineDragLeave(event)" ondrop="handleLineDrop(event)" ondragend="handleLineDragEnd(event)"{% endif %} onclick="selectGridRow(this)" data-product-id="{{ l.product_id }}" data-case-price="{{ l.case_price or l.unit_price }}" data-base-price="{{ l.case_price or l.unit_price }}" data-addon-product-id="{{ l.addon_product_id or '' }}" data-addon-quantity="{{ l.addon_quantity or 1.0 }}" data-combine-option-id="{{ l.combine_option_id or '' }}">
-                                            <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 600; color: #64748B; font-size: 12px;">
+                                            <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 700; color: #64748B; font-size: 12.5px;">
                                                 {{ loop.index }}
                                             </td>
                                             <td class="line-pic-cell" style="text-align: center; vertical-align: middle; padding: 4px;">
                                                 {% if l.product_image_url or l.image_url %}
-                                                <img src="{{ l.product_image_url or l.image_url }}" alt="Item" class="line-item-thumb" style="width: 32px; height: 32px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">
+                                                <img src="{{ l.product_image_url or l.image_url }}" alt="Item" class="line-item-thumb" onclick="previewImageModal(this.src)" title="Click to view full image">
                                                 {% else %}
-                                                <div class="line-item-thumb-placeholder" style="width: 32px; height: 32px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 13px;" title="No image">🖼️</div>
+                                                <div class="line-item-thumb-placeholder" title="No image">📦</div>
                                                 {% endif %}
                                             </td>
                                             <td style="position: relative; vertical-align: middle;" class="so-item-cell">
@@ -1733,18 +1797,28 @@
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_product_id]" class="line-addon-product-id" value="{{ l.addon_product_id or '' }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][addon_quantity]" class="line-addon-quantity" value="{{ l.addon_quantity or 1.0 }}">
                                                 <input type="hidden" name="lines[{{ loop.index0 }}][combine_option_id]" class="line-combine-option-id" value="{{ l.combine_option_id or '' }}">
-                                                <textarea rows="2" class="inflow-field-input grid-item-input so-item-input" 
-                                                          placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
-                                                          onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
-                                                          onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>{{ l.product_sku }} {{ l.product_name }}</textarea>
+                                                <div class="so-item-info-wrap">
+                                                    <textarea rows="1" class="inflow-field-input grid-item-input so-item-input" 
+                                                              placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 700; color: #0F172A; font-size: 13px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
+                                                              onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
+                                                              onkeydown="handleItemDropdownKey(event, this)" {% if is_paid %}readonly{% endif %}>{{ l.product_sku }} {{ l.product_name }}</textarea>
+                                                    <input type="text" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or '' }}" 
+                                                           class="inflow-field-input grid-desc-input so-item-sub-desc" placeholder="Description..." 
+                                                           style="border: none; background: transparent; width: 100%; color: #475569; font-size: 11.5px; padding: 1px 0; font-family: inherit;"
+                                                           oninput="markDirty()" {% if is_paid %}readonly{% endif %}>
+                                                    {% set line_scheme_name = '' %}
+                                                    {% for ps in pricing_schemes %}
+                                                        {% if (l.pricing_scheme_id == ps.id) or (not l.pricing_scheme_id and (order.pricing_scheme_id == ps.id or (not order.pricing_scheme_id and ps.name == 'Retail 1'))) %}
+                                                            {% set line_scheme_name = ps.name %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                    <span class="so-item-tier-badge">{{ line_scheme_name or 'Retail 1' }}</span>
+                                                </div>
                                             </td>
-                                            <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
-                                                <input type="text" name="lines[{{ loop.index0 }}][description]" value="{{ l.description or '' }}" 
-                                                       class="inflow-field-input grid-desc-input so-clean-input" placeholder="Description..." 
-                                                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #475569; font-size: 12px; padding: 4px 6px; border-radius: 4px;"
-                                                       oninput="markDirty()" {% if is_paid %}readonly{% endif %}>
+                                            <td style="display: none;">
+                                                <!-- Description input is housed inside .so-item-cell -->
                                             </td>
-                                            <td style="position: relative; vertical-align: middle; min-width: 185px;" class="qty-cell">
+                                            <td style="text-align: center; vertical-align: middle;" class="qty-cell">
                                                 <div class="inflow-qty-cell-wrapper so-qty-wrapper">
                                                     {% if l.is_backordered %}
                                                     <span class="inflow-backorder-badge" title="Insufficient Stock - Click to view component stock details" onclick="showBackorderNotice(this, event)" onmouseenter="showBackorderNotice(this, event)">!</span>
@@ -1760,7 +1834,7 @@
                                                 </div>
                                             </td>
                                             <td style="vertical-align: middle;">
-                                                <select name="lines[{{ loop.index0 }}][pricing_scheme_id]" class="inflow-field-select line-scheme-select so-clean-select" onchange="onLinePricingSchemeChange(this)" {% if is_paid %}disabled{% endif %}>
+                                                <select name="lines[{{ loop.index0 }}][pricing_scheme_id]" class="inflow-field-select line-scheme-select so-clean-select" onchange="onLinePricingSchemeChange(this)" style="height: 32px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px;" {% if is_paid %}disabled{% endif %}>
                                                     {% for ps in pricing_schemes %}
                                                     <option value="{{ ps.id }}" {% if (l.pricing_scheme_id == ps.id) or (not l.pricing_scheme_id and (order.pricing_scheme_id == ps.id or (not order.pricing_scheme_id and ps.name == 'Retail 1'))) %}selected{% endif %}>
                                                         {{ ps.name }}
@@ -1768,58 +1842,54 @@
                                                     {% endfor %}
                                                 </select>
                                             </td>
-                                            <td style="text-align: right; vertical-align: middle;">
-                                                <input type="number" step="0.0001" name="lines[{{ loop.index0 }}][unit_price]" value="{{ l.unit_price }}" class="inflow-field-input line-price so-clean-input" style="width: 72px; text-align: right;" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}>
+                                            <td style="text-align: center; vertical-align: middle;">
+                                                <input type="number" step="0.0001" name="lines[{{ loop.index0 }}][unit_price]" value="{{ l.unit_price }}" class="inflow-field-input line-price so-clean-input" style="width: 100%; height: 32px; font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}>
                                             </td>
-                                            <td style="text-align: right; vertical-align: middle; white-space: nowrap;">
-                                                <div style="display: inline-flex; align-items: center; gap: 2px;">
-                                                    <input type="number" step="any" name="lines[{{ loop.index0 }}][discount_percent]" value="{{ l.discount_percent }}" class="inflow-field-input line-disc so-clean-input" style="width: 42px; text-align: right;" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}>
+                                            <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
+                                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 2px;">
+                                                    <input type="number" step="any" name="lines[{{ loop.index0 }}][discount_percent]" value="{{ l.discount_percent }}" class="inflow-field-input line-disc so-clean-input" style="width: 48px; height: 32px; font-size: 12.5px; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();" {% if is_paid %}readonly{% endif %}>
                                                     <span style="font-size: 11px; color: #64748B;">%</span>
                                                 </div>
                                             </td>
-                                            <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13px;" class="line-subtotal">
+                                            <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13.5px;" class="line-subtotal">
                                                 ${{ "%.2f"|format(l.subtotal) }}
                                             </td>
-                                            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;" title="Actions & Reorder">
-                                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-                                                    {% if not is_paid %}
-                                                    <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
-                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                                                            <polyline points="3 6 5 6 21 6"></polyline>
-                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                                                        </svg>
-                                                    </button>
-                                                    {% endif %}
-                                                    <span class="so-drag-handle" title="Drag to reorder row" onmousedown="isDragHandlePressed = true;">⠿</span>
-                                                </div>
+                                            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;" title="Actions">
+                                                {% if not is_paid %}
+                                                <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                                                        <polyline points="3 6 5 6 21 6"></polyline>
+                                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                    </svg>
+                                                </button>
+                                                {% endif %}
                                             </td>
                                         </tr>
                                         {% endfor %}
 
                                         <!-- Asterisk Row for Typing / Adding New Items (*) -->
                                         <tr id="newRowEntry" onclick="selectGridRow(this)" {% if is_paid %}style="display:none;"{% endif %}>
-                                            <td style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 12px; font-weight: 600;">
-                                                *
+                                            <td style="text-align: center; vertical-align: middle; color: #94A3B8; font-size: 14px; font-weight: 700;">
+                                                +
                                             </td>
                                             <td class="line-pic-cell" style="text-align: center; vertical-align: middle; padding: 4px;">
-                                                <div class="line-item-thumb-placeholder" style="width: 32px; height: 32px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #2563EB; font-size: 14px; font-weight: bold; cursor: pointer;" onclick="addNewBlankLine()" title="Click to add">+</div>
+                                                <div class="line-item-thumb-placeholder" style="cursor: pointer;" onclick="addNewBlankLine()" title="Click to add">+</div>
                                             </td>
                                             <td style="position: relative; vertical-align: middle;">
                                                 <div style="position: relative; display: flex; align-items: center;">
                                                     <input type="text" id="newItemTextInput" class="inflow-field-input grid-item-input so-clean-input" 
-                                                           placeholder="Type to add item..." style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 32px !important; font-size: 12.5px; background: #FFFFFF;"
+                                                           placeholder="Type to add item..." style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 28px !important; font-size: 13px; background: #FFFFFF; height: 34px;"
                                                            onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
                                                            onkeydown="handleItemDropdownKey(event, this)">
-                                                    <span style="position: absolute; left: 10px; color: #94A3B8; pointer-events: none; font-size: 13px;">🔍</span>
+                                                    <span style="position: absolute; left: 8px; color: #94A3B8; pointer-events: none; font-size: 13px;">+</span>
                                                 </div>
                                             </td>
-                                            <td style="vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
-                                                <input type="text" id="newItemDescInput" class="inflow-field-input grid-desc-input so-clean-input" placeholder="Description..." 
-                                                       style="width: 100%; border: 1px solid transparent; background: transparent; color: #475569; font-size: 12px; padding: 4px 6px; border-radius: 4px;">
+                                            <td style="display: none;">
+                                                <input type="hidden" id="newItemDescInput" value="">
                                             </td>
-                                            <td style="vertical-align: middle; min-width: 185px;">
+                                            <td style="text-align: center; vertical-align: middle;">
                                                 <div class="inflow-qty-cell-wrapper so-qty-wrapper">
-                                                    <input type="number" value="0" class="so-clean-input so-qty-input" style="height: 28px; width: 88px; text-align: left; padding: 2px 8px; font-weight: 600; color: #94A3B8; background: #F8FAFC;" readonly>
+                                                    <input type="number" value="0" class="so-clean-input so-qty-input" style="height: 32px; width: 64px; text-align: center; font-weight: 700; color: #94A3B8; background: #F8FAFC;" readonly>
                                                     <div class="inflow-qty-uom-btn so-uom-badge" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock" style="cursor: pointer;">
                                                         <span class="uom-text">pcs.</span>
                                                         <span class="uom-arrow" style="font-size: 10px;">⌵</span>
@@ -1828,7 +1898,7 @@
                                                 </div>
                                             </td>
                                             <td style="vertical-align: middle;">
-                                                <select id="newItemSchemeSelect" class="inflow-field-select line-scheme-select so-clean-select">
+                                                <select id="newItemSchemeSelect" class="inflow-field-select line-scheme-select so-clean-select" style="height: 32px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px;">
                                                     {% for ps in pricing_schemes %}
                                                     <option value="{{ ps.id }}" {% if (order.pricing_scheme_id == ps.id) or (not order.pricing_scheme_id and ps.name == 'Retail 1') %}selected{% endif %}>
                                                         {{ ps.name }}
@@ -1836,24 +1906,19 @@
                                                     {% endfor %}
                                                 </select>
                                             </td>
-                                            <td style="text-align: right; vertical-align: middle;">
-                                                <input type="text" value="0.0000" class="so-clean-input" style="width: 72px; text-align: right; color: #94A3B8; background: #F8FAFC;" readonly>
+                                            <td style="text-align: center; vertical-align: middle;">
+                                                <input type="text" value="0.0000" class="so-clean-input" style="width: 100%; height: 32px; text-align: center; color: #94A3B8; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;" readonly>
                                             </td>
-                                            <td style="text-align: right; vertical-align: middle; white-space: nowrap;">
-                                                <div style="display: inline-flex; align-items: center; gap: 2px;">
-                                                    <input type="text" value="0.0" class="so-clean-input" style="width: 42px; text-align: right; color: #94A3B8; background: #F8FAFC;" readonly>
+                                            <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
+                                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 2px;">
+                                                    <input type="text" value="0.0" class="so-clean-input" style="width: 48px; height: 32px; text-align: center; color: #94A3B8; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 6px;" readonly>
                                                     <span style="font-size: 11px; color: #64748B;">%</span>
                                                 </div>
                                             </td>
-                                            <td style="text-align: right; font-weight: 600; color: #64748B; vertical-align: middle; font-size: 13px;">
+                                            <td style="text-align: right; font-weight: 700; color: #64748B; vertical-align: middle; font-size: 13.5px;">
                                                 $0.00
                                             </td>
-                                            <td style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;">
-                                                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-                                                    <span style="display: inline-block; width: 24px;"></span>
-                                                    <span style="color: #CBD5E1; font-size: 16px;">⠿</span>
-                                                </div>
-                                            </td>
+                                            <td style="text-align: center; vertical-align: middle;"></td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -2610,8 +2675,29 @@
 
     let currentSoLayoutMode = null;
 
+    function checkIsMobileMode() {
+        const mobSec = document.getElementById('soMobileTopSection');
+        if (mobSec) {
+            const disp = window.getComputedStyle(mobSec).display;
+            if (disp !== 'none') return true;
+        }
+        const mobBar = document.getElementById('soMobileTopBar');
+        if (mobBar) {
+            const disp = window.getComputedStyle(mobBar).display;
+            if (disp !== 'none') return true;
+        }
+        if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return true;
+        if (document.documentElement.classList.contains('is-mobile-view')) return true;
+        if (window.innerWidth <= 768) return true;
+        if (window.screen && window.screen.width <= 768) return true;
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Silk/i.test(navigator.userAgent)) {
+            if (!document.documentElement.classList.contains('is-desktop-view')) return true;
+        }
+        return false;
+    }
+
     function syncMobileLayoutSlots(force) {
-        const isMobile = window.innerWidth <= 768 || document.documentElement.classList.contains('is-mobile-view');
+        const isMobile = checkIsMobileMode();
         const mode = isMobile ? 'mobile' : 'desktop';
         if (!force && mode === currentSoLayoutMode) return;
         currentSoLayoutMode = mode;
@@ -2654,15 +2740,42 @@
     window.syncMobileAddressPreview = syncMobileAddressPreview;
     window.toggleMobileCustDetails = toggleMobileCustDetails;
 
+    // Cross-frame view mode change handler (from host shell tab workspace)
+    window.applyViewMode = function(mode) {
+        if (mode === 'mobile') {
+            document.documentElement.classList.add('is-mobile-view');
+            document.documentElement.classList.remove('is-desktop-view');
+        } else {
+            document.documentElement.classList.add('is-desktop-view');
+            document.documentElement.classList.remove('is-mobile-view');
+        }
+        syncMobileLayoutSlots(true);
+    };
+
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'INFLOW_VIEW_MODE_CHANGE') {
+            syncMobileLayoutSlots(true);
+        }
+    });
+
+    if (window.MutationObserver) {
+        const mo = new MutationObserver(() => syncMobileLayoutSlots(false));
+        mo.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-view-mode'] });
+    }
+
+    // Run immediately and at staggered intervals to guarantee sync after styles render
+    syncMobileLayoutSlots(true);
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', () => syncMobileLayoutSlots(true));
-    } else {
-        syncMobileLayoutSlots(true);
     }
+    window.addEventListener('load', () => syncMobileLayoutSlots(true));
+    setTimeout(() => syncMobileLayoutSlots(true), 50);
+    setTimeout(() => syncMobileLayoutSlots(true), 250);
+    setTimeout(() => syncMobileLayoutSlots(true), 800);
 
     let mobileResizeTimer = null;
     window.addEventListener('resize', function() {
         clearTimeout(mobileResizeTimer);
-        mobileResizeTimer = setTimeout(() => syncMobileLayoutSlots(false), 100);
+        mobileResizeTimer = setTimeout(() => syncMobileLayoutSlots(false), 80);
     });
     </script>

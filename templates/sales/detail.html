@@ -536,6 +536,12 @@ body.sales-order-body-fullscreen #inflowDirectContent {
 }
 
 @media (max-width: 768px) {
+    #soSidebarExpandTab,
+    .inflow-sidebar-edge-tab {
+        display: none !important;
+        width: 0 !important;
+        min-width: 0 !important;
+    }
     .inflow-so-workspace:not(.mobile-drawer-open) .so-master-sidebar {
         display: none !important;
         pointer-events: none !important;
@@ -605,6 +611,12 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
 }
 html.is-mobile-view .inflow-desktop-toolbar {
     display: none !important;
+}
+html.is-mobile-view #soSidebarExpandTab,
+html.is-mobile-view .inflow-sidebar-edge-tab {
+    display: none !important;
+    width: 0 !important;
+    min-width: 0 !important;
 }
 html.is-mobile-view .so-mobile-top-bar {
     display: flex !important;
@@ -3970,6 +3982,10 @@ function onMasterPricingSchemeChange(masterSchemeId) {
                 priceInput.value = formatPriceValue(newPrice, prod ? prod.price_decimals : null);
             }
         }
+        const tierBadge = row.querySelector('.so-item-tier-badge');
+        if (tierBadge && schemeSelect && schemeSelect.selectedIndex >= 0) {
+            tierBadge.textContent = schemeSelect.options[schemeSelect.selectedIndex].text;
+        }
     });
 
     recalculateTotals();
@@ -3994,6 +4010,10 @@ function onLinePricingSchemeChange(selectEl) {
         if (priceInput) {
             priceInput.value = formatPriceValue(newPrice, prod ? prod.price_decimals : null);
         }
+    }
+    const tierBadge = row.querySelector('.so-item-tier-badge');
+    if (tierBadge && selectEl.selectedIndex >= 0) {
+        tierBadge.textContent = selectEl.options[selectEl.selectedIndex].text;
     }
     recalculateTotals();
     markDirty();
@@ -6740,30 +6760,38 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         tr.setAttribute('data-addon-quantity', '1');
         tr.setAttribute('data-combine-option-id', '');
         tr.onclick = function() { selectGridRow(this); };
+        let activeSchemeName = 'Retail 1';
+        if (window.pricingSchemes && window.pricingSchemes.length) {
+            const found = window.pricingSchemes.find(s => s.id === activeSchemeId);
+            if (found) activeSchemeName = found.name;
+        }
+
         tr.innerHTML = `
-            <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 600; color: #64748B; font-size: 12px;">
+            <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 700; color: #64748B; font-size: 12.5px;">
                 ${existingCount + 1}
             </td>
             <td class="line-pic-cell" style="text-align: center; vertical-align: middle; padding: 4px;">
-                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 32px; height: 32px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 32px; height: 32px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 13px;" title="No image">🖼️</div>`}
+                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 44px; height: 44px; border-radius: 8px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 15px;" title="No image">📦</div>`}
             </td>
-            <td style="position: relative; vertical-align: middle;">
+            <td style="position: relative; vertical-align: middle;" class="so-item-cell">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
                 <input type="hidden" name="lines[${existingCount}][addon_product_id]" class="line-addon-product-id" value="">
                 <input type="hidden" name="lines[${existingCount}][addon_quantity]" class="line-addon-quantity" value="1">
                 <input type="hidden" name="lines[${existingCount}][combine_option_id]" class="line-combine-option-id" value="">
-                <textarea rows="2" class="inflow-field-input grid-item-input so-item-input" 
-                          placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 600; color: #0F172A; font-size: 12px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
-                          onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
-                          onkeydown="handleItemDropdownKey(event, this)">${sku} ${name}</textarea>
+                <div class="so-item-info-wrap">
+                    <textarea rows="1" class="inflow-field-input grid-item-input so-item-input" 
+                              placeholder="Type item name/code..." style="border: none; background: transparent; width: 100%; font-weight: 700; color: #0F172A; font-size: 13px; padding: 2px 0; line-height: 1.35; resize: none; overflow: hidden; font-family: inherit; display: block; box-sizing: border-box;"
+                              onclick="openItemDropdown(this)" onfocus="openItemDropdown(this)" oninput="filterItemDropdown(this.value, this)"
+                              onkeydown="handleItemDropdownKey(event, this)">${sku ? sku + ' ' : ''}${name}</textarea>
+                    <input type="text" name="lines[${existingCount}][description]" value="${(effectiveDesc || '').replace(/"/g, '&quot;')}" 
+                           class="inflow-field-input grid-desc-input so-item-sub-desc" placeholder="Description..." 
+                           style="border: none; background: transparent; width: 100%; color: #475569; font-size: 11.5px; padding: 1px 0; font-family: inherit;"
+                           oninput="markDirty()">
+                    <span class="so-item-tier-badge">${activeSchemeName}</span>
+                </div>
             </td>
-            <td style="position: relative; vertical-align: middle;" onclick="const inp = this.querySelector('.grid-desc-input'); if (inp && document.activeElement !== inp) inp.focus();">
-                <input type="text" name="lines[${existingCount}][description]" value="${(effectiveDesc || '').replace(/"/g, '&quot;')}" 
-                       class="inflow-field-input grid-desc-input so-clean-input" placeholder="Description..." 
-                       style="border: 1px solid transparent; background: transparent; width: 100%; color: #475569; font-size: 12px; padding: 4px 6px; border-radius: 4px;"
-                       oninput="markDirty()">
-            </td>
-            <td style="position: relative; vertical-align: middle;" class="qty-cell">
+            <td style="display: none;"></td>
+            <td style="text-align: center; vertical-align: middle;" class="qty-cell">
                 <div class="inflow-qty-cell-wrapper so-qty-wrapper">
                     <input type="number" step="any" name="lines[${existingCount}][quantity]" value="1" 
                            class="inflow-qty-num-input line-qty so-clean-input so-qty-input" 
@@ -6776,32 +6804,29 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                 </div>
             </td>
             <td style="vertical-align: middle;">
-                <select name="lines[${existingCount}][pricing_scheme_id]" class="inflow-field-select line-scheme-select so-clean-select" onchange="onLinePricingSchemeChange(this)">
+                <select name="lines[${existingCount}][pricing_scheme_id]" class="inflow-field-select line-scheme-select so-clean-select" onchange="onLinePricingSchemeChange(this)" style="height: 32px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px;">
                     ${generatePricingSchemeOptions(activeSchemeId)}
                 </select>
             </td>
-            <td style="text-align: right; vertical-align: middle;">
-                <input type="number" step="0.0001" name="lines[${existingCount}][unit_price]" value="${formattedPrice}" class="inflow-field-input line-price so-clean-input" style="width: 72px; text-align: right;" onchange="recalculateTotals(); markDirty();">
+            <td style="text-align: center; vertical-align: middle;">
+                <input type="number" step="0.0001" name="lines[${existingCount}][unit_price]" value="${formattedPrice}" class="inflow-field-input line-price so-clean-input" style="width: 100%; height: 32px; font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();">
             </td>
-            <td style="text-align: right; vertical-align: middle; white-space: nowrap;">
-                <div style="display: inline-flex; align-items: center; gap: 2px;">
-                    <input type="number" step="any" name="lines[${existingCount}][discount_percent]" value="0" class="inflow-field-input line-disc so-clean-input" style="width: 42px; text-align: right;" onchange="recalculateTotals(); markDirty();">
+            <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
+                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 2px;">
+                    <input type="number" step="any" name="lines[${existingCount}][discount_percent]" value="0" class="inflow-field-input line-disc so-clean-input" style="width: 48px; height: 32px; font-size: 12.5px; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();">
                     <span style="font-size: 11px; color: #64748B;">%</span>
                 </div>
             </td>
-            <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13px;" class="line-subtotal">
+            <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13.5px;" class="line-subtotal">
                 $${(1 * initialUnitPrice).toFixed(2)}
             </td>
-            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;" title="Actions & Reorder">
-                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
-                    <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <polyline points="3 6 5 6 21 6"></polyline>
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                        </svg>
-                    </button>
-                    <span class="so-drag-handle" title="Drag to reorder row" onmousedown="isDragHandlePressed = true;">⠿</span>
-                </div>
+            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;" title="Actions">
+                <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"></polyline>
+                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                </button>
             </td>
         `;
 
@@ -8588,6 +8613,7 @@ function submitQuickAddCustomerAjax() {
                 if (contactInput) contactInput.value = cust.contact_name || '';
                 if (phoneInput) phoneInput.value = cust.phone || '';
                 if (addressInput) addressInput.value = cAddr;
+                if (typeof syncMobileAddressPreview === 'function') syncMobileAddressPreview();
 
                 const custBranchAttr = (cust.branch_id !== null && cust.branch_id !== undefined) ? String(cust.branch_id) : '';
 
