@@ -187,6 +187,19 @@ def create_app():
         except (ValueError, TypeError):
             return str(val)
 
+    @app.template_filter('clean_qty')
+    def clean_qty_filter(val):
+        if val is None or val == '':
+            return ''
+        try:
+            f = float(val)
+            if f.is_integer():
+                return str(int(f))
+            s = f"{f:.4f}".rstrip('0').rstrip('.')
+            return s if s else '0'
+        except (ValueError, TypeError):
+            return str(val)
+
     # Access Control & Allowable Branch Enforcement Hook
     @app.before_request
     def enforce_access_control():

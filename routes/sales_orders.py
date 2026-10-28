@@ -209,6 +209,19 @@ def _match_uom(uom1, uom2):
         return True
     return False
 
+def _clean_qty_val(val):
+    """Strips unnecessary trailing zeros or decimal digits if integer."""
+    if val is None or val == '':
+        return 1
+    try:
+        f = float(val)
+        if f.is_integer():
+            return int(f)
+        s = f"{f:.4f}".rstrip('0').rstrip('.')
+        return float(s) if s else 0
+    except (ValueError, TypeError):
+        return val
+
 def _get_product_bom_components(cur, product_id):
     """
     Returns list of BOM components for product_id if it's a combined product:
@@ -2197,6 +2210,8 @@ def new_order():
             l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
+        if 'display_qty' in l:
+            l['display_qty'] = _clean_qty_val(l['display_qty'])
 
     preview_so_number = preview_order_number('SO', branch_id=branch['id'] if branch else None)
 
@@ -2465,6 +2480,8 @@ def detail_order(id):
                 l['display_uom'] = l.get('base_uom') or 'pcs.'
             elif suom and _match_uom(curr_uom, suom):
                 l['display_uom'] = suom
+            if 'display_qty' in l:
+                l['display_qty'] = _clean_qty_val(l['display_qty'])
 
         payments = query_all("""
             SELECT * FROM order_payments 
@@ -2583,6 +2600,8 @@ def detail_order(id):
             l['display_uom'] = l.get('base_uom') or 'pcs.'
         elif suom and _match_uom(curr_uom, suom):
             l['display_uom'] = suom
+        if 'display_qty' in l:
+            l['display_qty'] = _clean_qty_val(l['display_qty'])
 
     # Payment receipts history
     payments = query_all("""

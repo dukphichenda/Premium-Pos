@@ -3820,6 +3820,19 @@ function formatQtyNum(n) {
     return Number(n).toLocaleString('en-US', { maximumFractionDigits: 4 });
 }
 
+function cleanQtyInput(el) {
+    if (!el || el.value === '' || el.value === null || el.value === undefined) return;
+    const val = parseFloat(el.value);
+    if (!isNaN(val)) {
+        if (Number.isInteger(val)) {
+            el.value = val.toString();
+        } else {
+            const fixed = val.toFixed(4).replace(/\.?0+$/, '');
+            el.value = fixed;
+        }
+    }
+}
+
 function openQtyDropdown(event, btnEl) {
     if (event) {
         event.stopPropagation();
@@ -5226,6 +5239,9 @@ document.addEventListener('DOMContentLoaded', function () {
     // Initialize status filter checkboxes
     initStatusCheckboxes();
 
+    // Clean any decimal zeros on loaded quantity inputs
+    document.querySelectorAll('.line-qty').forEach(cleanQtyInput);
+
     // Initialize Google Sheets Style DatePicker
     if (window.GoogleSheetDatePicker && typeof window.GoogleSheetDatePicker.initAll === 'function') {
         window.GoogleSheetDatePicker.initAll();
@@ -6514,7 +6530,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                 <div class="inflow-qty-cell-wrapper so-qty-wrapper">
                     <input type="number" step="any" name="lines[${existingCount}][quantity]" value="1" 
                            class="inflow-qty-num-input line-qty so-clean-input so-qty-input" 
-                           oninput="onQtyNumberChange(this)" onchange="recalculateTotals(); markDirty();">
+                           oninput="onQtyNumberChange(this)" onchange="cleanQtyInput(this); recalculateTotals(); markDirty();" onblur="cleanQtyInput(this)">
                     <div class="inflow-qty-uom-btn so-uom-badge" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock">
                         <span class="uom-text">${baseUom}</span>
                         <span class="uom-arrow" style="font-size: 10px;">⌵</span>
