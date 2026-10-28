@@ -932,6 +932,31 @@ def create_order():
         flash(f"Error creating order: {e}", "error")
         return redirect(url_for('sales_orders.create_order'))
 
+def _order_matches_status_filter(order, status_filter):
+    if not order:
+        return False
+    if not status_filter or status_filter.strip().lower() in ('all', 'all orders', ''):
+        return True
+    tokens = [t.strip().lower() for t in status_filter.split(',') if t.strip()]
+    st_norm = str(order.get('status') or '').strip().upper()
+    pay_norm = str(order.get('payment_status') or '').strip().upper()
+
+    is_open = st_norm in ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')
+    is_paid = (st_norm in ('PAID', 'INVOICED') or (st_norm not in ('OPEN', 'CANCELLED', 'QUOTE') and pay_norm == 'PAID'))
+    is_cancelled = (st_norm == 'CANCELLED')
+    is_quote = (st_norm == 'QUOTE')
+
+    for token in tokens:
+        if token in ('open', 'unfulfilled') and is_open:
+            return True
+        if token in ('paid', 'fulfilled', 'fully shipped', 'shipped', 'invoiced') and is_paid:
+            return True
+        if token == 'cancelled' and is_cancelled:
+            return True
+        if token == 'quote' and is_quote:
+            return True
+    return False
+
 def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=None, current_order_id=None):
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
@@ -1077,7 +1102,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
                 status_clauses = []
                 break
         if status_clauses:
-            if current_order_id:
+            if current_order_id and request.args.get('just_saved') == '1':
                 drawer_where.append("((" + " OR ".join(status_clauses) + ") OR so.id = %s)")
                 drawer_params.append(int(current_order_id))
             else:
@@ -1176,7 +1201,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             WHERE so.id = %s
         """
         single_order = query_one(single_sql, (int(current_order_id),))
-        if single_order:
+        if single_order and (_order_matches_status_filter(single_order, status_filter) or request.args.get('just_saved') == '1'):
             sidebar_orders.insert(0, single_order)
             sidebar_orders.sort(key=lambda x: x['id'], reverse=True)
 
@@ -2369,6 +2394,14 @@ def detail_order(id):
     if 'status_filter' in request.args:
         status_filter = request.args.get('status_filter', 'Open').strip()
         session['so_status_filter'] = status_filter
+        if status_filter and status_filter.lower() not in ('all', 'all orders'):
+            if not request.args.get('just_saved') and not _order_matches_status_filter(order, status_filter):
+                return redirect(url_for('sales_orders.list_orders',
+                                        status=status_filter,
+                                        status_filter=status_filter,
+                                        branch=request.args.get('branch') or (str(order['branch_id']) if order.get('branch_id') else 'main'),
+                                        date_filter=request.args.get('date_filter') or 'All',
+                                        search=request.args.get('search') or ''))
     elif 'so_status_filter' in session and session.get('so_status_filter'):
         status_filter = session['so_status_filter']
     else:
@@ -3264,6 +3297,8 @@ def save_order(id=0):
             'date_filter': date_filter,
             'status_filter': status_filter
         }
+        if mark_complete_pay:
+            redirect_kwargs['just_saved'] = '1'
         if cust_search:
             redirect_kwargs['customer_search'] = cust_search
         if search_param:
@@ -3378,7 +3413,8 @@ def complete_pay(id):
         'id': target_id,
         'branch': branch_param,
         'date_filter': date_filter,
-        'status_filter': status_filter
+        'status_filter': status_filter,
+        'just_saved': '1'
     }
     if cust_search:
         redirect_kwargs['customer_search'] = cust_search

@@ -9604,7 +9604,29 @@ function selectSoStatusFilter(status) {
 
     url.searchParams.delete('customer_id');
     url.searchParams.delete('delivery_man');
-    const targetUrl = url.pathname + url.search;
+    url.searchParams.delete('just_saved');
+
+    // Check if the currently active order card matches the newly selected status filter
+    const activeCard = document.querySelector('.so-sidebar-card.active');
+    const curCardStatus = activeCard ? (activeCard.getAttribute('data-status') || '').toLowerCase() : '';
+    const targetStatus = String(status || '').trim().toLowerCase();
+
+    let orderMatchesFilter = true;
+    if (targetStatus && targetStatus !== 'all' && targetStatus !== 'all orders') {
+        if (targetStatus === 'open' || targetStatus === 'unfulfilled') {
+            orderMatchesFilter = (curCardStatus === 'open' || curCardStatus === 'unfulfilled');
+        } else if (['paid', 'fulfilled', 'fully shipped', 'shipped', 'invoiced'].includes(targetStatus)) {
+            orderMatchesFilter = (curCardStatus === 'paid' || curCardStatus === 'fulfilled' || curCardStatus === 'invoiced');
+        } else if (targetStatus === 'cancelled') {
+            orderMatchesFilter = (curCardStatus === 'cancelled');
+        } else if (targetStatus === 'quote') {
+            orderMatchesFilter = (curCardStatus === 'quote');
+        }
+    }
+
+    // If currently viewed order does not match new status filter, navigate to /sales to load the newest order of that status
+    const targetPath = orderMatchesFilter ? url.pathname : '/sales';
+    const targetUrl = targetPath + url.search;
     // Navigate within the current iframe — no new MDI tab
     try {
         if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
