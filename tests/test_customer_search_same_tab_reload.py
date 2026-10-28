@@ -25,7 +25,7 @@ class TestCustomerSearchSameTabReload(unittest.TestCase):
 
     def test_detail_html_does_not_force_status_filter_during_active_search(self):
         """Verify executeAnimatedOrderNavigation avoids forcing old status_filter when actively searching"""
-        self.assertIn("if (!activeSearch && !url.searchParams.has('status_filter')) {", self.detail_content)
+        self.assertIn("if (!liveSearchVal && !url.searchParams.has('status_filter')) {", self.detail_content)
 
     def test_detail_html_fallback_navigates_in_place(self):
         """Verify fallback on missing canvas uses in-place navigation to stay in the current tab"""
