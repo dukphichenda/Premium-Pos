@@ -557,6 +557,18 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
     line-height: 1.3;
 }
 
+.so-pill-btn.pill-open-orange {
+    background: #EA580C;
+    box-shadow: 0 1px 3px rgba(234, 88, 12, 0.35);
+}
+.so-pill-btn.pill-open-orange:hover {
+    background: #C2410C;
+    box-shadow: 0 2px 5px rgba(234, 88, 12, 0.45);
+}
+.so-pill-btn.pill-open-orange .so-pill-count {
+    color: #EA580C;
+}
+
 .so-menu-dropdown {
     position: absolute;
     top: calc(100% + 4px);
@@ -826,9 +838,9 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
 }
 .so-status-pill.badge-open,
 .so-status-pill.badge-unfulfilled {
-    border: 1px solid #5DA89B;
-    color: #2D7A6F;
-    background: #F0FDF9;
+    border: 1px solid #F97316;
+    color: #EA580C;
+    background: #FFF7ED;
 }
 .so-status-pill.badge-paid,
 .so-status-pill.badge-fulfilled {
@@ -932,8 +944,8 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
 }
 .so-sidebar-card.active .so-status-pill.badge-open,
 .so-sidebar-card.active .so-status-pill.badge-unfulfilled {
-    background: rgba(16, 185, 129, 0.35) !important;
-    border-color: rgba(255, 255, 255, 0.6) !important;
+    background: rgba(249, 115, 22, 0.45) !important;
+    border-color: rgba(255, 255, 255, 0.75) !important;
     color: #FFFFFF !important;
 }
 .so-sidebar-card.active .so-status-pill.badge-paid,
@@ -1091,6 +1103,11 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
     padding: 1.5px 8px;
     border-radius: 9999px;
     line-height: 1.25;
+}
+.so-prev-status-pill.badge-open {
+    border: 1px solid #F97316;
+    color: #EA580C;
+    background: #FFF7ED;
 }
 
 .so-prev-date {
@@ -2616,8 +2633,8 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
 
             <!-- Center Status Pill Button [ Open (51) ∨ ] -->
             <div class="so-pill-dropdown-wrap" style="position: relative;">
-                <button type="button" class="so-pill-btn" id="btnSoStatusPill" onclick="toggleSoStatusDropdown(event)">
-                    {% set cur_st = status_filter if status_filter and status_filter != 'Open, In Progress, Paid' else 'Open' %}
+                {% set cur_st = status_filter if status_filter and status_filter != 'Open, In Progress, Paid' else 'Open' %}
+                <button type="button" class="so-pill-btn {% if (cur_st|lower) in ('open', 'unfulfilled') %}pill-open-orange{% endif %}" id="btnSoStatusPill" onclick="toggleSoStatusDropdown(event)">
                     <span id="soStatusPillLabel">{{ cur_st }}</span>
                     <span class="so-pill-count" id="soStatusPillCount">
                         {% set st_key = (cur_st)|lower %}
@@ -2807,7 +2824,7 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                     <span class="so-status-pill {{ badge_class }}">{{ badge_display }}</span>
                 </div>
 
-                <!-- Line 2: Minor Text (Total Sale $, Customer Name, Delivery Person) -->
+                <!-- Line 2: Minor Text (Total Sale $, Customer Name) -->
                 <div class="so-card-row-bottom">
                     <span class="so-card-price-pill">${{ "%.2f"|format(s_ord.total_amount or 0) }}</span>
                     <span class="so-card-items-pill" title="{{ s_ord.total_items or 0 }} items sold ({{ '%.1f'|format(s_ord.total_qty or 0)|replace('.0', '') }} qty)">
@@ -2816,11 +2833,6 @@ html.is-desktop-view .so-mobile-drawer-backdrop {
                     <span class="so-card-cust-name" title="{{ s_ord.customer_name }}">
                         👤 {{ s_ord.customer_name or 'No Customer' }}
                     </span>
-                    {% if s_ord.completed_by %}
-                    <span class="so-card-completed-pill" title="Completed by {{ s_ord.completed_by }}">
-                        ✓ {{ s_ord.completed_by }}
-                    </span>
-                    {% endif %}
                 </div>
             </a>
             {% else %}
@@ -9566,6 +9578,14 @@ document.addEventListener('click', function(e) {
 });
 
 function selectSoStatusFilter(status) {
+    const pillBtn = document.getElementById('btnSoStatusPill');
+    if (pillBtn) {
+        if (['open', 'unfulfilled'].includes(String(status).toLowerCase())) {
+            pillBtn.classList.add('pill-open-orange');
+        } else {
+            pillBtn.classList.remove('pill-open-orange');
+        }
+    }
     const url = new URL(window.location.href);
     url.searchParams.set('status_filter', status);
     try {
