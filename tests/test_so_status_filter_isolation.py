@@ -32,5 +32,12 @@ class TestSalesOrderStatusFilterIsolation(unittest.TestCase):
         self.assertIn("const targetPath = orderMatchesFilter ? url.pathname : '/sales';", self.detail_content)
         self.assertIn("const targetUrl = targetPath + url.search;", self.detail_content)
 
+    def test_find_latest_matching_so_supports_cancelled_and_loop_prevention(self):
+        """Verify _find_latest_matching_so exists and handles CANCELLED without infinite redirect loops"""
+        self.assertIn("def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter):", self.routes_content)
+        self.assertIn("elif st in ('CANCELLED', 'CANCELED'):", self.routes_content)
+        self.assertIn("latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter)", self.routes_content)
+        self.assertIn("not request.args.get('_from_list')", self.routes_content)
+
 if __name__ == '__main__':
     unittest.main()
