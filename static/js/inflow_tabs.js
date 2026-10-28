@@ -30,6 +30,23 @@
         return url.split('?')[0].split('#')[0];
     }
 
+    function getReportKey(url) {
+        if (!url) return null;
+        try {
+            const clean = getCleanPath(url).toLowerCase();
+            const viewMatch = clean.match(/\/reports\/view\/([^\/?#]+)/);
+            if (viewMatch) return viewMatch[1];
+            if (clean.includes('/reports/valuation')) return 'inventory-valuation';
+            if (clean.includes('/reports/sales')) return 'sales-order-profit';
+            if (clean.includes('/reports/movement-log')) return 'movement-log';
+            const branchMatch = clean.match(/\/branches\/(\d+)\/reports/);
+            if (branchMatch) return `branch-${branchMatch[1]}-reports`;
+            if (clean.match(/\/reports(\/center|\/hub|\/list)?\/?$/)) return 'reports-hub';
+            if (clean.includes('/reports')) return clean.replace(/[^a-z0-9_-]/g, '_');
+        } catch (e) { }
+        return null;
+    }
+
     // Module Type Detection & Icon Definitions
     function detectTypeFromUrl(url) {
         if (!url) return 'home';
@@ -695,6 +712,35 @@
                 // Rule A: On Homepage tab -> transform tab to selected category below
                 if (currentCategory === 'home' || currentBase === 'home') {
                     this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                    return;
+                }
+
+                // Rule for Reports: Distinct reports open in their own separate tabs
+                const targetReportKey = (targetBase === 'reports' || cleanUrl.includes('/reports')) ? getReportKey(cleanUrl) : null;
+                const currentReportKey = (currentBase === 'reports' && activeTab) ? getReportKey(activeTab.url) : null;
+
+                if (targetReportKey) {
+                    // 1. If currently viewing the exact same report, refresh/navigate in current tab
+                    if (currentReportKey && currentReportKey === targetReportKey) {
+                        this.transformTab(this.activeTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                        return;
+                    }
+
+                    // 2. If target is a different report (or current tab is not this report),
+                    // switch to existing tab if already open
+                    const existingReportTab = this.tabs.find(t => {
+                        const rk = getReportKey(t.url);
+                        if (rk && rk === targetReportKey) return true;
+                        return t.url.replace(/[?&]embed=1/, '') === cleanUrl;
+                    });
+
+                    if (existingReportTab) {
+                        this.switchTab(existingReportTab.id);
+                        return;
+                    }
+
+                    // 3. Create a new tab for this distinct report document
+                    this.createTab(cleanUrl, displayTitle, 'reports');
                     return;
                 }
 

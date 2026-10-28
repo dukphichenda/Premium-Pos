@@ -534,7 +534,13 @@
 function openReportTab(key, title) {
     const branch = '{{ branch_scope }}';
     const url = "{{ url_for('reports.view_report', report_key='__KEY__') }}".replace('__KEY__', key) + (branch ? ('?branch=' + encodeURIComponent(branch)) : '');
-    window.location.href = url;
+    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
+        window.top.inflowMdi.navigateOrOpenTab(url, title || '', 'reports');
+    } else if (window.inflowMdi && typeof window.inflowMdi.navigateOrOpenTab === 'function') {
+        window.inflowMdi.navigateOrOpenTab(url, title || '', 'reports');
+    } else {
+        window.location.href = url;
+    }
 }
 
 function switchCategory(catKey, e) {
