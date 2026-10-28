@@ -482,36 +482,36 @@ def _revert_order_stock(cur, location_id, product_id, qty, was_shipped=False):
                 WHERE product_id = %s AND location_id = %s
             """, (qty, product_id, location_id))
 
-def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter):
+def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=None, customer_id=None):
     base_where = []
     params = []
 
     if not is_main:
         if user_bid:
-            base_where.append("branch_id = %s")
+            base_where.append("so.branch_id = %s")
             params.append(user_bid)
         else:
             base_where.append("1=0")
     else:
         if not branch_filter or str(branch_filter).strip().lower() == 'main':
-            base_where.append("branch_id IS NULL")
+            base_where.append("so.branch_id IS NULL")
         elif str(branch_filter).strip().isdigit():
-            base_where.append("branch_id = %s")
+            base_where.append("so.branch_id = %s")
             params.append(int(branch_filter))
         elif str(branch_filter).strip().lower() == 'all':
             pass
         else:
-            base_where.append("branch_id IS NULL")
+            base_where.append("so.branch_id IS NULL")
 
     st = (status_filter or '').strip().upper()
     if st == 'PAID':
-        base_where.append("(UPPER(status) IN ('PAID', 'INVOICED') OR (UPPER(payment_status) = 'PAID' AND UPPER(status) NOT IN ('OPEN', 'CANCELLED', 'QUOTE')))")
+        base_where.append("(UPPER(so.status) IN ('PAID', 'INVOICED') OR (UPPER(so.payment_status) = 'PAID' AND UPPER(so.status) NOT IN ('OPEN', 'CANCELLED', 'QUOTE')))")
     elif st in ('OPEN', 'UNFULFILLED'):
-        base_where.append("UPPER(status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')")
+        base_where.append("UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')")
     elif st in ('CANCELLED', 'CANCELED'):
-        base_where.append("UPPER(status) IN ('CANCELLED', 'CANCELED')")
+        base_where.append("UPPER(so.status) IN ('CANCELLED', 'CANCELED')")
     elif st == 'QUOTE':
-        base_where.append("UPPER(status) = 'QUOTE'")
+        base_where.append("UPPER(so.status) = 'QUOTE'")
     elif st in ('ALL', 'ALL ORDERS', ''):
         pass
     else:
@@ -519,22 +519,38 @@ def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter):
         st_clauses = []
         for tok in tokens:
             if tok in ('OPEN', 'UNFULFILLED'):
-                st_clauses.append("UPPER(status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')")
+                st_clauses.append("UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')")
             elif tok == 'PAID':
-                st_clauses.append("(UPPER(status) IN ('PAID', 'INVOICED') OR (UPPER(payment_status) = 'PAID' AND UPPER(status) NOT IN ('OPEN', 'CANCELLED', 'QUOTE')))")
+                st_clauses.append("(UPPER(so.status) IN ('PAID', 'INVOICED') OR (UPPER(so.payment_status) = 'PAID' AND UPPER(so.status) NOT IN ('OPEN', 'CANCELLED', 'QUOTE')))")
             elif tok in ('CANCELLED', 'CANCELED'):
-                st_clauses.append("UPPER(status) IN ('CANCELLED', 'CANCELED')")
+                st_clauses.append("UPPER(so.status) IN ('CANCELLED', 'CANCELED')")
             elif tok == 'QUOTE':
-                st_clauses.append("UPPER(status) = 'QUOTE'")
+                st_clauses.append("UPPER(so.status) = 'QUOTE'")
             elif tok in ('ALL', 'ALL ORDERS'):
                 st_clauses = []
                 break
         if st_clauses:
             base_where.append("(" + " OR ".join(st_clauses) + ")")
 
-    base_where.append("NOT (customer_id IS NULL AND total_amount = 0)")
+    if customer_id and str(customer_id).strip().isdigit():
+        base_where.append("so.customer_id = %s")
+        params.append(int(customer_id))
+
+    if search and search.strip():
+        base_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
+        sp = f"%{search.strip()}%"
+        params.extend([sp, sp, sp, sp])
+
+    base_where.append("NOT (so.customer_id IS NULL AND so.total_amount = 0)")
     where_sql = (" WHERE " + " AND ".join(base_where)) if base_where else ""
-    sql = f"SELECT id FROM sales_orders{where_sql} ORDER BY id DESC LIMIT 1"
+    sql = f"""
+        SELECT so.id 
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        {where_sql} 
+        ORDER BY so.id DESC 
+        LIMIT 1
+    """
     return query_one(sql, tuple(params) if params else None)
 
 @sales_orders_bp.route('/sales')
@@ -559,12 +575,24 @@ def list_orders():
     status_filter = request.args.get('status_filter') or request.args.get('status') or 'Open'
     date_filter = request.args.get('date_filter') or 'All'
     search = request.args.get('search') or ''
+    customer_id = request.args.get('customer_id') or None
 
-    latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter)
+    latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=search, customer_id=customer_id)
 
     if latest:
-        return redirect(url_for('sales_orders.detail_order', id=latest['id'], branch=branch_filter, status_filter=status_filter, date_filter=date_filter, search=search, _from_list='1'))
-    return redirect(url_for('sales_orders.new_order', branch=branch_filter, status_filter=status_filter, date_filter=date_filter, search=search))
+        redirect_kwargs = {'id': latest['id'], 'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter, '_from_list': '1'}
+        if search:
+            redirect_kwargs['search'] = search
+        if customer_id:
+            redirect_kwargs['customer_id'] = customer_id
+        return redirect(url_for('sales_orders.detail_order', **redirect_kwargs))
+
+    new_kwargs = {'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter}
+    if search:
+        new_kwargs['search'] = search
+    if customer_id:
+        new_kwargs['customer_id'] = customer_id
+    return redirect(url_for('sales_orders.new_order', **new_kwargs))
 
 
     if not is_main:
@@ -930,6 +958,20 @@ def _order_matches_status_filter(order, status_filter):
             return True
     return False
 
+def _order_matches_search(order, query):
+    if not order:
+        return False
+    if not query or not str(query).strip():
+        return True
+    q = str(query).strip().lower()
+    fields = [
+        str(order.get('order_number') or ''),
+        str(order.get('customer_name') or ''),
+        str(order.get('delivery_man') or ''),
+        str(order.get('total_amount') or '')
+    ]
+    return any(q in f.lower() for f in fields)
+
 def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress, Paid', customer_search='', customer_filter=None, scheme_id=100, branch_id=None, search_query=None, current_order_id=None):
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
@@ -1175,8 +1217,9 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         """
         single_order = query_one(single_sql, (int(current_order_id),))
         if single_order and (_order_matches_status_filter(single_order, status_filter) or request.args.get('just_saved') == '1'):
-            sidebar_orders.insert(0, single_order)
-            sidebar_orders.sort(key=lambda x: x['id'], reverse=True)
+            if not search_query or _order_matches_search(single_order, search_query):
+                sidebar_orders.insert(0, single_order)
+                sidebar_orders.sort(key=lambda x: x['id'], reverse=True)
 
     # Pre-aggregate items sold preview for instant hover preview ("when mouse over order it will preview total items sell")
     preview_map = {}

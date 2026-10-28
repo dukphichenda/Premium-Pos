@@ -9312,25 +9312,26 @@ function startNewOrderForCustomer(customerId, customerName) {
     if (curStatus) targetUrl += '&status_filter=' + encodeURIComponent(curStatus);
     if (curDate) targetUrl += '&date_filter=' + encodeURIComponent(curDate);
 
+    const doNavNew = function() {
+        try {
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                window.top.inflowMdi.updateActiveTabMeta(targetUrl, 'Sales Order');
+            }
+        } catch(e) {}
+        window.location.href = targetUrl;
+    };
+
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
             function() {
                 isDirty = false;
-                if (window.top && window.top.inflowMdi) {
-                    window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales');
-                } else {
-                    window.location.href = targetUrl;
-                }
+                doNavNew();
             },
             function() { /* cancel */ }
         );
     } else {
-        if (window.top && window.top.inflowMdi) {
-            window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales');
-        } else {
-            window.location.href = targetUrl;
-        }
+        doNavNew();
     }
 }
 
@@ -9354,7 +9355,7 @@ function closeSoCustSuggestPopup() {
     if (popup) popup.style.display = 'none';
 }
 
-function executeSoSearch(query) {
+function executeSoSearch(query, customerId) {
     closeSoCustSuggestPopup();
     const input = document.getElementById('soSidebarSearchInput');
     const val = (query !== undefined && query !== null ? String(query) : (input ? input.value : '')).trim();
@@ -9379,13 +9380,43 @@ function executeSoSearch(query) {
         try { sessionStorage.removeItem('inflow_so_search_query'); } catch(err) {}
     }
 
+    if (customerId) {
+        url.searchParams.set('customer_id', customerId);
+    } else {
+        url.searchParams.delete('customer_id');
+    }
+
+    // Strictly preserve current status filter and branch context
+    let curStatus = '';
+    try {
+        curStatus = sessionStorage.getItem('inflow_so_status_filter');
+    } catch(e) {}
+    if (!curStatus) {
+        curStatus = url.searchParams.get('status_filter') || url.searchParams.get('status') || '{{ status_filter or "Open" }}';
+    }
+    if (curStatus) {
+        url.searchParams.set('status_filter', curStatus);
+        url.searchParams.set('status', curStatus);
+    }
+    if (!url.searchParams.has('branch')) {
+        {% if branch_scope %}
+        url.searchParams.set('branch', '{{ branch_scope }}');
+        {% endif %}
+    }
+    if (!url.searchParams.has('date_filter')) {
+        {% if date_filter %}
+        url.searchParams.set('date_filter', '{{ date_filter }}');
+        {% endif %}
+    }
+
     const doNav = function() {
-        const targetUrl = url.pathname + url.search;
-        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
-            window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales', false, true);
-        } else {
-            window.location.href = targetUrl;
-        }
+        const targetUrl = '/sales' + url.search;
+        try {
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                window.top.inflowMdi.updateActiveTabMeta(targetUrl, 'Sales Order');
+            }
+        } catch(e) {}
+        window.location.href = targetUrl;
     };
 
     if (typeof isDirty !== 'undefined' && isDirty) {
@@ -9408,7 +9439,7 @@ function selectSoCustomerSuggestion(id, name) {
         input.value = name || '';
     }
     closeSoCustSuggestPopup();
-    executeSoSearch(name || '');
+    executeSoSearch(name || '', id);
 }
 
 function viewSoCustomerDetails(id, name) {
@@ -9443,21 +9474,33 @@ function clearSoLiveSearch() {
     handleSoLiveSearch('');
 
     const url = new URL(window.location.href);
-    const hasSearchInUrl = url.searchParams.has('search') || url.searchParams.has('q');
-    const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
+    url.searchParams.delete('search');
+    url.searchParams.delete('q');
+    url.searchParams.delete('customer_id');
 
-    if (hasSearchInUrl) {
-        url.searchParams.delete('search');
-        url.searchParams.delete('q');
-        try {
-            if (window.history && window.history.replaceState) {
-                window.history.replaceState(null, document.title, url.pathname + url.search);
-            }
-            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
-                window.top.inflowMdi.updateActiveTabMeta(url.pathname + url.search, document.title);
-            }
-        } catch(e) {}
+    let curStatus = '';
+    try {
+        curStatus = sessionStorage.getItem('inflow_so_status_filter');
+    } catch(e) {}
+    if (!curStatus) {
+        curStatus = url.searchParams.get('status_filter') || url.searchParams.get('status') || '{{ status_filter or "Open" }}';
     }
+    if (curStatus) {
+        url.searchParams.set('status_filter', curStatus);
+        url.searchParams.set('status', curStatus);
+    }
+    if (!url.searchParams.has('branch')) {
+        {% if branch_scope %}
+        url.searchParams.set('branch', '{{ branch_scope }}');
+        {% endif %}
+    }
+    if (!url.searchParams.has('date_filter')) {
+        {% if date_filter %}
+        url.searchParams.set('date_filter', '{{ date_filter }}');
+        {% endif %}
+    }
+
+    const hadServerSearch = {% if search_query %}true{% else %}false{% endif %};
 
     // Sync search clear to server session
     try {
@@ -9467,15 +9510,22 @@ function clearSoLiveSearch() {
     } catch(e) {}
 
     if (hadServerSearch) {
-        url.searchParams.set('search', '');
-        url.searchParams.delete('q');
-        const targetUrl = url.pathname + url.search;
-        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.navigateOrOpenTab === 'function') {
-            window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'Sales Order', 'sales', false, true);
-        } else {
-            window.location.href = targetUrl;
-        }
+        const targetUrl = '/sales' + url.search;
+        try {
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                window.top.inflowMdi.updateActiveTabMeta(targetUrl, 'Sales Order');
+            }
+        } catch(e) {}
+        window.location.href = targetUrl;
     } else {
+        try {
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, document.title, url.pathname + url.search);
+            }
+            if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                window.top.inflowMdi.updateActiveTabMeta(url.pathname + url.search, document.title);
+            }
+        } catch(e) {}
         if (inp) inp.focus();
     }
 }

@@ -41,5 +41,18 @@ class TestCustomerSearchSameTabReload(unittest.TestCase):
         self.assertIn("const existingSalesTab = this.tabs.find(t => getBaseCategory(t.type) === 'sales');", self.tabs_content)
         self.assertIn("displayTitle = tab.title;", self.tabs_content)
 
+    def test_customer_suggestion_selection_and_same_tab_status_filter(self):
+        """Verify selectSoCustomerSuggestion passes id and executeSoSearch navigates in-place preserving status"""
+        self.assertIn("executeSoSearch(name || '', id);", self.detail_content)
+        self.assertIn("const targetUrl = '/sales' + url.search;", self.detail_content)
+        self.assertIn("url.searchParams.set('status_filter', curStatus);", self.detail_content)
+        self.assertIn("window.location.href = targetUrl;", self.detail_content)
+
+    def test_routes_find_latest_matching_so_and_drawer_search(self):
+        """Verify _find_latest_matching_so filters by customer_id and search, and drawer guards single_order"""
+        self.assertIn("def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=None, customer_id=None):", self.routes_content)
+        self.assertIn("def _order_matches_search(order, query):", self.routes_content)
+        self.assertIn("if not search_query or _order_matches_search(single_order, search_query):", self.routes_content)
+
 if __name__ == '__main__':
     unittest.main()
