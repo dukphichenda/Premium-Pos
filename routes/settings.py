@@ -304,6 +304,11 @@ def general_settings():
     mobile_config = get_mobile_app_config()
     mobile_sim_data = get_mobile_simulator_real_data()
 
+    # Extract latest sales order for mobile view simulation
+    latest_orders = mobile_sim_data.get('orders_list', [])
+    latest_so_id = latest_orders[0].get('id') if latest_orders else None
+    latest_so_title = latest_orders[0].get('title', '') if latest_orders else ''
+
     return render_template('settings/general.html',
                            company=company,
                            inv_settings=inv_settings,
@@ -323,6 +328,8 @@ def general_settings():
                            backups_formatted_total_size=backups_formatted_total_size,
                            latest_backup=latest_backup,
                            active_tab=active_tab,
+                           latest_so_id=latest_so_id,
+                           latest_so_title=latest_so_title,
                            mobile_config=mobile_config,
                            mobile_sim_data=mobile_sim_data,
                            sim_delivery_orders=mobile_sim_data.get('orders_list', []),
