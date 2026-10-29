@@ -209,5 +209,10 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.assertIn('.inflow-sidebar-edge-tab', self.detail_html)
         self.assertIn('#soSidebarExpandTab', self.base_html)
 
+        # 5. Desktop / PC mode strictly suppresses bottom navigation bar
+        self.assertIn('html.is-desktop-view .so-mobile-nav-bar', self.styles_css)
+        self.assertIn('#universalMobileNavBar', self.styles_css)
+        self.assertIn('html.is-desktop-view #universalMobileNavBar', self.base_html)
+
 if __name__ == '__main__':
     unittest.main()
