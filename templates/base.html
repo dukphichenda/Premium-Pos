@@ -1095,8 +1095,8 @@
                     { id: "settings", label: "Settings", url: "/settings", icon: "gear", is_center: false },
                     { id: "report", label: "Report", url: "/expenses/monthly", icon: "chart", is_center: false },
                     { id: "home", label: "Home", url: "/dashboard", icon: "home", is_center: true },
-                    { id: "so", label: "SO", url: "/sales/", icon: "document", is_center: false },
-                    { id: "product", label: "Product", url: "/products/", icon: "cube", is_center: false }
+                    { id: "so", label: "SO", url: "/sales", icon: "document", is_center: false },
+                    { id: "product", label: "Product", url: "/products", icon: "cube", is_center: false }
                 ];
             }
 
@@ -1113,7 +1113,14 @@
                 let html = '';
                 customItems.forEach(item => {
                     const isCenter = !!item.is_center;
-                    const targetUrl = item.url || '/dashboard';
+                    let targetUrl = item.url || '/dashboard';
+                    if (targetUrl === '/sales/' || targetUrl === '/sales') targetUrl = '/sales';
+                    else if (targetUrl === '/products/' || targetUrl === '/products') targetUrl = '/products';
+                    else if (targetUrl === '/purchases/' || targetUrl === '/purchases') targetUrl = '/purchases';
+                    else if (targetUrl === '/inventory/' || targetUrl === '/inventory') targetUrl = '/inventory';
+                    else if (targetUrl === '/customers/' || targetUrl === '/customers') targetUrl = '/customers';
+                    else if (targetUrl === '/vendors/' || targetUrl === '/vendors') targetUrl = '/vendors';
+                    else if (targetUrl === '/transfers/' || targetUrl === '/transfers') targetUrl = '/transfers';
                     const cleanUrl = targetUrl.split('?')[0].toLowerCase();
                     
                     let isActive = false;
@@ -1179,8 +1186,17 @@
                 event.preventDefault();
                 event.stopPropagation();
             }
+            let targetUrl = url;
+            if (targetUrl === '/sales/' || targetUrl.startsWith('/sales/?')) targetUrl = targetUrl.replace('/sales/', '/sales');
+            else if (targetUrl === '/products/' || targetUrl.startsWith('/products/?')) targetUrl = targetUrl.replace('/products/', '/products');
+            else if (targetUrl === '/purchases/' || targetUrl.startsWith('/purchases/?')) targetUrl = targetUrl.replace('/purchases/', '/purchases');
+            else if (targetUrl === '/inventory/' || targetUrl.startsWith('/inventory/?')) targetUrl = targetUrl.replace('/inventory/', '/inventory');
+            else if (targetUrl === '/customers/' || targetUrl.startsWith('/customers/?')) targetUrl = targetUrl.replace('/customers/', '/customers');
+            else if (targetUrl === '/vendors/' || targetUrl.startsWith('/vendors/?')) targetUrl = targetUrl.replace('/vendors/', '/vendors');
+            else if (targetUrl === '/transfers/' || targetUrl.startsWith('/transfers/?')) targetUrl = targetUrl.replace('/transfers/', '/transfers');
+
             if (window.self !== window.top) {
-                let dest = url;
+                let dest = targetUrl;
                 if (!dest.includes('embed=1')) {
                     dest += (dest.includes('?') ? '&' : '?') + 'embed=1';
                 }
@@ -1197,7 +1213,7 @@
                 window.location.href = dest;
                 return;
             }
-            window.location.href = url;
+            window.location.href = targetUrl;
         };
 
         function handleSidebarLogoClick() {

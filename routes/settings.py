@@ -528,8 +528,8 @@ DEFAULT_BOTTOM_BAR_ITEMS = [
     {"id": "settings", "label": "Settings", "url": "/settings", "icon": "gear", "is_center": False},
     {"id": "report", "label": "Report", "url": "/expenses/monthly", "icon": "chart", "is_center": False},
     {"id": "home", "label": "Home", "url": "/dashboard", "icon": "home", "is_center": True},
-    {"id": "so", "label": "SO", "url": "/sales/", "icon": "document", "is_center": False},
-    {"id": "product", "label": "Product", "url": "/products/", "icon": "cube", "is_center": False}
+    {"id": "so", "label": "SO", "url": "/sales", "icon": "document", "is_center": False},
+    {"id": "product", "label": "Product", "url": "/products", "icon": "cube", "is_center": False}
 ]
 
 @settings_bp.route('/api/settings/bottom-bar', methods=['GET', 'POST'])

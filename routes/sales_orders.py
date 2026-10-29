@@ -553,7 +553,8 @@ def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, se
     """
     return query_one(sql, tuple(params) if params else None)
 
-@sales_orders_bp.route('/sales')
+@sales_orders_bp.route('/sales', strict_slashes=False)
+@sales_orders_bp.route('/sales/', strict_slashes=False)
 def list_orders():
     view_mode = request.args.get('view', '').strip()
     is_main = _is_main_admin()

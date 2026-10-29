@@ -33,6 +33,7 @@ def create_app():
         static_folder=os.path.join(base_dir, 'static'),
         template_folder=os.path.join(base_dir, 'templates')
     )
+    app.url_map.strict_slashes = False
     app.config.from_object(Config)
     app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1 GB
 
