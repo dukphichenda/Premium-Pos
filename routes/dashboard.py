@@ -64,7 +64,7 @@ def index():
             SELECT 
                 (SELECT COUNT(*) FROM products WHERE is_active = TRUE) as total_products,
                 (SELECT COALESCE(SUM(quantity), 0) FROM inventory) as total_units_on_hand,
-                (SELECT COALESCE(SUM(i.quantity * COALESCE(p.average_cost, p.standard_cost, 0)), 0) 
+                (SELECT COALESCE(SUM(GREATEST(i.quantity, 0) * COALESCE(p.average_cost, p.standard_cost, 0)), 0) 
                  FROM inventory i 
                  JOIN products p ON i.product_id = p.id) as total_inventory_value,
                 (SELECT COUNT(DISTINCT p.id) 
