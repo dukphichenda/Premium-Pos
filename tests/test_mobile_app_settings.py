@@ -22,7 +22,7 @@ class TestMobileAppSettings(unittest.TestCase):
         self.assertIn('id="tabMobileSim"', html)
         self.assertIn('btnTabMobileSim', html)
         self.assertIn('btnTabMobileApp', html)
-        self.assertIn('Mobile View Simulation &amp; Android App', html)
+        self.assertIn('Mobile View &amp; Android App', html)
         self.assertIn('inFlow-Premium.apk', html)
         self.assertIn('/settings/mobile-app/update', html)
 
