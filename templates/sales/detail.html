@@ -419,14 +419,15 @@ body.sales-order-body-fullscreen #inflowDirectContent {
     justify-content: center;
 }
 
-/* Mobile Top App Bar (Sleek inFlow theme matching reference mobile app bar) */
+/* Mobile Top App Bar (Minimalist Brown Theme) */
 .so-mobile-top-bar {
     display: none;
     align-items: center;
     justify-content: space-between;
     height: 52px;
     padding: 0 12px;
-    background: #1E293B;
+    background: #4E342E;
+    border-bottom: 1px solid #3E2723;
     color: #FFFFFF;
     position: sticky;
     top: 0;
@@ -528,11 +529,15 @@ body.sales-order-body-fullscreen #inflowDirectContent {
     right: 0;
     min-width: 220px;
     background: #FFFFFF;
-    border: 1px solid #CBD5E1;
-    border-radius: 8px;
-    box-shadow: 0 10px 25px -4px rgba(15, 23, 42, 0.25);
+    border: 1px solid #E5E7EB;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.2);
     padding: 6px;
     z-index: 100000;
+}
+.so-mobile-actions-menu .win-menu-item:hover {
+    background: #EFEBE9 !important;
+    color: #4E342E !important;
 }
 
 @media (max-width: 768px) {
@@ -1896,22 +1901,48 @@ html.is-mobile-view .so-mobile-floating-btn {
 }
 .so-modern-main-split {
     display: flex !important;
+    flex-direction: column !important;
     gap: 8px !important;
-    align-items: flex-start !important;
+    align-items: stretch !important;
     width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
 }
 .so-main-left {
-    flex: 1 1 0% !important;
+    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
-    max-width: calc(100% - 268px) !important;
+    flex: 1 1 100% !important;
+    box-sizing: border-box !important;
+}
+.so-card-items {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
 }
 .so-main-right {
-    width: 260px !important;
-    min-width: 260px !important;
-    max-width: 260px !important;
-    flex-shrink: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     box-sizing: border-box !important;
+}
+@media (min-width: 1281px) {
+    html:not(.is-mobile-view) .so-modern-main-split {
+        flex-direction: row !important;
+        align-items: flex-start !important;
+    }
+    html:not(.is-mobile-view) .so-main-left {
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+        max-width: calc(100% - 268px) !important;
+        width: calc(100% - 268px) !important;
+    }
+    html:not(.is-mobile-view) .so-main-right {
+        width: 260px !important;
+        min-width: 260px !important;
+        max-width: 260px !important;
+        flex-shrink: 0 !important;
+        display: block !important;
+    }
 }
 .so-card-items {
     padding: 0 !important;
@@ -2426,17 +2457,56 @@ html.is-mobile-view .so-mobile-floating-btn {
     }
     .so-modern-main-split {
         flex-direction: column !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .so-main-left {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+    .so-card-items {
+        width: 100% !important;
+        max-width: 100% !important;
     }
     .so-main-right {
         width: 100% !important;
+        max-width: 100% !important;
     }
 }
-@media (max-width: 768px) {
+@media (max-width: 1024px) {
     .so-card-grid-top {
         grid-template-columns: 1fr !important;
     }
     .so-bottom-cards-grid {
         grid-template-columns: 1fr !important;
+        width: 100% !important;
+    }
+    .so-modern-main-split,
+    html.is-desktop-view .so-modern-main-split {
+        flex-direction: column !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .so-main-left,
+    html.is-desktop-view .so-main-left {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        flex: 1 1 100% !important;
+    }
+    .so-card-items,
+    html.is-desktop-view .so-card-items {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .so-modern-table-wrap,
+    html.is-desktop-view .so-modern-table-wrap {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .so-main-right {
+        display: none !important;
     }
     .so-logistics-row {
         flex-direction: column !important;
@@ -2450,7 +2520,13 @@ html.is-mobile-view .so-mobile-floating-btn {
         width: 100% !important;
     }
     .inflow-document-canvas {
-        padding: 12px 10px 30px !important;
+        padding: 8px 8px 140px !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+    .so-modern-canvas {
+        width: 100% !important;
+        max-width: 100% !important;
     }
 }
 
@@ -6709,6 +6785,24 @@ function handleItemDropdownKey(e, inputEl) {
     }
 }
 
+
+function stepLineQty(btn, delta) {
+    if (typeof isOrderPaid === 'function' && isOrderPaid()) return;
+    const wrap = btn.closest('.so-qty-wrapper');
+    if (!wrap) return;
+    const input = wrap.querySelector('.line-qty');
+    if (!input || input.readOnly || input.disabled) return;
+    let currentVal = parseFloat(input.value) || 0;
+    let newVal = Math.max(0, currentVal + delta);
+    newVal = Math.round(newVal * 10000) / 10000;
+    input.value = newVal;
+    if (typeof onQtyNumberChange === 'function') onQtyNumberChange(input);
+    if (typeof cleanQtyInput === 'function') cleanQtyInput(input);
+    if (typeof recalculateTotals === 'function') recalculateTotals();
+    if (typeof markDirty === 'function') markDirty();
+}
+window.stepLineQty = stepLineQty;
+
 function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
     const tbody = document.getElementById('lineItemsBody');
     const popup = document.getElementById('itemDropdownPopup');
@@ -6793,9 +6887,11 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
             <td style="display: none;"></td>
             <td style="text-align: center; vertical-align: middle;" class="qty-cell">
                 <div class="inflow-qty-cell-wrapper so-qty-wrapper">
+                    <button type="button" class="so-qty-btn so-qty-btn-minus" onclick="stepLineQty(this, -1)" title="Decrease quantity">-</button>
                     <input type="number" step="any" name="lines[${existingCount}][quantity]" value="1" 
                            class="inflow-qty-num-input line-qty so-clean-input so-qty-input" 
                            oninput="onQtyNumberChange(this)" onchange="cleanQtyInput(this); recalculateTotals(); markDirty();" onblur="cleanQtyInput(this)">
+                    <button type="button" class="so-qty-btn so-qty-btn-plus" onclick="stepLineQty(this, 1)" title="Increase quantity">+</button>
                     <div class="inflow-qty-uom-btn so-uom-badge" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock">
                         <span class="uom-text">${baseUom}</span>
                         <span class="uom-arrow" style="font-size: 10px;">⌵</span>
@@ -7120,15 +7216,52 @@ function recalculateTotals() {
         balance = Math.max(0, subtotal - paid);
     }
 
-    document.getElementById('dispSubtotal').innerText = '$' + subtotal.toFixed(2);
-    document.getElementById('dispTotal').innerText = '$' + subtotal.toFixed(2);
-    document.getElementById('dispBalance').innerText = '$' + balance.toFixed(2);
+    const dispSub = document.getElementById('dispSubtotal');
+    if (dispSub) dispSub.innerText = '$' + subtotal.toFixed(2);
+    const dispTot = document.getElementById('dispTotal');
+    if (dispTot) dispTot.innerText = '$' + subtotal.toFixed(2);
+    const dispBal = document.getElementById('dispBalance');
+    if (dispBal) dispBal.innerText = '$' + balance.toFixed(2);
     const countEl = document.getElementById('soTotalItemsCount');
     if (countEl) countEl.innerText = rows.length;
     const chipTotal = document.getElementById('mobileChipTotal');
     if (chipTotal) chipTotal.innerText = '🏷️ $' + subtotal.toFixed(2);
     const chipItems = document.getElementById('mobileChipItems');
     if (chipItems) chipItems.innerText = '🛒 ' + rows.length + ' items';
+
+    // Synchronize Mobile Sticky Bar & Drawer & Modal
+    const stickyCount = document.getElementById('mobileStickyItemsCount');
+    if (stickyCount) stickyCount.innerText = rows.length + (rows.length === 1 ? ' item' : ' items');
+    const stickyTotal = document.getElementById('mobileStickyGrandTotal');
+    if (stickyTotal) stickyTotal.innerText = '$' + subtotal.toFixed(2);
+    const stickyPayTotal = document.getElementById('mobileStickyPayBtnTotal');
+    if (stickyPayTotal) stickyPayTotal.innerText = '$' + (orderIsPaid ? subtotal.toFixed(2) : balance.toFixed(2));
+
+    const drawerSub = document.getElementById('mobileDrawerSubtotal');
+    if (drawerSub) drawerSub.innerText = '$' + subtotal.toFixed(2);
+    const drawerTot = document.getElementById('mobileDrawerGrandTotal');
+    if (drawerTot) drawerTot.innerText = '$' + subtotal.toFixed(2);
+    const drawerPaid = document.getElementById('mobileDrawerPaid');
+    if (drawerPaid) drawerPaid.innerText = '$' + paid.toFixed(2);
+    const drawerBal = document.getElementById('mobileDrawerBalance');
+    if (drawerBal) drawerBal.innerText = '$' + balance.toFixed(2);
+
+    const modalBal = document.getElementById('mobileModalBalanceDue');
+    if (modalBal) modalBal.innerText = '$' + balance.toFixed(2);
+    const modalTot = document.getElementById('mobileModalTotal');
+    if (modalTot) modalTot.innerText = '$' + subtotal.toFixed(2);
+    const modalConfirmText = document.getElementById('mobileConfirmPayBtnText');
+    if (modalConfirmText) {
+        const modalInp = document.getElementById('mobileModalPaidInput');
+        const curInpVal = modalInp ? (parseFloat(modalInp.value) || 0) : balance;
+        modalConfirmText.innerText = 'Confirm & Complete Pay · $' + (curInpVal > 0 ? curInpVal.toFixed(2) : balance.toFixed(2));
+    }
+
+    // Toggle Empty Items Notice
+    const emptyNotice = document.getElementById('soEmptyItemsNotice');
+    if (emptyNotice) {
+        emptyNotice.style.display = rows.length === 0 ? 'block' : 'none';
+    }
 }
 
 function gatherLineItems() {
@@ -7643,11 +7776,13 @@ function executeCopyAction(action) {
         const targetUrl = buildUrlWithFilters('/sales/new', { copy_from: orderId });
 
         const proceedCopy = function() {
-            if (window.top && window.top.inflowMdi) {
-                window.top.inflowMdi.navigateOrOpenTab(targetUrl, 'New Sales Order', 'sales', false);
-            } else {
-                executeAnimatedOrderNavigation(targetUrl);
-            }
+            // Stay in the old tab — do NOT create a new tab!
+            try {
+                if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                    window.top.inflowMdi.updateActiveTabMeta(targetUrl, 'Sales Order');
+                }
+            } catch (e) {}
+            window.location.href = targetUrl;
         };
 
         if (isDirty) {
