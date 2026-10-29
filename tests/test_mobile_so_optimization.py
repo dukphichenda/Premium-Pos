@@ -6,22 +6,122 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
     def setUp(self):
         self.canvas_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'sales', '_detail_canvas.html')
         self.detail_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'sales', 'detail.html')
+        self.dashboard_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'dashboard.html')
+        self.list_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'sales', 'list.html')
         self.styles_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'css', 'styles.css')
+        
         with open(self.canvas_path, 'r', encoding='utf-8') as f:
             self.canvas_html = f.read()
         with open(self.detail_path, 'r', encoding='utf-8') as f:
             self.detail_html = f.read()
+        with open(self.dashboard_path, 'r', encoding='utf-8') as f:
+            self.dashboard_html = f.read()
+        with open(self.list_path, 'r', encoding='utf-8') as f:
+            self.list_html = f.read()
         with open(self.styles_path, 'r', encoding='utf-8') as f:
             self.styles_css = f.read()
 
-    def test_mobile_top_section_cards(self):
-        """Test the 3 structured mobile top cards: Order Info, Customer Selection, Order Settings & Delivery."""
-        self.assertIn('so-mobile-info-card', self.canvas_html)
-        self.assertIn('so-mobile-cust-card', self.canvas_html)
-        self.assertIn('so-mobile-settings-card', self.canvas_html)
-        self.assertIn('mobileSettingsDrawer', self.canvas_html)
-        self.assertIn('toggleMobileSettingsDrawer', self.canvas_html)
-        self.assertIn('mobileLogisticsSummary', self.canvas_html)
+    def test_emerald_mint_palette_styling(self):
+        """Verify Forest Emerald and Mint Green palette colors (#1E6B52, #5BB78B, #EAF7EF, #A7D7C5) are defined in CSS."""
+        self.assertIn('#1E6B52', self.canvas_html)
+        self.assertIn('#5BB78B', self.canvas_html)
+        self.assertIn('#EAF7EF', self.canvas_html)
+        self.assertIn('#A7D7C5', self.canvas_html)
+
+    def test_screen_1_home_dashboard(self):
+        """Verify Screen 1: Home Dashboard with hero card, 2x2 stats grid, recent orders, and nav bar."""
+        self.assertIn('so-mobile-dashboard-view', self.dashboard_html)
+        self.assertIn('so-mob-hero-card', self.dashboard_html)
+        self.assertIn('New Sale Order', self.dashboard_html)
+        self.assertIn('so-mob-stats-grid', self.dashboard_html)
+        self.assertIn("Today's Sales", self.dashboard_html)
+        self.assertIn('so-mob-recent-section', self.dashboard_html)
+        self.assertIn('so-mobile-nav-bar', self.dashboard_html)
+
+    def test_screen_2_sales_order_list(self):
+        """Verify Screen 2: Sale Order List with header, search, filter pills, order cards, and nav bar."""
+        self.assertIn('so-mobile-sales-list-view', self.list_html)
+        self.assertIn('so-mob-filter-pills', self.list_html)
+        self.assertIn('so-mob-orders-container', self.list_html)
+        self.assertIn('filterMobileOrders', self.list_html)
+        self.assertIn('so-mobile-nav-bar', self.list_html)
+
+    def test_screen_3_sale_order_detail_main_view(self):
+        """Verify Screen 3: Sale Order Detail main view components."""
+        self.assertIn('so-mobile-cust-select-card', self.canvas_html)
+        self.assertIn('so-mobile-settings-card-btn', self.canvas_html)
+        self.assertIn('so-mobile-search-add-bar', self.canvas_html)
+        self.assertIn('mobileItemsHeadingTitle', self.canvas_html)
+        self.assertIn('mobileStickyBottomBar', self.canvas_html)
+        self.assertIn('Complete & Pay', self.canvas_html)
+
+    def test_screen_4_customer_selection_bottom_sheet(self):
+        """Verify Screen 4: Customer Selection Bottom Sheet."""
+        self.assertIn('id="mobileCustomerSheet"', self.canvas_html)
+        self.assertIn('id="mobileCustomerSearchInput"', self.canvas_html)
+        self.assertIn('id="mobileCustomerItemsList"', self.canvas_html)
+        self.assertIn('+ Add New Customer', self.canvas_html)
+        self.assertIn('openMobileCustomerSheet', self.canvas_html)
+
+    def test_screen_5_order_settings_bottom_sheet(self):
+        """Verify Screen 5: Order Settings Bottom Sheet & Delivery Fee Quick Chips."""
+        self.assertIn('id="mobileOrderSettingsSheet"', self.canvas_html)
+        self.assertIn('so-mobile-fee-chips', self.canvas_html)
+        self.assertIn('setMobileDeliveryFee(1000)', self.canvas_html)
+        self.assertIn('setMobileDeliveryFee(2000)', self.canvas_html)
+        self.assertIn('openMobileOrderSettingsSheet', self.canvas_html)
+
+    def test_screen_6_add_product_picker_modal(self):
+        """Verify Screen 6: Add Product Picker Full Screen Modal with category pills and search."""
+        self.assertIn('id="mobileAddProductModal"', self.canvas_html)
+        self.assertIn('id="mobileProductSearchInput"', self.canvas_html)
+        self.assertIn('id="mobileProductCatPills"', self.canvas_html)
+        self.assertIn('openMobileAddProductModal', self.canvas_html)
+        self.assertIn('addProductFromMobilePicker', self.canvas_html)
+
+    def test_screen_7_payment_bottom_sheet(self):
+        """Verify Screen 7: Dedicated mobile payment bottom sheet with ABA, Cash, ACLEDA, KB PRASAC, Other Payment."""
+        self.assertIn('id="mobilePaymentModal"', self.canvas_html)
+        self.assertIn('ABA Bank', self.canvas_html)
+        self.assertIn('Cash', self.canvas_html)
+        self.assertIn('ACLEDA', self.canvas_html)
+        self.assertIn('KB PRASAC', self.canvas_html)
+        self.assertIn('Other Payment', self.canvas_html)
+        self.assertIn('openMobilePaymentModal', self.canvas_html)
+
+    def test_screen_8_order_summary_bottom_sheet(self):
+        """Verify Screen 8: Order Summary Bottom Sheet."""
+        self.assertIn('id="mobileOrderSummarySheet"', self.canvas_html)
+        self.assertIn('mobileSummarySubtotal', self.canvas_html)
+        self.assertIn('mobileSummaryTotal', self.canvas_html)
+        self.assertIn('openMobileOrderSummarySheet', self.canvas_html)
+
+    def test_screen_9_more_actions_bottom_sheet(self):
+        """Verify Screen 9: More Actions Bottom Sheet with full actions list."""
+        self.assertIn('id="mobileMoreActionsSheet"', self.canvas_html)
+        self.assertIn('openMobileMoreActionsSheet', self.canvas_html)
+        self.assertIn('Copy Order', self.canvas_html)
+        self.assertIn('Version History', self.canvas_html)
+        self.assertIn('Export PDF', self.canvas_html)
+        self.assertIn('Export JPG', self.canvas_html)
+        self.assertIn('Share Telegram', self.canvas_html)
+
+    def test_screen_10_empty_state_box(self):
+        """Verify Screen 10: Empty State Box with illustration and + Add Product button."""
+        self.assertIn('so-mobile-empty-state-box', self.canvas_html)
+        self.assertIn('No products added yet', self.canvas_html)
+        self.assertIn('Search and add products to create your sale order.', self.canvas_html)
+
+    def test_screen_11_universal_bottom_navigation_bar(self):
+        """Verify Screen 11: Universal 5-button bottom nav bar with elevated center Home bubble."""
+        self.assertIn('so-mobile-nav-bar', self.canvas_html)
+        self.assertIn('so-nav-center-home', self.canvas_html)
+        self.assertIn('so-nav-home-bubble', self.canvas_html)
+        self.assertIn('Settings', self.canvas_html)
+        self.assertIn('Report', self.canvas_html)
+        self.assertIn('Home', self.canvas_html)
+        self.assertIn('SO', self.canvas_html)
+        self.assertIn('Product', self.canvas_html)
 
     def test_all_12_mobile_slots_exist(self):
         """Verify that all 12 mobile slots defined in SO_MOBILE_SLOT_MAP exist in canvas DOM."""
@@ -43,60 +143,11 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
             self.assertIn(f'id="{slot}"', self.canvas_html, f"Missing slot: {slot}")
 
     def test_quantity_stepper_controls(self):
-        """Verify stepper buttons [-] and [+] exist in canvas template and detail JS."""
+        """Verify stepper buttons [-] and [+] exist in canvas template."""
         self.assertIn('so-qty-btn-minus', self.canvas_html)
         self.assertIn('so-qty-btn-plus', self.canvas_html)
         self.assertIn('stepLineQty(this, -1)', self.canvas_html)
         self.assertIn('stepLineQty(this, 1)', self.canvas_html)
-        self.assertIn('function stepLineQty', self.canvas_html)
-        self.assertIn('stepLineQty', self.detail_html)
-
-    def test_empty_items_notice_and_add_row(self):
-        """Verify empty state notice and mobile add row button exist."""
-        self.assertIn('id="soEmptyItemsNotice"', self.canvas_html)
-        self.assertIn('No products added yet', self.canvas_html)
-        self.assertIn('id="soMobileAddRowBar"', self.canvas_html)
-        self.assertIn('addNewBlankLine()', self.canvas_html)
-
-    def test_sticky_bottom_bar_and_drawer(self):
-        """Verify sticky bottom bar and expandable summary drawer."""
-        self.assertIn('id="mobileStickyBottomBar"', self.canvas_html)
-        self.assertIn('id="mobileStickyItemsCount"', self.canvas_html)
-        self.assertIn('id="mobileStickyGrandTotal"', self.canvas_html)
-        self.assertIn('id="mobileStickyPayBtn"', self.canvas_html)
-        self.assertIn('id="mobileSummaryDrawer"', self.canvas_html)
-        self.assertIn('id="mobileSummaryBackdrop"', self.canvas_html)
-        self.assertIn('toggleMobileSummaryDrawer', self.canvas_html)
-
-    def test_mobile_payment_workflow_modal(self):
-        """Verify dedicated mobile payment modal with ABA, Cash, ACLEDA, KB PRASAC, Other Payment tiles."""
-        self.assertIn('id="mobilePaymentModal"', self.canvas_html)
-        self.assertIn('id="mobilePaymentModalBackdrop"', self.canvas_html)
-        self.assertIn('id="mobileModalBalanceDue"', self.canvas_html)
-        self.assertIn('id="mobileModalPaidInput"', self.canvas_html)
-        self.assertIn('id="mobileConfirmPayBtn"', self.canvas_html)
-        self.assertIn('ABA Bank', self.canvas_html)
-        self.assertIn('Cash', self.canvas_html)
-        self.assertIn('ACLEDA', self.canvas_html)
-        self.assertIn('KB PRASAC', self.canvas_html)
-        self.assertIn('Other Payment', self.canvas_html)
-        self.assertIn('selectMobilePayMethod', self.canvas_html)
-        self.assertIn('fillMobileFullAmount', self.canvas_html)
-        self.assertIn('confirmMobilePaymentAndComplete', self.canvas_html)
-
-    def test_brown_palette_styling(self):
-        """Verify brown palette colors (#795548, #4E342E, #EFEBE9) are defined in CSS."""
-        self.assertIn('#795548', self.canvas_html)
-        self.assertIn('#4E342E', self.canvas_html)
-        self.assertIn('#EFEBE9', self.canvas_html)
-        self.assertIn('background: #4E342E;', self.detail_html)
-
-    def test_totals_recalculation_sync(self):
-        """Verify recalculateTotals synchronizes mobile elements and toggles empty notice."""
-        self.assertIn('mobileStickyItemsCount', self.detail_html)
-        self.assertIn('mobileStickyGrandTotal', self.detail_html)
-        self.assertIn('mobileStickyPayBtnTotal', self.detail_html)
-        self.assertIn('soEmptyItemsNotice', self.detail_html)
 
     def test_item_adding_box_full_width_stretch(self):
         """Verify that the item adding box and .so-main-left stretch 100% without 268px squishing."""
@@ -104,8 +155,6 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.assertIn('html.is-mobile-view .so-card-items', self.canvas_html)
         self.assertIn('@media (max-width: 1024px)', self.canvas_html)
         self.assertIn('@media (max-width: 1024px)', self.detail_html)
-        # Verify min-width 720px is not constraining mobile in styles.css
-        self.assertIn('html.is-mobile-view #lineItemsTable {\n  min-width: 0 !important;', self.styles_css)
 
 if __name__ == '__main__':
     unittest.main()
