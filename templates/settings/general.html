@@ -2910,6 +2910,11 @@
                     </div>
                 </div>
 
+                <div style="margin-bottom: 12px; display: flex; justify-content: flex-end;">
+                    <button type="button" onclick="openBottomBarCustomizerModal()" class="btn btn-sm" style="background: #1E6B52; color: #FFFFFF; font-weight: 700; padding: 8px 14px; border-radius: 6px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(30,107,82,0.25);">
+                        <span>🎨</span> Open Visual Bottom Bar Customizer (កំណត់របាររុករក)
+                    </button>
+                </div>
                 <div style="background: #F8FAFC; border-radius: 8px; padding: 12px; border: 1px solid #E2E8F0; margin-bottom: 14px;">
                     <span style="font-size: 0.78rem; color: #475569;">
                         Customize up to 5 bottom shortcut items. Toggle checkboxes to enable/disable buttons:
@@ -3484,7 +3489,13 @@
                 </button>
                 
                 <!-- Open in Standalone Mobile Window -->
-                <button type="button" onclick="openMobileSimPopup()" class="btn btn-outline" style="background: rgba(255, 255, 255, 0.12); color: #FFFFFF; border-color: rgba(255, 255, 255, 0.35); font-weight: 700; padding: 10px 16px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                <!-- Customize Bottom Bar Button in Top Hero Banner -->
+                <button type="button" onclick="openBottomBarCustomizerModal()" id="btnSimCustomizeBottomBar" class="btn" style="background: #1E6B52; color: #FFFFFF; font-weight: 800; padding: 10px 18px; border-radius: 8px; border: none; display: inline-flex; align-items: center; gap: 8px; box-shadow: 0 4px 14px rgba(30,107,82,0.35); cursor: pointer; transition: all 0.2s ease;">
+                    <span style="font-size: 16px;">🎨</span>
+                    <span>Customize Bottom Bar (កំណត់របារខាងក្រោម)</span>
+                </button>
+
+                <button type="button" onclick="openMobileSimPopup()" class="btn btn-outline"  style="background: rgba(255, 255, 255, 0.12); color: #FFFFFF; border-color: rgba(255, 255, 255, 0.35); font-weight: 700; padding: 10px 16px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
                     <span>↗️</span> Open in Mobile Window (390×844)
                 </button>
 
@@ -3696,6 +3707,31 @@
                 </div>
             </div>
 
+            <!-- 5. Bottom Navigation Bar Customizer Card -->
+            <div class="card" style="border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 18px; background: #FFFFFF; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #F1F5F9;">
+                    <span style="font-size: 18px;">🎨</span>
+                    <div>
+                        <h3 style="font-size: 0.96rem; font-weight: 800; color: #0F172A; margin: 0;">5. Bottom Navigation Bar (របាររុករក)</h3>
+                        <span style="font-size: 0.74rem; color: #64748B;">Reorder &amp; customize the 5 mobile bottom navigation shortcuts</span>
+                    </div>
+                </div>
+
+                <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px;">
+                    <div id="simBottomBarMiniPreview" style="display: flex; justify-content: space-around; align-items: center; font-size: 11px; font-weight: 700; color: #475569;">
+                        <span>⚙️ Settings</span>
+                        <span>📊 Report</span>
+                        <span style="color: #1E6B52; font-weight: 800; background: #EAF7EF; padding: 2px 8px; border-radius: 12px;">🟢 Home</span>
+                        <span>📄 SO</span>
+                        <span>📦 Product</span>
+                    </div>
+                </div>
+
+                <button type="button" onclick="openBottomBarCustomizerModal()" class="btn btn-sm" style="width: 100%; background: #1E6B52; color: #FFFFFF; font-weight: 700; padding: 10px; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-shadow: 0 2px 8px rgba(30,107,82,0.25);">
+                    <span>🎨</span> Customize Bottom Navigation Bar
+                </button>
+            </div>
+
         </div>
 
         <!-- Right Column: Interactive Phone Mockup Frame Studio -->
@@ -3713,6 +3749,9 @@
                     </span>
                     <button type="button" onclick="reloadSimIframe()" title="Reload" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #64748B;">
                         🔄
+                    </button>
+                    <button type="button" onclick="openBottomBarCustomizerModal()" title="Customize Mobile Bottom Navigation Bar" style="background: #EAF7EF; border: 1.5px solid #A7D7C5; font-size: 0.72rem; font-weight: 700; color: #1E6B52; padding: 3px 8px; border-radius: 6px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                        <span>🎨</span> Customize Bar
                     </button>
                     <button type="button" onclick="openMobileSimPopup()" title="Pop out into new window" style="background: none; border: none; font-size: 14px; cursor: pointer; color: #64748B;">
                         ↗️
@@ -7015,6 +7054,250 @@ function onSimIframeLoaded() {
     }
 }
 
+
+/* ================= Bottom Bar Customizer Functions ================= */
+const BOTTOM_BAR_MODULES = {
+    'settings': { id: 'settings', label: 'Settings', url: '/settings', icon: 'gear' },
+    'report': { id: 'report', label: 'Report', url: '/expenses/monthly', icon: 'chart' },
+    'home': { id: 'home', label: 'Home', url: '/dashboard', icon: 'home' },
+    'so': { id: 'so', label: 'SO', url: '/sales/', icon: 'document' },
+    'new_so': { id: 'new_so', label: 'New SO', url: '/sales/new', icon: 'plus_doc' },
+    'product': { id: 'product', label: 'Product', url: '/products/', icon: 'cube' },
+    'po': { id: 'po', label: 'Purchases', url: '/purchases/', icon: 'cart' },
+    'inventory': { id: 'inventory', label: 'Inventory', url: '/inventory/', icon: 'inventory' },
+    'customers': { id: 'customers', label: 'Customers', url: '/customers/', icon: 'users' },
+    'vendors': { id: 'vendors', label: 'Vendors', url: '/vendors/', icon: 'truck' },
+    'transfers': { id: 'transfers', label: 'Transfers', url: '/transfers/', icon: 'transfer' }
+};
+
+const MODULE_OPTIONS_HTML = `
+    <option value="home">🏠 Home (ផ្ទាំងដើម - /dashboard)</option>
+    <option value="so">📄 SO List (បញ្ជាលក់ - /sales/)</option>
+    <option value="new_so">➕ New SO (លក់ថ្មី - /sales/new)</option>
+    <option value="product">📦 Product (ទំនិញ - /products/)</option>
+    <option value="report">📊 Report (របាយការណ៍ចំណាយ - /expenses/monthly)</option>
+    <option value="po">🛒 Purchase Orders (បញ្ជាទិញ - /purchases/)</option>
+    <option value="inventory">🏢 Inventory Stock (ស្តុកទំនិញ - /inventory/)</option>
+    <option value="customers">👥 Customers (អតិថិជន - /customers/)</option>
+    <option value="settings">⚙️ Settings (ការកំណត់ - /settings)</option>
+    <option value="vendors">🚚 Vendors (អ្នកផ្គត់ផ្គង់ - /vendors/)</option>
+    <option value="transfers">🔄 Transfers (ផ្ទេរទំនិញ - /transfers/)</option>
+`;
+
+function initSlotSelectOptions() {
+    for (let i = 1; i <= 5; i++) {
+        const sel = document.getElementById(`slot_${i}_module`);
+        if (sel && sel.options.length === 0) {
+            sel.innerHTML = MODULE_OPTIONS_HTML;
+        }
+    }
+}
+
+function openBottomBarCustomizerModal() {
+    initSlotSelectOptions();
+
+    // Load current items from localStorage or API
+    let items = null;
+    try {
+        const stored = localStorage.getItem('inflow_custom_bottom_bar');
+        if (stored) items = JSON.parse(stored);
+    } catch(e) {}
+
+    if (!items || !Array.isArray(items) || items.length !== 5) {
+        items = [
+            { id: 'settings', label: 'Settings', is_center: false },
+            { id: 'report', label: 'Report', is_center: false },
+            { id: 'home', label: 'Home', is_center: true },
+            { id: 'so', label: 'SO', is_center: false },
+            { id: 'product', label: 'Product', is_center: false }
+        ];
+    }
+
+    for (let i = 1; i <= 5; i++) {
+        const item = items[i - 1];
+        const sel = document.getElementById(`slot_${i}_module`);
+        const lbl = document.getElementById(`slot_${i}_label`);
+        const centerRadio = document.getElementById(`slot_${i}_is_center`);
+        if (sel) sel.value = item.id || 'home';
+        if (lbl) lbl.value = item.label || '';
+        if (centerRadio) centerRadio.checked = !!item.is_center;
+    }
+
+    updateBottomBarCustomizerPreview();
+    const modal = document.getElementById('modalCustomizeBottomBar');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeBottomBarCustomizerModal() {
+    const modal = document.getElementById('modalCustomizeBottomBar');
+    if (modal) modal.style.display = 'none';
+}
+
+function onSlotModuleChange(slotIndex) {
+    const sel = document.getElementById(`slot_${slotIndex}_module`);
+    const lbl = document.getElementById(`slot_${slotIndex}_label`);
+    if (!sel || !lbl) return;
+    const mod = BOTTOM_BAR_MODULES[sel.value];
+    if (mod) {
+        lbl.value = mod.label;
+    }
+    updateBottomBarCustomizerPreview();
+}
+
+function updateBottomBarCustomizerPreview() {
+    const previewContainer = document.getElementById('customizerLivePreviewBar');
+    if (!previewContainer) return;
+
+    let html = '';
+    for (let i = 1; i <= 5; i++) {
+        const sel = document.getElementById(`slot_${i}_module`);
+        const lbl = document.getElementById(`slot_${i}_label`);
+        const centerRadio = document.getElementById(`slot_${i}_is_center`);
+
+        const modKey = sel ? sel.value : 'home';
+        const mod = BOTTOM_BAR_MODULES[modKey] || BOTTOM_BAR_MODULES['home'];
+        const labelText = (lbl && lbl.value.trim()) ? lbl.value.trim() : mod.label;
+        const isCenter = centerRadio ? centerRadio.checked : false;
+
+        const iconSvg = (typeof INFLOW_BOTTOM_BAR_ICONS !== 'undefined' && INFLOW_BOTTOM_BAR_ICONS[mod.icon]) 
+            ? INFLOW_BOTTOM_BAR_ICONS[mod.icon] 
+            : '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg>';
+
+        if (isCenter) {
+            html += `
+            <div style="position: relative; margin-top: -12px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; flex: 1;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: #1E6B52; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(30, 107, 82, 0.4); border: 3px solid #FFFFFF;">
+                    ${iconSvg.replace('stroke="currentColor"', 'stroke="#FFFFFF"')}
+                </div>
+                <span style="font-size: 10px; font-weight: 700; color: #1E6B52;">${labelText}</span>
+            </div>`;
+        } else {
+            html += `
+            <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #64748B; font-size: 10px; font-weight: 600; flex: 1;">
+                ${iconSvg}
+                <span>${labelText}</span>
+            </div>`;
+        }
+    }
+    previewContainer.innerHTML = html;
+}
+
+function applyBottomBarPreset(presetName) {
+    initSlotSelectOptions();
+    const PRESETS = {
+        'default': [
+            { id: 'settings', label: 'Settings', center: false },
+            { id: 'report', label: 'Report', center: false },
+            { id: 'home', label: 'Home', center: true },
+            { id: 'so', label: 'SO', center: false },
+            { id: 'product', label: 'Product', center: false }
+        ],
+        'sales': [
+            { id: 'customers', label: 'Customers', center: false },
+            { id: 'so', label: 'SO', center: false },
+            { id: 'new_so', label: 'New Sale', center: true },
+            { id: 'product', label: 'Product', center: false },
+            { id: 'settings', label: 'Settings', center: false }
+        ],
+        'warehouse': [
+            { id: 'inventory', label: 'Inventory', center: false },
+            { id: 'transfers', label: 'Transfers', center: false },
+            { id: 'home', label: 'Home', center: true },
+            { id: 'product', label: 'Product', center: false },
+            { id: 'po', label: 'Purchases', center: false }
+        ]
+    };
+
+    const chosen = PRESETS[presetName] || PRESETS['default'];
+    for (let i = 1; i <= 5; i++) {
+        const item = chosen[i - 1];
+        const sel = document.getElementById(`slot_${i}_module`);
+        const lbl = document.getElementById(`slot_${i}_label`);
+        const centerRadio = document.getElementById(`slot_${i}_is_center`);
+        if (sel) sel.value = item.id;
+        if (lbl) lbl.value = item.label;
+        if (centerRadio) centerRadio.checked = item.center;
+    }
+    updateBottomBarCustomizerPreview();
+}
+
+function resetDefaultBottomBar() {
+    applyBottomBarPreset('default');
+}
+
+function saveCustomBottomBar() {
+    const items = [];
+    for (let i = 1; i <= 5; i++) {
+        const sel = document.getElementById(`slot_${i}_module`);
+        const lbl = document.getElementById(`slot_${i}_label`);
+        const centerRadio = document.getElementById(`slot_${i}_is_center`);
+
+        const modKey = sel ? sel.value : 'home';
+        const mod = BOTTOM_BAR_MODULES[modKey] || BOTTOM_BAR_MODULES['home'];
+        const labelText = (lbl && lbl.value.trim()) ? lbl.value.trim() : mod.label;
+        const isCenter = centerRadio ? centerRadio.checked : false;
+
+        items.push({
+            id: modKey,
+            label: labelText,
+            url: mod.url,
+            icon: mod.icon,
+            is_center: isCenter
+        });
+    }
+
+    try {
+        localStorage.setItem('inflow_custom_bottom_bar', JSON.stringify(items));
+    } catch(e) {}
+
+    fetch('/api/settings/bottom-bar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: items })
+    }).then(res => res.json())
+      .then(data => {
+          console.log("Saved bottom bar to backend:", data);
+      }).catch(err => console.warn("Backend save failed:", err));
+
+    if (typeof window.renderCustomBottomBar === 'function') {
+        window.renderCustomBottomBar();
+    }
+
+    const simIframe = document.getElementById('simDeviceIframe');
+    if (simIframe && simIframe.contentWindow) {
+        try {
+            simIframe.contentWindow.localStorage.setItem('inflow_custom_bottom_bar', JSON.stringify(items));
+            if (typeof simIframe.contentWindow.renderCustomBottomBar === 'function') {
+                simIframe.contentWindow.renderCustomBottomBar();
+            } else {
+                simIframe.contentWindow.location.reload();
+            }
+        } catch(e) {}
+    }
+
+    window.postMessage({ type: 'INFLOW_BOTTOM_BAR_UPDATED', data: items }, '*');
+
+    // Update mini preview in Tab 8 Card
+    updateTab8MiniPreview(items);
+
+    closeBottomBarCustomizerModal();
+    alert('Bottom navigation bar updated & applied successfully! / បានកែប្រែ និងអនុវត្តរបាររុករកដោយជោគជ័យ!');
+}
+
+function updateTab8MiniPreview(items) {
+    const mini = document.getElementById('simBottomBarMiniPreview');
+    if (!mini || !items || !Array.isArray(items)) return;
+    let html = '';
+    items.forEach(it => {
+        if (it.is_center) {
+            html += `<span style="color: #1E6B52; font-weight: 800; background: #EAF7EF; padding: 2px 8px; border-radius: 12px;">🟢 ${it.label}</span>`;
+        } else {
+            html += `<span>${it.label}</span>`;
+        }
+    });
+    mini.innerHTML = html;
+}
+
 </script>
 
 <style>
@@ -7377,4 +7660,194 @@ input:checked + .slider:before {
     100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
 }
 </style>
+
+<!-- ================= Modal: Customize Mobile Bottom Navigation Bar ================= -->
+<div id="modalCustomizeBottomBar" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.68); z-index: 999999; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px);">
+    <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 640px; max-height: 92vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4); border: 1px solid #CBD5E1;">
+        <!-- Modal Header -->
+        <div style="background: linear-gradient(135deg, #1E6B52 0%, #154D3B 100%); color: #FFFFFF; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <span style="font-size: 24px;">🎨</span>
+                <div>
+                    <h3 style="margin: 0; font-size: 1.12rem; font-weight: 800; color: #FFFFFF; letter-spacing: -0.01em;">
+                        Customize Bottom Bar (កំណត់របាររុករកខាងក្រោម)
+                    </h3>
+                    <p style="margin: 2px 0 0; font-size: 0.76rem; color: #D2EBDD;">
+                        Configure modules, custom labels &amp; center elevated bubble button
+                    </p>
+                </div>
+            </div>
+            <button type="button" onclick="closeBottomBarCustomizerModal()" style="background: rgba(255,255,255,0.18); border: none; color: #FFFFFF; font-size: 16px; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background 0.15s ease;">✕</button>
+        </div>
+
+        <!-- Modal Body (Scrollable) -->
+        <div style="padding: 20px 22px; overflow-y: auto; flex: 1;">
+            
+            <!-- Live Preview Card -->
+            <div style="margin-bottom: 20px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <span style="font-size: 0.78rem; font-weight: 800; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">
+                        Live Bar Preview (ទិដ្ឋភាពជាក់ស្តែង)
+                    </span>
+                    <span style="font-size: 0.72rem; color: #1E6B52; font-weight: 700; background: #EAF7EF; padding: 2px 8px; border-radius: 10px; border: 1px solid #A7D7C5;">
+                        Interactive Real-Time
+                    </span>
+                </div>
+                <div style="background: #F1F5F9; padding: 16px 12px; border-radius: 12px; border: 1.5px solid #CBD5E1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);">
+                    <div id="customizerLivePreviewBar" style="background: #FFFFFF; height: 58px; border-radius: 10px; border: 1px solid #E5E7EB; box-shadow: 0 4px 12px rgba(0,0,0,0.06); display: flex; align-items: center; justify-content: space-around; position: relative;">
+                        <!-- Injected live items -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Presets -->
+            <div style="margin-bottom: 20px;">
+                <label style="display: block; font-size: 0.78rem; font-weight: 700; color: #475569; margin-bottom: 8px;">
+                    Quick Presets (គំរូដែលបានកំណត់ជាស្រេច):
+                </label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" onclick="applyBottomBarPreset('default')" class="btn btn-sm" style="background: #EAF7EF; border: 1px solid #A7D7C5; color: #1E6B52; font-weight: 700; padding: 6px 12px; border-radius: 6px; font-size: 0.76rem; cursor: pointer;">
+                        ★ Default (Settings, Report, Home, SO, Product)
+                    </button>
+                    <button type="button" onclick="applyBottomBarPreset('sales')" class="btn btn-sm" style="background: #F8FAFC; border: 1px solid #CBD5E1; color: #334155; font-weight: 600; padding: 6px 12px; border-radius: 6px; font-size: 0.76rem; cursor: pointer;">
+                        💼 Sales Focus (Customers, SO, New SO, Products, Settings)
+                    </button>
+                    <button type="button" onclick="applyBottomBarPreset('warehouse')" class="btn btn-sm" style="background: #F8FAFC; border: 1px solid #CBD5E1; color: #334155; font-weight: 600; padding: 6px 12px; border-radius: 6px; font-size: 0.76rem; cursor: pointer;">
+                        📦 Warehouse (Inventory, Transfers, Home, Products, Purchases)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 5 Slot Editors -->
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <!-- Slot 1 -->
+                <div class="custom-slot-card" style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #1E293B;">Slot 1 (Leftmost / ខាងឆ្វេងបំផុត)</span>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="radio" name="center_slot_radio" id="slot_1_is_center" onchange="updateBottomBarCustomizerPreview()" style="cursor: pointer;">
+                            Center Bubble
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Module / Target</label>
+                            <select id="slot_1_module" onchange="onSlotModuleChange(1)" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 600; font-size: 0.82rem;">
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Label Text</label>
+                            <input type="text" id="slot_1_label" oninput="updateBottomBarCustomizerPreview()" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 700; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 2 -->
+                <div class="custom-slot-card" style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #1E293B;">Slot 2</span>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="radio" name="center_slot_radio" id="slot_2_is_center" onchange="updateBottomBarCustomizerPreview()" style="cursor: pointer;">
+                            Center Bubble
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Module / Target</label>
+                            <select id="slot_2_module" onchange="onSlotModuleChange(2)" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 600; font-size: 0.82rem;">
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Label Text</label>
+                            <input type="text" id="slot_2_label" oninput="updateBottomBarCustomizerPreview()" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 700; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 3 (Center) -->
+                <div class="custom-slot-card" style="background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 3px rgba(30,107,82,0.05);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #1E6B52;">Slot 3 (Center Action Button / ប៊ូតុងកណ្តាល)</span>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 700; color: #1E6B52; cursor: pointer;">
+                            <input type="radio" name="center_slot_radio" id="slot_3_is_center" checked onchange="updateBottomBarCustomizerPreview()" style="cursor: pointer;">
+                            ★ Center Bubble
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.72rem; color: #1E6B52; font-weight: 700; text-transform: uppercase;">Module / Target</label>
+                            <select id="slot_3_module" onchange="onSlotModuleChange(3)" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #86EFAC; font-weight: 600; font-size: 0.82rem; background: #FFFFFF;">
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.72rem; color: #1E6B52; font-weight: 700; text-transform: uppercase;">Label Text</label>
+                            <input type="text" id="slot_3_label" oninput="updateBottomBarCustomizerPreview()" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #86EFAC; font-weight: 700; font-size: 0.82rem; background: #FFFFFF;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 4 -->
+                <div class="custom-slot-card" style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #1E293B;">Slot 4</span>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="radio" name="center_slot_radio" id="slot_4_is_center" onchange="updateBottomBarCustomizerPreview()" style="cursor: pointer;">
+                            Center Bubble
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Module / Target</label>
+                            <select id="slot_4_module" onchange="onSlotModuleChange(4)" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 600; font-size: 0.82rem;">
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Label Text</label>
+                            <input type="text" id="slot_4_label" oninput="updateBottomBarCustomizerPreview()" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 700; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 5 -->
+                <div class="custom-slot-card" style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 800; color: #1E293B;">Slot 5 (Rightmost / ខាងស្តាំបំផុត)</span>
+                        <label style="display: flex; align-items: center; gap: 5px; font-size: 0.76rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="radio" name="center_slot_radio" id="slot_5_is_center" onchange="updateBottomBarCustomizerPreview()" style="cursor: pointer;">
+                            Center Bubble
+                        </label>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Module / Target</label>
+                            <select id="slot_5_module" onchange="onSlotModuleChange(5)" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 600; font-size: 0.82rem;">
+                            </select>
+                        </div>
+                        <div>
+                            <label style="font-size: 0.72rem; color: #64748B; font-weight: 700; text-transform: uppercase;">Label Text</label>
+                            <input type="text" id="slot_5_label" oninput="updateBottomBarCustomizerPreview()" class="form-control" style="width: 100%; padding: 6px 8px; border-radius: 6px; border: 1.5px solid #CBD5E1; font-weight: 700; font-size: 0.82rem;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Modal Footer -->
+        <div style="background: #F8FAFC; padding: 14px 22px; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-shrink: 0;">
+            <button type="button" onclick="resetDefaultBottomBar()" class="btn btn-sm" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; color: #DC2626; font-weight: 700; padding: 8px 14px; border-radius: 6px; cursor: pointer;">
+                ↺ Reset to Default
+            </button>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" onclick="closeBottomBarCustomizerModal()" class="btn btn-sm" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; color: #475569; font-weight: 600; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                    Cancel
+                </button>
+                <button type="button" onclick="saveCustomBottomBar()" class="btn btn-sm" style="background: #1E6B52; color: #FFFFFF; font-weight: 700; padding: 8px 20px; border-radius: 6px; border: none; cursor: pointer; box-shadow: 0 4px 10px rgba(30,107,82,0.3); display: flex; align-items: center; gap: 6px;">
+                    <span>💾</span> Save &amp; Apply Bar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}

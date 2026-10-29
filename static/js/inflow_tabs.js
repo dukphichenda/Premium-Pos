@@ -1586,7 +1586,7 @@
                 const href = link.getAttribute('href');
                 if (!href || href.startsWith('javascript:') || href.startsWith('#')) return;
                 if (link.getAttribute('target') === '_blank' || link.hasAttribute('download')) return;
-                if (link.getAttribute('data-no-tab') === 'true' || link.classList.contains('sheet-tab-item') || link.closest('.sheet-tabs-container')) return;
+                if (link.getAttribute('data-no-tab') === 'true' || link.classList.contains('sheet-tab-item') || link.closest('.sheet-tabs-container') || link.closest('.so-mobile-nav-bar')) return;
                 if (href.includes('/export') || href.includes('/download') || href.includes('.xlsx') || href.includes('.pdf') || href.includes('.csv') || href.includes('.zip')) return;
 
                 // If link already had custom handler that called preventDefault, don't re-handle

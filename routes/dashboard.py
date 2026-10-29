@@ -264,7 +264,8 @@ def index():
                            current_store_name=current_store_name,
                            current_store_code=current_store_code,
                            store_performances=store_performances,
-                           central_wh=central_wh)
+                           central_wh=central_wh,
+                           now_date_str=datetime.now().strftime('%d %b %Y'))
 
 @dashboard_bp.route('/api/dashboard/charts')
 def chart_data():

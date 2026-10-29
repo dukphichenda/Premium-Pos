@@ -8,6 +8,8 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.detail_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'sales', 'detail.html')
         self.dashboard_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'dashboard.html')
         self.list_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'sales', 'list.html')
+        self.settings_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'settings', 'general.html')
+        self.base_path = os.path.join(os.path.dirname(__file__), '..', 'templates', 'base.html')
         self.styles_path = os.path.join(os.path.dirname(__file__), '..', 'static', 'css', 'styles.css')
         
         with open(self.canvas_path, 'r', encoding='utf-8') as f:
@@ -18,6 +20,10 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
             self.dashboard_html = f.read()
         with open(self.list_path, 'r', encoding='utf-8') as f:
             self.list_html = f.read()
+        with open(self.settings_path, 'r', encoding='utf-8') as f:
+            self.settings_html = f.read()
+        with open(self.base_path, 'r', encoding='utf-8') as f:
+            self.base_html = f.read()
         with open(self.styles_path, 'r', encoding='utf-8') as f:
             self.styles_css = f.read()
 
@@ -29,13 +35,16 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.assertIn('#A7D7C5', self.canvas_html)
 
     def test_screen_1_home_dashboard(self):
-        """Verify Screen 1: Home Dashboard with hero card, 2x2 stats grid, recent orders, and nav bar."""
+        """Verify Screen 1: Mobile Dashboard with Header, Logistics, Quick Actions, Workflow, KPI grid, and Nav Bar."""
         self.assertIn('so-mobile-dashboard-view', self.dashboard_html)
-        self.assertIn('so-mob-hero-card', self.dashboard_html)
-        self.assertIn('New Sale Order', self.dashboard_html)
-        self.assertIn('so-mob-stats-grid', self.dashboard_html)
-        self.assertIn("Today's Sales", self.dashboard_html)
-        self.assertIn('so-mob-recent-section', self.dashboard_html)
+        self.assertIn('so-mob-dash-header', self.dashboard_html)
+        self.assertIn('New Sales', self.dashboard_html)
+        self.assertIn('so-mob-logistics-grid', self.dashboard_html)
+        self.assertIn('so-mob-quick-actions-grid', self.dashboard_html)
+        self.assertIn('so-mob-workflow-grid', self.dashboard_html)
+        self.assertIn('so-mob-kpi-grid', self.dashboard_html)
+        self.assertIn('Monthly Sales &amp; Profit Breakdown', self.dashboard_html)
+        self.assertIn('Stock Value by Category', self.dashboard_html)
         self.assertIn('so-mobile-nav-bar', self.dashboard_html)
 
     def test_screen_2_sales_order_list(self):
@@ -155,6 +164,26 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.assertIn('html.is-mobile-view .so-card-items', self.canvas_html)
         self.assertIn('@media (max-width: 1024px)', self.canvas_html)
         self.assertIn('@media (max-width: 1024px)', self.detail_html)
+
+    def test_bottom_bar_customizer_settings_button_and_api(self):
+        """Verify Customize Bottom Bar button, modal, and API endpoint exist."""
+        self.assertIn('Customize Bottom Bar', self.settings_html)
+        self.assertIn('openBottomBarCustomizerModal', self.settings_html)
+        self.assertIn('modalCustomizeBottomBar', self.settings_html)
+        self.assertIn('saveCustomBottomBar', self.settings_html)
+        self.assertIn('renderCustomBottomBar', self.base_html)
+
+        from app import app
+        with app.test_client() as client:
+            with client.session_transaction() as sess:
+                sess['user_id'] = 1
+                sess['username'] = 'admin'
+                sess['role'] = 'main_admin'
+            res = client.get('/api/settings/bottom-bar')
+            self.assertEqual(res.status_code, 200)
+            data = res.get_json()
+            self.assertTrue(data.get('success'))
+            self.assertEqual(len(data.get('items', [])), 5)
 
 if __name__ == '__main__':
     unittest.main()

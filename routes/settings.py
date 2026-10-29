@@ -524,6 +524,56 @@ def api_mobile_config_version():
         "app_name": cfg.get("app_name", "inFlow Premium")
     })
 
+DEFAULT_BOTTOM_BAR_ITEMS = [
+    {"id": "settings", "label": "Settings", "url": "/settings", "icon": "gear", "is_center": False},
+    {"id": "report", "label": "Report", "url": "/expenses/monthly", "icon": "chart", "is_center": False},
+    {"id": "home", "label": "Home", "url": "/dashboard", "icon": "home", "is_center": True},
+    {"id": "so", "label": "SO", "url": "/sales/", "icon": "document", "is_center": False},
+    {"id": "product", "label": "Product", "url": "/products/", "icon": "cube", "is_center": False}
+]
+
+@settings_bp.route('/api/settings/bottom-bar', methods=['GET', 'POST'])
+def api_bottom_bar():
+    if request.method == 'POST':
+        try:
+            data = request.get_json(silent=True) or {}
+            items = data.get('items')
+            if not isinstance(items, list) or len(items) != 5:
+                return jsonify({'success': False, 'error': 'Bottom bar requires exactly 5 items'}), 400
+
+            clean_items = []
+            for item in items:
+                clean_items.append({
+                    "id": str(item.get('id', 'item')).strip(),
+                    "label": str(item.get('label', '')).strip()[:30],
+                    "url": str(item.get('url', '/dashboard')).strip()[:200],
+                    "icon": str(item.get('icon', 'home')).strip()[:30],
+                    "is_center": bool(item.get('is_center', False))
+                })
+
+            execute("""
+                INSERT INTO app_settings (setting_key, setting_value, description, updated_at)
+                VALUES ('mobile_bottom_bar', %s, 'Custom 5-slot configuration for mobile bottom navigation bar', CURRENT_TIMESTAMP)
+                ON CONFLICT (setting_key) DO UPDATE
+                SET setting_value = EXCLUDED.setting_value,
+                    updated_at = CURRENT_TIMESTAMP;
+            """, (json.dumps(clean_items, ensure_ascii=False),))
+            return jsonify({'success': True, 'items': clean_items})
+        except Exception as e:
+            logger.error(f"Failed to update mobile bottom bar settings: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+    else:
+        try:
+            row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_bottom_bar'")
+            if row and row.get('setting_value'):
+                val = row['setting_value']
+                items = json.loads(val) if isinstance(val, str) else val
+                if isinstance(items, list) and len(items) == 5:
+                    return jsonify({'success': True, 'items': items})
+        except Exception as e:
+            logger.warning(f"Failed to load mobile bottom bar settings: {e}")
+        return jsonify({'success': True, 'items': DEFAULT_BOTTOM_BAR_ITEMS})
+
 @settings_bp.route('/settings/currency/update', methods=['POST'])
 def update_currency_settings():
     try:
