@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&family=Inter:wght@400;500;600;700;800&family=Kantumruy+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400;1,600;1,700&family=Siemreap&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261026_red_dot">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}?v=20261029_universal_nav_v9">
     {% block extra_css %}{% endblock %}
     {% block head %}{% endblock %}
     {% block head_extra %}{% endblock %}
@@ -129,8 +129,8 @@
             background-color: rgba(255, 255, 255, 0.16) !important;
         }
 
-        /* Mobile Layout & Chrome Suppression (Hides desktop sidebar rail, desktop dock, and forces 100% width with 0 margins) */
-        @media (max-width: 768px), (max-device-width: 768px) {
+        /* Mobile & Tablet Layout Chrome Suppression (Completely deletes left white gap & desktop rails) */
+        @media (max-width: 1024px), (max-device-width: 1024px) {
             #inflowCloudSidebar,
             .inflow-cloud-sidebar,
             #inflowSidebarFlyout,
@@ -138,7 +138,11 @@
             #inflowTopTabBar,
             .inflow-top-tab-bar,
             #inflowTabAccentLine,
-            .inflow-tab-accent-line {
+            .inflow-tab-accent-line,
+            #soSidebarExpandTab,
+            .inflow-sidebar-edge-tab,
+            #soMasterSidebar,
+            .so-master-sidebar {
                 display: none !important;
                 width: 0 !important;
                 height: 0 !important;
@@ -158,7 +162,10 @@
             .main-wrapper,
             #inflowTabWorkspace,
             #inflowDirectContent,
-            .content-area {
+            .content-area,
+            .inflow-so-workspace,
+            .inflow-document-canvas,
+            .so-main-left {
                 margin: 0 !important;
                 margin-left: 0 !important;
                 margin-right: 0 !important;
@@ -177,6 +184,11 @@
             #inflowTabWorkspace {
                 height: 100vh !important;
                 height: 100dvh !important;
+                width: 100% !important;
+                max-width: 100vw !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                left: 0 !important;
             }
             .inflow-tab-viewport,
             .inflow-tab-iframe {
@@ -184,6 +196,7 @@
                 height: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                left: 0 !important;
                 border: none !important;
             }
         }
@@ -195,7 +208,11 @@
         html.is-mobile-view #inflowTopTabBar,
         html.is-mobile-view .inflow-top-tab-bar,
         html.is-mobile-view #inflowTabAccentLine,
-        html.is-mobile-view .inflow-tab-accent-line {
+        html.is-mobile-view .inflow-tab-accent-line,
+        html.is-mobile-view #soSidebarExpandTab,
+        html.is-mobile-view .inflow-sidebar-edge-tab,
+        html.is-mobile-view #soMasterSidebar,
+        html.is-mobile-view .so-master-sidebar {
             display: none !important;
             width: 0 !important;
             height: 0 !important;
@@ -216,7 +233,10 @@
         html.is-mobile-view .main-wrapper,
         html.is-mobile-view #inflowTabWorkspace,
         html.is-mobile-view #inflowDirectContent,
-        html.is-mobile-view .content-area {
+        html.is-mobile-view .content-area,
+        html.is-mobile-view .inflow-so-workspace,
+        html.is-mobile-view .inflow-document-canvas,
+        html.is-mobile-view .so-main-left {
             margin: 0 !important;
             margin-left: 0 !important;
             margin-right: 0 !important;
@@ -1071,10 +1091,22 @@
             } catch(e) {}
 
             if (!customItems || !Array.isArray(customItems) || customItems.length !== 5) {
-                return;
+                customItems = [
+                    { id: "settings", label: "Settings", url: "/settings", icon: "gear", is_center: false },
+                    { id: "report", label: "Report", url: "/expenses/monthly", icon: "chart", is_center: false },
+                    { id: "home", label: "Home", url: "/dashboard", icon: "home", is_center: true },
+                    { id: "so", label: "SO", url: "/sales/", icon: "document", is_center: false },
+                    { id: "product", label: "Product", url: "/products/", icon: "cube", is_center: false }
+                ];
             }
 
-            const currentPath = window.location.pathname.toLowerCase();
+            let currentPath = (window.location.pathname || '').toLowerCase();
+            if (window.inflowMdi && window.inflowMdi.activeTabId && Array.isArray(window.inflowMdi.tabs)) {
+                const activeTab = window.inflowMdi.tabs.find(t => t.id === window.inflowMdi.activeTabId);
+                if (activeTab && activeTab.url) {
+                    currentPath = activeTab.url.split('?')[0].toLowerCase();
+                }
+            }
             const navBars = document.querySelectorAll('.so-mobile-nav-bar');
 
             navBars.forEach(nav => {
@@ -1085,18 +1117,16 @@
                     const cleanUrl = targetUrl.split('?')[0].toLowerCase();
                     
                     let isActive = false;
-                    if (cleanUrl === '/dashboard' || cleanUrl === '/') {
-                        isActive = (currentPath === '/dashboard' || currentPath === '/');
-                    } else if (cleanUrl === '/sales/' || cleanUrl === '/sales') {
-                        isActive = currentPath.startsWith('/sales') && !currentPath.includes('/sales/new');
-                    } else if (cleanUrl === '/sales/new') {
-                        isActive = currentPath.includes('/sales/new');
-                    } else if (cleanUrl === '/expenses/monthly') {
-                        isActive = currentPath.includes('/expenses') || currentPath.includes('/reports');
-                    } else if (cleanUrl === '/products/' || cleanUrl === '/products') {
-                        isActive = currentPath.startsWith('/products');
-                    } else if (cleanUrl === '/settings') {
-                        isActive = currentPath.startsWith('/settings');
+                    if (cleanUrl === '/dashboard' || cleanUrl === '/' || item.id === 'home') {
+                        isActive = (currentPath === '/dashboard' || currentPath === '/' || currentPath === '' || currentPath.includes('/workspace'));
+                    } else if (cleanUrl.startsWith('/sales') || item.id === 'so') {
+                        isActive = currentPath.startsWith('/sales');
+                    } else if (cleanUrl.startsWith('/product') || cleanUrl.startsWith('/inventory') || item.id === 'product') {
+                        isActive = currentPath.startsWith('/product') || currentPath.startsWith('/inventory') || currentPath.startsWith('/transfers');
+                    } else if (cleanUrl.startsWith('/expense') || cleanUrl.startsWith('/report') || item.id === 'report') {
+                        isActive = currentPath.startsWith('/expense') || currentPath.startsWith('/report') || currentPath.startsWith('/purchases') || currentPath.startsWith('/vendors');
+                    } else if (cleanUrl.startsWith('/setting') || item.id === 'settings') {
+                        isActive = currentPath.startsWith('/setting') || currentPath.startsWith('/branches/settings') || currentPath.startsWith('/users');
                     } else if (cleanUrl.length > 2) {
                         isActive = currentPath.startsWith(cleanUrl);
                     }
@@ -1107,7 +1137,7 @@
 
                     if (isCenter) {
                         html += `
-                        <a href="${targetUrl}" data-no-tab="true" onclick="navigateMobileTab('${targetUrl}', event)" class="so-mobile-nav-item ${centerClass} ${activeClass}">
+                        <a href="${targetUrl}" data-no-tab="true" onclick="navigateMobileTab('${targetUrl}', event)" class="so-mobile-nav-item ${centerClass} ${activeClass}" data-tab-type="${item.id}">
                             <div class="so-nav-home-bubble">
                                 ${iconSvg.replace('stroke="currentColor"', 'stroke="#FFFFFF"')}
                             </div>
@@ -1115,7 +1145,7 @@
                         </a>`;
                     } else {
                         html += `
-                        <a href="${targetUrl}" data-no-tab="true" onclick="navigateMobileTab('${targetUrl}', event)" class="so-mobile-nav-item ${activeClass}">
+                        <a href="${targetUrl}" data-no-tab="true" onclick="navigateMobileTab('${targetUrl}', event)" class="so-mobile-nav-item ${activeClass}" data-tab-type="${item.id}">
                             ${iconSvg}
                             <span>${item.label || ''}</span>
                         </a>`;
@@ -3477,18 +3507,45 @@
         }
     </style>
 
-    {% if mobile_config.enable_bottom_nav and session.get('user_id') %}
-    <nav class="inflow-mobile-bottom-nav" id="inflowMobileBottomNav" aria-label="Mobile Navigation">
-        {% for item in mobile_config.bottom_nav_shortcuts %}
-            {% if item.enabled %}
-            <a href="{{ item.url }}" class="mobile-nav-item {% if request.path == item.url or (item.url != '/' and item.url != '/sales' and request.path.startswith(item.url)) or (item.url == '/sales' and request.path == '/sales') %}active{% endif %}">
-                <span class="mobile-nav-icon">{{ item.icon }}</span>
-                <span class="mobile-nav-label">{{ item.title }}</span>
-            </a>
-            {% endif %}
-        {% endfor %}
-    </nav>
     {% endif %}
+
+    <!-- =========================================================================
+         Universal 5-Button Bottom Navigation Bar (Always visible on mobile view)
+         ========================================================================= -->
+    {% if session.get('user_id') %}
+    <nav class="so-mobile-nav-bar" id="universalMobileNavBar" aria-label="Mobile Navigation">
+        <!-- 1. Settings -->
+        <a href="{{ url_for('settings.general_settings') }}" data-tab-type="settings" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('settings.general_settings') }}', event)" class="so-mobile-nav-item {% if request.path.startswith('/settings') or request.path.startswith('/branches/settings') %}active{% endif %}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Settings</span>
+        </a>
+
+        <!-- 2. Report -->
+        <a href="{{ url_for('expenses.monthly_expenses') }}" data-tab-type="report" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('expenses.monthly_expenses') }}', event)" class="so-mobile-nav-item {% if request.path.startswith('/expenses') or request.path.startswith('/reports') or request.path.startswith('/purchases') %}active{% endif %}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <span>Report</span>
+        </a>
+
+        <!-- 3. Home (Elevated Center Bubble) -->
+        <a href="{{ url_for('dashboard.index') }}" data-tab-type="home" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('dashboard.index') }}', event)" class="so-mobile-nav-item so-nav-center-home {% if request.path == '/' or request.path == '/dashboard' or (request.path.startswith('/branches/') and 'workspace' in request.path) %}active{% endif %}">
+            <div class="so-nav-home-bubble">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
+            <span>Home</span>
+        </a>
+
+        <!-- 4. SO -->
+        <a href="{{ url_for('sales_orders.list_orders') }}" data-tab-type="so" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('sales_orders.list_orders') }}', event)" class="so-mobile-nav-item {% if request.path.startswith('/sales') %}active{% endif %}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>SO</span>
+        </a>
+
+        <!-- 5. Product -->
+        <a href="{{ url_for('products.list_products') }}" data-tab-type="product" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('products.list_products') }}', event)" class="so-mobile-nav-item {% if request.path.startswith('/products') or request.path.startswith('/inventory') or request.path.startswith('/transfers') %}active{% endif %}">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            <span>Product</span>
+        </a>
+    </nav>
     {% endif %}
 </body>
 </html>

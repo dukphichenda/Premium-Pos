@@ -570,6 +570,9 @@
                             if (tab.id === MdiShell.activeTabId && window.history && window.history.replaceState) {
                                 const cleanPath = tab.url.replace(/[?&]embed=1/, '');
                                 window.history.replaceState(null, '', cleanPath || '/');
+                                if (typeof window.renderCustomBottomBar === 'function') {
+                                    try { window.renderCustomBottomBar(); } catch(e) {}
+                                }
                             }
 
                             const docTitle = frameDoc.title || '';
@@ -990,6 +993,10 @@
                 if (window.history && window.history.replaceState) {
                     const cleanPath = targetTab.url.replace(/[?&]embed=1/, '');
                     window.history.replaceState(null, '', cleanPath || '/');
+                }
+
+                if (typeof window.renderCustomBottomBar === 'function') {
+                    try { window.renderCustomBottomBar(); } catch(e) {}
                 }
 
                 this.saveTabsToStorage();

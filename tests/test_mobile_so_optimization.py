@@ -185,5 +185,29 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
             self.assertTrue(data.get('success'))
             self.assertEqual(len(data.get('items', [])), 5)
 
+    def test_universal_bottom_bar_and_zero_left_margin(self):
+        """Verify universal bottom bar always exists across all pages and left blank is completely deleted."""
+        # 1. Base template universal bottom bar with all 5 tabs
+        self.assertIn('id="universalMobileNavBar"', self.base_html)
+        self.assertIn('data-tab-type="settings"', self.base_html)
+        self.assertIn('data-tab-type="report"', self.base_html)
+        self.assertIn('data-tab-type="home"', self.base_html)
+        self.assertIn('data-tab-type="so"', self.base_html)
+        self.assertIn('data-tab-type="product"', self.base_html)
+
+        # 2. Strict desktop-only 56px rail wrapper in styles.css
+        self.assertIn('@media (min-width: 1025px)', self.styles_css)
+        self.assertIn('margin-left: 56px !important', self.styles_css)
+
+        # 3. Mobile zero-margin reset across containers
+        self.assertIn('@media (max-width: 1024px)', self.styles_css)
+        self.assertIn('.so-main-left', self.styles_css)
+        self.assertIn('.inflow-so-workspace', self.styles_css)
+
+        # 4. Suppression of sidebar edge rail on mobile in detail.html and base.html
+        self.assertIn('#soSidebarExpandTab', self.detail_html)
+        self.assertIn('.inflow-sidebar-edge-tab', self.detail_html)
+        self.assertIn('#soSidebarExpandTab', self.base_html)
+
 if __name__ == '__main__':
     unittest.main()
