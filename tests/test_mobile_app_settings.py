@@ -18,43 +18,33 @@ class TestMobileAppSettings(unittest.TestCase):
         resp = self.client.get('/settings?tab=tabMobileApp')
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        self.assertIn('id="tabMobileApp"', html)
+        # Unified Mobile View & Android App assertions
+        self.assertIn('id="tabMobileSim"', html)
+        self.assertIn('btnTabMobileSim', html)
         self.assertIn('btnTabMobileApp', html)
-        self.assertIn('Android App &amp; Mobile UI Designer', html)
-        self.assertIn('id="phoneMockupFrame"', html)
-        self.assertIn('id="mockupAppHeader"', html)
-        self.assertIn('id="mockupBottomNav"', html)
+        self.assertIn('Mobile View Simulation &amp; Android App', html)
         self.assertIn('inFlow-Premium.apk', html)
         self.assertIn('/settings/mobile-app/update', html)
 
-        # Step-by-Step Wizard assertions
-        self.assertIn('id="mobileStep1"', html)
-        self.assertIn('id="mobileStep2"', html)
-        self.assertIn('id="mobileStep3"', html)
-        self.assertIn('id="mobileStep4"', html)
-        self.assertIn('id="mobileStep5"', html)
-        self.assertIn('id="mobileStep6"', html)
-        self.assertIn('id="wizardPill1"', html)
-        self.assertIn('id="wizardPill6"', html)
-        self.assertIn('Continue to Step 2: Colors', html)
-        self.assertIn('goToWizardStep(1)', html)
-        self.assertIn('toggleWizardMode()', html)
+        # Hardware Simulator & Iframe assertions (follows real mobile view)
+        self.assertIn('id="simDeviceChassis"', html)
+        self.assertIn('id="simScreenViewport"', html)
+        self.assertIn('id="simDeviceIframe"', html)
+        self.assertIn('id="simDeviceStatusBar"', html)
+        self.assertIn('id="simDeviceHomeBar"', html)
 
-        # Interactive Simulator assertions
-        self.assertIn('id="simScreen_nav_delivery"', html)
-        self.assertIn('id="simScreen_nav_orders"', html)
-        self.assertIn('id="simScreen_nav_reports"', html)
-        self.assertIn('id="simScreen_nav_scanner"', html)
-        self.assertIn('id="simScreen_nav_more"', html)
-        self.assertIn('id="simOrderModal"', html)
-        self.assertIn('id="simCallOverlay"', html)
-        self.assertIn('switchSimulatorTab', html)
-        self.assertIn('triggerSimCall', html)
-        self.assertIn('toggleSimOrderPaid', html)
-        # Real system data assertions
-        self.assertIn('Real System Invoices', html)
-        self.assertIn('Recent Sales (Last 7 Days)', html)
-        self.assertIn('SIM_SAMPLE_PRODUCT', html)
+        # App Configuration Form assertions
+        self.assertIn('id="mobileAppConfigForm"', html)
+        self.assertIn('id="inputAppName"', html)
+        self.assertIn('id="inputAppEmoji"', html)
+        self.assertIn('id="themeColorInput"', html)
+        self.assertIn('id="accentColorInput"', html)
+
+        # Hero Banner Actions & Badges
+        self.assertIn('id="btnHeroPublishMobile"', html)
+        self.assertIn('id="heroLiveVersionLabel"', html)
+        self.assertIn('openPublishMobileModal()', html)
+        self.assertIn('openBottomBarCustomizerModal()', html)
 
     def test_mobile_simulator_real_data(self):
         from routes.settings import get_mobile_simulator_real_data

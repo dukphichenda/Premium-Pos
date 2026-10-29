@@ -27,13 +27,13 @@ class TestMobileViewSimulation(unittest.TestCase):
     def test_sidebar_flyout_has_mobile_sim_link(self):
         """Ensure templates/base.html has the Mobile View Simulation link under flyout-settings."""
         self.assertIn("tab='tabMobileSim'", self.base_html)
-        self.assertIn("Mobile View Simulation", self.base_html)
+        self.assertTrue("Mobile View & Android App" in self.base_html or "Mobile View Simulation" in self.base_html)
 
     def test_settings_sidebar_has_tab_button(self):
         """Ensure templates/settings/general.html has Tab 8 navigation button for Mobile View Simulation."""
         self.assertIn('id="btnTabMobileSim"', self.general_html)
         self.assertIn("switchSettingsTab('tabMobileSim', this)", self.general_html)
-        self.assertIn("Mobile View Simulation", self.general_html)
+        self.assertTrue("Mobile View & Android App" in self.general_html or "Mobile View Simulation" in self.general_html)
 
     def test_tab_pane_container_exists(self):
         """Ensure id='tabMobileSim' settings-tab-pane container exists."""

@@ -301,6 +301,8 @@ def general_settings():
     latest_backup = backups[0] if backups else None
 
     active_tab = request.args.get('tab', 'tabCompany')
+    if active_tab == 'tabMobileApp':
+        active_tab = 'tabMobileSim'
     mobile_config = get_mobile_app_config()
     mobile_sim_data = get_mobile_simulator_real_data()
 
@@ -430,7 +432,7 @@ def update_mobile_app_settings():
         logger.error(f"Failed to update mobile app settings: {e}")
         flash(f"Failed to update mobile app settings: {e}", "error")
 
-    return redirect(url_for('settings.general_settings', tab='tabMobileApp'))
+    return redirect(url_for('settings.general_settings', tab='tabMobileSim'))
 
 def bump_mobile_version(ver_str):
     """
@@ -497,13 +499,13 @@ def publish_mobile_app_update():
             })
 
         flash(msg, "success")
-        return redirect(request.referrer or url_for('settings.general_settings', tab='tabMobileApp'))
+        return redirect(request.referrer or url_for('settings.general_settings', tab='tabMobileSim'))
     except Exception as e:
         logger.error(f"Failed to publish mobile app update: {e}", exc_info=True)
         if request.is_json or request.headers.get('Accept') == 'application/json':
             return jsonify({'success': False, 'error': str(e)}), 500
         flash(f"Error publishing mobile app update: {e}", "error")
-        return redirect(request.referrer or url_for('settings.general_settings', tab='tabMobileApp'))
+        return redirect(request.referrer or url_for('settings.general_settings', tab='tabMobileSim'))
 
 @settings_bp.route('/api/mobile-config', methods=['GET'])
 def api_mobile_config():
