@@ -7104,12 +7104,13 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
             if (found) activeSchemeName = found.name;
         }
 
+        const itemSku = sku || (prodInfo && prodInfo.sku) || '';
         tr.innerHTML = `
             <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 700; color: #64748B; font-size: 12.5px;">
                 ${existingCount + 1}
             </td>
             <td class="line-pic-cell" style="text-align: center; vertical-align: middle; padding: 4px;">
-                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 44px; height: 44px; border-radius: 8px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 15px;" title="No image">📦</div>`}
+                ${prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" title="No image">📦</div>`}
             </td>
             <td style="position: relative; vertical-align: middle;" class="so-item-cell">
                 <input type="hidden" name="lines[${existingCount}][product_id]" value="${pid}">
@@ -7125,40 +7126,60 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                            class="inflow-field-input grid-desc-input so-item-sub-desc" placeholder="Description..." 
                            style="border: none; background: transparent; width: 100%; color: #475569; font-size: 11.5px; padding: 1px 0; font-family: inherit;"
                            oninput="markDirty()">
+                    <div class="so-item-sku-line" ${itemSku ? '' : 'style="display:none;"'}>
+                        SKU: <span class="so-item-sku-val">${itemSku}</span>
+                    </div>
                     <span class="so-item-tier-badge">${activeSchemeName}</span>
                 </div>
             </td>
             <td style="display: none;"></td>
             <td style="text-align: center; vertical-align: middle;" class="qty-cell">
-                <div class="inflow-qty-cell-wrapper so-qty-wrapper">
-                    <button type="button" class="so-qty-btn so-qty-btn-minus" onclick="stepLineQty(this, -1)" title="Decrease quantity">-</button>
-                    <input type="number" step="any" name="lines[${existingCount}][quantity]" value="1" 
-                           class="inflow-qty-num-input line-qty so-clean-input so-qty-input" 
-                           oninput="onQtyNumberChange(this)" onchange="cleanQtyInput(this); recalculateTotals(); markDirty();" onblur="cleanQtyInput(this)">
-                    <button type="button" class="so-qty-btn so-qty-btn-plus" onclick="stepLineQty(this, 1)" title="Increase quantity">+</button>
-                    <div class="inflow-qty-uom-btn so-uom-badge" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock">
-                        <span class="uom-text">${baseUom}</span>
-                        <span class="uom-arrow" style="font-size: 10px;">⌵</span>
+                <div class="inflow-qty-cell-wrapper so-qty-wrapper so-qty-wrapper-split">
+                    <div class="so-mob-col-qty">
+                        <label class="so-mob-field-label">Quantity</label>
+                        <div class="so-mob-stepper-box">
+                            <button type="button" class="so-qty-btn so-qty-btn-minus" onclick="stepLineQty(this, -1)" title="Decrease quantity">-</button>
+                            <input type="number" step="any" name="lines[${existingCount}][quantity]" value="1" 
+                                   class="inflow-qty-num-input line-qty so-clean-input so-qty-input" 
+                                   oninput="onQtyNumberChange(this)" onchange="cleanQtyInput(this); recalculateTotals(); markDirty();" onblur="cleanQtyInput(this)">
+                            <button type="button" class="so-qty-btn so-qty-btn-plus" onclick="stepLineQty(this, 1)" title="Increase quantity">+</button>
+                        </div>
                     </div>
-                    <input type="hidden" name="lines[${existingCount}][uom]" class="line-uom" value="${baseUom}">
+                    <div class="so-mob-col-unit">
+                        <label class="so-mob-field-label">Unit</label>
+                        <div class="inflow-qty-uom-btn so-uom-badge" onclick="openQtyDropdown(event, this)" title="Choose Unit / Stock">
+                            <span class="uom-text">${baseUom}</span>
+                            <span class="uom-arrow" style="font-size: 10px;">⌵</span>
+                        </div>
+                        <input type="hidden" name="lines[${existingCount}][uom]" class="line-uom" value="${baseUom}">
+                    </div>
                 </div>
             </td>
-            <td style="vertical-align: middle;">
+            <td class="line-tier-cell" style="vertical-align: middle;">
+                <label class="so-mob-field-label">Price Tier</label>
                 <select name="lines[${existingCount}][pricing_scheme_id]" class="inflow-field-select line-scheme-select so-clean-select" onchange="onLinePricingSchemeChange(this)" style="height: 32px; font-size: 12px; border: 1px solid #CBD5E1; border-radius: 6px;">
                     ${generatePricingSchemeOptions(activeSchemeId)}
                 </select>
             </td>
-            <td style="text-align: center; vertical-align: middle;">
-                <input type="number" step="0.0001" name="lines[${existingCount}][unit_price]" value="${formattedPrice}" class="inflow-field-input line-price so-clean-input" style="width: 100%; height: 32px; font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();">
+            <td class="line-price-cell" style="text-align: center; vertical-align: middle;">
+                <label class="so-mob-field-label">Unit Price</label>
+                <div class="so-mob-input-with-addon">
+                    <input type="number" step="0.0001" name="lines[${existingCount}][unit_price]" value="${formattedPrice}" class="inflow-field-input line-price so-clean-input" style="width: 100%; height: 32px; font-size: 12.5px; font-weight: 600; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();">
+                    <span class="so-mob-addon">USD</span>
+                </div>
             </td>
-            <td style="text-align: center; vertical-align: middle; white-space: nowrap;">
-                <div style="display: inline-flex; align-items: center; justify-content: center; gap: 2px;">
+            <td class="line-disc-cell" style="text-align: center; vertical-align: middle; white-space: nowrap;">
+                <label class="so-mob-field-label">Discount</label>
+                <div class="so-mob-input-with-addon">
                     <input type="number" step="any" name="lines[${existingCount}][discount_percent]" value="0" class="inflow-field-input line-disc so-clean-input" style="width: 48px; height: 32px; font-size: 12.5px; text-align: center; border: 1px solid #CBD5E1; border-radius: 6px;" onchange="recalculateTotals(); markDirty();">
-                    <span style="font-size: 11px; color: #64748B;">%</span>
+                    <span class="so-mob-addon">%</span>
                 </div>
             </td>
             <td style="text-align: right; font-weight: 700; color: #0F172A; vertical-align: middle; font-size: 13.5px;" class="line-subtotal">
-                $${(1 * initialUnitPrice).toFixed(2)}
+                <div class="so-mob-subtotal-card">
+                    <span class="so-mob-subtotal-label">Subtotal</span>
+                    <span class="so-subtotal-amount">$${(1 * initialUnitPrice).toFixed(2)}</span>
+                </div>
             </td>
             <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;" title="Actions">
                 <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
@@ -7197,7 +7218,18 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
         if (itemInput) itemInput.value = `${sku} ${name}`;
         const picCell = activeGridRowEl.querySelector('.line-pic-cell');
         if (picCell) {
-            picCell.innerHTML = prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" style="width: 26px; height: 26px; object-fit: cover; border-radius: 6px; border: 1px solid #E2E8F0; vertical-align: middle; cursor: pointer;" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" style="width: 26px; height: 26px; border-radius: 6px; border: 1px dashed #CBD5E1; background: #F8FAFC; display: inline-flex; align-items: center; justify-content: center; color: #94A3B8; font-size: 11px;">🖼️</div>`;
+            picCell.innerHTML = prodInfo.image_url ? `<img src="${prodInfo.image_url}" alt="Item" class="line-item-thumb" onclick="previewImageModal(this.src)" title="Click to view full image">` : `<div class="line-item-thumb-placeholder" title="No image">📦</div>`;
+        }
+        let skuLine = activeGridRowEl.querySelector('.so-item-sku-line');
+        const itemSku = sku || (prodInfo && prodInfo.sku) || '';
+        if (skuLine) {
+            if (itemSku) {
+                skuLine.style.display = '';
+                const skuVal = skuLine.querySelector('.so-item-sku-val');
+                if (skuVal) skuVal.textContent = itemSku;
+            } else {
+                skuLine.style.display = 'none';
+            }
         }
         const descInput = activeGridRowEl.querySelector('input[name*="[description]"]');
         if (descInput) descInput.value = desc;
@@ -7440,7 +7472,12 @@ function recalculateTotals() {
             const lineSub = (qty * price) * (1 - (disc / 100));
             subtotal += lineSub;
             if (subEl) {
-                subEl.innerText = '$' + lineSub.toFixed(2);
+                const subAmtEl = subEl.querySelector('.so-subtotal-amount');
+                if (subAmtEl) {
+                    subAmtEl.innerText = '$' + lineSub.toFixed(2);
+                } else {
+                    subEl.innerText = '$' + lineSub.toFixed(2);
+                }
             }
         }
     });

@@ -251,5 +251,42 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.assertIn('window.handleMobileCustomerPick = function', self.canvas_html)
         self.assertIn('window.selectMobileCustomer = function', self.canvas_html)
 
+    def test_mobile_line_item_card_redesign(self):
+        """Verify redesigned mobile line item card matching media_1793369282830_5994b064.jpg."""
+        # 1. Structure in canvas template (existing rows)
+        self.assertIn('class="so-item-sku-line"', self.canvas_html)
+        self.assertIn('class="so-item-sku-val"', self.canvas_html)
+        self.assertIn('class="so-mob-field-label"', self.canvas_html)
+        self.assertIn('class="so-qty-wrapper-split"', self.canvas_html)
+        self.assertIn('class="so-mob-col-qty"', self.canvas_html)
+        self.assertIn('class="so-mob-col-unit"', self.canvas_html)
+        self.assertIn('class="so-mob-stepper-box"', self.canvas_html)
+        self.assertIn('class="line-tier-cell"', self.canvas_html)
+        self.assertIn('class="line-price-cell"', self.canvas_html)
+        self.assertIn('class="line-disc-cell"', self.canvas_html)
+        self.assertIn('class="so-mob-input-with-addon"', self.canvas_html)
+        self.assertIn('class="so-mob-addon"', self.canvas_html)
+        self.assertIn('class="so-mob-subtotal-card"', self.canvas_html)
+        self.assertIn('class="so-mob-subtotal-label"', self.canvas_html)
+        self.assertIn('class="so-subtotal-amount"', self.canvas_html)
+
+        # 2. Dynamic row generation in detail.html
+        self.assertIn('so-item-sku-line', self.detail_html)
+        self.assertIn('so-qty-wrapper-split', self.detail_html)
+        self.assertIn('so-mob-col-qty', self.detail_html)
+        self.assertIn('so-mob-col-unit', self.detail_html)
+        self.assertIn('so-mob-input-with-addon', self.detail_html)
+        self.assertIn('so-mob-subtotal-card', self.detail_html)
+        self.assertIn('so-subtotal-amount', self.detail_html)
+
+        # 3. CSS Grid layout specification
+        self.assertIn('"item-hdr item-hdr"', self.canvas_html)
+        self.assertIn('"row-qty  row-qty"', self.canvas_html)
+        self.assertIn('"col-tier col-price"', self.canvas_html)
+        self.assertIn('"col-disc col-subtotal"', self.canvas_html)
+
+        # 4. Desktop preservation
+        self.assertIn('.so-mob-field-label {\n            display: none !important;', self.canvas_html)
+
 if __name__ == '__main__':
     unittest.main()
