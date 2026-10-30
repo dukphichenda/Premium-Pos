@@ -49,8 +49,20 @@ class TestMobileSoCustomerAndDrawer(unittest.TestCase):
     def test_sim_device_iframe_and_base_mode_detection(self):
         """Verify simulator iframe specifies sim_mobile=1 and base detection handles mobile iframes."""
         self.assertIn('src="/sales/new?embed=1&sim_mobile=1"', self.settings_html)
-        self.assertIn('if (window.innerWidth <= 768) {', self.base_html)
         self.assertIn('return \'mobile\';', self.base_html)
+
+    def test_mobile_drawer_open_styles_and_base_override(self):
+        """Verify base.html and styles.css correctly allow #soMasterSidebar to display on mobile when drawer is opened."""
+        self.assertIn('html.is-mobile-view:not(.mobile-drawer-open) .inflow-so-workspace:not(.mobile-drawer-open) #soMasterSidebar', self.base_html)
+        self.assertIn('html.is-mobile-view.mobile-drawer-open #soMasterSidebar', self.base_html)
+        self.assertIn('z-index: 100005', self.base_html)
+
+    def test_pc_desktop_mode_strictly_hides_mobile_bottom_bar(self):
+        """Verify PC / desktop mode hides .so-mobile-nav-bar under all conditions."""
+        self.assertIn('html.is-desktop-view .so-mobile-nav-bar', self.base_html)
+        self.assertIn('html:not(.is-mobile-view) .so-mobile-nav-bar', self.base_html)
+        self.assertIn('display: none !important;', self.base_html)
 
 if __name__ == '__main__':
     unittest.main()
+

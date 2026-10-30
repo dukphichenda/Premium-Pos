@@ -555,6 +555,8 @@ def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, se
 
 @sales_orders_bp.route('/sales', strict_slashes=False)
 @sales_orders_bp.route('/sales/', strict_slashes=False)
+@sales_orders_bp.route('/sales/orders', strict_slashes=False)
+@sales_orders_bp.route('/sales/list', strict_slashes=False)
 def list_orders():
     view_mode = request.args.get('view', '').strip()
     is_main = _is_main_admin()
