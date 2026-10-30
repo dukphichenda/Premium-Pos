@@ -528,7 +528,7 @@ def api_mobile_config_version():
 
 DEFAULT_BOTTOM_BAR_ITEMS = [
     {"id": "settings", "label": "Settings", "url": "/settings", "icon": "gear", "is_center": False},
-    {"id": "report", "label": "Report", "url": "/expenses/monthly", "icon": "chart", "is_center": False},
+    {"id": "report", "label": "Report", "url": "/reports/list", "icon": "chart", "is_center": False},
     {"id": "home", "label": "Home", "url": "/dashboard", "icon": "home", "is_center": True},
     {"id": "so", "label": "SO", "url": "/sales", "icon": "document", "is_center": False},
     {"id": "product", "label": "Product", "url": "/products", "icon": "cube", "is_center": False}
@@ -571,6 +571,9 @@ def api_bottom_bar():
                 val = row['setting_value']
                 items = json.loads(val) if isinstance(val, str) else val
                 if isinstance(items, list) and len(items) == 5:
+                    for itm in items:
+                        if itm.get('id') == 'report' and itm.get('url') in ('/expenses/monthly', '/expenses'):
+                            itm['url'] = '/reports/list'
                     return jsonify({'success': True, 'items': items})
         except Exception as e:
             logger.warning(f"Failed to load mobile bottom bar settings: {e}")
