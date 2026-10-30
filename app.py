@@ -529,6 +529,16 @@ def create_app():
         branch_permissions['view_costs'] = can_view_costs
         branch_permissions['edit_products'] = can_edit_product
 
+        active_logo_url = None
+        if is_branch_mode and current_branch and current_branch.get('logo_url'):
+            active_logo_url = current_branch['logo_url']
+        elif company_data and company_data.get('app_logo_url'):
+            active_logo_url = company_data['app_logo_url']
+        elif hq_invoice_logo_url:
+            active_logo_url = hq_invoice_logo_url
+        elif company_data and company_data.get('logo_url'):
+            active_logo_url = company_data['logo_url']
+
         return {
             'company': company_data or default_company,
             'current_year': datetime.now().year,
@@ -544,6 +554,7 @@ def create_app():
             'current_user': current_user,
             'app_logo_url': (company_data.get('app_logo_url') if company_data else None),
             'hq_logo_url': hq_invoice_logo_url,
+            'active_logo_url': active_logo_url,
             'store_theme': store_theme,
             'active_store_primary_color': store_theme['primary'],
             'mobile_config': (lambda: __import__('routes.settings', fromlist=['get_mobile_app_config']).get_mobile_app_config())()

@@ -340,11 +340,15 @@
         html.is-desktop-view #mobDashboardNavBar,
         html.is-desktop-view #soMobileNavBar,
         html.is-desktop-view .inflow-mobile-bottom-nav,
+        html.is-desktop-view #inflowMobileProfileDrawer,
+        html.is-desktop-view #inflowMobileProfileBackdrop,
         html:not(.is-mobile-view) .so-mobile-nav-bar,
         html:not(.is-mobile-view) #universalMobileNavBar,
         html:not(.is-mobile-view) #mobDashboardNavBar,
         html:not(.is-mobile-view) #soMobileNavBar,
-        html:not(.is-mobile-view) .inflow-mobile-bottom-nav {
+        html:not(.is-mobile-view) .inflow-mobile-bottom-nav,
+        html:not(.is-mobile-view) #inflowMobileProfileDrawer,
+        html:not(.is-mobile-view) #inflowMobileProfileBackdrop {
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
@@ -3698,6 +3702,252 @@
             <span>Product</span>
         </a>
     </nav>
+    {% endif %}
+
+    <!-- =========================================================================
+         Mobile Profile, System & View Switcher Sidebar Drawer
+         ========================================================================= -->
+    {% if session.get('user_id') %}
+    <div class="inflow-mobile-profile-backdrop" id="inflowMobileProfileBackdrop" onclick="closeMobileProfileDrawer()" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(2px); z-index: 100010; opacity: 0; transition: opacity 0.25s ease;"></div>
+
+    <aside class="inflow-mobile-profile-drawer" id="inflowMobileProfileDrawer" aria-label="Profile and System Menu" style="position: fixed; top: 0; left: 0; bottom: 0; width: 320px; max-width: 86vw; height: 100vh; height: 100dvh; background: #FFFFFF; z-index: 100011; box-shadow: 8px 0 35px rgba(0,0,0,0.35); transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Kantumruy Pro', sans-serif;">
+        <!-- 1. Drawer Header with Active Store / Branch Logo -->
+        <div style="padding: 16px 18px; background: linear-gradient(135deg, #0F766E 0%, #042F2E 100%); color: #FFFFFF; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;">
+            <div style="display: flex; align-items: center; gap: 12px; min-width: 0;">
+                <div style="width: 44px; height: 44px; border-radius: 11px; background: #FFFFFF; padding: 2.5px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; overflow: hidden; flex-shrink: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.25);">
+                    {% if active_logo_url %}
+                    <img src="{{ active_logo_url }}" alt="Store Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                    {% elif app_logo_url %}
+                    <img src="{{ app_logo_url }}" alt="App Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                    {% elif hq_logo_url %}
+                    <img src="{{ hq_logo_url }}" alt="HQ Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                    {% elif company and company.logo_url %}
+                    <img src="{{ company.logo_url }}" alt="Company Logo" style="width: 100%; height: 100%; object-fit: contain;">
+                    {% else %}
+                    <div style="width: 100%; height: 100%; background: #0D9488; color: #FFFFFF; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center;">
+                        {{ (current_branch.code if current_branch else 'HQ')[:2] }}
+                    </div>
+                    {% endif %}
+                </div>
+                <div style="min-width: 0;">
+                    <div style="font-size: 15px; font-weight: 800; color: #FFFFFF; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        {% if is_branch_mode and current_branch %}
+                        {{ current_branch.name }}
+                        {% else %}
+                        {{ company.name if company else 'Main Store (HQ)' }}
+                        {% endif %}
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-top: 3px;">
+                        {% if is_branch_mode and current_branch %}
+                        <span style="font-size: 10px; font-weight: 700; background: rgba(56, 189, 248, 0.25); color: #BAE6FD; border: 1px solid rgba(56, 189, 248, 0.4); padding: 1px 6px; border-radius: 4px; letter-spacing: 0.04em;">BRANCH {{ current_branch.code }}</span>
+                        {% else %}
+                        <span style="font-size: 10px; font-weight: 700; background: rgba(52, 211, 153, 0.25); color: #A7F3D0; border: 1px solid rgba(52, 211, 153, 0.4); padding: 1px 6px; border-radius: 4px; letter-spacing: 0.04em;">ENTERPRISE HQ</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            <button type="button" onclick="closeMobileProfileDrawer()" style="background: rgba(255,255,255,0.18); border: none; width: 32px; height: 32px; border-radius: 8px; color: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;" title="Close Menu">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+        </div>
+
+        <!-- 2. Scrollable Body -->
+        <div style="flex: 1 1 auto; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 14px; -webkit-overflow-scrolling: touch;">
+            
+            <!-- User Profile Box -->
+            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px; display: flex; align-items: center; gap: 12px;">
+                <div style="width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF; font-weight: 800; font-size: 18px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35);">
+                    {{ (current_user.display_name if current_user and current_user.display_name else 'A')[:1].upper() }}
+                </div>
+                <div style="min-width: 0; flex: 1;">
+                    <div style="font-size: 14px; font-weight: 700; color: #0F172A; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        {{ current_user.display_name if current_user else 'Administrator' }}
+                    </div>
+                    <div style="font-size: 11.5px; color: #64748B; margin-top: 2px;">
+                        @{{ current_user.username if current_user else 'admin' }}
+                    </div>
+                    <div style="margin-top: 4px;">
+                        {% if current_user and current_user.is_main_admin %}
+                        <span style="font-size: 10px; font-weight: 700; background: #DCFCE7; color: #166534; padding: 2px 7px; border-radius: 6px;">👑 Main Admin</span>
+                        {% else %}
+                        <span style="font-size: 10px; font-weight: 700; background: #E0F2FE; color: #0369A1; padding: 2px 7px; border-radius: 6px;">🏪 Branch Staff</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile / PC View Switch -->
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px;">
+                <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Display Mode / ទិដ្ឋភាព</span>
+                    <span style="font-size: 10.5px; color: #0F766E; font-weight: 700;">1-Click Switch</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button type="button" onclick="switchViewModeMobile('mobile')" id="drawerBtnMobileView" style="padding: 10px 8px; border-radius: 8px; border: 2px solid #0D9488; background: #F0FDFA; color: #0F766E; font-weight: 700; font-size: 12.5px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s ease;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                        <span>📱 Mobile View</span>
+                    </button>
+                    <button type="button" onclick="switchViewModeMobile('desktop')" id="drawerBtnDesktopView" style="padding: 10px 8px; border-radius: 8px; border: 1.5px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 700; font-size: 12.5px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; transition: all 0.15s ease;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+                        <span>💻 PC ERP View</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Language Switcher -->
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px;">
+                <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;">
+                    <span>Language / ភាសា</span>
+                    <span id="drawerActiveLangLabel" style="font-size: 11px; font-weight: 700; color: #0284C7;">English</span>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <button type="button" onclick="handleSwitchLanguage('en', event); closeMobileProfileDrawer();" id="drawerLangEnBtn" style="padding: 9px 10px; border-radius: 8px; border: 1.5px solid #E2E8F0; background: #FFFFFF; color: #1E293B; font-weight: 700; font-size: 12.5px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                        <span style="font-size: 16px;">🇺🇸</span>
+                        <span>English</span>
+                    </button>
+                    <button type="button" onclick="handleSwitchLanguage('km', event); closeMobileProfileDrawer();" id="drawerLangKmBtn" style="padding: 9px 10px; border-radius: 8px; border: 1.5px solid #E2E8F0; background: #FFFFFF; color: #1E293B; font-weight: 700; font-size: 12.5px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;">
+                        <span style="font-size: 16px;">🇰🇭</span>
+                        <span>ភាសាខ្មែរ</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Branch Switching for Main Admin -->
+            {% if current_user and current_user.is_main_admin and all_branches %}
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px 14px;">
+                <div style="font-size: 12px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">
+                    Switch Store / ប្តូរហាង
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <a href="{{ url_for('dashboard.index') }}" onclick="closeMobileProfileDrawer()" style="padding: 9px 12px; border-radius: 8px; text-decoration: none; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; {% if not is_branch_mode %}background: #F0FDF4; color: #166534; border: 1.5px solid #86EFAC;{% else %}background: #F8FAFC; color: #334155; border: 1px solid #E2E8F0;{% endif %}">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span>🏢</span>
+                            <span>Main Store (HQ)</span>
+                        </div>
+                        {% if not is_branch_mode %}
+                        <span style="font-size: 14px;">✓</span>
+                        {% endif %}
+                    </a>
+                    {% for br in all_branches %}
+                    <a href="{{ url_for('branches.branch_workspace', id=br.id) }}" onclick="closeMobileProfileDrawer()" style="padding: 9px 12px; border-radius: 8px; text-decoration: none; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; font-weight: 700; {% if current_branch and current_branch.id == br.id %}background: #F0FDF4; color: #166534; border: 1.5px solid #86EFAC;{% else %}background: #F8FAFC; color: #334155; border: 1px solid #E2E8F0;{% endif %}">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span>🏪</span>
+                            <span>{{ br.name }} ({{ br.code }})</span>
+                        </div>
+                        {% if current_branch and current_branch.id == br.id %}
+                        <span style="font-size: 14px;">✓</span>
+                        {% endif %}
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Account Actions -->
+            <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px;">
+                <a href="{{ url_for('auth.login') }}" onclick="closeMobileProfileDrawer()" style="padding: 10px 12px; border-radius: 8px; text-decoration: none; color: #0284C7; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 10px; transition: background 0.15s ease;">
+                    <span style="font-size: 16px;">🔄</span>
+                    <span>Switch Account / Sign In</span>
+                </a>
+                <div style="height: 1px; background: #F1F5F9; margin: 2px 0;"></div>
+                <a href="{{ url_for('auth.logout') }}" onclick="handleLogoutClick(event, this)" target="_top" style="padding: 10px 12px; border-radius: 8px; text-decoration: none; color: #EF4444; font-weight: 700; font-size: 13px; display: flex; align-items: center; gap: 10px; transition: background 0.15s ease;">
+                    <span style="font-size: 16px;">🚪</span>
+                    <span>Log Out (ចាកចេញ)</span>
+                </a>
+            </div>
+
+        </div>
+
+        <!-- 3. Drawer Footer -->
+        <div style="padding: 12px 16px; border-top: 1px solid #E2E8F0; background: #F8FAFC; font-size: 11px; color: #94A3B8; text-align: center; flex-shrink: 0;">
+            inFlow Premium Enterprise ERP v1.5.2
+        </div>
+    </aside>
+
+    <script>
+    window.openMobileProfileDrawer = function() {
+        const drawer = document.getElementById('inflowMobileProfileDrawer');
+        const backdrop = document.getElementById('inflowMobileProfileBackdrop');
+        if (drawer && backdrop) {
+            // Update language indicator in drawer
+            const curLang = localStorage.getItem('inflow_app_lang') || 'en';
+            const enBtn = document.getElementById('drawerLangEnBtn');
+            const kmBtn = document.getElementById('drawerLangKmBtn');
+            const langLbl = document.getElementById('drawerActiveLangLabel');
+            if (enBtn && kmBtn) {
+                if (curLang === 'km') {
+                    kmBtn.style.borderColor = '#0284C7';
+                    kmBtn.style.background = '#F0F9FF';
+                    kmBtn.style.color = '#0369A1';
+                    enBtn.style.borderColor = '#E2E8F0';
+                    enBtn.style.background = '#FFFFFF';
+                    enBtn.style.color = '#1E293B';
+                    if (langLbl) langLbl.textContent = 'ភាសាខ្មែរ (KM)';
+                } else {
+                    enBtn.style.borderColor = '#0284C7';
+                    enBtn.style.background = '#F0F9FF';
+                    enBtn.style.color = '#0369A1';
+                    kmBtn.style.borderColor = '#E2E8F0';
+                    kmBtn.style.background = '#FFFFFF';
+                    kmBtn.style.color = '#1E293B';
+                    if (langLbl) langLbl.textContent = 'English (EN)';
+                }
+            }
+
+            // Update view mode indicator in drawer
+            const isMob = document.documentElement.classList.contains('is-mobile-view');
+            const btnMob = document.getElementById('drawerBtnMobileView');
+            const btnDesk = document.getElementById('drawerBtnDesktopView');
+            if (btnMob && btnDesk) {
+                if (isMob) {
+                    btnMob.style.borderColor = '#0D9488';
+                    btnMob.style.background = '#F0FDFA';
+                    btnMob.style.color = '#0F766E';
+                    btnDesk.style.borderColor = '#CBD5E1';
+                    btnDesk.style.background = '#FFFFFF';
+                    btnDesk.style.color = '#475569';
+                } else {
+                    btnDesk.style.borderColor = '#0D9488';
+                    btnDesk.style.background = '#F0FDFA';
+                    btnDesk.style.color = '#0F766E';
+                    btnMob.style.borderColor = '#CBD5E1';
+                    btnMob.style.background = '#FFFFFF';
+                    btnMob.style.color = '#475569';
+                }
+            }
+
+            backdrop.style.display = 'block';
+            drawer.style.display = 'flex';
+            void drawer.offsetWidth;
+            backdrop.style.opacity = '1';
+            drawer.style.transform = 'translateX(0)';
+        }
+    };
+
+    window.closeMobileProfileDrawer = function() {
+        const drawer = document.getElementById('inflowMobileProfileDrawer');
+        const backdrop = document.getElementById('inflowMobileProfileBackdrop');
+        if (drawer && backdrop) {
+            backdrop.style.opacity = '0';
+            drawer.style.transform = 'translateX(-100%)';
+            setTimeout(function() {
+                backdrop.style.display = 'none';
+            }, 280);
+        }
+    };
+
+    window.switchViewModeMobile = function(mode) {
+        closeMobileProfileDrawer();
+        if (typeof applyViewMode === 'function') {
+            applyViewMode(mode, true);
+        }
+        if (window.self === window.top) {
+            setTimeout(function() {
+                window.location.reload();
+            }, 150);
+        }
+    };
+    </script>
     {% endif %}
 </body>
 </html>

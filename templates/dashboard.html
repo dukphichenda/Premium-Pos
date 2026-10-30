@@ -44,12 +44,22 @@ html.is-mobile-view .so-desktop-dashboard-wrap {
 .so-mob-store-icon {
     width: 44px !important;
     height: 44px !important;
-    background: #D2EBDD !important;
+    background: #FFFFFF !important;
+    border: 1.5px solid #E2E8F0 !important;
     border-radius: 12px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     flex-shrink: 0 !important;
+    overflow: hidden !important;
+    padding: 3px !important;
+    box-sizing: border-box !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important;
+    cursor: pointer !important;
+    transition: transform 0.15s ease, box-shadow 0.15s ease !important;
+}
+.so-mob-store-icon:active {
+    transform: scale(0.95) !important;
 }
 .so-mob-store-info {
     display: flex !important;
@@ -547,17 +557,30 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
 <div class="so-mobile-dashboard-view" id="mobileDashboardView">
     <!-- Header -->
     <div class="so-mob-dash-header">
-        <div class="so-mob-header-left">
-            <div class="so-mob-store-icon">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                    <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                </svg>
+        <div class="so-mob-header-left" onclick="openMobileProfileDrawer()" style="cursor: pointer;" title="Profile & System Settings">
+            <div class="so-mob-store-icon" title="Store Logo">
+                {% if active_logo_url %}
+                <img src="{{ active_logo_url }}" alt="Store Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% elif app_logo_url %}
+                <img src="{{ app_logo_url }}" alt="App Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% elif hq_logo_url %}
+                <img src="{{ hq_logo_url }}" alt="HQ Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% elif company and company.logo_url %}
+                <img src="{{ company.logo_url }}" alt="Company Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% else %}
+                <div style="width: 100%; height: 100%; background: #0D9488; color: #FFFFFF; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; border-radius: 9px;">
+                    {{ (current_branch.code if current_branch else 'HQ')[:2] }}
+                </div>
+                {% endif %}
             </div>
             <div class="so-mob-store-info">
                 <div class="so-mob-store-name">{{ current_store_name or 'Main Store (HQ)' }}</div>
                 <div class="so-mob-badges-row">
+                    {% if is_branch_mode and current_branch %}
+                    <span class="so-mob-badge-hq" style="background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD;">Branch {{ current_branch.code }}</span>
+                    {% else %}
                     <span class="so-mob-badge-hq">Enterprise HQ</span>
+                    {% endif %}
                     <span class="so-mob-badge-scope">Isolated Scope</span>
                 </div>
             </div>
@@ -570,7 +593,7 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </svg>
                 <span class="so-mob-red-dot"></span>
             </button>
-            <button type="button" class="so-mob-icon-btn" onclick="if(typeof toggleInflowMainMenu === 'function') toggleInflowMainMenu(event)" title="Menu">
+            <button type="button" class="so-mob-icon-btn" onclick="openMobileProfileDrawer()" title="Profile & System Menu">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2.4" stroke-linecap="round">
                     <line x1="3" y1="12" x2="21" y2="12"></line>
                     <line x1="3" y1="6" x2="21" y2="6"></line>
