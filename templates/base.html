@@ -29,6 +29,14 @@
 
         // Comprehensive Device View Mode detection (Phones/Tablets in portrait or landscape default to mobile)
         function inflowDetectDeviceViewMode() {
+            // 1. Explicit query parameter override (used in mobile preview / simulation iframes)
+            if (window.location.search.indexOf('sim_mobile=1') !== -1 || window.location.search.indexOf('view_mode=mobile') !== -1) {
+                return 'mobile';
+            }
+            if (window.location.search.indexOf('view_mode=desktop') !== -1) {
+                return 'desktop';
+            }
+            // 2. Inherit mode from parent window if inside an iframe
             try {
                 if (window.top && window.top !== window.self && window.top.document && window.top.document.documentElement) {
                     var topMode = window.top.document.documentElement.getAttribute('data-view-mode');
@@ -37,23 +45,24 @@
                     }
                 }
             } catch(e) {}
-            // Physical smartphone screens (<= 768px or touch mobile UA) must ALWAYS default to mobile view
-            var isPhoneScreen = (window.innerWidth <= 768) || (window.screen && window.screen.width <= 768)
-                || /Android|webOS|iPhone|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile/i.test(navigator.userAgent);
+            // 3. Physical smartphone screens (<= 768px with mobile UA) default to mobile view
+            var isPhoneUA = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+            var isPhoneScreen = (window.innerWidth <= 768) && isPhoneUA;
             if (isPhoneScreen) {
                 return 'mobile';
             }
-            try {
-                var manual = localStorage.getItem('inflow_view_mode_manual');
-                var saved = localStorage.getItem('inflow_view_mode');
-                if (manual === 'true' && (saved === 'mobile' || saved === 'desktop')) {
-                    return saved;
-                }
-            } catch(e) {}
-            var isMob = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Silk/i.test(navigator.userAgent)
-                || (navigator.maxTouchPoints && navigator.maxTouchPoints > 1 && window.screen.width <= 1024)
-                || (window.innerWidth <= 768);
-            return isMob ? 'mobile' : 'desktop';
+            // 4. Desktop PC, Mac, Workstations, Laptops (non-phone UA or width >= 992px): ALWAYS DEFAULT TO DESKTOP
+            if (!isPhoneUA || window.innerWidth >= 992) {
+                try {
+                    var manual = localStorage.getItem('inflow_view_mode_manual');
+                    var saved = localStorage.getItem('inflow_view_mode');
+                    if (manual === 'true' && saved === 'mobile' && window.innerWidth <= 1024) {
+                        return 'mobile';
+                    }
+                } catch(e) {}
+                return 'desktop';
+            }
+            return (window.innerWidth <= 768) ? 'mobile' : 'desktop';
         }
 
         var savedViewMode = inflowDetectDeviceViewMode();

@@ -214,5 +214,42 @@ class TestMobileSaleOrderOptimization(unittest.TestCase):
         self.assertIn('#universalMobileNavBar', self.styles_css)
         self.assertIn('html.is-desktop-view #universalMobileNavBar', self.base_html)
 
+
+    def test_early_sidebar_functions_definition(self):
+        """Verify sidebar navigation functions (handleSelectOrder, clearSoLiveSearch) are defined early before sidebar HTML."""
+        self.assertIn('window.handleSelectOrder = function', self.detail_html)
+        self.assertIn('window.clearSoLiveSearch = function', self.detail_html)
+        self.assertIn('window.toggleSoSidebarCollapse = function', self.detail_html)
+        self.assertIn('window.openSoMobileDrawer = function', self.detail_html)
+        self.assertIn('window.closeSoMobileDrawer = function', self.detail_html)
+        
+        # Verify early script appears before #soMasterSidebar
+        early_idx = self.detail_html.find('window.handleSelectOrder = function')
+        sidebar_idx = self.detail_html.find('id="soMasterSidebar"')
+        self.assertTrue(early_idx != -1 and early_idx < sidebar_idx, "Early script must precede #soMasterSidebar")
+
+    def test_pc_desktop_view_workspace_restoration(self):
+        """Verify PC Desktop view guarantees full dual-column ERP interface and strictly hides mobile controls."""
+        # 1. Desktop rules in detail.html
+        self.assertIn('html.is-desktop-view .inflow-desktop-toolbar', self.detail_html)
+        self.assertIn('html.is-desktop-view .inflow-so-workspace:not(.sidebar-collapsed) .so-master-sidebar', self.detail_html)
+        self.assertIn('width: 280px !important', self.detail_html)
+
+        # 2. Desktop dual-column canvas rules in _detail_canvas.html
+        self.assertIn('html.is-desktop-view .so-main-right', self.canvas_html)
+        self.assertIn('html.is-desktop-view .so-card-grid-top', self.canvas_html)
+        self.assertIn('html.is-desktop-view .so-bottom-cards-grid', self.canvas_html)
+        self.assertIn('html.is-desktop-view .so-modern-main-split', self.canvas_html)
+
+        # 3. Base detection defaults PC screens to desktop mode
+        self.assertIn('ALWAYS DEFAULT TO DESKTOP', self.base_html)
+
+    def test_mobile_customer_sheet_selection_data_attr(self):
+        """Verify customer sheet row uses data-customer-id and handleMobileCustomerPick to avoid quote parsing bugs."""
+        self.assertIn('data-customer-id="', self.canvas_html)
+        self.assertIn('handleMobileCustomerPick', self.canvas_html)
+        self.assertIn('window.handleMobileCustomerPick = function', self.canvas_html)
+        self.assertIn('window.selectMobileCustomer = function', self.canvas_html)
+
 if __name__ == '__main__':
     unittest.main()

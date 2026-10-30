@@ -2585,8 +2585,7 @@
         @media (max-width: 768px) {
             html:not(.is-desktop-view) .so-card-grid-top,
             html:not(.is-desktop-view) .so-main-right,
-            html:not(.is-desktop-view) .so-bottom-cards-grid,
-            html:not(.is-desktop-view) .so-mobile-sidebar-bar {
+            html:not(.is-desktop-view) .so-bottom-cards-grid {
                 display: none !important;
             }
             html:not(.is-desktop-view) .so-mobile-top-section {
@@ -2596,6 +2595,9 @@
             html:not(.is-desktop-view) .so-mobile-settings-card-btn,
             html:not(.is-desktop-view) .so-mobile-search-add-bar,
             html:not(.is-desktop-view) .so-mobile-items-heading-row {
+                display: flex !important;
+            }
+            html:not(.is-desktop-view) .so-mobile-sidebar-bar {
                 display: flex !important;
             }
             html:not(.is-desktop-view) .so-mobile-sticky-bar {
@@ -2614,10 +2616,66 @@
             }
         }
 
+        /* Desktop View Mode: Full Original inFlow PC ERP Workspace Guarantee */
+        html.is-desktop-view .so-card-grid-top,
+        html:not(.is-mobile-view) .so-card-grid-top {
+            display: grid !important;
+        }
+        html.is-desktop-view .so-main-right,
+        html:not(.is-mobile-view) .so-main-right {
+            display: flex !important;
+            flex-direction: column !important;
+            width: 360px !important;
+            min-width: 360px !important;
+            flex-shrink: 0 !important;
+        }
+        html.is-desktop-view .so-bottom-cards-grid,
+        html:not(.is-mobile-view) .so-bottom-cards-grid {
+            display: grid !important;
+            grid-template-columns: 240px 1fr !important;
+        }
+        html.is-desktop-view .so-modern-main-split,
+        html:not(.is-mobile-view) .so-modern-main-split {
+            display: flex !important;
+            flex-direction: row !important;
+            gap: 20px !important;
+            width: 100% !important;
+        }
+        html.is-desktop-view .so-main-left,
+        html:not(.is-mobile-view) .so-main-left {
+            flex: 1 1 0% !important;
+            min-width: 0 !important;
+        }
+        html.is-desktop-view .so-mobile-top-section,
+        html.is-desktop-view .so-mobile-cust-select-card,
+        html.is-desktop-view .so-mobile-settings-card-btn,
+        html.is-desktop-view .so-mobile-search-add-bar,
+        html.is-desktop-view .so-mobile-items-heading-row,
+        html.is-desktop-view .so-mobile-sticky-bar,
+        html.is-desktop-view .so-mobile-sidebar-bar,
+        html.is-desktop-view .so-mobile-top-bar,
+        html.is-desktop-view .so-mobile-nav-bar,
+        html:not(.is-mobile-view) .so-mobile-top-section,
+        html:not(.is-mobile-view) .so-mobile-cust-select-card,
+        html:not(.is-mobile-view) .so-mobile-settings-card-btn,
+        html:not(.is-mobile-view) .so-mobile-search-add-bar,
+        html:not(.is-mobile-view) .so-mobile-items-heading-row,
+        html:not(.is-mobile-view) .so-mobile-sticky-bar,
+        html:not(.is-mobile-view) .so-mobile-sidebar-bar,
+        html:not(.is-mobile-view) .so-mobile-top-bar,
+        html:not(.is-mobile-view) .so-mobile-nav-bar {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            height: 0 !important;
+            width: 0 !important;
+            opacity: 0 !important;
+        }
+
+        /* Mobile View Mode: Clean Phone Interface */
         html.is-mobile-view .so-card-grid-top,
         html.is-mobile-view .so-main-right,
-        html.is-mobile-view .so-bottom-cards-grid,
-        html.is-mobile-view .so-mobile-sidebar-bar {
+        html.is-mobile-view .so-bottom-cards-grid {
             display: none !important;
         }
         html.is-mobile-view .so-mobile-top-section {
@@ -2627,6 +2685,9 @@
         html.is-mobile-view .so-mobile-settings-card-btn,
         html.is-mobile-view .so-mobile-search-add-bar,
         html.is-mobile-view .so-mobile-items-heading-row {
+            display: flex !important;
+        }
+        html.is-mobile-view:not(.mobile-drawer-open) .so-mobile-sidebar-bar {
             display: flex !important;
         }
         html.is-mobile-view .so-mobile-sticky-bar {
@@ -5467,15 +5528,18 @@
         let html = '';
         matches.slice(0, 50).forEach(c => {
             const isSelected = (currentCustId && String(c.id) === currentCustId) || (!currentCustId && currentCustName && c.name === currentCustName);
+            const escName = (c.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escPhone = (c.phone || 'No phone').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escAddr = (c.address || 'Phnom Penh').replace(/</g, '&lt;').replace(/>/g, '&gt;');
             html += `
-            <div class="so-cust-item-row" onclick="selectMobileCustomer(${c.id}, ${JSON.stringify(c.name)}, ${JSON.stringify(c.contact || '')}, ${JSON.stringify(c.phone || '')}, ${JSON.stringify(c.address || '')})">
+            <div class="so-cust-item-row" data-customer-id="${c.id}" onclick="handleMobileCustomerPick(this)">
                 <div class="so-cust-avatar-circle">👤</div>
                 <div class="so-cust-info-col">
-                    <div class="so-cust-row-name">${c.name}</div>
+                    <div class="so-cust-row-name">${escName}</div>
                     <div class="so-cust-row-meta">
-                        <span>📞 ${c.phone || 'No phone'}</span>
-                        <span style="margin:0 4px;">·</span>
-                        <span>📍 ${c.address || 'Phnom Penh'}</span>
+                        <span>📞 ${escPhone}</span>
+                        <span style="margin:0 4px;">•</span>
+                        <span>📍 ${escAddr}</span>
                     </div>
                 </div>
                 ${isSelected ? '<div class="so-cust-check-icon">✓</div>' : ''}
@@ -5486,23 +5550,57 @@
     window.filterMobileCustomersList = function(q) {
         renderMobileCustomersList(q);
     };
-    window.selectMobileCustomer = function(id, name, contact, phone, address) {
-        if (typeof selectCustomer === 'function') {
-            selectCustomer(id, name, contact, phone, address);
-        } else {
-            const inp = document.getElementById('customerSearchInput');
-            if (inp) inp.value = name;
-            const hid = document.getElementById('customerIdHidden');
-            if (hid) hid.value = id;
+    window.handleMobileCustomerPick = function(rowEl) {
+        if (!rowEl) return;
+        const cid = rowEl.getAttribute('data-customer-id');
+        const custs = window.allCustomersList || [];
+        const c = custs.find(item => String(item.id) === String(cid));
+        if (c) {
+            selectMobileCustomer(c.id, c.name, c.contact || '', c.phone || '', c.address || '');
         }
+    };
+    window.selectMobileCustomer = function(id, name, contact, phone, address) {
+        try {
+            if (typeof selectCustomer === 'function') {
+                selectCustomer(id, name, contact, phone, address);
+            } else {
+                const inp = document.getElementById('customerSearchInput');
+                if (inp) inp.value = name || '';
+                const hid = document.getElementById('customerIdHidden');
+                if (hid) hid.value = id || '';
+                const cInp = document.getElementById('contactInput');
+                if (cInp) cInp.value = contact || '';
+                const pInp = document.getElementById('phoneInput');
+                if (pInp) pInp.value = phone || '';
+                const aInp = document.getElementById('addressInput');
+                if (aInp) aInp.value = address || '';
+            }
+        } catch(err) {
+            console.warn('selectCustomer error, fallback direct assignment:', err);
+            const inp = document.getElementById('customerSearchInput');
+            if (inp) inp.value = name || '';
+            const hid = document.getElementById('customerIdHidden');
+            if (hid) hid.value = id || '';
+        }
+
         const nameEl = document.getElementById('mobileDisplayCustName');
         if (nameEl) nameEl.textContent = name || 'Select Customer';
         const phoneEl = document.getElementById('mobileDisplayCustPhone');
         if (phoneEl) phoneEl.textContent = phone ? ('📞 ' + phone) : 'No phone';
         const addrEl = document.getElementById('mobileDisplayCustAddr');
         if (addrEl) addrEl.textContent = address ? ('📍 ' + address) : 'No address';
+
+        if (typeof syncMobileAddressPreview === 'function') {
+            try { syncMobileAddressPreview(); } catch(e) {}
+        }
+        if (typeof markDirty === 'function') {
+            try { markDirty(); } catch(e) {}
+        }
+
         closeMobileCustomerSheet();
-        showMobileToast('Customer: ' + name);
+        if (typeof showMobileToast === 'function') {
+            showMobileToast('Customer: ' + (name || 'Selected'));
+        }
     };
 
     window.openMobileOrderSettingsSheet = function() {
