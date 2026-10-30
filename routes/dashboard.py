@@ -23,8 +23,7 @@ def index():
     cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
     is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
 
-    # Desktop PC mode: preserve dedicated branch workspace interface if active_bid
-    if not is_mobile_req and view_mode != 'table' and active_bid:
+    if active_bid:
         return redirect(url_for('branches.branch_workspace', id=active_bid))
 
     raw_branch = request.args.get('branch')

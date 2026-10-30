@@ -3,6 +3,323 @@
 {% block title %}{{ branch.name }} (Branch Dashboard) - inFlow Premium{% endblock %}
 
 {% block content %}
+
+<!-- Mobile Dashboard View (Master Emerald Parity for Branch) -->
+<div class="so-mobile-dashboard-view" id="mobileDashboardView">
+    <!-- Header -->
+    <div class="so-mob-dash-header">
+        <div class="so-mob-header-left" onclick="openMobileProfileDrawer()" style="cursor: pointer;" title="Profile & System Settings">
+            <div class="so-mob-store-icon" title="Store Logo">
+                {% if branch.logo_url %}
+                <img src="{{ branch.logo_url }}" alt="{{ branch.code }}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% elif active_logo_url %}
+                <img src="{{ active_logo_url }}" alt="{{ branch.code }}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% elif app_logo_url %}
+                <img src="{{ app_logo_url }}" alt="App Logo" style="width: 100%; height: 100%; object-fit: contain; border-radius: 9px;">
+                {% else %}
+                <div style="width: 100%; height: 100%; background: #0284C7; color: #FFFFFF; font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; border-radius: 9px;">
+                    {{ (branch.code or 'BR')[:2] }}
+                </div>
+                {% endif %}
+            </div>
+            <div class="so-mob-store-info">
+                <div class="so-mob-store-name">{{ branch.name }} ({{ branch.code }})</div>
+                <div class="so-mob-badges-row">
+                    <span class="so-mob-badge-hq" style="background: #E0F2FE; color: #0369A1; border: 1px solid #BAE6FD;">Branch {{ branch.code }}</span>
+                    <span class="so-mob-badge-scope">Isolated Scope</span>
+                </div>
+            </div>
+        </div>
+        <div class="so-mob-header-actions">
+            <button type="button" class="so-mob-icon-btn" title="Notifications">
+                <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span class="so-mob-red-dot"></span>
+            </button>
+            <button type="button" class="so-mob-icon-btn" onclick="openMobileProfileDrawer()" title="Profile & System Menu">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2.4" stroke-linecap="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Store Logistics 3-Card Row -->
+    <div class="so-mob-logistics-grid">
+        <div class="so-mob-logistics-card">
+            <div class="so-mob-logistics-label">
+                <span>📍</span> Fulfillment Warehouse
+            </div>
+            <div class="so-mob-logistics-val">{{ branch.location_name or central_wh.name or 'Main Warehouse' }} ▾</div>
+        </div>
+        <div class="so-mob-logistics-card">
+            <div class="so-mob-logistics-label">
+                <span>📦</span> Catalog
+            </div>
+            <div class="so-mob-logistics-val">{{ kpis.total_products or 0 }} Products ▾</div>
+        </div>
+        <div class="so-mob-logistics-card">
+            <div class="so-mob-logistics-label">
+                <span>📅</span> Last Updated
+            </div>
+            <div class="so-mob-logistics-val">{{ now_date_str or '' }}</div>
+        </div>
+    </div>
+
+    <!-- 4 Quick Action Cards -->
+    <div class="so-mob-quick-actions-grid">
+        <a href="{{ url_for('branches.branch_new_order', id=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_new_order', id=branch.id) }}', event)" class="so-mob-action-card primary" title="Create New Sales Order">
+            <div class="so-mob-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="12" y1="18" x2="12" y2="12"></line>
+                    <line x1="9" y1="15" x2="15" y2="15"></line>
+                </svg>
+            </div>
+            <span class="so-mob-action-text">New Sales<br>Order</span>
+        </a>
+        {% if perms.pos %}
+        <a href="{{ url_for('branches.branch_pos', id=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_pos', id=branch.id) }}', event)" class="so-mob-action-card" title="POS Retail Billing">
+            <div class="so-mob-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+            </div>
+            <span class="so-mob-action-text">⚡ POS<br>Billing</span>
+        </a>
+        {% else %}
+        <a href="/purchases/" data-no-tab="true" onclick="navigateMobileTab('/purchases/', event)" class="so-mob-action-card" title="Purchase Orders">
+            <div class="so-mob-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
+                    <circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle>
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                </svg>
+            </div>
+            <span class="so-mob-action-text">Purchase<br>Order</span>
+        </a>
+        {% endif %}
+        <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_inventory', id=branch.id) }}', event)" class="so-mob-action-card" title="Adjust Stock">
+            <div class="so-mob-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                </svg>
+            </div>
+            <span class="so-mob-action-text">Adjust<br>Stock</span>
+        </a>
+        <a href="{{ url_for('branches.branch_transfers', id=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_transfers', id=branch.id) }}', event)" class="so-mob-action-card" title="Transfer Stock">
+            <div class="so-mob-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 5h18"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 19H3"></path>
+                </svg>
+            </div>
+            <span class="so-mob-action-text">Transfer<br>Stock</span>
+        </a>
+    </div>
+
+    <!-- Workflow Section -->
+    <div class="so-mob-section-card">
+        <div class="so-mob-section-header">
+            <span class="so-mob-section-title">Workflow</span>
+            <a href="{{ url_for('sales_orders.list_orders', branch=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('sales_orders.list_orders', branch=branch.id) }}', event)" class="so-mob-view-all">View All &rsaquo;</a>
+        </div>
+        <div class="so-mob-workflow-grid">
+            <a href="/vendors" data-no-tab="true" onclick="navigateMobileTab('/vendors', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                </div>
+                <span class="so-mob-wf-name">Vendor</span>
+            </a>
+            <a href="/purchases" data-no-tab="true" onclick="navigateMobileTab('/purchases', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                </div>
+                <span class="so-mob-wf-name">Purchase Order</span>
+            </a>
+            <a href="{{ url_for('branches.branch_inventory', id=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_inventory', id=branch.id) }}', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                </div>
+                <span class="so-mob-wf-name">Inventory</span>
+            </a>
+            <a href="{{ url_for('sales_orders.list_orders', branch=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('sales_orders.list_orders', branch=branch.id) }}', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                </div>
+                <span class="so-mob-wf-name">Sales Order</span>
+            </a>
+            <a href="/customers" data-no-tab="true" onclick="navigateMobileTab('/customers', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <span class="so-mob-wf-name">Customer</span>
+            </a>
+            <a href="/expenses/monthly" data-no-tab="true" onclick="navigateMobileTab('/expenses/monthly', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line><circle cx="16" cy="15" r="1.5" fill="#1E6B52"></circle></svg>
+                </div>
+                <span class="so-mob-wf-name">Expenses</span>
+            </a>
+            <a href="/reports/list" data-no-tab="true" onclick="navigateMobileTab('/reports/list', event)" class="so-mob-workflow-item">
+                <div class="so-mob-wf-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                </div>
+                <span class="so-mob-wf-name">Reports</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- 2x3 KPI Grid -->
+    <div class="so-mob-kpi-grid">
+        <!-- Card 1: Inventory Valuation -->
+        <div class="so-mob-kpi-card">
+            <div class="so-mob-kpi-top">
+                <div class="so-mob-kpi-icon mint">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                </div>
+                <span class="so-mob-kpi-label">Inventory Valuation</span>
+            </div>
+            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.total_inventory_value|abs if kpis and kpis.total_inventory_value is not none else 0) }}</div>
+            <div class="so-mob-kpi-trend" style="color: #64748B;">{{ "{:,.0f}".format(kpis.total_units_on_hand|abs if kpis and kpis.total_units_on_hand is not none else 0) }} units on hand</div>
+        </div>
+
+        <!-- Card 2: Catalog Products -->
+        <div class="so-mob-kpi-card">
+            <div class="so-mob-kpi-top">
+                <div class="so-mob-kpi-icon mint">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><path d="M16.5 9.4 7.55 4.24a1.78 1.78 0 0 0-2.5 1.55v12.42a1.78 1.78 0 0 0 2.5 1.55L16.5 14.6a1.78 1.78 0 0 0 0-3.2z"></path><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                </div>
+                <span class="so-mob-kpi-label">Catalog Products</span>
+            </div>
+            <div class="so-mob-kpi-value">{{ kpis.total_products or 0 }}</div>
+            <div class="so-mob-kpi-trend" style="color: #64748B;">Active catalog items</div>
+        </div>
+
+        <!-- Card 3: Month Sales (Branch) -->
+        <div class="so-mob-kpi-card">
+            <div class="so-mob-kpi-top">
+                <div class="so-mob-kpi-icon mint">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                </div>
+                <span class="so-mob-kpi-label">Month Sales ({{ branch.code }})</span>
+            </div>
+            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.month_sales_total or 0) }}</div>
+            <div class="so-mob-kpi-trend" style="color: {% if kpis and kpis.sales_trend_label and kpis.sales_trend_label.startswith('↓') %}#EF4444{% else %}#1E6B52{% endif %};">{{ kpis.sales_trend_label or "Current month" }}</div>
+        </div>
+
+        <!-- Card 4: Receivables (Branch) -->
+        <div class="so-mob-kpi-card">
+            <div class="so-mob-kpi-top">
+                <div class="so-mob-kpi-icon mint">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3.5s3.5 1.5 3.5 3.5a3.5 3.5 0 0 1-7 0"></path></svg>
+                </div>
+                <span class="so-mob-kpi-label">Receivables ({{ branch.code }})</span>
+            </div>
+            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.total_receivables or 0) }}</div>
+            <div class="so-mob-kpi-trend" style="color: #64748B;">{{ kpis.pending_sales_orders or 0 }} open orders</div>
+        </div>
+
+        <!-- Card 5: Low Stock Alerts -->
+        <div class="so-mob-kpi-card">
+            <div class="so-mob-kpi-top">
+                <div class="so-mob-kpi-icon amber">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                </div>
+                <span class="so-mob-kpi-label">Low Stock Alerts</span>
+            </div>
+            <div class="so-mob-kpi-value" style="color: #D97706;">{{ kpis.low_stock_count or 0 }}</div>
+            <div class="so-mob-kpi-trend" style="color: #D97706;">Below reorder point</div>
+        </div>
+
+        <!-- Card 6: Procurement Inflow -->
+        <div class="so-mob-kpi-card">
+            <div class="so-mob-kpi-top">
+                <div class="so-mob-kpi-icon purple">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#8B5CF6" stroke-width="2"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
+                </div>
+                <span class="so-mob-kpi-label">Procurement Inflow</span>
+            </div>
+            <div class="so-mob-kpi-value" style="color: #8B5CF6;">{{ kpis.pending_purchase_orders or 0 }}</div>
+            <div class="so-mob-kpi-trend" style="color: #8B5CF6;">Active purchase orders</div>
+        </div>
+    </div>
+
+    <!-- Monthly Sales & Profit Breakdown Card -->
+    <div class="so-mob-section-card">
+        <div class="so-mob-chart-header">
+            <div class="so-mob-chart-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+                <span>Monthly Sales &amp; Profit Breakdown – {{ branch.name }} ({{ branch.code }})</span>
+            </div>
+            <span class="so-mob-filter-chip">This 12 Months</span>
+        </div>
+
+        <!-- Real Dynamic Monthly Chart via Chart.js -->
+        <div style="position: relative; width: 100%; height: 210px; margin-top: 10px;">
+            <canvas id="mobileRevenueTrendChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Stock Value by Category Card -->
+    <div class="so-mob-section-card">
+        <div class="so-mob-chart-header">
+            <div class="so-mob-chart-title">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                <span>Stock Value by Category</span>
+            </div>
+            <span class="so-mob-filter-chip">By Category</span>
+        </div>
+
+        <div class="so-mob-donut-wrap" style="align-items: center; gap: 14px; margin-top: 10px;">
+            <!-- Real Dynamic Donut Chart Left -->
+            <div class="so-mob-donut-col" style="position: relative; width: 110px; height: 110px; flex-shrink: 0;">
+                <canvas id="mobileCategoryShareChart"></canvas>
+            </div>
+
+            <!-- Real Dynamic Category Breakdown Right -->
+            <div class="so-mob-donut-legend" id="mobileCategoryLegend">
+                <div style="font-size: 11px; color: #94A3B8; padding: 12px 0;">Loading category inventory...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Universal 5-Button Bottom Nav Bar with Home Active -->
+    <nav class="so-mobile-nav-bar" id="mobDashboardNavBar">
+        <a href="/settings" data-no-tab="true" onclick="navigateMobileTab('/settings', event)" class="so-mobile-nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            <span>Settings</span>
+        </a>
+        <a href="/reports/list" data-no-tab="true" onclick="navigateMobileTab('/reports/list', event)" class="so-mobile-nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+            <span>Report</span>
+        </a>
+        <a href="{{ url_for('branches.branch_workspace', id=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_workspace', id=branch.id) }}', event)" class="so-mobile-nav-item so-nav-center-home active">
+            <div class="so-nav-home-bubble">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+            </div>
+            <span>Home</span>
+        </a>
+        <a href="{{ url_for('sales_orders.list_orders', branch=branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('sales_orders.list_orders', branch=branch.id) }}', event)" class="so-mobile-nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+            <span>SO</span>
+        </a>
+        <a href="/products" data-no-tab="true" onclick="navigateMobileTab('/products', event)" class="so-mobile-nav-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 2 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+            <span>Product</span>
+        </a>
+    </nav>
+</div>
+
+<div class="so-desktop-dashboard-wrap">
 <!-- Top Accent Bar (inFlow Branch Theme) -->
 <div class="inflow-top-accent-bar branch" style="background: {{ branch.primary_color or branch.color or (store_theme.primary if store_theme else '#10B981') }};"></div>
 
@@ -700,6 +1017,7 @@
         </table>
     </div>
 </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -907,7 +1225,156 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .catch(err => console.error("Error loading branch charts:", err));
 
-    // 2. Initialize inFlow Desktop Tab for Branch
+    // 2. Mobile Dashboard Charts (Parity with HQ Master Emerald Design)
+    const mobTrendCanvas = document.getElementById('mobileRevenueTrendChart');
+    const mobCatCanvas = document.getElementById('mobileCategoryShareChart');
+    if (mobTrendCanvas || mobCatCanvas) {
+        const catColors = ['#0EA5E9', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6', '#64748B'];
+        fetch('/api/dashboard/charts?branch={{ branch.id }}')
+            .then(res => res.json())
+            .then(data => {
+                if (mobTrendCanvas && typeof Chart !== 'undefined' && data.monthly_labels) {
+                    if (window.mobileRevenueTrendChartInstance) {
+                        try { window.mobileRevenueTrendChartInstance.destroy(); } catch (e) {}
+                    }
+                    const ctxMobTrend = mobTrendCanvas.getContext('2d');
+                    if (ctxMobTrend) {
+                        const mobTrendDatasets = [{
+                            label: 'Total Sales',
+                            data: data.monthly_revenue || [],
+                            backgroundColor: '#0284C7',
+                            borderColor: '#0284C7',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            barPercentage: 0.85,
+                            categoryPercentage: 0.82
+                        }];
+
+                        if (data.monthly_profit && data.monthly_profit.length > 0) {
+                            mobTrendDatasets.push({
+                                label: 'Profit',
+                                data: data.monthly_profit,
+                                backgroundColor: '#059669',
+                                borderColor: '#059669',
+                                borderWidth: 1,
+                                borderRadius: 3,
+                                barPercentage: 0.85,
+                                categoryPercentage: 0.82
+                            });
+                        }
+
+                        window.mobileRevenueTrendChartInstance = new Chart(ctxMobTrend, {
+                            type: 'bar',
+                            data: {
+                                labels: data.monthly_labels,
+                                datasets: mobTrendDatasets
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'bottom',
+                                        labels: {
+                                            usePointStyle: true,
+                                            boxWidth: 7,
+                                            padding: 10,
+                                            font: { size: 10.5, weight: '600' }
+                                        }
+                                    },
+                                    tooltip: {
+                                        callbacks: {
+                                            label: function(ctx) {
+                                                return ' ' + ctx.dataset.label + ': $' + Number(ctx.parsed.y || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    y: {
+                                        beginAtZero: true,
+                                        ticks: {
+                                            callback: val => '$' + Number(val).toLocaleString(),
+                                            font: { size: 9 }
+                                        },
+                                        grid: { color: '#F1F5F9' }
+                                    },
+                                    x: {
+                                        ticks: {
+                                            font: { size: 8.5 },
+                                            maxRotation: 45,
+                                            minRotation: 0
+                                        },
+                                        grid: { display: false }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+                if (mobCatCanvas && typeof Chart !== 'undefined' && data.category_labels) {
+                    if (window.mobileCategoryShareChartInstance) {
+                        try { window.mobileCategoryShareChartInstance.destroy(); } catch (e) {}
+                    }
+                    const ctxMobCat = mobCatCanvas.getContext('2d');
+                    if (ctxMobCat) {
+                        window.mobileCategoryShareChartInstance = new Chart(ctxMobCat, {
+                            type: 'doughnut',
+                            data: {
+                                labels: data.category_labels,
+                                datasets: [{
+                                    data: data.category_values || [],
+                                    backgroundColor: catColors.slice(0, data.category_labels.length),
+                                    borderWidth: 2,
+                                    borderColor: '#FFFFFF'
+                                }]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                plugins: {
+                                    legend: { display: false }
+                                },
+                                cutout: '64%'
+                            }
+                        });
+                    }
+                }
+
+                // Mobile Category Legend dynamic population
+                const mobLegendWrap = document.getElementById('mobileCategoryLegend');
+                if (mobLegendWrap && data.category_labels) {
+                    const totalCatVal = (data.category_values || []).reduce((acc, v) => acc + (Number(v) || 0), 0);
+                    if (data.category_labels.length === 0 || totalCatVal <= 0) {
+                        mobLegendWrap.innerHTML = '<div style="font-size: 11px; color: #94A3B8; padding: 10px 0;">No category inventory data</div>';
+                    } else {
+                        let legendHtml = '';
+                        data.category_labels.forEach((label, idx) => {
+                            const val = Number(data.category_values[idx]) || 0;
+                            const pct = totalCatVal > 0 ? ((val / totalCatVal) * 100).toFixed(1) : '0.0';
+                            const dotColor = catColors[idx % catColors.length];
+                            const formattedVal = '$' + val.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                            legendHtml += `
+                                <div class="so-mob-donut-row">
+                                    <span class="so-mob-cat-info" title="${label}">
+                                        <span class="so-mob-donut-dot" style="background: ${dotColor};"></span>
+                                        <span class="so-mob-cat-name">${label}</span>
+                                    </span>
+                                    <span class="so-mob-cat-val">${formattedVal}</span>
+                                    <span class="so-mob-cat-pct">${pct}%</span>
+                                </div>
+                            `;
+                        });
+                        mobLegendWrap.innerHTML = legendHtml;
+                    }
+                }
+            })
+            .catch(err => console.error("Error loading branch mobile dashboard charts:", err));
+    }
+
+    // 3. Initialize inFlow Desktop Tab for Branch
     if (window.initInflowTabs) {
         window.initInflowTabs({
             type: 'home',

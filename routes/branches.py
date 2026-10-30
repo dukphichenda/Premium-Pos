@@ -490,25 +490,16 @@ def switch_branch(id):
     - id = 0: Switches to Main Store (HQ / Enterprise view)
     - id > 0: Switches to Branch Shop Workspace
     """
-    ua = request.headers.get('User-Agent', '')
-    import re
-    is_phone_ua = bool(re.search(r'Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini', ua, re.I))
-    view_mode = request.args.get('view', '').strip().lower()
-    cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
-    is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
-
     user_role = session.get('role')
     user_bid = session.get('branch_id')
     if user_role in ('branch_admin', 'branch_cashier') and user_bid and id != user_bid:
         flash(f"🔒 Access Restricted: You are logged in as Branch Admin and can only access Branch #{user_bid}. / គ្មានសិទ្ធិចូលសាខាផ្សេងទេ", "error")
-        if is_mobile_req:
-            return redirect(url_for('dashboard.index', branch=user_bid))
         return redirect(url_for('branches.branch_workspace', id=user_bid))
 
     if id == 0:
         session.pop('active_branch_id', None)
         flash("🏢 Switched to Main Store (HQ - Headquarters). Full enterprise view active.", "info")
-        return redirect(url_for('dashboard.index', branch='main'))
+        return redirect(url_for('dashboard.index'))
 
     branch = query_one("SELECT * FROM branches WHERE id = %s AND is_active = TRUE", (id,))
     if not branch:
@@ -517,8 +508,6 @@ def switch_branch(id):
 
     session['active_branch_id'] = id
     flash(f"🏪 Switched to {branch['name']} ({branch['code']}). Branch Workspace mode active.", "success")
-    if is_mobile_req:
-        return redirect(url_for('dashboard.index', branch=id))
     return redirect(url_for('branches.branch_workspace', id=id))
 
 @branches_bp.route('/branches/launch')
@@ -573,17 +562,6 @@ def branch_workspace(id):
     Complete Cloned Branch Workspace & Dashboard.
     Provides full feature parity with Main Store, governed by Main Store permission controls.
     """
-    ua = request.headers.get('User-Agent', '')
-    import re
-    is_phone_ua = bool(re.search(r'Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini', ua, re.I))
-    view_mode = request.args.get('view', '').strip().lower()
-    cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
-    is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
-
-    if is_mobile_req:
-        session['active_branch_id'] = id
-        return redirect(url_for('dashboard.index', branch=id))
-
     branch = query_one("""
         SELECT b.*, l.name as location_name 
         FROM branches b 
@@ -685,6 +663,50 @@ def branch_workspace(id):
         LIMIT 6
     """, (central_id,))
 
+    # Compute high-level KPIs for mobile parity with HQ dashboard
+    prod_cnt = query_one("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE")
+    total_products = prod_cnt['cnt'] if prod_cnt else 0
+
+    inv_data = query_one("""
+        SELECT 
+            COALESCE(SUM(quantity), 0) as total_units,
+            COALESCE(SUM(GREATEST(i.quantity, 0) * COALESCE(p.average_cost, p.standard_cost, 0)), 0) as total_val
+        FROM inventory i
+        JOIN products p ON i.product_id = p.id
+    """)
+    total_units_on_hand = inv_data['total_units'] if inv_data else 0
+    total_inventory_value = inv_data['total_val'] if inv_data else 0
+
+    prev_month_sales = query_one("""
+        SELECT COALESCE(SUM(total_amount), 0) as prev_sales
+        FROM sales_orders
+        WHERE branch_id = %s AND TO_CHAR(order_date, 'YYYY-MM') = TO_CHAR(CURRENT_DATE - INTERVAL '1 month', 'YYYY-MM') AND status NOT IN ('CANCELLED')
+    """, (id,))
+    cur_sales = float(month_stats.get('month_sales') or 0)
+    prev_sales = float(prev_month_sales.get('prev_sales') or 0) if prev_month_sales else 0
+    if prev_sales > 0:
+        diff_pct = round(((cur_sales - prev_sales) / prev_sales) * 100, 1)
+        sales_trend_label = f"↑ {diff_pct}% vs last month" if diff_pct >= 0 else f"↓ {abs(diff_pct)}% vs last month"
+    else:
+        sales_trend_label = "Current month"
+
+    po_cnt = query_one("SELECT COUNT(*) as cnt FROM purchase_orders WHERE status IN ('DRAFT', 'ISSUED', 'PARTIAL_RECEIVED')")
+    pending_purchase_orders = po_cnt['cnt'] if po_cnt else 0
+
+    kpis = {
+        'total_products': total_products,
+        'total_units_on_hand': total_units_on_hand,
+        'total_inventory_value': total_inventory_value,
+        'low_stock_count': len(low_stock_items),
+        'pending_sales_orders': receivables_stats.get('unpaid_orders_count', 0),
+        'pending_purchase_orders': pending_purchase_orders,
+        'month_sales_total': cur_sales,
+        'total_receivables': float(receivables_stats.get('total_receivables') or 0),
+        'sales_trend_label': sales_trend_label
+    }
+
+    branch_fulfillment_wh = {'id': branch.get('location_id') or (central_wh['id'] if central_wh else 1), 'name': branch.get('location_name') or (central_wh['name'] if central_wh else 'Main Warehouse')}
+
     return render_template('branches/dashboard.html',
                            branch=branch,
                            perms=perms,
@@ -696,7 +718,12 @@ def branch_workspace(id):
                            top_products=top_products,
                            low_stock_items=low_stock_items,
                            current_month=current_month,
-                           central_wh=central_wh)
+                           central_wh=branch_fulfillment_wh,
+                           kpis=kpis,
+                           current_store_name=f"{branch['code']} - {branch['name']}",
+                           current_store_code=branch['code'],
+                           branch_scope=str(id),
+                           now_date_str=datetime.now().strftime('%d %b %Y'))
 
 @branches_bp.route('/api/branches/<int:id>/charts')
 def branch_chart_data(id):
