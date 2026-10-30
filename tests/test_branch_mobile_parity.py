@@ -55,5 +55,11 @@ class TestBranchMobileParity(unittest.TestCase):
         """Verify base.html Mobile Profile Drawer links switch branches via switch_branch endpoint."""
         self.assertIn("branches.switch_branch", self.base_html)
 
+    def test_top_branch_indicator_bar_removed(self):
+        """Verify the legacy top branch indicator banner in the red rectangle is removed from base.html."""
+        self.assertNotIn('class="branch-context-indicator-bar', self.base_html)
+        self.assertNotIn('Branch Mode Active:', self.base_html.split('INFLOW_TRANSLATION_MAP_EN_TO_KM')[0])
+
 if __name__ == '__main__':
     unittest.main()
+
