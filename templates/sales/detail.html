@@ -3004,6 +3004,7 @@ window.toggleSoSidebarCollapse = function(forceState) {
     if (expandBtn) expandBtn.style.display = willCollapse ? 'inline-flex' : 'none';
 };
 window.openSoMobileDrawer = function() {
+    if (Date.now() - (window._soDrawerJustClosedAt || 0) < 350) return;
     const ws = document.querySelector('.inflow-so-workspace');
     if (ws) ws.classList.add('mobile-drawer-open');
     document.body.classList.add('so-drawer-backdrop-active');
@@ -3015,8 +3016,28 @@ window.openSoMobileDrawer = function() {
         backdrop.style.setProperty('visibility', 'visible', 'important');
     }
     const barBtn = document.getElementById('soMobileSidebarBar');
-    if (barBtn) barBtn.style.display = 'none';
+    if (barBtn) barBtn.style.setProperty('display', 'none', 'important');
+    const sidebar = document.getElementById('soMasterSidebar');
+    if (sidebar) {
+        sidebar.style.setProperty('display', 'flex', 'important');
+        sidebar.style.setProperty('position', 'fixed', 'important');
+        sidebar.style.setProperty('top', '0', 'important');
+        sidebar.style.setProperty('left', '0', 'important');
+        sidebar.style.setProperty('bottom', '0', 'important');
+        sidebar.style.setProperty('width', '320px', 'important');
+        sidebar.style.setProperty('max-width', '88vw', 'important');
+        sidebar.style.setProperty('height', '100vh', 'important');
+        sidebar.style.setProperty('z-index', '100005', 'important');
+        sidebar.style.setProperty('box-shadow', '8px 0 30px rgba(0, 0, 0, 0.4)', 'important');
+        sidebar.style.setProperty('background', '#FFFFFF', 'important');
+        sidebar.style.setProperty('pointer-events', 'auto', 'important');
+        sidebar.style.setProperty('visibility', 'visible', 'important');
+        sidebar.style.setProperty('opacity', '1', 'important');
+    }
 };
+function openSoMobileDrawer() {
+    window.openSoMobileDrawer();
+}
 window.closeSoMobileDrawer = function() {
     window._soDrawerJustClosedAt = Date.now();
     const ws = document.querySelector('.inflow-so-workspace');
@@ -3032,9 +3053,29 @@ window.closeSoMobileDrawer = function() {
     const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
     const barBtn = document.getElementById('soMobileSidebarBar');
     if (barBtn) {
-        barBtn.style.display = isMobile ? 'flex' : 'none';
+        barBtn.style.setProperty('display', isMobile ? 'flex' : 'none', 'important');
+    }
+    const sidebar = document.getElementById('soMasterSidebar');
+    if (sidebar) {
+        sidebar.style.removeProperty('display');
+        sidebar.style.removeProperty('position');
+        sidebar.style.removeProperty('top');
+        sidebar.style.removeProperty('left');
+        sidebar.style.removeProperty('bottom');
+        sidebar.style.removeProperty('width');
+        sidebar.style.removeProperty('max-width');
+        sidebar.style.removeProperty('height');
+        sidebar.style.removeProperty('z-index');
+        sidebar.style.removeProperty('box-shadow');
+        sidebar.style.removeProperty('background');
+        sidebar.style.removeProperty('pointer-events');
+        sidebar.style.removeProperty('visibility');
+        sidebar.style.removeProperty('opacity');
     }
 };
+function closeSoMobileDrawer() {
+    window.closeSoMobileDrawer();
+}
 </script>
 <aside class="inflow-search-drawer so-master-sidebar" id="soMasterSidebar">
         <!-- Mobile Drawer Top Header with Minimize Arrow (visible on mobile <= 768px) -->
@@ -3592,7 +3633,7 @@ window.closeSoMobileDrawer = function() {
 </div>
 
 <!-- Modal: Quick Add Customer Directly -->
-<div id="modalQuickAddCustomer" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
+<div id="modalQuickAddCustomer" class="inflow-modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 100020; align-items: center; justify-content: center; backdrop-filter: blur(2px);">
     <div class="inflow-modal-box" style="max-width: 480px; width: 95%; border-radius: 8px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); overflow: hidden; background: #FFFFFF; border: 1px solid #CBD5E1;">
         <div class="inflow-modal-header" style="background: linear-gradient(135deg, #1E40AF, #2563EB); color: #FFFFFF; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center;">
             <div style="font-weight: 700; font-size: 13.5px; display: flex; align-items: center; gap: 8px;">
@@ -4167,7 +4208,7 @@ window.pricingSchemes = [
 
 window.allCustomersList = [
     {% for c in all_customers %}
-    { id: {{ c.id }}, name: {{ c.name | tojson }}, contact: {{ (c.contact_name or '') | tojson }}, phone: {{ (c.phone or '') | tojson }}, address: {{ (c.address or c.shipping_address or '') | tojson }} },
+    { id: {{ c.id }}, name: {{ c.name | tojson }}, contact: {{ (c.contact_name or '') | tojson }}, phone: {{ (c.phone or '') | tojson }}, address: {{ (c.customer_address or c.address1 or c.address or c.shipping_address or '') | tojson }} },
     {% endfor %}
 ];
 
@@ -4730,30 +4771,7 @@ function closeSoMobileDrawer() {
     }
 }
 
-function openSoMobileDrawer() {
-    const isMobile = document.documentElement.classList.contains('is-mobile-view') || (window.innerWidth <= 768 && !document.documentElement.classList.contains('is-desktop-view'));
-    if (!isMobile) return;
-    // Suppress ghost clicks/tap bleed-through from re-opening within 500ms of closing
-    if (Date.now() - (window._soDrawerJustClosedAt || 0) < 500) {
-        return;
-    }
-    const ws = document.querySelector('.inflow-so-workspace');
-    if (ws) {
-        ws.classList.add('mobile-drawer-open');
-    }
-    document.body.classList.add('so-drawer-backdrop-active');
-    const backdrop = document.getElementById('soMobileDrawerBackdrop');
-    if (backdrop) {
-        backdrop.style.setProperty('display', 'block', 'important');
-        backdrop.style.setProperty('pointer-events', 'auto', 'important');
-        backdrop.style.setProperty('opacity', '1', 'important');
-        backdrop.style.setProperty('visibility', 'visible', 'important');
-    }
-    const floatBtn = document.getElementById('soMobileFloatingBtn');
-    if (floatBtn) floatBtn.style.display = 'none';
-    const barBtn = document.getElementById('soMobileSidebarBar');
-    if (barBtn) barBtn.style.display = 'none';
-}
+// Mobile drawer functions delegated to window.openSoMobileDrawer/window.closeSoMobileDrawer
 
 // Sidebar Minimize / Collapse Toggle (Collapse sidebar completely for 100% full-width document)
 function toggleSoSidebarCollapse(forceState) {
@@ -9010,12 +9028,43 @@ function submitQuickAddCustomerAjax() {
                     setTimeout(() => { custInput.style.backgroundColor = ''; }, 1200);
                     custInput.focus();
                 }
+
+                // Update mobile customer card display
+                const nameEl = document.getElementById('mobileDisplayCustName');
+                if (nameEl) nameEl.textContent = cust.name || 'Select Customer';
+                const phoneEl = document.getElementById('mobileDisplayCustPhone');
+                if (phoneEl) phoneEl.textContent = cust.phone ? ('📞 ' + cust.phone) : 'No phone';
+                const addrEl = document.getElementById('mobileDisplayCustAddr');
+                if (addrEl) addrEl.textContent = cAddr ? ('📍 ' + cAddr) : 'No address';
+
+                // Prepend to window.allCustomersList
+                if (!window.allCustomersList) window.allCustomersList = [];
+                window.allCustomersList.unshift({
+                    id: cust.id,
+                    name: cust.name,
+                    contact: cust.contact_name || '',
+                    phone: cust.phone || '',
+                    address: cAddr
+                });
+
+                if (typeof renderMobileCustomersList === 'function') {
+                    try { renderMobileCustomersList(''); } catch(e) {}
+                }
+                if (typeof closeMobileCustomerSheet === 'function') {
+                    try { closeMobileCustomerSheet(); } catch(e) {}
+                }
+                if (typeof showMobileToast === 'function') {
+                    try { showMobileToast('Customer: ' + (cust.name || 'Created')); } catch(e) {}
+                }
             } catch(domErr) {
                 console.warn('Post-save customer DOM sync notice:', domErr);
             } finally {
                 // Guarantee the modal disappears and returns immediately to the sales order page
                 closeQuickAddCustomerModal();
                 closeCustomerDropdown();
+                if (typeof closeMobileCustomerSheet === 'function') {
+                    try { closeMobileCustomerSheet(); } catch(e) {}
+                }
             }
         } else {
             const errMsg = data.message || 'Error creating customer';

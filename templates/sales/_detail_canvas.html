@@ -1,6 +1,6 @@
     <main class="inflow-document-canvas">
         <!-- Mobile Show Sidebar Bar with Arrow (visible on mobile screens <= 768px when sidebar is hidden) -->
-        <div class="so-mobile-sidebar-bar" id="soMobileSidebarBar" onclick="toggleSoSidebarCollapse()" title="Show Orders List / បង្ហាញបញ្ជីលក់">
+        <div class="so-mobile-sidebar-bar" id="soMobileSidebarBar" onclick="openSoMobileDrawer()" ontouchend="openSoMobileDrawer()" title="Show Orders List / បង្ហាញបញ្ជីលក់">
             <div class="so-mobile-bar-left">
                 <span style="font-size: 16px;">📋</span>
                 <span>Orders List / បញ្ជីលក់</span>
@@ -3464,9 +3464,9 @@
                         <div class="so-mobile-cust-details">
                             <div class="so-mobile-cust-name" id="mobileDisplayCustName">{{ order.customer_name or order.customer_company_name or 'Select Customer' }}</div>
                             <div class="so-mobile-cust-sub" id="mobileDisplayCustSub">
-                                <span id="mobileDisplayCustPhone">📞 {{ order.customer_phone or '085 22 22 75' }}</span>
+                                <span id="mobileDisplayCustPhone">📞 {{ order.customer_phone or 'No phone' }}</span>
                                 <span class="so-dot-sep">·</span>
-                                <span id="mobileDisplayCustAddr">📍 {{ order.customer_address or order.customer_shipping_address or 'Phnom Penh' }}</span>
+                                <span id="mobileDisplayCustAddr">📍 {{ order.customer_address or order.customer_shipping_address or 'No address' }}</span>
                             </div>
                         </div>
                         <div class="so-mobile-chevron">›</div>
@@ -5496,14 +5496,30 @@
         if (typeof renderMobileCustomersList === 'function') renderMobileCustomersList('');
         const backdrop = document.getElementById('mobileCustomerBackdrop');
         const sheet = document.getElementById('mobileCustomerSheet');
-        if (backdrop) backdrop.style.display = 'block';
-        if (sheet) sheet.classList.add('open');
+        if (backdrop) {
+            backdrop.style.setProperty('display', 'block', 'important');
+            backdrop.style.setProperty('pointer-events', 'auto', 'important');
+        }
+        if (sheet) {
+            sheet.style.setProperty('display', 'flex', 'important');
+            sheet.classList.add('open');
+        }
+        setTimeout(() => {
+            const searchInp = document.getElementById('mobileCustomerSearchInput');
+            if (searchInp) searchInp.focus();
+        }, 150);
     };
     window.closeMobileCustomerSheet = function() {
         const backdrop = document.getElementById('mobileCustomerBackdrop');
         const sheet = document.getElementById('mobileCustomerSheet');
-        if (backdrop) backdrop.style.display = 'none';
-        if (sheet) sheet.classList.remove('open');
+        if (backdrop) {
+            backdrop.style.setProperty('display', 'none', 'important');
+            backdrop.style.setProperty('pointer-events', 'none', 'important');
+        }
+        if (sheet) {
+            sheet.classList.remove('open');
+            sheet.style.setProperty('display', 'none', 'important');
+        }
     };
     window.renderMobileCustomersList = function(query) {
         const listEl = document.getElementById('mobileCustomerItemsList');
@@ -5528,18 +5544,29 @@
         let html = '';
         matches.slice(0, 50).forEach(c => {
             const isSelected = (currentCustId && String(c.id) === currentCustId) || (!currentCustId && currentCustName && c.name === currentCustName);
-            const escName = (c.name || '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const escPhone = (c.phone || 'No phone').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            const escAddr = (c.address || 'Phnom Penh').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escName = (c.name || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escContact = (c.contact || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escPhone = (c.phone || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const escAddr = (c.address || '').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            const displayPhone = escPhone || 'No phone';
+            const displayAddr = escAddr || 'No address';
+
             html += `
-            <div class="so-cust-item-row" data-customer-id="${c.id}" onclick="handleMobileCustomerPick(this)">
+            <div class="so-cust-item-row" 
+                 data-customer-id="${c.id}" 
+                 data-customer-name="${escName}" 
+                 data-customer-contact="${escContact}" 
+                 data-customer-phone="${escPhone}" 
+                 data-customer-address="${escAddr}"
+                 onclick="handleMobileCustomerPick(this)"
+                 ontouchend="handleMobileCustomerPick(this)">
                 <div class="so-cust-avatar-circle">👤</div>
                 <div class="so-cust-info-col">
                     <div class="so-cust-row-name">${escName}</div>
                     <div class="so-cust-row-meta">
-                        <span>📞 ${escPhone}</span>
+                        <span>📞 ${displayPhone}</span>
                         <span style="margin:0 4px;">•</span>
-                        <span>📍 ${escAddr}</span>
+                        <span>📍 ${displayAddr}</span>
                     </div>
                 </div>
                 ${isSelected ? '<div class="so-cust-check-icon">✓</div>' : ''}
@@ -5552,43 +5579,56 @@
     };
     window.handleMobileCustomerPick = function(rowEl) {
         if (!rowEl) return;
-        const cid = rowEl.getAttribute('data-customer-id');
+        if (Date.now() - (window._lastCustPickTime || 0) < 300) return;
+        window._lastCustPickTime = Date.now();
+
+        const row = rowEl.closest('.so-cust-item-row') || rowEl;
+        const cid = row.getAttribute('data-customer-id');
+        let name = row.getAttribute('data-customer-name') || '';
+        let contact = row.getAttribute('data-customer-contact') || '';
+        let phone = row.getAttribute('data-customer-phone') || '';
+        let address = row.getAttribute('data-customer-address') || '';
+
         const custs = window.allCustomersList || [];
         const c = custs.find(item => String(item.id) === String(cid));
         if (c) {
-            selectMobileCustomer(c.id, c.name, c.contact || '', c.phone || '', c.address || '');
+            name = c.name || name;
+            contact = c.contact || contact;
+            phone = c.phone || phone;
+            address = c.address || address;
         }
+
+        selectMobileCustomer(cid, name, contact, phone, address);
     };
     window.selectMobileCustomer = function(id, name, contact, phone, address) {
+        // Direct field assignment
+        const cSearch = document.getElementById('customerSearchInput');
+        if (cSearch) cSearch.value = name || '';
+        const cId = document.getElementById('customerIdHidden');
+        if (cId) cId.value = id || '';
+        const cContact = document.getElementById('contactInput');
+        if (cContact) cContact.value = contact || '';
+        const cPhone = document.getElementById('phoneInput');
+        if (cPhone) cPhone.value = phone || '';
+        const cAddr = document.getElementById('addressInput');
+        if (cAddr) cAddr.value = address || '';
+
+        // Call ERP selectCustomer handler
         try {
             if (typeof selectCustomer === 'function') {
                 selectCustomer(id, name, contact, phone, address);
-            } else {
-                const inp = document.getElementById('customerSearchInput');
-                if (inp) inp.value = name || '';
-                const hid = document.getElementById('customerIdHidden');
-                if (hid) hid.value = id || '';
-                const cInp = document.getElementById('contactInput');
-                if (cInp) cInp.value = contact || '';
-                const pInp = document.getElementById('phoneInput');
-                if (pInp) pInp.value = phone || '';
-                const aInp = document.getElementById('addressInput');
-                if (aInp) aInp.value = address || '';
             }
         } catch(err) {
             console.warn('selectCustomer error, fallback direct assignment:', err);
-            const inp = document.getElementById('customerSearchInput');
-            if (inp) inp.value = name || '';
-            const hid = document.getElementById('customerIdHidden');
-            if (hid) hid.value = id || '';
         }
 
+        // Always update mobile card visual elements
         const nameEl = document.getElementById('mobileDisplayCustName');
         if (nameEl) nameEl.textContent = name || 'Select Customer';
         const phoneEl = document.getElementById('mobileDisplayCustPhone');
-        if (phoneEl) phoneEl.textContent = phone ? ('📞 ' + phone) : 'No phone';
+        if (phoneEl) phoneEl.textContent = phone ? ('📞 ' + phone) : '📞 No phone';
         const addrEl = document.getElementById('mobileDisplayCustAddr');
-        if (addrEl) addrEl.textContent = address ? ('📍 ' + address) : 'No address';
+        if (addrEl) addrEl.textContent = address ? ('📍 ' + address) : '📍 No address';
 
         if (typeof syncMobileAddressPreview === 'function') {
             try { syncMobileAddressPreview(); } catch(e) {}

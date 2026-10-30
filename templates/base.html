@@ -39,6 +39,10 @@
             // 2. Inherit mode from parent window if inside an iframe
             try {
                 if (window.top && window.top !== window.self && window.top.document && window.top.document.documentElement) {
+                    // If this iframe is phone-sized (<= 768px), it's a mobile simulator or phone preview! Always mobile.
+                    if (window.innerWidth <= 768) {
+                        return 'mobile';
+                    }
                     var topMode = window.top.document.documentElement.getAttribute('data-view-mode');
                     if (topMode === 'mobile' || topMode === 'desktop') {
                         return topMode;
@@ -1722,12 +1726,14 @@
             if (typeof broadcast === 'undefined') broadcast = true;
             if (mode !== 'mobile' && mode !== 'desktop') mode = 'desktop';
 
-            // 1. Persist in localStorage and cookie
-            try {
-                localStorage.setItem('inflow_view_mode', mode);
-                localStorage.setItem('inflow_view_mode_manual', 'true');
-                document.cookie = "inflow_view_mode=" + mode + "; path=/; max-age=31536000; SameSite=Lax";
-            } catch(e) {}
+            // 1. Persist in localStorage and cookie (only for top-level window to prevent iframe simulation pollution)
+            if (window.self === window.top) {
+                try {
+                    localStorage.setItem('inflow_view_mode', mode);
+                    localStorage.setItem('inflow_view_mode_manual', 'true');
+                    document.cookie = "inflow_view_mode=" + mode + "; path=/; max-age=31536000; SameSite=Lax";
+                } catch(e) {}
+            }
 
             // 2. Toggle classes on documentElement
             const root = document.documentElement;
