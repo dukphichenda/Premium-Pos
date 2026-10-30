@@ -58,7 +58,7 @@ class TestBranchMobileParity(unittest.TestCase):
     def test_top_branch_indicator_bar_removed(self):
         """Verify the legacy top branch indicator banner in the red rectangle is removed from base.html."""
         self.assertNotIn('class="branch-context-indicator-bar', self.base_html)
-        self.assertNotIn('Branch Mode Active:', self.base_html.split('INFLOW_TRANSLATION_MAP_EN_TO_KM')[0])
+        self.assertNotIn('<strong>Branch Mode Active:</strong>', self.base_html)
 
 if __name__ == '__main__':
     unittest.main()

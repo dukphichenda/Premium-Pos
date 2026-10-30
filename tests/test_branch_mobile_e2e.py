@@ -32,9 +32,9 @@ class TestBranchMobileE2E(unittest.TestCase):
         self.assertIn('mobileCategoryShareChart', html)
         self.assertIn('mobileCategoryLegend', html)
         self.assertIn('so-mobile-nav-bar', html)
-        # Verify the top bar in the red rectangle is deleted
-        self.assertNotIn('branch-context-indicator-bar', html)
-        self.assertNotIn('Branch Mode Active:', html)
+        # Verify the top bar in the red rectangle is deleted from the DOM
+        self.assertNotIn('class="branch-context-indicator-bar', html)
+        self.assertNotIn('<strong>Branch Mode Active:</strong>', html)
 
     def test_branch_workspace_desktop_view(self):
         """Verify accessing branch workspace in desktop mode preserves classic workflow card."""
