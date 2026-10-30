@@ -490,16 +490,25 @@ def switch_branch(id):
     - id = 0: Switches to Main Store (HQ / Enterprise view)
     - id > 0: Switches to Branch Shop Workspace
     """
+    ua = request.headers.get('User-Agent', '')
+    import re
+    is_phone_ua = bool(re.search(r'Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini', ua, re.I))
+    view_mode = request.args.get('view', '').strip().lower()
+    cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
+    is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
+
     user_role = session.get('role')
     user_bid = session.get('branch_id')
     if user_role in ('branch_admin', 'branch_cashier') and user_bid and id != user_bid:
         flash(f"🔒 Access Restricted: You are logged in as Branch Admin and can only access Branch #{user_bid}. / គ្មានសិទ្ធិចូលសាខាផ្សេងទេ", "error")
+        if is_mobile_req:
+            return redirect(url_for('dashboard.index', branch=user_bid))
         return redirect(url_for('branches.branch_workspace', id=user_bid))
 
     if id == 0:
         session.pop('active_branch_id', None)
         flash("🏢 Switched to Main Store (HQ - Headquarters). Full enterprise view active.", "info")
-        return redirect(url_for('dashboard.index'))
+        return redirect(url_for('dashboard.index', branch='main'))
 
     branch = query_one("SELECT * FROM branches WHERE id = %s AND is_active = TRUE", (id,))
     if not branch:
@@ -508,6 +517,8 @@ def switch_branch(id):
 
     session['active_branch_id'] = id
     flash(f"🏪 Switched to {branch['name']} ({branch['code']}). Branch Workspace mode active.", "success")
+    if is_mobile_req:
+        return redirect(url_for('dashboard.index', branch=id))
     return redirect(url_for('branches.branch_workspace', id=id))
 
 @branches_bp.route('/branches/launch')
@@ -562,6 +573,17 @@ def branch_workspace(id):
     Complete Cloned Branch Workspace & Dashboard.
     Provides full feature parity with Main Store, governed by Main Store permission controls.
     """
+    ua = request.headers.get('User-Agent', '')
+    import re
+    is_phone_ua = bool(re.search(r'Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini', ua, re.I))
+    view_mode = request.args.get('view', '').strip().lower()
+    cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
+    is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
+
+    if is_mobile_req:
+        session['active_branch_id'] = id
+        return redirect(url_for('dashboard.index', branch=id))
+
     branch = query_one("""
         SELECT b.*, l.name as location_name 
         FROM branches b 
@@ -768,8 +790,8 @@ def branch_chart_data(id):
 
 @branches_bp.route('/branches/<int:id>/orders')
 def branch_orders(id):
-    """Branch sales order page removed; redirects directly to Paid Invoices."""
-    return redirect(url_for('sales_orders.list_orders', status='PAID', branch=id))
+    """Branch sales order page: redirects to dedicated sales orders list scoped to this branch."""
+    return redirect(url_for('sales_orders.list_orders', branch=id))
 
 @branches_bp.route('/branches/<int:id>/orders/new')
 def branch_new_order(id):

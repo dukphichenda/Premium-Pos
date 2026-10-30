@@ -627,7 +627,7 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
 
     <!-- 4 Quick Action Cards -->
     <div class="so-mob-quick-actions-grid">
-        <a href="/sales/new" data-no-tab="true" onclick="navigateMobileTab('/sales/new', event)" class="so-mob-action-card primary" title="Create New Sales Order">
+        <a href="{% if is_branch_mode and current_branch %}{{ url_for('branches.branch_new_order', id=current_branch.id) }}{% else %}/sales/new{% endif %}" data-no-tab="true" onclick="navigateMobileTab('{% if is_branch_mode and current_branch %}{{ url_for('branches.branch_new_order', id=current_branch.id) }}{% else %}/sales/new{% endif %}', event)" class="so-mob-action-card primary" title="Create New Sales Order">
             <div class="so-mob-action-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.2">
                     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -638,6 +638,16 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
             </div>
             <span class="so-mob-action-text">New Sales<br>Order</span>
         </a>
+        {% if is_branch_mode and current_branch and branch_permissions and branch_permissions.pos %}
+        <a href="{{ url_for('branches.branch_pos', id=current_branch.id) }}" data-no-tab="true" onclick="navigateMobileTab('{{ url_for('branches.branch_pos', id=current_branch.id) }}', event)" class="so-mob-action-card" title="POS Retail Billing">
+            <div class="so-mob-action-icon">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                </svg>
+            </div>
+            <span class="so-mob-action-text">POS<br>Billing</span>
+        </a>
+        {% else %}
         <a href="/purchases/" data-no-tab="true" onclick="navigateMobileTab('/purchases/', event)" class="so-mob-action-card" title="Purchase Orders">
             <div class="so-mob-action-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
@@ -647,6 +657,7 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
             </div>
             <span class="so-mob-action-text">Purchase<br>Order</span>
         </a>
+        {% endif %}
         <a href="/inventory/" data-no-tab="true" onclick="navigateMobileTab('/inventory/', event)" class="so-mob-action-card" title="Adjust Stock">
             <div class="so-mob-action-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
@@ -657,7 +668,7 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
             </div>
             <span class="so-mob-action-text">Adjust<br>Stock</span>
         </a>
-        <a href="/transfers/" data-no-tab="true" onclick="navigateMobileTab('/transfers/', event)" class="so-mob-action-card" title="Transfer Stock">
+        <a href="{% if is_branch_mode and current_branch %}{{ url_for('branches.branch_transfers', id=current_branch.id) }}{% else %}/transfers/{% endif %}" data-no-tab="true" onclick="navigateMobileTab('{% if is_branch_mode and current_branch %}{{ url_for('branches.branch_transfers', id=current_branch.id) }}{% else %}/transfers/{% endif %}', event)" class="so-mob-action-card" title="Transfer Stock">
             <div class="so-mob-action-icon">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2">
                     <polyline points="17 1 21 5 17 9"></polyline>
@@ -695,7 +706,7 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </div>
                 <span class="so-mob-wf-name">Inventory</span>
             </a>
-            <a href="/sales" data-no-tab="true" onclick="navigateMobileTab('/sales', event)" class="so-mob-workflow-item">
+            <a href="{% if is_branch_mode and current_branch %}{{ url_for('sales_orders.list_orders', branch=current_branch.id) }}{% else %}/sales{% endif %}" data-no-tab="true" onclick="navigateMobileTab('{% if is_branch_mode and current_branch %}{{ url_for('sales_orders.list_orders', branch=current_branch.id) }}{% else %}/sales{% endif %}', event)" class="so-mob-workflow-item">
                 <div class="so-mob-wf-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                 </div>

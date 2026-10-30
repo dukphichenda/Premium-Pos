@@ -1,3 +1,4 @@
+import re
 from flask import Blueprint, render_template, jsonify, session, redirect, url_for, request
 from database import query_one, query_all
 from datetime import datetime
@@ -14,14 +15,36 @@ def index():
     user_role = session.get('role', 'main_admin')
     user_bid = session.get('branch_id')
     active_bid = session.get('active_branch_id') or (user_bid if user_role in ('branch_admin', 'branch_cashier') else None)
-    if active_bid:
+
+    # Detect mobile mode from user-agent, cookies, or query parameters
+    view_mode = request.args.get('view', '').strip().lower()
+    ua = request.headers.get('User-Agent', '')
+    is_phone_ua = bool(re.search(r'Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini', ua, re.I))
+    cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
+    is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
+
+    # Desktop PC mode: preserve dedicated branch workspace interface if active_bid
+    if not is_mobile_req and view_mode != 'table' and active_bid:
         return redirect(url_for('branches.branch_workspace', id=active_bid))
 
-    branch_scope = request.args.get('branch', 'main').strip().lower()
+    raw_branch = request.args.get('branch')
+    if raw_branch:
+        branch_scope = raw_branch.strip().lower()
+    elif active_bid:
+        branch_scope = str(active_bid)
+    else:
+        branch_scope = 'main'
 
     try:
-        # Load all active branches for store selector
-        branches = query_all("SELECT id, code, name, manager_name, phone, settings_json FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        # Load all active branches with fulfillment locations
+        branches = query_all("""
+            SELECT b.id, b.code, b.name, b.manager_name, b.phone, b.settings_json, b.location_id,
+                   l.name as location_name
+            FROM branches b
+            LEFT JOIN locations l ON b.location_id = l.id
+            WHERE b.is_active = TRUE
+            ORDER BY b.id ASC
+        """)
         import json
         for b in branches:
             raw_s = b.get('settings_json')
@@ -44,6 +67,8 @@ def index():
                 sol_filter = f"AND so.branch_id = {bid}"
                 current_store_name = f"{selected_branch['code']} - {selected_branch['name']}"
                 current_store_code = selected_branch['code']
+                if selected_branch.get('location_name'):
+                    central_wh = {'id': selected_branch.get('location_id'), 'name': selected_branch.get('location_name')}
             else:
                 branch_scope = 'main'
                 so_filter = "AND (branch_id IS NULL OR branch_id = 0)"
@@ -263,6 +288,8 @@ def index():
         current_store_name = 'Main Store (HQ)'
         current_store_code = 'HQ'
 
+    branch_active_logo = selected_branch.get('logo_url') if selected_branch else None
+
     return render_template('dashboard.html',
                            kpis=kpis,
                            low_stock_items=low_stock_items,
@@ -275,6 +302,7 @@ def index():
                            current_store_code=current_store_code,
                            store_performances=store_performances,
                            central_wh=central_wh,
+                           active_logo_url=branch_active_logo,
                            now_date_str=datetime.now().strftime('%d %b %Y'))
 
 @dashboard_bp.route('/api/dashboard/charts')

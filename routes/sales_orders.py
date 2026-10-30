@@ -576,6 +576,8 @@ def list_orders():
         # HQ (main_admin) can see main (default), specific branch, or all
         if raw_branch is not None:
             branch_filter = raw_branch.strip().lower()
+        elif session.get('active_branch_id'):
+            branch_filter = str(session.get('active_branch_id'))
         else:
             branch_filter = 'main'  # HQ default overview: Main Store (HQ)
 
