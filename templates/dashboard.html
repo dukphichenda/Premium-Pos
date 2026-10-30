@@ -615,13 +615,13 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
             <div class="so-mob-logistics-label">
                 <span>📦</span> Catalog
             </div>
-            <div class="so-mob-logistics-val">{{ kpis.total_products or 287 }} Products ▾</div>
+            <div class="so-mob-logistics-val">{{ kpis.total_products or 0 }} Products ▾</div>
         </div>
         <div class="so-mob-logistics-card">
             <div class="so-mob-logistics-label">
                 <span>📅</span> Last Updated
             </div>
-            <div class="so-mob-logistics-val">{{ now_date_str or '29 Oct 2026' }}</div>
+            <div class="so-mob-logistics-val">{{ now_date_str or '' }}</div>
         </div>
     </div>
 
@@ -713,7 +713,7 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </div>
                 <span class="so-mob-wf-name">Expenses</span>
             </a>
-            <a href="/reports/" data-no-tab="true" onclick="navigateMobileTab('/reports/', event)" class="so-mob-workflow-item">
+            <a href="/reports/list" data-no-tab="true" onclick="navigateMobileTab('/reports/list', event)" class="so-mob-workflow-item">
                 <div class="so-mob-wf-icon">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                 </div>
@@ -732,8 +732,8 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </div>
                 <span class="so-mob-kpi-label">Inventory Valuation</span>
             </div>
-            <div class="so-mob-kpi-value">${{ "{:,.4f}".format(kpis.total_inventory_value|abs) if kpis.total_inventory_value else "7,550,883.8704" }}</div>
-            <div class="so-mob-kpi-trend">&uarr; 12.5% vs last month</div>
+            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.total_inventory_value|abs if kpis and kpis.total_inventory_value is not none else 0) }}</div>
+            <div class="so-mob-kpi-trend" style="color: #64748B;">{{ "{:,.0f}".format(kpis.total_units_on_hand|abs if kpis and kpis.total_units_on_hand is not none else 0) }} units on hand</div>
         </div>
 
         <!-- Card 2: Catalog Products -->
@@ -744,8 +744,8 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </div>
                 <span class="so-mob-kpi-label">Catalog Products</span>
             </div>
-            <div class="so-mob-kpi-value">{{ kpis.total_products or 287 }}</div>
-            <div class="so-mob-kpi-trend">&uarr; 8.2% vs last month</div>
+            <div class="so-mob-kpi-value">{{ kpis.total_products or 0 }}</div>
+            <div class="so-mob-kpi-trend" style="color: #64748B;">Active catalog items</div>
         </div>
 
         <!-- Card 3: Month Sales (HQ) -->
@@ -754,10 +754,10 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 <div class="so-mob-kpi-icon mint">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
                 </div>
-                <span class="so-mob-kpi-label">Month Sales (HQ)</span>
+                <span class="so-mob-kpi-label">Month Sales ({{ current_store_code or 'HQ' }})</span>
             </div>
-            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.month_sales_total) if kpis.month_sales_total else "46,258.68" }}</div>
-            <div class="so-mob-kpi-trend">&uarr; 15.3% vs last month</div>
+            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.month_sales_total or 0) }}</div>
+            <div class="so-mob-kpi-trend" style="color: {% if kpis and kpis.sales_trend_label and kpis.sales_trend_label.startswith('↓') %}#EF4444{% else %}#1E6B52{% endif %};">{{ kpis.sales_trend_label or "Current month" }}</div>
         </div>
 
         <!-- Card 4: Receivables (HQ) -->
@@ -766,10 +766,10 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 <div class="so-mob-kpi-icon mint">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1E6B52" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v12M15 9.5a3.5 3.5 0 0 0-7 0c0 2 1.5 3 3.5 3.5s3.5 1.5 3.5 3.5a3.5 3.5 0 0 1-7 0"></path></svg>
                 </div>
-                <span class="so-mob-kpi-label">Receivables (HQ)</span>
+                <span class="so-mob-kpi-label">Receivables ({{ current_store_code or 'HQ' }})</span>
             </div>
-            <div class="so-mob-kpi-value">${{ "{:,.4f}".format(kpis.total_receivables) if kpis.total_receivables else "3,298.7499" }}</div>
-            <div class="so-mob-kpi-trend">&uarr; 6.7% vs last month</div>
+            <div class="so-mob-kpi-value">${{ "{:,.2f}".format(kpis.total_receivables or 0) }}</div>
+            <div class="so-mob-kpi-trend" style="color: #64748B;">{{ kpis.pending_sales_orders or 0 }} open orders</div>
         </div>
 
         <!-- Card 5: Low Stock Alerts -->
@@ -780,8 +780,8 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </div>
                 <span class="so-mob-kpi-label">Low Stock Alerts</span>
             </div>
-            <div class="so-mob-kpi-value" style="color: #D97706;">{{ kpis.low_stock_count or 107 }}</div>
-            <div class="so-mob-kpi-trend">&uarr; 22.4% vs last month</div>
+            <div class="so-mob-kpi-value" style="color: #D97706;">{{ kpis.low_stock_count or 0 }}</div>
+            <div class="so-mob-kpi-trend" style="color: #D97706;">Below reorder point</div>
         </div>
 
         <!-- Card 6: Procurement Inflow -->
@@ -792,8 +792,8 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 </div>
                 <span class="so-mob-kpi-label">Procurement Inflow</span>
             </div>
-            <div class="so-mob-kpi-value" style="color: #8B5CF6;">{{ kpis.pending_purchase_orders or 2 }}</div>
-            <div class="so-mob-kpi-trend">&uarr; 100% vs last month</div>
+            <div class="so-mob-kpi-value" style="color: #8B5CF6;">{{ kpis.pending_purchase_orders or 0 }}</div>
+            <div class="so-mob-kpi-trend" style="color: #8B5CF6;">Active purchase orders</div>
         </div>
     </div>
 
@@ -802,107 +802,14 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
         <div class="so-mob-chart-header">
             <div class="so-mob-chart-title">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2.2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
-                <span>Monthly Sales &amp; Profit Breakdown – Main Store (HQ)</span>
+                <span>Monthly Sales &amp; Profit Breakdown – {{ current_store_name or 'Main Store (HQ)' }}</span>
             </div>
-            <span class="so-mob-filter-chip">This 12 Months ▾</span>
+            <span class="so-mob-filter-chip">This 12 Months</span>
         </div>
 
-        <!-- SVG Bar Chart -->
-        <div class="so-mob-barchart-container">
-            <svg viewBox="0 0 540 220" class="so-mob-chart-svg" preserveAspectRatio="none" id="mobDashSalesSvg">
-                <!-- Grid lines & Y-axis labels -->
-                <g class="grid-lines" stroke="#E2E8F0" stroke-width="1" stroke-dasharray="2,2">
-                    <line x1="50" y1="20" x2="530" y2="20"></line>
-                    <line x1="50" y1="44" x2="530" y2="44"></line>
-                    <line x1="50" y1="68" x2="530" y2="68"></line>
-                    <line x1="50" y1="92" x2="530" y2="92"></line>
-                    <line x1="50" y1="116" x2="530" y2="116"></line>
-                    <line x1="50" y1="140" x2="530" y2="140"></line>
-                    <line x1="50" y1="164" x2="530" y2="164"></line>
-                    <line x1="50" y1="188" x2="530" y2="188" stroke="#CBD5E1" stroke-dasharray="0"></line>
-                </g>
-                <g font-size="9" fill="#94A3B8" text-anchor="end">
-                    <text x="44" y="23">$70,000</text>
-                    <text x="44" y="47">$60,000</text>
-                    <text x="44" y="71">$50,000</text>
-                    <text x="44" y="95">$40,000</text>
-                    <text x="44" y="119">$30,000</text>
-                    <text x="44" y="143">$20,000</text>
-                    <text x="44" y="167">$10,000</text>
-                    <text x="44" y="191">$0</text>
-                </g>
-
-                <!-- 12 Month Bars (Total Sales Blue #0284C7, Profit Green #059669) -->
-                <!-- Month 1: Nov 2025 -->
-                <rect x="58" y="132" width="13" height="56" rx="2" fill="#0284C7"></rect>
-                <rect x="73" y="160" width="13" height="28" rx="2" fill="#059669"></rect>
-
-                <!-- Month 2: Dec 2025 -->
-                <rect x="98" y="130" width="13" height="58" rx="2" fill="#0284C7"></rect>
-                <rect x="113" y="160" width="13" height="28" rx="2" fill="#059669"></rect>
-
-                <!-- Month 3: Jan 2026 -->
-                <rect x="138" y="120" width="13" height="68" rx="2" fill="#0284C7"></rect>
-                <rect x="153" y="156" width="13" height="32" rx="2" fill="#059669"></rect>
-
-                <!-- Month 4: Feb 2026 -->
-                <rect x="178" y="104" width="13" height="84" rx="2" fill="#0284C7"></rect>
-                <rect x="193" y="152" width="13" height="36" rx="2" fill="#059669"></rect>
-
-                <!-- Month 5: Mar 2026 -->
-                <rect x="218" y="118" width="13" height="70" rx="2" fill="#0284C7"></rect>
-                <rect x="233" y="158" width="13" height="30" rx="2" fill="#059669"></rect>
-
-                <!-- Month 6: Apr 2026 -->
-                <rect x="258" y="116" width="13" height="72" rx="2" fill="#0284C7"></rect>
-                <rect x="273" y="156" width="13" height="32" rx="2" fill="#059669"></rect>
-
-                <!-- Month 7: May 2026 -->
-                <rect x="298" y="102" width="13" height="86" rx="2" fill="#0284C7"></rect>
-                <rect x="313" y="150" width="13" height="38" rx="2" fill="#059669"></rect>
-
-                <!-- Month 8: Jun 2026 -->
-                <rect x="338" y="118" width="13" height="70" rx="2" fill="#0284C7"></rect>
-                <rect x="353" y="156" width="13" height="32" rx="2" fill="#059669"></rect>
-
-                <!-- Month 9: Jul 2026 -->
-                <rect x="378" y="110" width="13" height="78" rx="2" fill="#0284C7"></rect>
-                <rect x="393" y="152" width="13" height="36" rx="2" fill="#059669"></rect>
-
-                <!-- Month 10: Aug 2026 -->
-                <rect x="418" y="98" width="13" height="90" rx="2" fill="#0284C7"></rect>
-                <rect x="433" y="148" width="13" height="40" rx="2" fill="#059669"></rect>
-
-                <!-- Month 11: Sep 2026 -->
-                <rect x="458" y="98" width="13" height="90" rx="2" fill="#0284C7"></rect>
-                <rect x="473" y="146" width="13" height="42" rx="2" fill="#059669"></rect>
-
-                <!-- Month 12: Oct 2026 -->
-                <rect x="498" y="92" width="13" height="96" rx="2" fill="#0284C7"></rect>
-                <rect x="513" y="142" width="13" height="46" rx="2" fill="#059669"></rect>
-
-                <!-- X-axis Month Labels -->
-                <g font-size="7.5" fill="#64748B" text-anchor="middle">
-                    <text x="72" y="202">Nov 2025</text>
-                    <text x="112" y="202">Dec 2025</text>
-                    <text x="152" y="202">Jan 2026</text>
-                    <text x="192" y="202">Feb 2026</text>
-                    <text x="232" y="202">Mar 2026</text>
-                    <text x="272" y="202">Apr 2026</text>
-                    <text x="312" y="202">May 2026</text>
-                    <text x="352" y="202">Jun 2026</text>
-                    <text x="392" y="202">Jul 2026</text>
-                    <text x="432" y="202">Aug 2026</text>
-                    <text x="472" y="202">Sep 2026</text>
-                    <text x="512" y="202">Oct 2026</text>
-                </g>
-            </svg>
-        </div>
-
-        <!-- Chart Legend -->
-        <div class="so-mob-chart-legend">
-            <span class="legend-item"><span class="legend-dot" style="background: #0284C7;"></span> Total Sales</span>
-            <span class="legend-item"><span class="legend-dot" style="background: #059669;"></span> Profit</span>
+        <!-- Real Dynamic Monthly Chart via Chart.js -->
+        <div style="position: relative; width: 100%; height: 210px; margin-top: 10px;">
+            <canvas id="mobileRevenueTrendChart"></canvas>
         </div>
     </div>
 
@@ -913,70 +820,18 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1E293B" stroke-width="2.2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                 <span>Stock Value by Category</span>
             </div>
-            <span class="so-mob-filter-chip">By Category ▾</span>
+            <span class="so-mob-filter-chip">By Category</span>
         </div>
 
-        <div class="so-mob-donut-wrap">
-            <!-- Donut Chart Left -->
-            <div class="so-mob-donut-col">
-                <svg viewBox="0 0 150 150" class="so-mob-donut-svg">
-                    <circle cx="75" cy="75" r="50" fill="none" stroke="#38BDF8" stroke-width="18"
-                            stroke-dasharray="120.3 193.86" stroke-dashoffset="0"></circle>
-                    <circle cx="75" cy="75" r="50" fill="none" stroke="#F472B6" stroke-width="18"
-                            stroke-dasharray="60.6 253.56" stroke-dashoffset="-120.3"></circle>
-                    <circle cx="75" cy="75" r="50" fill="none" stroke="#FBBF24" stroke-width="18"
-                            stroke-dasharray="45.2 268.96" stroke-dashoffset="-180.9"></circle>
-                    <circle cx="75" cy="75" r="50" fill="none" stroke="#34D399" stroke-width="18"
-                            stroke-dasharray="31.7 282.46" stroke-dashoffset="-226.1"></circle>
-                    <circle cx="75" cy="75" r="50" fill="none" stroke="#A78BFA" stroke-width="18"
-                            stroke-dasharray="56.5 257.66" stroke-dashoffset="-257.8"></circle>
-                    <text x="75" y="72" text-anchor="middle" font-size="11" font-weight="800" fill="#1E293B">${{ "{:,.0f}".format(kpis.total_inventory_value|abs) if kpis.total_inventory_value else "7,550,883" }}</text>
-                    <text x="75" y="85" text-anchor="middle" font-size="8.5" fill="#64748B">Total Value</text>
-                </svg>
+        <div class="so-mob-donut-wrap" style="align-items: center; gap: 14px; margin-top: 10px;">
+            <!-- Real Dynamic Donut Chart Left -->
+            <div class="so-mob-donut-col" style="position: relative; width: 110px; height: 110px; flex-shrink: 0;">
+                <canvas id="mobileCategoryShareChart"></canvas>
             </div>
 
-            <!-- Legend & Category Breakdown Right -->
-            <div class="so-mob-donut-legend">
-                <div class="so-mob-donut-row">
-                    <span class="so-mob-cat-info">
-                        <span class="so-mob-donut-dot" style="background: #38BDF8;"></span>
-                        <span class="so-mob-cat-name">Food &amp; Beverage</span>
-                    </span>
-                    <span class="so-mob-cat-val">$2,890,420</span>
-                    <span class="so-mob-cat-pct">38.3%</span>
-                </div>
-                <div class="so-mob-donut-row">
-                    <span class="so-mob-cat-info">
-                        <span class="so-mob-donut-dot" style="background: #F472B6;"></span>
-                        <span class="so-mob-cat-name">Packaging</span>
-                    </span>
-                    <span class="so-mob-cat-val">$1,452,680</span>
-                    <span class="so-mob-cat-pct">19.3%</span>
-                </div>
-                <div class="so-mob-donut-row">
-                    <span class="so-mob-cat-info">
-                        <span class="so-mob-donut-dot" style="background: #FBBF24;"></span>
-                        <span class="so-mob-cat-name">Kitchen Supplies</span>
-                    </span>
-                    <span class="so-mob-cat-val">$1,086,340</span>
-                    <span class="so-mob-cat-pct">14.4%</span>
-                </div>
-                <div class="so-mob-donut-row">
-                    <span class="so-mob-cat-info">
-                        <span class="so-mob-donut-dot" style="background: #34D399;"></span>
-                        <span class="so-mob-cat-name">Cleaning Supplies</span>
-                    </span>
-                    <span class="so-mob-cat-val">$765,210</span>
-                    <span class="so-mob-cat-pct">10.1%</span>
-                </div>
-                <div class="so-mob-donut-row">
-                    <span class="so-mob-cat-info">
-                        <span class="so-mob-donut-dot" style="background: #A78BFA;"></span>
-                        <span class="so-mob-cat-name">Other</span>
-                    </span>
-                    <span class="so-mob-cat-val">$1,356,233</span>
-                    <span class="so-mob-cat-pct">18.0%</span>
-                </div>
+            <!-- Real Dynamic Category Breakdown Right -->
+            <div class="so-mob-donut-legend" id="mobileCategoryLegend">
+                <div style="font-size: 11px; color: #94A3B8; padding: 12px 0;">Loading category inventory...</div>
             </div>
         </div>
     </div>
@@ -1691,11 +1546,13 @@ html.is-mobile-view:not(.is-desktop-view) #mobDashboardNavBar {
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // If running in the top host window where direct content is emptied for MDI iframes,
-    // do not initialize charts in the host shell (the iframe loads its own charts).
+    // Check both desktop and mobile chart containers
     const trendCanvas = document.getElementById('revenueTrendChart');
     const catCanvas = document.getElementById('categoryShareChart');
-    if (!trendCanvas && !catCanvas) {
+    const mobTrendCanvas = document.getElementById('mobileRevenueTrendChart');
+    const mobCatCanvas = document.getElementById('mobileCategoryShareChart');
+
+    if (!trendCanvas && !catCanvas && !mobTrendCanvas && !mobCatCanvas) {
         if (window.initInflowTabs) {
             window.initInflowTabs({
                 type: 'home',
@@ -1712,7 +1569,14 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (!data) return;
 
-            // 1. 3-Column Monthly Financial Breakdown Chart (Total Paid Sale, Open Sale, Profit)
+            const catColors = [
+                '#0284C7', '#10B981', '#F59E0B', '#EC4899',
+                '#8B5CF6', '#06B6D4', '#64748B', '#F97316'
+            ];
+
+            // ==========================================
+            // 1. DESKTOP CHARTS
+            // ==========================================
             const currentTrendCanvas = document.getElementById('revenueTrendChart');
             if (currentTrendCanvas && typeof Chart !== 'undefined' && data.monthly_labels) {
                 if (window.revenueTrendChartInstance) {
@@ -1818,7 +1682,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // 2. Category Share Doughnut
             const currentCatCanvas = document.getElementById('categoryShareChart');
             if (currentCatCanvas && typeof Chart !== 'undefined' && data.category_labels) {
                 if (window.categoryShareChartInstance) {
@@ -1832,10 +1695,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             labels: data.category_labels,
                             datasets: [{
                                 data: data.category_values || [],
-                                backgroundColor: [
-                                    '#0284C7', '#10B981', '#6366F1', '#818CF8',
-                                    '#F59E0B', '#EC4899', '#94A3B8'
-                                ],
+                                backgroundColor: catColors.slice(0, data.category_labels.length),
                                 borderWidth: 2,
                                 borderColor: '#FFFFFF'
                             }]
@@ -1849,6 +1709,151 @@ document.addEventListener('DOMContentLoaded', () => {
                             cutout: '68%'
                         }
                     });
+                }
+            }
+
+            // ==========================================
+            // 2. MOBILE CHARTS
+            // ==========================================
+            const currentMobTrend = document.getElementById('mobileRevenueTrendChart');
+            if (currentMobTrend && typeof Chart !== 'undefined' && data.monthly_labels) {
+                if (window.mobileRevenueTrendChartInstance) {
+                    try { window.mobileRevenueTrendChartInstance.destroy(); } catch (e) {}
+                }
+                const ctxMobTrend = currentMobTrend.getContext('2d');
+                if (ctxMobTrend) {
+                    const mobTrendDatasets = [
+                        {
+                            label: 'Total Sales',
+                            data: data.monthly_revenue || data.monthly_paid || [],
+                            backgroundColor: '#0284C7',
+                            borderColor: '#0284C7',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            barPercentage: 0.85,
+                            categoryPercentage: 0.82
+                        }
+                    ];
+
+                    if (data.monthly_profit && data.monthly_profit.length > 0) {
+                        mobTrendDatasets.push({
+                            label: 'Profit',
+                            data: data.monthly_profit,
+                            backgroundColor: '#059669',
+                            borderColor: '#059669',
+                            borderWidth: 1,
+                            borderRadius: 3,
+                            barPercentage: 0.85,
+                            categoryPercentage: 0.82
+                        });
+                    }
+
+                    window.mobileRevenueTrendChartInstance = new Chart(ctxMobTrend, {
+                        type: 'bar',
+                        data: {
+                            labels: data.monthly_labels,
+                            datasets: mobTrendDatasets
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'bottom',
+                                    labels: {
+                                        usePointStyle: true,
+                                        boxWidth: 7,
+                                        padding: 10,
+                                        font: { size: 10.5, weight: '600' }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(ctx) {
+                                            return ' ' + ctx.dataset.label + ': $' + Number(ctx.parsed.y || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: val => '$' + Number(val).toLocaleString(),
+                                        font: { size: 9 }
+                                    },
+                                    grid: { color: '#F1F5F9' }
+                                },
+                                x: {
+                                    ticks: {
+                                        font: { size: 8.5 },
+                                        maxRotation: 45,
+                                        minRotation: 0
+                                    },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            const currentMobCat = document.getElementById('mobileCategoryShareChart');
+            if (currentMobCat && typeof Chart !== 'undefined' && data.category_labels) {
+                if (window.mobileCategoryShareChartInstance) {
+                    try { window.mobileCategoryShareChartInstance.destroy(); } catch (e) {}
+                }
+                const ctxMobCat = currentMobCat.getContext('2d');
+                if (ctxMobCat) {
+                    window.mobileCategoryShareChartInstance = new Chart(ctxMobCat, {
+                        type: 'doughnut',
+                        data: {
+                            labels: data.category_labels,
+                            datasets: [{
+                                data: data.category_values || [],
+                                backgroundColor: catColors.slice(0, data.category_labels.length),
+                                borderWidth: 2,
+                                borderColor: '#FFFFFF'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            cutout: '64%'
+                        }
+                    });
+                }
+            }
+
+            // Mobile Category Legend dynamic population
+            const mobLegendWrap = document.getElementById('mobileCategoryLegend');
+            if (mobLegendWrap && data.category_labels) {
+                const totalCatVal = (data.category_values || []).reduce((acc, v) => acc + (Number(v) || 0), 0);
+                if (data.category_labels.length === 0 || totalCatVal <= 0) {
+                    mobLegendWrap.innerHTML = '<div style="font-size: 11px; color: #94A3B8; padding: 10px 0;">No category inventory data</div>';
+                } else {
+                    let legendHtml = '';
+                    data.category_labels.forEach((label, idx) => {
+                        const val = Number(data.category_values[idx]) || 0;
+                        const pct = totalCatVal > 0 ? ((val / totalCatVal) * 100).toFixed(1) : '0.0';
+                        const dotColor = catColors[idx % catColors.length];
+                        const formattedVal = '$' + val.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0});
+                        legendHtml += `
+                            <div class="so-mob-donut-row">
+                                <span class="so-mob-cat-info" title="${label}">
+                                    <span class="so-mob-donut-dot" style="background: ${dotColor};"></span>
+                                    <span class="so-mob-cat-name">${label}</span>
+                                </span>
+                                <span class="so-mob-cat-val">${formattedVal}</span>
+                                <span class="so-mob-cat-pct">${pct}%</span>
+                            </div>
+                        `;
+                    });
+                    mobLegendWrap.innerHTML = legendHtml;
                 }
             }
         })

@@ -75,11 +75,21 @@ def index():
                 (SELECT COUNT(*) FROM purchase_orders WHERE status IN ('DRAFT', 'ISSUED', 'PARTIAL_RECEIVED')) as pending_purchase_orders,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date >= date_trunc('month', CURRENT_DATE) {so_filter}) as month_sales_total,
                 (SELECT COALESCE(SUM(CASE WHEN status = 'PAID' OR payment_status = 'PAID' THEN total_amount ELSE 0 END), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date >= date_trunc('month', CURRENT_DATE) {so_filter}) as month_paid_total,
+                (SELECT COALESCE(SUM(total_amount), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date >= date_trunc('month', CURRENT_DATE - INTERVAL '1 month') AND order_date < date_trunc('month', CURRENT_DATE) {so_filter}) as prev_month_sales_total,
                 (SELECT COALESCE(SUM(balance_due), 0) FROM sales_orders WHERE balance_due > 0 AND status != 'CANCELLED' {so_filter}) as total_receivables,
                 (SELECT COALESCE(SUM(total_amount), 0) FROM sales_orders WHERE status != 'CANCELLED' AND order_date = CURRENT_DATE {so_filter}) as today_sales_total,
                 (SELECT COUNT(*) FROM sales_orders WHERE status != 'CANCELLED' AND order_date = CURRENT_DATE {so_filter}) as today_sales_count,
                 (SELECT COUNT(*) FROM branches WHERE is_active = TRUE) as active_branches_count
         """)
+
+        if kpis:
+            cur_sales = float(kpis.get('month_sales_total') or 0)
+            prev_sales = float(kpis.get('prev_month_sales_total') or 0)
+            if prev_sales > 0:
+                diff_pct = round(((cur_sales - prev_sales) / prev_sales) * 100, 1)
+                kpis['sales_trend_label'] = f"↑ {diff_pct}% vs last month" if diff_pct >= 0 else f"↓ {abs(diff_pct)}% vs last month"
+            else:
+                kpis['sales_trend_label'] = "Current month"
 
         # 2. Urgent Low Stock items (top 8)
         low_stock_items = query_all("""
@@ -324,7 +334,7 @@ def chart_data():
         SELECT 
             COALESCE(c.name, 'Uncategorized') as category_name,
             COUNT(DISTINCT p.id) as product_count,
-            COALESCE(SUM(i.quantity * COALESCE(p.average_cost, p.standard_cost, 0)), 0) as total_value
+            COALESCE(SUM(GREATEST(i.quantity, 0) * COALESCE(p.average_cost, p.standard_cost, 0)), 0) as total_value
         FROM categories c
         RIGHT JOIN products p ON c.id = p.category_id
         LEFT JOIN inventory i ON p.id = i.product_id
