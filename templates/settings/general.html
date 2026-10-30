@@ -3,7 +3,8 @@
 {% block title %}Settings - inFlow Premium{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+<div class="settings-desktop-layout" id="settingsDesktopLayout">
+<div class="settings-desktop-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
     <div>
         <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">System & Company Settings</h1>
         <p style="color: #64748B; font-size: 0.88rem;">Configure business profile, currency symbol, number format, and decimal precision</p>
@@ -3039,6 +3040,409 @@
 
     </main>
 </div><!-- /.settings-page-layout -->
+</div><!-- /#settingsDesktopLayout -->
+
+<!-- =========================================================================
+     SETTINGS MOBILE APP CONTAINER (Screenshot 2: Coffee & Sand Theme)
+     ========================================================================= -->
+<div class="settings-mobile-app-container" id="settingsMobileAppContainer">
+    <!-- Top Warm Header -->
+    <header class="set-mob-header">
+        <button type="button" class="set-mob-back-btn" onclick="window.location.href='/'" aria-label="Back">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2D231B" stroke-width="2.5" stroke-linecap="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        </button>
+        <div class="set-mob-titles">
+            <h1 class="set-mob-title">System & Company Settings</h1>
+            <p class="set-mob-sub">Configure business profile, currency symbol, number format, and decimal precision</p>
+        </div>
+        <button type="button" class="set-mob-more-btn" onclick="openInflowMobileProfile()" aria-label="More Options">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D231B" stroke-width="2.5"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>
+        </button>
+    </header>
+
+    <div class="set-mob-content-scroll">
+        <!-- 1. Company Profile Card (Collapsible) -->
+        <div class="set-mob-card" id="setMobCompanyCard">
+            <div class="set-mob-card-head" onclick="toggleSetMobCard('setMobCompanyCard')">
+                <div class="set-mob-head-left">
+                    <div class="set-mob-icon-badge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+                    </div>
+                    <span class="set-mob-card-title">Company Profile</span>
+                </div>
+                <svg class="set-mob-head-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A6F66" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <div class="set-mob-card-body">
+                <form action="{{ url_for('settings.update_settings') }}" method="POST" id="setMobCompanyForm">
+                    <input type="hidden" name="active_tab" value="tabCompany">
+                    
+                    <div class="set-mob-field">
+                        <label>Company Legal Name *</label>
+                        <input type="text" name="name" value="{{ company.name or 'inFlow Premium Business' }}" required>
+                    </div>
+
+                    <div class="set-mob-row-2">
+                        <div class="set-mob-field">
+                            <label>Phone Number</label>
+                            <input type="text" name="phone" value="{{ company.phone or '098 22 22 78' }}">
+                        </div>
+                        <div class="set-mob-field">
+                            <label>Email Address</label>
+                            <input type="email" name="email" value="{{ company.email or 'info@inflow.com' }}">
+                        </div>
+                    </div>
+
+                    <div class="set-mob-field">
+                        <label>Website</label>
+                        <input type="text" name="website" value="{{ company.website or 'www.inflow.com' }}">
+                    </div>
+
+                    <div class="set-mob-field">
+                        <label>Address</label>
+                        <input type="text" name="address" value="{{ company.address or 'No. 123, Street 115, Sangkat Boeung Keng Kang' }}">
+                    </div>
+
+                    <div class="set-mob-row-2">
+                        <div class="set-mob-field">
+                            <label>City</label>
+                            <input type="text" name="city" value="{{ company.city or 'Phnom Penh' }}">
+                        </div>
+                        <div class="set-mob-field">
+                            <label>Country</label>
+                            <input type="text" name="country" value="{{ company.country or 'Cambodia' }}">
+                        </div>
+                    </div>
+
+                    <div class="set-mob-row-2">
+                        <div class="set-mob-field">
+                            <label>VAT / Tax Number</label>
+                            <input type="text" name="vat_number" value="{{ company.vat_number or '1234567890' }}">
+                        </div>
+                        <div class="set-mob-field">
+                            <label>Currency Code</label>
+                            <input type="text" name="currency_code" value="{{ company.currency_code or 'USD' }}">
+                        </div>
+                    </div>
+
+                    <div class="set-mob-field">
+                        <label>Currency Symbol</label>
+                        <input type="text" name="currency_symbol" value="{{ company.currency_symbol or '$' }}">
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 2. Settings Navigation Cards List -->
+        <div class="set-mob-nav-group">
+            <!-- 1. Pricing & Currency -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('pricing')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.4-1.3-2-3-2s-3 .6-3 1.8 3 1.2 3 2.7-1.3 2-3 2"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Pricing & Currency</div>
+                    <div class="sub">Configure pricing schemes, currency & exchange rate</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 2. Decimal Precision -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('decimals')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="17" r="1.5" fill="currentColor"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Decimal Precision</div>
+                    <div class="sub">Number format & decimals</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 3. Invoice Customization -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('invoice')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Invoice Customization</div>
+                    <div class="sub">Enter your logo & branding</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 4. Users & Permissions -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('users')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Users & Permissions</div>
+                    <div class="sub">User accounts & access roles</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 5. Backup & Restore -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('backup')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Backup & Restore</div>
+                    <div class="sub">Backup, restore & Google Drive</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 6. Import & Export Data -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('import')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Import & Export Data</div>
+                    <div class="sub">inFlow CSV: Products, Stock & Customers</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 7. Android App & Mobile UI -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('mobileapp')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Android App & Mobile UI</div>
+                    <div class="sub">Theme, mobile layout & APK</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <!-- 8. Mobile View Simulation -->
+            <div class="set-mob-nav-card" onclick="openMobSettingsSection('mobilesim')">
+                <div class="set-mob-nav-badge">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                </div>
+                <div class="set-mob-nav-info">
+                    <div class="title">Mobile View Simulation</div>
+                    <div class="sub">Live phone simulator; Sale Order & POS</div>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+        </div>
+
+        <!-- 3. Application Logo Card (Collapsible) -->
+        <div class="set-mob-card" id="setMobLogoCard">
+            <div class="set-mob-card-head" onclick="toggleSetMobCard('setMobLogoCard')">
+                <div class="set-mob-head-left">
+                    <div class="set-mob-icon-badge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                    </div>
+                    <span class="set-mob-card-title">Application Logo</span>
+                </div>
+                <svg class="set-mob-head-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A6F66" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <div class="set-mob-card-body set-mob-center-box">
+                <form action="{{ url_for('settings.update_app_logo') }}" method="POST" enctype="multipart/form-data" id="mobAppLogoForm" style="width: 100%; display: flex; flex-direction: column; align-items: center;">
+                    <div class="set-mob-logo-circle">
+                        {% if app_logo_url %}
+                        <img id="mobLogoPreviewImg" src="{{ app_logo_url }}" alt="Company Logo">
+                        {% else %}
+                        <div id="mobLogoDefaultIcon" style="font-size: 32px;">🏪</div>
+                        {% endif %}
+                    </div>
+                    <span class="set-mob-logo-lbl">Sidebar Preview</span>
+                    
+                    <label class="set-mob-btn-secondary" style="cursor: pointer; margin-bottom: 8px;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                        <span>Choose Logo File</span>
+                        <input type="file" name="app_logo_file" id="mobLogoFileInput" style="display: none;" accept="image/png, image/jpeg, image/svg+xml, image/webp, image/x-icon, image/gif" onchange="previewMobLogoFile(this)">
+                    </label>
+                    <p class="set-mob-logo-note">Supports PNG, JPG, SVG, WebP, ICO. Recommended: square, transparent PNG/SVG.</p>
+                    
+                    <div class="set-mob-logo-actions">
+                        <button type="submit" name="reset_default" value="1" class="set-mob-btn-secondary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                            <span>Reset Default</span>
+                        </button>
+                        <button type="submit" class="set-mob-btn-primary">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                            <span>Save App Logo</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 4. System Architecture Card (Collapsible) -->
+        <div class="set-mob-card" id="setMobArchCard">
+            <div class="set-mob-card-head" onclick="toggleSetMobCard('setMobArchCard')">
+                <div class="set-mob-head-left">
+                    <div class="set-mob-icon-badge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    </div>
+                    <span class="set-mob-card-title">System Architecture</span>
+                </div>
+                <svg class="set-mob-head-caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7A6F66" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </div>
+            <div class="set-mob-card-body">
+                <div class="set-mob-arch-row">
+                    <span class="lbl">Database Engine:</span>
+                    <span class="val">PostgreSQL 16</span>
+                </div>
+                <div class="set-mob-arch-row">
+                    <span class="lbl">Active Warehouses:</span>
+                    <span class="val">{{ all_branches_list|length if all_branches_list else 4 }} locations</span>
+                </div>
+                <div class="set-mob-arch-row">
+                    <span class="lbl">Total Items / Products:</span>
+                    <span class="val">{{ catalog_products|length if catalog_products else 287 }} items</span>
+                </div>
+                <div class="set-mob-arch-row">
+                    <span class="lbl">Pricing Schemes:</span>
+                    <span class="val">5 tiers</span>
+                </div>
+                <div class="set-mob-arch-row">
+                    <span class="lbl">Encoding:</span>
+                    <span class="val">UTF-8 Unicode (Khmer OK)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. Legacy Data Sync Card -->
+        <div class="set-mob-card" id="setMobSyncCard">
+            <div class="set-mob-card-head" onclick="window.location.href='{{ url_for('migration.migration_page') }}'">
+                <div class="set-mob-head-left">
+                    <div class="set-mob-icon-badge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                    </div>
+                    <span class="set-mob-card-title">Legacy Data Sync</span>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="set-mob-card-body">
+                <p class="set-mob-text-muted">Migrate or re-sync all live products, orders, and stocks from legacy inFlow SQL Server directly into PostgreSQL.</p>
+                <a href="{{ url_for('migration.migration_page') }}" class="set-mob-btn-primary" style="text-decoration: none; width: 100%; box-sizing: border-box; text-align: center; display: block;">
+                    Open inFlow SQL Sync Hub →
+                </a>
+            </div>
+        </div>
+
+        <!-- 6. Database Backup (.sql) Card -->
+        <div class="set-mob-card" id="setMobBackupCard">
+            <div class="set-mob-card-head" onclick="openCreateBackupModal()">
+                <div class="set-mob-head-left">
+                    <div class="set-mob-icon-badge">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#73533F" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    </div>
+                    <span class="set-mob-card-title">Database Backup (.sql)</span>
+                </div>
+                <svg class="chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A89B8F" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+            <div class="set-mob-card-body">
+                <div style="display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+                    <p class="set-mob-text-muted" style="margin: 0;">Export full PostgreSQL database as dated sql files, restore data, and more.</p>
+                    <button type="button" class="set-mob-badge-btn" onclick="openCreateBackupModal()">
+                        + {{ backups|length if backups else 4 }} backups
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sticky Bottom Save Button -->
+    <div class="set-mob-sticky-bottom">
+        <button type="button" class="set-mob-save-btn" onclick="submitMobCompanyForm()">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            <span>Save Settings</span>
+        </button>
+    </div>
+</div>
+
+<script>
+// =========================================================================
+// Settings Mobile View Interactive Handlers (Screenshot 2)
+// =========================================================================
+function toggleSetMobCard(cardId) {
+    const card = document.getElementById(cardId);
+    if (!card) return;
+    const body = card.querySelector('.set-mob-card-body');
+    const caret = card.querySelector('.set-mob-head-caret');
+    if (!body) return;
+    const isClosed = (body.style.display === 'none');
+    body.style.display = isClosed ? 'block' : 'none';
+    if (caret) {
+        caret.style.transform = isClosed ? 'rotate(0deg)' : 'rotate(180deg)';
+    }
+}
+
+function submitMobCompanyForm() {
+    const form = document.getElementById('setMobCompanyForm');
+    if (form) {
+        if (!form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+        form.submit();
+    }
+}
+
+function previewMobLogoFile(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            let img = document.getElementById('mobLogoPreviewImg');
+            const defIcon = document.getElementById('mobLogoDefaultIcon');
+            if (defIcon) defIcon.style.display = 'none';
+            if (!img) {
+                const circle = document.querySelector('.set-mob-logo-circle');
+                if (circle) {
+                    img = document.createElement('img');
+                    img.id = 'mobLogoPreviewImg';
+                    circle.appendChild(img);
+                }
+            }
+            if (img) {
+                img.src = e.target.result;
+                img.style.display = 'block';
+            }
+        };
+        reader.readAsDataURL(input.files[0]);
+    }
+}
+
+function openMobSettingsSection(section) {
+    if (section === 'users') {
+        if (typeof openUserModal === 'function') {
+            openUserModal();
+        } else {
+            window.location.href = '/settings?tab=tabUsers';
+        }
+    } else if (section === 'backup') {
+        if (typeof openCreateBackupModal === 'function') {
+            openCreateBackupModal();
+        } else {
+            window.location.href = '/settings?tab=tabBackup';
+        }
+    } else if (section === 'mobileapp') {
+        if (typeof openBottomBarCustomizerModal === 'function') {
+            openBottomBarCustomizerModal();
+        } else {
+            window.location.href = '/settings?tab=tabMobileSim';
+        }
+    } else if (section === 'import') {
+        window.location.href = "{{ url_for('migration.migration_page') }}";
+    } else if (section === 'pricing') {
+        window.location.href = '/settings?tab=tabPricing';
+    } else if (section === 'decimals') {
+        window.location.href = '/settings?tab=tabDecimals';
+    } else if (section === 'invoice') {
+        window.location.href = '/settings?tab=tabInvoice';
+    } else if (section === 'mobilesim') {
+        window.location.href = '/settings?tab=tabMobileSim';
+    }
+}
+</script>
 
 <!-- ============================================================== -->
 <!-- MODAL: PUBLISH LIVE UPDATE TO INSTALLED MOBILE DEVICES         -->
@@ -6535,6 +6939,353 @@ function updateTab8MiniPreview(items) {
 </script>
 
 <style>
+/* ==========================================================================
+   SETTINGS MOBILE VIEW REDESIGN (Screenshot 2: Coffee & Sand Theme)
+   ========================================================================== */
+.settings-mobile-app-container {
+    display: none !important;
+}
+
+html.is-mobile-view #settingsDesktopLayout,
+html.is-mobile-view .settings-desktop-layout,
+@media (max-width: 768px) {
+    html:not(.is-desktop-view) #settingsDesktopLayout,
+    html:not(.is-desktop-view) .settings-desktop-layout {
+        display: none !important;
+    }
+}
+
+html.is-mobile-view .settings-mobile-app-container,
+@media (max-width: 768px) {
+    html:not(.is-desktop-view) .settings-mobile-app-container {
+        display: block !important;
+        width: 100% !important;
+        min-height: 100vh !important;
+        background: #FBF8F5 !important;
+        box-sizing: border-box !important;
+        padding-bottom: 120px !important;
+    }
+}
+
+html.is-desktop-view .settings-mobile-app-container {
+    display: none !important;
+}
+html.is-desktop-view #settingsDesktopLayout,
+html.is-desktop-view .settings-desktop-layout {
+    display: block !important;
+}
+
+/* Header (Coffee / Warm Sand) */
+.set-mob-header {
+    background: #FBF8F5 !important;
+    padding: 14px 16px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 100 !important;
+    border-bottom: 1px solid #ECE4DA !important;
+}
+.set-mob-back-btn, .set-mob-more-btn {
+    background: transparent !important;
+    border: none !important;
+    color: #2D231B !important;
+    cursor: pointer !important;
+    padding: 4px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 6px !important;
+    line-height: 1 !important;
+}
+.set-mob-titles {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+.set-mob-title {
+    font-size: 17px !important;
+    font-weight: 800 !important;
+    color: #2D231B !important;
+    margin: 0 !important;
+    line-height: 1.25 !important;
+    letter-spacing: -0.01em !important;
+}
+.set-mob-sub {
+    font-size: 11.5px !important;
+    color: #7A6F66 !important;
+    margin: 2px 0 0 !important;
+    line-height: 1.35 !important;
+}
+
+/* Content Scroll Container */
+.set-mob-content-scroll {
+    padding: 14px 16px 140px 16px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 14px !important;
+}
+
+/* Cards Base */
+.set-mob-card {
+    background: #FFFFFF !important;
+    border: 1px solid #ECE4DA !important;
+    border-radius: 14px !important;
+    padding: 14px 16px !important;
+    box-shadow: 0 2px 8px rgba(115, 83, 63, 0.04) !important;
+}
+.set-mob-card-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    cursor: pointer !important;
+    user-select: none !important;
+}
+.set-mob-head-left {
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+}
+.set-mob-icon-badge {
+    width: 32px !important;
+    height: 32px !important;
+    border-radius: 8px !important;
+    background: #EFE8E1 !important;
+    color: #73533F !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+.set-mob-card-title {
+    font-size: 14.5px !important;
+    font-weight: 800 !important;
+    color: #2D231B !important;
+}
+.set-mob-head-caret {
+    color: #7A6F66 !important;
+    transition: transform 0.2s ease !important;
+}
+.set-mob-card-body {
+    margin-top: 14px !important;
+}
+
+/* Fields & Inputs */
+.set-mob-field {
+    margin-bottom: 11px !important;
+}
+.set-mob-field label {
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    color: #6E5F54 !important;
+    margin-bottom: 4px !important;
+    display: block !important;
+}
+.set-mob-field input {
+    width: 100% !important;
+    padding: 8px 12px !important;
+    border: 1px solid #E6DFD7 !important;
+    border-radius: 8px !important;
+    font-size: 13.5px !important;
+    color: #2D231B !important;
+    background: #FFFFFF !important;
+    box-sizing: border-box !important;
+    outline: none !important;
+    transition: border-color 0.15s ease !important;
+}
+.set-mob-field input:focus {
+    border-color: #73533F !important;
+    box-shadow: 0 0 0 2px rgba(115, 83, 63, 0.12) !important;
+}
+.set-mob-row-2 {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 10px !important;
+}
+
+/* 8 Settings Nav Cards */
+.set-mob-nav-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+}
+.set-mob-nav-card {
+    background: #FFFFFF !important;
+    border: 1px solid #ECE4DA !important;
+    border-radius: 12px !important;
+    padding: 12px 14px !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    cursor: pointer !important;
+    box-shadow: 0 2px 6px rgba(115, 83, 63, 0.03) !important;
+    transition: transform 0.15s ease, border-color 0.15s ease !important;
+}
+.set-mob-nav-badge {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 50% !important;
+    background: #EFE8E1 !important;
+    color: #73533F !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex-shrink: 0 !important;
+}
+.set-mob-nav-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+}
+.set-mob-nav-info .title {
+    font-size: 13.5px !important;
+    font-weight: 700 !important;
+    color: #2D231B !important;
+    line-height: 1.25 !important;
+}
+.set-mob-nav-info .sub {
+    font-size: 11.5px !important;
+    color: #7A6F66 !important;
+    margin-top: 2px !important;
+    line-height: 1.3 !important;
+}
+
+/* App Logo Card */
+.set-mob-center-box {
+    text-align: center !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+}
+.set-mob-logo-circle {
+    width: 68px !important;
+    height: 68px !important;
+    border-radius: 50% !important;
+    background: #EFE8E1 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 4px auto 6px auto !important;
+    overflow: hidden !important;
+    border: 2px solid #DFD5CA !important;
+}
+.set-mob-logo-circle img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
+}
+.set-mob-logo-lbl {
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    color: #6E5F54 !important;
+    margin-bottom: 12px !important;
+    display: block !important;
+}
+.set-mob-btn-secondary {
+    background: #EFE8E1 !important;
+    color: #73533F !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    border: 1px solid #DFD5CA !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    cursor: pointer !important;
+}
+.set-mob-btn-primary {
+    background: #73533F !important;
+    color: #FFFFFF !important;
+    font-size: 12.5px !important;
+    font-weight: 700 !important;
+    border: none !important;
+    border-radius: 8px !important;
+    padding: 8px 16px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 6px !important;
+    cursor: pointer !important;
+}
+.set-mob-logo-note {
+    font-size: 11px !important;
+    color: #7A6F66 !important;
+    margin: 8px 0 12px 0 !important;
+    line-height: 1.35 !important;
+    max-width: 280px !important;
+}
+.set-mob-logo-actions {
+    display: flex !important;
+    gap: 10px !important;
+    width: 100% !important;
+}
+.set-mob-logo-actions button {
+    flex: 1 !important;
+}
+
+/* System Arch Card */
+.set-mob-arch-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 6px 0 !important;
+    border-bottom: 1px solid #F3EEE9 !important;
+    font-size: 12.5px !important;
+}
+.set-mob-arch-row:last-child {
+    border-bottom: none !important;
+}
+.set-mob-arch-row .lbl { color: #6E5F54 !important; font-weight: 600 !important; }
+.set-mob-arch-row .val { color: #2D231B !important; font-weight: 700 !important; }
+
+/* Text Muted */
+.set-mob-text-muted {
+    font-size: 12px !important;
+    color: #7A6F66 !important;
+    line-height: 1.45 !important;
+    margin: 0 0 10px 0 !important;
+}
+.set-mob-badge-btn {
+    background: #EFE8E1 !important;
+    color: #73533F !important;
+    font-size: 11.5px !important;
+    font-weight: 700 !important;
+    padding: 4px 10px !important;
+    border-radius: 12px !important;
+    border: 1px solid #DFD5CA !important;
+    white-space: nowrap !important;
+    cursor: pointer !important;
+}
+
+/* Sticky Bottom Save Button */
+.set-mob-sticky-bottom {
+    position: fixed !important;
+    bottom: 60px !important;
+    left: 0 !important;
+    right: 0 !important;
+    background: rgba(251, 248, 245, 0.96) !important;
+    backdrop-filter: blur(8px) !important;
+    padding: 10px 16px !important;
+    border-top: 1px solid #ECE4DA !important;
+    z-index: 99 !important;
+}
+.set-mob-save-btn {
+    width: 100% !important;
+    background: #73533F !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 10px !important;
+    padding: 12px !important;
+    font-size: 14px !important;
+    font-weight: 800 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    cursor: pointer !important;
+    box-shadow: 0 4px 14px rgba(115, 83, 63, 0.3) !important;
+}
+
 /* Settings Page Layout with Side Bar Tabs */
 .settings-page-layout {
     display: grid;
