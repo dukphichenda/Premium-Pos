@@ -558,10 +558,16 @@ def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, se
 @sales_orders_bp.route('/sales/orders', strict_slashes=False)
 @sales_orders_bp.route('/sales/list', strict_slashes=False)
 def list_orders():
-    view_mode = request.args.get('view', '').strip()
+    view_mode = request.args.get('view', '').strip().lower()
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
     raw_branch = request.args.get('branch')
+
+    # Detect mobile mode from user-agent, cookies, or query parameters
+    ua = request.headers.get('User-Agent', '')
+    is_phone_ua = bool(re.search(r'Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini', ua, re.I))
+    cookie_mode = request.cookies.get('inflow_view_mode', '').strip().lower()
+    is_mobile_req = (view_mode == 'mobile') or (cookie_mode == 'mobile' and view_mode != 'desktop') or (is_phone_ua and view_mode != 'desktop' and cookie_mode != 'desktop')
 
     if not is_main:
         # Branch users are strictly locked to their assigned branch: cannot view HQ or other branches!
@@ -573,8 +579,6 @@ def list_orders():
         else:
             branch_filter = 'main'  # HQ default overview: Main Store (HQ)
 
-    # Standalone table view deprecated per user instructions;
-    # redirect directly to Sales Order workspace with modern sidebar.
     status_filter = request.args.get('status_filter') or request.args.get('status') or 'Open'
     date_filter = request.args.get('date_filter') or 'All'
     search = (request.args.get('search') or request.args.get('q') or '').strip()
@@ -587,22 +591,33 @@ def list_orders():
     else:
         session['so_search_query'] = search
 
-    latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=search, customer_id=customer_id)
+    # Desktop PC view: Preserve direct workspace with modern sidebar unless user requested table/mobile view
+    if not is_mobile_req and view_mode not in ('table', 'list'):
+        latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=search, customer_id=customer_id)
+        if latest:
+            redirect_kwargs = {'id': latest['id'], 'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter, '_from_list': '1'}
+            if 'search' in request.args or 'q' in request.args:
+                redirect_kwargs['search'] = search
+            if customer_id:
+                redirect_kwargs['customer_id'] = customer_id
+            return redirect(url_for('sales_orders.detail_order', **redirect_kwargs))
 
-    if latest:
-        redirect_kwargs = {'id': latest['id'], 'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter, '_from_list': '1'}
+        new_kwargs = {'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter}
         if 'search' in request.args or 'q' in request.args:
-            redirect_kwargs['search'] = search
+            new_kwargs['search'] = search
         if customer_id:
-            redirect_kwargs['customer_id'] = customer_id
-        return redirect(url_for('sales_orders.detail_order', **redirect_kwargs))
+            new_kwargs['customer_id'] = customer_id
+        return redirect(url_for('sales_orders.new_order', **new_kwargs))
 
-    new_kwargs = {'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter}
-    if 'search' in request.args or 'q' in request.args:
-        new_kwargs['search'] = search
-    if customer_id:
-        new_kwargs['customer_id'] = customer_id
-    return redirect(url_for('sales_orders.new_order', **new_kwargs))
+    # Mobile view or table view: Query orders list for sales/list.html
+    page = int(request.args.get('page', 1))
+    per_page = int(request.args.get('per_page', 120 if is_mobile_req else 25))
+    offset = (page - 1) * per_page
+
+    status = request.args.get('status', '').strip()
+    payment_status = request.args.get('payment_status', '').strip()
+    where_clauses = ["1=1"]
+    params = []
 
 
     if not is_main:
@@ -674,6 +689,8 @@ def list_orders():
             so.total_amount, so.paid_amount, so.balance_due,
             so.sales_rep, so.tracking_number, so.branch_id,
             so.payment_method, so.completed_by,
+            so.created_at,
+            TO_CHAR(COALESCE(so.created_at, so.order_date::timestamp), 'DD Mon YYYY') || ' · ' || TO_CHAR(COALESCE(so.created_at, so.order_date::timestamp), 'HH12:MI AM') as formatted_datetime,
             b.name as branch_name, b.code as branch_code,
             c.name as customer_name,
             c.phone as customer_phone,
@@ -685,7 +702,7 @@ def list_orders():
         LEFT JOIN locations l ON so.location_id = l.id
         LEFT JOIN sales_order_lines sol ON so.id = sol.sales_order_id
         WHERE {where_sql}
-        GROUP BY so.id, b.name, b.code, c.name, c.phone, l.name, so.payment_method, so.completed_by
+        GROUP BY so.id, b.name, b.code, c.name, c.phone, l.name, so.payment_method, so.completed_by, so.created_at
         ORDER BY so.order_date DESC, so.id DESC
         LIMIT %s OFFSET %s
     """
