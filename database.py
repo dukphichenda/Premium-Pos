@@ -671,6 +671,8 @@ def init_db():
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS tax_number VARCHAR(100);")
                 cur.execute("ALTER TABLE customers ADD COLUMN IF NOT EXISTS branch_id INTEGER;")
                 cur.execute("ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS submission_token VARCHAR(64);")
+                cur.execute("ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS completed_by VARCHAR(100);")
+                cur.execute("ALTER TABLE sales_orders ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP WITH TIME ZONE;")
                 cur.execute("CREATE INDEX IF NOT EXISTS idx_sales_orders_sub_token ON sales_orders(submission_token);")
                 cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_unit VARCHAR(50) DEFAULT 'ប្រអប់';")
                 cur.execute("ALTER TABLE products ADD COLUMN IF NOT EXISTS price_card_custom_detail TEXT DEFAULT NULL;")

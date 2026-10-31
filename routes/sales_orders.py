@@ -2430,6 +2430,24 @@ def detail_order(id):
         else:
             order['sales_rep'] = raw_rep
 
+    # Format completion date/time if completed
+    completed_dt = order.get('completed_at') or (order.get('invoiced_date') if order.get('completed_by') else None) or (order.get('updated_at') if order.get('completed_by') else None)
+    if completed_dt and hasattr(completed_dt, 'strftime'):
+        order['completed_at_formatted'] = completed_dt.strftime('%d-%b-%Y %I:%M %p')
+    elif completed_dt:
+        try:
+            from datetime import datetime
+            if isinstance(completed_dt, str):
+                dt_clean = completed_dt.split('.')[0].replace('T', ' ')
+                dt_obj = datetime.strptime(dt_clean[:19], '%Y-%m-%d %H:%M:%S')
+                order['completed_at_formatted'] = dt_obj.strftime('%d-%b-%Y %I:%M %p')
+            else:
+                order['completed_at_formatted'] = str(completed_dt)
+        except Exception:
+            order['completed_at_formatted'] = str(completed_dt)
+    else:
+        order['completed_at_formatted'] = ''
+
     if 'date_filter' in request.args:
         date_filter = request.args.get('date_filter') or 'All'
         session['so_date_filter'] = date_filter
@@ -3237,7 +3255,8 @@ def save_order(id=0):
                             status = %s, payment_status = %s, invoiced_date = CURRENT_TIMESTAMP,
                             shipped_date = CURRENT_DATE,
                             payment_method = %s,
-                            completed_by = %s
+                            completed_by = %s,
+                            completed_at = CURRENT_TIMESTAMP
                         WHERE id = %s
                     """, (subtotal, total_amount, paid_amount, balance_due, status, payment_status, pay_method, user_login_name, id))
                     if total_amount > 0:
@@ -3409,6 +3428,7 @@ def complete_pay(id):
                 balance_due = 0,
                 payment_method = %s,
                 completed_by = %s,
+                completed_at = CURRENT_TIMESTAMP,
                 shipped_date = COALESCE(shipped_date, CURRENT_DATE),
                 invoiced_date = COALESCE(invoiced_date, CURRENT_TIMESTAMP),
                 updated_at = CURRENT_TIMESTAMP
@@ -3477,11 +3497,13 @@ def complete_pay(id):
         logger.warning(f"Failed to record version on complete: {ve}")
 
     if request.is_json:
+        from datetime import datetime as _dt
         return jsonify({
             'success': True,
             'message': f"Order {order['order_number']} completed and marked paid by {payment_method} (Completed by: {user_login_name})!",
             'payment_method': payment_method,
             'completed_by': user_login_name,
+            'completed_at_formatted': _dt.now().strftime('%d-%b-%Y %I:%M %p'),
             'status': 'PAID',
             'payment_status': 'PAID',
             'order_id': id,
@@ -3528,6 +3550,7 @@ def reopen_order(id):
                 paid_amount = 0,
                 balance_due = total_amount,
                 completed_by = NULL,
+                completed_at = NULL,
                 updated_at = CURRENT_TIMESTAMP
             WHERE id = %s
         """, (id,))

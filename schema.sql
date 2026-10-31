@@ -322,6 +322,8 @@ CREATE TABLE IF NOT EXISTS sales_orders (
     paid_amount NUMERIC(16, 4) DEFAULT 0,
     balance_due NUMERIC(16, 4) DEFAULT 0,
     sales_rep VARCHAR(100),
+    completed_by VARCHAR(100),
+    completed_at TIMESTAMP WITH TIME ZONE,
     po_number VARCHAR(100),
     carrier VARCHAR(100),
     tracking_number VARCHAR(100),
