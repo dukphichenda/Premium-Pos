@@ -57,5 +57,31 @@ class TestSoCompletedAtAndRearrange(unittest.TestCase):
             self.assertIn('soCompletedDateUnderBiller', html)
             self.assertIn(order['completed_by'], html)
 
+    def test_desktop_so_layout_hierarchy(self):
+        resp = self.client.get('/sales/new')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Verify ordering: so-modern-main-split -> so-main-left -> so-card-grid-top -> so-card-items -> so-bottom-cards-grid -> so-main-right
+        idx_split = html.find('class="so-modern-main-split"')
+        idx_left = html.find('class="so-main-left"')
+        idx_top_grid = html.find('class="so-card-grid-top"')
+        idx_items = html.find('class="so-card so-card-items"')
+        idx_table = html.find('id="lineItemsTable"')
+        idx_bottom = html.find('class="so-bottom-cards-grid"')
+        idx_right = html.find('class="so-main-right"')
+
+        self.assertTrue(idx_split != -1, "so-modern-main-split must exist")
+        self.assertTrue(idx_left != -1, "so-main-left must exist")
+        self.assertTrue(idx_top_grid != -1, "so-card-grid-top must exist")
+        self.assertTrue(idx_items != -1, "so-card-items must exist")
+        self.assertTrue(idx_table != -1, "lineItemsTable must exist")
+        self.assertTrue(idx_bottom != -1, "so-bottom-cards-grid must exist")
+        self.assertTrue(idx_right != -1, "so-main-right must exist")
+
+        self.assertTrue(idx_split < idx_left < idx_top_grid < idx_items < idx_table < idx_bottom < idx_right,
+                        "Elements must follow strict layout hierarchy")
+
 if __name__ == '__main__':
     unittest.main()
+
