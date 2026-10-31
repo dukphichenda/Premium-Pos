@@ -1077,7 +1077,10 @@ async function onNextStep() {
             banner.style.background = '#F0FDF4';
             banner.style.border = '1px solid #BBF7D0';
             banner.style.color = '#15803D';
-            banner.innerHTML = `ℹ️ <span><strong>Safe Mode:</strong> Keep existing ${escapeHtml(selText)} records and add / update chosen orders.</span>`;
+            const isOrderType = (dataType === 'sales_order' || dataType === 'purchase_order');
+            banner.innerHTML = isOrderType
+                ? `ℹ️ <span><strong>Safe Mode:</strong> Keep existing ${escapeHtml(selText)} records and add / update chosen orders.</span>`
+                : `ℹ️ <span><strong>Safe Mode:</strong> Keep existing ${escapeHtml(selText)} records and add / update records.</span>`;
         }
 
         const winBox = document.querySelector('.inflow-win-window');
@@ -1666,14 +1669,16 @@ async function onExecuteImport() {
         formData.append('branch_id', branchEl.value);
     }
 
+    const isOrderType = (dataType === 'sales_order' || dataType === 'purchase_order');
+
     // If Keep mode and no actionable orders exist, alert user
-    if (currentImportMode === 'keep' && (!currentOrdersSummary || currentOrdersSummary.length === 0)) {
+    if (isOrderType && currentImportMode === 'keep' && (!currentOrdersSummary || currentOrdersSummary.length === 0)) {
         alert('All orders in this CSV file are already up to date in the database.\n\nNo new orders or status updates to import.');
         return;
     }
 
     // If order selection is active, gather selected orders across all pages
-    if (currentOrdersSummary && currentOrdersSummary.length > 0) {
+    if (isOrderType && currentOrdersSummary && currentOrdersSummary.length > 0) {
         const selectedOrders = currentOrdersSummary.filter(o => o.is_selected).map(o => o.order_number);
         if (selectedOrders.length === 0) {
             alert('Please select at least one order to import, or click Cancel.');

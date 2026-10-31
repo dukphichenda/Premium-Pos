@@ -197,7 +197,7 @@ def export_data_to_csv(data_type, branch_id=None):
             ])
 
     elif key == 'customer':
-        if str(branch_id).strip().lower() == 'all' or branch_id is None:
+        if str(branch_id).strip().lower() == 'all':
             rows = query_all("""
                 SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance, remarks
                 FROM customers
@@ -215,7 +215,7 @@ def export_data_to_csv(data_type, branch_id=None):
             rows = query_all("""
                 SELECT name, contact_name, phone, email, address1, city, country, payment_terms, balance, remarks
                 FROM customers
-                WHERE is_active = TRUE
+                WHERE is_active = TRUE AND branch_id IS NULL
                 ORDER BY name ASC;
             """)
         for r in rows:
@@ -1012,16 +1012,35 @@ def preview_import_data(data_type, file_content, has_headers=True, import_mode='
                         if val != '':
                             return val
             if norm_headers and norm_headers[0].startswith('column'):
-                pos_map = {
-                    'ordernumber': 0, 'orderstatus': 1, 'customer': 2, 'contactname': 3,
-                    'phone': 4, 'email': 5, 'billingaddress1': 6, 'billingaddress2': 7,
-                    'billingcity': 8, 'orderdate': 9, 'itemcode': 10, 'itemname': 11,
-                    'itemquantity': 12, 'itemunitprice': 13, 'itemsubtotal': 14
-                } if key == 'sales_order' else {
-                    'ordernumber': 0, 'orderstatus': 1, 'vendor': 2, 'orderdate': 3,
-                    'itemcode': 4, 'itemdescription': 5, 'itemquantity': 6, 'itemunitcost': 7,
-                    'itemsubtotal': 8
-                }
+                if key == 'customer':
+                    pos_map = {
+                        'name': 0, 'customername': 0, 'customer': 0,
+                        'contactname': 1, 'contact': 1,
+                        'phone': 2,
+                        'fax': 3,
+                        'email': 4,
+                        'website': 5,
+                        'address1': 6, 'address': 6, 'billingaddress1': 6,
+                        'address2': 7, 'billingaddress2': 7,
+                        'city': 8, 'billingcity': 8,
+                        'state': 9, 'billingstate': 9,
+                        'country': 10, 'billingcountry': 10,
+                        'postalcode': 11, 'zip': 11,
+                        'remarks': 12, 'notes': 12
+                    }
+                elif key == 'sales_order':
+                    pos_map = {
+                        'ordernumber': 0, 'orderstatus': 1, 'customer': 2, 'contactname': 3,
+                        'phone': 4, 'email': 5, 'billingaddress1': 6, 'billingaddress2': 7,
+                        'billingcity': 8, 'orderdate': 9, 'itemcode': 10, 'itemname': 11,
+                        'itemquantity': 12, 'itemunitprice': 13, 'itemsubtotal': 14
+                    }
+                else:
+                    pos_map = {
+                        'ordernumber': 0, 'orderstatus': 1, 'vendor': 2, 'orderdate': 3,
+                        'itemcode': 4, 'itemdescription': 5, 'itemquantity': 6, 'itemunitcost': 7,
+                        'itemsubtotal': 8
+                    }
                 for target in norm_aliases:
                     if target in pos_map and pos_map[target] < len(row):
                         val = row[pos_map[target]].strip()
@@ -1381,16 +1400,35 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
                     if val != '':
                         return val
         if norm_headers and norm_headers[0].startswith('column'):
-            pos_map = {
-                'ordernumber': 0, 'orderstatus': 1, 'customer': 2, 'contactname': 3,
-                'phone': 4, 'email': 5, 'billingaddress1': 6, 'billingaddress2': 7,
-                'billingcity': 8, 'orderdate': 9, 'itemcode': 10, 'itemname': 11,
-                'itemquantity': 12, 'itemunitprice': 13, 'itemsubtotal': 14
-            } if key == 'sales_order' else {
-                'ordernumber': 0, 'orderstatus': 1, 'vendor': 2, 'orderdate': 3,
-                'itemcode': 4, 'itemdescription': 5, 'itemquantity': 6, 'itemunitcost': 7,
-                'itemsubtotal': 8
-            }
+            if key == 'customer':
+                pos_map = {
+                    'name': 0, 'customername': 0, 'customer': 0,
+                    'contactname': 1, 'contact': 1,
+                    'phone': 2,
+                    'fax': 3,
+                    'email': 4,
+                    'website': 5,
+                    'address1': 6, 'address': 6, 'billingaddress1': 6,
+                    'address2': 7, 'billingaddress2': 7,
+                    'city': 8, 'billingcity': 8,
+                    'state': 9, 'billingstate': 9,
+                    'country': 10, 'billingcountry': 10,
+                    'postalcode': 11, 'zip': 11,
+                    'remarks': 12, 'notes': 12
+                }
+            elif key == 'sales_order':
+                pos_map = {
+                    'ordernumber': 0, 'orderstatus': 1, 'customer': 2, 'contactname': 3,
+                    'phone': 4, 'email': 5, 'billingaddress1': 6, 'billingaddress2': 7,
+                    'billingcity': 8, 'orderdate': 9, 'itemcode': 10, 'itemname': 11,
+                    'itemquantity': 12, 'itemunitprice': 13, 'itemsubtotal': 14
+                }
+            else:
+                pos_map = {
+                    'ordernumber': 0, 'orderstatus': 1, 'vendor': 2, 'orderdate': 3,
+                    'itemcode': 4, 'itemdescription': 5, 'itemquantity': 6, 'itemunitcost': 7,
+                    'itemsubtotal': 8
+                }
             for target in norm_aliases:
                 if target in pos_map and pos_map[target] < len(row):
                     val = row[pos_map[target]].strip()
@@ -1500,57 +1538,91 @@ def execute_import_data(data_type, file_content, has_headers=True, import_mode='
     # 2. CUSTOMER IMPORT
     # =========================================================================
     elif key == 'customer':
+        def _norm_k(s):
+            return re.sub(r'[\u200b-\u200f\ufeff\s]+', ' ', str(s or '')).strip().lower()
+
         if bid is not None:
-            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id = %s;", (bid,))}
+            cust_rows = query_all("SELECT id, name FROM customers WHERE branch_id = %s;", (bid,))
         else:
-            cust_map = {c['name'].lower().strip(): c['id'] for c in query_all("SELECT id, name FROM customers WHERE branch_id IS NULL;")}
+            cust_rows = query_all("SELECT id, name FROM customers WHERE branch_id IS NULL;")
+        cust_map = {_norm_k(c['name']): c['id'] for c in cust_rows if c.get('name')}
+
         with get_db_cursor(commit=True) as cur:
             for row_idx, r in enumerate(data_rows, start=2 if has_headers else 1):
-                name = get_val(r, ['Customer Name', 'CustomerName', 'Customer', 'Name', 'Company Name'])
-                contact = get_val(r, ['Contact Name', 'ContactName', 'Contact', 'Contact Person'])
-                phone = get_val(r, ['Phone', 'Telephone', 'Mobile'])
-                email = get_val(r, ['Email', 'Email Address'])
-                address = get_val(r, ['Address', 'BillingAddress1', 'Billing Address', 'Street'])
-                city = get_val(r, ['City', 'BillingCity'])
-                country = get_val(r, ['Country', 'BillingCountry'], 'Cambodia')
-                terms = get_val(r, ['Payment Terms', 'PaymentTerms', 'Terms'], 'Due on Receipt')
+                name = get_val(r, ['Customer Name', 'CustomerName', 'Customer', 'Name', 'Company Name', 'Customer Company', 'Company', 'ឈ្មោះអតិថិជន', 'ឈ្មោះ'])
+                contact = get_val(r, ['Contact Name', 'ContactName', 'Contact', 'Contact Person', 'Attn', 'Attention', 'អ្នកទំនាក់ទំនង'])
+                phone = get_val(r, ['Phone', 'Phone Number', 'PhoneNumber', 'Telephone', 'Mobile', 'Mobile Number', 'Customer Phone', 'CustomerPhone', 'Contact Phone', 'Tel', 'Phone 1', 'Phone1', 'MobilePhone', 'Customer Mobile', 'លេខទូរស័ព្ទ', 'ទូរស័ព្ទ'])
+                fax = get_val(r, ['Fax', 'Fax Number', 'Customer Fax', 'Telephone Fax'])
+                email = get_val(r, ['Email', 'Email Address', 'Customer Email', 'CustomerEmail', 'E-mail', 'អ៊ីមែល'])
+                website = get_val(r, ['Website', 'Web', 'URL', 'HomePage'])
+                tax_number = get_val(r, ['Tax Number', 'TaxNumber', 'VAT Number', 'VATNumber', 'Tax ID', 'TaxID'])
+                address1 = get_val(r, ['Address1', 'Address 1', 'CustomerAddress1', 'Customer Address 1', 'Address', 'BillingAddress1', 'Billing Address 1', 'Billing Address', 'Street', 'Street1', 'Customer Street', 'អាសយដ្ឋាន១', 'អាសយដ្ឋាន'])
+                address2 = get_val(r, ['Address2', 'Address 2', 'CustomerAddress2', 'Customer Address 2', 'BillingAddress2', 'Billing Address 2', 'Street2', 'អាសយដ្ឋាន២'])
+                city = get_val(r, ['City', 'BillingCity', 'Billing City', 'City1', 'ទីក្រុង'])
+                state = get_val(r, ['State', 'Province', 'BillingState', 'Billing State', 'Region', 'រាជធានី/ខេត្ត'])
+                country = get_val(r, ['Country', 'BillingCountry', 'Billing Country', 'ប្រទេស'], 'Cambodia')
+                postal_code = get_val(r, ['PostalCode', 'Postal Code', 'Zip', 'ZipCode', 'BillingPostalCode', 'Billing Zip', 'Postal'])
+                terms = get_val(r, ['Payment Terms', 'PaymentTerms', 'Terms', 'លក្ខខណ្ឌបង់ប្រាក់'], 'Due on Receipt')
+                remarks = get_val(r, ['Remarks', 'Notes', 'Comment', 'Comments', 'Customer Remarks', 'សម្គាល់', 'ចំណាំ'])
+
                 if not name and not contact and not phone:
                     errors.append(f"Row {row_idx}: Missing customer name.")
                     continue
 
                 # Auto-resolve phone and customer name
-                name, contact, phone = resolve_customer_phone_and_name(name, contact, phone, address)
+                name, contact, phone = resolve_customer_phone_and_name(name, contact, phone, address1 or address2, remarks)
                 if not name:
                     name = phone or 'Customer'
 
+                clean_name = re.sub(r'[\u200b-\u200f\ufeff]', '', name).strip()
+                norm_key = _norm_k(clean_name)
+
                 existing_id = None
                 if not is_erase_mode:
-                    existing_id = cust_map.get(name.lower().strip())
+                    existing_id = cust_map.get(norm_key)
 
                 if existing_id:
                     cur.execute("""
                         UPDATE customers
                         SET contact_name = COALESCE(NULLIF(%s, ''), contact_name),
                             phone = COALESCE(NULLIF(%s, ''), phone),
+                            fax = COALESCE(NULLIF(%s, ''), fax),
                             email = COALESCE(NULLIF(%s, ''), email),
+                            website = COALESCE(NULLIF(%s, ''), website),
+                            tax_number = COALESCE(NULLIF(%s, ''), tax_number),
                             address1 = COALESCE(NULLIF(%s, ''), address1),
+                            address2 = COALESCE(NULLIF(%s, ''), address2),
+                            shipping_address = COALESCE(NULLIF(%s, ''), shipping_address),
+                            billing_address = COALESCE(NULLIF(%s, ''), billing_address),
                             city = COALESCE(NULLIF(%s, ''), city),
+                            state = COALESCE(NULLIF(%s, ''), state),
                             country = COALESCE(NULLIF(%s, ''), country),
+                            postal_code = COALESCE(NULLIF(%s, ''), postal_code),
                             payment_terms = COALESCE(NULLIF(%s, ''), payment_terms),
+                            remarks = COALESCE(NULLIF(%s, ''), remarks),
                             branch_id = %s,
                             updated_at = CURRENT_TIMESTAMP
                         WHERE id = %s;
-                    """, (contact, phone, email, address, city, country, terms, bid, existing_id))
+                    """, (contact, phone, fax, email, website, tax_number, address1, address2, address1, address1, city, state, country, postal_code, terms, remarks, bid, existing_id))
                     updated_cnt += 1
                 else:
+                    full_addr = address1 or address2 or ''
                     cur.execute("""
-                        INSERT INTO customers (name, contact_name, phone, email, address1, city, country, payment_terms, branch_id, is_active)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
+                        INSERT INTO customers (
+                            name, contact_name, phone, fax, email, website, tax_number,
+                            address1, address2, shipping_address, billing_address,
+                            city, state, country, postal_code,
+                            payment_terms, remarks, branch_id, is_active
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, TRUE)
                         RETURNING id;
-                    """, (name, contact, phone, email, address, city, country, terms, bid))
+                    """, (clean_name, contact, phone, fax, email, website, tax_number, address1, address2, full_addr, full_addr, city, state, country, postal_code, terms, remarks, bid))
                     new_id = cur.fetchone()['id']
-                    cust_map[name.lower().strip()] = new_id
+                    cust_map[norm_key] = new_id
                     imported_cnt += 1
+
+            # Resynchronize sequences
+            resync_all_sequences(cur=cur)
 
     # =========================================================================
     # 3. VENDOR IMPORT
