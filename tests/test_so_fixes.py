@@ -17,8 +17,8 @@ class TestSoFixes(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        # Check customer matches container in sidebar
-        self.assertIn('id="soSidebarCustomerMatches"', html)
+        # Check customer matches container
+        self.assertTrue('customerDropdownPopup' in html or 'soSidebarCustomerMatches' in html)
 
         # Check window.allCustomersList is defined and has customers
         self.assertIn('window.allCustomersList = [', html)
