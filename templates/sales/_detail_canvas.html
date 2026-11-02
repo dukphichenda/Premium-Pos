@@ -29,12 +29,6 @@
             margin: 0 auto !important;
             display: block !important;
         }
-        @media (max-width: 1024px) {
-            html.is-mobile-view .so-main-left,
-            html.is-mobile-view .so-card-items {
-                width: 100% !important;
-            }
-        }
         .so-card {
             background: #FFFFFF !important;
             border: 1px solid #E2E8F0 !important;
@@ -4129,365 +4123,62 @@
             <input type="hidden" name="cod_amount" id="hiddenFormCodAmount" value="{{ '%.2f'|format(order.get('cod_amount') if (order and order.get('cod_amount') is not none) else 0.0) }}">
 
             <div class="so-modern-canvas">
-                
-                <!-- ================= Mobile Redesign Section (#soMobileContainer) ================= -->
-                <div id="soMobileContainer" class="so-mobile-redesign-container w-full max-w-md mx-auto flex flex-col min-h-screen relative shadow-md bg-slate-100 text-slate-800 font-sans antialiased">
-                    <!-- BEGIN: MobileHeader -->
-                    <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-2xs">
-                        <!-- Status & Quick Navigation Bar -->
-                        <div class="flex items-center justify-between px-3.5 py-2.5 bg-slate-50/70 border-b border-slate-100">
-                            <div class="flex items-center gap-2">
-                                <button type="button" id="open-queue-btn" class="inline-flex items-center gap-1.5 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition shadow-2xs cursor-pointer active:scale-95" title="Open Bills Queue">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="layout-grid" class="lucide lucide-layout-grid w-3.5 h-3.5"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></svg>
-                                    <span>Bills</span>
-                                    <span class="bg-emerald-600 text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full" id="mobileHeaderBillsBadge">{{ status_counts.total if status_counts and status_counts.total is defined else (sidebar_orders|length if sidebar_orders else 0) }}</span>
-                                </button>
-                                <div class="flex items-center gap-1.5">
-                                    <span class="text-xs font-bold text-slate-900" id="mobileHeaderOrderNumber">{% if is_new %}&lt;New Order&gt;{% else %}{{ order.order_number or ('SO-' ~ order.id) }}{% endif %}</span>
-                                    <span class="{% if is_paid %}bg-emerald-100 text-emerald-800{% elif (order.status or '')|upper == 'CANCELLED' %}bg-rose-100 text-rose-800{% else %}bg-emerald-100 text-emerald-800{% endif %} text-[10px] font-bold px-1.5 py-0.5 rounded-full" id="mobileHeaderStatusBadge">
-                                        {% if is_paid %}Paid{% elif (order.status or '')|upper == 'CANCELLED' %}Cancelled{% elif (order.status or '')|upper == 'OPEN' %}Open{% else %}{{ order.status | capitalize }}{% endif %}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-1.5">
-                                <div class="flex items-center gap-1 px-2 py-1 bg-white border border-slate-200 rounded-md text-[11px] font-semibold text-slate-700 shadow-2xs">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                                    <span class="truncate max-w-[90px]">{{ current_branch.name if current_branch else (order.branch_name if order.branch_name else 'Main HQ') }}</span>
-                                </div>
-                                <button type="button" onclick="openMobileMoreActionsSheet()" class="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 cursor-pointer" title="More Options">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="more-horizontal" aria-hidden="true" class="lucide lucide-more-horizontal w-4 h-4"><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg>
-                                </button>
+                <!-- ================= Mobile Top Section (Screen 3: Emerald Theme) ================= -->
+                <div class="so-mobile-top-section" id="soMobileTopSection">
+                    <!-- Screen 3: Customer Card (Click opens Screen 4) -->
+                    <div class="so-mobile-cust-select-card" onclick="openMobileCustomerSheet()" title="Select Customer">
+                        <div class="so-mobile-cust-avatar">👤</div>
+                        <div class="so-mobile-cust-details">
+                            <div class="so-mobile-cust-name" id="mobileDisplayCustName">{{ order.customer_name or order.customer_company_name or 'Select Customer' }}</div>
+                            <div class="so-mobile-cust-sub" id="mobileDisplayCustSub">
+                                <span id="mobileDisplayCustPhone">📞 {{ order.customer_phone or 'No phone' }}</span>
+                                <span class="so-dot-sep">·</span>
+                                <span id="mobileDisplayCustAddr">📍 {{ order.customer_address or order.customer_shipping_address or 'No address' }}</span>
                             </div>
                         </div>
-                        <!-- Mobile Action & Utility Toolbar -->
-                        <div class="px-3.5 py-2 flex items-center justify-between gap-1 overflow-x-auto no-scrollbar">
-                            <div class="flex items-center gap-1.5">
-                                <a href="{{ url_for('sales_orders.new_order') }}" class="inline-flex items-center gap-1 bg-emerald-600 active:scale-95 text-white px-2.5 py-1.5 rounded-lg text-xs font-semibold shadow-xs transition cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus-circle" aria-hidden="true" class="lucide lucide-plus-circle w-3.5 h-3.5"><circle cx="12" cy="12" r="10"></circle><path d="M8 12h8"></path><path d="M12 8v8"></path></svg>
-                                    <span>New</span>
-                                </a>
-                                <button type="button" onclick="saveSalesOrder()" class="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2.5 py-1.5 rounded-lg text-xs font-medium shadow-xs hover:bg-slate-50 active:scale-95 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="save" aria-hidden="true" class="lucide lucide-save w-3.5 h-3.5 text-slate-500"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"></path><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"></path><path d="M7 3v4a1 1 0 0 0 1 1h7"></path></svg>
-                                    <span>Save</span>
-                                </button>
-                                <button type="button" onclick="selectAndExecuteDoc('print')" class="inline-flex items-center gap-1 bg-white border border-slate-200 text-slate-700 px-2 py-1.5 rounded-lg text-xs font-medium shadow-xs hover:bg-slate-50 active:scale-95 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="printer" aria-hidden="true" class="lucide lucide-printer w-3.5 h-3.5 text-slate-500"><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><path d="M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6"></path><rect x="6" y="14" width="12" height="8" rx="1"></rect></svg>
-                                    <span>Print</span>
-                                </button>
-                                <button type="button" onclick="directShareOrderTelegram('direct')" class="inline-flex items-center gap-1 bg-sky-50 text-sky-700 border border-sky-200 px-2 py-1.5 rounded-lg text-xs font-medium shadow-xs hover:bg-sky-100 active:scale-95 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="send" aria-hidden="true" class="lucide lucide-send w-3.5 h-3.5 text-sky-600"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg>
-                                    <span>Telegram</span>
-                                </button>
-                            </div>
-                            <div class="flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-1 rounded-md">
-                                <span>v{{ versions|length if (versions and versions|length > 0) else 1 }}</span>
-                            </div>
-                        </div>
-                    </header>
-                    <!-- END: MobileHeader -->
-
-                    <!-- BEGIN: MobileMainContent -->
-                    <main class="flex-1 overflow-y-auto px-3.5 pt-3 pb-32 space-y-3.5">
-                        <!-- Section 1: Customer & Logistics Card -->
-                        <section class="bg-white rounded-xl border border-slate-200/80 shadow-xs p-3.5 space-y-3">
-                            <div class="flex items-center justify-between pb-1.5 border-b border-slate-100">
-                                <div class="flex items-center gap-2">
-                                    <div class="p-1.5 rounded-md bg-emerald-50 text-emerald-700">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="user" aria-hidden="true" class="lucide lucide-user w-4 h-4"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-                                    </div>
-                                    <h3 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Customer &amp; Logistics</h3>
-                                </div>
-                                <span onclick="viewCurrentCustomerHistory()" class="text-[11px] text-emerald-600 font-semibold hover:underline cursor-pointer">History</span>
-                            </div>
-                            <!-- Customer Info -->
-                            <div class="space-y-2">
-                                <div class="flex items-center gap-1.5">
-                                    <div class="relative flex-1">
-                                        <select id="mobileCustomerSelect" class="w-full text-xs font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg py-1.5 pl-3 pr-8 focus:ring-emerald-500" onchange="onMobileCustomerSelectChange(this.value)">
-                                            <option value="">-- Select Customer / ជ្រើសរើសអតិថិជន --</option>
-                                            {% for c in all_customers %}
-                                            <option value="{{ c.id }}" {% if (order.customer_id and order.customer_id == c.id) or (c.name == order.customer_name) %}selected{% endif %} data-phone="{{ c.phone or '' }}" data-address="{{ c.display_address or c.shipping_address or c.address1 or '' }}" data-scheme="{{ c.default_pricing_scheme_id or '' }}">
-                                                {{ c.name }}{% if c.contact_name and c.contact_name != c.name %} ({{ c.contact_name }}){% endif %}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                    <button type="button" onclick="openQuickAddCustomerModal()" class="bg-emerald-600 hover:bg-emerald-700 text-white p-1.5 rounded-lg transition shadow-2xs cursor-pointer active:scale-95" title="New Customer">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="user-plus" aria-hidden="true" class="lucide lucide-user-plus w-4 h-4"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><line x1="19" x2="19" y1="8" y2="14"></line><line x1="22" x2="16" y1="11" y2="11"></line></svg>
-                                    </button>
-                                </div>
-                                <!-- Price Tier Selector Row -->
-                                <div class="flex items-center justify-between gap-2 bg-slate-50/70 p-2 rounded-lg border border-slate-200/80">
-                                    <div class="flex items-center gap-1.5 min-w-0">
-                                        <span class="text-[11px] font-bold text-slate-700 whitespace-nowrap">Price Tier:</span>
-                                    </div>
-                                    <div class="relative flex-1 max-w-[220px]">
-                                        <select id="mobilePricingSchemeSelect" class="w-full text-[11px] font-semibold text-emerald-800 bg-white border border-emerald-300 rounded-md py-1 pl-2 pr-6 focus:ring-1 focus:ring-emerald-500 shadow-2xs" onchange="onMobilePricingSchemeChange(this.value)">
-                                            {% for ps in pricing_schemes %}
-                                            <option value="{{ ps.id }}" {% if (order.pricing_scheme_id == ps.id) or (not order.pricing_scheme_id and loop.first) %}selected{% endif %}>
-                                                {{ ps.name }}{% if loop.first %} (Default){% endif %}
-                                            </option>
-                                            {% endfor %}
-                                        </select>
-                                    </div>
-                                </div>
-                                <div class="flex items-center gap-2 text-xs text-slate-700 bg-slate-50/60 p-2 rounded-lg border border-slate-100">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="phone" aria-hidden="true" class="lucide lucide-phone w-3.5 h-3.5 text-slate-400"><path d="M13.832 16.568a1 1 0 0 0 1.213-.303l.355-.465A2 2 0 0 1 17 15h3a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2A18 18 0 0 1 2 4a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2v3a2 2 0 0 1-.8 1.6l-.468.351a1 1 0 0 0-.292 1.233 14 14 0 0 0 6.392 6.384"></path></svg>
-                                    <span class="font-semibold" id="mobileCustomerPhoneDisp">{{ order.customer_phone or 'No phone number' }}</span>
-                                </div>
-                                <div class="flex items-start gap-2 text-xs text-slate-700 bg-slate-50/60 p-2 rounded-lg border border-slate-100">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="map-pin" aria-hidden="true" class="lucide lucide-map-pin w-3.5 h-3.5 text-slate-400 mt-0.5 flex-shrink-0"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                                    <span class="font-sans text-[11px] leading-tight" id="mobileCustomerAddressDisp">{{ order.customer_address or order.customer_shipping_address or 'No address specified' }}</span>
-                                </div>
-                                <!-- Courier Fee Chips -->
-                                <div class="pt-1 space-y-1.5">
-                                    <div class="flex items-center justify-between text-[11px]">
-                                        <span class="font-semibold text-slate-600">Delivery Fee:</span>
-                                        <span class="font-bold text-slate-800" id="mobileDeliveryFeeDisp">{{ "{:,}".format((order.delivery_fee_khr or 0)|int) }} KHR</span>
-                                    </div>
-                                    <div class="flex flex-wrap gap-1 text-[11px]" id="mobileFeeChipsContainer">
-                                        {% for fee in [1000, 1500, 2000, 3000] %}
-                                        <button type="button" class="mobile-fee-chip px-2 py-0.5 {% if (order.delivery_fee_khr or 0)|int == fee %}bg-emerald-600 text-white border-emerald-600 font-bold{% else %}bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 font-medium{% endif %} rounded border transition cursor-pointer" onclick="selectMobileDeliveryFee({{ fee }}, this)">{{ "{:,}".format(fee) }}</button>
-                                        {% endfor %}
-                                        <button type="button" onclick="promptMobileCustomDeliveryFee()" class="px-2 py-0.5 bg-white text-emerald-700 rounded border border-emerald-300 font-semibold hover:bg-emerald-50 transition cursor-pointer">+ Custom</button>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        <!-- Section 2: Order Items Card -->
-                        <section class="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-                            <!-- Header & Search -->
-                            <div class="p-3 bg-slate-50/70 border-b border-slate-200 flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <div class="p-1.5 rounded-md bg-emerald-50 text-emerald-700">
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="boxes" aria-hidden="true" class="lucide lucide-boxes w-4 h-4"><path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"></path><path d="m7 16.5-4.74-2.85"></path><path d="m7 16.5 5-3"></path><path d="M7 16.5v5.17"></path><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"></path><path d="m17 16.5-5-3"></path><path d="m17 16.5 4.74-2.85"></path><path d="M17 16.5v5.17"></path><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"></path><path d="M12 8 7.26 5.15"></path><path d="m12 8 4.74-2.85"></path><path d="M12 13.5V8"></path></svg>
-                                    </div>
-                                    <div>
-                                        <h2 class="text-xs font-bold text-slate-800 uppercase tracking-wider">Order Items</h2>
-                                        <span class="text-[10px] text-slate-500 font-medium" id="mobileItemsCountSubtitle">{{ lines|length }} item{% if lines|length != 1 %}s{% endif %} selected</span>
-                                    </div>
-                                </div>
-                                <span class="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200" id="mobileItemsSubtotalBadge">${{ "%.2f"|format(order.subtotal or order.total_amount or 0) }}</span>
-                            </div>
-                            <!-- Quick Barcode Search Bar -->
-                            <div class="p-2.5 border-b border-slate-100 flex items-center gap-2">
-                                <div class="relative flex-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="scan-barcode" aria-hidden="true" class="lucide lucide-scan-barcode w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"><path d="M3 7V5a2 2 0 0 1 2-2h2"></path><path d="M17 3h2a2 2 0 0 1 2 2v2"></path><path d="M21 17v2a2 2 0 0 1-2 2h-2"></path><path d="M7 21H5a2 2 0 0 1-2-2v-2"></path><path d="M8 7v10"></path><path d="M12 7v10"></path><path d="M17 7v10"></path></svg>
-                                    <input class="w-full pl-8 pr-2.5 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white" id="mobileBarcodeSearchInput" placeholder="Scan SKU / barcode..." type="text" onkeydown="handleMobileBarcodeKeydown(event)">
-                                </div>
-                                <button type="button" onclick="openMobileAddProductModal()" class="p-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg transition active:scale-95 cursor-pointer" title="Add Product">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" aria-hidden="true" class="lucide lucide-plus w-4 h-4"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
-                                </button>
-                            </div>
-                            <!-- Mobile Touch-Optimized Item Card List -->
-                            <div class="p-3 space-y-2.5 divide-y divide-slate-100" id="mobileLineItemsList">
-                                <!-- Populated dynamically via syncMobileLineCards() -->
-                            </div>
-                            <!-- Empty State Box -->
-                            <div id="mobileEmptyNoticeBox" class="p-6 text-center text-slate-400" {% if lines and lines|length > 0 %}style="display:none;"{% endif %}>
-                                <div class="text-3xl mb-1">📦</div>
-                                <div class="text-xs font-bold text-slate-700">No products added yet</div>
-                                <div class="text-[11px] text-slate-400 mt-0.5">Scan SKU / barcode above or tap Add Line Item</div>
-                            </div>
-                            <!-- Add Row Button -->
-                            <div class="p-2.5 bg-slate-50/70 border-t border-slate-200 flex items-center justify-between">
-                                <button type="button" onclick="openMobileAddProductModal()" class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-white border border-emerald-200 hover:bg-emerald-50 rounded-lg transition shadow-2xs active:scale-95 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" aria-hidden="true" class="lucide lucide-plus w-3.5 h-3.5"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>
-                                    <span>Add Line Item</span>
-                                </button>
-                                <span class="text-[10px] text-slate-400">F2 barcode ready</span>
-                            </div>
-                        </section>
-
-                        <!-- Section 3: Notes & Currency -->
-                        <section class="bg-white rounded-xl border border-slate-200/80 shadow-xs p-3.5 space-y-2.5">
-                            <div class="flex items-center justify-between text-xs font-bold text-slate-700 uppercase tracking-wide pb-1 border-b border-slate-100">
-                                <div class="flex items-center gap-1.5">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="message-square" aria-hidden="true" class="lucide lucide-message-square w-3.5 h-3.5 text-emerald-600"><path d="M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z"></path></svg>
-                                    <span>Notes &amp; Currency</span>
-                                </div>
-                                <span class="text-[10px] text-slate-400 font-normal italic">Editable</span>
-                            </div>
-                            <div class="relative">
-                                <textarea id="mobileOrderNotesTextarea" class="w-full text-xs font-sans text-slate-700 p-2 bg-slate-50 border border-slate-200 rounded-lg focus:ring-1 focus:ring-emerald-500 resize-none" placeholder="Add internal note..." rows="2" maxlength="500" oninput="onMobileNotesChange(this)">{{ order.notes or '' }}</textarea>
-                                <span class="absolute right-2 bottom-1.5 text-[9px] text-slate-400" id="mobileNotesCharCounter">{{ (order.notes or '')|length }}/500</span>
-                            </div>
-                        </section>
-
-                        <!-- Section 4: Payment Method Selection -->
-                        <section class="bg-white rounded-xl border border-slate-200/80 shadow-xs p-3.5 space-y-3">
-                            <div class="flex items-center justify-between pb-1 border-b border-slate-100">
-                                <span class="text-xs font-bold text-slate-800 uppercase tracking-wider">Payment Method</span>
-                                <span class="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full">Fast Select</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2" id="mobilePaymentMethodGrid">
-                                <!-- ABA Bank Button -->
-                                <button type="button" class="mobile-pay-method-btn p-2.5 rounded-xl border-2 transition shadow-xs text-left cursor-pointer {% if order_payment_method == 'ABA Bank' %}border-emerald-600 bg-emerald-50/50 text-emerald-950 active{% else %}border-slate-200 bg-white hover:border-slate-300 text-slate-800{% endif %}" data-method="ABA Bank" onclick="selectMobilePaymentMethod('ABA Bank', this)">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-xs font-bold">ABA Bank</span>
-                                        <span class="pay-radio-dot w-2 h-2 rounded-full {% if order_payment_method == 'ABA Bank' %}bg-emerald-600{% else %}bg-slate-300{% endif %}"></span>
-                                    </div>
-                                    <div class="text-[10px] font-medium mt-0.5 {% if order_payment_method == 'ABA Bank' %}text-emerald-700{% else %}text-slate-500{% endif %}">ABA Pay / QR</div>
-                                </button>
-                                <!-- Cash Button -->
-                                <button type="button" class="mobile-pay-method-btn p-2.5 rounded-xl border-2 transition text-left cursor-pointer {% if order_payment_method == 'Cash' %}border-emerald-600 bg-emerald-50/50 text-emerald-950 active{% else %}border-slate-200 bg-white hover:border-slate-300 text-slate-800{% endif %}" data-method="Cash" onclick="selectMobilePaymentMethod('Cash', this)">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-xs font-bold">Cash</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="banknote" aria-hidden="true" class="lucide lucide-banknote w-3.5 h-3.5 text-emerald-600"><rect width="20" height="12" x="2" y="6" rx="2"></rect><circle cx="12" cy="12" r="2"></circle><path d="M6 12h.01M18 12h.01"></path></svg>
-                                    </div>
-                                    <div class="text-[10px] font-medium mt-0.5 {% if order_payment_method == 'Cash' %}text-emerald-700{% else %}text-slate-500{% endif %}">សាច់ប្រាក់</div>
-                                </button>
-                                <!-- ACLEDA Button -->
-                                <button type="button" class="mobile-pay-method-btn p-2.5 rounded-xl border-2 transition text-left cursor-pointer {% if order_payment_method == 'ACLEDA Bank' or order_payment_method == 'ACLEDA' %}border-emerald-600 bg-emerald-50/50 text-emerald-950 active{% else %}border-slate-200 bg-white hover:border-slate-300 text-slate-800{% endif %}" data-method="ACLEDA Bank" onclick="selectMobilePaymentMethod('ACLEDA Bank', this)">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-xs font-bold">ACLEDA</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="smartphone" aria-hidden="true" class="lucide lucide-smartphone w-3.5 h-3.5 text-blue-600"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"></rect><path d="M12 18h.01"></path></svg>
-                                    </div>
-                                    <div class="text-[10px] font-medium mt-0.5 {% if order_payment_method == 'ACLEDA Bank' or order_payment_method == 'ACLEDA' %}text-emerald-700{% else %}text-slate-500{% endif %}">ToanChet</div>
-                                </button>
-                                <!-- KB PRASAC Button -->
-                                <button type="button" class="mobile-pay-method-btn p-2.5 rounded-xl border-2 transition text-left cursor-pointer {% if order_payment_method == 'KB PRASAC' %}border-emerald-600 bg-emerald-50/50 text-emerald-950 active{% else %}border-slate-200 bg-white hover:border-slate-300 text-slate-800{% endif %}" data-method="KB PRASAC" onclick="selectMobilePaymentMethod('KB PRASAC', this)">
-                                    <div class="flex items-center justify-between">
-                                        <span class="text-xs font-bold">KB PRASAC</span>
-                                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="credit-card" aria-hidden="true" class="lucide lucide-credit-card w-3.5 h-3.5 text-amber-600"><rect width="20" height="14" x="2" y="5" rx="2"></rect><line x1="2" x2="22" y1="10" y2="10"></line><path d="M6 14h2"></path></svg>
-                                    </div>
-                                    <div class="text-[10px] font-medium mt-0.5 {% if order_payment_method == 'KB PRASAC' %}text-emerald-700{% else %}text-slate-500{% endif %}">PRASAC Pay</div>
-                                </button>
-                            </div>
-                        </section>
-
-                        <!-- Section 5: Order Breakdown Summary -->
-                        <section class="bg-white rounded-xl border border-slate-200/80 shadow-xs p-3.5 space-y-2 text-xs text-slate-600 font-medium">
-                            <div class="flex justify-between items-center">
-                                <span>Sub-Total</span>
-                                <span class="font-bold text-slate-800" id="mobileSummarySubtotal">${{ "%.2f"|format(order.subtotal or order.total_amount or 0) }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span>Discount / Tax (VAT 0%)</span>
-                                <span class="text-slate-400" id="mobileSummaryDiscountTax">$0.00</span>
-                            </div>
-                            <div class="pt-2 border-t border-slate-200 flex justify-between items-baseline">
-                                <span class="text-xs font-bold text-slate-900 uppercase">Total Payable</span>
-                                <div class="text-right">
-                                    <span class="text-lg font-black text-emerald-600" id="mobileSummaryTotalPayableUsd">${{ "%.2f"|format(order.total_amount or 0) }}</span>
-                                    <span class="text-[10px] text-slate-400 font-medium block" id="mobileSummaryTotalPayableKhr">≈ {{ "{:,}".format(((order.total_amount or 0) * 4100)|round|int) }} KHR</span>
-                                </div>
-                            </div>
-                        </section>
-                    </main>
-                    <!-- END: MobileMainContent -->
-
-                    <!-- BEGIN: MobilePersistentStickyBottomBar -->
-                    <nav class="fixed bottom-0 left-0 right-0 max-w-md mx-auto bg-white/95 backdrop-blur-md border-t border-slate-200 px-3.5 py-2.5 z-30 shadow-md" id="mobileStickyBottomBarRedesign">
-                        <div class="flex items-center gap-2.5">
-                            <button type="button" onclick="cancelOrderAction()" class="p-2.5 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-xl transition active:scale-95 flex-shrink-0 cursor-pointer" title="Cancel / Delete">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="trash-2" aria-hidden="true" class="lucide lucide-trash-2 w-4 h-4"><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                            </button>
-                            <!-- Main Pay CTA -->
-                            {% if is_paid %}
-                            <button type="button" onclick="openReopenPromptModal()" class="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl font-extrabold text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-between cursor-pointer">
-                                <div class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle" aria-hidden="true" class="lucide lucide-check-circle w-4 h-4"><path d="M21.801 10A10 10 0 1 1 17 3.335"></path><path d="m9 11 3 3L22 4"></path></svg>
-                                    <span>✓ Paid (Tap to Reopen)</span>
-                                </div>
-                                <span class="text-base font-black tracking-tight">${{ "%.2f"|format(order.total_amount or 0) }}</span>
-                            </button>
-                            {% else %}
-                            <button type="button" onclick="completePayAction()" class="flex-1 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl font-extrabold text-sm shadow-md shadow-emerald-600/20 transition flex items-center justify-between cursor-pointer">
-                                <div class="flex items-center gap-2">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="check-circle" aria-hidden="true" class="lucide lucide-check-circle w-4 h-4"><path d="M21.801 10A10 10 0 1 1 17 3.335"></path><path d="m9 11 3 3L22 4"></path></svg>
-                                    <span>Pay &amp; Complete</span>
-                                </div>
-                                <span class="text-base font-black tracking-tight" id="mobileStickyPayBtnAmount">${{ "%.2f"|format(order.total_amount or 0) }}</span>
-                            </button>
-                            {% endif %}
-                        </div>
-                    </nav>
-                    <!-- END: MobilePersistentStickyBottomBar -->
-                </div>
-                <!-- END: Mobile Redesign Container -->
-
-                <!-- BEGIN: Orders Queue Drawer & Backdrop -->
-                <div id="orders-drawer-backdrop" class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-40 hidden transition-opacity duration-300"></div>
-                <aside id="orders-drawer" aria-label="Orders Queue Drawer" class="fixed top-0 bottom-0 left-0 w-80 max-w-[85vw] bg-white z-50 shadow-2xl flex flex-col -translate-x-full transition-transform duration-300 ease-out border-r border-slate-200">
-                    <div class="p-3 bg-white border-b border-slate-200 flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <div class="inline-flex items-center rounded-lg bg-slate-100 p-0.5 text-xs font-semibold">
-                                <button type="button" id="drawerTabOpen" onclick="switchDrawerQueueTab('open')" class="flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-md shadow-2xs font-bold text-xs cursor-pointer">
-                                    <span>Open</span>
-                                    <span class="bg-emerald-700/80 px-1.5 py-0.2 text-[10px] rounded-full" id="drawerOpenCountBadge">{{ status_counts.open if status_counts and status_counts.open is defined else (sidebar_orders|length if sidebar_orders else 0) }}</span>
-                                </button>
-                                <button type="button" id="drawerTabCompleted" onclick="switchDrawerQueueTab('completed')" class="px-2.5 py-1 text-slate-600 hover:text-slate-900 text-xs font-medium cursor-pointer">
-                                    <span>Completed</span>
-                                </button>
-                            </div>
-                            <span class="text-[11px] text-slate-400 font-medium leading-none" id="drawerTotalCountText">{{ sidebar_orders|length if sidebar_orders else 0 }} orders</span>
-                        </div>
-                        <button type="button" id="close-queue-btn" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition cursor-pointer">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                        </button>
+                        <div class="so-mobile-chevron">›</div>
                     </div>
-                    <div class="flex-1 overflow-y-auto divide-y divide-slate-100 text-xs" id="drawerOrdersListContainer">
-                        {% for o in sidebar_orders %}
-                        {% set is_active_so = (not is_new and order.id == o.id) %}
-                        {% set item_cnt = (o.total_items if o.total_items is defined else (o.total_qty if o.total_qty is defined else 1)) %}
-                        <div onclick="window.location.href='/sales/{{ o.id }}'" class="p-3 transition cursor-pointer flex items-center justify-between gap-2 {% if is_active_so %}bg-emerald-50/60 border-l-4 border-emerald-600{% else %}hover:bg-slate-50{% endif %}" data-order-status="{{ o.status|lower }}">
-                            <div class="min-w-0 space-y-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-bold text-[13px] {% if is_active_so %}text-emerald-950{% else %}text-slate-900{% endif %}">{{ o.order_number or ('SO-' ~ o.id) }}</span>
-                                    <span class="text-[11px] {% if is_active_so %}text-emerald-700 font-medium{% else %}text-slate-400{% endif %}">{{ o.order_date.strftime('%d-%b-%y') if o.order_date else '' }}</span>
-                                </div>
-                                <div class="flex items-center gap-2">
-                                    <span class="font-extrabold text-xs {% if is_active_so %}text-emerald-700{% else %}text-slate-900{% endif %}">${{ "%.2f"|format(o.total_amount or 0) }}</span>
-                                    <span class="w-1 h-1 rounded-full {% if is_active_so %}bg-emerald-400{% else %}bg-slate-300{% endif %}"></span>
-                                    <span class="text-[11px] {% if is_active_so %}text-emerald-700{% else %}text-slate-500{% endif %} inline-flex items-center gap-1">
-                                        <svg class="w-3 h-3 {% if is_active_so %}text-emerald-600{% else %}text-slate-400{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                                        {{ item_cnt }} Item{% if item_cnt != 1 %}s{% endif %}
-                                    </span>
-                                </div>
-                                <div class="flex items-center gap-1.5 text-[11px] truncate {% if is_active_so %}text-emerald-800 font-semibold{% else %}text-slate-600{% endif %}">
-                                    <svg class="w-3 h-3 flex-shrink-0 {% if is_active_so %}text-emerald-600{% else %}text-slate-400{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                                    <span class="truncate">{{ o.customer_name or 'N/A' }}</span>
-                                </div>
-                            </div>
-                            {% if is_active_so %}
-                            <span class="px-2.5 py-0.5 rounded-full text-white bg-emerald-600 font-bold text-[11px] shadow-2xs">Active</span>
-                            {% elif o.status|upper == 'PAID' %}
-                            <span class="px-2 py-0.5 rounded-full border border-emerald-300 text-emerald-700 bg-emerald-50/60 font-semibold text-[11px]">Paid</span>
-                            {% elif o.status|upper == 'CANCELLED' %}
-                            <span class="px-2 py-0.5 rounded-full border border-rose-300 text-rose-700 bg-rose-50/60 font-semibold text-[11px]">Cancelled</span>
-                            {% else %}
-                            <span class="px-2 py-0.5 rounded-full border border-amber-300 text-amber-700 bg-amber-50/60 font-semibold text-[11px]">Open</span>
-                            {% endif %}
-                        </div>
-                        {% endfor %}
-                    </div>
-                    <div class="p-2.5 bg-slate-50 border-t border-slate-200 text-center">
-                        <span class="text-[11px] text-slate-500 font-medium" id="drawerFooterText">Showing {{ sidebar_orders|length if sidebar_orders else 0 }} orders</span>
-                    </div>
-                    <!-- Edge Toggle Tab -->
-                    <button type="button" id="drawer-toggle-tab" aria-label="Toggle Orders Drawer" class="absolute -right-10 top-1/2 -translate-y-1/2 w-10 h-14 bg-emerald-600 hover:bg-emerald-700 text-white rounded-r-xl shadow-md flex flex-col items-center justify-center gap-0.5 border-t border-b border-r border-emerald-500 cursor-pointer active:scale-95 transition">
-                        <svg id="drawer-toggle-arrow" class="w-5 h-5 transition-transform duration-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
-                        <span class="text-[9px] font-bold leading-none tracking-tight">{{ status_counts.total if status_counts and status_counts.total is defined else (sidebar_orders|length if sidebar_orders else 0) }}</span>
-                    </button>
-                </aside>
-                <!-- END: Orders Queue Drawer -->
 
-                <!-- Preserved Hidden Slots for DOM Sync Compatibility -->
-                <div id="soMobileHiddenSlots" style="display:none !important;">
-                    <div id="slotMobileCustomer"></div>
-                    <div id="slotMobileDate"></div>
-                    <div id="slotMobileOrderNumber"></div>
-                    <div id="slotMobileStatus"></div>
-                    <div id="slotMobilePhone"></div>
-                    <div id="slotMobileSalesRep"></div>
-                    <div id="slotMobileAddress"></div>
-                    <div id="slotMobileBranch"></div>
-                    <div id="slotMobileLocation"></div>
-                    <div id="slotMobileDeliveryBy"></div>
-                    <div id="slotMobileDeliveryFee"></div>
-                    <div id="slotMobileDeliveryNotes"></div>
+                    <!-- Screen 3: Order Settings Card (Click opens Screen 5) -->
+                    <div class="so-mobile-settings-card-btn" onclick="openMobileOrderSettingsSheet()" title="Order Settings & Delivery">
+                        <div class="so-mobile-settings-icon">🏪</div>
+                        <div class="so-mobile-settings-details">
+                            <div class="so-mobile-settings-title">Order Settings</div>
+                            <div class="so-mobile-settings-sub" id="mobileDisplaySettingsSub">Main Store (HQ) · Main Warehouse</div>
+                            <div class="so-mobile-settings-delivery" id="mobileDisplayDeliverySub">Delivery: {{ order.carrier or 'Unassigned' }}</div>
+                        </div>
+                        <div class="so-mobile-chevron">›</div>
+                    </div>
+
+                    <!-- Screen 3: Product Search & Add Bar (Click opens Screen 6) -->
+                    <div class="so-mobile-search-add-bar">
+                        <div class="so-mobile-search-input-wrap" onclick="openMobileAddProductModal()">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="text" placeholder="Search product, barcode, SKU..." readonly onclick="openMobileAddProductModal()">
+                        </div>
+                        <button type="button" class="so-mobile-add-btn-green" onclick="openMobileAddProductModal()" title="Add Product">+</button>
+                    </div>
+
+                    <!-- Screen 3: Items Heading -->
+                    <div class="so-mobile-items-heading-row">
+                        <span class="so-mobile-items-heading-title" id="mobileItemsHeadingTitle">Items ({{ lines|length }})</span>
+                    </div>
+
+                    <!-- Preserved Hidden Slots for DOM Sync Compatibility -->
+                    <div id="soMobileHiddenSlots" style="display:none !important;">
+                        <div id="slotMobileCustomer"></div>
+                        <div id="slotMobileDate"></div>
+                        <div id="slotMobileOrderNumber"></div>
+                        <div id="slotMobileStatus"></div>
+                        <div id="slotMobilePhone"></div>
+                        <div id="slotMobileSalesRep"></div>
+                        <div id="slotMobileAddress"></div>
+                        <div id="slotMobileBranch"></div>
+                        <div id="slotMobileLocation"></div>
+                        <div id="slotMobileDeliveryBy"></div>
+                        <div id="slotMobileDeliveryFee"></div>
+                        <div id="slotMobileDeliveryNotes"></div>
+                    </div>
                 </div>
 
                 <!-- ================= Main Split Section ================= -->
@@ -6188,14 +5879,6 @@
     let currentSoLayoutMode = null;
 
     function checkIsMobileMode() {
-        if (document.documentElement.classList.contains('is-desktop-view')) return false;
-        if (document.documentElement.classList.contains('is-mobile-view')) return true;
-        if (window.innerWidth <= 768 || (window.screen && window.screen.width <= 768)) {
-            return true;
-        }
-        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Silk/i.test(navigator.userAgent)) {
-            if (window.innerWidth <= 768) return true;
-        }
         return false;
     }
 
@@ -6449,17 +6132,9 @@
     setTimeout(() => syncMobileLayoutSlots(true), 800);
 
     function enforceDeviceMobileMode() {
-        const isSmallScreen = (window.innerWidth <= 768) || (window.screen && window.screen.width <= 768);
-        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile|mobile|Silk/i.test(navigator.userAgent);
-        if (isSmallScreen || (isMobileUA && window.innerWidth <= 768)) {
-            document.documentElement.classList.add('is-mobile-view');
-            document.documentElement.classList.remove('is-desktop-view');
-            document.documentElement.setAttribute('data-view-mode', 'mobile');
-        } else {
-            document.documentElement.classList.remove('is-mobile-view');
-            document.documentElement.classList.add('is-desktop-view');
-            document.documentElement.setAttribute('data-view-mode', 'desktop');
-        }
+        document.documentElement.classList.remove('is-mobile-view');
+        document.documentElement.classList.add('is-desktop-view');
+        document.documentElement.setAttribute('data-view-mode', 'desktop');
     }
     enforceDeviceMobileMode();
 
@@ -6930,394 +6605,4 @@
         }
     });
     
-</script>
-
-
-<!-- ================= Mobile Redesign Runtime Script ================= -->
-<script id="mobile-redesign-runtime">
-(function() {
-    // 1. Drawer interaction logic
-    const drawer = document.getElementById('orders-drawer');
-    const backdrop = document.getElementById('orders-drawer-backdrop');
-    const openBtn = document.getElementById('open-queue-btn');
-    const closeBtn = document.getElementById('close-queue-btn');
-    const toggleTab = document.getElementById('drawer-toggle-tab');
-    const toggleArrow = document.getElementById('drawer-toggle-arrow');
-
-    window.toggleOrdersDrawer = function(forceState) {
-        if (!drawer) return;
-        const isClosed = drawer.classList.contains('-translate-x-full');
-        const shouldOpen = typeof forceState === 'boolean' ? forceState : isClosed;
-        if (shouldOpen) {
-            drawer.classList.remove('-translate-x-full');
-            if (backdrop) backdrop.classList.remove('hidden');
-            if (toggleArrow) toggleArrow.style.transform = 'rotate(180deg)';
-        } else {
-            drawer.classList.add('-translate-x-full');
-            if (backdrop) backdrop.classList.add('hidden');
-            if (toggleArrow) toggleArrow.style.transform = 'rotate(0deg)';
-        }
-    };
-
-    if (toggleTab) toggleTab.addEventListener('click', () => window.toggleOrdersDrawer());
-    if (openBtn) openBtn.addEventListener('click', () => window.toggleOrdersDrawer(true));
-    if (closeBtn) closeBtn.addEventListener('click', () => window.toggleOrdersDrawer(false));
-    if (backdrop) backdrop.addEventListener('click', () => window.toggleOrdersDrawer(false));
-
-    window.switchDrawerQueueTab = function(mode) {
-        const openBtn = document.getElementById('drawerTabOpen');
-        const compBtn = document.getElementById('drawerTabCompleted');
-        const items = document.querySelectorAll('#drawerOrdersListContainer > div[data-order-status]');
-        if (mode === 'open') {
-            if (openBtn) openBtn.className = 'flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-md shadow-2xs font-bold text-xs cursor-pointer';
-            if (compBtn) compBtn.className = 'px-2.5 py-1 text-slate-600 hover:text-slate-900 text-xs font-medium cursor-pointer';
-            items.forEach(el => {
-                const st = (el.getAttribute('data-order-status') || '').toLowerCase();
-                el.style.display = (st.includes('paid') || st.includes('completed') || st.includes('shipped') || st.includes('cancelled')) ? 'none' : 'flex';
-            });
-        } else {
-            if (compBtn) compBtn.className = 'flex items-center gap-1.5 px-3 py-1 bg-emerald-600 text-white rounded-md shadow-2xs font-bold text-xs cursor-pointer';
-            if (openBtn) openBtn.className = 'px-2.5 py-1 text-slate-600 hover:text-slate-900 text-xs font-medium cursor-pointer';
-            items.forEach(el => {
-                const st = (el.getAttribute('data-order-status') || '').toLowerCase();
-                el.style.display = (st.includes('paid') || st.includes('completed') || st.includes('shipped')) ? 'flex' : 'none';
-            });
-        }
-    };
-
-    // 2. Customer selection synchronization
-    window.onMobileCustomerSelectChange = function(custId) {
-        const sel = document.getElementById('mobileCustomerSelect');
-        if (!sel) return;
-        const opt = sel.options[sel.selectedIndex];
-        const custIdHidden = document.getElementById('customerIdHidden');
-        const custSearchInput = document.getElementById('customerSearchInput');
-        if (custIdHidden) custIdHidden.value = custId || '';
-        if (custSearchInput && opt) custSearchInput.value = opt.value ? opt.text : '';
-
-        const phone = opt ? (opt.getAttribute('data-phone') || '') : '';
-        const address = opt ? (opt.getAttribute('data-address') || '') : '';
-        const scheme = opt ? (opt.getAttribute('data-scheme') || '') : '';
-
-        const phoneDisp = document.getElementById('mobileCustomerPhoneDisp');
-        if (phoneDisp) phoneDisp.textContent = phone || 'No phone number';
-        const addrDisp = document.getElementById('mobileCustomerAddressDisp');
-        if (addrDisp) addrDisp.textContent = address || 'No address specified';
-
-        const phoneInput = document.getElementById('phoneInput');
-        if (phoneInput) phoneInput.value = phone;
-        const addressInput = document.getElementById('addressInput');
-        if (addressInput) addressInput.value = address;
-
-        if (scheme) {
-            const schemeSelect = document.getElementById('mobilePricingSchemeSelect');
-            if (schemeSelect) {
-                schemeSelect.value = scheme;
-                window.onMobilePricingSchemeChange(scheme);
-            }
-        }
-        if (typeof markDirty === 'function') markDirty();
-    };
-
-    // 3. Pricing Scheme synchronization
-    window.onMobilePricingSchemeChange = function(schemeId) {
-        const masterSelect = document.getElementById('masterPricingSchemeSelect');
-        if (masterSelect) {
-            masterSelect.value = schemeId;
-            if (typeof handlePricingSchemeChange === 'function') {
-                handlePricingSchemeChange(schemeId);
-            }
-        }
-        window.syncMobileLineCards();
-        if (typeof recalculateTotals === 'function') recalculateTotals();
-    };
-
-    // 4. Delivery fee synchronization
-    window.selectMobileDeliveryFee = function(feeAmount, btnEl) {
-        const inp = document.getElementById('deliveryFeeKhrInput');
-        if (inp) inp.value = feeAmount;
-        const disp = document.getElementById('mobileDeliveryFeeDisp');
-        if (disp) disp.textContent = Number(feeAmount).toLocaleString() + ' KHR';
-
-        document.querySelectorAll('.mobile-fee-chip').forEach(b => {
-            b.className = 'mobile-fee-chip px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200 font-medium rounded border transition cursor-pointer';
-        });
-        if (btnEl) {
-            btnEl.className = 'mobile-fee-chip px-2 py-0.5 bg-emerald-600 text-white border-emerald-600 font-bold rounded border transition cursor-pointer';
-        }
-        if (typeof markDirty === 'function') markDirty();
-        if (typeof persistDeliveryLogisticsIfCompleted === 'function') persistDeliveryLogisticsIfCompleted();
-    };
-
-    window.promptMobileCustomDeliveryFee = function() {
-        const cur = document.getElementById('deliveryFeeKhrInput')?.value || 0;
-        const val = prompt('Enter custom delivery fee (KHR) / បញ្ចូលថ្លៃដឹកជញ្ជូន:', cur);
-        if (val !== null && !isNaN(parseFloat(val))) {
-            window.selectMobileDeliveryFee(Math.max(0, parseInt(val)), null);
-        }
-    };
-
-    // 5. Payment Method fast select
-    window.selectMobilePaymentMethod = function(methodName, btnEl) {
-        const hiddenInp = document.getElementById('orderPaymentMethodHidden');
-        if (hiddenInp) hiddenInp.value = methodName;
-
-        document.querySelectorAll('.mobile-pay-method-btn').forEach(b => {
-            b.classList.remove('border-emerald-600', 'bg-emerald-50/50', 'text-emerald-950', 'active');
-            b.classList.add('border-slate-200', 'bg-white', 'text-slate-800');
-            const dot = b.querySelector('.pay-radio-dot');
-            if (dot) { dot.classList.remove('bg-emerald-600'); dot.classList.add('bg-slate-300'); }
-        });
-        if (btnEl) {
-            btnEl.classList.remove('border-slate-200', 'bg-white', 'text-slate-800');
-            btnEl.classList.add('border-emerald-600', 'bg-emerald-50/50', 'text-emerald-950', 'active');
-            const dot = btnEl.querySelector('.pay-radio-dot');
-            if (dot) { dot.classList.remove('bg-slate-300'); dot.classList.add('bg-emerald-600'); }
-        }
-
-        // Also sync desktop payment tiles
-        const desktopTile = document.querySelector(`.pay-method-tile[data-method="${methodName}"]`);
-        if (desktopTile && typeof selectPayMethodTile === 'function') {
-            selectPayMethodTile(desktopTile, methodName);
-        }
-        if (typeof markDirty === 'function') markDirty();
-    };
-
-    // 6. Notes synchronization
-    window.onMobileNotesChange = function(textareaEl) {
-        const orderNotesInput = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
-        if (orderNotesInput) orderNotesInput.value = textareaEl.value;
-        const counter = document.getElementById('mobileNotesCharCounter');
-        if (counter) counter.textContent = textareaEl.value.length + '/500';
-        if (typeof markDirty === 'function') markDirty();
-    };
-
-    // 7. Barcode quick scan
-    window.handleMobileBarcodeKeydown = function(event) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            const query = (event.target.value || '').trim();
-            if (!query) return;
-            event.target.value = '';
-
-            const catalog = window.productsCatalog || {};
-            const qLower = query.toLowerCase();
-            const found = Object.values(catalog).find(p => 
-                (p.sku && p.sku.toLowerCase() === qLower) || 
-                (p.barcode && p.barcode.toLowerCase() === qLower) ||
-                (p.name && p.name.toLowerCase() === qLower)
-            );
-            if (found && typeof addProductFromMobilePicker === 'function') {
-                addProductFromMobilePicker(found.id);
-            } else {
-                // If not exact match, open product picker filtered by query
-                if (typeof openMobileAddProductModal === 'function') {
-                    openMobileAddProductModal();
-                    const searchIn = document.getElementById('mobileProductSearchInput');
-                    if (searchIn) { searchIn.value = query; filterMobileProductPicker(query); }
-                }
-            }
-        }
-    };
-
-    // 8. Mobile touch item cards synchronization
-    window.syncMobileLineCards = function() {
-        const container = document.getElementById('mobileLineItemsList');
-        const emptyNotice = document.getElementById('mobileEmptyNoticeBox');
-        const itemsCountSubtitle = document.getElementById('mobileItemsCountSubtitle');
-        const itemsSubtotalBadge = document.getElementById('mobileItemsSubtotalBadge');
-        if (!container) return;
-
-        const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
-        const totalLines = rows.length;
-
-        if (itemsCountSubtitle) {
-            itemsCountSubtitle.textContent = totalLines + (totalLines === 1 ? ' item selected' : ' items selected');
-        }
-        if (emptyNotice) {
-            emptyNotice.style.display = totalLines === 0 ? 'block' : 'none';
-        }
-
-        let cardsHtml = '';
-        let runningSubtotal = 0;
-
-        rows.forEach((r, idx) => {
-            const itemInput = r.querySelector('.so-item-input');
-            const descInput = r.querySelector('.grid-desc-input');
-            const qtyEl = r.querySelector('.line-qty');
-            const uomEl = r.querySelector('.line-uom');
-            const tierSelect = r.querySelector('.line-scheme-select');
-            const priceEl = r.querySelector('.line-price');
-            const discEl = r.querySelector('.line-disc');
-            const thumbImg = r.querySelector('.line-item-thumb');
-
-            const title = itemInput ? (itemInput.value || '').trim() : '';
-            const desc = descInput ? (descInput.value || '').trim() : '';
-            const qty = qtyEl ? (parseFloat(qtyEl.value) || 0) : 1;
-            const uom = uomEl ? (uomEl.value || 'pcs.') : 'pcs.';
-            const tierName = (tierSelect && tierSelect.selectedIndex >= 0) ? tierSelect.options[tierSelect.selectedIndex].text : 'Retail 1 Tier';
-            const unitPrice = priceEl ? (parseFloat(priceEl.value) || 0) : 0;
-            const disc = discEl ? (parseFloat(discEl.value) || 0) : 0;
-            const lineTotal = (qty * unitPrice) * (1 - (disc / 100));
-            runningSubtotal += lineTotal;
-            const imgSrc = thumbImg ? thumbImg.src : '';
-
-            cardsHtml += `
-            <div class="space-y-2.5 pt-2 border-b border-slate-100 pb-3" data-mobile-row-idx="${idx}">
-              <div class="flex items-start gap-2.5">
-                <div class="w-12 h-12 rounded-lg border border-amber-200 bg-amber-50/50 flex-shrink-0 flex items-center justify-center p-1 shadow-2xs overflow-hidden">
-                  ${imgSrc ? `<img src="${imgSrc}" alt="" class="w-full h-full object-cover rounded">` : `<svg class="w-6 h-6 text-amber-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v6"></path><path d="M16.76 3a2 2 0 0 1 1.8 1.1l2.23 4.479a2 2 0 0 1 .21.891V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9.472a2 2 0 0 1 .211-.894L5.45 4.1A2 2 0 0 1 7.24 3z"></path><path d="M3.054 9.013h17.893"></path></svg>`}
-                </div>
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-start justify-between gap-1">
-                    <h3 class="text-xs font-bold text-slate-900 leading-snug truncate" title="${title || 'Item'}">${title || 'Type to select product...'}</h3>
-                    <button type="button" onclick="deleteMobileLineItem(${idx})" class="text-slate-400 hover:text-red-600 p-1 -mr-1 -mt-1 cursor-pointer active:scale-95" title="Delete">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500"><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                  </div>
-                  <p class="text-[11px] text-slate-500 font-normal truncate">${desc || 'No description'}</p>
-                  <div class="flex items-center gap-1.5 mt-1">
-                    <span class="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/60">${tierName}</span>
-                    <span class="text-[11px] font-medium text-slate-500">$${unitPrice.toFixed(2)} / ${uom}</span>
-                  </div>
-                </div>
-              </div>
-              <!-- Stepper & Price Calculation Row -->
-              <div class="flex items-center justify-between pt-1 bg-slate-50/60 p-2 rounded-lg border border-slate-100">
-                <div class="flex items-center gap-1">
-                  <button type="button" onclick="stepMobileLineQty(${idx}, -1)" class="w-7 h-7 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-700 font-bold active:bg-slate-100 shadow-2xs cursor-pointer select-none">-</button>
-                  <input class="w-14 py-1 text-center text-xs font-bold text-slate-900 bg-white border border-slate-200 rounded-md focus:ring-1 focus:ring-emerald-500" type="number" min="0.01" step="any" value="${qty}" oninput="setMobileLineQty(${idx}, this.value)">
-                  <button type="button" onclick="stepMobileLineQty(${idx}, 1)" class="w-7 h-7 flex items-center justify-center rounded-md bg-white border border-slate-200 text-slate-700 font-bold active:bg-slate-100 shadow-2xs cursor-pointer select-none">+</button>
-                  <span class="text-[11px] text-slate-500 font-medium pl-1">${uom}</span>
-                </div>
-                <div class="text-right">
-                  <span class="text-[10px] text-slate-400 block font-medium">Line Total</span>
-                  <span class="text-sm font-extrabold text-slate-900">$${lineTotal.toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-            `;
-        });
-
-        container.innerHTML = cardsHtml;
-        if (itemsSubtotalBadge) {
-            itemsSubtotalBadge.textContent = '$' + runningSubtotal.toFixed(2);
-        }
-        if (window.lucide && typeof lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
-    };
-
-    window.stepMobileLineQty = function(rowIdx, delta) {
-        const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
-        const r = rows[rowIdx];
-        if (!r) return;
-        const qtyEl = r.querySelector('.line-qty');
-        if (!qtyEl) return;
-        let val = parseFloat(qtyEl.value) || 0;
-        val = Math.max(1, val + delta);
-        qtyEl.value = val;
-        if (typeof markDirty === 'function') markDirty();
-        if (typeof recalculateTotals === 'function') recalculateTotals();
-        window.syncMobileLineCards();
-    };
-
-    window.setMobileLineQty = function(rowIdx, val) {
-        const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
-        const r = rows[rowIdx];
-        if (!r) return;
-        const qtyEl = r.querySelector('.line-qty');
-        if (!qtyEl) return;
-        qtyEl.value = Math.max(0.01, parseFloat(val) || 0);
-        if (typeof markDirty === 'function') markDirty();
-        if (typeof recalculateTotals === 'function') recalculateTotals();
-
-        const priceEl = r.querySelector('.line-price');
-        const discEl = r.querySelector('.line-disc');
-        const price = priceEl ? (parseFloat(priceEl.value) || 0) : 0;
-        const disc = discEl ? (parseFloat(discEl.value) || 0) : 0;
-        const lineSub = (parseFloat(qtyEl.value) * price) * (1 - (disc / 100));
-        const card = document.querySelector(`[data-mobile-row-idx="${rowIdx}"]`);
-        if (card) {
-            const totDisp = card.querySelector('.text-sm.font-extrabold');
-            if (totDisp) totDisp.textContent = '$' + lineSub.toFixed(2);
-        }
-    };
-
-    window.deleteMobileLineItem = function(rowIdx) {
-        const rows = document.querySelectorAll('#lineItemsBody tr[data-line-index]');
-        const r = rows[rowIdx];
-        if (!r) return;
-        const delBtn = r.querySelector('.line-delete-cross-btn');
-        if (delBtn && typeof deleteSpecificSoLine === 'function') {
-            deleteSpecificSoLine(delBtn);
-        } else {
-            r.remove();
-            if (typeof markDirty === 'function') markDirty();
-            if (typeof recalculateTotals === 'function') recalculateTotals();
-        }
-        window.syncMobileLineCards();
-    };
-
-    window.viewCurrentCustomerHistory = function() {
-        const custId = document.getElementById('customerIdHidden')?.value || document.getElementById('mobileCustomerSelect')?.value;
-        if (custId) {
-            window.open('/customers/' + custId, '_blank');
-        } else {
-            alert('Please select a customer first.');
-        }
-    };
-
-    // 9. Attach mobile recalculation updater to recalculateTotals
-    const origRecalculateTotals = window.recalculateTotals;
-    window.recalculateTotals = function() {
-        if (typeof origRecalculateTotals === 'function') {
-            origRecalculateTotals();
-        }
-        // Update Mobile Summary
-        const dispTot = document.getElementById('dispTotal');
-        const dispSub = document.getElementById('dispSubtotal');
-        const subVal = dispSub ? dispSub.innerText : '$0.00';
-        const totVal = dispTot ? dispTot.innerText : '$0.00';
-        const totNum = parseFloat(totVal.replace(/[^0-9.]/g, '')) || 0;
-        const khrVal = '≈ ' + Math.round(totNum * 4100).toLocaleString() + ' KHR';
-
-        const mobSub = document.getElementById('mobileSummarySubtotal');
-        if (mobSub) mobSub.innerText = subVal;
-        const mobTot = document.getElementById('mobileSummaryTotalPayableUsd');
-        if (mobTot) mobTot.innerText = totVal;
-        const mobKhr = document.getElementById('mobileSummaryTotalPayableKhr');
-        if (mobKhr) mobKhr.innerText = khrVal;
-        const mobPayBtn = document.getElementById('mobileStickyPayBtnAmount');
-        if (mobPayBtn) mobPayBtn.innerText = totVal;
-        const mobBadge = document.getElementById('mobileItemsSubtotalBadge');
-        if (mobBadge) mobBadge.innerText = subVal;
-    };
-
-    // 10. Hook into addProductFromMobilePicker to re-sync mobile line cards
-    const origAddProductFromMobilePicker = window.addProductFromMobilePicker;
-    if (typeof origAddProductFromMobilePicker === 'function') {
-        window.addProductFromMobilePicker = function(pid) {
-            origAddProductFromMobilePicker(pid);
-            setTimeout(() => {
-                window.syncMobileLineCards();
-                if (typeof closeMobileAddProductModal === 'function') closeMobileAddProductModal();
-            }, 50);
-        };
-    }
-
-    // Run initial sync on DOM ready
-    document.addEventListener('DOMContentLoaded', function() {
-        window.syncMobileLineCards();
-        if (window.lucide && typeof lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
-    });
-    setTimeout(function() {
-        window.syncMobileLineCards();
-        if (window.lucide && typeof lucide.createIcons === 'function') {
-            lucide.createIcons();
-        }
-    }, 200);
-})();
 </script>
