@@ -202,6 +202,17 @@
 }
 
 html.is-mobile-view .mobile-reports-directory-view,
+html.is-embedded:not(.is-desktop-view) .mobile-reports-directory-view,
+html[data-view-mode="mobile"] .mobile-reports-directory-view {
+  display: block !important;
+}
+
+html.is-mobile-view .desktop-reports-hub-wrapper,
+html.is-embedded:not(.is-desktop-view) .desktop-reports-hub-wrapper,
+html[data-view-mode="mobile"] .desktop-reports-hub-wrapper {
+  display: none !important;
+}
+
 @media (max-width: 768px) {
   html:not(.is-desktop-view) .mobile-reports-directory-view {
     display: block !important;
@@ -210,7 +221,18 @@ html.is-mobile-view .mobile-reports-directory-view,
     display: none !important;
   }
 }
-html.is-mobile-view .desktop-reports-hub-wrapper {
+
+html.is-desktop-view .mobile-reports-directory-view {
+  display: none !important;
+}
+html.is-desktop-view .desktop-reports-hub-wrapper {
+  display: block !important;
+}
+
+/* Hide duplicate base shell mobile navbar so mob-rep-bottom-nav has exclusive display */
+html.is-mobile-view #universalMobileNavBar,
+html.is-embedded #universalMobileNavBar,
+html[data-view-mode="mobile"] #universalMobileNavBar {
   display: none !important;
 }
 
@@ -885,7 +907,7 @@ html.is-mobile-view .desktop-reports-hub-wrapper {
     <header class="mob-rep-appbar">
         <div class="mob-rep-appbar-row">
             <div class="mob-rep-appbar-left">
-                <button type="button" class="mob-rep-menu-btn" aria-label="Open Navigation Drawer" onclick="window.history.length > 1 ? window.history.back() : (window.location.href='/dashboard')">
+                <button type="button" class="mob-rep-menu-btn" aria-label="Open Navigation Drawer" onclick="typeof openMobileProfileDrawer === 'function' ? openMobileProfileDrawer() : (window.history.length > 1 ? window.history.back() : (window.location.href='/dashboard'))">
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 6h16M4 12h16M4 18h16" stroke-linecap="round" stroke-linejoin="round"></path></svg>
                 </button>
                 <div class="mob-rep-title-group">
@@ -1860,6 +1882,31 @@ html.is-mobile-view .desktop-reports-hub-wrapper {
 
 
 <script>
+// Ensure immediate view mode resolution in embedded simulator or phone viewports
+(function() {
+    const isMobile = (window.innerWidth <= 768) || 
+                     window.location.search.includes('sim_mobile=1') || 
+                     window.location.search.includes('view=mobile') ||
+                     (window.self !== window.top && window.innerWidth <= 768);
+    if (isMobile) {
+        document.documentElement.classList.add('is-mobile-view');
+        document.documentElement.classList.remove('is-desktop-view');
+        document.documentElement.setAttribute('data-view-mode', 'mobile');
+    }
+})();
+
+window.applyViewMode = function(mode) {
+    if (mode === 'mobile') {
+        document.documentElement.classList.add('is-mobile-view');
+        document.documentElement.classList.remove('is-desktop-view');
+        document.documentElement.setAttribute('data-view-mode', 'mobile');
+    } else {
+        document.documentElement.classList.add('is-desktop-view');
+        document.documentElement.classList.remove('is-mobile-view');
+        document.documentElement.setAttribute('data-view-mode', 'desktop');
+    }
+};
+
 // Mobile Navigation Helper for bottom bar
 window.navigateMobileTab = function(url, event) {
     if (event) {
