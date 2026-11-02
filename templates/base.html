@@ -50,21 +50,30 @@
                     }
                 }
             } catch(e) {}
-            // 3. Physical smartphone screens (<= 768px with mobile UA) default to mobile view
+            // 3. User manual preference in localStorage ALWAYS takes highest precedence over screen size/UA detection
+            try {
+                var manual = localStorage.getItem('inflow_view_mode_manual');
+                var saved = localStorage.getItem('inflow_view_mode');
+                if (manual === 'true' && (saved === 'desktop' || saved === 'mobile')) {
+                    return saved;
+                }
+            } catch(e) {}
+            // 4. Check cookie for manual preference
+            try {
+                var mCookie = document.cookie.match(/(?:^|;\s*)inflow_view_mode=(desktop|mobile)(?:;|$)/);
+                var mManual = document.cookie.match(/(?:^|;\s*)inflow_view_mode_manual=true(?:;|$)/);
+                if (mCookie && mCookie[1] && mManual) {
+                    return mCookie[1];
+                }
+            } catch(e) {}
+            // 5. Physical smartphone screens (<= 768px with mobile UA) default to mobile view
             var isPhoneUA = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             var isPhoneScreen = (window.innerWidth <= 768) && isPhoneUA;
             if (isPhoneScreen) {
                 return 'mobile';
             }
-            // 4. Desktop PC, Mac, Workstations, Laptops (non-phone UA or width >= 992px): ALWAYS DEFAULT TO DESKTOP
-            if (!isPhoneUA || window.innerWidth >= 992) {
-                try {
-                    var manual = localStorage.getItem('inflow_view_mode_manual');
-                    var saved = localStorage.getItem('inflow_view_mode');
-                    if (manual === 'true' && saved === 'mobile' && window.innerWidth <= 1024) {
-                        return 'mobile';
-                    }
-                } catch(e) {}
+            // 6. Desktop PC, Mac, Workstations, Laptops, or Mobile Desktop site mode (non-phone UA or width >= 900px): ALWAYS DEFAULT TO DESKTOP
+            if (!isPhoneUA || window.innerWidth >= 900) {
                 return 'desktop';
             }
             return (window.innerWidth <= 768) ? 'mobile' : 'desktop';
@@ -143,18 +152,18 @@
             background-color: rgba(255, 255, 255, 0.16) !important;
         }
 
-        /* Mobile & Tablet Layout Chrome Suppression (Completely deletes left white gap & desktop rails) */
+        /* Mobile & Tablet Layout Chrome Suppression (Completely deletes left white gap & desktop rails ONLY when NOT in Desktop/PC view) */
         @media (max-width: 1024px), (max-device-width: 1024px) {
-            #inflowCloudSidebar,
-            .inflow-cloud-sidebar,
-            #inflowSidebarFlyout,
-            .inflow-sidebar-flyout,
-            #inflowTopTabBar,
-            .inflow-top-tab-bar,
-            #inflowTabAccentLine,
-            .inflow-tab-accent-line,
-            #soSidebarExpandTab,
-            .inflow-sidebar-edge-tab {
+            html:not(.is-desktop-view) #inflowCloudSidebar,
+            html:not(.is-desktop-view) .inflow-cloud-sidebar,
+            html:not(.is-desktop-view) #inflowSidebarFlyout,
+            html:not(.is-desktop-view) .inflow-sidebar-flyout,
+            html:not(.is-desktop-view) #inflowTopTabBar,
+            html:not(.is-desktop-view) .inflow-top-tab-bar,
+            html:not(.is-desktop-view) #inflowTabAccentLine,
+            html:not(.is-desktop-view) .inflow-tab-accent-line,
+            html:not(.is-desktop-view) #soSidebarExpandTab,
+            html:not(.is-desktop-view) .inflow-sidebar-edge-tab {
                 display: none !important;
                 width: 0 !important;
                 height: 0 !important;
@@ -169,8 +178,8 @@
                 border: none !important;
             }
             /* #soMasterSidebar hidden conditionally — allows .mobile-drawer-open to show it */
-            #soMasterSidebar:not(.mobile-drawer-open),
-            .so-master-sidebar:not(.mobile-drawer-open) {
+            html:not(.is-desktop-view) #soMasterSidebar:not(.mobile-drawer-open),
+            html:not(.is-desktop-view) .so-master-sidebar:not(.mobile-drawer-open) {
                 display: none !important;
                 width: 0 !important;
                 height: 0 !important;
@@ -184,16 +193,16 @@
                 padding: 0 !important;
                 border: none !important;
             }
-            html,
-            body,
-            .app-container,
-            .main-wrapper,
-            #inflowTabWorkspace,
-            #inflowDirectContent,
-            .content-area,
-            .inflow-so-workspace,
-            .inflow-document-canvas,
-            .so-main-left {
+            html:not(.is-desktop-view),
+            html:not(.is-desktop-view) body,
+            html:not(.is-desktop-view) .app-container,
+            html:not(.is-desktop-view) .main-wrapper,
+            html:not(.is-desktop-view) #inflowTabWorkspace,
+            html:not(.is-desktop-view) #inflowDirectContent,
+            html:not(.is-desktop-view) .content-area,
+            html:not(.is-desktop-view) .inflow-so-workspace,
+            html:not(.is-desktop-view) .inflow-document-canvas,
+            html:not(.is-desktop-view) .so-main-left {
                 margin: 0 !important;
                 margin-left: 0 !important;
                 margin-right: 0 !important;
@@ -209,7 +218,7 @@
                 box-sizing: border-box !important;
                 overflow-x: hidden !important;
             }
-            #inflowTabWorkspace {
+            html:not(.is-desktop-view) #inflowTabWorkspace {
                 height: 100vh !important;
                 height: 100dvh !important;
                 width: 100% !important;
@@ -218,8 +227,8 @@
                 padding: 0 !important;
                 left: 0 !important;
             }
-            .inflow-tab-viewport,
-            .inflow-tab-iframe {
+            html:not(.is-desktop-view) .inflow-tab-viewport,
+            html:not(.is-desktop-view) .inflow-tab-iframe {
                 width: 100% !important;
                 height: 100% !important;
                 margin: 0 !important;
@@ -227,6 +236,94 @@
                 left: 0 !important;
                 border: none !important;
             }
+        }
+
+        /* ==========================================================================
+           DESKTOP / PC VIEW MODE CHROME GUARANTEE
+           Strictly restores 56px Sidebar Rail and MDI Top Tab Bar when user switches
+           to PC view on any mobile device, tablet, or browser viewport.
+           ========================================================================== */
+        html.is-desktop-view:not(.is-embedded) #inflowCloudSidebar,
+        html.is-desktop-view:not(.is-embedded) .inflow-cloud-sidebar {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            bottom: 0 !important;
+            width: 56px !important;
+            min-width: 56px !important;
+            max-width: 56px !important;
+            height: 100vh !important;
+            height: 100dvh !important;
+            z-index: 9999 !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            box-shadow: 1px 0 4px rgba(0, 0, 0, 0.15) !important;
+            padding: 8px 0 !important;
+            margin: 0 !important;
+        }
+
+        html.is-desktop-view:not(.is-embedded) #inflowTopTabBar,
+        html.is-desktop-view:not(.is-embedded) .inflow-top-tab-bar {
+            display: flex !important;
+            align-items: center !important;
+            height: 44px !important;
+            min-height: 44px !important;
+            max-height: 44px !important;
+            width: 100% !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            z-index: 50 !important;
+            position: relative !important;
+            background: linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%) !important;
+            border-bottom: 1px solid #E2E8F0 !important;
+            padding: 0 12px !important;
+        }
+
+        html.is-desktop-view:not(.is-embedded) #inflowTabAccentLine,
+        html.is-desktop-view:not(.is-embedded) .inflow-tab-accent-line {
+            display: block !important;
+            height: 3px !important;
+            min-height: 3px !important;
+            width: 100% !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 49 !important;
+        }
+
+        html.is-desktop-view:not(.is-embedded) body:not(.sales-order-body-fullscreen) .main-wrapper {
+            margin-left: 56px !important;
+            width: calc(100% - 56px) !important;
+            min-width: 1024px !important;
+            box-sizing: border-box !important;
+        }
+
+        html.is-desktop-view:not(.is-embedded) .app-container {
+            width: 100% !important;
+            min-width: 1080px !important;
+            box-sizing: border-box !important;
+        }
+
+        html.is-desktop-view,
+        html.is-desktop-view body {
+            overflow-x: auto !important;
+            min-width: 1080px !important;
+        }
+
+        html.is-desktop-view .inflow-bar-right {
+            display: flex !important;
+        }
+
+        html.is-desktop-view:not(.is-embedded) #inflowTabWorkspace {
+            display: block !important;
+            height: calc(100vh - 47px) !important;
+            height: calc(100dvh - 47px) !important;
+            width: 100% !important;
+            min-width: 1024px !important;
         }
 
         html.is-mobile-view #inflowCloudSidebar,
@@ -1805,6 +1902,7 @@
                     localStorage.setItem('inflow_view_mode', mode);
                     localStorage.setItem('inflow_view_mode_manual', 'true');
                     document.cookie = "inflow_view_mode=" + mode + "; path=/; max-age=31536000; SameSite=Lax";
+                    document.cookie = "inflow_view_mode_manual=true; path=/; max-age=31536000; SameSite=Lax";
                 } catch(e) {}
             }
 
