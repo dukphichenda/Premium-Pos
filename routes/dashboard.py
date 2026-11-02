@@ -34,6 +34,7 @@ def index():
     else:
         branch_scope = 'main'
 
+    selected_branch = None
     try:
         # Load all active branches with fulfillment locations
         branches = query_all("""
@@ -286,6 +287,7 @@ def index():
         branch_scope = 'main'
         current_store_name = 'Main Store (HQ)'
         current_store_code = 'HQ'
+        selected_branch = None
 
     branch_active_logo = selected_branch.get('logo_url') if selected_branch else None
 
