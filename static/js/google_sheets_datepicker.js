@@ -314,14 +314,9 @@
         const formatted = formatDate(date, activeInput);
         activeInput.value = formatted;
 
-        // Dispatch input & change events
+        // Dispatch input & change events (which triggers inline onchange and listeners)
         activeInput.dispatchEvent(new Event('input', { bubbles: true }));
         activeInput.dispatchEvent(new Event('change', { bubbles: true }));
-
-        // Call handleBillDateChange if defined on sales order page
-        if (typeof window.handleBillDateChange === 'function') {
-            window.handleBillDateChange(activeInput);
-        }
 
         // Call markDirty if present in page
         if (typeof window.markDirty === 'function') {

@@ -7909,9 +7909,14 @@ function handleBillDateChange(input) {
     if (origDate && newDate && origDate !== newDate) {
         const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
         if (remarksEl) {
+            // ONLY add to note once - if remarks already contains previous bill date, do not add more
+            if (/previous\s+bill\s+date\s*:/i.test(remarksEl.value)) {
+                return;
+            }
             const dateNote = `Previous bill date: ${origDate}`;
-            if (!remarksEl.value.includes(dateNote)) {
-                remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
+            remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
+            if (typeof updateRemarksCharCount === 'function') {
+                updateRemarksCharCount(remarksEl);
             }
         }
     }
@@ -7933,7 +7938,7 @@ function saveSalesOrder() {
         return;
     }
 
-    // Ensure previous bill date is recorded if changed (only for existing saved orders)
+    // Ensure previous bill date is recorded if changed (only for existing saved orders, and only once)
     const orderId = typeof getCurrentOrderId === 'function' ? getCurrentOrderId() : null;
     if (!isNewOrder && !isCopiedDraft && orderId && orderId !== '0' && orderId !== 0) {
         const dateInput = document.getElementById('orderDateInput');
@@ -7942,14 +7947,30 @@ function saveSalesOrder() {
             const newDate = (dateInput.value || '').trim();
             if (origDate && newDate && origDate !== newDate) {
                 const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
-                if (remarksEl) {
+                if (remarksEl && !/previous\s+bill\s+date\s*:/i.test(remarksEl.value)) {
                     const dateNote = `Previous bill date: ${origDate}`;
-                    if (!remarksEl.value.includes(dateNote)) {
-                        remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
-                    }
+                    remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
                 }
             }
         }
+    }
+
+    // Deduplicate any duplicate Previous bill date lines in remarks before submitting
+    const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
+    if (remarksEl && remarksEl.value && /previous\s+bill\s+date\s*:/i.test(remarksEl.value)) {
+        let seenPrevDate = false;
+        const cleaned = [];
+        remarksEl.value.split('\n').forEach(line => {
+            if (/^\s*previous\s+bill\s+date\s*:/i.test(line)) {
+                if (!seenPrevDate) {
+                    cleaned.push(line.trim());
+                    seenPrevDate = true;
+                }
+            } else {
+                cleaned.push(line);
+            }
+        });
+        remarksEl.value = cleaned.join('\n').trim();
     }
 
     const lines = gatherLineItems();

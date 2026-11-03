@@ -2872,12 +2872,27 @@ def save_order(id=0):
 
         # When change date of the bill the previous date must add to remark (ONLY for existing orders)
         if not is_new and order and order.get('order_date'):
+            import re
             old_date = order['order_date']
             if old_date and order_date and old_date != order_date:
-                old_date_str = old_date.strftime('%d-%b-%Y')
-                date_note = f"Previous bill date: {old_date_str}"
-                if date_note not in notes:
+                has_prev_date = bool(re.search(r'previous\s+bill\s+date\s*:', notes, re.IGNORECASE))
+                if not has_prev_date:
+                    old_date_str = old_date.strftime('%d-%b-%y')
+                    date_note = f"Previous bill date: {old_date_str}"
                     notes = f"{notes}\n{date_note}".strip() if notes else date_note
+
+            # Clean and deduplicate any multiple 'Previous bill date:' lines to keep only the first one
+            if notes and re.search(r'previous\s+bill\s+date\s*:', notes, re.IGNORECASE):
+                seen_prev_date = False
+                cleaned_lines = []
+                for line in notes.splitlines():
+                    if re.match(r'^\s*previous\s+bill\s+date\s*:', line, re.IGNORECASE):
+                        if not seen_prev_date:
+                            cleaned_lines.append(line.strip())
+                            seen_prev_date = True
+                    else:
+                        cleaned_lines.append(line)
+                notes = "\n".join(cleaned_lines).strip()
         elif is_new and notes:
             # Strip any accidental 'Previous bill date: ...' from new or copied orders
             import re
