@@ -91,7 +91,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             'subtotal': 100.0,
             'total_amount': 100.0
         }
-        resp = self.client.post(f'/sales/save/{order_id}', data=post_data, follow_redirects=True)
+        resp = self.client.post(f'/sales/{order_id}/save', data=post_data, follow_redirects=True)
         self.assertEqual(resp.status_code, 200)
 
         saved = query_one("SELECT notes FROM sales_orders WHERE id = %s", (order_id,))
@@ -99,7 +99,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
         self.assertEqual(len(lines), 1, f"Expected exactly 1 previous bill date line, got: {saved['notes']}")
 
         # 2. Saving again must NOT add another line
-        resp2 = self.client.post(f'/sales/save/{order_id}', data=post_data, follow_redirects=True)
+        resp2 = self.client.post(f'/sales/{order_id}/save', data=post_data, follow_redirects=True)
         self.assertEqual(resp2.status_code, 200)
         saved2 = query_one("SELECT notes FROM sales_orders WHERE id = %s", (order_id,))
         lines2 = [l for l in (saved2['notes'] or '').splitlines() if re.search(r'previous\s+bill\s+date', l, re.I)]
@@ -129,7 +129,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             'subtotal': 100.0,
             'total_amount': 100.0
         }
-        resp = self.client.post(f'/sales/save/{order_id}', data=post_data, follow_redirects=True)
+        resp = self.client.post(f'/sales/{order_id}/save', data=post_data, follow_redirects=True)
         self.assertEqual(resp.status_code, 200)
 
         saved = query_one("SELECT notes FROM sales_orders WHERE id = %s", (order_id,))
