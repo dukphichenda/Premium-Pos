@@ -307,6 +307,46 @@
     color: #0284C7;
     box-shadow: 0 1px 4px rgba(0,0,0,0.1);
 }
+.pl-btn-clear-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #FFF1F2;
+    color: #E11D48;
+    border: 1px solid #FECDD3;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin-left: 4px;
+}
+.pl-btn-clear-pill:hover {
+    background: #FFE4E6;
+    border-color: #FDA4AF;
+    color: #BE123C;
+}
+.pl-btn-clear-selection {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #FFF1F2 !important;
+    color: #E11D48 !important;
+    border: 1px solid #FECDD3 !important;
+    border-radius: 8px !important;
+    height: 36px;
+    padding: 0 12px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.pl-btn-clear-selection:hover {
+    background: #FFE4E6 !important;
+    border-color: #FDA4AF !important;
+    color: #BE123C !important;
+}
 
 /* Form selects & search */
 .pl-select {
@@ -2585,18 +2625,18 @@
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
                 </button>
                 <div class="pl-copy-dropdown-menu" id="plCopyDropdownMenu">
-                    <div class="pl-copy-dropdown-item" onclick="handleCopyHeaderAction('selected_single')">
+                    <div class="pl-copy-dropdown-item" onclick="handleCopyHeaderAction('selected_single', event)">
                         <span class="pl-copy-dropdown-icon">📋</span>
                         <div>
-                            <div class="pl-copy-dropdown-heading">Copy Card to Clipboard (<span id="copySelectedCount">0</span> selected)</div>
-                            <div class="pl-copy-dropdown-desc">Copy high-res image directly into clipboard. Ready to paste (Ctrl+V) into Telegram, Messenger, WhatsApp, etc.</div>
+                            <div class="pl-copy-dropdown-heading" id="copySingleHeading">Copy Separate Picture (<span id="copySelectedCount">0</span> selected)</div>
+                            <div class="pl-copy-dropdown-desc">Copy / share each card as an individual separate picture (not combined) for Telegram, Messenger, WhatsApp, etc.</div>
                         </div>
                     </div>
-                    <div class="pl-copy-dropdown-item" onclick="handleCopyHeaderAction('selected_combined')">
+                    <div class="pl-copy-dropdown-item" onclick="handleCopyHeaderAction('selected_combined', event)">
                         <span class="pl-copy-dropdown-icon">🖼️</span>
                         <div>
-                            <div class="pl-copy-dropdown-heading">Copy Combined Picture</div>
-                            <div class="pl-copy-dropdown-desc">Combines selected cards side-by-side into a single comparison picture on clipboard.</div>
+                            <div class="pl-copy-dropdown-heading">Copy Combined Picture (Merged)</div>
+                            <div class="pl-copy-dropdown-desc">Combines selected cards side-by-side into a single merged comparison picture.</div>
                         </div>
                     </div>
                     <div class="pl-copy-dropdown-divider"></div>
@@ -2670,6 +2710,13 @@
                     <span>☑️ Selected</span>
                     <span class="pl-selected-pill" id="selectedCountPill">0</span>
                 </button>
+                <button type="button" class="pl-btn-clear-pill" id="btnClearAllSelection" onclick="clearAllSelectedProducts(event)" title="Clear all selected products" style="display: none;">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                    <span>Clear</span>
+                </button>
             </div>
 
             <!-- Category Dropdown -->
@@ -2701,12 +2748,12 @@
                 </select>
             </div>
 
-            <!-- View Mode Switcher: [ 📋 Table | 🎴 Cards ] -->
+            <!-- View Mode Switcher: [ 📋 Table | 🎴 Cards ] (Default: Cards) -->
             <div class="pl-view-switcher" id="viewModeSwitcher">
-                <button type="button" class="pl-view-btn active" id="btnViewTable" onclick="switchViewMode('table')" title="Switch to Modern Table View">
+                <button type="button" class="pl-view-btn" id="btnViewTable" onclick="switchViewMode('table')" title="Switch to Modern Table View">
                     <span>📋 Table</span>
                 </button>
-                <button type="button" class="pl-view-btn" id="btnViewCards" onclick="switchViewMode('cards')" title="Switch to Cards View">
+                <button type="button" class="pl-view-btn active" id="btnViewCards" onclick="switchViewMode('cards')" title="Switch to Cards View">
                     <span>🎴 Cards</span>
                 </button>
             </div>
@@ -2726,8 +2773,17 @@
                 <span>Select Products</span>
             </button>
 
+            <!-- Clear All Selection Button -->
+            <button type="button" class="pl-btn pl-btn-clear-selection" id="btnClearAllSelectionBtn" onclick="clearAllSelectedProducts(event)" title="Clear all selected products" style="display: none;">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+                <span>Clear Selection</span>
+            </button>
+
             <!-- Group By Dropdown (for Cards View) -->
-            <div id="groupByFilterWrap" style="display: none; align-items: center; gap: 6px;">
+            <div id="groupByFilterWrap" style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 12px; font-weight: 700; color: #64748B;">Group by:</span>
                 <select id="groupByFilter" class="pl-select" onchange="applyFiltersAndRender()" title="Group cards by Category, UOM or flat continuous grid">
                     <option value="category" selected>📁 Category</option>
@@ -2737,7 +2793,7 @@
             </div>
 
             <!-- Card Style Dropdown (for Cards View) -->
-            <div id="cardStyleFilterWrap" style="display: none; align-items: center; gap: 6px;">
+            <div id="cardStyleFilterWrap" style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 12px; font-weight: 700; color: #64748B;">Style:</span>
                 <select id="cardStyleFilter" class="pl-select" onchange="onCardStyleChange()" title="Choose Price Card Style (Classic vs Modern vs Cute Look vs Gen Z)">
                     <option value="auto" selected>⚡ Auto (By Category)</option>
@@ -2763,7 +2819,7 @@
     </div>
 
     <!-- 1. MODERN PRICE LIST TABLE WRAPPER (Screenshot 2 Match with Extra Detail) -->
-    <div class="pl-table-wrapper" id="priceTableWrapper">
+    <div class="pl-table-wrapper" id="priceTableWrapper" style="display: none;">
         <div class="pl-table-toolbar-meta">
             <div class="pl-table-meta-left">
                 <span class="pl-table-meta-badge" id="tableMetaCount">0 Products</span>
@@ -2805,8 +2861,8 @@
         </div>
     </div>
 
-    <!-- 2. MAIN CARDS CONTAINER (Dynamic Render Container for Cards View) -->
-    <div class="pl-groups-container" id="priceCardsContainer" style="display: none;">
+    <!-- 2. MAIN CARDS CONTAINER (Dynamic Render Container for Cards View - Default) -->
+    <div class="pl-groups-container" id="priceCardsContainer" style="display: flex;">
         <!-- Hidden baseline template markup for test assertions and card rendering fallback -->
         <div style="display: none;" class="pl-card-template-hidden">
             <div class="pl-price-card">
@@ -2971,7 +3027,7 @@ let currentGroupBy = 'category'; // 'category' | 'uom' | 'none'
 let currentSearch = '';
 let currentThemeColor = '#3B4B64';
 let selectedProductIds = new Set(); // Start empty: no pre-selected products, user chooses later
-let currentViewMode = 'table'; // Default: 'table' view matching user request
+let currentViewMode = 'cards'; // Default: 'cards' view matching user request
 let currentSchemeId = {{ (pricing_schemes|selectattr('is_default')|first).id if pricing_schemes and (pricing_schemes|selectattr('is_default')|list) else (pricing_schemes[0].id if pricing_schemes else 100) }};
 let currentUom = 'pack'; // 'pack' | 'case' | 'pcs' | 'auto'
 const GLOBAL_PRICE_TABLE_STYLE = {{ (global_price_table_style or 'classic')|tojson }};
@@ -3002,10 +3058,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         const v = urlParams.get('view');
-        if (v === 'cards') {
-            currentViewMode = 'cards';
-        } else {
+        if (v === 'table') {
             currentViewMode = 'table';
+        } else {
+            currentViewMode = 'cards';
         }
     } catch(e) {}
 
@@ -3208,6 +3264,44 @@ function updateSelectedBadges() {
     if (zipCount) zipCount.textContent = count;
     const copyCount = document.getElementById('copySelectedCount');
     if (copyCount) copyCount.textContent = count;
+
+    // Show/hide Clear All Selection buttons
+    const clearPill = document.getElementById('btnClearAllSelection');
+    if (clearPill) clearPill.style.display = count > 0 ? 'inline-flex' : 'none';
+    const clearBtn = document.getElementById('btnClearAllSelectionBtn');
+    if (clearBtn) clearBtn.style.display = count > 0 ? 'inline-flex' : 'none';
+
+    // Dynamically update copy single/separate heading text
+    const copyHeading = document.getElementById('copySingleHeading');
+    if (copyHeading) {
+        if (count === 0) {
+            copyHeading.innerHTML = `Copy Separate Picture (<span id="copySelectedCount">0</span> selected)`;
+        } else if (count === 1) {
+            copyHeading.innerHTML = `Copy Card to Clipboard (1 selected)`;
+        } else {
+            copyHeading.innerHTML = `Copy / Share Separate Pictures (${count} selected)`;
+        }
+    }
+}
+
+// Clear all selected products
+function clearAllSelectedProducts(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    selectedProductIds.clear();
+    // Uncheck all row checkboxes in table view
+    document.querySelectorAll('.pl-row-chk, #selectAllRowsChk, .pl-card-checkbox').forEach(chk => {
+        chk.checked = false;
+    });
+    // Remove selected classes
+    document.querySelectorAll('.row-selected, .card-selected, .pl-picker-item.selected').forEach(el => {
+        el.classList.remove('row-selected', 'card-selected', 'selected');
+    });
+    updateSelectedBadges();
+    applyFiltersAndRender();
+    showPriceListToast('✓ Cleared all selected products (0 selected)', true);
 }
 
 // Row Checkbox Selection
@@ -5465,12 +5559,36 @@ async function copySingleCardAsImage(productId, btnEl, event) {
         return;
     }
     
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const safeName = (item.khmer_name || (item.card && item.card.khmer_name) || item.name || 'Product').replace(/[\/\\:*?"<>|]/g, '_').trim();
+    const filename = `${safeSku}_${safeName}.png`;
+
     const origHtml = btnEl ? btnEl.innerHTML : '';
     if (btnEl) {
         btnEl.innerHTML = `<span style="display:inline-block;animation:spin 1s linear infinite;">⏳</span> Capturing...`;
         btnEl.disabled = true;
     }
     
+    // CRITICAL FOR ANDROID CHROME & IOS:
+    // Initiate navigator.clipboard.write SYNCHRONOUSLY within the active user gesture
+    // using a deferred Promise so Android does not expire user activation during html2canvas!
+    let clipboardResolve = null, clipboardReject = null;
+    const blobPromise = new Promise((resolve, reject) => {
+        clipboardResolve = resolve;
+        clipboardReject = reject;
+    });
+
+    let syncClipboardPromise = null;
+    if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+        try {
+            const clipItem = new ClipboardItem({ 'image/png': blobPromise });
+            syncClipboardPromise = navigator.clipboard.write([clipItem]);
+        } catch (syncErr) {
+            console.warn('Sync ClipboardItem with Promise not supported, will use fallback:', syncErr);
+        }
+    }
+
     try {
         const framedCanvas = await captureItemToCanvas(item, 2.5);
         
@@ -5481,9 +5599,21 @@ async function copySingleCardAsImage(productId, btnEl, event) {
                 else reject(new Error('Canvas to PNG failed'));
             }, 'image/png');
         });
+
+        // Resolve deferred clipboard promise for Android/Desktop
+        if (clipboardResolve) clipboardResolve(pngBlob);
         
         let copied = false;
-        if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+        if (syncClipboardPromise) {
+            try {
+                await syncClipboardPromise;
+                copied = true;
+            } catch (pErr) {
+                console.warn('Sync clipboard promise error:', pErr);
+            }
+        }
+        
+        if (!copied && navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
             try {
                 const clipItem = new ClipboardItem({ 'image/png': pngBlob });
                 await navigator.clipboard.write([clipItem]);
@@ -5494,7 +5624,10 @@ async function copySingleCardAsImage(productId, btnEl, event) {
         }
         
         if (copied) {
-            showPriceListToast(`✓ Copied [${item.sku || 'Card'}] to clipboard! Paste (Ctrl+V) into Telegram or Messenger.`, true);
+            const msg = isMobile
+                ? `✓ Copied [${item.sku || 'Card'}]! Tap image preview on keyboard to paste in Telegram/Messenger.`
+                : `✓ Copied [${item.sku || 'Card'}] to clipboard! Paste (Ctrl+V) into Telegram or Messenger.`;
+            showPriceListToast(msg, true);
             if (btnEl) {
                 btnEl.classList.add('copied');
                 btnEl.innerHTML = `✓ Copied!`;
@@ -5504,18 +5637,46 @@ async function copySingleCardAsImage(productId, btnEl, event) {
                     btnEl.disabled = false;
                 }, 2000);
             }
-        } else {
-            // Fallback: direct download
-            const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
-            const safeName = (item.khmer_name || (item.card && item.card.khmer_name) || item.name || 'Product').replace(/[\/\\:*?"<>|]/g, '_').trim();
-            saveAs(pngBlob, `${safeSku}_${safeName}.png`);
-            showPriceListToast(`📥 Downloaded picture to device (clipboard permission blocked).`, true);
-            if (btnEl) {
-                btnEl.innerHTML = origHtml;
-                btnEl.disabled = false;
+            return;
+        }
+
+        // On Android / Mobile: If clipboard blocked, invoke native Web Share API
+        if (isMobile && navigator.canShare) {
+            try {
+                const file = new File([pngBlob], filename, { type: 'image/png' });
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: `${item.sku || 'Product'}: ${safeName}`
+                    });
+                    showPriceListToast(`✓ Shared [${item.sku || 'Card'}]!`, true);
+                    if (btnEl) {
+                        btnEl.innerHTML = origHtml;
+                        btnEl.disabled = false;
+                    }
+                    return;
+                }
+            } catch (shareErr) {
+                if (shareErr.name === 'AbortError') {
+                    if (btnEl) {
+                        btnEl.innerHTML = origHtml;
+                        btnEl.disabled = false;
+                    }
+                    return;
+                }
+                console.warn('Web Share failed:', shareErr);
             }
         }
+
+        // Fallback: direct download
+        saveAs(pngBlob, filename);
+        showPriceListToast(`📥 Downloaded picture to device.`, true);
+        if (btnEl) {
+            btnEl.innerHTML = origHtml;
+            btnEl.disabled = false;
+        }
     } catch (err) {
+        if (clipboardReject) clipboardReject(err);
         console.error('Copy card error:', err);
         showPriceListToast(`Could not copy card: ${err.message || err}`, false);
         if (btnEl) {
@@ -5558,24 +5719,97 @@ async function exportSingleCardAsPicture(productId, btnEl, event) {
     }
 }
 
-async function handleCopyHeaderAction(action) {
+async function handleCopyHeaderAction(action, event) {
+    if (event) event.stopPropagation();
     const menu = document.getElementById('plCopyDropdownMenu');
     if (menu) menu.classList.remove('show');
     
     let selectedItems = ALL_PRODUCTS_DATA.filter(p => selectedProductIds.has(p.id));
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
     
     if (action === 'selected_single') {
-        if (selectedItems.length === 1) {
-            await copySingleCardAsImage(selectedItems[0].id, null);
-        } else if (selectedItems.length > 1) {
-            await handleCopyHeaderAction('selected_combined');
-        } else {
+        if (selectedItems.length === 0) {
             const visible = getFilteredProducts();
             if (visible && visible.length > 0) {
-                await copySingleCardAsImage(visible[0].id, null);
+                await copySingleCardAsImage(visible[0].id, null, event);
                 showPriceListToast(`✓ Copied [${visible[0].sku || 'Item'}] to clipboard! (Tick checkboxes to choose specific cards)`, true);
             } else {
                 showPriceListToast('No products available to copy. Select cards first.', false);
+            }
+        } else if (selectedItems.length === 1) {
+            // Exactly 1 card selected: copy as individual picture
+            await copySingleCardAsImage(selectedItems[0].id, null, event);
+        } else {
+            // MULTIPLE SELECTED (e.g. 2, 3 cards): DO NOT COMBINE! KEEP STRICTLY SEPARATE!
+            showPriceListToast(`Rendering ${selectedItems.length} separate card pictures...`, true);
+
+            try {
+                // 1. Render all selected items to separate PNG blobs/files
+                const separateFiles = [];
+                for (let i = 0; i < selectedItems.length; i++) {
+                    const item = selectedItems[i];
+                    const framedCanvas = await captureItemToCanvas(item, 2.5);
+                    const pngBlob = await new Promise((resolve, reject) => {
+                        framedCanvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas to PNG failed')), 'image/png');
+                    });
+                    const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
+                    const safeName = (item.khmer_name || (item.card && item.card.khmer_name) || item.name || 'Product').replace(/[\/\\:*?"<>|]/g, '_').trim();
+                    const filename = `${safeSku}_${safeName}.png`;
+                    separateFiles.push({
+                        item: item,
+                        blob: pngBlob,
+                        file: new File([pngBlob], filename, { type: 'image/png' }),
+                        filename: filename
+                    });
+                }
+
+                // 2. On Android / Mobile: Web Share API shares ALL separate pictures simultaneously!
+                if (isMobile && navigator.canShare) {
+                    try {
+                        const filesToShare = separateFiles.map(sf => sf.file);
+                        if (navigator.canShare({ files: filesToShare })) {
+                            await navigator.share({
+                                files: filesToShare,
+                                title: `${selectedItems.length} Product Price Cards`
+                            });
+                            showPriceListToast(`✓ Shared ${selectedItems.length} separate pictures!`, true);
+                            return;
+                        }
+                    } catch (shareErr) {
+                        if (shareErr.name === 'AbortError') return;
+                        console.warn('Multi-file Web Share failed, falling back to copy/download:', shareErr);
+                    }
+                }
+
+                // 3. On Desktop (or if Web Share not available):
+                // Copy the first selected card directly to clipboard for immediate paste (Ctrl+V)
+                let firstCopied = false;
+                try {
+                    if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+                        const clipItem = new ClipboardItem({ 'image/png': separateFiles[0].blob });
+                        await navigator.clipboard.write([clipItem]);
+                        firstCopied = true;
+                    }
+                } catch (clipErr) {
+                    console.warn('Clipboard write for first card failed:', clipErr);
+                }
+
+                // Download each separate picture file individually (STRICTLY SEPARATE, NEVER COMBINED!)
+                for (let i = 0; i < separateFiles.length; i++) {
+                    saveAs(separateFiles[i].blob, separateFiles[i].filename);
+                    if (i < separateFiles.length - 1) {
+                        await new Promise(r => setTimeout(r, 250));
+                    }
+                }
+
+                if (firstCopied) {
+                    showPriceListToast(`✓ Copied [${selectedItems[0].sku || 'Card 1'}] to clipboard & saved all ${selectedItems.length} separate pictures! Paste in Telegram/Messenger or drag downloaded pictures.`, true);
+                } else {
+                    showPriceListToast(`✓ Successfully exported ${selectedItems.length} separate pictures (not combined)!`, true);
+                }
+            } catch (multiErr) {
+                console.error('Separate export error:', multiErr);
+                showPriceListToast(`Failed to export separate pictures: ${multiErr.message || multiErr}`, false);
             }
         }
     } else if (action === 'selected_combined') {
@@ -5588,19 +5822,48 @@ async function handleCopyHeaderAction(action) {
             return;
         }
         if (items.length === 1) {
-            await copySingleCardAsImage(items[0].id, null);
+            await copySingleCardAsImage(items[0].id, null, event);
             return;
         }
         
         showPriceListToast(`Combining ${items.length} cards into comparison picture...`, true);
+
+        // Synchronous user gesture initiation for Android / mobile
+        let clipboardResolve = null, clipboardReject = null;
+        const blobPromise = new Promise((resolve, reject) => {
+            clipboardResolve = resolve;
+            clipboardReject = reject;
+        });
+
+        let syncClipboardPromise = null;
+        if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+            try {
+                const clipItem = new ClipboardItem({ 'image/png': blobPromise });
+                syncClipboardPromise = navigator.clipboard.write([clipItem]);
+            } catch (e) {
+                console.warn('Sync ClipboardItem failed:', e);
+            }
+        }
+
         try {
             const canvas = await captureMultipleItemsToCanvas(items, 2.2);
             const pngBlob = await new Promise((resolve, reject) => {
                 canvas.toBlob(b => b ? resolve(b) : reject(new Error('Canvas to PNG failed')), 'image/png');
             });
+
+            if (clipboardResolve) clipboardResolve(pngBlob);
             
             let copied = false;
-            if (navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+            if (syncClipboardPromise) {
+                try {
+                    await syncClipboardPromise;
+                    copied = true;
+                } catch (e) {
+                    console.warn('Sync combined clipboard write rejected:', e);
+                }
+            }
+
+            if (!copied && navigator.clipboard && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
                 try {
                     const clipItem = new ClipboardItem({ 'image/png': pngBlob });
                     await navigator.clipboard.write([clipItem]);
@@ -5610,13 +5873,34 @@ async function handleCopyHeaderAction(action) {
                 }
             }
             
+            const combinedFilename = `Combined_Price_Cards_${items.length}_items.png`;
             if (copied) {
-                showPriceListToast(`✓ Combined picture (${items.length} cards) copied to clipboard! Paste in Telegram or Messenger.`, true);
+                const msg = isMobile
+                    ? `✓ Combined picture (${items.length} cards) copied! Tap image preview on keyboard to paste.`
+                    : `✓ Combined picture (${items.length} cards) copied to clipboard! Paste in Telegram or Messenger.`;
+                showPriceListToast(msg, true);
+            } else if (isMobile && navigator.canShare) {
+                try {
+                    const file = new File([pngBlob], combinedFilename, { type: 'image/png' });
+                    if (navigator.canShare({ files: [file] })) {
+                        await navigator.share({
+                            files: [file],
+                            title: `Combined Price Cards (${items.length} items)`
+                        });
+                        showPriceListToast(`✓ Shared combined picture!`, true);
+                        return;
+                    }
+                } catch (shareErr) {
+                    if (shareErr.name === 'AbortError') return;
+                }
+                saveAs(pngBlob, combinedFilename);
+                showPriceListToast(`📥 Combined picture saved to Downloads.`, true);
             } else {
-                saveAs(pngBlob, `Combined_Price_Cards_${items.length}_items.png`);
+                saveAs(pngBlob, combinedFilename);
                 showPriceListToast(`📥 Combined picture saved to Downloads.`, true);
             }
         } catch (err) {
+            if (clipboardReject) clipboardReject(err);
             console.error('Combined copy error:', err);
             showPriceListToast(`Failed to combine cards: ${err.message || err}`, false);
         }
