@@ -24,11 +24,14 @@ def clean_text(text):
     t = re.sub(r'\s+', ' ', t).strip()
     return t
 
+NOLID_TERMS = {'អត់គម្រប', 'no lid', 'nolid', 'without lid', 'no-lid', 'no_lid'}
+WITHLID_TERMS = {'មានគម្រប', 'with lid', 'withlid', 'with-lid', 'with_lid'}
+
 OPPOSING_ATTRIBUTE_PAIRS = [
     ({'black', 'ខ្មៅ'}, {'clear', 'ថ្លា', 'transparent'}),
     ({'black', 'ខ្មៅ'}, {'white', 'ស'}),
     ({'gold', 'មាស'}, {'silver', 'ប្រាក់'}),
-    ({'មានគម្រប', 'with lid', 'withlid'}, {'អត់គម្រប', 'no lid', 'nolid', 'without lid'}),
+    (WITHLID_TERMS, NOLID_TERMS),
     ({'អត់រន្ធ', 'no hole'}, {'មានរន្ធ', 'with hole'}),
     ({'1ថត', '1 tray', '1 compartment'}, {'2ថត', '2 trays', '2 compartments'}),
     ({'2ថត', '2 trays', '2 compartments'}, {'3ថត', '3 trays', '3 compartments'}),
@@ -38,17 +41,30 @@ OPPOSING_ATTRIBUTE_PAIRS = [
 
 def extract_dimensions_and_sizes(text):
     if not text:
-        return set(), set(), set(), set()
+        return set(), set(), set(), set(), set()
     text_upper = text.upper()
-    vols = set(re.sub(r'\s+', '', v) for v in re.findall(r'\b\d+(?:\.\d+)?\s*(?:ML|OZ|L|G|KG|CM|MM)\b', text_upper))
+    vols = set(re.sub(r'\s+', '', v) for v in re.findall(r'\b\d+(?:\.\d+)?\s*(?:ML|OZ|L|G|KG)\b', text_upper))
+    dims = set(re.sub(r'\s+', '', d) for d in re.findall(r'\b\d+(?:\.\d+)?\s*(?:MM|CM|M|INCH)\b', text_upper))
     trays = set(re.findall(r'\b(\d+)\s*(?:ថត|TRAY|TRAYS|COMPARTMENT)', text_upper))
-    models = set(re.findall(r'\b(?:[A-Z]{1,5})\s*(\d+(?:\.\d+)?)\b', text_upper))
+    models = set(re.findall(r'\b([A-Z]{1,5}\d+(?:\.\d+)?[A-Z]{0,3})\b', text_upper))
+    model_nums = set()
+    for m in models:
+        m_num = re.search(r'\d+', m)
+        if m_num:
+            model_nums.add(m_num.group(0))
     colors = set(re.findall(r'(\d+)\s*COLOR', text_upper))
-    return vols, trays, models, colors
+    return vols, dims, trays, model_nums, colors
 
 def has_opposing_attributes(t1, t2):
     c1 = (t1 or '').lower()
     c2 = (t2 or '').lower()
+    # Asymmetric No-Lid rule: If one product is explicitly "without lid" and the other is not,
+    # they represent fundamentally different product variants / sets and cannot be merged.
+    no1 = any(w in c1 for w in NOLID_TERMS)
+    no2 = any(w in c2 for w in NOLID_TERMS)
+    if (no1 and not no2) or (no2 and not no1):
+        return True
+
     for set_a, set_b in OPPOSING_ATTRIBUTE_PAIRS:
         has_a1 = any(w in c1 for w in set_a)
         has_b1 = any(w in c1 for w in set_b)
@@ -58,12 +74,18 @@ def has_opposing_attributes(t1, t2):
             return True
     return False
 
-def calculate_similarity(p1, p2):
+def calculate_similarity(p1, p2, bom_pairs=None):
     """
     Computes a hybrid similarity score (0.0 to 1.0) between two products
     taking into account Khmer text, English text, and SKUs, while strictly
     differentiating product variants (e.g. colors, lids, volumes, and models).
+    Kits and their own components are guaranteed a 0.0 similarity.
     """
+    id1 = p1.get('id')
+    id2 = p2.get('id')
+    if bom_pairs and id1 and id2 and ((id1, id2) in bom_pairs or (id2, id1) in bom_pairs):
+        return 0.0
+
     name1 = p1.get('name') or ''
     name2 = p2.get('name') or ''
     sku1 = p1.get('sku') or ''
@@ -76,17 +98,17 @@ def calculate_similarity(p1, p2):
         return 0.10
 
     # 2. Dimensions, volumes & models conflict check
-    v1, tr1, m1, col1 = extract_dimensions_and_sizes(full1)
-    v2, tr2, m2, col2 = extract_dimensions_and_sizes(full2)
+    v1, d1, tr1, m1, col1 = extract_dimensions_and_sizes(full1)
+    v2, d2, tr2, m2, col2 = extract_dimensions_and_sizes(full2)
 
-    # If both specify volumes and they differ (e.g., 500ml vs 1000ml)
+    # If both specify volumes and they differ (e.g., 500ml vs 1000ml, 750ml vs 1000ml)
     if v1 and v2 and not (v1 & v2):
+        return 0.10
+    # If both specify model/size numeric codes and they differ (e.g. PB500 vs PB600, UKP16 vs UKP20)
+    if m1 and m2 and not (m1 & m2):
         return 0.10
     # If both specify tray count and they differ (e.g., 1 vs 2 trays)
     if tr1 and tr2 and not (tr1 & tr2):
-        return 0.10
-    # If both specify model/size codes and they differ (e.g., S22 vs S24, N3 vs N14, ST02 vs ST04)
-    if m1 and m2 and not (m1 & m2):
         return 0.10
     # If both specify printing color count and they differ
     if col1 and col2 and col1 != col2:
@@ -181,13 +203,17 @@ def find_duplicate_groups(threshold=0.75, limit=100):
             pair_key = tuple(sorted([root_i, root_j]))
             scores[pair_key] = max(scores.get(pair_key, 0.0), sim)
 
+    # Fetch active BOM relationships so parent kits and child components are NEVER merged together
+    bom_rows = query_all("SELECT product_id, component_product_id FROM product_boms")
+    bom_pairs = set((r['product_id'], r['component_product_id']) for r in bom_rows)
+
     # Compute pairwise similarities
     n = len(prods)
     for i in range(n):
         p1 = prods[i]
         for j in range(i + 1, n):
             p2 = prods[j]
-            sim = calculate_similarity(p1, p2)
+            sim = calculate_similarity(p1, p2, bom_pairs=bom_pairs)
             if sim >= threshold:
                 union(p1['id'], p2['id'], sim)
                 scores[(min(p1['id'], p2['id']), max(p1['id'], p2['id']))] = sim
@@ -344,6 +370,16 @@ def execute_product_merge(master_id, source_ids, overrides=None):
         if not sources:
             raise ValueError("No valid duplicate products found to merge.")
 
+        # Safeguard: Never merge a kit with its own active component or vice versa!
+        cur.execute("""
+            SELECT product_id, component_product_id FROM product_boms
+            WHERE (product_id = %s AND component_product_id = ANY(%s))
+               OR (product_id = ANY(%s) AND component_product_id = %s)
+        """, (master_id, source_ids, source_ids, master_id))
+        active_bom_conflicts = cur.fetchall()
+        if active_bom_conflicts:
+            raise ValueError(f"Cannot merge product #{master_id} with its own combined kit component(s). These are parent-child items in a kit, not duplicates!")
+
         sources_summary = [{
             'id': s['id'],
             'name': s['name'],
@@ -435,15 +471,54 @@ def execute_product_merge(master_id, source_ids, overrides=None):
             cur.execute("UPDATE product_attachments SET product_id = %s WHERE product_id = %s", (master_id, src_id))
             cur.execute("DELETE FROM product_versions WHERE product_id = %s", (src_id,))
 
-            # 8. Relink BOMs & Combos (prevent circular self-references)
-            cur.execute("DELETE FROM product_boms WHERE (product_id = %s AND component_product_id = %s) OR (product_id = %s AND component_product_id = %s)", (src_id, master_id, master_id, src_id))
-            cur.execute("UPDATE product_boms SET product_id = %s WHERE product_id = %s", (master_id, src_id))
-            cur.execute("UPDATE product_boms SET component_product_id = %s WHERE component_product_id = %s", (master_id, src_id))
+            # 8. Relink BOMs & Combos safely without destroying kit components
+            # If other products used src_id as a component, replace with master_id (avoiding duplicate component lines)
+            cur.execute("""
+                UPDATE product_boms pb
+                SET component_product_id = %s
+                WHERE component_product_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM product_boms pb2 
+                      WHERE pb2.product_id = pb.product_id AND pb2.component_product_id = %s
+                  )
+            """, (master_id, src_id, master_id))
+            cur.execute("DELETE FROM product_boms WHERE component_product_id = %s", (src_id,))
+
+            # If src_id was a kit itself, adopt components if master doesn't have them
+            cur.execute("""
+                UPDATE product_boms pb
+                SET product_id = %s
+                WHERE product_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM product_boms pb2
+                      WHERE pb2.product_id = %s AND pb2.component_product_id = pb.component_product_id
+                  )
+            """, (master_id, src_id, master_id))
+            cur.execute("DELETE FROM product_boms WHERE product_id = %s", (src_id,))
             cur.execute("DELETE FROM product_boms WHERE product_id = component_product_id")
 
-            cur.execute("DELETE FROM product_combine_options WHERE (product_id = %s AND component_product_id = %s) OR (product_id = %s AND component_product_id = %s)", (src_id, master_id, master_id, src_id))
-            cur.execute("UPDATE product_combine_options SET product_id = %s WHERE product_id = %s", (master_id, src_id))
-            cur.execute("UPDATE product_combine_options SET component_product_id = %s WHERE component_product_id = %s", (master_id, src_id))
+            # Same safe handling for product_combine_options
+            cur.execute("""
+                UPDATE product_combine_options pco
+                SET component_product_id = %s
+                WHERE component_product_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM product_combine_options pco2 
+                      WHERE pco2.product_id = pco.product_id AND pco2.component_product_id = %s
+                  )
+            """, (master_id, src_id, master_id))
+            cur.execute("DELETE FROM product_combine_options WHERE component_product_id = %s", (src_id,))
+
+            cur.execute("""
+                UPDATE product_combine_options pco
+                SET product_id = %s
+                WHERE product_id = %s
+                  AND NOT EXISTS (
+                      SELECT 1 FROM product_combine_options pco2
+                      WHERE pco2.product_id = %s AND pco2.component_product_id = pco.component_product_id
+                  )
+            """, (master_id, src_id, master_id))
+            cur.execute("DELETE FROM product_combine_options WHERE product_id = %s", (src_id,))
             cur.execute("DELETE FROM product_combine_options WHERE product_id = component_product_id")
 
             # 9. Product Prices (Tiers)

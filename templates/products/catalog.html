@@ -7902,6 +7902,7 @@ function onOutsideClickTabBomSearch(e) {
     }
 }
 
+let tabBomSearchDebounceTimer = null;
 function filterTabBomSearchDropdown(term) {
     const q = (term || '').trim().toLowerCase();
     const items = document.querySelectorAll('#tabBomSearchResultsList .tab-bom-item');
@@ -7919,6 +7920,46 @@ function filterTabBomSearchDropdown(term) {
     const noMatch = document.getElementById('tabBomNoMatch');
     if (noMatch) noMatch.style.display = visibleCount === 0 ? 'block' : 'none';
     tabBomSearchActiveIdx = -1;
+
+    // Dynamic search fallback if no local matches or items list was empty
+    if (visibleCount === 0 && q.length >= 1) {
+        clearTimeout(tabBomSearchDebounceTimer);
+        tabBomSearchDebounceTimer = setTimeout(async () => {
+            try {
+                const excId = typeof CURRENT_PRODUCT_ID !== 'undefined' ? CURRENT_PRODUCT_ID : '';
+                const resp = await fetch(`/api/products/search-components?q=${encodeURIComponent(q)}&exclude_id=${excId}`);
+                if (!resp.ok) return;
+                const prods = await resp.json();
+                const list = document.getElementById('tabBomSearchResultsList');
+                if (!list) return;
+                if (prods && prods.length > 0) {
+                    list.innerHTML = prods.map(ap => `
+                        <div class="tab-bom-item"
+                             data-id="${ap.id}"
+                             data-sku="${ap.sku || ''}"
+                             data-name="${ap.name || ''}"
+                             data-cost="${parseFloat(ap.standard_cost || 0).toFixed(4)}"
+                             data-search="${((ap.sku || '') + ' ' + (ap.name || '') + ' ' + (ap.description || '')).toLowerCase()}"
+                             onclick="selectTabBomComponentFromSearch(this)"
+                             style="padding: 7px 10px; cursor: pointer; border-bottom: 1px solid #F1F5F9; display: flex; align-items: center; justify-content: space-between;"
+                             onmouseover="this.style.background='#F0F9FF'"
+                             onmouseout="this.style.background='transparent'">
+                            <div style="flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                                <span style="font-weight: 700; color: #0284C7;">${ap.sku || ''}</span>
+                                <span style="color: #1E293B; margin-left: 6px;">${ap.name || ''}</span>
+                            </div>
+                            <span style="font-weight: 600; color: #059669; font-size: 11.5px; margin-left: 8px; white-space: nowrap;">$${parseFloat(ap.standard_cost || 0).toFixed(2)}</span>
+                        </div>
+                    `).join('');
+                    if (noMatch) noMatch.style.display = 'none';
+                } else {
+                    if (noMatch) noMatch.style.display = 'block';
+                }
+            } catch (err) {
+                console.error('Error in dynamic component search:', err);
+            }
+        }, 200);
+    }
 }
 
 function handleTabBomSearchKey(e) {

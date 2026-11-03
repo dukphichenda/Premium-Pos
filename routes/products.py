@@ -862,10 +862,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
     locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
     all_vendors = query_all("SELECT id, name FROM vendors WHERE is_active = TRUE ORDER BY name ASC")
 
-    if is_partial:
-        all_products = []
-    else:
-        all_products = query_all("SELECT id, name, sku, description, standard_cost, image_url FROM products WHERE is_active = TRUE AND id != %s ORDER BY name ASC", (product_id,))
+    all_products = query_all("SELECT id, name, sku, description, standard_cost, image_url FROM products WHERE is_active = TRUE AND id != %s ORDER BY name ASC", (product_id,))
     pricing_schemes = query_all("SELECT id, name, COALESCE(currency, 'US Dollar ($)') as currency, is_active FROM pricing_schemes WHERE is_active = TRUE ORDER BY id ASC")
 
     can_view_costs = user_can_view_costs()
@@ -1677,6 +1674,23 @@ def delete_catalog_product(id):
         if not prod:
             return jsonify({'success': False, 'message': 'Product not found'}), 404
 
+        # Safeguard: Do not delete a product if it is an active component in any kit product
+        used_in_kits = query_all("""
+            SELECT p.id, p.name, p.sku 
+            FROM product_boms pb
+            JOIN products p ON pb.product_id = p.id
+            WHERE pb.component_product_id = %s
+        """, (id,))
+        if used_in_kits:
+            kit_names = [f"'{k['name']}' ({k['sku']})" for k in used_in_kits[:3]]
+            kit_str = ", ".join(kit_names)
+            if len(used_in_kits) > 3:
+                kit_str += f" and {len(used_in_kits) - 3} more kits"
+            return jsonify({
+                'success': False, 
+                'message': f"Cannot delete '{prod['name']}' because it is an active component in combined kit(s): {kit_str}. Remove it from those kits first, or deactivate it instead."
+            }), 400
+
         snapshot_desc = f"{prod['name']} ({prod['sku']})"
 
         # Safely detach foreign key references before deleting product
@@ -2385,8 +2399,8 @@ def edit_product(id):
                 except (ValueError, TypeError):
                     pass
             recalc_product_bom_cost(id)
-        elif has_bom_submitted:
-            # User cleared all BOM items
+        elif has_bom_submitted and (request.form.get('clear_all_boms') == '1' or request.form.get('active_tab') == 'tabBOM'):
+            # User explicitly cleared all BOM items from the BOM tab
             execute("DELETE FROM product_boms WHERE product_id = %s", (id,))
             recalc_product_bom_cost(id)
 
@@ -2864,6 +2878,30 @@ def search_products_json():
         LIMIT 25
     """, (param, param, param))
 
+    return jsonify([dict(r) for r in results])
+
+@products_bp.route('/api/products/search-components')
+def search_components_json():
+    query = request.args.get('q', '').strip()
+    exclude_id = request.args.get('exclude_id', type=int)
+    
+    where_sql = ["p.is_active = TRUE"]
+    params = []
+    if exclude_id:
+        where_sql.append("p.id != %s")
+        params.append(exclude_id)
+    if query:
+        where_sql.append("(p.name ILIKE %s OR p.sku ILIKE %s OR p.barcode ILIKE %s)")
+        qparam = f"%{query}%"
+        params.extend([qparam, qparam, qparam])
+        
+    results = query_all(f"""
+        SELECT p.id, p.sku, p.name, p.standard_cost, p.description, p.image_url
+        FROM products p
+        WHERE {' AND '.join(where_sql)}
+        ORDER BY p.name ASC
+        LIMIT 50
+    """, tuple(params))
     return jsonify([dict(r) for r in results])
 
 @products_bp.route('/api/pricing-schemes', methods=['GET'])
