@@ -90,6 +90,29 @@ class TestInvoiceHidePaidWhenZero(unittest.TestCase):
         html_pick = response_pick.get_data(as_text=True)
         self.assertIn('ព័ត៌មានដឹកជញ្ជូន / FULFILLMENT', html_pick)
 
+    def test_invoice_header_no_email_and_single_row_phone(self):
+        """Invoice header must not show email and phone must stay on 1 row with white-space: nowrap."""
+        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+        branch_id = cust.get('branch_id') if cust else None
+
+        order_id = execute_returning_id(
+            "INSERT INTO sales_orders (order_number, customer_id, branch_id, total_amount, paid_amount, balance_due, status, payment_status, order_date) "
+            "VALUES ('TEST-HDR-PHONE', %s, %s, 10.00, 0.00, 10.00, 'OPEN', 'UNPAID', '2026-11-04') RETURNING id",
+            (cust_id, branch_id)
+        )
+
+        response = self.client.get(f'/sales/{order_id}/print?type=invoice')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+
+        # Must not show email in header
+        self.assertNotIn('✉️', html)
+
+        # Phone row must be styled with white-space: nowrap to guarantee 1 row
+        self.assertIn('class="shop-meta-line" style="white-space: nowrap;"', html)
+        self.assertIn('<span>📞</span>', html)
+
 if __name__ == '__main__':
     unittest.main()
 
