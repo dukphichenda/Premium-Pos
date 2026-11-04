@@ -64,5 +64,32 @@ class TestInvoiceHidePaidWhenZero(unittest.TestCase):
         self.assertIn('$30.00', html)
         self.assertIn('$70.00', html)
 
+    def test_invoice_bill_does_not_show_fulfillment(self):
+        """On standard invoice / bill, the Fulfillment & Logistics box must not be shown."""
+        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+        branch_id = cust.get('branch_id') if cust else None
+
+        order_id = execute_returning_id(
+            "INSERT INTO sales_orders (order_number, customer_id, branch_id, total_amount, paid_amount, balance_due, status, payment_status, order_date) "
+            "VALUES ('TEST-NO-FULFILL', %s, %s, 26.00, 0.00, 26.00, 'OPEN', 'UNPAID', '2026-11-04') RETURNING id",
+            (cust_id, branch_id)
+        )
+
+        # 1. Invoice type
+        response = self.client.get(f'/sales/{order_id}/print?type=invoice')
+        self.assertEqual(response.status_code, 200)
+        html = response.get_data(as_text=True)
+        self.assertNotIn('ព័ត៌មានដឹកជញ្ជូន / FULFILLMENT', html)
+        self.assertIn('single-col', html)
+        self.assertIn('ព័ត៌មានអតិថិជន / CUSTOMER DETAILS', html)
+
+        # 2. Pick list type should still include fulfillment for warehouse
+        response_pick = self.client.get(f'/sales/{order_id}/print?type=pick')
+        self.assertEqual(response_pick.status_code, 200)
+        html_pick = response_pick.get_data(as_text=True)
+        self.assertIn('ព័ត៌មានដឹកជញ្ជូន / FULFILLMENT', html_pick)
+
 if __name__ == '__main__':
     unittest.main()
+
