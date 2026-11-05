@@ -28,6 +28,23 @@ class TestPosReceiptCashierAndVatTin(unittest.TestCase):
             self.assertIn('>chenda</strong>', html)
             self.assertIn('class="pos-cashier-name">chenda<', html)
 
+            # 3. Verify Payment method, Received, Change rows are deleted from POS receipt
+            self.assertNotIn('វិធីទូទាត់ / Payment Method:', html)
+            self.assertNotIn('ប្រាក់ទទួលបាន / Received:', html)
+            self.assertNotIn('ប្រាក់អាប់ / Change Returned:', html)
+            self.assertNotIn('id="recMethod"', html)
+            self.assertNotIn('id="recPaidRow"', html)
+            self.assertNotIn('id="recChangeRow"', html)
+
+            # 4. Verify Thank You greeting & Powered by footer are deleted
+            self.assertNotIn('សូមអរគុណ! សូមអញ្ជើញមកវិញ!', html)
+            self.assertNotIn('Powered by inFlow Premium POS', html)
+
+            # 5. Verify Rate & Return policy remain intact
+            self.assertIn('អត្រាប្តូរប្រាក់ / Rate:', html)
+            self.assertIn('* សូមពិនិត្យទំនិញ និងប្រាក់អាប់មុនពេលចាកចេញ *', html)
+            self.assertIn('(Please check your items & change before leaving)', html)
+
     def test_pos_receipt_cashier_custom_user(self):
         with app.test_client() as client:
             with client.session_transaction() as sess:
