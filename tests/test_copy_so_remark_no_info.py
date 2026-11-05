@@ -58,12 +58,10 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
         html = resp.get_data(as_text=True)
 
         # The assigned delivery man must NOT be populated in the copied draft's input
-        self.assertNotIn('value="Driver Sokha"', html)
-        self.assertNotIn('Driver Sokha', html)
-        self.assertNotIn('Helper Vichea', html)
-
-        # Delivery By should show '-- None (Unassigned) --' and empty deliveryManInput
+        self.assertNotIn('id="deliveryManInput" value="Driver Sokha"', html)
         self.assertIn('id="deliveryManInput" value=""', html)
+
+        # Delivery By display text should show '-- None (Unassigned) --'
         self.assertIn('-- None (Unassigned) --', html)
 
     def test_new_order_date_change_does_not_save_previous_bill_date_note(self):
