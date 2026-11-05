@@ -49,7 +49,8 @@ class TestPosReceiptCashierAndVatTin(unittest.TestCase):
             self.assertIn('size: 80mm auto;', html)
             self.assertIn('font-weight: 700 !important;', html)
             self.assertIn('.pos-container,', html)
-            self.assertIn('body.is-printing-receipt', html)
+            self.assertIn('posThermalPrintFrame', html)
+            self.assertIn('72mm', html)
 
     def test_pos_receipt_cashier_custom_user(self):
         with app.test_client() as client:

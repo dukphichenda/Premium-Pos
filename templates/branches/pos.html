@@ -1730,50 +1730,13 @@
     margin: 0 auto;
 }
 
-/* While printing receipt, hide all non-receipt elements */
-body.is-printing-receipt .pos-container,
-body.is-printing-receipt .no-print,
-body.is-printing-receipt .no-print-thermal {
-    display: none !important;
-}
-
-body.is-printing-receipt #posReceiptModal {
-    position: static !important;
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-}
-
-body.is-printing-receipt .pos-receipt-modal-card {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-    border: none !important;
-    border-radius: 0 !important;
-}
-
-body.is-printing-receipt .pos-receipt-paper {
-    width: 100% !important;
-    max-width: 100% !important;
-    border: none !important;
-    border-radius: 0 !important;
-    box-shadow: none !important;
-    padding: 2mm 1.5mm !important;
-}
-
 /* Page rule at top level for 80mm thermal receipt */
 @page {
     size: 80mm auto;
     margin: 0;
 }
 
-/* Print CSS formatted strictly for full 80mm roll width & bold text */
+/* Print CSS formatted strictly for full 80mm roll width (72mm printable) & bold text */
 @media print {
     @page {
         size: 80mm auto;
@@ -1788,9 +1751,9 @@ body.is-printing-receipt .pos-receipt-paper {
         margin: 0 !important;
         padding: 0 !important;
         background: #FFFFFF !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 100% !important;
+        width: 72mm !important;
+        max-width: 72mm !important;
+        min-width: 72mm !important;
         overflow: visible !important;
     }
     body * {
@@ -1815,9 +1778,9 @@ body.is-printing-receipt .pos-receipt-paper {
         position: static !important;
         left: 0 !important;
         top: 0 !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 100% !important;
+        width: 72mm !important;
+        max-width: 72mm !important;
+        min-width: 72mm !important;
         margin: 0 !important;
         padding: 0 !important;
         background: #FFFFFF !important;
@@ -1829,9 +1792,9 @@ body.is-printing-receipt .pos-receipt-paper {
     .pos-receipt-modal-card {
         display: block !important;
         position: static !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 100% !important;
+        width: 72mm !important;
+        max-width: 72mm !important;
+        min-width: 72mm !important;
         margin: 0 !important;
         padding: 0 !important;
         border: none !important;
@@ -1843,9 +1806,9 @@ body.is-printing-receipt .pos-receipt-paper {
     }
     .pos-receipt-paper {
         display: block !important;
-        width: 100% !important;
-        max-width: 100% !important;
-        min-width: 100% !important;
+        width: 72mm !important;
+        max-width: 72mm !important;
+        min-width: 72mm !important;
         font-family: 'Kantumruy Pro', 'Battambang', 'Segoe UI', -apple-system, sans-serif !important;
         font-size: 11px !important;
         font-weight: 700 !important;
@@ -1853,7 +1816,7 @@ body.is-printing-receipt .pos-receipt-paper {
         border: none !important;
         box-shadow: none !important;
         border-radius: 0 !important;
-        padding: 2mm 1.5mm !important;
+        padding: 2mm 1mm !important;
         margin: 0 !important;
     }
     .pos-receipt-paper,
@@ -4160,19 +4123,121 @@ function closePosReceiptModal() {
 }
 
 function printReceipt() {
-    document.body.classList.add('is-printing-receipt');
-    try {
+    const receiptContent = document.getElementById('receiptContent');
+    if (!receiptContent) {
         window.print();
-    } finally {
-        setTimeout(() => {
-            document.body.classList.remove('is-printing-receipt');
-        }, 1200);
+        return;
     }
-}
 
-window.addEventListener('afterprint', () => {
-    document.body.classList.remove('is-printing-receipt');
-});
+    const receiptHtml = receiptContent.innerHTML;
+
+    let iframe = document.getElementById('posThermalPrintFrame');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'posThermalPrintFrame';
+        iframe.style.position = 'fixed';
+        iframe.style.right = '0';
+        iframe.style.bottom = '0';
+        iframe.style.width = '0';
+        iframe.style.height = '0';
+        iframe.style.border = 'none';
+        iframe.style.visibility = 'hidden';
+        document.body.appendChild(iframe);
+    }
+
+    const doc = iframe.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>POS Receipt (80mm)</title>
+    <style>
+        @page {
+            size: 80mm auto;
+            margin: 0mm;
+        }
+        *, *::before, *::after {
+            box-sizing: border-box !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+        html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            width: 72mm !important;
+            max-width: 72mm !important;
+            background: #FFFFFF !important;
+            font-family: 'Kantumruy Pro', 'Battambang', 'Segoe UI', -apple-system, sans-serif !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            color: #000000 !important;
+            line-height: 1.35 !important;
+        }
+        .pos-receipt-print-wrapper {
+            width: 72mm !important;
+            max-width: 72mm !important;
+            padding: 1.5mm 1mm !important;
+            margin: 0 !important;
+            color: #000000 !important;
+            font-weight: 700 !important;
+        }
+        .pos-receipt-print-wrapper * {
+            color: #000000 !important;
+            font-weight: 700 !important;
+        }
+        .pos-rec-row {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: baseline !important;
+            width: 100% !important;
+            margin-bottom: 3px !important;
+            font-weight: 700 !important;
+        }
+        .pos-rec-divider-dashed {
+            border-top: 1.5px dashed #000000 !important;
+            margin: 6px 0 !important;
+            width: 100% !important;
+        }
+        .pos-rec-divider-double {
+            border-top: 2.5px double #000000 !important;
+            margin: 6px 0 !important;
+            width: 100% !important;
+        }
+        .pos-rec-title-pill {
+            background: #000000 !important;
+            color: #FFFFFF !important;
+            font-weight: 900 !important;
+            display: inline-block !important;
+            padding: 3px 12px !important;
+            border-radius: 4px !important;
+        }
+        .pos-rec-title-pill * {
+            color: #FFFFFF !important;
+            font-weight: 900 !important;
+        }
+        strong, b, [style*="font-weight: 800"], [style*="font-weight: 900"] {
+            font-weight: 900 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="pos-receipt-print-wrapper">
+        ${receiptHtml}
+    </div>
+</body>
+</html>`);
+    doc.close();
+
+    setTimeout(() => {
+        try {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+        } catch (e) {
+            window.print();
+        }
+    }, 150);
+}
 
 // -------------------------------------------------------------------------
 // Quick Add Customer Modal
