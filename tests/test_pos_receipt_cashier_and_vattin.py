@@ -3,9 +3,19 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import unittest
 from app import app
-from database import query_one
+from database import query_one, get_db_cursor, resync_all_sequences
 
 class TestPosReceiptCashierAndVatTin(unittest.TestCase):
+    def setUp(self):
+        self.created_so_ids = []
+
+    def tearDown(self):
+        if hasattr(self, 'created_so_ids') and self.created_so_ids:
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = ANY(%s)", (self.created_so_ids,))
+                cur.execute("DELETE FROM sales_order_versions WHERE sales_order_id = ANY(%s)", (self.created_so_ids,))
+                cur.execute("DELETE FROM sales_orders WHERE id = ANY(%s)", (self.created_so_ids,))
+            resync_all_sequences()
     def test_pos_receipt_no_vattin_and_cashier_name(self):
         with app.test_client() as client:
             with client.session_transaction() as sess:
@@ -103,6 +113,8 @@ class TestPosReceiptCashierAndVatTin(unittest.TestCase):
             self.assertEqual(resp.status_code, 200)
             data = resp.get_json()
             self.assertTrue(data['success'])
+            if data.get('sales_order_id'):
+                self.created_so_ids.append(data['sales_order_id'])
             self.assertEqual(data['cashier_name'], 'veasna')
 
             # Check in database

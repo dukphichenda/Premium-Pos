@@ -1,15 +1,24 @@
 import unittest
 import re
 from app import app
-from database import query_one, execute_returning_id
+from database import query_one, execute_returning_id, get_db_cursor, resync_all_sequences
 
 class TestCopySoRemarkNoInfo(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
+        self.created_so_ids = []
         with self.client.session_transaction() as sess:
             sess['user_id'] = 1
             sess['username'] = 'admin'
             sess['role'] = 'main_admin'
+
+    def tearDown(self):
+        if hasattr(self, 'created_so_ids') and self.created_so_ids:
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = ANY(%s)", (self.created_so_ids,))
+                cur.execute("DELETE FROM sales_order_versions WHERE sales_order_id = ANY(%s)", (self.created_so_ids,))
+                cur.execute("DELETE FROM sales_orders WHERE id = ANY(%s)", (self.created_so_ids,))
+            resync_all_sequences()
 
     def test_copied_draft_removes_previous_bill_date_info_from_remark(self):
         """When copying an SO, previous bill date info must NOT be included in remarks."""
@@ -25,6 +34,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             "VALUES (%s, %s, %s, 50, 'OPEN', 'UNPAID', '2026-10-08', %s) RETURNING id",
             (f'TEST-COPY-{t_str}', cust_id, branch_id, "Customer remark here\nPrevious bill date: 26-Oct-26")
         )
+        self.created_so_ids.append(source_id)
 
         resp = self.client.get(f'/sales/new?copy_from={source_id}')
         self.assertEqual(resp.status_code, 200)
@@ -52,6 +62,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             "VALUES (%s, %s, %s, 75, 'OPEN', 'UNPAID', '2026-11-01', %s, %s, %s) RETURNING id",
             (f'TEST-RIDER-{t_str}', cust_id, branch_id, 'Driver Sokha', 'Helper Vichea', 'Express Logistics')
         )
+        self.created_so_ids.append(source_id)
 
         resp = self.client.get(f'/sales/new?copy_from={source_id}')
         self.assertEqual(resp.status_code, 200)
@@ -89,6 +100,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
         # Fetch the newly saved order
         new_order = query_one("SELECT id, notes FROM sales_orders WHERE customer_id = %s ORDER BY id DESC LIMIT 1", (cust_id,))
         self.assertIsNotNone(new_order)
+        self.created_so_ids.append(new_order['id'])
         self.assertIn('Call before deliver', new_order['notes'])
         self.assertNotIn('Previous bill date', new_order['notes'])
 
@@ -105,6 +117,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             "VALUES (%s, %s, %s, 100, 'OPEN', 'UNPAID', '2026-10-01', %s) RETURNING id",
             (f'TEST-ONCE-{t_str}', cust_id, branch_id, "Order notes initial")
         )
+        self.created_so_ids.append(order_id)
 
         # 1. Update with changed date and note added by frontend
         post_data = {
@@ -144,6 +157,7 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
             "VALUES (%s, %s, %s, 100, 'OPEN', 'UNPAID', '2026-10-01', %s) RETURNING id",
             (f'TEST-DEDUP-{t_str}', cust_id, branch_id, "Note text\nPrevious bill date: 01-Nov-26\nPrevious bill date: 01-Nov-2026")
         )
+        self.created_so_ids.append(order_id)
 
         post_data = {
             'order_id': order_id,

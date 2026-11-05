@@ -1,17 +1,26 @@
 import unittest
 import time
 from app import create_app
-from database import query_one, execute_returning_id
+from database import query_one, execute_returning_id, get_db_cursor, resync_all_sequences
 
 class TestInvoiceHidePaidWhenZero(unittest.TestCase):
     def setUp(self):
         self.app = create_app()
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
+        self.created_so_ids = []
         with self.client.session_transaction() as sess:
             sess['user_id'] = 1
             sess['username'] = 'admin'
             sess['role'] = 'main_admin'
+
+    def tearDown(self):
+        if hasattr(self, 'created_so_ids') and self.created_so_ids:
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = ANY(%s)", (self.created_so_ids,))
+                cur.execute("DELETE FROM sales_order_versions WHERE sales_order_id = ANY(%s)", (self.created_so_ids,))
+                cur.execute("DELETE FROM sales_orders WHERE id = ANY(%s)", (self.created_so_ids,))
+            resync_all_sequences()
 
     def test_invoice_hides_paid_and_balance_due_when_no_amount_paid(self):
         """When no amount has been paid, the Paid & Balance Due rows must not be displayed on the invoice."""
@@ -26,6 +35,7 @@ class TestInvoiceHidePaidWhenZero(unittest.TestCase):
             "VALUES (%s, %s, %s, 83.00, 0.00, 83.00, 'OPEN', 'UNPAID', '2026-11-03') RETURNING id",
             (f'TEST-UNPAID-{t_str}', cust_id, branch_id)
         )
+        self.created_so_ids.append(unpaid_id)
 
         response = self.client.get(f'/sales/{unpaid_id}/print?type=invoice')
         self.assertEqual(response.status_code, 200)
@@ -54,6 +64,7 @@ class TestInvoiceHidePaidWhenZero(unittest.TestCase):
             "VALUES (%s, %s, %s, 100.00, 30.00, 70.00, 'OPEN', 'PARTIAL', '2026-11-03') RETURNING id",
             (f'TEST-PARTIAL-{t_str}', cust_id, branch_id)
         )
+        self.created_so_ids.append(paid_id)
 
         response = self.client.get(f'/sales/{paid_id}/print?type=invoice')
         self.assertEqual(response.status_code, 200)
@@ -79,6 +90,7 @@ class TestInvoiceHidePaidWhenZero(unittest.TestCase):
             "VALUES (%s, %s, %s, 26.00, 0.00, 26.00, 'OPEN', 'UNPAID', '2026-11-04') RETURNING id",
             (f'TEST-NO-FULFILL-{t_str}', cust_id, branch_id)
         )
+        self.created_so_ids.append(order_id)
 
         # 1. Invoice type
         response = self.client.get(f'/sales/{order_id}/print?type=invoice')
@@ -106,6 +118,7 @@ class TestInvoiceHidePaidWhenZero(unittest.TestCase):
             "VALUES (%s, %s, %s, 10.00, 0.00, 10.00, 'OPEN', 'UNPAID', '2026-11-04') RETURNING id",
             (f'TEST-HDR-PHONE-{t_str}', cust_id, branch_id)
         )
+        self.created_so_ids.append(order_id)
 
         response = self.client.get(f'/sales/{order_id}/print?type=invoice')
         self.assertEqual(response.status_code, 200)

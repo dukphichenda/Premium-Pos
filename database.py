@@ -423,6 +423,22 @@ def resync_all_sequences(cur=None):
                     c.execute(f"SELECT setval('{seq_name}', %s, true);", (m_b,))
                 else:
                     c.execute(f"SELECT setval('{seq_name}', 1, false);")
+
+                # Resync POS sequence for this branch
+                pos_seq_name = f"pos_branch_{b_id}_seq"
+                _ensure_sequence_exists(c, pos_seq_name)
+                pos_pattern = r'^SO-' + re.escape((b_code or 'STM').strip().upper()) + r'-P-([0-9]+)$'
+                c.execute(f"""
+                    SELECT MAX(SUBSTRING(order_number FROM %s)::bigint) as m
+                    FROM sales_orders
+                    WHERE order_number ~ %s;
+                """, (pos_pattern, pos_pattern))
+                pos_row = c.fetchone()
+                m_pos = _row_val(pos_row, 'm', 0) or 0
+                if m_pos > 0:
+                    c.execute(f"SELECT setval('{pos_seq_name}', %s, true);", (m_pos,))
+                else:
+                    c.execute(f"SELECT setval('{pos_seq_name}', 1, false);")
         except Exception as b_err:
             logger.warning(f"Branch sequence resync warning: {b_err}")
 
