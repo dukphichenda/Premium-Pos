@@ -45,6 +45,12 @@ class TestPosReceiptCashierAndVatTin(unittest.TestCase):
             self.assertIn('* សូមពិនិត្យទំនិញ និងប្រាក់អាប់មុនពេលចាកចេញ *', html)
             self.assertIn('(Please check your items & change before leaving)', html)
 
+            # 6. Verify 80mm full width print styles and all-bold receipt text
+            self.assertIn('size: 80mm auto;', html)
+            self.assertIn('font-weight: 700 !important;', html)
+            self.assertIn('.pos-container,', html)
+            self.assertIn('body.is-printing-receipt', html)
+
     def test_pos_receipt_cashier_custom_user(self):
         with app.test_client() as client:
             with client.session_transaction() as sess:
