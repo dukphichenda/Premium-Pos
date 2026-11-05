@@ -2034,6 +2034,11 @@ def new_order():
             order['balance_due'] = float(source_order.get('total_amount') or 0.0)
             order['order_date'] = date.today()
 
+            # When copying SO, do not keep delivery person assigned (keep blank to assign later)
+            order['delivery_man'] = ''
+            order['delivery_helper'] = ''
+            order['carrier'] = ''
+
             import re
             raw_notes = (order.get('notes') or '').strip()
             # When copying SO, do not include system previous bill date or copy metadata in remark
@@ -2117,8 +2122,8 @@ def new_order():
                 'tracking_number': '',
                 'destination_province': '',
                 'package_count': 1,
-                'delivery_man': source_order.get('delivery_man') or '' if source_order else '',
-                'delivery_helper': source_order.get('delivery_helper') or '' if source_order else '',
+                'delivery_man': '',
+                'delivery_helper': '',
                 'delivery_fee_khr': source_order.get('delivery_fee_khr') or 0 if source_order else 0,
                 'delivery_notes': source_order.get('delivery_notes') or '' if source_order else '',
                 'payment_method': source_order.get('payment_method') or '' if source_order else '',

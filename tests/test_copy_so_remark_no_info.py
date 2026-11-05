@@ -38,6 +38,34 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
         # The data-original-date must be empty for copied drafts
         self.assertIn('data-original-date=""', html)
 
+    def test_copied_draft_clears_delivery_person_assignment(self):
+        """When copying an SO, delivery person assignment must be kept blank (unassigned) for later assignment."""
+        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+        branch_id = cust.get('branch_id') if cust else None
+        import time
+        t_str = str(int(time.time() * 1000))
+
+        # Create a source order with an assigned delivery man and helper
+        source_id = execute_returning_id(
+            "INSERT INTO sales_orders (order_number, customer_id, branch_id, total_amount, status, payment_status, order_date, delivery_man, delivery_helper, carrier) "
+            "VALUES (%s, %s, %s, 75, 'OPEN', 'UNPAID', '2026-11-01', %s, %s, %s) RETURNING id",
+            (f'TEST-RIDER-{t_str}', cust_id, branch_id, 'Driver Sokha', 'Helper Vichea', 'Express Logistics')
+        )
+
+        resp = self.client.get(f'/sales/new?copy_from={source_id}')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.get_data(as_text=True)
+
+        # The assigned delivery man must NOT be populated in the copied draft's input
+        self.assertNotIn('value="Driver Sokha"', html)
+        self.assertNotIn('Driver Sokha', html)
+        self.assertNotIn('Helper Vichea', html)
+
+        # Delivery By should show '-- None (Unassigned) --' and empty deliveryManInput
+        self.assertIn('id="deliveryManInput" value=""', html)
+        self.assertIn('-- None (Unassigned) --', html)
+
     def test_new_order_date_change_does_not_save_previous_bill_date_note(self):
         """Saving a new order must never add 'Previous bill date' note even if date is changed or passed."""
         cust = query_one("SELECT id, branch_id FROM customers ORDER BY id DESC LIMIT 1 OFFSET 1") or query_one("SELECT id, branch_id FROM customers LIMIT 1")
