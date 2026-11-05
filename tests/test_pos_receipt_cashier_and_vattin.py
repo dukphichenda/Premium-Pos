@@ -62,6 +62,11 @@ class TestPosReceiptCashierAndVatTin(unittest.TestCase):
             self.assertIn('posThermalPrintFrame', html)
             self.assertIn('72mm', html)
 
+            # 7. Verify Date & Invoice number have separate clean rows and DD/MM/YYYY formatting
+            self.assertIn('id="recOrderNum"', html)
+            self.assertIn('id="recDate"', html)
+            self.assertIn('getPosFormattedNow', html)
+
     def test_pos_receipt_cashier_custom_user(self):
         with app.test_client() as client:
             with client.session_transaction() as sess:

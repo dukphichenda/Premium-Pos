@@ -2460,15 +2460,23 @@
 
             <div class="pos-rec-divider-dashed"></div>
 
-            <!-- Receipt Meta (2-Column Grid) -->
+            <!-- Receipt Meta (Clean Full-Width Rows) -->
             <div style="font-size: 10.5px; font-weight: 700; line-height: 1.45; margin-bottom: 5px; color: #000000;">
-                <div class="pos-rec-row" style="white-space: nowrap; color: #000000; font-weight: 700;">
-                    <span style="white-space: nowrap; color: #000000; font-weight: 700;">លេខវិក្កយបត្រ / Inv #: <strong id="recOrderNum" style="color: #000000; font-family: monospace; font-size: 11.5px; font-weight: 800; white-space: nowrap;">SO-STM-P-00001</strong></span>
-                    <span style="white-space: nowrap; color: #000000; font-weight: 700;">កាលបរិច្ឆេទ / Date: <strong id="recDate" style="color: #000000; font-weight: 800;">17/10/2026</strong></span>
+                <div class="pos-rec-row" style="color: #000000; font-weight: 700; margin-bottom: 2px;">
+                    <span style="color: #000000; font-weight: 700;">លេខវិក្កយបត្រ / Inv #:</span>
+                    <strong id="recOrderNum" style="color: #000000; font-family: monospace; font-size: 11.5px; font-weight: 900; white-space: nowrap;">SO-STM-P-00001</strong>
                 </div>
-                <div class="pos-rec-row" style="color: #000000; font-weight: 700;">
-                    <span style="color: #000000; font-weight: 700;">អតិថិជន / Cust: <strong id="recCustName" class="font-khmer" style="color: #000000; font-weight: 800;">Walk-in Customer</strong></span>
-                    <span style="color: #000000; font-weight: 700;">បេឡាករ / Cashier: <strong id="recCashierName" style="color: #000000; font-weight: 800;">{{ current_cashier }}</strong></span>
+                <div class="pos-rec-row" style="color: #000000; font-weight: 700; margin-bottom: 2px;">
+                    <span style="color: #000000; font-weight: 700;">កាលបរិច្ឆេទ / Date:</span>
+                    <strong id="recDate" style="color: #000000; font-weight: 900; white-space: nowrap;">--/--/----</strong>
+                </div>
+                <div class="pos-rec-row" style="color: #000000; font-weight: 700; margin-bottom: 2px;">
+                    <span style="color: #000000; font-weight: 700;">អតិថិជន / Cust:</span>
+                    <strong id="recCustName" class="font-khmer" style="color: #000000; font-weight: 900; text-align: right; max-width: 62%; word-break: break-word;">Walk-in Customer</strong>
+                </div>
+                <div class="pos-rec-row" style="color: #000000; font-weight: 700; margin-bottom: 2px;">
+                    <span style="color: #000000; font-weight: 700;">បេឡាករ / Cashier:</span>
+                    <strong id="recCashierName" style="color: #000000; font-weight: 900; white-space: nowrap;">{{ current_cashier }}</strong>
                 </div>
             </div>
 
@@ -3763,7 +3771,7 @@ function submitPosCheckout(forceCheckout = false) {
             // Populate Thermal Receipt
             populateThermalReceipt({
                 orderNumber: data.order_number || 'SO-STM-P-00001',
-                date: new Date().toLocaleString('en-US', { hour12: false }),
+                date: getPosFormattedNow(),
                 whName: whName,
                 customerName: custName,
                 cashierName: (data && data.cashier_name) ? data.cashier_name : {{ current_cashier|tojson }},
@@ -3940,6 +3948,17 @@ function drawFallbackKHQR(canvas, orderNumber, amount) {
     img.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=KHQR_${encodeURIComponent(orderNumber || 'SO')}_${encodeURIComponent(amount || 0)}`;
 }
 
+function getPosFormattedNow(d = new Date()) {
+    const pad = (n) => String(n).padStart(2, '0');
+    const day = pad(d.getDate());
+    const month = pad(d.getMonth() + 1);
+    const year = d.getFullYear();
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    const seconds = pad(d.getSeconds());
+    return `${day}/${month}/${year}, ${hours}:${minutes}:${seconds}`;
+}
+
 function populateThermalReceipt(info) {
     const exchangeRate = parseFloat({{ (branch_settings.khr_exchange_rate if branch_settings else 4100)|tojson }}) || 4100;
     
@@ -3950,7 +3969,7 @@ function populateThermalReceipt(info) {
     if (orderNumEl) orderNumEl.textContent = info.orderNumber || 'SO-STM-P-00001';
     
     const dateEl = document.getElementById('recDate');
-    if (dateEl) dateEl.textContent = info.date || new Date().toLocaleString('en-GB');
+    if (dateEl) dateEl.textContent = info.date || getPosFormattedNow();
     
     const custEl = document.getElementById('recCustName');
     if (custEl) custEl.textContent = info.customerName || 'Walk-in Customer';
@@ -4089,7 +4108,7 @@ function previewCurrentReceipt() {
 
     populateThermalReceipt({
         orderNumber: previewOrderNum,
-        date: new Date().toLocaleString('en-US', { hour12: false }),
+        date: getPosFormattedNow(),
         whName: whName,
         customerName: custName,
         cashierName: {{ current_cashier|tojson }},
