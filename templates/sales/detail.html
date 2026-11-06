@@ -4477,6 +4477,9 @@ Object.defineProperty(window, 'isDirty', {
     configurable: true
 });
 window.isCurrentOrderPaid = {{ 'true' if is_paid else 'false' }};
+window.DEFAULT_KHR_RATE = parseFloat("{{ default_khr_rate or 4100 }}") || 4100;
+window.CURRENT_KHR_RATE = parseFloat("{{ current_khr_rate or default_khr_rate or 4100 }}") || 4100;
+window.BRANCH_KHR_RATES = {{ (branch_khr_rates or {}) | tojson }};
 
 function isOrderPaid() {
     if (typeof window.isCurrentOrderPaid === 'boolean') {
@@ -5344,6 +5347,16 @@ function handleSoBranchChange(val) {
     if (hidden) hidden.value = val || '';
     const meta = document.getElementById('soPartialMeta');
     if (meta) meta.setAttribute('data-branch-id', val || '');
+
+    // Update active KHR exchange rate based on selected branch
+    if (val && window.BRANCH_KHR_RATES && window.BRANCH_KHR_RATES[String(val)]) {
+        window.CURRENT_KHR_RATE = parseFloat(window.BRANCH_KHR_RATES[String(val)]) || window.DEFAULT_KHR_RATE;
+    } else {
+        window.CURRENT_KHR_RATE = window.DEFAULT_KHR_RATE;
+    }
+    if (typeof recalculateTotals === 'function') {
+        recalculateTotals();
+    }
 
     // Check if currently selected customer belongs to a different branch
     const selectedCustId = document.getElementById('customerIdHidden')?.value;
@@ -7804,7 +7817,8 @@ function recalculateTotals() {
     if (dispTot) dispTot.innerText = '$' + subtotal.toFixed(2);
     const dispTotKhr = document.getElementById('dispTotalKhr');
     if (dispTotKhr) {
-        const khr = Math.round(subtotal * 4100);
+        const rate = (typeof window.CURRENT_KHR_RATE === 'number' && !isNaN(window.CURRENT_KHR_RATE)) ? window.CURRENT_KHR_RATE : (parseFloat("{{ current_khr_rate or default_khr_rate or 4100 }}") || 4100);
+        const khr = Math.round((subtotal * rate) / 100) * 100;
         dispTotKhr.innerText = '≈ ' + khr.toLocaleString() + ' KHR';
     }
     const btnPayDisp = document.getElementById('btnPayAmountDisp');

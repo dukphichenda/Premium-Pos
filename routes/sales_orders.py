@@ -1964,6 +1964,33 @@ def api_preview_order_number():
     order_num = preview_order_number('SO', branch_id=bid)
     return jsonify({'order_number': order_num})
 
+def _get_khr_rates_context(target_branch_id=None):
+    inv_settings = query_one("SELECT khr_exchange_rate FROM invoice_settings LIMIT 1")
+    default_rate = float(inv_settings['khr_exchange_rate']) if inv_settings and inv_settings.get('khr_exchange_rate') else 4100.0
+
+    branches = query_all("SELECT id, settings_json FROM branches WHERE is_active = TRUE")
+    branch_rates_map = {}
+    for b in branches:
+        b_set = b.get('settings_json') or {}
+        if isinstance(b_set, str):
+            try:
+                b_set = json.loads(b_set)
+            except Exception:
+                b_set = {}
+        branch_rates_map[str(b['id'])] = float(b_set.get('khr_exchange_rate') or default_rate)
+
+    current_rate = default_rate
+    if target_branch_id:
+        b_key = str(target_branch_id)
+        if b_key in branch_rates_map:
+            current_rate = branch_rates_map[b_key]
+
+    return {
+        'default_khr_rate': default_rate,
+        'current_khr_rate': current_rate,
+        'branch_khr_rates': branch_rates_map
+    }
+
 @sales_orders_bp.route('/sales/new')
 def new_order():
     is_main = _is_main_admin()
@@ -2291,6 +2318,7 @@ def new_order():
             l['display_qty'] = _clean_qty_val(l['display_qty'])
 
     preview_so_number = preview_order_number('SO', branch_id=branch['id'] if branch else None)
+    khr_ctx = _get_khr_rates_context(branch['id'] if branch else None)
 
     return render_template('sales/detail.html',
                            order=order,
@@ -2324,7 +2352,8 @@ def new_order():
                            attachments=[],
                            versions=[],
                            preview_so_number=preview_so_number,
-                           submission_token=submission_token)
+                           submission_token=submission_token,
+                           **khr_ctx)
 
 def _get_order_attachments_and_versions(order_id):
     _ensure_so_tables_exist()
@@ -2727,6 +2756,7 @@ def detail_order(id):
 
     # Load attachments & versions for this sales order
     attachments, versions = _get_order_attachments_and_versions(id)
+    khr_ctx = _get_khr_rates_context(order.get('branch_id'))
 
     return render_template('sales/detail.html',
                            order=order,
@@ -2758,7 +2788,8 @@ def detail_order(id):
                            versions=versions,
                            current_branch=branch_obj,
                            is_branch_order=bool(branch_obj),
-                           submission_token=submission_token)
+                           submission_token=submission_token,
+                           **khr_ctx)
 
 @sales_orders_bp.route('/sales/api/preview_items/<int:id>')
 def api_order_preview_items(id):
