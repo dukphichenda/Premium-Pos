@@ -117,23 +117,25 @@ def generate_monthly_excel(data):
             ("ចំណាយសរុប (Expenses)", "A4", "FEE2E2", "DC2626"),
             ("លុយចាស់ (Opening)", "B4", "DCFCE7", "166534"),
             ("Clear STM", "C4", "E0F2FE", "0369A1"),
-            ("Media (ប្រាក់ពី Media)", "D4", "DCFCE7", "15803D"),
-            ("លុយលក់ (Customer Receipts)", "E4", "CCFBF1", "0F766E"),
-            ("លុយសរុប (Total Inflow)", "F4", "DBEAFE", "1D4ED8"),
-            ("លុយសល់ (Money in Hand)", "G4", "FEF9C3", "B45309"),
-            ("ចំណូល - ចំណាយ (Net Margin)", "H4", "DCFCE7", "15803D")
+            ("Clear From SK", "D4", "E0F2FE", "0369A1"),
+            ("Media (ប្រាក់ពី Media)", "E4", "DCFCE7", "15803D"),
+            ("លុយលក់ (Customer Receipts)", "F4", "CCFBF1", "0F766E"),
+            ("លុយសរុប (Total Inflow)", "G4", "DBEAFE", "1D4ED8"),
+            ("លុយសល់ (Money in Hand)", "H4", "FEF9C3", "B45309"),
+            ("ចំណូល - ចំណាយ (Net Margin)", "I4", "DCFCE7", "15803D")
         ]
         kpi_values = [
             data.get('total_expenses', 0.0),
             data.get('opening_balance', 0.0),
             data.get('clear_stm', 0.0),
+            data.get('clear_sk', 0.0),
             data.get('media_total', 0.0),
             data.get('sales_received', 0.0),
             data.get('total_money_in', 0.0),
             data.get('money_in_hand', 0.0),
             data.get('net_operating_income', 0.0)
         ]
-        cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H']
+        cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']
 
     ws1.row_dimensions[4].height = 22
     ws1.row_dimensions[5].height = 28
@@ -533,26 +535,28 @@ def generate_monthly_pdf(data):
     else:
         kpi_data = [
             [
-                Paragraph("<b>TOTAL EXPENSES</b><br/><font size=10 color='#DC2626'><b>${:,.2f}</b></font>".format(data.get('total_expenses', 0.0)), cell_style),
-                Paragraph("<b>OPENING BALANCE</b><br/><font size=10 color='#166534'><b>${:,.2f}</b></font>".format(data.get('opening_balance', 0.0)), cell_style),
-                Paragraph("<b>CLEAR STM</b><br/><font size=10 color='#0369A1'><b>${:,.2f}</b></font>".format(data.get('clear_stm', 0.0)), cell_style),
-                Paragraph("<b>MEDIA RECEIPTS</b><br/><font size=10 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('media_total', 0.0)), cell_style),
-                Paragraph("<b>SALES RECEIVED</b><br/><font size=10 color='#0F766E'><b>${:,.2f}</b></font>".format(data.get('sales_received', 0.0)), cell_style),
-                Paragraph("<b>TOTAL INFLOW</b><br/><font size=10 color='#1D4ED8'><b>${:,.2f}</b></font>".format(data.get('total_money_in', 0.0)), cell_style),
-                Paragraph("<b>MONEY IN HAND</b><br/><font size=10 color='#B45309'><b>${:,.2f}</b></font>".format(data.get('money_in_hand', 0.0)), cell_style),
-                Paragraph("<b>NET MARGIN</b><br/><font size=10 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('net_operating_income', 0.0)), cell_style)
+                Paragraph("<b>TOTAL EXPENSES</b><br/><font size=9 color='#DC2626'><b>${:,.2f}</b></font>".format(data.get('total_expenses', 0.0)), cell_style),
+                Paragraph("<b>OPENING BALANCE</b><br/><font size=9 color='#166534'><b>${:,.2f}</b></font>".format(data.get('opening_balance', 0.0)), cell_style),
+                Paragraph("<b>CLEAR STM</b><br/><font size=9 color='#0369A1'><b>${:,.2f}</b></font>".format(data.get('clear_stm', 0.0)), cell_style),
+                Paragraph("<b>CLEAR SK</b><br/><font size=9 color='#0369A1'><b>${:,.2f}</b></font>".format(data.get('clear_sk', 0.0)), cell_style),
+                Paragraph("<b>MEDIA RECEIPTS</b><br/><font size=9 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('media_total', 0.0)), cell_style),
+                Paragraph("<b>SALES RECEIVED</b><br/><font size=9 color='#0F766E'><b>${:,.2f}</b></font>".format(data.get('sales_received', 0.0)), cell_style),
+                Paragraph("<b>TOTAL INFLOW</b><br/><font size=9 color='#1D4ED8'><b>${:,.2f}</b></font>".format(data.get('total_money_in', 0.0)), cell_style),
+                Paragraph("<b>MONEY IN HAND</b><br/><font size=9 color='#B45309'><b>${:,.2f}</b></font>".format(data.get('money_in_hand', 0.0)), cell_style),
+                Paragraph("<b>NET MARGIN</b><br/><font size=9 color='#15803D'><b>${:,.2f}</b></font>".format(data.get('net_operating_income', 0.0)), cell_style)
             ]
         ]
-        t_kpi = Table(kpi_data, colWidths=[93] * 8)
+        t_kpi = Table(kpi_data, colWidths=[82] * 9)
         t_kpi.setStyle(TableStyle([
             ('BACKGROUND', (0, 0), (0, 0), colors.HexColor('#FEE2E2')),
             ('BACKGROUND', (1, 0), (1, 0), colors.HexColor('#DCFCE7')),
             ('BACKGROUND', (2, 0), (2, 0), colors.HexColor('#E0F2FE')),
-            ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#DCFCE7')),
-            ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#CCFBF1')),
-            ('BACKGROUND', (5, 0), (5, 0), colors.HexColor('#DBEAFE')),
-            ('BACKGROUND', (6, 0), (6, 0), colors.HexColor('#FEF9C3')),
-            ('BACKGROUND', (7, 0), (7, 0), colors.HexColor('#DCFCE7')),
+            ('BACKGROUND', (3, 0), (3, 0), colors.HexColor('#E0F2FE')),
+            ('BACKGROUND', (4, 0), (4, 0), colors.HexColor('#DCFCE7')),
+            ('BACKGROUND', (5, 0), (5, 0), colors.HexColor('#CCFBF1')),
+            ('BACKGROUND', (6, 0), (6, 0), colors.HexColor('#DBEAFE')),
+            ('BACKGROUND', (7, 0), (7, 0), colors.HexColor('#FEF9C3')),
+            ('BACKGROUND', (8, 0), (8, 0), colors.HexColor('#DCFCE7')),
             ('BOX', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
             ('INNERGRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#CBD5E1')),
             ('TOPPADDING', (0, 0), (-1, -1), 5),

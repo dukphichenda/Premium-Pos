@@ -180,12 +180,14 @@ def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
         else:
             opening = 0.0
 
-    # 2. Clear STM and Media Total (Branch has NO STM and NO Media; HQ / Main has STM and Media)
+    # 2. Clear STM, Clear SK and Media Total (Branch has NO STM, NO SK and NO Media; HQ / Main has STM, SK and Media)
     if is_branch:
         stm = 0.0
+        sk = 0.0
         media_total = 0.0
     else:
-        stm = float(summary['clear_stm'] or 0) if summary else 0.0
+        stm = float(summary['clear_stm'] or 0) if summary and summary.get('clear_stm') else 0.0
+        sk = float(summary['clear_sk'] or 0) if summary and summary.get('clear_sk') else 0.0
         media_rec = query_one("SELECT COALESCE(SUM(amount), 0) as tot FROM media_receipts WHERE month_key = %s", (month_key,))
         media_sheet_total = float(media_rec['tot'] or 0) if media_rec else 0.0
 
@@ -213,7 +215,7 @@ def _calculate_month_money_in_hand(month_key, visited=None, branch_id='main'):
         exp_res = query_one("SELECT COALESCE(SUM(total_price), 0) as tot FROM expenses WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
     total_exp = float(exp_res['tot'] or 0) if exp_res else 0.0
 
-    total_inflow = opening + stm + media_total + sales
+    total_inflow = opening + stm + sk + media_total + sales
     money_in_hand = total_inflow - total_exp
     return money_in_hand
 
@@ -239,14 +241,14 @@ def _get_or_create_monthly_summary(month_key, branch_id='main'):
 
         if branch_id_val is not None:
             execute("""
-                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, accounts_json)
-                VALUES (%s, %s, %s, NULL, 0.0, NULL, 0.0, %s)
+                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, clear_sk, accounts_json)
+                VALUES (%s, %s, %s, NULL, 0.0, NULL, 0.0, 0.0, %s)
             """, (month_key, branch_id_val, carried_opening, json.dumps(DEFAULT_ACCOUNTS_LIST)))
             summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND branch_id = %s", (month_key, branch_id_val))
         else:
             execute("""
-                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, accounts_json)
-                VALUES (%s, NULL, %s, NULL, 0.0, NULL, 0.0, %s)
+                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, media_expense, manual_media_income, clear_stm, clear_sk, accounts_json)
+                VALUES (%s, NULL, %s, NULL, 0.0, NULL, 0.0, 0.0, %s)
             """, (month_key, carried_opening, json.dumps(DEFAULT_ACCOUNTS_LIST)))
             summary = query_one("SELECT * FROM monthly_cash_summaries WHERE month_key = %s AND (branch_id IS NULL OR branch_id = 0)", (month_key,))
 
@@ -282,14 +284,15 @@ def _get_monthly_report_data(month_key, branch_id='main'):
         """, (month_key,))
     total_expenses = sum(float(e['total_price'] or 0) for e in expenses)
 
-    # 2. Media receipts & Clear STM logic
+    # 2. Media receipts, Clear STM & Clear SK logic
     if is_branch:
-        # Branches do not have Clear STM or Media money
+        # Branches do not have Clear STM, Clear SK or Media money
         media_receipts = []
         media_sheet_total = 0.0
         media_total = 0.0
         is_manual_media = False
         clear_stm = 0.0
+        clear_sk = 0.0
     else:
         # HQ / Main Store
         media_receipts = query_all("""
@@ -309,6 +312,7 @@ def _get_monthly_report_data(month_key, branch_id='main'):
                 summary['media_expense'] = media_total
 
         clear_stm = float(summary.get('clear_stm') or 0)
+        clear_sk = float(summary.get('clear_sk') or 0)
 
     # 3. Dynamic Opening Balance logic
     prev_m = _get_previous_month_key(month_key)
@@ -331,13 +335,13 @@ def _get_monthly_report_data(month_key, branch_id='main'):
         sales_received = inflow_data['total_paid']
 
     # 5. Inflow & Balances
-    total_money_in = opening_balance + clear_stm + media_total + sales_received
+    total_money_in = opening_balance + clear_stm + clear_sk + media_total + sales_received
     money_in_hand = total_money_in - total_expenses
     if is_branch:
         # Branch net operating income is strictly Sales minus Expenses
         net_operating_income = sales_received - total_expenses
     else:
-        net_operating_income = (sales_received + clear_stm + media_total) - total_expenses
+        net_operating_income = (sales_received + clear_stm + clear_sk + media_total) - total_expenses
 
     # 6. Accounts Reconciliation
     accounts = _normalize_accounts(summary.get('accounts_json'))
@@ -358,6 +362,7 @@ def _get_monthly_report_data(month_key, branch_id='main'):
         'prev_money_in_hand': prev_money_in_hand,
         'prev_month_display': _format_month_display(prev_m) if prev_m else '',
         'clear_stm': clear_stm,
+        'clear_sk': clear_sk,
         'media_receipts': media_receipts,
         'media_sheet_total': media_sheet_total,
         'media_total': media_total,
@@ -447,6 +452,7 @@ def monthly_expenses():
                            prev_money_in_hand=report_data['prev_money_in_hand'],
                            prev_month_display=report_data['prev_month_display'],
                            clear_stm=report_data['clear_stm'],
+                           clear_sk=report_data['clear_sk'],
                            media_receipts=report_data['media_receipts'],
                            media_sheet_total=report_data['media_sheet_total'],
                            media_total=report_data['media_total'],
@@ -568,6 +574,7 @@ def print_monthly_report():
         total_expenses=report_data['total_expenses'],
         opening_balance=report_data['opening_balance'],
         clear_stm=report_data['clear_stm'],
+        clear_sk=report_data['clear_sk'],
         media_receipts=report_data['media_receipts'],
         media_total=report_data['media_total'],
         sales_received=report_data['sales_received'],
@@ -888,6 +895,7 @@ def update_monthly_summary():
 
         if is_branch:
             clear_stm = 0.0
+            clear_sk = 0.0
             media_total = 0.0
             manual_media = None
         else:
@@ -897,6 +905,13 @@ def update_monthly_summary():
                 clear_stm = float(existing.get('clear_stm') or 0.0)
             else:
                 clear_stm = 0.0
+
+            if 'clear_sk' in data:
+                clear_sk = float(data.get('clear_sk', 0) or 0)
+            elif existing:
+                clear_sk = float(existing.get('clear_sk') or 0.0)
+            else:
+                clear_sk = 0.0
 
             has_media_in_req = ('manual_media_income' in data or 'media' in data or 'media_expense' in data)
             if has_media_in_req:
@@ -951,24 +966,27 @@ def update_monthly_summary():
                 SET opening_balance = %s,
                     manual_opening_balance = %s,
                     clear_stm = %s,
+                    clear_sk = %s,
                     media_expense = %s,
                     manual_media_income = %s,
                     custom_sales_income = %s,
                     accounts_json = %s,
                     updated_at = CURRENT_TIMESTAMP
                 WHERE id = %s
-            """, (opening_balance, manual_opening, clear_stm, media_total, manual_media, custom_sales, json.dumps(accounts_list), existing['id']))
+            """, (opening_balance, manual_opening, clear_stm, clear_sk, media_total, manual_media, custom_sales, json.dumps(accounts_list), existing['id']))
         else:
             execute("""
-                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, clear_stm, media_expense, manual_media_income, custom_sales_income, accounts_json, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
-            """, (month_key, branch_id, opening_balance, manual_opening, clear_stm, media_total, manual_media, custom_sales, json.dumps(accounts_list)))
+                INSERT INTO monthly_cash_summaries (month_key, branch_id, opening_balance, manual_opening_balance, clear_stm, clear_sk, media_expense, manual_media_income, custom_sales_income, accounts_json, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+            """, (month_key, branch_id, opening_balance, manual_opening, clear_stm, clear_sk, media_total, manual_media, custom_sales, json.dumps(accounts_list)))
 
         return jsonify({
             'success': True,
             'message': 'Monthly financial summary updated successfully!',
             'opening_balance': opening_balance,
             'is_manual_opening': (manual_opening is not None),
+            'clear_stm': clear_stm,
+            'clear_sk': clear_sk,
             'media_total': media_total,
             'is_manual_media': (manual_media is not None),
             'branch_id': branch_id
@@ -991,6 +1009,7 @@ def summary_dashboard():
             'month_display': report['month_display'],
             'opening_balance': report['opening_balance'],
             'clear_stm': report['clear_stm'],
+            'clear_sk': report['clear_sk'],
             'media_total': report['media_total'],
             'sales_received': report['sales_received'],
             'inflow_invoiced': report['inflow_data']['total_invoiced'],

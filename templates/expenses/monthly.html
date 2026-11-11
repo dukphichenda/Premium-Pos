@@ -125,7 +125,7 @@
 
             <button type="button" class="btn btn-outline" onclick="openBalanceModal()" title="Edit Opening Balance & Sales">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                <span>Edit Balances ({% if is_branch %}លុយចាស់ / លក់{% else %}លុយចាស់ / STM{% endif %})</span>
+                <span>Edit Balances ({% if is_branch %}លុយចាស់ / លក់{% else %}លុយចាស់ / STM / SK{% endif %})</span>
             </button>
             <button type="button" class="btn btn-outline" onclick="openNewMonthModal()" title="Add another month sheet">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/><line x1="10" y1="16" x2="14" y2="16"/></svg>
@@ -274,6 +274,16 @@
             <div class="kpi-card-sub">Bank/STM cleared settlement</div>
         </div>
 
+        <!-- 3.1 Clear From SK (HQ only) -->
+        <div class="expense-kpi-card teal-accent">
+            <div class="kpi-card-header">
+                <span class="kpi-label">Clear From SK</span>
+                <button type="button" class="kpi-edit-link" onclick="openBalanceModal()">Edit ✎</button>
+            </div>
+            <div class="kpi-card-value teal-text" style="font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important; font-variant-numeric: tabular-nums !important;">${{ "{:,.2f}".format(clear_sk) }}</div>
+            <div class="kpi-card-sub">Bank/SK cleared settlement</div>
+        </div>
+
         <!-- 4. Media Total (HQ only: ប្រាក់ទទួលបានពី Media) -->
         <div class="expense-kpi-card green-accent">
             <div class="kpi-card-header">
@@ -322,7 +332,7 @@
                 {% if is_branch %}
                 <span class="kpi-tag blue">ចាស់ + លក់</span>
                 {% else %}
-                <span class="kpi-tag blue">ចាស់+STM+Media+លក់</span>
+                <span class="kpi-tag blue">ចាស់+STM+SK+Media+លក់</span>
                 {% endif %}
             </div>
             <div class="kpi-card-value blue-text" style="font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important; font-variant-numeric: tabular-nums !important;">${{ "{:,.2f}".format(total_money_in) }}</div>
@@ -330,7 +340,7 @@
                 {% if is_branch %}
                 Opening + Sales (Customer Receipts)
                 {% else %}
-                Opening + Clear STM + Media + Sales
+                Opening + Clear STM + Clear SK + Media + Sales
                 {% endif %}
             </div>
         </div>
@@ -364,7 +374,7 @@
                 {% if is_branch %}
                 Sales minus Expenses
                 {% else %}
-                Sales + STM + Media minus Expenses
+                Sales + STM + SK + Media minus Expenses
                 {% endif %}
             </div>
         </div>
@@ -845,7 +855,7 @@
 <div class="modal-overlay" id="balanceModal">
     <div class="modal-dialog" style="max-width: 500px; padding: 22px;">
         <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #E2E8F0; padding-bottom: 12px; margin-bottom: 16px;">
-            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances {% if not is_branch %}& STM {% endif %}for {{ month_display }} ({{ current_store_name }})</h3>
+            <h3 style="font-size: 15px; font-weight: 700; color: #0F172A;">⚙️ Monthly Balances {% if not is_branch %}& STM / SK {% endif %}for {{ month_display }} ({{ current_store_name }})</h3>
             <button type="button" class="modal-close-btn" onclick="closeModal('balanceModal')">✕</button>
         </div>
         <form id="summaryBalanceForm" onsubmit="handleSummaryBalanceSubmit(event)">
@@ -875,6 +885,11 @@
             <div class="form-group mb-3">
                 <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Clear STM ($)</label>
                 <input type="number" step="0.01" id="inputClearStm" class="form-control" value="{{ "{:.2f}".format(clear_stm) }}">
+            </div>
+
+            <div class="form-group mb-3">
+                <label class="form-label" style="font-size: 11.5px; font-weight: 600;">Clear SK ($) (Clear From SK)</label>
+                <input type="number" step="0.01" id="inputClearSk" class="form-control" value="{{ "{:.2f}".format(clear_sk) }}" placeholder="0.00">
             </div>
 
             <!-- Media Money with Auto/Manual Selector -->
@@ -1821,6 +1836,8 @@
         const manualOpening = openVal !== '' ? parseFloat(openVal) : null;
         const stmEl = document.getElementById('inputClearStm');
         const stm = stmEl ? (parseFloat(stmEl.value) || 0) : 0;
+        const skEl = document.getElementById('inputClearSk');
+        const sk = skEl ? (parseFloat(skEl.value) || 0) : 0;
         
         const mediaEl = document.getElementById('inputMedia');
         const manualMedia = (mediaEl && mediaEl.value.trim() !== '') ? parseFloat(mediaEl.value.trim()) : null;
@@ -1857,6 +1874,7 @@
                     branch_id: BRANCH_SCOPE,
                     manual_opening_balance: manualOpening,
                     clear_stm: stm,
+                    clear_sk: sk,
                     manual_media_income: manualMedia,
                     custom_sales_income: customSales,
                     accounts_json: accountsList

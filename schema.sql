@@ -660,6 +660,7 @@ CREATE TABLE IF NOT EXISTS monthly_cash_summaries (
     media_expense NUMERIC(16, 2) DEFAULT 0, -- Media legacy/cached field
     manual_media_income NUMERIC(16, 2), -- User manual override if filled; if null/empty auto-uses sum from media_receipts
     clear_stm NUMERIC(16, 2) DEFAULT 0, -- Clear STM
+    clear_sk NUMERIC(16, 2) DEFAULT 0, -- Clear From SK
     custom_sales_income NUMERIC(16, 2), -- Optional manual override for លុយលក់
     accounts_json JSONB DEFAULT '{"ABA": 0, "Cash USD": 0, "Cash KHR": 0, "ACELEDA": 0, "WING": 0, "Office": 0, "Teamwork": 0, "Tola": 0, "Borrow": 0}'::jsonb,
     notes TEXT,
@@ -667,6 +668,7 @@ CREATE TABLE IF NOT EXISTS monthly_cash_summaries (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 ALTER TABLE monthly_cash_summaries ADD COLUMN IF NOT EXISTS branch_id INTEGER REFERENCES branches(id) ON DELETE CASCADE;
+ALTER TABLE monthly_cash_summaries ADD COLUMN IF NOT EXISTS clear_sk NUMERIC(16, 2) DEFAULT 0;
 ALTER TABLE monthly_cash_summaries DROP CONSTRAINT IF EXISTS monthly_cash_summaries_month_key_key;
 CREATE UNIQUE INDEX IF NOT EXISTS uq_monthly_cash_summaries_month_branch ON monthly_cash_summaries(month_key, COALESCE(branch_id, 0));
 CREATE INDEX IF NOT EXISTS idx_monthly_cash_summaries_branch ON monthly_cash_summaries(branch_id);

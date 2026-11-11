@@ -34,6 +34,7 @@ class TestBranchExpenseSheet(unittest.TestCase):
         report_branch = _get_monthly_report_data("2026-10", branch_id="1")
         self.assertTrue(report_branch['is_branch'])
         self.assertEqual(report_branch['clear_stm'], 0.0)
+        self.assertEqual(report_branch['clear_sk'], 0.0)
         self.assertEqual(report_branch['media_total'], 0.0)
         self.assertEqual(report_branch['media_receipts'], [])
         
@@ -49,14 +50,14 @@ class TestBranchExpenseSheet(unittest.TestCase):
         expected_branch_money_in_hand = expected_branch_total_in - report_branch['total_expenses']
         self.assertAlmostEqual(report_branch['money_in_hand'], expected_branch_money_in_hand, places=2)
 
-        # HQ Report Verification (STM and Media are restored for HQ, except only Branch)
+        # HQ Report Verification (STM, SK and Media are restored for HQ, except only Branch)
         report_hq = _get_monthly_report_data("2026-10", branch_id="main")
         self.assertFalse(report_hq['is_branch'])
-        # HQ total_money_in includes opening + clear_stm + media_total + sales_received
-        expected_hq_total_in = report_hq['opening_balance'] + report_hq['clear_stm'] + report_hq['media_total'] + report_hq['sales_received']
+        # HQ total_money_in includes opening + clear_stm + clear_sk + media_total + sales_received
+        expected_hq_total_in = report_hq['opening_balance'] + report_hq['clear_stm'] + report_hq.get('clear_sk', 0.0) + report_hq['media_total'] + report_hq['sales_received']
         self.assertAlmostEqual(report_hq['total_money_in'], expected_hq_total_in, places=2)
-        # HQ net_operating_income includes sales_received + clear_stm + media_total - total_expenses
-        expected_hq_net = (report_hq['sales_received'] + report_hq['clear_stm'] + report_hq['media_total']) - report_hq['total_expenses']
+        # HQ net_operating_income includes sales_received + clear_stm + clear_sk + media_total - total_expenses
+        expected_hq_net = (report_hq['sales_received'] + report_hq['clear_stm'] + report_hq.get('clear_sk', 0.0) + report_hq['media_total']) - report_hq['total_expenses']
         self.assertAlmostEqual(report_hq['net_operating_income'], expected_hq_net, places=2)
 
     def test_monthly_summary_branch_isolation_in_db(self):
