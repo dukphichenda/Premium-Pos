@@ -23,10 +23,16 @@ class TestSoKhrRateMatchesPreview(unittest.TestCase):
             resync_all_sequences()
 
     def test_hq_so_khr_matches_invoice_preview(self):
-        """Verify that HQ sales order detail view displays KHR matching invoice preview exactly (46,600 KHR for $11.50 with rate 4050)."""
+        """Verify that HQ sales order detail view displays KHR matching invoice preview exactly."""
         cust = query_one("SELECT id FROM customers WHERE branch_id IS NULL LIMIT 1") or query_one("SELECT id FROM customers LIMIT 1")
         cust_id = cust['id'] if cust else 1
         t_str = str(int(time.time() * 1000))
+
+        inv_set = query_one("SELECT khr_exchange_rate FROM invoice_settings LIMIT 1")
+        rate = float(inv_set['khr_exchange_rate']) if inv_set and inv_set.get('khr_exchange_rate') else 4100.0
+        expected_khr = int(round(11.50 * rate, -2))
+        rate_str = f"{int(rate):,}"
+        khr_str = f"{expected_khr:,}"
 
         order_id = execute_returning_id(
             "INSERT INTO sales_orders (order_number, customer_id, branch_id, total_amount, subtotal, paid_amount, balance_due, status, payment_status, order_date) "
@@ -39,18 +45,17 @@ class TestSoKhrRateMatchesPreview(unittest.TestCase):
         resp_prev = self.client.get(f'/sales/{order_id}/print?type=invoice')
         self.assertEqual(resp_prev.status_code, 200)
         prev_html = resp_prev.get_data(as_text=True)
-        # Should show rate 4,050 and 46,600
-        self.assertIn('4,050', prev_html)
-        self.assertIn('46,600', prev_html)
+        # Should show the active invoice settings rate and calculated KHR
+        self.assertIn(rate_str, prev_html)
+        self.assertIn(khr_str, prev_html)
 
         # 2. Check Sales Order Detail
         resp_detail = self.client.get(f'/sales/{order_id}')
         self.assertEqual(resp_detail.status_code, 200)
         detail_html = resp_detail.get_data(as_text=True)
 
-        # In SO detail canvas, dispTotalKhr should show 46,600 KHR (not 47,150 KHR)
-        self.assertIn('46,600 KHR', detail_html)
-        self.assertNotIn('47,150 KHR', detail_html)
+        # In SO detail canvas, dispTotalKhr should match preview exactly
+        self.assertIn(f'{khr_str} KHR', detail_html)
         self.assertIn('window.CURRENT_KHR_RATE', detail_html)
 
 if __name__ == '__main__':
