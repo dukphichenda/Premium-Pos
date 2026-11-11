@@ -66,6 +66,103 @@
     -webkit-font-feature-settings: "tnum" 1 !important;
     font-feature-settings: "tnum" 1 !important;
 }
+
+/* Compact 1-Row KPI Summary Cards */
+.expense-kpi-grid {
+    display: grid !important;
+    gap: 7px !important;
+    margin-bottom: 14px !important;
+    width: 100% !important;
+}
+.expense-kpi-grid.kpi-cols-9 {
+    grid-template-columns: repeat(9, minmax(0, 1fr)) !important;
+}
+.expense-kpi-grid.kpi-cols-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr)) !important;
+}
+@media (max-width: 1024px) {
+    .expense-kpi-grid.kpi-cols-9,
+    .expense-kpi-grid.kpi-cols-6 {
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+    }
+}
+@media (max-width: 640px) {
+    .expense-kpi-grid.kpi-cols-9,
+    .expense-kpi-grid.kpi-cols-6 {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    }
+}
+
+.expense-kpi-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 7px 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-height: 76px !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.expense-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+.kpi-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+    gap: 4px;
+    min-width: 0;
+}
+.kpi-label {
+    font-size: 9.5px !important;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.01em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.kpi-tag {
+    font-size: 8.5px !important;
+    font-weight: 700;
+    padding: 1px 4px !important;
+    border-radius: 3px;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+.kpi-edit-link {
+    font-size: 9.5px !important;
+    flex-shrink: 0;
+    padding: 0 2px;
+}
+.kpi-card-value {
+    font-size: 1.15rem !important;
+    font-weight: 800;
+    line-height: 1.15;
+    margin: 2px 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+.kpi-card-sub {
+    font-size: 8.5px !important;
+    color: #94A3B8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-top: 1px;
+    line-height: 1.15;
+    min-width: 0;
+}
 </style>
 <div class="inflow-expense-container">
     <!-- Top Bar: Title & Primary Actions -->
@@ -232,7 +329,7 @@
     </div>
 
     <!-- Executive Financial KPI Summary Cards (Clean Cash Flow Record: 6 Core Metrics) -->
-    <div class="expense-kpi-grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+    <div class="expense-kpi-grid {% if not is_branch %}kpi-cols-9{% else %}kpi-cols-6{% endif %}" style="grid-template-columns: {% if not is_branch %}repeat(9, minmax(0, 1fr)){% else %}repeat(6, minmax(0, 1fr)){% endif %};">
         <!-- 1. Total Expenses (ចំណាយសរុប) -->
         <div class="expense-kpi-card danger-accent">
             <div class="kpi-card-header">
@@ -313,15 +410,8 @@
                 <span class="kpi-tag teal">{% if is_custom_sales %}Custom{% else %}inFlow Live{% if current_store_code %} ({{ current_store_code }}){% endif %}{% endif %}</span>
             </div>
             <div class="kpi-card-value teal-text" style="font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important; font-variant-numeric: tabular-nums !important;">${{ "{:,.2f}".format(sales_received) }}</div>
-            <div class="kpi-card-sub">
+            <div class="kpi-card-sub" title="Invoiced: ${{ "{:,.2f}".format(inflow_data.total_invoiced) }} ({{ inflow_data.paid_invoice_count }} paid){% if branch_scope == 'main' %} • HQ Store Only{% elif branch_scope == 'all' %} • All Branches Combined{% else %} • {{ current_store_name }} Only{% endif %}">
                 Invoiced: ${{ "{:,.2f}".format(inflow_data.total_invoiced) }} ({{ inflow_data.paid_invoice_count }} paid)
-                {% if branch_scope == 'main' %}
-                <span style="display: block; font-size: 11px; color: #0284C7; margin-top: 2px;">• HQ Store Only (No Branch Mix)</span>
-                {% elif branch_scope == 'all' %}
-                <span style="display: block; font-size: 11px; color: #64748B; margin-top: 2px;">• All Branches Combined</span>
-                {% else %}
-                <span style="display: block; font-size: 11px; color: #10B981; margin-top: 2px;">• {{ current_store_name }} Only</span>
-                {% endif %}
             </div>
         </div>
 
@@ -351,7 +441,7 @@
                 <span class="kpi-label" style="font-weight: 800; color: #92400E;">លុយសល់ (Money in Hand)</span>
                 <span class="kpi-tag amber" style="background: #FDE68A; color: #92400E;">សរុប - ចំណាយ</span>
             </div>
-            <div class="kpi-card-value amber-text" style="font-size: 1.55rem; font-weight: 800; color: #B45309; font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important; font-variant-numeric: tabular-nums !important;">
+            <div class="kpi-card-value amber-text" style="font-weight: 800; color: #B45309; font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important; font-variant-numeric: tabular-nums !important;">
                 ${{ "{:,.2f}".format(money_in_hand) }}
             </div>
             <div class="kpi-card-sub" style="color: #92400E;">
