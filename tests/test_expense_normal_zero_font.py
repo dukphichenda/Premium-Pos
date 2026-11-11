@@ -48,5 +48,23 @@ class TestExpenseNormalZeroFont(unittest.TestCase):
         self.assertNotIn('id="recSubtotal" style="font-family: monospace;', pos_content)
         self.assertNotIn('id="recTotal" style="font-size: 16px; font-family: monospace;', pos_content)
 
+    def test_monthly_kpi_and_inputs_have_embedded_and_inline_clean_fonts(self):
+        """Verify monthly.html embeds style block and inline styles for KPI cards and inputs."""
+        with open(self.monthly_html_path, 'r', encoding='utf-8') as f:
+            monthly_content = f.read()
+
+        # Embedded style block
+        self.assertIn('.kpi-card-value,', monthly_content)
+        self.assertIn('.acc-val-input,', monthly_content)
+
+        # Inline styles on Clear STM and Media KPI cards
+        self.assertIn('class="kpi-card-value teal-text" style="font-family:', monthly_content)
+        self.assertIn('class="kpi-card-value green-text" style="font-family:', monthly_content)
+
+        # Inline style on acc-val-input
+        self.assertIn('class="acc-val-input"', monthly_content)
+        self.assertIn('style="font-family: \'Inter\', \'Segoe UI\'', monthly_content)
+
 if __name__ == '__main__':
     unittest.main()
+
