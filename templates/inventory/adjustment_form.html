@@ -247,18 +247,7 @@
         <!-- User Request: "add option choose adjuct for seleted product by adding one by one or by category or all product." -->
         {% if not is_detail %}
         <div class="inflow-adj-selection-toolbar">
-            <!-- Mode 1: Add One by One -->
-            <div class="inflow-adj-mode-search">
-                <div class="inflow-search-box-wrap">
-                    <span class="search-icon">🔍</span>
-                    <input type="text" id="adjProductLiveSearch" class="inflow-search-input" placeholder="Add one by one (Type product name, SKU, or barcode)..." autocomplete="off" oninput="onLiveProductSearchInput(this.value)">
-                    <span id="searchLoadingSpinner" class="search-spinner" style="display: none;">⏳</span>
-                </div>
-                <!-- Live Search Results Dropdown -->
-                <div id="adjLiveSearchResults" class="inflow-live-search-dropdown" style="display: none;"></div>
-            </div>
-
-            <!-- Mode 2: Add by Category (Supports Multiple Category Selection) -->
+            <!-- Mode 1: Add by Category (Supports Multiple Category Selection) -->
             <div class="inflow-adj-mode-category">
                 <div class="inflow-cat-multiselect-container" id="catMultiSelectContainer">
                     <button type="button" class="inflow-cat-picker-btn" id="adjCategoryTriggerBtn" onclick="toggleCategoryMultiDropdown(event)" title="Click to select one or multiple categories">
@@ -304,7 +293,7 @@
                 </button>
             </div>
 
-            <!-- Mode 3: Add All Products -->
+            <!-- Mode 2: Add All Products -->
             <div class="inflow-adj-mode-all">
                 <button type="button" class="btn btn-sm btn-secondary" onclick="addAllCatalogProducts()" title="Populate all active catalog products into this stock adjustment sheet">
                     <span>📦 Add All Products ({{ total_active_prods }})</span>
@@ -415,14 +404,92 @@
                     {% else %}
                         <!-- Rows dynamically populated via JavaScript -->
                     {% endif %}
+
+                    {% if not is_detail %}
+                    <!-- Bottom Row: Type to add product (Matching Sales Order pattern) -->
+                    <tr id="adjNewRowEntry" class="inflow-adj-new-row" onclick="focusAdjSearchInput()">
+                        <!-- Product (Input box with search dropdown) -->
+                        <td style="position: relative; vertical-align: middle;">
+                            <div class="inflow-adj-new-prod-cell">
+                                <div class="inflow-adj-thumb-placeholder" title="Click to add" onclick="focusAdjSearchInput()">+</div>
+                                <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                                    <span style="position: absolute; left: 10px; color: #94A3B8; pointer-events: none; font-size: 13px; font-weight: 700;">+</span>
+                                    <input type="text" id="adjProductLiveSearch" class="inflow-field-input grid-item-input so-clean-input"
+                                           placeholder="Type to add item..."
+                                           title="Add one by one (Type product name, SKU, or barcode)..."
+                                           autocomplete="off"
+                                           oninput="onLiveProductSearchInput(this.value)"
+                                           onkeydown="onLiveProductSearchKeyDown(event)"
+                                           onclick="event.stopPropagation();"
+                                           style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 28px !important; font-size: 13px; background: #FFFFFF; height: 34px;">
+                                    <span id="searchLoadingSpinner" class="search-spinner" style="display: none; position: absolute; right: 10px;">⏳</span>
+                                    <!-- Live Search Results Dropdown -->
+                                    <div id="adjLiveSearchResults" class="inflow-live-search-dropdown" style="display: none;"></div>
+                                </div>
+                            </div>
+                        </td>
+                        <!-- Sublocation -->
+                        <td>
+                            <input type="text" class="inflow-adj-subloc-input" value="-" readonly style="background: #F8FAFC; color: #94A3B8; border-color: #E2E8F0; text-align: center; cursor: default;">
+                        </td>
+                        <!-- UOM -->
+                        <td style="text-align: center;">
+                            <span class="badge" style="font-size: 11px; font-weight: 600; color: #94A3B8; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 3px 8px; border-radius: 5px;">-</span>
+                        </td>
+                        <!-- Qty on Hand -->
+                        <td style="text-align: center;">
+                            <input type="text" value="0" class="inflow-adj-onhand-input" readonly style="background: #F8FAFC; color: #94A3B8; border-color: #E2E8F0; cursor: default;">
+                        </td>
+                        <!-- Qty Reserved -->
+                        <td style="text-align: right;">
+                            <span class="badge" style="background: #F8FAFC; color: #94A3B8; border: 1px solid #E2E8F0; font-weight: 600;">0</span>
+                        </td>
+                        <!-- Initial -->
+                        <td style="text-align: center;">
+                            <div class="inflow-adj-pill pill-initial" style="background: #F8FAFC; color: #94A3B8; border: 1px solid #E2E8F0;">0</div>
+                        </td>
+                        <!-- Change -->
+                        <td style="text-align: center;">
+                            <div class="inflow-adj-change-wrap">
+                                <input type="text" value="0" class="inflow-adj-change-input pill-change-zero" readonly style="background: #F8FAFC; color: #94A3B8; cursor: default;">
+                            </div>
+                        </td>
+                        <!-- Final -->
+                        <td style="text-align: center;">
+                            <input type="text" value="0" class="inflow-adj-final-input" readonly style="background: #F8FAFC; color: #94A3B8; border-color: #E2E8F0; cursor: default;">
+                        </td>
+                        <!-- Actions -->
+                        <td style="text-align: center;"></td>
+                    </tr>
+                    {% endif %}
                 </tbody>
             </table>
 
+            <!-- Table Footer Bar (+ Add Row, 🧹 Clean 0s) -->
+            {% if not is_detail %}
+            <div class="so-table-footer-bar" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-top: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 0 0 8px 8px;">
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" class="so-footer-btn" onclick="focusAdjSearchInput()" title="Add new item row (+)" style="display: flex; align-items: center; gap: 4px; padding: 5px 12px; background: #ECFDF5; border: 1px solid #A7F3D0; color: #059669; font-weight: 700; font-size: 12px; border-radius: 6px; cursor: pointer;">
+                        <span style="font-size: 14px; font-weight: 800;">+</span> Add Row
+                    </button>
+                    <button type="button" class="so-footer-btn" onclick="clearUnadjustedItems()" title="Remove rows where Change is zero" style="display: flex; align-items: center; gap: 4px; padding: 5px 12px; background: #F8FAFC; border: 1px solid #E2E8F0; color: #64748B; font-weight: 600; font-size: 12px; border-radius: 6px; cursor: pointer;">
+                        <span style="font-size: 12px;">🧹</span> Clean 0s
+                    </button>
+                    <button type="button" class="so-footer-btn" onclick="clearAllAdjustmentRows()" title="Remove all items from table" style="display: flex; align-items: center; gap: 4px; padding: 5px 12px; background: #FEF2F2; border: 1px solid #FECACA; color: #EF4444; font-weight: 600; font-size: 12px; border-radius: 6px; cursor: pointer;">
+                        <span style="font-size: 12px;">✕</span> Clear All
+                    </button>
+                </div>
+                <div style="font-size: 11px; color: #94A3B8;">
+                    Shortcuts: Press <kbd style="font-family: monospace; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 4px; border-radius: 3px; font-weight: 600;">F2</kbd> to search item
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Empty State Placeholder -->
-            <div id="adjEmptyState" class="inflow-adj-empty-state" style="display: {% if is_detail and lines %}none{% elif not is_detail %}block{% else %}none{% endif %};">
+            <div id="adjEmptyState" class="inflow-adj-empty-state" style="display: none;">
                 <div class="empty-icon">📦</div>
                 <div class="empty-title">No products selected for adjustment</div>
-                <div class="empty-subtitle">Use the options above to add products <strong>one by one</strong>, by <strong>category</strong>, or add <strong>all products</strong>.</div>
+                <div class="empty-subtitle">Use the options above or the add row below to add products.</div>
             </div>
         </div>
 
@@ -1297,44 +1364,17 @@
     padding: 10px 14px;
 }
 
-.inflow-adj-mode-search {
-    flex: 1.8;
-    min-width: 260px;
-    position: relative;
-}
-.inflow-search-box-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-.inflow-search-box-wrap .search-icon {
-    position: absolute;
-    left: 10px;
-    font-size: 14px;
-    color: #94A3B8;
-}
-.inflow-search-input {
-    width: 100%;
-    border: 1px solid #CBD5E1;
-    border-radius: 6px;
-    padding: 7px 10px 7px 32px;
-    font-size: 13px;
-    background: #FFFFFF;
-}
-.inflow-search-input:focus {
-    outline: none;
-    border-color: #F59E0B;
-    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
 }
 .inflow-live-search-dropdown {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
-    right: 0;
+    min-width: 480px;
+    max-width: 580px;
     background: #FFFFFF;
     border: 1px solid #CBD5E1;
     border-radius: 6px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.18);
     z-index: 1000;
     max-height: 280px;
     overflow-y: auto;
@@ -1348,8 +1388,49 @@
     cursor: pointer;
     transition: background 0.12s ease;
 }
-.live-search-item:hover {
+.live-search-item:hover, .live-search-item.active-search-item {
     background: #FEF3C7;
+}
+
+/* Sales Order Style New Row Entry for Stock Adjustment */
+.inflow-adj-new-prod-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+.inflow-adj-thumb-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px dashed #CBD5E1;
+    background: #F8FAFC;
+    color: #94A3B8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+.inflow-adj-thumb-placeholder:hover {
+    border-color: #059669;
+    color: #059669;
+    background: #ECFDF5;
+}
+.inflow-adj-new-row {
+    background: #FFFFFF;
+    transition: background 0.15s ease;
+}
+.inflow-adj-new-row:hover {
+    background: #F8FAFC;
+}
+.so-clean-input:focus {
+    border-color: #059669 !important;
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.15) !important;
+    outline: none !important;
 }
 
 .inflow-adj-mode-category {
@@ -1583,7 +1664,7 @@
 .inflow-adj-table-container {
     border: 1px solid #E2E8F0;
     border-radius: 8px;
-    overflow: hidden;
+    overflow: visible;
     margin-bottom: 24px;
 }
 .inflow-adj-table {
@@ -2234,6 +2315,11 @@ window.handleTabCloseAttempt = function(targetUrl) {
     if (isSubmittingOrConfirmedDiscard) return true;
     if (!isAdjustmentDirty()) return true;
 
+    // Only prompt when actually closing this tab (__CLOSE__)
+    if (targetUrl && targetUrl !== '__CLOSE__') {
+        return true;
+    }
+
     pendingCloseTarget = targetUrl || '__CLOSE__';
     openDiscardModal();
     return false; // Blocks the close attempt in inflow_tabs
@@ -2288,7 +2374,7 @@ document.addEventListener('DOMContentLoaded', () => {
             menu.style.display = 'none';
         }
         const searchDropdown = document.getElementById('adjLiveSearchResults');
-        const searchWrap = document.querySelector('.inflow-adj-mode-search');
+        const searchWrap = document.getElementById('adjNewRowEntry');
         if (searchDropdown && searchWrap && !searchWrap.contains(e.target)) {
             searchDropdown.style.display = 'none';
         }
@@ -2479,8 +2565,10 @@ function renderLiveSearchResults(products) {
 
 function onPickProductFromSearch(product) {
     addProductRowToTable(product);
-    document.getElementById('adjLiveSearchResults').style.display = 'none';
-    document.getElementById('adjProductLiveSearch').value = '';
+    const resultsDiv = document.getElementById('adjLiveSearchResults');
+    if (resultsDiv) resultsDiv.style.display = 'none';
+    const searchInp = document.getElementById('adjProductLiveSearch');
+    if (searchInp) searchInp.value = '';
 
     setTimeout(() => {
         const input = document.getElementById(`change_input_${product.id}`);
@@ -2490,6 +2578,73 @@ function onPickProductFromSearch(product) {
         }
     }, 50);
 }
+
+function onLiveProductSearchKeyDown(e) {
+    const resultsDiv = document.getElementById('adjLiveSearchResults');
+    if (!resultsDiv || resultsDiv.style.display === 'none') {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+        }
+        return;
+    }
+
+    const items = Array.from(resultsDiv.querySelectorAll('.live-search-item'));
+    if (!items.length) return;
+
+    let highlightedIndex = items.findIndex(item => item.classList.contains('active-search-item'));
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (highlightedIndex >= 0) items[highlightedIndex].classList.remove('active-search-item');
+        highlightedIndex = (highlightedIndex + 1) % items.length;
+        items[highlightedIndex].classList.add('active-search-item');
+        items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (highlightedIndex >= 0) items[highlightedIndex].classList.remove('active-search-item');
+        highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
+        items[highlightedIndex].classList.add('active-search-item');
+        items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (highlightedIndex >= 0 && items[highlightedIndex]) {
+            items[highlightedIndex].click();
+        } else if (items.length > 0) {
+            items[0].click();
+        }
+    } else if (e.key === 'Escape') {
+        e.preventDefault();
+        resultsDiv.style.display = 'none';
+    }
+}
+
+function focusAdjSearchInput() {
+    const inp = document.getElementById('adjProductLiveSearch');
+    if (inp) {
+        inp.focus();
+        inp.select();
+        inp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// Global F2 Shortcut to Search & Add Products (Matching Sales Order)
+window.addEventListener('keydown', function(e) {
+    if (e.key === 'F2') {
+        e.preventDefault();
+        focusAdjSearchInput();
+    }
+});
+
+// Click outside live search results to close dropdown
+document.addEventListener('click', function(e) {
+    const newRow = document.getElementById('adjNewRowEntry');
+    const resultsDiv = document.getElementById('adjLiveSearchResults');
+    if (resultsDiv && resultsDiv.style.display !== 'none') {
+        if (!e.target.closest('#adjNewRowEntry') && !e.target.closest('#adjLiveSearchResults')) {
+            resultsDiv.style.display = 'none';
+        }
+    }
+});
 
 // ==========================================================================
 // Category Selection & Multi-Category Batching (Requested by User)
@@ -2760,8 +2915,15 @@ function sortTableRowsInDom(sortBy) {
         return 0;
     });
 
-    // Re-append in sorted order without destroying element state
-    rows.forEach(r => tbody.appendChild(r));
+    // Re-append in sorted order without destroying element state (before new row entry)
+    const newRow = document.getElementById('adjNewRowEntry');
+    rows.forEach(r => {
+        if (newRow && newRow.parentNode === tbody) {
+            tbody.insertBefore(r, newRow);
+        } else {
+            tbody.appendChild(r);
+        }
+    });
 }
 
 // ==========================================================================
@@ -2951,7 +3113,12 @@ function addProductRowToTable(product) {
         </td>
     `;
 
-    tbody.appendChild(tr);
+    const newRow = document.getElementById('adjNewRowEntry');
+    if (newRow && newRow.parentNode === tbody) {
+        tbody.insertBefore(tr, newRow);
+    } else {
+        tbody.appendChild(tr);
+    }
 }
 
 // Number sanitizers avoiding HTML5 input commas blanking
@@ -3143,10 +3310,7 @@ function removeProductRow(productId) {
     loadedProductsMap.delete(productId);
     const row = document.getElementById(`adj_row_${productId}`);
     if (row) row.remove();
-
-    if (loadedProductsMap.size === 0) {
-        document.getElementById('adjEmptyState').style.display = 'block';
-    }
+    markAdjustmentDirty();
 }
 
 function clearUnadjustedItems() {
@@ -3164,14 +3328,19 @@ function clearAllAdjustmentRows() {
     if (loadedProductsMap.size === 0) return;
     if (confirm("Clear all products from this adjustment sheet?")) {
         loadedProductsMap.clear();
-        document.getElementById('adjProductTableBody').innerHTML = '';
-        document.getElementById('adjEmptyState').style.display = 'block';
+        const tbody = document.getElementById('adjProductTableBody');
+        if (tbody) {
+            tbody.querySelectorAll('tr.inflow-adj-row').forEach(r => r.remove());
+        }
+        const emptyState = document.getElementById('adjEmptyState');
+        if (emptyState) emptyState.style.display = 'none';
+        markAdjustmentDirty();
     }
 }
 
 function filterTableRows(query) {
     const q = (query || '').toLowerCase().trim();
-    const rows = document.querySelectorAll('#adjProductTableBody tr');
+    const rows = document.querySelectorAll('#adjProductTableBody tr.inflow-adj-row');
     rows.forEach(tr => {
         const text = tr.innerText.toLowerCase();
         tr.style.display = (!q || text.includes(q)) ? '' : 'none';
@@ -3194,6 +3363,8 @@ function onInputKeyDown(event, productId, fieldType) {
                 nextInput.focus();
                 nextInput.select();
             }
+        } else if (currentIndex === rows.length - 1) {
+            focusAdjSearchInput();
         }
     }
 }
