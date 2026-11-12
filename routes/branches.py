@@ -1033,10 +1033,13 @@ def branch_checkout(id):
             return jsonify({'success': False, 'message': 'No items selected.'}), 400
 
         customer_id = data.get('customer_id') or None
+        customer_name_input = str(data.get('customer_name') or '').strip()
         if customer_id:
-            cust_chk = query_one("SELECT branch_id FROM customers WHERE id = %s", (int(customer_id),))
+            cust_chk = query_one("SELECT branch_id, name FROM customers WHERE id = %s", (int(customer_id),))
             if cust_chk and cust_chk.get('branch_id') != id:
                 return jsonify({'success': False, 'message': 'Selected customer does not belong to this branch. Customer of HQ and Branch are kept independently.'}), 400
+            if not customer_name_input and cust_chk:
+                customer_name_input = cust_chk.get('name') or ''
         discount_amount = max(0.0, float(data.get('discount_amount') or 0.0))
         force_checkout = bool(data.get('force_checkout') or data.get('accept_out_of_stock'))
 
@@ -1044,6 +1047,34 @@ def branch_checkout(id):
         paid_amount = float(data.get('paid_amount') if data.get('paid_amount') is not None else data.get('total_amount', 0.0))
 
         with get_db_cursor(commit=True) as cur:
+            # If no specific customer selected, link to branch walk-in customer record
+            if not customer_id:
+                cur.execute("""
+                    SELECT id, name FROM customers 
+                    WHERE (branch_id = %s OR branch_id IS NULL) 
+                      AND (name ILIKE '%%Walk In%%' OR name ILIKE '%%Walk-in%%' OR name ILIKE '%%អតិថិជនទូទៅ%%')
+                    ORDER BY (branch_id = %s) DESC, id ASC 
+                    LIMIT 1
+                """, (id, id))
+                w_cust = cur.fetchone()
+                if w_cust:
+                    customer_id = w_cust['id']
+                    if not customer_name_input:
+                        customer_name_input = w_cust['name']
+                else:
+                    cur.execute("""
+                        INSERT INTO customers (name, branch_id, is_active, notes)
+                        VALUES (%s, %s, TRUE, 'Default Walk-in Customer for POS')
+                        RETURNING id, name;
+                    """, ('Walk-in Customer (អតិថិជនទូទៅ)', id))
+                    w_cust = cur.fetchone()
+                    customer_id = w_cust['id']
+                    if not customer_name_input:
+                        customer_name_input = w_cust['name']
+
+            if not customer_name_input:
+                customer_name_input = 'Walk-in Customer (អតិថិជនទូទៅ)'
+
             # Determine target warehouse location (STM Warehouse by default)
             wh_req_id = data.get('warehouse_id')
             wh_row = None
@@ -1130,18 +1161,21 @@ def branch_checkout(id):
                 INSERT INTO sales_orders (
                     order_number, customer_id, branch_id, location_id, order_date,
                     status, payment_status, subtotal, discount_amount,
-                    total_amount, paid_amount, balance_due, notes, completed_by, sales_rep
+                    total_amount, paid_amount, balance_due, notes, completed_by, sales_rep,
+                    customer_contact
                 ) VALUES (
                     %s, %s, %s, %s, CURRENT_DATE,
                     'INVOICED', %s, %s, %s,
-                    %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s,
+                    %s
                 ) RETURNING id;
             """, (
                 order_number, customer_id, id, target_loc_id,
                 pay_status, subtotal, discount_amount,
                 total_amount, paid_amount, balance_due,
                 f"POS Sale via {payment_method} from {branch['name']} ({target_loc_name}){note_suffix}",
-                cashier_login_name, cashier_login_name
+                cashier_login_name, cashier_login_name,
+                customer_name_input
             ))
             so_id = cur.fetchone()['id']
 

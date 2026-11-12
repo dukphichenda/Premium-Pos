@@ -694,7 +694,7 @@ def list_orders():
             so.created_at,
             TO_CHAR(COALESCE(so.created_at, so.order_date::timestamp), 'DD Mon YYYY') || ' · ' || TO_CHAR(COALESCE(so.created_at, so.order_date::timestamp), 'HH12:MI AM') as formatted_datetime,
             b.name as branch_name, b.code as branch_code,
-            c.name as customer_name,
+            COALESCE(c.name, NULLIF(so.customer_contact, ''), CASE WHEN so.order_number LIKE '%%-P-%%' THEN 'Walk-in Customer (អតិថិជនទូទៅ)' ELSE '' END) as customer_name,
             c.phone as customer_phone,
             l.name as location_name,
             COUNT(sol.id) as line_count
@@ -2029,7 +2029,7 @@ def new_order():
                 so.*,
                 b.name as branch_name,
                 b.code as branch_code,
-                c.name as customer_name,
+                COALESCE(c.name, NULLIF(so.customer_contact, ''), CASE WHEN so.order_number LIKE '%%-P-%%' THEN 'Walk-in Customer (អតិថិជនទូទៅ)' ELSE '' END) as customer_name,
                 COALESCE(NULLIF(so.customer_contact, ''), NULLIF(c.contact_name, ''), '') as customer_contact,
                 COALESCE(NULLIF(so.customer_phone, ''), NULLIF(c.phone, ''), '') as customer_phone,
                 c.email as customer_email,
@@ -2418,7 +2418,7 @@ def detail_order(id):
             so.*,
             b.name as branch_name,
             b.code as branch_code,
-            c.name as customer_name,
+            COALESCE(c.name, NULLIF(so.customer_contact, ''), CASE WHEN so.order_number LIKE '%%-P-%%' THEN 'Walk-in Customer (អតិថិជនទូទៅ)' ELSE '' END) as customer_name,
             COALESCE(NULLIF(so.customer_contact, ''), NULLIF(c.contact_name, ''), '') as customer_contact,
             COALESCE(NULLIF(so.customer_phone, ''), NULLIF(c.phone, ''), '') as customer_phone,
             c.email as customer_email,
@@ -4075,7 +4075,7 @@ def print_invoice(id):
     order = query_one("""
         SELECT 
             so.*,
-            c.name as customer_name,
+            COALESCE(c.name, NULLIF(so.customer_contact, ''), CASE WHEN so.order_number LIKE '%%-P-%%' THEN 'Walk-in Customer (អតិថិជនទូទៅ)' ELSE '' END) as customer_name,
             COALESCE(NULLIF(so.customer_contact, ''), NULLIF(c.contact_name, ''), '') as customer_contact,
             COALESCE(NULLIF(so.customer_phone, ''), NULLIF(c.phone, ''), '') as customer_phone,
             c.email as customer_email,
