@@ -57,10 +57,13 @@ class TestSoCrossAndMoveLines(unittest.TestCase):
         html = resp.get_data(as_text=True)
 
         # 1. Header structure: selector-col comes before #
-        self.assertIn('<th class="inflow-grid-selector-col"', html)
-        idx_selector_th = html.find('th class="inflow-grid-selector-col"')
-        idx_no_th = html.find('>#</th>')
-        self.assertTrue(idx_selector_th < idx_no_th, "Selector header should be placed before # header")
+        table_idx = html.find('id="lineItemsTable"')
+        self.assertTrue(table_idx > -1, "lineItemsTable should exist")
+        table_html = html[table_idx:table_idx + 1000]
+        self.assertIn('class="inflow-grid-selector-col"', table_html)
+        idx_selector_th = table_html.find('class="inflow-grid-selector-col"')
+        idx_no_th = table_html.find('>#</th>')
+        self.assertTrue(idx_selector_th < idx_no_th, "Selector header should be placed before # header in lineItemsTable")
 
         # 2. Right trash button column removed from the table headers
         self.assertNotIn('<th style="width: 44px; text-align: center;" title="Actions"></th>', html)
