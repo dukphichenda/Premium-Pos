@@ -3494,8 +3494,8 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- Offscreen Rendering Container for Batch Price Card Generation -->
-<div id="batchPriceCardStageContainer" style="position: fixed; left: -9999px; top: 0; width: 680px; z-index: -100; pointer-events: none; opacity: 0;">
-    <div class="inflow-spec-card is-exporting" id="batchPriceCardStage" style="width: 680px; max-width: 680px; margin: 0; background: #FFFFFF;">
+<div id="batchPriceCardStageContainer" style="position: fixed; left: -9999px; top: 0; width: 680px; height: 680px; z-index: -100; pointer-events: none; opacity: 0;">
+    <div class="inflow-spec-card is-exporting" id="batchPriceCardStage" style="width: 680px; height: 680px; max-width: 680px; aspect-ratio: 1 / 1; margin: 0; background: #FFFFFF;">
         <!-- Injected via JavaScript during batch rendering -->
     </div>
 </div>
@@ -6619,7 +6619,7 @@ function onCategorySelectChange(selectEl) {
 // ==========================================================================
 // EXPORT PRICE SHOWCASE CARD AS HIGH-RESOLUTION JPG & BATCH ZIP
 // ==========================================================================
-function addExportMarginToCanvas(sourceCanvas, marginPx = 28, scale = 3.2) {
+function addExportMarginToCanvas(sourceCanvas, marginPx = 14, scale = 3.2) {
     if (!sourceCanvas) return sourceCanvas;
     const margin = Math.round(marginPx * scale);
     const framedCanvas = document.createElement('canvas');
@@ -6738,6 +6738,10 @@ function exportCurrentCardAsJpg() {
                 const targetCard = clonedDoc.getElementById('printablePriceCard');
                 if (!targetCard) return;
                 
+                targetCard.style.width = '680px';
+                targetCard.style.height = '680px';
+                targetCard.style.aspectRatio = '1 / 1';
+                
                 // Replace all input elements with pure styled spans to completely eliminate text clipping/vertical shifting
                 targetCard.querySelectorAll('input').forEach(inp => {
                     const span = clonedDoc.createElement('span');
@@ -6773,7 +6777,7 @@ function exportCurrentCardAsJpg() {
             }
         }).then(async canvas => {
             card.classList.remove('is-exporting');
-            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
+            const framedCanvas = addExportMarginToCanvas(canvas, 14, 3.2);
             const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
             if (blob) {
                 saveAs(blob, filename);
@@ -6936,7 +6940,7 @@ async function fetchPriceCardsAndExportZip(apiUrl, zipFileName, scopeTitle) {
                 backgroundColor: '#FFFFFF',
                 logging: false
             });
-            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
+            const framedCanvas = addExportMarginToCanvas(canvas, 14, 3.2);
             
             // Convert to JPEG blob guaranteed between 700KB and 1MB
             const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
@@ -6986,6 +6990,9 @@ function renderOffscreenCard(stage, item) {
     
     updateCardColorProperties(stage, cardColor);
     stage.style.setProperty('--price-card-font', `'${cardFont}', 'Siemreap', sans-serif`);
+    stage.style.width = '680px';
+    stage.style.height = '680px';
+    stage.style.aspectRatio = '1 / 1';
     
     let imgHtml = '';
     if (item.image_url) {

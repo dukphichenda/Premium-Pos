@@ -874,7 +874,7 @@
                         <div class="inflow-modern-middle-grid">
                             <div class="inflow-modern-image-box">
                                 {% if product.image_url %}
-                                <img src="{{ product.image_url }}" style="max-width: 100%; max-height: 200px; object-fit: contain; border-radius: 12px;" alt="{{ product.name }}">
+                                <img src="{{ product.image_url }}" style="max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 10px;" alt="{{ product.name }}">
                                 {% else %}
                                 <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 160px; color: #94A3B8;">
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -2156,8 +2156,8 @@
 </div>
 
 <!-- Offscreen Rendering Container for Batch Price Card Generation -->
-<div id="batchPriceCardStageContainerDetail" style="position: fixed; left: -9999px; top: 0; width: 680px; z-index: -100; pointer-events: none; opacity: 0;">
-    <div class="inflow-spec-card is-exporting" id="batchPriceCardStageDetail" style="width: 680px; max-width: 680px; margin: 0; background: #FFFFFF;"></div>
+<div id="batchPriceCardStageContainerDetail" style="position: fixed; left: -9999px; top: 0; width: 680px; height: 680px; z-index: -100; pointer-events: none; opacity: 0;">
+    <div class="inflow-spec-card is-exporting" id="batchPriceCardStageDetail" style="width: 680px; height: 680px; max-width: 680px; aspect-ratio: 1 / 1; margin: 0; background: #FFFFFF;"></div>
 </div>
 
 {% if not is_new %}
@@ -2612,7 +2612,7 @@ function onCategorySelectChangeDetail(selectEl) {
     }
 }
 
-function addExportMarginToCanvas(sourceCanvas, marginPx = 28, scale = 3.2) {
+function addExportMarginToCanvas(sourceCanvas, marginPx = 14, scale = 3.2) {
     if (!sourceCanvas) return sourceCanvas;
     const margin = Math.round(marginPx * scale);
     const framedCanvas = document.createElement('canvas');
@@ -2727,6 +2727,10 @@ function exportCurrentCardAsJpgDetail() {
                 const targetCard = clonedDoc.getElementById('printablePriceCardDetail');
                 if (!targetCard) return;
                 
+                targetCard.style.width = '680px';
+                targetCard.style.height = '680px';
+                targetCard.style.aspectRatio = '1 / 1';
+                
                 targetCard.querySelectorAll('input').forEach(inp => {
                     const span = clonedDoc.createElement('span');
                     span.textContent = inp.value;
@@ -2761,7 +2765,7 @@ function exportCurrentCardAsJpgDetail() {
             }
         }).then(async canvas => {
             card.classList.remove('is-exporting');
-            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
+            const framedCanvas = addExportMarginToCanvas(canvas, 14, 3.2);
             const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
             if (blob) {
                 saveAs(blob, filename);
@@ -2860,6 +2864,9 @@ async function fetchPriceCardsAndExportZipDetail(apiUrl, zipFileName) {
             const cardColor = c.card_color || '#00A3E0';
             const stdBadge = (c && (c.standard_uom_display || c.standard_uom)) || (item && (item.standard_uom_display || item.standard_uom)) || 'PCS';
             stage.style.setProperty('--price-card-color', cardColor);
+            stage.style.width = '680px';
+            stage.style.height = '680px';
+            stage.style.aspectRatio = '1 / 1';
             
             stage.innerHTML = `
                 <div class="inflow-spec-header-grid" style="background: ${cardColor};">
@@ -2919,7 +2926,7 @@ async function fetchPriceCardsAndExportZipDetail(apiUrl, zipFileName) {
             
             await new Promise(r => setTimeout(r, 40));
             const canvas = await html2canvas(stage, { scale: 3.2, useCORS: true, allowTaint: true, backgroundColor: '#FFFFFF', logging: false });
-            const framedCanvas = addExportMarginToCanvas(canvas, 28, 3.2);
+            const framedCanvas = addExportMarginToCanvas(canvas, 14, 3.2);
             const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
             if (blob) {
                 const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -4304,9 +4311,7 @@ function deleteCombineOption(productId, optId) {
         </div>
     </div>
 </div>
-{% endblock %}
 
-{% block scripts %}
 <script>
 function toggleAdaptiveCostDetail(productId, isChecked) {
     fetch('/api/products/' + productId + '/toggle_adaptive_cost', {
