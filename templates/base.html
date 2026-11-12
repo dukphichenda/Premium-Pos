@@ -40,10 +40,6 @@
             // 2. Inherit mode from parent window if inside an iframe
             try {
                 if (window.top && window.top !== window.self && window.top.document && window.top.document.documentElement) {
-                    // If this iframe is phone-sized (<= 768px), it's a mobile simulator or phone preview! Always mobile.
-                    if (window.innerWidth <= 768) {
-                        return 'mobile';
-                    }
                     var topMode = window.top.document.documentElement.getAttribute('data-view-mode');
                     if (topMode === 'mobile' || topMode === 'desktop') {
                         return topMode;
@@ -255,8 +251,10 @@
             width: 56px !important;
             min-width: 56px !important;
             max-width: 56px !important;
-            height: 100vh !important;
-            height: 100dvh !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            min-height: 100vh !important;
+            min-height: 100dvh !important;
             z-index: 9999 !important;
             visibility: visible !important;
             opacity: 1 !important;
@@ -299,17 +297,44 @@
             margin-left: 56px !important;
             width: calc(100% - 56px) !important;
             min-width: 1024px !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            min-height: 100vh !important;
+            min-height: 100dvh !important;
+            display: flex !important;
+            flex-direction: column !important;
+            flex: 1 1 auto !important;
             box-sizing: border-box !important;
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
         }
 
         html.is-desktop-view:not(.is-embedded) .app-container {
             width: 100% !important;
             min-width: 1080px !important;
+            height: 100% !important;
+            min-height: 100% !important;
+            min-height: 100vh !important;
+            min-height: 100dvh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
             box-sizing: border-box !important;
         }
 
         html.is-desktop-view,
-        html.is-desktop-view body {
+        html.is-desktop-view body,
+        html:not(.is-mobile-view) body,
+        html.is-embedded body {
+            height: 100% !important;
+            min-height: 100% !important;
+            min-height: 100vh !important;
+            min-height: 100dvh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
             overflow-x: auto !important;
             min-width: 1080px !important;
         }
@@ -320,10 +345,16 @@
 
         html.is-desktop-view:not(.is-embedded) #inflowTabWorkspace {
             display: block !important;
+            flex: 1 1 auto !important;
             height: calc(100vh - 47px) !important;
             height: calc(100dvh - 47px) !important;
+            height: calc(100% - 47px) !important;
+            min-height: calc(100vh - 47px) !important;
+            min-height: calc(100dvh - 47px) !important;
             width: 100% !important;
             min-width: 1024px !important;
+            margin-bottom: 0 !important;
+            padding-bottom: 0 !important;
         }
 
         html.is-mobile-view #inflowCloudSidebar,
@@ -432,30 +463,50 @@
             border: none !important;
         }
 
-        /* PC / Desktop Mode: Strictly hide mobile bottom navigation bar */
+        /* PC / Desktop Mode & Embedded Tabs: Strictly hide mobile bottom navigation bar */
         html.is-desktop-view .so-mobile-nav-bar,
         html.is-desktop-view #universalMobileNavBar,
         html.is-desktop-view #mobDashboardNavBar,
         html.is-desktop-view #soMobileNavBar,
+        html.is-desktop-view #soListMobileNavBar,
         html.is-desktop-view .inflow-mobile-bottom-nav,
         html.is-desktop-view #inflowMobileProfileDrawer,
         html.is-desktop-view #inflowMobileProfileBackdrop,
+        html.is-desktop-view .so-mobile-sticky-bar,
+        html.is-desktop-view #mobileStickyBottomBar,
         html:not(.is-mobile-view) .so-mobile-nav-bar,
         html:not(.is-mobile-view) #universalMobileNavBar,
         html:not(.is-mobile-view) #mobDashboardNavBar,
         html:not(.is-mobile-view) #soMobileNavBar,
+        html:not(.is-mobile-view) #soListMobileNavBar,
         html:not(.is-mobile-view) .inflow-mobile-bottom-nav,
         html:not(.is-mobile-view) #inflowMobileProfileDrawer,
-        html:not(.is-mobile-view) #inflowMobileProfileBackdrop {
+        html:not(.is-mobile-view) #inflowMobileProfileBackdrop,
+        html:not(.is-mobile-view) .so-mobile-sticky-bar,
+        html:not(.is-mobile-view) #mobileStickyBottomBar,
+        html.is-embedded .so-mobile-nav-bar,
+        html.is-embedded #universalMobileNavBar,
+        html.is-embedded #mobDashboardNavBar,
+        html.is-embedded #soMobileNavBar,
+        html.is-embedded #soListMobileNavBar,
+        html.is-embedded .inflow-mobile-bottom-nav,
+        html.is-embedded #inflowMobileProfileDrawer,
+        html.is-embedded #inflowMobileProfileBackdrop,
+        html.is-embedded .so-mobile-sticky-bar,
+        html.is-embedded #mobileStickyBottomBar {
             display: none !important;
             visibility: hidden !important;
             pointer-events: none !important;
             height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
             width: 0 !important;
             opacity: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
             border: none !important;
+            position: static !important;
+            overflow: hidden !important;
         }
 
         @media (min-width: 769px) {
@@ -3680,7 +3731,7 @@
             {% endif %}
 
             {% if mobile_config.enable_bottom_nav and session.get('user_id') %}
-            body {
+            html.is-mobile-view:not(.is-desktop-view):not(.is-embedded) body {
                 padding-bottom: 68px !important;
             }
             {% endif %}
@@ -3696,7 +3747,7 @@
             display: none;
         }
         @media (max-width: 768px) {
-            .inflow-mobile-bottom-nav {
+            html.is-mobile-view:not(.is-desktop-view):not(.is-embedded) .inflow-mobile-bottom-nav {
                 position: fixed;
                 bottom: 0;
                 left: 0;
@@ -3736,6 +3787,60 @@
                 font-size: 10px;
                 line-height: 1.1;
             }
+        }
+
+        /* Desktop & Embedded Mode Zero-Padding & Mobile Bar Elimination Guarantee */
+        html.is-desktop-view body,
+        html.is-desktop-view,
+        html:not(.is-mobile-view) body,
+        html.is-embedded body {
+            padding-bottom: 0 !important;
+            margin-bottom: 0 !important;
+        }
+
+        html.is-desktop-view .so-mobile-nav-bar,
+        html.is-desktop-view #universalMobileNavBar,
+        html.is-desktop-view #mobDashboardNavBar,
+        html.is-desktop-view #soMobileNavBar,
+        html.is-desktop-view #soListMobileNavBar,
+        html.is-desktop-view .inflow-mobile-bottom-nav,
+        html.is-desktop-view #inflowMobileProfileDrawer,
+        html.is-desktop-view #inflowMobileProfileBackdrop,
+        html.is-desktop-view .so-mobile-sticky-bar,
+        html.is-desktop-view #mobileStickyBottomBar,
+        html:not(.is-mobile-view) .so-mobile-nav-bar,
+        html:not(.is-mobile-view) #universalMobileNavBar,
+        html:not(.is-mobile-view) #mobDashboardNavBar,
+        html:not(.is-mobile-view) #soMobileNavBar,
+        html:not(.is-mobile-view) #soListMobileNavBar,
+        html:not(.is-mobile-view) .inflow-mobile-bottom-nav,
+        html:not(.is-mobile-view) #inflowMobileProfileDrawer,
+        html:not(.is-mobile-view) #inflowMobileProfileBackdrop,
+        html:not(.is-mobile-view) .so-mobile-sticky-bar,
+        html:not(.is-mobile-view) #mobileStickyBottomBar,
+        html.is-embedded .so-mobile-nav-bar,
+        html.is-embedded #universalMobileNavBar,
+        html.is-embedded #mobDashboardNavBar,
+        html.is-embedded #soMobileNavBar,
+        html.is-embedded #soListMobileNavBar,
+        html.is-embedded .inflow-mobile-bottom-nav,
+        html.is-embedded #inflowMobileProfileDrawer,
+        html.is-embedded #inflowMobileProfileBackdrop,
+        html.is-embedded .so-mobile-sticky-bar,
+        html.is-embedded #mobileStickyBottomBar {
+            display: none !important;
+            visibility: hidden !important;
+            pointer-events: none !important;
+            height: 0 !important;
+            min-height: 0 !important;
+            max-height: 0 !important;
+            width: 0 !important;
+            opacity: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border: none !important;
+            position: static !important;
+            overflow: hidden !important;
         }
     </style>
 
