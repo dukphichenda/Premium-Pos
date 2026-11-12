@@ -152,7 +152,7 @@ window.prefetchCatalogProduct = function(id, url) {
     padding: 8px 10px !important;
     background: #FFFFFF !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06) !important;
-    aspect-ratio: 1 / 1 !important;
+    aspect-ratio: 1 / 0.9 !important;
     width: 100% !important;
     max-width: 680px !important;
     margin: 8px auto !important;
@@ -3533,8 +3533,8 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- Offscreen Rendering Container for Batch Price Card Generation -->
-<div id="batchPriceCardStageContainer" style="position: absolute; left: 0; top: 0; width: 680px; height: 680px; overflow: hidden; pointer-events: none; opacity: 0; z-index: -9999;">
-    <div class="inflow-spec-card is-exporting" id="batchPriceCardStage" style="width: 680px; height: 680px; max-width: 680px; aspect-ratio: 1 / 1; margin: 0; background: #FFFFFF;">
+<div id="batchPriceCardStageContainer" style="position: absolute; left: 0; top: 0; width: 680px; height: 612px; overflow: hidden; pointer-events: none; opacity: 0; z-index: -9999;">
+    <div class="inflow-spec-card is-exporting" id="batchPriceCardStage" style="width: 680px; height: 612px; max-width: 680px; aspect-ratio: 1 / 0.9; margin: 0; background: #FFFFFF;">
         <!-- Injected via JavaScript during batch rendering -->
     </div>
 </div>
@@ -6338,6 +6338,7 @@ function setProductPriceCardStyle(style) {
     } else {
         style = String(style).toLowerCase().trim();
         if (style === 'genz') style = 'gen_z';
+        if (style === 'brown_look') style = 'brown';
     }
 
     const card = document.getElementById('printablePriceCard');
@@ -6345,13 +6346,15 @@ function setProductPriceCardStyle(style) {
     const modernContent = document.getElementById('cardContentModern');
     const cuteContent = document.getElementById('cardContentCute');
     const genZContent = document.getElementById('cardContentGenZ');
+    const brownContent = document.getElementById('cardContentBrown');
     const btnClassic = document.getElementById('btnDetailStyleClassic');
     const btnModern = document.getElementById('btnDetailStyleModern');
     const btnCute = document.getElementById('btnDetailStyleCute');
     const btnGenZ = document.getElementById('btnDetailStyleGenZ');
+    const btnBrown = document.getElementById('btnDetailStyleBrown');
     
     if (card) {
-        card.classList.remove('classic', 'modern', 'cute', 'gen_z');
+        card.classList.remove('classic', 'modern', 'cute', 'gen_z', 'brown');
         card.classList.add(style);
     }
 
@@ -6359,11 +6362,13 @@ function setProductPriceCardStyle(style) {
     if (modernContent) modernContent.style.display = (style === 'modern') ? 'flex' : 'none';
     if (cuteContent) cuteContent.style.display = (style === 'cute') ? 'block' : 'none';
     if (genZContent) genZContent.style.display = (style === 'gen_z') ? 'block' : 'none';
+    if (brownContent) brownContent.style.display = (style === 'brown') ? 'flex' : 'none';
 
     if (btnClassic) btnClassic.classList.toggle('active-classic', style === 'classic');
     if (btnModern) btnModern.classList.toggle('active-modern', style === 'modern');
     if (btnCute) btnCute.classList.toggle('active-cute', style === 'cute');
     if (btnGenZ) btnGenZ.classList.toggle('active-gen_z', style === 'gen_z');
+    if (btnBrown) btnBrown.classList.toggle('active-brown', style === 'brown');
     
     if (typeof markFieldDirty === 'function') {
         markFieldDirty('price_card_style', style);
@@ -6380,30 +6385,35 @@ function syncCardTierInputs() {
         const mQty = document.getElementById('cardModernTierQtyInput' + idx);
         const cuteQty = document.getElementById('cardCuteTierQtyInput' + idx);
         const genZQty = document.getElementById('cardGenZTierQtyInput' + idx);
-        const valQty = (cQty && cQty.value) || (mQty && mQty.value) || (cuteQty && cuteQty.value) || (genZQty && genZQty.value);
+        const brownQty = document.getElementById('cardBrownTierQtyInput' + idx);
+        const valQty = (cQty && cQty.value) || (mQty && mQty.value) || (cuteQty && cuteQty.value) || (genZQty && genZQty.value) || (brownQty && brownQty.value);
         if (valQty) {
             if (cQty && document.activeElement !== cQty) cQty.value = valQty;
             if (mQty && document.activeElement !== mQty) mQty.value = valQty;
             if (cuteQty && document.activeElement !== cuteQty) cuteQty.value = valQty;
             if (genZQty && document.activeElement !== genZQty) genZQty.value = valQty;
+            if (brownQty && document.activeElement !== brownQty) brownQty.value = valQty;
         }
         
         const cTot = document.getElementById('cardTierTotInput' + idx);
         const mTot = document.getElementById('cardModernTierTotInput' + idx);
         const cuteTot = document.getElementById('cardCuteTierTotInput' + idx);
         const genZTot = document.getElementById('cardGenZTierTotInput' + idx);
-        const valTot = (cTot && cTot.value) || (mTot && mTot.value) || (cuteTot && cuteTot.value) || (genZTot && genZTot.value);
+        const brownTot = document.getElementById('cardBrownTierTotInput' + idx);
+        const valTot = (cTot && cTot.value) || (mTot && mTot.value) || (cuteTot && cuteTot.value) || (genZTot && genZTot.value) || (brownTot && brownTot.value);
         if (valTot) {
             if (cTot && document.activeElement !== cTot) cTot.value = valTot;
             if (mTot && document.activeElement !== mTot) mTot.value = valTot;
             if (cuteTot && document.activeElement !== cuteTot) cuteTot.value = valTot;
             if (genZTot && document.activeElement !== genZTot) genZTot.value = valTot;
+            if (brownTot && document.activeElement !== brownTot) brownTot.value = valTot;
         }
         
         const cUnit = document.getElementById('cardTierUnitDisplay' + idx);
         const mUnit = document.getElementById('cardModernTierUnitDisplay' + idx);
         const cuteUnit = document.getElementById('cardCuteTierUnitDisplay' + idx);
         const genZUnit = document.getElementById('cardGenZTierUnitDisplay' + idx);
+        const brownUnit = document.getElementById('cardBrownTierUnitDisplay' + idx);
         if (cUnit && mUnit) {
             mUnit.innerText = cUnit.innerText;
         }
@@ -6416,6 +6426,11 @@ function syncCardTierInputs() {
             const m = cUnit.innerText.match(/([\d.]+)/);
             const num = m ? m[1] : '0.000';
             genZUnit.innerText = `(${num} $/${getActiveStdUomBadge()})`;
+        }
+        if (brownUnit && cUnit) {
+            const m = cUnit.innerText.match(/([\d.]+)/);
+            const num = m ? m[1] : '0.000';
+            brownUnit.innerText = `(${num} $/${getActiveStdUomBadge()})`;
         }
     });
 }
@@ -6475,6 +6490,26 @@ function onGenZTierTotChange(idx) {
     const cInput = document.getElementById('cardTierTotInput' + idx);
     if (genZInput && cInput) {
         cInput.value = genZInput.value;
+    }
+    onCardTierTotChange(idx);
+    syncCardTierInputs();
+}
+
+function onBrownTierQtyChange(idx) {
+    const brownInput = document.getElementById('cardBrownTierQtyInput' + idx);
+    const cInput = document.getElementById('cardTierQtyInput' + idx);
+    if (brownInput && cInput) {
+        cInput.value = brownInput.value;
+    }
+    onCardTierQtyChange(idx);
+    syncCardTierInputs();
+}
+
+function onBrownTierTotChange(idx) {
+    const brownInput = document.getElementById('cardBrownTierTotInput' + idx);
+    const cInput = document.getElementById('cardTierTotInput' + idx);
+    if (brownInput && cInput) {
+        cInput.value = brownInput.value;
     }
     onCardTierTotChange(idx);
     syncCardTierInputs();
@@ -6780,8 +6815,8 @@ function exportCurrentCardAsJpg() {
                 if (!targetCard) return;
                 
                 targetCard.style.width = '680px';
-                targetCard.style.height = '680px';
-                targetCard.style.aspectRatio = '1 / 1';
+                targetCard.style.height = '612px';
+                targetCard.style.aspectRatio = '1 / 0.9';
                 const modernEl = targetCard.querySelector('#cardContentModern');
                 if (modernEl && window.getComputedStyle(modernEl).display !== 'none') {
                     modernEl.style.display = 'flex';
@@ -6795,6 +6830,14 @@ function exportCurrentCardAsJpg() {
                     genZEl.style.height = '100%';
                     genZEl.style.width = '100%';
                     genZEl.style.justifyContent = 'space-between';
+                }
+                const brownEl = targetCard.querySelector('#cardContentBrown');
+                if (brownEl && window.getComputedStyle(brownEl).display !== 'none') {
+                    brownEl.style.display = 'flex';
+                    brownEl.style.flexDirection = 'column';
+                    brownEl.style.height = '100%';
+                    brownEl.style.width = '100%';
+                    brownEl.style.justifyContent = 'space-between';
                 }
                 
                 // Replace all input elements with pure styled spans to completely eliminate text clipping/vertical shifting
@@ -6997,7 +7040,7 @@ async function fetchPriceCardsAndExportZip(apiUrl, zipFileName, scopeTitle) {
                 x: 0,
                 y: 0,
                 width: 680,
-                height: 680,
+                height: 612,
                 scrollX: 0,
                 scrollY: 0,
                 onclone: (clonedDoc) => {
@@ -7063,8 +7106,8 @@ function renderOffscreenCard(stage, item) {
     updateCardColorProperties(stage, cardColor);
     stage.style.setProperty('--price-card-font', `'${cardFont}', 'Siemreap', sans-serif`);
     stage.style.width = '680px';
-    stage.style.height = '680px';
-    stage.style.aspectRatio = '1 / 1';
+    stage.style.height = '612px';
+    stage.style.aspectRatio = '1 / 0.9';
     
     let imgHtml = '';
     if (item.image_url) {
@@ -7392,6 +7435,121 @@ function renderOffscreenCard(stage, item) {
                         <line x1="2" y1="2" x2="10" y2="6"/>
                         <line x1="2" y1="12" x2="8" y2="10"/>
                     </svg>
+                </div>
+            </div>
+        `;
+    } else if (activeStyle === 'brown' || activeStyle === 'brown_look') {
+        stage.classList.remove('modern', 'cute', 'gen_z');
+        stage.classList.add('brown');
+        stage.style.display = 'flex';
+        stage.style.flexDirection = 'column';
+        stage.style.justifyContent = 'space-between';
+        stage.style.padding = '18px 22px 16px 22px';
+        stage.style.borderRadius = '28px';
+        stage.style.boxSizing = 'border-box';
+        stage.style.height = '612px';
+        stage.style.aspectRatio = '1 / 0.9';
+        
+        const dim = c.dim_str || '22cm x 15cm x 4.5cm';
+        const parts = dim.split(/x|\*/i).map(s => s.trim());
+        const len = parts[0] || '22 cm';
+        const wid = parts[1] || '15 cm';
+        const hgt = parts[2] || '4.5 cm';
+        
+        stage.innerHTML = `
+            <svg class="inflow-brown-deco-wheat-tr" viewBox="0 0 70 50" fill="none" stroke="#7D6352" stroke-width="1.2" stroke-linecap="round"><path d="M5 45 C25 35, 45 20, 65 5"/><path d="M30 30 C32 24, 38 23, 40 27 C38 31, 33 32, 30 30 Z" fill="#D8C7B8"/><path d="M42 22 C44 16, 50 15, 52 19 C50 23, 45 24, 42 22 Z" fill="#D8C7B8"/><path d="M54 13 C56 7, 62 6, 64 10 C62 14, 57 15, 54 13 Z" fill="#D8C7B8"/></svg>
+            <svg class="inflow-brown-deco-rosemary" viewBox="0 0 50 70" fill="none" stroke="#7D6352" stroke-width="1.2" stroke-linecap="round"><path d="M25 65 Q23 35, 27 5"/><path d="M24 50 Q10 46, 12 40"/><path d="M26 42 Q40 38, 38 32"/><path d="M25 30 Q12 26, 15 20"/><path d="M26 20 Q38 16, 35 10"/></svg>
+            <svg class="inflow-brown-deco-whisk" viewBox="0 0 60 60" fill="none" stroke="#7D6352" stroke-width="1.1" stroke-linecap="round"><ellipse cx="28" cy="28" rx="14" ry="22" transform="rotate(-35 28 28)"/><line x1="28" y1="6" x2="28" y2="50" transform="rotate(-35 28 28)"/><path d="M42 42 L56 56" stroke-width="2.5"/></svg>
+            <div class="inflow-brown-deco-drop1"></div>
+            <div class="inflow-brown-deco-drop2"></div>
+
+            <div class="inflow-brown-header">
+                <div class="inflow-brown-header-left">
+                    <div class="inflow-brown-header-icon-box">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FAF7F2" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                    </div>
+                    <div class="inflow-brown-title-wrap">
+                        <div class="inflow-brown-title-sku">${item.sku || ''}</div>
+                        <div class="inflow-brown-sub-desc font-khmer">${c.khmer_name || item.name}</div>
+                    </div>
+                </div>
+                <div class="inflow-brown-mood-doodle">
+                    <div class="inflow-brown-mood-line">Good</div>
+                    <div class="inflow-brown-mood-line">Food</div>
+                    <div class="inflow-brown-mood-line">Good</div>
+                    <div class="inflow-brown-mood-line">Mood</div>
+                    <div class="inflow-brown-mood-smile">
+                        <svg width="22" height="11" viewBox="0 0 24 12" fill="none" stroke="#7D6352" stroke-width="2.2" stroke-linecap="round"><path d="M3 2C7 9 17 9 21 2"/></svg>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inflow-brown-middle-grid">
+                <div class="inflow-brown-photo-wrap">
+                    <svg class="inflow-brown-photo-sketch" width="55" height="55" viewBox="0 0 60 60" fill="none" stroke="#5A3A25" stroke-width="1.2"><path d="M10 50 C25 45, 45 45, 50 10"/><path d="M20 55 C35 50, 50 35, 55 20"/></svg>
+                    <span class="inflow-brown-dim-label font-khmer" style="top: 8px; left: 14px; transform: rotate(-35deg);">${wid}</span>
+                    <span class="inflow-brown-dim-label font-khmer" style="bottom: 8px; left: 50%; transform: translateX(-50%);">${len}</span>
+                    <span class="inflow-brown-dim-label font-khmer" style="top: 50%; right: 8px; transform: translateY(-50%) rotate(90deg);">${hgt}</span>
+                    <div class="inflow-brown-image-frame">
+                        ${imgHtml}
+                    </div>
+                </div>
+
+                <div class="inflow-brown-specs-card">
+                    <div class="inflow-brown-specs-badge">
+                        <div class="inflow-brown-specs-h-km font-khmer">លក្ខណៈផលិតផល</div>
+                        <div class="inflow-brown-specs-h-en">Product Detail</div>
+                    </div>
+                    <div class="inflow-brown-specs-list">
+                        <div class="inflow-brown-spec-row">
+                            <div class="inflow-brown-spec-icon-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg></div>
+                            <div class="inflow-brown-spec-text font-khmer">ទំហំ: <strong>${dim}</strong></div>
+                        </div>
+                        <div class="inflow-brown-spec-row">
+                            <div class="inflow-brown-spec-icon-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+                            <div class="inflow-brown-spec-text font-khmer">1 កេស មាន <strong>${c.packs_per_case || 4}</strong> ដុំ</div>
+                        </div>
+                        <div class="inflow-brown-spec-row">
+                            <div class="inflow-brown-spec-icon-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+                            <div class="inflow-brown-spec-text font-khmer">1 ដុំ មាន <strong>${c.pcs_per_pack || 125}</strong> ${unitWord}</div>
+                        </div>
+                        <div class="inflow-brown-spec-row">
+                            <div class="inflow-brown-spec-icon-box"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
+                            <div class="inflow-brown-spec-text font-khmer"><strong>${c.pcs_per_case || 500}</strong> ${unitWord}/1កេស</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="inflow-brown-price-wrap">
+                <div class="inflow-brown-price-header">
+                    <div class="inflow-brown-price-th-left">
+                        <div class="inflow-brown-th-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg></div>
+                        <div><div class="inflow-brown-th-km font-khmer">តម្លៃ</div><div class="inflow-brown-th-en">Price</div></div>
+                    </div>
+                    <div class="inflow-brown-price-th-right">
+                        <div class="inflow-brown-th-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg></div>
+                        <div><div class="inflow-brown-th-km font-khmer">តម្លៃក្នុងមួយ${unitWord}</div><div class="inflow-brown-th-en">Unit Price</div></div>
+                    </div>
+                </div>
+                <div class="inflow-brown-tier-row">
+                    <div class="inflow-brown-qty-capsule font-khmer">${c.tier_qty_1} ${unitWord} (${stdBadge})</div>
+                    <div class="inflow-brown-equal-sign">=</div>
+                    <div class="inflow-brown-tot-capsule font-khmer">$${Number(c.tot_price_1).toFixed(2)}</div>
+                    <div class="inflow-brown-uprice-capsule font-khmer">(${Number(c.u_price_1).toFixed(3)} $/${stdBadge})</div>
+                </div>
+                <div class="inflow-brown-tier-row">
+                    <div class="inflow-brown-qty-capsule font-khmer">${c.tier_qty_2} ${unitWord} (${stdBadge})</div>
+                    <div class="inflow-brown-equal-sign">=</div>
+                    <div class="inflow-brown-tot-capsule font-khmer">$${Number(c.tot_price_2).toFixed(2)}</div>
+                    <div class="inflow-brown-uprice-capsule font-khmer">(${Number(c.u_price_2).toFixed(3)} $/${stdBadge})</div>
+                </div>
+                <div class="inflow-brown-tier-row">
+                    <div class="inflow-brown-qty-capsule font-khmer">${c.tier_qty_3} ${unitWord} (${stdBadge})</div>
+                    <div class="inflow-brown-equal-sign">=</div>
+                    <div class="inflow-brown-tot-capsule font-khmer">$${Number(c.tot_price_3).toFixed(2)}</div>
+                    <div class="inflow-brown-uprice-capsule font-khmer">(${Number(c.u_price_3).toFixed(3)} $/${stdBadge})</div>
+                    <div class="inflow-brown-best-choice"><div>Best &gt;</div><div>Choice</div></div>
                 </div>
             </div>
         `;

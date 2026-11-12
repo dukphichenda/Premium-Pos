@@ -39,6 +39,11 @@
     color: #FFFFFF;
     box-shadow: 0 1px 4px rgba(51, 65, 85, 0.35);
 }
+.btn-global-style.active-brown {
+    background: #3B2416;
+    color: #FFFFFF;
+    box-shadow: 0 1px 4px rgba(59, 36, 22, 0.4);
+}
 
 /* Category Table Style Pills */
 .cat-style-pill-btn {
@@ -77,6 +82,11 @@
     background: #334155;
     color: #FFFFFF;
     box-shadow: 0 1px 3px rgba(51, 65, 85, 0.3);
+}
+.cat-style-pill-btn.active-brown {
+    background: #3B2416;
+    color: #FFFFFF;
+    box-shadow: 0 1px 3px rgba(59, 36, 22, 0.35);
 }
 
 /* Toast alert notification */
@@ -153,9 +163,14 @@
                         🌸 Cute Look
                     </button>
                     <button type="button" id="globalBtnGenZ" onclick="applyGlobalPriceTableStyle('gen_z')"
-                            class="btn-global-style {% if global_price_table_style == 'gen_z' %}active-gen_z{% endif %}"
+                            class="btn-global-style {% if global_price_table_style in ('gen_z', 'genz') %}active-gen_z{% endif %}"
                             title="Set all categories to Gen Z price table">
                         ⚡ Gen Z
+                    </button>
+                    <button type="button" id="globalBtnBrown" onclick="applyGlobalPriceTableStyle('brown')"
+                            class="btn-global-style {% if global_price_table_style in ('brown', 'brown_look') %}active-brown{% endif %}"
+                            title="Set all categories to Brown Look price table (Caramel & Espresso)">
+                        ☕ Brown Look
                     </button>
                 </div>
             </div>
@@ -356,9 +371,15 @@
                                 </button>
                                 <button type="button" 
                                         onclick="setCategoryStyleDirect({{ c.id }}, 'gen_z', this)"
-                                        class="cat-style-pill-btn cat-btn-gen_z-{{ c.id }} {% if c.price_table_style == 'gen_z' %}active-gen_z{% endif %}"
+                                        class="cat-style-pill-btn cat-btn-gen_z-{{ c.id }} {% if c.price_table_style in ('gen_z', 'genz') %}active-gen_z{% endif %}"
                                         title="Switch to Gen Z price table">
                                     ⚡ Gen Z
+                                </button>
+                                <button type="button" 
+                                        onclick="setCategoryStyleDirect({{ c.id }}, 'brown', this)"
+                                        class="cat-style-pill-btn cat-btn-brown-{{ c.id }} {% if c.price_table_style in ('brown', 'brown_look') %}active-brown{% endif %}"
+                                        title="Switch to Brown Look price table (Caramel & Espresso)">
+                                    ☕ Brown
                                 </button>
                             </div>
                         </td>
@@ -507,11 +528,18 @@
                             <div style="font-size: 10.5px; color: #64748B;">Pastel pills (Image 3)</div>
                         </div>
                     </label>
-                    <label id="newStyleCardGenZ" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid {% if global_price_table_style == 'gen_z' %}#334155{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style == 'gen_z' %}#F8FAFC{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
-                        <input type="radio" name="price_table_style" id="newStyleRadioGenZ" value="gen_z" {% if global_price_table_style == 'gen_z' %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #334155; width: 15px; height: 15px;">
+                    <label id="newStyleCardGenZ" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid {% if global_price_table_style in ('gen_z', 'genz') %}#334155{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style in ('gen_z', 'genz') %}#F8FAFC{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioGenZ" value="gen_z" {% if global_price_table_style in ('gen_z', 'genz') %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #334155; width: 15px; height: 15px;">
                         <div>
                             <div style="font-weight: 700; font-size: 12px; color: #0F172A;">⚡ Gen Z</div>
                             <div style="font-size: 10.5px; color: #64748B;">Trendy doodles & mint</div>
+                        </div>
+                    </label>
+                    <label id="newStyleCardBrown" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid {% if global_price_table_style in ('brown', 'brown_look') %}#3B2416{% else %}#CBD5E1{% endif %}; border-radius: 8px; cursor: pointer; background: {% if global_price_table_style in ('brown', 'brown_look') %}#FAF6F0{% else %}#FFFFFF{% endif %}; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="newStyleRadioBrown" value="brown" {% if global_price_table_style in ('brown', 'brown_look') %}checked{% endif %} onchange="updateStyleCardSelection('new')" style="accent-color: #3B2416; width: 15px; height: 15px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">☕ Brown Look</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Caramel, chocolate & wheat</div>
                         </div>
                     </label>
                 </div>
@@ -621,6 +649,13 @@
                         <div>
                             <div style="font-weight: 700; font-size: 12px; color: #0F172A;">⚡ Gen Z</div>
                             <div style="font-size: 10.5px; color: #64748B;">Trendy doodles & mint</div>
+                        </div>
+                    </label>
+                    <label id="editStyleCardBrown" style="display: flex; align-items: center; gap: 8px; padding: 10px 10px; border: 1.5px solid #CBD5E1; border-radius: 8px; cursor: pointer; background: #FFFFFF; transition: all 0.15s ease;">
+                        <input type="radio" name="price_table_style" id="editStyleRadioBrown" value="brown" onchange="updateStyleCardSelection('edit')" style="accent-color: #3B2416; width: 15px; height: 15px;">
+                        <div>
+                            <div style="font-weight: 700; font-size: 12px; color: #0F172A;">☕ Brown Look</div>
+                            <div style="font-size: 10.5px; color: #64748B;">Caramel, chocolate & wheat</div>
                         </div>
                     </label>
                 </div>
@@ -736,7 +771,13 @@ function openNewCategoryModal() {
     document.getElementById('newColorPreview').style.backgroundColor = '#00A3E0';
     const isGlobalModern = document.getElementById('globalBtnModern') && document.getElementById('globalBtnModern').classList.contains('active-modern');
     const isGlobalCute = document.getElementById('globalBtnCute') && document.getElementById('globalBtnCute').classList.contains('active-cute');
-    if (isGlobalCute) {
+    const isGlobalGenZ = document.getElementById('globalBtnGenZ') && document.getElementById('globalBtnGenZ').classList.contains('active-gen_z');
+    const isGlobalBrown = document.getElementById('globalBtnBrown') && document.getElementById('globalBtnBrown').classList.contains('active-brown');
+    if (isGlobalBrown) {
+        document.getElementById('newStyleRadioBrown').checked = true;
+    } else if (isGlobalGenZ) {
+        document.getElementById('newStyleRadioGenZ').checked = true;
+    } else if (isGlobalCute) {
         document.getElementById('newStyleRadioCute').checked = true;
     } else if (isGlobalModern) {
         document.getElementById('newStyleRadioModern').checked = true;
@@ -768,7 +809,10 @@ function openEditCategoryModalFromRow(row) {
     document.getElementById('editCategoryDescription').value = catDesc;
     document.getElementById('editCategoryActive').checked = catActive;
 
-    if (catStyle === 'gen_z') {
+    if (catStyle === 'brown' || catStyle === 'brown_look') {
+        const rBrown = document.getElementById('editStyleRadioBrown');
+        if (rBrown) rBrown.checked = true;
+    } else if (catStyle === 'gen_z' || catStyle === 'genz') {
         const rGenZ = document.getElementById('editStyleRadioGenZ');
         if (rGenZ) rGenZ.checked = true;
     } else if (catStyle === 'cute') {
@@ -793,10 +837,12 @@ function updateStyleCardSelection(prefix) {
     const modernRadio = document.getElementById(prefix + 'StyleRadioModern');
     const cuteRadio = document.getElementById(prefix + 'StyleRadioCute');
     const genZRadio = document.getElementById(prefix + 'StyleRadioGenZ');
+    const brownRadio = document.getElementById(prefix + 'StyleRadioBrown');
     const classicCard = document.getElementById(prefix + 'StyleCardClassic');
     const modernCard = document.getElementById(prefix + 'StyleCardModern');
     const cuteCard = document.getElementById(prefix + 'StyleCardCute');
     const genZCard = document.getElementById(prefix + 'StyleCardGenZ');
+    const brownCard = document.getElementById(prefix + 'StyleCardBrown');
 
     if (classicRadio && classicCard) {
         if (classicRadio.checked) {
@@ -834,6 +880,15 @@ function updateStyleCardSelection(prefix) {
             genZCard.style.backgroundColor = '#FFFFFF';
         }
     }
+    if (brownRadio && brownCard) {
+        if (brownRadio.checked) {
+            brownCard.style.borderColor = '#3B2416';
+            brownCard.style.backgroundColor = '#FAF6F0';
+        } else {
+            brownCard.style.borderColor = '#CBD5E1';
+            brownCard.style.backgroundColor = '#FFFFFF';
+        }
+    }
 }
 
 /* Individual Category Style Switcher (AJAX) */
@@ -842,6 +897,8 @@ function setCategoryStyleDirect(catId, style, btn) {
     const classicBtn = document.querySelector(`.cat-btn-classic-${catId}`);
     const modernBtn = document.querySelector(`.cat-btn-modern-${catId}`);
     const cuteBtn = document.querySelector(`.cat-btn-cute-${catId}`);
+    const genZBtn = document.querySelector(`.cat-btn-gen_z-${catId}`);
+    const brownBtn = document.querySelector(`.cat-btn-brown-${catId}`);
 
     if (btn) btn.style.opacity = '0.5';
 
@@ -858,8 +915,8 @@ function setCategoryStyleDirect(catId, style, btn) {
             if (classicBtn) classicBtn.classList.toggle('active-classic', style === 'classic');
             if (modernBtn) modernBtn.classList.toggle('active-modern', style === 'modern');
             if (cuteBtn) cuteBtn.classList.toggle('active-cute', style === 'cute');
-            const genZBtn = document.querySelector(`.cat-btn-gen_z-${catId}`);
             if (genZBtn) genZBtn.classList.toggle('active-gen_z', style === 'gen_z');
+            if (brownBtn) brownBtn.classList.toggle('active-brown', style === 'brown');
             showCategoryToast(`Category "${res.category_name}" price table set to ${style.toUpperCase()}`);
         } else {
             alert(res.message || 'Failed to update category style.');
@@ -874,7 +931,7 @@ function setCategoryStyleDirect(catId, style, btn) {
 
 /* Global Price Table Style Switcher (All Categories & Products) */
 function applyGlobalPriceTableStyle(style) {
-    const styleLabel = style === 'gen_z' ? 'Gen Z ⚡' : (style === 'cute' ? 'Cute Look 🌸' : (style === 'modern' ? 'Modern ✨' : 'Classic'));
+    const styleLabel = style === 'brown' ? 'Brown Look ☕' : (style === 'gen_z' ? 'Gen Z ⚡' : (style === 'cute' ? 'Cute Look 🌸' : (style === 'modern' ? 'Modern ✨' : 'Classic')));
     if (!confirm(`Switch Price Table Style for ALL products and categories to ${styleLabel}?`)) {
         return;
     }
@@ -883,10 +940,12 @@ function applyGlobalPriceTableStyle(style) {
     const btnModern = document.getElementById('globalBtnModern');
     const btnCute = document.getElementById('globalBtnCute');
     const btnGenZ = document.getElementById('globalBtnGenZ');
+    const btnBrown = document.getElementById('globalBtnBrown');
     if (btnClassic) btnClassic.style.opacity = '0.5';
     if (btnModern) btnModern.style.opacity = '0.5';
     if (btnCute) btnCute.style.opacity = '0.5';
     if (btnGenZ) btnGenZ.style.opacity = '0.5';
+    if (btnBrown) btnBrown.style.opacity = '0.5';
 
     fetch('/api/categories/set-all-style', {
         method: 'POST',
@@ -899,6 +958,7 @@ function applyGlobalPriceTableStyle(style) {
         if (btnModern) btnModern.style.opacity = '1';
         if (btnCute) btnCute.style.opacity = '1';
         if (btnGenZ) btnGenZ.style.opacity = '1';
+        if (btnBrown) btnBrown.style.opacity = '1';
 
         if (res.success) {
             // Update global toggle buttons
@@ -906,6 +966,7 @@ function applyGlobalPriceTableStyle(style) {
             if (btnModern) btnModern.classList.toggle('active-modern', style === 'modern');
             if (btnCute) btnCute.classList.toggle('active-cute', style === 'cute');
             if (btnGenZ) btnGenZ.classList.toggle('active-gen_z', style === 'gen_z');
+            if (btnBrown) btnBrown.classList.toggle('active-brown', style === 'brown');
 
             // Update all category row buttons in the table
             document.querySelectorAll('.category-row').forEach(row => {
@@ -915,10 +976,12 @@ function applyGlobalPriceTableStyle(style) {
                 const mBtn = document.querySelector(`.cat-btn-modern-${catId}`);
                 const cuteB = document.querySelector(`.cat-btn-cute-${catId}`);
                 const genZB = document.querySelector(`.cat-btn-gen_z-${catId}`);
+                const brownB = document.querySelector(`.cat-btn-brown-${catId}`);
                 if (cBtn) cBtn.classList.toggle('active-classic', style === 'classic');
                 if (mBtn) mBtn.classList.toggle('active-modern', style === 'modern');
                 if (cuteB) cuteB.classList.toggle('active-cute', style === 'cute');
                 if (genZB) genZB.classList.toggle('active-gen_z', style === 'gen_z');
+                if (brownB) brownB.classList.toggle('active-brown', style === 'brown');
             });
 
             showCategoryToast(`All products & categories updated to ${style.toUpperCase()} style!`);
@@ -930,6 +993,8 @@ function applyGlobalPriceTableStyle(style) {
         if (btnClassic) btnClassic.style.opacity = '1';
         if (btnModern) btnModern.style.opacity = '1';
         if (btnCute) btnCute.style.opacity = '1';
+        if (btnGenZ) btnGenZ.style.opacity = '1';
+        if (btnBrown) btnBrown.style.opacity = '1';
         console.error('Error setting all style:', err);
         alert('Network error while updating global style.');
     });
