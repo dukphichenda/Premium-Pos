@@ -152,8 +152,8 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         self.assertIn('inflow-brown-price-wrap', leg_html)
 
     def test_product_catalog_facebook_renders_brown_option(self):
-        """Verify /product_catalog (Card Mode) includes Brown Look option and .cat-card.brown CSS."""
-        resp = self.client.get('/product_catalog')
+        """Verify /inventory/product-catalog (Card Mode) includes Brown Look option and .cat-card.brown CSS."""
+        resp = self.client.get('/inventory/product-catalog')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
         self.assertIn('<option value="brown">☕ Brown Look</option>', html)
