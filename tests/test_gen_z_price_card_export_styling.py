@@ -68,10 +68,12 @@ class TestGenZPriceCardExportStyling(unittest.TestCase):
 
                 # 2. Check for lingering test orders
                 cursor.execute("""
-                    SELECT order_number, remarks FROM sales_orders 
-                    WHERE order_number ILIKE '%test%' 
-                       OR order_number ILIKE '%temp%' 
-                       OR remarks ILIKE '%test%';
+                    SELECT so.id, so.order_number, c.name 
+                    FROM sales_orders so 
+                    LEFT JOIN customers c ON c.id = so.customer_id 
+                    WHERE so.order_number ILIKE '%TEST%' 
+                       OR so.order_number ILIKE '%TEMP%' 
+                       OR c.name ILIKE '%TEST%';
                 """)
                 test_sos = cursor.fetchall()
                 self.assertEqual(len(test_sos), 0, f"Found lingering test sales orders: {[r['order_number'] for r in test_sos]}")
