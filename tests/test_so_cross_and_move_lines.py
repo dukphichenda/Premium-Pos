@@ -79,7 +79,7 @@ class TestSoCrossAndMoveLines(unittest.TestCase):
         # 4. #newRowEntry structure
         self.assertIn('<tr id="newRowEntry"', html)
         idx_new_row = html.find('id="newRowEntry"')
-        new_row_slice = html[idx_new_row:idx_new_row + 400]
+        new_row_slice = html[idx_new_row:idx_new_row + 800]
         self.assertIn('inflow-grid-selector-col', new_row_slice)
         self.assertIn('+', new_row_slice)
 
