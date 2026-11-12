@@ -11,7 +11,10 @@ class TestPosBillingCustomerAndDelete(unittest.TestCase):
 
     def test_pos_template_has_delete_button_and_full_height(self):
         """Verify templates/branches/pos.html contains the delete button and edge-to-edge layout."""
-        with open('templates/branches/pos.html', 'r', encoding='utf-8') as f:
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        template_path = os.path.join(base_dir, 'templates', 'branches', 'pos.html')
+        with open(template_path, 'r', encoding='utf-8') as f:
             content = f.read()
 
         # Delete button & removeFromCart function
