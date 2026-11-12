@@ -122,18 +122,18 @@ class TestSoSidebarFlushAndUom(unittest.TestCase):
         """
         Verify:
         1. Quantity cell has amount input and UOM badge aligned without trash button.
-        2. Delete icon (trash button) is placed in the last column next to the drag handle.
+        2. Delete icon (trash button) is replaced by Cross button before No. column.
         """
         resp = self.client.get('/sales/new')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
 
-        self.assertIn('line-drag-handle-cell', html)
-        self.assertIn('so-drag-handle', html)
+        self.assertIn('inflow-grid-selector-col', html)
+        self.assertIn('line-delete-cross-btn', html)
         self.assertIn('so-qty-input', html)
         self.assertIn('so-uom-badge', html)
-        self.assertIn('isDragHandlePressed', html)
-        self.assertIn('handleLineDragStart', html)
+        self.assertIn('moveSoLineUp', html)
+        self.assertIn('moveSoLineDown', html)
 
     def test_kit_components_in_hand_and_reserved_stock(self):
         """

@@ -7420,6 +7420,15 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
 
         const itemSku = sku || (prodInfo && prodInfo.sku) || '';
         tr.innerHTML = `
+            <td class="inflow-grid-selector-col" style="width: 44px; text-align: center; vertical-align: middle; padding: 0 2px;">
+                <div class="inflow-selector-cell-content" style="display: flex; align-items: center; justify-content: center; gap: 4px;">
+                    <button type="button" class="line-delete-cross-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">✕</button>
+                    <div class="so-line-move-stack po-line-move-stack">
+                        <button type="button" class="so-line-move-btn po-line-move-btn" onclick="moveSoLineUp(this, event)" title="Move up (↑)">▲</button>
+                        <button type="button" class="so-line-move-btn po-line-move-btn" onclick="moveSoLineDown(this, event)" title="Move down (↓)">▼</button>
+                    </div>
+                </div>
+            </td>
             <td class="line-no-col" style="text-align: center; vertical-align: middle; font-weight: 700; color: #64748B; font-size: 12.5px;">
                 ${existingCount + 1}
             </td>
@@ -7494,14 +7503,6 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
                     <span class="so-mob-subtotal-label">Subtotal</span>
                     <span class="so-subtotal-amount">$${(1 * initialUnitPrice).toFixed(2)}</span>
                 </div>
-            </td>
-            <td class="line-drag-handle-cell" style="text-align: center; vertical-align: middle; white-space: nowrap; padding: 2px 4px;" title="Actions">
-                <button type="button" class="line-delete-cross-btn so-qty-trash-btn" onclick="deleteSpecificSoLine(this, event)" title="Delete this line">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="3 6 5 6 21 6"></polyline>
-                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                    </svg>
-                </button>
             </td>
         `;
 
@@ -7641,6 +7642,46 @@ function deleteSpecificSoLine(btn, event) {
     markDirty();
     syncSoSelectAllCheckbox();
 }
+
+function moveSoLineUp(btnOrRow, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    if (isOrderPaid()) return;
+    const row = (btnOrRow && btnOrRow.tagName === 'TR') ? btnOrRow : (btnOrRow ? btnOrRow.closest('tr') : null);
+    if (!row) return;
+    const prev = row.previousElementSibling;
+    if (prev && prev.hasAttribute('data-line-index')) {
+        row.parentNode.insertBefore(row, prev);
+        selectGridRow(row);
+        resequenceSoLineIndices();
+        recalculateTotals();
+        markDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+window.moveSoLineUp = moveSoLineUp;
+
+function moveSoLineDown(btnOrRow, event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    if (isOrderPaid()) return;
+    const row = (btnOrRow && btnOrRow.tagName === 'TR') ? btnOrRow : (btnOrRow ? btnOrRow.closest('tr') : null);
+    if (!row) return;
+    const next = row.nextElementSibling;
+    if (next && next.hasAttribute('data-line-index')) {
+        row.parentNode.insertBefore(next, row);
+        selectGridRow(row);
+        resequenceSoLineIndices();
+        recalculateTotals();
+        markDirty();
+        row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+window.moveSoLineDown = moveSoLineDown;
 
 function deleteSelectedLine() {
     if (isOrderPaid()) {
