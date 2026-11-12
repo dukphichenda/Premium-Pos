@@ -304,6 +304,7 @@
                                                title="Add one by one (Type product name, SKU, or barcode)..."
                                                autocomplete="off"
                                                oninput="onLiveTrfSearchInput(this.value)"
+                                               onfocus="if (this.value && this.value.trim().length > 0) onLiveTrfSearchInput(this.value);"
                                                onkeydown="onLiveTrfSearchKeyDown(event)"
                                                onclick="event.stopPropagation();"
                                                style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 28px !important; font-size: 13px; background: #FFFFFF; height: 34px;">
@@ -1353,7 +1354,7 @@ function renderTrfSearchResults(products) {
         const available = Number(p.available_qty || 0).toLocaleString();
 
         rowsHtml += `
-            <tr class="inflow-dropdown-row" data-index="${idx}" onclick="onPickProductFromSearchIndex(${idx})">
+            <tr class="inflow-dropdown-row" data-index="${idx}" onclick="onPickProductFromSearchIndex(${idx})" onmouseenter="searchKeyboardIndex=${idx}; highlightKeyboardSelection(document.querySelectorAll('.inflow-dropdown-row'));">
                 <td style="width: 44px; text-align: center;">${thumbHtml}</td>
                 <td style="width: 18%; color: #64748B; font-size: 11.5px;">${p.category_name || 'General'}</td>
                 <td>
@@ -1400,11 +1401,12 @@ function positionTrfDropdown(searchInp) {
 
     popup.style.position = 'fixed';
     popup.style.width = `${popupWidth}px`;
-    popup.style.left = `${Math.max(16, rect.left - 40)}px`;
+    popup.style.left = `${Math.max(10, Math.min(rect.left, window.innerWidth - popupWidth - 20))}px`;
+    popup.style.zIndex = '9999999';
 
-    if (spaceBelow < 280 && rect.top > 280) {
-        popup.style.top = 'auto';
-        popup.style.bottom = `${winHeight - rect.top + 4}px`;
+    if (spaceBelow < 300 && rect.top > 300) {
+        popup.style.top = Math.max(10, rect.top - 340) + 'px';
+        popup.style.bottom = 'auto';
     } else {
         popup.style.top = `${rect.bottom + 4}px`;
         popup.style.bottom = 'auto';
@@ -1699,7 +1701,7 @@ function getAvailabilityStatusHtml(requiredQty, availableQty) {
         return `<span class="status-pill-avail">✓ Available to Transfer</span>`;
     }
     const shortBy = requiredQty - availableQty;
-    return `<span class="status-pill-insufficient" title="Required: ${requiredQty:g}, Available: ${availableQty:g}">⚠ Short by ${Number(shortBy.toFixed(2))}</span>`;
+    return `<span class="status-pill-insufficient" title="Required: ${requiredQty}, Available: ${availableQty}">⚠ Short by ${Number(shortBy.toFixed(2))}</span>`;
 }
 
 // Remove row
