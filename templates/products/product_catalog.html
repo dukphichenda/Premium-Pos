@@ -2461,7 +2461,7 @@ body {
 </div>
 
 <!-- Offscreen container for crystal-clear Facebook JPG generation -->
-<div id="catBatchExportStage" style="position: fixed; left: -9999px; top: -9999px; width: 620px; z-index: -99999; opacity: 0; pointer-events: none; background: #FFFFFF;"></div>
+<div id="catBatchExportStage" style="position: absolute; left: 0; top: 0; width: 620px; overflow: hidden; z-index: -9999; opacity: 0; pointer-events: none; background: #FFFFFF;"></div>
 {% endblock %}
 
 {% block scripts %}
@@ -2873,8 +2873,23 @@ async function exportSingleCardJpg(prodId, btnEl) {
             allowTaint: true,
             backgroundColor: '#FFFFFF',
             logging: false,
+            x: 0,
+            y: 0,
+            width: 620,
+            height: stage.offsetHeight,
             scrollX: 0,
-            scrollY: 0
+            scrollY: 0,
+            onclone: (clonedDoc) => {
+                const clonedStage = clonedDoc.getElementById('catBatchExportStage');
+                if (clonedStage) {
+                    clonedStage.style.position = 'absolute';
+                    clonedStage.style.left = '0';
+                    clonedStage.style.top = '0';
+                    clonedStage.style.opacity = '1';
+                    clonedStage.style.visibility = 'visible';
+                    clonedStage.style.zIndex = '99999';
+                }
+            }
         });
 
         const safeSku = (item.sku || `ITEM_${item.id}`).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -3013,8 +3028,23 @@ async function startCatCardsBatchZipExport(items, title) {
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
                 logging: false,
+                x: 0,
+                y: 0,
+                width: 620,
+                height: stage.offsetHeight,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                onclone: (clonedDoc) => {
+                    const clonedStage = clonedDoc.getElementById('catBatchExportStage');
+                    if (clonedStage) {
+                        clonedStage.style.position = 'absolute';
+                        clonedStage.style.left = '0';
+                        clonedStage.style.top = '0';
+                        clonedStage.style.opacity = '1';
+                        clonedStage.style.visibility = 'visible';
+                        clonedStage.style.zIndex = '99999';
+                    }
+                }
             });
 
             const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.95));

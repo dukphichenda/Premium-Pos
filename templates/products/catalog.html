@@ -3533,7 +3533,7 @@ document.addEventListener('DOMContentLoaded', () => {
 </div>
 
 <!-- Offscreen Rendering Container for Batch Price Card Generation -->
-<div id="batchPriceCardStageContainer" style="position: fixed; left: -9999px; top: 0; width: 680px; height: 680px; z-index: -100; pointer-events: none; opacity: 0;">
+<div id="batchPriceCardStageContainer" style="position: absolute; left: 0; top: 0; width: 680px; height: 680px; overflow: hidden; pointer-events: none; opacity: 0; z-index: -9999;">
     <div class="inflow-spec-card is-exporting" id="batchPriceCardStage" style="width: 680px; height: 680px; max-width: 680px; aspect-ratio: 1 / 1; margin: 0; background: #FFFFFF;">
         <!-- Injected via JavaScript during batch rendering -->
     </div>
@@ -6773,6 +6773,8 @@ function exportCurrentCardAsJpg() {
             allowTaint: true,
             backgroundColor: '#FFFFFF',
             logging: false,
+            scrollX: 0,
+            scrollY: 0,
             onclone: (clonedDoc) => {
                 const targetCard = clonedDoc.getElementById('printablePriceCard');
                 if (!targetCard) return;
@@ -6785,6 +6787,14 @@ function exportCurrentCardAsJpg() {
                     modernEl.style.display = 'flex';
                     modernEl.style.height = '100%';
                     modernEl.style.width = '100%';
+                }
+                const genZEl = targetCard.querySelector('#cardContentGenZ');
+                if (genZEl && window.getComputedStyle(genZEl).display !== 'none') {
+                    genZEl.style.display = 'flex';
+                    genZEl.style.flexDirection = 'column';
+                    genZEl.style.height = '100%';
+                    genZEl.style.width = '100%';
+                    genZEl.style.justifyContent = 'space-between';
                 }
                 
                 // Replace all input elements with pure styled spans to completely eliminate text clipping/vertical shifting
@@ -6983,7 +6993,24 @@ async function fetchPriceCardsAndExportZip(apiUrl, zipFileName, scopeTitle) {
                 useCORS: true,
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
-                logging: false
+                logging: false,
+                x: 0,
+                y: 0,
+                width: 680,
+                height: 680,
+                scrollX: 0,
+                scrollY: 0,
+                onclone: (clonedDoc) => {
+                    const clonedContainer = clonedDoc.getElementById('batchPriceCardStageContainer');
+                    if (clonedContainer) {
+                        clonedContainer.style.position = 'absolute';
+                        clonedContainer.style.left = '0';
+                        clonedContainer.style.top = '0';
+                        clonedContainer.style.opacity = '1';
+                        clonedContainer.style.visibility = 'visible';
+                        clonedContainer.style.zIndex = '99999';
+                    }
+                }
             });
             const framedCanvas = addExportMarginToCanvas(canvas, 14, 3.2);
             

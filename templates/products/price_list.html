@@ -2246,6 +2246,8 @@
     overflow: hidden !important;
     display: flex !important;
     flex-direction: column !important;
+    justify-content: space-between !important;
+    aspect-ratio: 1 / 1 !important;
 }
 .inflow-spec-card.gen_z:hover {
     box-shadow: 0 10px 32px rgba(45, 55, 72, 0.12) !important;
@@ -3039,7 +3041,7 @@
 </div>
 
 <!-- Offscreen rendering container for crystal-clear 3.2x scale capture -->
-<div id="plBatchExportStageContainer" style="position: fixed; left: -9999px; top: 0; width: 680px; height: 680px; overflow: visible; pointer-events: none; opacity: 1; z-index: -1;">
+<div id="plBatchExportStageContainer" style="position: absolute; left: 0; top: 0; width: 680px; height: 680px; overflow: hidden; pointer-events: none; opacity: 0; z-index: -9999;">
     <div id="plBatchExportStage" style="width: 680px; height: 680px; max-width: 680px; max-height: 680px; aspect-ratio: 1 / 1; background: #FFFFFF; margin: 0; padding: 0; box-sizing: border-box;"></div>
 </div>
 
@@ -5294,8 +5296,14 @@ function renderOffscreenPriceCard(stage, item, activeStyle) {
         cardEl.style.boxShadow = 'none';
         cardEl.style.transform = 'none';
         
-        // Ensure theme color applied for classic cards
-        if (styleToUse === 'classic') {
+        if (styleToUse === 'gen_z' || styleToUse === 'genz') {
+            cardEl.style.display = 'flex';
+            cardEl.style.flexDirection = 'column';
+            cardEl.style.justifyContent = 'space-between';
+            cardEl.style.padding = '24px 26px 20px 26px';
+            cardEl.style.borderRadius = '28px';
+            cardEl.style.boxSizing = 'border-box';
+        } else if (styleToUse === 'classic') {
             cardEl.style.borderColor = currentThemeColor;
             const hGrid = cardEl.querySelector('.pl-card-header-grid');
             if (hGrid) {
@@ -5422,8 +5430,25 @@ async function startPriceListZipExport(mode) {
                 allowTaint: true,
                 backgroundColor: '#FFFFFF',
                 logging: false,
+                x: 0,
+                y: 0,
+                width: 680,
+                height: 680,
                 scrollX: 0,
-                scrollY: 0
+                scrollY: 0,
+                windowWidth: document.documentElement.offsetWidth,
+                windowHeight: document.documentElement.offsetHeight,
+                onclone: (clonedDoc) => {
+                    const clonedContainer = clonedDoc.getElementById('plBatchExportStageContainer');
+                    if (clonedContainer) {
+                        clonedContainer.style.position = 'absolute';
+                        clonedContainer.style.left = '0';
+                        clonedContainer.style.top = '0';
+                        clonedContainer.style.opacity = '1';
+                        clonedContainer.style.visibility = 'visible';
+                        clonedContainer.style.zIndex = '99999';
+                    }
+                }
             });
 
             // Add margin frame
@@ -5520,8 +5545,25 @@ async function captureItemToCanvas(item, scale = 2.8) {
         allowTaint: true,
         backgroundColor: '#FFFFFF',
         logging: false,
+        x: 0,
+        y: 0,
+        width: 680,
+        height: 680,
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        windowWidth: document.documentElement.offsetWidth,
+        windowHeight: document.documentElement.offsetHeight,
+        onclone: (clonedDoc) => {
+            const clonedContainer = clonedDoc.getElementById('plBatchExportStageContainer');
+            if (clonedContainer) {
+                clonedContainer.style.position = 'absolute';
+                clonedContainer.style.left = '0';
+                clonedContainer.style.top = '0';
+                clonedContainer.style.opacity = '1';
+                clonedContainer.style.visibility = 'visible';
+                clonedContainer.style.zIndex = '99999';
+            }
+        }
     });
     
     const framedCanvas = addExportMarginToCanvas(canvas, 12, scale);
@@ -5577,8 +5619,25 @@ async function captureMultipleItemsToCanvas(items, scale = 2.2) {
         allowTaint: true,
         backgroundColor: '#F8FAFC',
         logging: false,
+        x: 0,
+        y: 0,
+        width: stageWidth,
+        height: stage.offsetHeight,
         scrollX: 0,
-        scrollY: 0
+        scrollY: 0,
+        windowWidth: document.documentElement.offsetWidth,
+        windowHeight: document.documentElement.offsetHeight,
+        onclone: (clonedDoc) => {
+            const clonedContainer = clonedDoc.getElementById('plBatchExportStageContainer');
+            if (clonedContainer) {
+                clonedContainer.style.position = 'absolute';
+                clonedContainer.style.left = '0';
+                clonedContainer.style.top = '0';
+                clonedContainer.style.opacity = '1';
+                clonedContainer.style.visibility = 'visible';
+                clonedContainer.style.zIndex = '99999';
+            }
+        }
     });
     
     // Reset stage dimensions

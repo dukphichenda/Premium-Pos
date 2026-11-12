@@ -2201,7 +2201,7 @@
 </div>
 
 <!-- Offscreen Rendering Container for Batch Price Card Generation -->
-<div id="batchPriceCardStageContainerDetail" style="position: fixed; left: -9999px; top: 0; width: 680px; height: 680px; z-index: -100; pointer-events: none; opacity: 0;">
+<div id="batchPriceCardStageContainerDetail" style="position: absolute; left: 0; top: 0; width: 680px; height: 680px; overflow: hidden; pointer-events: none; opacity: 0; z-index: -9999;">
     <div class="inflow-spec-card is-exporting" id="batchPriceCardStageDetail" style="width: 680px; height: 680px; max-width: 680px; aspect-ratio: 1 / 1; margin: 0; background: #FFFFFF;"></div>
 </div>
 
@@ -2768,6 +2768,8 @@ function exportCurrentCardAsJpgDetail() {
             allowTaint: true,
             backgroundColor: '#FFFFFF',
             logging: false,
+            scrollX: 0,
+            scrollY: 0,
             onclone: (clonedDoc) => {
                 const targetCard = clonedDoc.getElementById('printablePriceCardDetail');
                 if (!targetCard) return;
@@ -2780,6 +2782,14 @@ function exportCurrentCardAsJpgDetail() {
                     modernEl.style.display = 'flex';
                     modernEl.style.height = '100%';
                     modernEl.style.width = '100%';
+                }
+                const genZEl = targetCard.querySelector('#cardContentGenZDetail');
+                if (genZEl && window.getComputedStyle(genZEl).display !== 'none') {
+                    genZEl.style.display = 'flex';
+                    genZEl.style.flexDirection = 'column';
+                    genZEl.style.height = '100%';
+                    genZEl.style.width = '100%';
+                    genZEl.style.justifyContent = 'space-between';
                 }
                 
                 targetCard.querySelectorAll('input').forEach(inp => {
@@ -2976,7 +2986,30 @@ async function fetchPriceCardsAndExportZipDetail(apiUrl, zipFileName) {
             }));
             
             await new Promise(r => setTimeout(r, 40));
-            const canvas = await html2canvas(stage, { scale: 3.2, useCORS: true, allowTaint: true, backgroundColor: '#FFFFFF', logging: false });
+            const canvas = await html2canvas(stage, {
+                scale: 3.2,
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#FFFFFF',
+                logging: false,
+                x: 0,
+                y: 0,
+                width: 680,
+                height: 680,
+                scrollX: 0,
+                scrollY: 0,
+                onclone: (clonedDoc) => {
+                    const clonedContainer = clonedDoc.getElementById('batchPriceCardStageContainerDetail');
+                    if (clonedContainer) {
+                        clonedContainer.style.position = 'absolute';
+                        clonedContainer.style.left = '0';
+                        clonedContainer.style.top = '0';
+                        clonedContainer.style.opacity = '1';
+                        clonedContainer.style.visibility = 'visible';
+                        clonedContainer.style.zIndex = '99999';
+                    }
+                }
+            });
             const framedCanvas = addExportMarginToCanvas(canvas, 14, 3.2);
             const blob = await exportCanvasToTargetJpegBlob(framedCanvas, 720, 980);
             if (blob) {
