@@ -423,8 +423,6 @@
                                            onclick="event.stopPropagation();"
                                            style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 28px !important; font-size: 13px; background: #FFFFFF; height: 34px;">
                                     <span id="searchLoadingSpinner" class="search-spinner" style="display: none; position: absolute; right: 10px;">⏳</span>
-                                    <!-- Live Search Results Dropdown -->
-                                    <div id="adjLiveSearchResults" class="inflow-live-search-dropdown" style="display: none;"></div>
                                 </div>
                             </div>
                         </td>
@@ -481,6 +479,26 @@
                 </div>
                 <div style="font-size: 11px; color: #94A3B8;">
                     Shortcuts: Press <kbd style="font-family: monospace; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 4px; border-radius: 3px; font-weight: 600;">F2</kbd> to search item
+                </div>
+            </div>
+
+            <!-- Floating Item Search Dropdown Table (Matching Sales Order Image 2) -->
+            <div id="adjLiveSearchResults" class="inflow-item-dropdown-popup" onclick="event.stopPropagation();" style="display: none;">
+                <div style="max-height: 380px; overflow-y: auto; background: #FFFFFF; min-width: 720px; max-width: 860px; border-radius: 6px; box-shadow: 0 16px 36px rgba(0,0,0,0.25); border: 1.5px solid #7F9DB9;">
+                    <table class="inflow-item-table" style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                        <thead>
+                            <tr style="background: linear-gradient(180deg, #F0EDE4 0%, #D8D2C4 100%); position: sticky; top: 0; z-index: 10;">
+                                <th style="width: 44px; text-align: center; padding: 6px 8px; border: 1px solid #B0ABA0; color: #333333; font-weight: 700;">PHOTO</th>
+                                <th style="width: 18%; padding: 6px 8px; border: 1px solid #B0ABA0; color: #333333; font-weight: 700;">CATEGORY</th>
+                                <th style="width: 38%; padding: 6px 8px; border: 1px solid #B0ABA0; color: #333333; font-weight: 700;">ITEM</th>
+                                <th style="width: 14%; text-align: right; padding: 6px 8px; border: 1px solid #B0ABA0; color: #333333; font-weight: 700;">ON HAND</th>
+                                <th style="width: 14%; text-align: right; padding: 6px 8px; border: 1px solid #B0ABA0; color: #333333; font-weight: 700;">RESERVED</th>
+                                <th style="width: 16%; text-align: right; padding: 6px 8px; border: 1px solid #B0ABA0; color: #333333; font-weight: 700;">AVAILABLE</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adjItemDropdownBody">
+                        </tbody>
+                    </table>
                 </div>
             </div>
             {% endif %}
@@ -1364,32 +1382,20 @@
     padding: 10px 14px;
 }
 
-}
-.inflow-live-search-dropdown {
-    position: absolute;
-    top: calc(100% + 4px);
-    left: 0;
-    min-width: 480px;
-    max-width: 580px;
+/* inFlow Floating Product Search Table Popup (Matching Sales Order Image 2) */
+.inflow-item-dropdown-popup {
+    display: none;
+    position: fixed;
     background: #FFFFFF;
-    border: 1px solid #CBD5E1;
+    border: 1.5px solid #7F9DB9;
     border-radius: 6px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.18);
-    z-index: 1000;
-    max-height: 280px;
-    overflow-y: auto;
+    box-shadow: 0 16px 36px rgba(0,0,0,0.28);
+    z-index: 9999999;
+    overflow: hidden;
 }
-.live-search-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px 12px;
-    border-bottom: 1px solid #F1F5F9;
-    cursor: pointer;
-    transition: background 0.12s ease;
-}
-.live-search-item:hover, .live-search-item.active-search-item {
-    background: #FEF3C7;
+.adj-search-row:hover td, .adj-search-row.highlighted td {
+    background: #CCFBF1 !important;
+    color: #0F172A !important;
 }
 
 /* Sales Order Style New Row Entry for Stock Adjustment */
@@ -2504,69 +2510,131 @@ function applyBatchStockMode(mode) {
     }
 }
 
-// Live Search: Add One by One
+// Live Search: Add One by One (Table format matching Sales Order Image 2)
 let searchDebounceTimer = null;
+let currentAdjSearchResults = [];
+let highlightedAdjSearchIndex = -1;
+
 function onLiveProductSearchInput(val) {
     clearTimeout(searchDebounceTimer);
-    const resultsDiv = document.getElementById('adjLiveSearchResults');
+    const popup = document.getElementById('adjLiveSearchResults');
     const spinner = document.getElementById('searchLoadingSpinner');
+    const searchInp = document.getElementById('adjProductLiveSearch');
 
     if (!val || val.trim().length < 1) {
-        resultsDiv.style.display = 'none';
-        resultsDiv.innerHTML = '';
+        closeAdjDropdown();
         return;
     }
 
-    spinner.style.display = 'inline';
+    if (spinner) spinner.style.display = 'inline';
     searchDebounceTimer = setTimeout(async () => {
         try {
             const locId = document.getElementById('adjLocationSelect').value;
             const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${locId}&q=${encodeURIComponent(val.trim())}`);
             const data = await res.json();
-            spinner.style.display = 'none';
+            if (spinner) spinner.style.display = 'none';
 
             if (data.success && data.products && data.products.length > 0) {
                 renderLiveSearchResults(data.products);
             } else {
-                resultsDiv.innerHTML = `<div style="padding: 12px; font-size: 12px; color: #94A3B8; text-align: center;">No matching products found.</div>`;
-                resultsDiv.style.display = 'block';
+                const tbody = document.getElementById('adjItemDropdownBody');
+                if (tbody) {
+                    tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: #94A3B8; padding: 20px;">No matching products found.</td></tr>`;
+                }
+                if (searchInp) positionAdjDropdown(searchInp);
+                if (popup) popup.style.display = 'block';
             }
         } catch (e) {
-            spinner.style.display = 'none';
+            if (spinner) spinner.style.display = 'none';
             console.error(e);
         }
-    }, 200);
+    }, 180);
+}
+
+function positionAdjDropdown(inputEl) {
+    const popup = document.getElementById('adjLiveSearchResults');
+    if (!popup || !inputEl) return;
+    const rect = inputEl.getBoundingClientRect();
+    popup.style.position = 'fixed';
+    const spaceBelow = window.innerHeight - rect.bottom;
+    if (spaceBelow < 300 && rect.top > 300) {
+        popup.style.top = Math.max(10, rect.top - 384) + 'px';
+    } else {
+        popup.style.top = (rect.bottom + 4) + 'px';
+    }
+    popup.style.left = Math.max(10, Math.min(rect.left, window.innerWidth - 740)) + 'px';
+    popup.style.zIndex = '9999999';
 }
 
 function renderLiveSearchResults(products) {
-    const resultsDiv = document.getElementById('adjLiveSearchResults');
-    resultsDiv.innerHTML = products.map(p => {
+    currentAdjSearchResults = products || [];
+    highlightedAdjSearchIndex = -1;
+    const popup = document.getElementById('adjLiveSearchResults');
+    const tbody = document.getElementById('adjItemDropdownBody');
+    const searchInp = document.getElementById('adjProductLiveSearch');
+
+    if (!tbody) return;
+
+    tbody.innerHTML = currentAdjSearchResults.map((p, idx) => {
         const isLoaded = loadedProductsMap.has(p.id);
-        const imgHtml = p.image_url ? `<img src="${p.image_url}" style="width: 32px; height: 32px; object-fit: cover; border-radius: 4px;">` : `<div style="width: 32px; height: 32px; background: #E2E8F0; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 14px;">📦</div>`;
+        const imgHtml = p.image_url 
+            ? `<img src="${p.image_url}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px; border: 1px solid #CBD5E1; vertical-align: middle;">`
+            : `<div style="width: 28px; height: 28px; background: #F1F5F9; border: 1px dashed #CBD5E1; border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px;">📦</div>`;
+        const onHandDisp = formatNum(p.on_hand_qty);
+        const resDisp = formatNum(p.reserved_qty);
+        const avail = (parseFloat(p.on_hand_qty || 0) - parseFloat(p.reserved_qty || 0));
+        const availDisp = formatNum(avail);
+        const availColor = avail > 0 ? '#059669' : '#DC2626';
+
         return `
-            <div class="live-search-item" onclick="onPickProductFromSearch(${JSON.stringify(p).replace(/"/g, '&quot;')})">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    ${imgHtml}
-                    <div>
-                        <div style="font-weight: 700; color: #0F172A; font-size: 13px;">${p.name}</div>
-                        <div style="font-size: 11px; color: #64748B; font-family: monospace;">${p.sku} • ${p.category_name} • Base: ${p.uom || 'Pcs'}</div>
-                    </div>
-                </div>
-                <div style="text-align: right; font-size: 11.5px;">
-                    <div>On Hand: <strong style="color: #0F172A;">${formatNum(p.on_hand_qty)}</strong> ${p.uom || ''}</div>
-                    <div style="color: #0284C7;">Reserved: <strong>${formatNum(p.reserved_qty)}</strong></div>
-                    ${isLoaded ? '<span style="color: #10B981; font-size: 10.5px; font-weight: 700;">✓ Added</span>' : ''}
-                </div>
-            </div>
+            <tr class="adj-search-row" id="adj_s_row_${idx}" data-idx="${idx}"
+                onclick="onPickProductFromSearchIndex(${idx})"
+                onmouseenter="highlightAdjSearchRow(${idx})"
+                style="cursor: pointer; border-bottom: 1px solid #E2E8F0; transition: background 0.1s ease;">
+                <td style="width: 44px; text-align: center; vertical-align: middle; padding: 6px;">${imgHtml}</td>
+                <td style="color: #64748B; vertical-align: middle; padding: 6px 8px;">${p.category_name || 'GENERAL'}</td>
+                <td style="font-weight: 700; color: #0F172A; vertical-align: middle; padding: 6px 8px;">
+                    <div>${p.sku} ${p.name}</div>
+                    ${isLoaded ? '<span class="badge" style="background: #ECFDF5; color: #059669; font-size: 10px; padding: 1px 6px;">✓ Added</span>' : ''}
+                </td>
+                <td style="text-align: right; font-weight: 600; color: #0F172A; vertical-align: middle; padding: 6px 8px;">${onHandDisp} <span style="font-size: 10px; color: #64748B;">${p.uom || ''}</span></td>
+                <td style="text-align: right; color: #0284C7; font-weight: 600; vertical-align: middle; padding: 6px 8px;">${resDisp}</td>
+                <td style="text-align: right; font-weight: 700; color: ${availColor}; vertical-align: middle; padding: 6px 8px;">${availDisp}</td>
+            </tr>
         `;
     }).join('');
-    resultsDiv.style.display = 'block';
+
+    if (searchInp) positionAdjDropdown(searchInp);
+    if (popup) popup.style.display = 'block';
+
+    if (currentAdjSearchResults.length > 0) {
+        highlightAdjSearchRow(0);
+    }
+}
+
+function highlightAdjSearchRow(idx) {
+    document.querySelectorAll('#adjItemDropdownBody tr.adj-search-row').forEach(r => {
+        r.classList.remove('highlighted');
+        r.style.background = '';
+    });
+    highlightedAdjSearchIndex = idx;
+    const row = document.getElementById(`adj_s_row_${idx}`);
+    if (row) {
+        row.classList.add('highlighted');
+        row.style.background = '#CCFBF1'; // Exact mint/cyan highlight matching Image 2
+        row.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function onPickProductFromSearchIndex(idx) {
+    if (idx < 0 || idx >= currentAdjSearchResults.length) return;
+    const product = currentAdjSearchResults[idx];
+    onPickProductFromSearch(product);
 }
 
 function onPickProductFromSearch(product) {
     addProductRowToTable(product);
-    const resultsDiv = document.getElementById('adjLiveSearchResults');
-    if (resultsDiv) resultsDiv.style.display = 'none';
+    closeAdjDropdown();
     const searchInp = document.getElementById('adjProductLiveSearch');
     if (searchInp) searchInp.value = '';
 
@@ -2579,42 +2647,48 @@ function onPickProductFromSearch(product) {
     }, 50);
 }
 
+function closeAdjDropdown() {
+    const popup = document.getElementById('adjLiveSearchResults');
+    if (popup) popup.style.display = 'none';
+}
+
 function onLiveProductSearchKeyDown(e) {
-    const resultsDiv = document.getElementById('adjLiveSearchResults');
-    if (!resultsDiv || resultsDiv.style.display === 'none') {
-        if (e.key === 'Enter') {
+    const popup = document.getElementById('adjLiveSearchResults');
+    const isShowing = popup && popup.style.display !== 'none';
+
+    if (!isShowing) {
+        if (e.key === 'ArrowDown') {
             e.preventDefault();
+            const val = document.getElementById('adjProductLiveSearch')?.value;
+            if (val && val.length > 0) {
+                onLiveProductSearchInput(val);
+            }
         }
         return;
     }
 
-    const items = Array.from(resultsDiv.querySelectorAll('.live-search-item'));
-    if (!items.length) return;
-
-    let highlightedIndex = items.findIndex(item => item.classList.contains('active-search-item'));
-
     if (e.key === 'ArrowDown') {
         e.preventDefault();
-        if (highlightedIndex >= 0) items[highlightedIndex].classList.remove('active-search-item');
-        highlightedIndex = (highlightedIndex + 1) % items.length;
-        items[highlightedIndex].classList.add('active-search-item');
-        items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+        if (currentAdjSearchResults.length > 0) {
+            const nextIdx = (highlightedAdjSearchIndex + 1) % currentAdjSearchResults.length;
+            highlightAdjSearchRow(nextIdx);
+        }
     } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        if (highlightedIndex >= 0) items[highlightedIndex].classList.remove('active-search-item');
-        highlightedIndex = (highlightedIndex - 1 + items.length) % items.length;
-        items[highlightedIndex].classList.add('active-search-item');
-        items[highlightedIndex].scrollIntoView({ block: 'nearest' });
+        if (currentAdjSearchResults.length > 0) {
+            const prevIdx = (highlightedAdjSearchIndex - 1 + currentAdjSearchResults.length) % currentAdjSearchResults.length;
+            highlightAdjSearchRow(prevIdx);
+        }
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        if (highlightedIndex >= 0 && items[highlightedIndex]) {
-            items[highlightedIndex].click();
-        } else if (items.length > 0) {
-            items[0].click();
+        if (highlightedAdjSearchIndex >= 0 && highlightedAdjSearchIndex < currentAdjSearchResults.length) {
+            onPickProductFromSearchIndex(highlightedAdjSearchIndex);
+        } else if (currentAdjSearchResults.length > 0) {
+            onPickProductFromSearchIndex(0);
         }
     } else if (e.key === 'Escape') {
         e.preventDefault();
-        resultsDiv.style.display = 'none';
+        closeAdjDropdown();
     }
 }
 
@@ -2643,6 +2717,14 @@ document.addEventListener('click', function(e) {
         if (!e.target.closest('#adjNewRowEntry') && !e.target.closest('#adjLiveSearchResults')) {
             resultsDiv.style.display = 'none';
         }
+    }
+});
+
+window.addEventListener('resize', function() {
+    const searchInp = document.getElementById('adjProductLiveSearch');
+    const popup = document.getElementById('adjLiveSearchResults');
+    if (popup && popup.style.display !== 'none' && searchInp) {
+        positionAdjDropdown(searchInp);
     }
 });
 

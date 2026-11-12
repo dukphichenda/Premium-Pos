@@ -64,6 +64,8 @@
             return 'sales_all';
         }
         if (clean.includes('/purchase') || clean.includes('/vendors') || clean.includes('/contacts/vendors')) return 'purchase';
+        if (clean.includes('/transfers')) return 'transfer';
+        if (clean.includes('/adjustments')) return 'adjustment';
         if (clean.includes('/product') || clean.includes('/inventory') || clean.includes('/locations')) return 'product';
         if (clean.includes('/settings') || clean.includes('/migration') || clean.includes('/data')) return 'settings';
         return 'default';
@@ -111,6 +113,35 @@
                     <path d="M14 2v6h6" fill="#93C5FD"/>
                     <line x1="8" y1="12" x2="16" y2="12" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
                     <line x1="8" y1="16" x2="13" y2="16" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </span>`;
+        }
+
+        // Stock Transfer -> Teal exchange arrows
+        if (type === 'transfer' || titleLower.includes('transfer')) {
+            return `<span class="inflow-tab-icon icon-transfer" title="Stock Transfer">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="17 1 21 5 17 9"></polyline>
+                    <path d="M3 5h18"></path>
+                    <polyline points="7 23 3 19 7 15"></polyline>
+                    <path d="M21 19H3"></path>
+                </svg>
+            </span>`;
+        }
+
+        // Stock Adjustment -> Orange sliders
+        if (type === 'adjustment' || titleLower.includes('adjustment')) {
+            return `<span class="inflow-tab-icon icon-adjustment" title="Stock Adjustment">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#EA580C" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="4" y1="21" x2="4" y2="14"></line>
+                    <line x1="4" y1="10" x2="4" y2="3"></line>
+                    <line x1="12" y1="21" x2="12" y2="12"></line>
+                    <line x1="12" y1="8" x2="12" y2="3"></line>
+                    <line x1="20" y1="21" x2="20" y2="16"></line>
+                    <line x1="20" y1="12" x2="20" y2="3"></line>
+                    <circle cx="4" cy="12" r="2" fill="#EA580C"></circle>
+                    <circle cx="12" cy="10" r="2" fill="#EA580C"></circle>
+                    <circle cx="20" cy="14" r="2" fill="#EA580C"></circle>
                 </svg>
             </span>`;
         }
@@ -337,6 +368,14 @@
                     if (url.includes('/create') || url.includes('/new')) return 'Purchase Order';
                     if (url.includes('/vendors')) return 'Vendor List';
                     return 'Purchase Order';
+                }
+                if (type === 'transfer' || url.includes('/transfers')) {
+                    if (url.includes('/transfers/new')) return 'New Stock Transfer';
+                    return 'Stock Transfers';
+                }
+                if (type === 'adjustment' || url.includes('/adjustments')) {
+                    if (url.includes('/adjustments/new')) return 'New Stock Adjustment';
+                    return 'Stock Adjustments';
                 }
                 if (type === 'product') {
                     if (url.includes('/merge-duplicates')) return 'Merge Duplicates';
@@ -1329,7 +1368,11 @@
                     'Current Stock': 'ទំនិញក្នុងស្តុក',
                     'Inventory': 'ឃ្លាំងទំនិញ',
                     'Adjust Stock': 'កែសម្រួលស្តុក',
+                    'Stock Adjustments': 'កែសម្រួលស្តុក',
+                    'New Stock Adjustment': 'កែសម្រួលស្តុកថ្មី',
                     'Transfer Stock': 'ផ្ទេរស្តុក',
+                    'Stock Transfers': 'ផ្ទេរស្តុក',
+                    'New Stock Transfer': 'ផ្ទេរស្តុកថ្មី',
                     'Monthly Expenses': 'ចំណាយប្រចាំខែ',
                     'Company Settings': 'ការកំណត់ក្រុមហ៊ុន',
                     'Settings': 'ការកំណត់',

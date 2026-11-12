@@ -1,165 +1,296 @@
 {% extends 'base.html' %}
 
-{% block title %}Warehouse Transfers - inFlow Premium{% endblock %}
+{% block title %}Stock Transfers - inFlow Premium{% endblock %}
 
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
-    <div>
-        <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em;">Inter-Warehouse Stock Transfers</h1>
-        <p style="color: #64748B; font-size: 0.88rem;">Move inventory seamlessly between Main Warehouse, STM Warehouse, and retail outlets</p>
-    </div>
-    <div style="display: flex; gap: 10px;">
-        <button onclick="openModal('newTransferModal')" class="btn btn-primary">
-            <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
-            <span>+ New Stock Transfer</span>
-        </button>
-    </div>
-</div>
-
-<!-- Transfers History Table -->
-<div class="card" style="padding: 0; overflow: hidden;">
-    <div class="table-container" style="border: none;">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Transfer #</th>
-                    <th>Date</th>
-                    <th>Source Warehouse</th>
-                    <th>Destination Warehouse</th>
-                    <th style="text-align: right;">Total Units</th>
-                    <th>Status</th>
-                    <th>Notes</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for trf in transfers %}
-                <tr>
-                    <td style="font-weight: 700; font-family: var(--font-mono); color: #0F766E;">
-                        {{ trf.transfer_number }}
-                    </td>
-                    <td>{{ trf.transfer_date | format_date }}</td>
-                    <td style="font-weight: 600; color: #DC2626;">{{ trf.from_location_name }}</td>
-                    <td style="font-weight: 600; color: #059669;">{{ trf.to_location_name }}</td>
-                    <td style="text-align: right; font-weight: 700; color: #0F172A;">
-                        {{ "{:,.0f}".format(trf.total_units or 0) }}
-                    </td>
-                    <td><span class="badge badge-success">{{ trf.status }}</span></td>
-                    <td style="color: #64748B;">{{ trf.notes or '-' }}</td>
-                </tr>
-                {% else %}
-                <tr>
-                    <td colspan="7" style="text-align: center; color: #94A3B8; padding: 32px;">No warehouse transfers recorded yet.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<!-- New Transfer Modal -->
-<div class="modal-overlay" id="newTransferModal">
-    <div class="modal-dialog">
-        <div class="modal-header">
-            <h2 class="modal-title">+ Inter-Warehouse Transfer</h2>
-            <button class="modal-close" onclick="closeModal('newTransferModal')">×</button>
+<div style="padding: 4px 0 24px 0;">
+    <!-- Top Header -->
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <div>
+            <h1 style="font-size: 1.6rem; font-weight: 800; color: #0F172A; letter-spacing: -0.02em; margin-bottom: 4px;">
+                Inter-Warehouse Stock Transfers
+            </h1>
+            <p style="color: #64748B; font-size: 0.88rem; margin: 0;">
+                Multi-product inventory movements between Main Warehouse, STM Warehouse, and retail branches. Save requests as Draft, then execute transfer upon dispatch.
+            </p>
         </div>
-        <form action="{{ url_for('inventory.create_transfer') }}" method="POST">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px;">
-                <div class="form-group">
-                    <label class="form-label">From Warehouse (Source) *</label>
-                    <select name="from_location_id" required class="form-select">
-                        {% for loc in locations %}
-                        <option value="{{ loc.id }}" {% if loc.is_default %}selected{% endif %}>{{ loc.name }}</option>
-                        {% endfor %}
-                    </select>
+        <div>
+            <a href="{{ url_for('inventory.new_transfer') }}" class="btn btn-primary" style="display: inline-flex; align-items: center; gap: 6px; font-weight: 700; text-decoration: none;">
+                <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2" d="M12 4v16m8-8H4"/></svg>
+                <span>+ New Stock Transfer</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- KPI Summary Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; margin-bottom: 22px;">
+        <!-- Total Transfers -->
+        <div class="card" style="padding: 16px; border-left: 4px solid #0D9488; background: #FFFFFF;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+                Total Transfers
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #0F172A;">
+                {{ stats.total or 0 }}
+            </div>
+            <div style="font-size: 11.5px; color: #94A3B8; margin-top: 4px;">
+                All transfer requests & dispatches
+            </div>
+        </div>
+
+        <!-- Draft Requests -->
+        <a href="{{ url_for('inventory.list_transfers', status='DRAFT') }}" style="text-decoration: none;" class="card" style="padding: 16px; border-left: 4px solid #F59E0B; background: #FFFBEB;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #B45309; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+                ✏️ Draft Requests
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #92400E;">
+                {{ stats.draft or 0 }}
+            </div>
+            <div style="font-size: 11.5px; color: #B45309; margin-top: 4px;">
+                Pending transfer & review
+            </div>
+        </a>
+
+        <!-- Completed Transfers -->
+        <a href="{{ url_for('inventory.list_transfers', status='COMPLETED') }}" style="text-decoration: none;" class="card" style="padding: 16px; border-left: 4px solid #10B981; background: #F0FDF4;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #047857; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+                ✓ Completed Transfers
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #065F46;">
+                {{ stats.completed or 0 }}
+            </div>
+            <div style="font-size: 11.5px; color: #047857; margin-top: 4px;">
+                Stock successfully moved
+            </div>
+        </a>
+
+        <!-- Total Units Transferred -->
+        <div class="card" style="padding: 16px; border-left: 4px solid #3B82F6; background: #FFFFFF;">
+            <div style="font-size: 11.5px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px;">
+                📦 Total Units Transferred
+            </div>
+            <div style="font-size: 24px; font-weight: 800; color: #1E40AF;">
+                {{ "{:,.0f}".format(stats.total_units or 0) }}
+            </div>
+            <div style="font-size: 11.5px; color: #94A3B8; margin-top: 4px;">
+                Base units moved between warehouses
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="card" style="padding: 14px 18px; margin-bottom: 16px; background: #FFFFFF;">
+        <form method="GET" action="{{ url_for('inventory.list_transfers') }}" style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+            <!-- Left: Status Tabs -->
+            <div style="display: flex; gap: 6px; background: #F1F5F9; padding: 3px; border-radius: 8px;">
+                <a href="{{ url_for('inventory.list_transfers', status='all', q=search, from_location_id=from_loc, to_location_id=to_loc) }}"
+                   class="btn-status-filter {% if status_filter == 'ALL' or not status_filter %}active{% endif %}">
+                    All ({{ stats.total }})
+                </a>
+                <a href="{{ url_for('inventory.list_transfers', status='DRAFT', q=search, from_location_id=from_loc, to_location_id=to_loc) }}"
+                   class="btn-status-filter {% if status_filter == 'DRAFT' %}active{% endif %}">
+                    Draft Requests ({{ stats.draft }})
+                </a>
+                <a href="{{ url_for('inventory.list_transfers', status='COMPLETED', q=search, from_location_id=from_loc, to_location_id=to_loc) }}"
+                   class="btn-status-filter {% if status_filter == 'COMPLETED' %}active{% endif %}">
+                    Completed ({{ stats.completed }})
+                </a>
+            </div>
+
+            <!-- Right: Search & Warehouse Dropdowns -->
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                <input type="hidden" name="status" value="{{ status_filter }}">
+
+                <!-- Search -->
+                <div style="position: relative;">
+                    <input type="text" name="q" value="{{ search }}" placeholder="Search transfer # or notes..."
+                           class="form-input form-input-sm" style="width: 200px; padding-left: 26px;">
+                    <span style="position: absolute; left: 8px; top: 6px; color: #94A3B8; font-size: 12px;">🔍</span>
                 </div>
-                <div class="form-group">
-                    <label class="form-label">To Warehouse (Destination) *</label>
-                    <select name="to_location_id" required class="form-select">
-                        {% for loc in locations %}
-                        <option value="{{ loc.id }}" {% if not loc.is_default %}selected{% endif %}>{{ loc.name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-            </div>
 
-            <!-- Product Search -->
-            <div class="form-group">
-                <label class="form-label">Select Product to Move *</label>
-                <input type="text" id="trfProductSearch" placeholder="Type name or SKU..." class="form-input">
-                <input type="hidden" name="product_id" id="trfProductId" required>
-                <div id="trfProductSearchResults" style="max-height: 160px; overflow-y: auto; margin-top: 4px;"></div>
-            </div>
+                <!-- Source Warehouse -->
+                <select name="from_location_id" class="form-select form-select-sm" style="font-size: 12px;" onchange="this.form.submit()">
+                    <option value="">-- From Warehouse --</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if from_loc == (loc.id|string) %}selected{% endif %}>From: {{ loc.name }}</option>
+                    {% endfor %}
+                </select>
 
-            <div id="trfProductSelectedInfo" style="display: none; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
-                <div style="font-weight: 600; color: #0F172A;" id="trfSelectedName"></div>
-                <div style="font-size: 0.8rem; color: #64748B;" id="trfSelectedDetails"></div>
-            </div>
+                <!-- Destination Warehouse -->
+                <select name="to_location_id" class="form-select form-select-sm" style="font-size: 12px;" onchange="this.form.submit()">
+                    <option value="">-- To Warehouse --</option>
+                    {% for loc in locations %}
+                    <option value="{{ loc.id }}" {% if to_loc == (loc.id|string) %}selected{% endif %}>To: {{ loc.name }}</option>
+                    {% endfor %}
+                </select>
 
-            <div class="form-group">
-                <label class="form-label">Quantity to Transfer *</label>
-                <input type="number" step="1" name="quantity" value="1" required class="form-input" style="font-size: 1.1rem; font-weight: 700;">
-            </div>
-
-            <div class="form-group">
-                <label class="form-label">Transfer Dispatch Notes</label>
-                <textarea name="notes" rows="2" placeholder="Driver name, vehicle #, or dispatch reason..." class="form-textarea"></textarea>
-            </div>
-
-            <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn btn-secondary" onclick="closeModal('newTransferModal')">Cancel</button>
-                <button type="submit" class="btn btn-primary">Execute Transfer</button>
+                <button type="submit" class="btn btn-sm btn-secondary" style="font-weight: 600;">Filter</button>
+                {% if search or from_loc or to_loc or status_filter != 'ALL' %}
+                <a href="{{ url_for('inventory.list_transfers') }}" class="btn btn-sm btn-ghost" style="color: #64748B;">Reset</a>
+                {% endif %}
             </div>
         </form>
     </div>
-</div>
-{% endblock %}
 
-{% block scripts %}
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    const sInput = document.getElementById('trfProductSearch');
-    const resDiv = document.getElementById('trfProductSearchResults');
-    const idInput = document.getElementById('trfProductId');
-    const infoDiv = document.getElementById('trfProductSelectedInfo');
-    const nameSpan = document.getElementById('trfSelectedName');
-    const detSpan = document.getElementById('trfSelectedDetails');
+    <!-- Transfers History Data Table -->
+    <div class="card" style="padding: 0; overflow: hidden; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 8px;">
+        <div class="table-container" style="border: none; margin: 0;">
+            <table class="data-table">
+                <thead>
+                    <tr style="background: #F8FAFC;">
+                        <th style="padding: 12px 16px;">Transfer #</th>
+                        <th style="padding: 12px 14px;">Date</th>
+                        <th style="padding: 12px 14px;">Source Warehouse</th>
+                        <th style="width: 24px; text-align: center; padding: 12px 4px;">➔</th>
+                        <th style="padding: 12px 14px;">Destination Warehouse</th>
+                        <th style="text-align: center; padding: 12px 14px;">Items Count</th>
+                        <th style="text-align: right; padding: 12px 14px;">Total Units</th>
+                        <th style="text-align: center; padding: 12px 14px;">Status</th>
+                        <th style="padding: 12px 14px;">Notes / Dispatch</th>
+                        <th style="text-align: right; padding: 12px 16px;">Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for trf in transfers %}
+                    {% set is_draft = trf.status in ['DRAFT', 'REQUESTED'] %}
+                    <tr style="cursor: pointer; transition: background 0.12s ease;" onclick="window.location.href='{{ url_for('inventory.view_transfer', id=trf.id) }}'">
+                        <!-- Transfer # -->
+                        <td style="padding: 12px 16px; font-weight: 700; font-family: monospace; font-size: 13.5px;">
+                            <a href="{{ url_for('inventory.view_transfer', id=trf.id) }}" style="color: #0D9488; text-decoration: none;">
+                                {{ trf.transfer_number }}
+                            </a>
+                        </td>
 
-    let debounce;
-    sInput.addEventListener('input', () => {
-        clearTimeout(debounce);
-        const q = sInput.value.trim();
-        if (q.length < 2) {
-            resDiv.innerHTML = '';
-            return;
-        }
+                        <!-- Date -->
+                        <td style="padding: 12px 14px; font-size: 12.5px; color: #475569;">
+                            {{ trf.transfer_date | format_date if trf.transfer_date else '-' }}
+                        </td>
 
-        debounce = setTimeout(() => {
-            fetch(`/api/products/search?q=${encodeURIComponent(q)}`)
-                .then(r => r.json())
-                .then(items => {
-                    let h = '';
-                    items.forEach(it => {
-                        h += `
-                            <div onclick="selectTrfProduct(${it.id}, '${it.name.replace(/'/g, "\\'")}', '${it.sku}', '${it.uom}')" style="padding: 8px 12px; background: white; border: 1px solid #E2E8F0; border-radius: 6px; margin-bottom: 4px; cursor: pointer;">
-                                <div style="font-weight: 600; font-size: 0.85rem;">${it.name}</div>
-                                <div style="font-size: 0.72rem; color: #64748B;">SKU: ${it.sku}</div>
+                        <!-- Source Warehouse -->
+                        <td style="padding: 12px 14px; font-weight: 600; color: #DC2626;">
+                            <span style="font-size: 11px;">●</span> {{ trf.from_location_name }}
+                        </td>
+
+                        <!-- Arrow -->
+                        <td style="text-align: center; padding: 12px 4px; color: #0D9488; font-weight: 700;">
+                            ➔
+                        </td>
+
+                        <!-- Destination Warehouse -->
+                        <td style="padding: 12px 14px; font-weight: 600; color: #059669;">
+                            <span style="font-size: 11px;">●</span> {{ trf.to_location_name }}
+                        </td>
+
+                        <!-- Items Count -->
+                        <td style="text-align: center; padding: 12px 14px;">
+                            <span class="badge" style="background: #F1F5F9; color: #334155; font-weight: 700; padding: 3px 8px;">
+                                {{ trf.item_count or 0 }} items
+                            </span>
+                        </td>
+
+                        <!-- Total Units -->
+                        <td style="text-align: right; padding: 12px 14px; font-weight: 700; color: #0F172A; font-size: 13px;">
+                            {{ "{:,.0f}".format(trf.total_units or 0) }} pcs
+                        </td>
+
+                        <!-- Status Badge -->
+                        <td style="text-align: center; padding: 12px 14px;">
+                            {% if is_draft %}
+                            <span class="badge" style="font-size: 11px; padding: 4px 8px; font-weight: 700; background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D;">
+                                ✏️ DRAFT
+                            </span>
+                            {% else %}
+                            <span class="badge badge-success" style="font-size: 11px; padding: 4px 8px; font-weight: 700;">
+                                ✓ DONE
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Notes -->
+                        <td style="padding: 12px 14px; color: #64748B; font-size: 12px; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            {{ trf.notes or '-' }}
+                        </td>
+
+                        <!-- Actions -->
+                        <td style="text-align: right; padding: 12px 16px;" onclick="event.stopPropagation();">
+                            {% if is_draft %}
+                            <a href="{{ url_for('inventory.view_transfer', id=trf.id) }}" class="btn btn-sm btn-primary" style="font-size: 11.5px; padding: 3px 10px; font-weight: 700; text-decoration: none; background: #0D9488;">
+                                Edit / Complete ➔
+                            </a>
+                            <button type="button" class="btn btn-sm btn-ghost" onclick="deleteTransferDraft({{ trf.id }}, '{{ trf.transfer_number }}')" style="color: #EF4444; font-size: 12px; padding: 3px 6px;" title="Delete draft request">
+                                🗑️
+                            </button>
+                            {% else %}
+                            <a href="{{ url_for('inventory.view_transfer', id=trf.id) }}" class="btn btn-sm btn-secondary" style="font-size: 11.5px; padding: 3px 10px; font-weight: 600; text-decoration: none;">
+                                View 👁️
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="10" style="text-align: center; color: #94A3B8; padding: 48px 16px;">
+                            <div style="font-size: 32px; margin-bottom: 8px;">🔄</div>
+                            <div style="font-weight: 700; font-size: 14px; color: #1E293B;">No stock transfers found</div>
+                            <div style="font-size: 12.5px; margin-top: 4px; margin-bottom: 14px;">
+                                {% if search or from_loc or to_loc or status_filter != 'ALL' %}
+                                Try clearing your search or status filters.
+                                {% else %}
+                                Create your first multi-product stock transfer request to move inventory between warehouses.
+                                {% endif %}
                             </div>
-                        `;
-                    });
-                    resDiv.innerHTML = h;
-                });
-        }, 200);
-    });
+                            <a href="{{ url_for('inventory.new_transfer') }}" class="btn btn-primary btn-sm" style="font-weight: 700; text-decoration: none;">
+                                + Create New Stock Transfer
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
 
-    window.selectTrfProduct = function(id, name, sku, uom) {
-        idInput.value = id;
-        sInput.value = '';
-        resDiv.innerHTML = '';
-        infoDiv.style.display = 'block';
-        nameSpan.innerText = name;
-        detSpan.innerText = `SKU: ${sku} (${uom})`;
-    };
-});
+<style>
+.btn-status-filter {
+    padding: 5px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #64748B;
+    text-decoration: none;
+    transition: all 0.15s ease;
+}
+.btn-status-filter:hover {
+    color: #0F172A;
+    background: rgba(255, 255, 255, 0.6);
+}
+.btn-status-filter.active {
+    background: #FFFFFF;
+    color: #0F172A;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+</style>
+
+<script>
+async function deleteTransferDraft(id, transferNum) {
+    if (!confirm(`Are you sure you want to delete transfer draft ${transferNum}?`)) {
+        return;
+    }
+    try {
+        const res = await fetch(`/inventory/transfers/${id}/delete`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const data = await res.json();
+        if (data.success) {
+            window.location.reload();
+        } else {
+            alert(data.message || "Failed to delete transfer draft.");
+        }
+    } catch (e) {
+        alert("Network error: " + e);
+    }
+}
 </script>
 {% endblock %}

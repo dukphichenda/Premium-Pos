@@ -593,102 +593,395 @@ def create_adjustment():
         flash(f"Error executing stock adjustment: {e}", "error")
         return redirect(url_for('inventory.list_adjustments'))
 
+def _get_next_trf_number():
+    try:
+        row = query_one("SELECT MAX(CAST(SUBSTRING(transfer_number FROM 'TRF-([0-9]+)') AS INTEGER)) as max_val FROM stock_transfers WHERE transfer_number ~ '^TRF-[0-9]+$'")
+        max_val = row['max_val'] if row and row.get('max_val') else 0
+        return f"TRF-{max_val + 1:05d}"
+    except Exception:
+        seq = get_next_sequence_val('trf_number_seq')
+        return f"TRF-{seq:05d}"
+
 @inventory_bp.route('/inventory/transfers')
 def list_transfers():
-    transfers = query_all("""
+    status_filter = (request.args.get('status') or 'all').strip().upper()
+    search = (request.args.get('q') or '').strip()
+    from_loc = request.args.get('from_location_id', '').strip()
+    to_loc = request.args.get('to_location_id', '').strip()
+
+    stats_row = query_one("""
+        SELECT 
+            COUNT(*) as total_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(status, '')) IN ('DRAFT', 'REQUESTED')) as draft_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(status, '')) = 'COMPLETED') as completed_count
+        FROM stock_transfers
+    """) or {}
+    total_units_row = query_one("""
+        SELECT COALESCE(SUM(stl.quantity), 0) as total_units 
+        FROM stock_transfer_lines stl 
+        JOIN stock_transfers st ON stl.transfer_id = st.id 
+        WHERE UPPER(COALESCE(st.status, '')) = 'COMPLETED'
+    """) or {}
+
+    where_clauses = ["1=1"]
+    params = []
+    if status_filter in ['DRAFT', 'REQUESTED']:
+        where_clauses.append("UPPER(COALESCE(st.status, '')) IN ('DRAFT', 'REQUESTED')")
+    elif status_filter == 'COMPLETED':
+        where_clauses.append("UPPER(COALESCE(st.status, '')) = 'COMPLETED'")
+
+    if search:
+        where_clauses.append("(st.transfer_number ILIKE %s OR st.notes ILIKE %s)")
+        params.extend([f"%{search}%", f"%{search}%"])
+    if from_loc:
+        where_clauses.append("st.from_location_id = %s")
+        params.append(int(from_loc))
+    if to_loc:
+        where_clauses.append("st.to_location_id = %s")
+        params.append(int(to_loc))
+
+    transfers = query_all(f"""
         SELECT 
             st.*,
             fl.name as from_location_name,
             tl.name as to_location_name,
             COUNT(stl.id) as item_count,
-            SUM(stl.quantity) as total_units
+            COALESCE(SUM(stl.quantity), 0) as total_units
+        FROM stock_transfers st
+        JOIN locations fl ON st.from_location_id = fl.id
+        JOIN locations tl ON st.to_location_id = tl.id
+        LEFT JOIN stock_transfer_lines stl ON st.id = stl.transfer_id
+        WHERE {" AND ".join(where_clauses)}
+        GROUP BY st.id, fl.name, tl.name
+        ORDER BY st.transfer_date DESC, st.id DESC
+        LIMIT 100
+    """, params)
+
+    locations = query_all("SELECT id, name, is_default, is_central FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, is_central DESC, name ASC")
+
+    return render_template(
+        'inventory/transfers.html',
+        transfers=transfers,
+        locations=locations,
+        status_filter=status_filter,
+        search=search,
+        from_loc=from_loc,
+        to_loc=to_loc,
+        stats={
+            'total': stats_row.get('total_count', 0),
+            'draft': stats_row.get('draft_count', 0),
+            'completed': stats_row.get('completed_count', 0),
+            'total_units': total_units_row.get('total_units', 0)
+        }
+    )
+
+@inventory_bp.route('/inventory/transfers/new')
+def new_transfer():
+    """Create a new multi-product warehouse transfer, starting as Draft request."""
+    next_trf_num = _get_next_trf_number()
+    locations = query_all("SELECT id, name, is_default, is_central FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, is_central DESC, name ASC")
+    from_loc = locations[0]['id'] if locations else None
+    to_loc = locations[1]['id'] if len(locations) > 1 else (locations[0]['id'] if locations else None)
+
+    history_transfers = query_all("""
+        SELECT 
+            st.id, st.transfer_number, st.transfer_date, st.status, st.notes,
+            fl.name as from_location_name, tl.name as to_location_name,
+            COUNT(stl.id) as item_count,
+            COALESCE(SUM(stl.quantity), 0) as total_units
         FROM stock_transfers st
         JOIN locations fl ON st.from_location_id = fl.id
         JOIN locations tl ON st.to_location_id = tl.id
         LEFT JOIN stock_transfer_lines stl ON st.id = stl.transfer_id
         GROUP BY st.id, fl.name, tl.name
         ORDER BY st.transfer_date DESC, st.id DESC
-        LIMIT 50
+        LIMIT 40
     """)
-    locations = query_all("SELECT id, name FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, name ASC")
-    return render_template('inventory/transfers.html', transfers=transfers, locations=locations)
 
-@inventory_bp.route('/inventory/transfers/create', methods=['POST'])
-def create_transfer():
+    return render_template(
+        'inventory/transfer_form.html',
+        is_detail=False,
+        is_edit=False,
+        transfer={
+            'id': None,
+            'transfer_number': next_trf_num,
+            'from_location_id': from_loc,
+            'to_location_id': to_loc,
+            'transfer_date': datetime.now().strftime('%Y-%m-%d'),
+            'notes': '',
+            'status': 'DRAFT'
+        },
+        locations=locations,
+        lines=[],
+        lines_json='[]',
+        history_transfers=history_transfers,
+        today_date=datetime.now().strftime('%b %d, %Y')
+    )
+
+@inventory_bp.route('/inventory/transfers/<int:id>')
+def view_transfer(id):
+    """View transfer details or continue editing/completing a Draft transfer."""
+    trf = query_one("""
+        SELECT st.*, fl.name as from_location_name, tl.name as to_location_name
+        FROM stock_transfers st
+        JOIN locations fl ON st.from_location_id = fl.id
+        JOIN locations tl ON st.to_location_id = tl.id
+        WHERE st.id = %s
+    """, (id,))
+    if not trf:
+        flash("Stock Transfer not found.", "error")
+        return redirect(url_for('inventory.list_transfers'))
+
+    # Fetch lines with live stock in source warehouse
+    lines = query_all("""
+        SELECT 
+            stl.*,
+            p.sku as product_sku,
+            p.name as product_name,
+            p.image_url as product_image_url,
+            p.uom as product_uom,
+            p.sales_uom,
+            p.sales_uom_ratio,
+            p.sales_uom_ratio_std,
+            p.purchasing_uom,
+            p.purchasing_uom_ratio,
+            p.purchasing_uom_ratio_std,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(src_inv.quantity, 0) as current_on_hand,
+            COALESCE(open_so.reserved_qty, 0) as current_reserved,
+            (COALESCE(src_inv.quantity, 0) - COALESCE(open_so.reserved_qty, 0)) as current_available
+        FROM stock_transfer_lines stl
+        JOIN products p ON stl.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN inventory src_inv ON src_inv.product_id = p.id AND src_inv.location_id = %s
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status = 'OPEN' 
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
+        WHERE stl.transfer_id = %s
+        ORDER BY stl.id ASC
+    """, (trf['from_location_id'], trf['from_location_id'], trf['from_location_id'], id))
+
+    locations = query_all("SELECT id, name, is_default, is_central FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_default DESC, is_central DESC, name ASC")
+    is_completed = (trf.get('status') or '').upper() == 'COMPLETED'
+
+    lines_data = []
+    for l in lines:
+        lines_data.append({
+            'product_id': l['product_id'],
+            'sku': l.get('product_sku') or '',
+            'name': l.get('product_name') or '',
+            'image_url': l.get('product_image_url') or '',
+            'category_name': l.get('category_name') or '',
+            'uom': l.get('uom') or l.get('product_uom') or 'pcs.',
+            'base_uom': l.get('product_uom') or 'pcs.',
+            'uom_factor': float(l.get('uom_factor') or 1.0),
+            'sales_uom': l.get('sales_uom') or '',
+            'sales_uom_ratio': float(l.get('sales_uom_ratio') or l.get('sales_uom_ratio_std') or 1.0),
+            'purchasing_uom': l.get('purchasing_uom') or '',
+            'purchasing_uom_ratio': float(l.get('purchasing_uom_ratio') or l.get('purchasing_uom_ratio_std') or 1.0),
+            'source_on_hand': float(l.get('current_on_hand') if l.get('current_on_hand') is not None else (l.get('source_on_hand') or 0)),
+            'source_reserved': float(l.get('current_reserved') or 0),
+            'source_available': float(l.get('current_available') if l.get('current_available') is not None else (l.get('source_available') or 0)),
+            'quantity': float(l.get('quantity') or 1)
+        })
+    lines_json = json.dumps(lines_data)
+
+    history_transfers = query_all("""
+        SELECT 
+            st.id, st.transfer_number, st.transfer_date, st.status, st.notes,
+            fl.name as from_location_name, tl.name as to_location_name,
+            COUNT(stl.id) as item_count,
+            COALESCE(SUM(stl.quantity), 0) as total_units
+        FROM stock_transfers st
+        JOIN locations fl ON st.from_location_id = fl.id
+        JOIN locations tl ON st.to_location_id = tl.id
+        LEFT JOIN stock_transfer_lines stl ON st.id = stl.transfer_id
+        GROUP BY st.id, fl.name, tl.name
+        ORDER BY st.transfer_date DESC, st.id DESC
+        LIMIT 40
+    """)
+
+    return render_template(
+        'inventory/transfer_form.html',
+        is_detail=is_completed,
+        is_edit=(not is_completed),
+        transfer=trf,
+        locations=locations,
+        lines=lines,
+        lines_json=lines_json,
+        history_transfers=history_transfers,
+        today_date=datetime.now().strftime('%b %d, %Y')
+    )
+
+@inventory_bp.route('/inventory/transfers/save', methods=['POST'])
+def save_transfer():
+    """Save transfer request as DRAFT or execute COMPLETED stock movement."""
     try:
-        from_loc = int(request.form.get('from_location_id'))
-        to_loc = int(request.form.get('to_location_id'))
-        product_id = int(request.form.get('product_id'))
-        transfer_qty = float(request.form.get('quantity', 0) or 0)
-        notes = request.form.get('notes', '').strip()
+        data = request.get_json(force=True) or {}
+        transfer_id = data.get('transfer_id')
+        transfer_number = (data.get('transfer_number') or '').strip()
+        from_location_id = int(data.get('from_location_id') or 0)
+        to_location_id = int(data.get('to_location_id') or 0)
+        transfer_date = data.get('transfer_date') or datetime.now().strftime('%Y-%m-%d')
+        notes = (data.get('notes') or '').strip()
+        status = (data.get('status') or 'DRAFT').upper()
+        lines = data.get('lines', [])
 
-        if transfer_qty <= 0:
-            flash("Transfer quantity must be greater than zero.", "error")
-            return redirect(url_for('inventory.list_transfers'))
+        if not from_location_id or not to_location_id:
+            return jsonify({'success': False, 'message': 'Please select both source and destination warehouses.'}), 400
 
-        if from_loc == to_loc:
-            flash("Source and destination warehouse cannot be the same.", "error")
-            return redirect(url_for('inventory.list_transfers'))
+        if from_location_id == to_location_id:
+            return jsonify({'success': False, 'message': 'Source and destination warehouse cannot be the same.'}), 400
 
-        seq_val = get_next_sequence_val('trf_number_seq')
-        transfer_num = f"TRF-{seq_val:05d}"
+        if not lines or len(lines) == 0:
+            return jsonify({'success': False, 'message': 'Please add at least one product to transfer.'}), 400
+
+        if not transfer_number:
+            transfer_number = _get_next_trf_number()
 
         with get_db_cursor(commit=True) as cur:
-            # Row lock source warehouse inventory to eliminate race conditions
-            cur.execute("""
-                SELECT COALESCE(quantity, 0) as qty 
-                FROM inventory 
-                WHERE product_id = %s AND location_id = %s 
-                FOR UPDATE
-            """, (product_id, from_loc))
-            src_inv = cur.fetchone()
-            src_qty = float(src_inv['qty']) if src_inv else 0.0
+            # 1. If completing, validate stock availability in source location
+            if status == 'COMPLETED':
+                if transfer_id:
+                    cur.execute("SELECT status FROM stock_transfers WHERE id = %s", (transfer_id,))
+                    existing = cur.fetchone()
+                    if existing and existing['status'] == 'COMPLETED':
+                        return jsonify({'success': False, 'message': 'This transfer has already been completed.'}), 400
 
-            if src_qty < transfer_qty:
-                flash(f"Insufficient stock in source warehouse (Available: {src_qty}, Requested: {transfer_qty})", "error")
-                return redirect(url_for('inventory.list_transfers'))
+                insufficient_items = []
+                for l in lines:
+                    pid = int(l['product_id'])
+                    qty = float(l.get('quantity') or 0)
+                    factor = float(l.get('uom_factor') or 1.0)
+                    base_qty = qty * factor
 
-            cur.execute("""
-                INSERT INTO stock_transfers (transfer_number, from_location_id, to_location_id, status, notes)
-                VALUES (%s, %s, %s, 'COMPLETED', %s)
-                RETURNING id;
-            """, (transfer_num, from_loc, to_loc, notes))
-            trf_id = cur.fetchone()['id']
+                    if qty <= 0:
+                        return jsonify({'success': False, 'message': f"Invalid transfer quantity ({qty}) on line item."}), 400
 
-            cur.execute("""
-                INSERT INTO stock_transfer_lines (transfer_id, product_id, quantity)
-                VALUES (%s, %s, %s);
-            """, (trf_id, product_id, transfer_qty))
+                    # Lock source warehouse inventory
+                    cur.execute("""
+                        SELECT COALESCE(quantity, 0) as qty, COALESCE(reserved_quantity, 0) as reserved
+                        FROM inventory
+                        WHERE product_id = %s AND location_id = %s
+                        FOR UPDATE
+                    """, (pid, from_location_id))
+                    inv_row = cur.fetchone()
+                    src_on_hand = float(inv_row['qty']) if inv_row else 0.0
 
-            # Deduct from source
-            cur.execute("""
-                UPDATE inventory 
-                SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
-                WHERE product_id = %s AND location_id = %s;
-            """, (transfer_qty, product_id, from_loc))
+                    if src_on_hand < base_qty:
+                        cur.execute("SELECT sku, name FROM products WHERE id = %s", (pid,))
+                        p_info = cur.fetchone() or {'sku': '', 'name': f'Product #{pid}'}
+                        insufficient_items.append(f"{p_info['sku']} {p_info['name']} (Available: {src_on_hand:g}, Required: {base_qty:g})")
 
-            # Add to destination via upsert
-            cur.execute("""
-                INSERT INTO inventory (product_id, location_id, sublocation, quantity)
-                VALUES (%s, %s, '', %s)
-                ON CONFLICT (product_id, location_id, sublocation)
-                DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
-            """, (product_id, to_loc, transfer_qty))
+                if insufficient_items:
+                    return jsonify({
+                        'success': False,
+                        'message': "Cannot complete transfer due to insufficient stock in source warehouse:<br>• " + "<br>• ".join(insufficient_items)
+                    }), 400
 
-            # Audit ledger
-            cur.execute("""
-                INSERT INTO inventory_logs (
-                    product_id, movement_type, reference_type, reference_id,
-                    from_location_id, to_location_id, quantity, qty_before, qty_after, reason, notes
-                ) VALUES (%s, 'TRANSFER', 'TRANSFER', %s, %s, %s, %s, %s, %s, 'Warehouse Transfer', %s);
-            """, (product_id, transfer_num, from_loc, to_loc, transfer_qty, src_qty, src_qty - transfer_qty, notes))
+            # 2. Insert or update header in stock_transfers
+            if transfer_id:
+                cur.execute("""
+                    UPDATE stock_transfers
+                    SET transfer_number = %s, from_location_id = %s, to_location_id = %s,
+                        status = %s, transfer_date = %s, notes = %s
+                    WHERE id = %s
+                    RETURNING id;
+                """, (transfer_number, from_location_id, to_location_id, status, transfer_date, notes, transfer_id))
+                trf_id = transfer_id
+            else:
+                cur.execute("""
+                    INSERT INTO stock_transfers (transfer_number, from_location_id, to_location_id, status, transfer_date, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """, (transfer_number, from_location_id, to_location_id, status, transfer_date, notes))
+                trf_id = cur.fetchone()['id']
 
-        flash(f"Stock Transfer {transfer_num} ({transfer_qty} units) executed successfully!", "success")
-        return redirect(url_for('inventory.list_transfers'))
+            # 3. Replace lines
+            cur.execute("DELETE FROM stock_transfer_lines WHERE transfer_id = %s", (trf_id,))
+            for l in lines:
+                pid = int(l['product_id'])
+                qty = float(l.get('quantity') or 0)
+                uom = l.get('uom') or 'pcs.'
+                factor = float(l.get('uom_factor') or 1.0)
+                src_on_hand = float(l.get('source_on_hand') or 0)
+                src_avail = float(l.get('source_available') or 0)
+
+                cur.execute("""
+                    INSERT INTO stock_transfer_lines (transfer_id, product_id, quantity, uom, uom_factor, source_on_hand, source_available)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (trf_id, pid, qty, uom, factor, src_on_hand, src_avail))
+
+            # 4. If COMPLETED, execute atomic inventory deduction & addition
+            if status == 'COMPLETED':
+                for l in lines:
+                    pid = int(l['product_id'])
+                    qty = float(l.get('quantity') or 0)
+                    factor = float(l.get('uom_factor') or 1.0)
+                    base_qty = qty * factor
+
+                    cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s", (pid, from_location_id))
+                    src_row = cur.fetchone()
+                    qty_before_src = float(src_row['qty']) if src_row else 0.0
+
+                    # Deduct from source warehouse
+                    cur.execute("""
+                        UPDATE inventory 
+                        SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE product_id = %s AND location_id = %s;
+                    """, (base_qty, pid, from_location_id))
+
+                    # Add to destination warehouse (upsert)
+                    cur.execute("""
+                        INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                        VALUES (%s, %s, '', %s)
+                        ON CONFLICT (product_id, location_id, sublocation)
+                        DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                    """, (pid, to_location_id, base_qty))
+
+                    # Audit log in inventory_logs
+                    cur.execute("""
+                        INSERT INTO inventory_logs (
+                            product_id, movement_type, reference_type, reference_id,
+                            from_location_id, to_location_id, quantity, qty_before, qty_after, reason, notes
+                        ) VALUES (%s, 'TRANSFER', 'TRANSFER', %s, %s, %s, %s, %s, %s, 'Warehouse Transfer Out', %s);
+                    """, (pid, transfer_number, from_location_id, to_location_id, -base_qty, qty_before_src, qty_before_src - base_qty, notes))
+
+        msg = f"Stock Transfer {transfer_number} completed successfully!" if status == 'COMPLETED' else f"Transfer request {transfer_number} saved as Draft."
+        return jsonify({
+            'success': True,
+            'transfer_id': trf_id,
+            'transfer_number': transfer_number,
+            'status': status,
+            'message': msg
+        })
 
     except Exception as e:
-        flash(f"Error executing transfer: {e}", "error")
-        return redirect(url_for('inventory.list_transfers'))
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@inventory_bp.route('/inventory/transfers/<int:id>/delete', methods=['POST'])
+def delete_transfer(id):
+    """Delete a transfer request draft."""
+    try:
+        trf = query_one("SELECT id, status, transfer_number FROM stock_transfers WHERE id = %s", (id,))
+        if not trf:
+            return jsonify({'success': False, 'message': 'Transfer not found.'}), 404
+        if (trf.get('status') or '').upper() == 'COMPLETED':
+            return jsonify({'success': False, 'message': 'Cannot delete an already completed transfer.'}), 400
+
+        with get_db_cursor(commit=True) as cur:
+            cur.execute("DELETE FROM stock_transfer_lines WHERE transfer_id = %s", (id,))
+            cur.execute("DELETE FROM stock_transfers WHERE id = %s", (id,))
+
+        return jsonify({'success': True, 'message': f"Transfer draft {trf['transfer_number']} deleted."})
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
 
 @inventory_bp.route('/inventory/reorder')
 def reorder_assistant():

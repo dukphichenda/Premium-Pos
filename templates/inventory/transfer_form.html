@@ -1,0 +1,1953 @@
+{% extends 'base.html' %}
+
+{% block title %}
+{{ transfer.transfer_number if is_detail or is_edit else 'New Stock Transfer' }} - inFlow Premium
+{% endblock %}
+
+{% block content %}
+<div class="inflow-trf-layout no-print">
+    <!-- Left Sidebar: History of Transfers -->
+    <aside class="inflow-trf-sidebar" id="trfHistorySidebar">
+        <div class="inflow-sidebar-header">
+            <div class="inflow-sidebar-title-row">
+                <div class="inflow-sidebar-title">Transfers History</div>
+                <a href="{{ url_for('inventory.new_transfer') }}" class="inflow-sidebar-new-btn" title="Create new transfer request">+ New</a>
+            </div>
+            <div class="inflow-sidebar-search-box">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input type="text" id="sidebarTrfSearch" class="inflow-sidebar-search-input" placeholder="Search transfers..." oninput="filterSidebarTransfers(this.value)">
+            </div>
+            <div class="inflow-sidebar-tabs">
+                <button type="button" class="inflow-sidebar-tab active" data-filter="ALL" onclick="filterSidebarStatus('ALL', this)">All</button>
+                <button type="button" class="inflow-sidebar-tab" data-filter="DRAFT" onclick="filterSidebarStatus('DRAFT', this)">Draft</button>
+                <button type="button" class="inflow-sidebar-tab" data-filter="COMPLETED" onclick="filterSidebarStatus('COMPLETED', this)">Completed</button>
+            </div>
+        </div>
+        <div class="inflow-sidebar-list" id="sidebarTrfList">
+            {% for hist in history_transfers %}
+            {% set is_active_item = (transfer and transfer.id == hist.id) %}
+            <a href="{{ url_for('inventory.view_transfer', id=hist.id) }}"
+               class="inflow-sidebar-card {% if is_active_item %}active{% endif %}"
+               data-id="{{ hist.id }}"
+               data-number="{{ hist.transfer_number | lower }}"
+               data-status="{{ hist.status }}"
+               data-from="{{ (hist.from_location_name or '') | lower }}"
+               data-to="{{ (hist.to_location_name or '') | lower }}"
+               data-notes="{{ (hist.notes or '') | lower }}"
+               data-date="{{ (hist.transfer_date | format_date if hist.transfer_date else '') | lower }}">
+                <div class="inflow-sidebar-card-top">
+                    <span class="inflow-sidebar-card-num">{{ hist.transfer_number }}</span>
+                    {% if hist.status in ['DRAFT', 'REQUESTED'] %}
+                    <span class="badge" style="font-size: 10px; padding: 2px 6px; font-weight: 700; background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D;">DRAFT</span>
+                    {% else %}
+                    <span class="badge badge-success" style="font-size: 10px; padding: 2px 6px; font-weight: 700;">DONE</span>
+                    {% endif %}
+                </div>
+                <div class="inflow-sidebar-card-meta">
+                    <span>{{ hist.transfer_date | format_date if hist.transfer_date else '' }}</span>
+                    <span>•</span>
+                    <span>{{ hist.from_location_name }} ➔ {{ hist.to_location_name }}</span>
+                </div>
+                <div class="inflow-sidebar-card-bottom">
+                    <span class="inflow-sidebar-card-reason">{{ hist.notes or 'Stock Transfer' }}</span>
+                    <span class="inflow-sidebar-card-count">{{ hist.item_count or 0 }} items ({{ "{:,.0f}".format(hist.total_units or 0) }} pcs)</span>
+                </div>
+            </a>
+            {% else %}
+            <div class="inflow-sidebar-empty">No transfers found</div>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <!-- Right: Main Content Panel -->
+    <div class="inflow-trf-main-content">
+        <!-- 1. Top Action Toolbar -->
+        <div class="inflow-trf-top-bar">
+            <div class="inflow-trf-top-left">
+                <a href="{{ url_for('inventory.list_transfers') }}" class="inflow-trf-close-btn" onclick="return onCloseTransferPage(event)" title="Back to Transfers (បិទ / ត្រឡប់ក្រោយ)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </a>
+                <button type="button" class="btn btn-sm btn-secondary inflow-trf-sidebar-toggle-btn" onclick="toggleTrfSidebar()" title="Toggle History Sidebar (បង្ហាញ/លាក់ ប្រវត្តិ)">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg>
+                    <span id="sidebarToggleText">History</span>
+                </button>
+                {% if is_detail %}
+                <span class="badge badge-success" style="font-size: 11.5px; padding: 4px 10px; font-weight: 700; letter-spacing: 0.04em;">
+                    ✓ COMPLETED (Transferred)
+                </span>
+                {% else %}
+                <span class="badge" style="font-size: 11.5px; padding: 4px 10px; font-weight: 700; letter-spacing: 0.04em; background: #FEF3C7; color: #B45309; border: 1px solid #FCD34D;">
+                    ✏️ DRAFT (Transfer Request)
+                </span>
+                {% endif %}
+            </div>
+            <div class="inflow-trf-top-right">
+                <button type="button" class="btn btn-sm btn-secondary inflow-trf-tool-btn" onclick="copyTransferData()" title="Copy transfer table to clipboard">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                    <span>Copy</span>
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary inflow-trf-tool-btn" onclick="printTransferSheet()" title="Print stock transfer dispatch sheet">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                    <span>Print</span>
+                </button>
+                {% if not is_detail %}
+                <button type="button" class="btn btn-sm btn-ghost btn-cancel-trf" onclick="onCloseTransferPage(event)" style="font-weight: 600; color: #64748B;">
+                    Cancel
+                </button>
+                <button type="button" id="topBtnSaveDraft" class="btn btn-sm btn-secondary btn-save-draft" onclick="saveTransfer('DRAFT')" title="Save as Draft to request transfer first without moving live inventory">
+                    <span>💾 Save Draft</span>
+                    <span id="topBtnSaveDraftDot" class="inflow-unsaved-dot" style="display: none;" title="Unsaved changes"></span>
+                </button>
+                <button type="button" id="topBtnCompleteTransfer" class="btn btn-primary btn-complete-transfer" onclick="saveTransfer('COMPLETED')" title="Complete transfer and move live stock between warehouses">
+                    <span>✓ Complete Transfer</span>
+                </button>
+                {% else %}
+                <a href="{{ url_for('inventory.new_transfer') }}" class="btn btn-primary btn-complete-transfer" style="text-decoration: none;">
+                    <span>+ New Stock Transfer</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 2. Main Transfer Document Container (White Card) -->
+        <div class="inflow-trf-card">
+            <!-- Document Header Area -->
+            <div class="inflow-trf-doc-header">
+                <!-- Left: Transfer Number -->
+                <div class="inflow-trf-title-col">
+                    <div class="inflow-trf-doc-title">Stock Transfer Number</div>
+                    <div class="inflow-trf-number-row">
+                        {% if not is_detail %}
+                        <input type="text" id="trfNumberInput" value="{{ transfer.transfer_number }}" class="inflow-trf-number-input" placeholder="TRF-00001" title="Document Number (Auto-sequenced or Custom)">
+                        {% else %}
+                        <div class="inflow-trf-number-text">{{ transfer.transfer_number }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Right: Date & Warehouses Routing -->
+                <div class="inflow-trf-meta-col">
+                    <!-- Date -->
+                    <div class="inflow-trf-date-picker">
+                        <span class="inflow-trf-date-icon">📅</span>
+                        {% if not is_detail %}
+                        <input type="date" id="trfDateInput" value="{{ transfer.transfer_date or current_time.strftime('%Y-%m-%d') }}" class="inflow-trf-date-input" onchange="markTransferDirty()">
+                        {% else %}
+                        <span class="inflow-trf-date-text">{{ transfer.transfer_date | format_date if transfer.transfer_date else today_date }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Warehouse Source & Destination Selector Block -->
+            <div class="inflow-trf-routing-box">
+                <div class="inflow-trf-route-cell">
+                    <label class="inflow-trf-route-label">
+                        <span style="color: #DC2626;">●</span> From Warehouse (Source / ឃ្លាំងចេញ)
+                    </label>
+                    {% if not is_detail %}
+                    <select id="trfFromLocationSelect" class="inflow-trf-loc-select" onchange="onSourceWarehouseChanged()">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if transfer.from_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }} {% if loc.is_default %}(Default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <div class="inflow-trf-loc-static" style="color: #DC2626; font-weight: 700;">
+                        {{ transfer.from_location_name }}
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="inflow-trf-route-arrow" title="Stock Transfer Flow">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0D9488" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                        <polyline points="12 5 19 12 12 19"></polyline>
+                    </svg>
+                </div>
+
+                <div class="inflow-trf-route-cell">
+                    <label class="inflow-trf-route-label">
+                        <span style="color: #059669;">●</span> To Warehouse (Destination / ឃ្លាំងទទួល)
+                    </label>
+                    {% if not is_detail %}
+                    <select id="trfToLocationSelect" class="inflow-trf-loc-select" onchange="markTransferDirty()">
+                        {% for loc in locations %}
+                        <option value="{{ loc.id }}" {% if transfer.to_location_id == loc.id %}selected{% endif %}>
+                            {{ loc.name }} {% if loc.is_default %}(Default){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    {% else %}
+                    <div class="inflow-trf-loc-static" style="color: #059669; font-weight: 700;">
+                        {{ transfer.to_location_name }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Notes & Dispatch Instructions -->
+            <div class="inflow-trf-notes-row">
+                <label class="inflow-trf-section-label">Transfer Notes & Instructions (កំណត់ចំណាំ / មូលហេតុផ្ទេរ)</label>
+                {% if not is_detail %}
+                <input type="text" id="trfNotesInput" value="{{ transfer.notes or '' }}" class="inflow-field-input" placeholder="e.g. Replenishing STM branch display boxes, dispatched via motorbike rider..." oninput="markTransferDirty()">
+                {% else %}
+                <div class="inflow-trf-notes-text">{{ transfer.notes or 'None specified' }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Table Action Toolbar -->
+            <div class="inflow-trf-table-toolbar">
+                <div class="inflow-trf-tb-left">
+                    <span class="inflow-trf-tb-label">Transfer Items:</span>
+                    <span id="trfItemCountBadge" class="badge badge-primary" style="font-weight: 700;">0 items</span>
+                    <span id="trfTotalUnitsBadge" class="badge" style="background: #E0F2FE; color: #0369A1; font-weight: 700;">0 units</span>
+                </div>
+                <div class="inflow-trf-tb-right">
+                    {% if not is_detail %}
+                    <button type="button" class="btn btn-sm btn-ghost" onclick="focusTrfSearchInput()" title="Press F2 to add item">
+                        <span style="font-weight: 700; color: #0D9488;">+ Add Item</span> (F2)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-ghost" onclick="clearAllTransferRows()" style="color: #EF4444;" title="Clear all rows">
+                        Clear All
+                    </button>
+                    {% endif %}
+                    <input type="text" id="trfTableFilter" class="form-input form-input-sm" placeholder="Filter added items..." oninput="filterTransferTableRows(this.value)" style="width: 170px;">
+                </div>
+            </div>
+
+            <!-- 3. Transfer Products Table -->
+            <div class="inflow-trf-table-container">
+                <table class="inflow-trf-table" id="trfProductsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 32%;">Product</th>
+                            <th style="width: 10%; text-align: center;">UOM</th>
+                            <th style="width: 11%; text-align: right;">Source On Hand</th>
+                            <th style="width: 11%; text-align: right;">Source Reserved</th>
+                            <th style="width: 11%; text-align: right;">Source Available</th>
+                            <th style="width: 12%; text-align: center;">Transfer Qty</th>
+                            <th style="width: 18%; text-align: center;">Availability Status</th>
+                            {% if not is_detail %}
+                            <th style="width: 5%; text-align: center;">Action</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody id="trfProductTableBody">
+                        {% if is_detail %}
+                            {% for line in lines %}
+                            <tr class="inflow-trf-row">
+                                <!-- Product -->
+                                <td>
+                                    <div class="inflow-trf-prod-cell">
+                                        <div class="inflow-trf-prod-thumb">
+                                            {% if line.product_image_url %}
+                                            <img src="{{ line.product_image_url }}" alt="{{ line.product_sku }}">
+                                            {% else %}
+                                            <div class="inflow-thumb-placeholder">📦</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="inflow-trf-prod-info">
+                                            <div class="inflow-trf-prod-name font-khmer">{{ line.product_name }}</div>
+                                            <div class="inflow-trf-prod-sku">{{ line.product_sku }}</div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <!-- UOM -->
+                                <td style="text-align: center;">
+                                    <span class="badge" style="font-size: 11px; font-weight: 600; color: #475569; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 3px 8px; border-radius: 5px;">
+                                        {{ line.uom or 'pcs.' }}
+                                    </span>
+                                </td>
+                                <!-- Source On Hand -->
+                                <td style="text-align: right; font-weight: 600; color: #334155;">
+                                    {{ "{:,.0f}".format(line.source_on_hand or 0) }}
+                                </td>
+                                <!-- Source Reserved -->
+                                <td style="text-align: right; color: #0284C7; font-weight: 600;">
+                                    {{ "{:,.0f}".format(line.current_reserved or 0) }}
+                                </td>
+                                <!-- Source Available -->
+                                <td style="text-align: right; font-weight: 700; color: #059669;">
+                                    {{ "{:,.0f}".format(line.source_available or 0) }}
+                                </td>
+                                <!-- Transfer Qty -->
+                                <td style="text-align: center;">
+                                    <div class="inflow-trf-pill pill-transfer-qty">
+                                        {{ "{:,.0f}".format(line.quantity or 0) }}
+                                    </div>
+                                </td>
+                                <!-- Status -->
+                                <td style="text-align: center;">
+                                    <span class="badge badge-success" style="padding: 4px 10px; font-weight: 700; font-size: 11.5px;">
+                                        ✓ Transferred
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <!-- Rows dynamically populated via JavaScript -->
+                        {% endif %}
+
+                        {% if not is_detail %}
+                        <!-- Bottom Row: Type to add product (Matching Sales Order & Stock Adjustment) -->
+                        <tr id="trfNewRowEntry" class="inflow-trf-new-row" onclick="focusTrfSearchInput()">
+                            <!-- Product Cell with input -->
+                            <td style="position: relative; vertical-align: middle;">
+                                <div class="inflow-trf-new-prod-cell">
+                                    <div class="inflow-trf-thumb-placeholder" title="Click to add" onclick="focusTrfSearchInput()">+</div>
+                                    <div style="position: relative; flex: 1; display: flex; align-items: center;">
+                                        <span style="position: absolute; left: 10px; color: #94A3B8; pointer-events: none; font-size: 13px; font-weight: 700;">+</span>
+                                        <input type="text" id="trfProductLiveSearch" class="inflow-field-input grid-item-input so-clean-input"
+                                               placeholder="Type to add item..."
+                                               title="Add one by one (Type product name, SKU, or barcode)..."
+                                               autocomplete="off"
+                                               oninput="onLiveTrfSearchInput(this.value)"
+                                               onkeydown="onLiveTrfSearchKeyDown(event)"
+                                               onclick="event.stopPropagation();"
+                                               style="width: 100%; border: 1px solid #CBD5E1; border-radius: 6px; padding-left: 28px !important; font-size: 13px; background: #FFFFFF; height: 34px;">
+                                        <span id="trfSearchLoadingSpinner" class="search-spinner" style="display: none; position: absolute; right: 10px;">⏳</span>
+                                    </div>
+                                </div>
+                            </td>
+                            <!-- UOM Placeholder -->
+                            <td style="text-align: center;">
+                                <span class="badge" style="font-size: 11px; font-weight: 600; color: #94A3B8; background: #F8FAFC; border: 1px solid #E2E8F0; padding: 3px 8px; border-radius: 5px;">-</span>
+                            </td>
+                            <!-- Source On Hand -->
+                            <td style="text-align: right; color: #94A3B8;">-</td>
+                            <!-- Source Reserved -->
+                            <td style="text-align: right; color: #94A3B8;">-</td>
+                            <!-- Source Available -->
+                            <td style="text-align: right; color: #94A3B8;">-</td>
+                            <!-- Transfer Qty -->
+                            <td style="text-align: center; color: #94A3B8;">-</td>
+                            <!-- Status -->
+                            <td style="text-align: center; color: #94A3B8; font-size: 12px;">Type above to add</td>
+                            <!-- Action -->
+                            <td style="text-align: center; color: #CBD5E1;">—</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Empty State Warning when no items added -->
+            <div id="trfEmptyState" class="inflow-trf-empty" style="{% if lines and lines|length > 0 %}display: none;{% endif %}">
+                <div style="font-size: 28px; margin-bottom: 6px;">📦</div>
+                <div style="font-weight: 700; color: #1E293B; font-size: 14px;">No items added to this transfer yet</div>
+                <div style="color: #64748B; font-size: 12.5px; margin-top: 2px;">
+                    Use the bottom row above or press <kbd style="background: #E2E8F0; padding: 2px 6px; border-radius: 4px; font-weight: 700;">F2</kbd> to search and add products from catalog.
+                </div>
+            </div>
+
+            <!-- Bottom Action Footer Bar -->
+            <div class="inflow-trf-bottom-bar">
+                <div class="inflow-trf-footer-shortcuts">
+                    <span>Shortcuts: Press <kbd>F2</kbd> to search item • <kbd>Enter</kbd> to navigate</span>
+                </div>
+                <div class="inflow-trf-footer-actions">
+                    {% if not is_detail %}
+                    <button type="button" class="btn btn-secondary btn-cancel-trf" onclick="onCloseTransferPage(event)" style="font-weight: 600;">
+                        Cancel
+                    </button>
+                    <button type="button" id="bottomBtnSaveDraft" class="btn btn-secondary btn-save-draft" onclick="saveTransfer('DRAFT')">
+                        <span>💾 Save Draft</span>
+                    </button>
+                    <button type="button" id="bottomBtnCompleteTransfer" class="btn btn-primary btn-complete-transfer" onclick="saveTransfer('COMPLETED')">
+                        <span>✓ Complete Transfer</span>
+                    </button>
+                    {% else %}
+                    <a href="{{ url_for('inventory.new_transfer') }}" class="btn btn-primary btn-complete-transfer" style="text-decoration: none;">
+                        <span>+ New Stock Transfer</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Floating Table Popup for Product Search (Styled Identically to Sales Order & Image 2) -->
+<div id="trfLiveSearchResults" class="inflow-item-dropdown-popup" style="display: none;"></div>
+
+<!-- Hidden Printable Voucher Form -->
+<div id="printVoucherArea" class="printable-only" style="display: none;">
+    <div style="font-size: 20px; font-weight: 800; margin-bottom: 4px;">STOCK TRANSFER VOUCHER</div>
+    <div style="display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 13px;">
+        <div>Transfer #: <strong id="printTrfNumber">{{ transfer.transfer_number }}</strong></div>
+        <div>Date: <strong id="printTrfDate">{{ transfer.transfer_date | format_date if transfer.transfer_date else today_date }}</strong></div>
+    </div>
+    <div style="display: flex; gap: 20px; margin-bottom: 16px; font-size: 13px;">
+        <div>From: <strong id="printFromLoc">{{ transfer.from_location_name }}</strong></div>
+        <div>➔</div>
+        <div>To: <strong id="printToLoc">{{ transfer.to_location_name }}</strong></div>
+    </div>
+    <table style="width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px;">
+        <thead>
+            <tr style="border-bottom: 2px solid #000; text-align: left;">
+                <th style="padding: 6px;">Product</th>
+                <th style="padding: 6px;">SKU</th>
+                <th style="padding: 6px; text-align: center;">UOM</th>
+                <th style="padding: 6px; text-align: right;">Transfer Qty</th>
+            </tr>
+        </thead>
+        <tbody id="printTrfTableBody"></tbody>
+    </table>
+    <div style="margin-top: 30px; display: flex; justify-content: space-between; font-size: 12px;">
+        <div>Dispatched By: ___________________</div>
+        <div>Received By: ___________________</div>
+    </div>
+</div>
+
+<style>
+/* Layout Container */
+.inflow-trf-layout {
+    display: flex;
+    min-height: calc(100vh - 46px);
+    background: #F8FAFC;
+    color: #0F172A;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* History Sidebar */
+.inflow-trf-sidebar {
+    width: 275px;
+    background: #FFFFFF;
+    border-right: 1px solid #E2E8F0;
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    transition: margin-left 0.25s ease, opacity 0.25s ease;
+}
+.inflow-trf-sidebar.is-collapsed {
+    margin-left: -275px;
+    opacity: 0;
+    pointer-events: none;
+}
+.inflow-sidebar-header {
+    padding: 14px 14px 10px 14px;
+    border-bottom: 1px solid #F1F5F9;
+}
+.inflow-sidebar-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.inflow-sidebar-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.01em;
+}
+.inflow-sidebar-new-btn {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0D9488;
+    background: #CCFBF1;
+    padding: 3px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    transition: background 0.15s ease;
+}
+.inflow-sidebar-new-btn:hover {
+    background: #99F6E4;
+}
+.inflow-sidebar-search-box {
+    position: relative;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+}
+.inflow-sidebar-search-box svg {
+    position: absolute;
+    left: 10px;
+    color: #94A3B8;
+}
+.inflow-sidebar-search-input {
+    width: 100%;
+    padding: 6px 10px 6px 30px;
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    font-size: 12px;
+    background: #F8FAFC;
+    outline: none;
+}
+.inflow-sidebar-search-input:focus {
+    border-color: #0D9488;
+    background: #FFFFFF;
+}
+.inflow-sidebar-tabs {
+    display: flex;
+    gap: 4px;
+    background: #F1F5F9;
+    padding: 2px;
+    border-radius: 6px;
+}
+.inflow-sidebar-tab {
+    flex: 1;
+    font-size: 11px;
+    font-weight: 600;
+    color: #64748B;
+    background: transparent;
+    border: none;
+    padding: 4px 6px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.inflow-sidebar-tab.active {
+    background: #FFFFFF;
+    color: #0F172A;
+    font-weight: 700;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+.inflow-sidebar-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+.inflow-sidebar-card {
+    display: block;
+    padding: 9px 10px;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    text-decoration: none;
+    color: inherit;
+    margin-bottom: 4px;
+    transition: background 0.12s ease, border-color 0.12s ease;
+}
+.inflow-sidebar-card:hover {
+    background: #F8FAFC;
+    border-color: #E2E8F0;
+}
+.inflow-sidebar-card.active {
+    background: #F0FDFA;
+    border-color: #99F6E4;
+}
+.inflow-sidebar-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 3px;
+}
+.inflow-sidebar-card-num {
+    font-size: 12.5px;
+    font-weight: 700;
+    font-family: monospace;
+    color: #0F172A;
+}
+.inflow-sidebar-card-meta {
+    font-size: 11px;
+    color: #64748B;
+    margin-bottom: 4px;
+    display: flex;
+    gap: 4px;
+}
+.inflow-sidebar-card-bottom {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #94A3B8;
+}
+.inflow-sidebar-card-reason {
+    color: #475569;
+    font-weight: 500;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.inflow-sidebar-empty {
+    padding: 24px 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #94A3B8;
+}
+
+/* Main Content Area */
+.inflow-trf-main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow-y: auto;
+}
+
+/* Top Toolbar */
+.inflow-trf-top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: #FFFFFF;
+    border-bottom: 1px solid #E2E8F0;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+}
+.inflow-trf-top-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.inflow-trf-close-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    color: #64748B;
+    background: transparent;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+.inflow-trf-close-btn:hover {
+    background: #F1F5F9;
+    color: #0F172A;
+}
+.inflow-trf-top-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.inflow-trf-tool-btn {
+    font-size: 12px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 12px;
+    height: 32px;
+}
+.btn-save-draft {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid #FCD34D;
+    font-weight: 700;
+    position: relative;
+}
+.btn-save-draft:hover {
+    background: #FDE68A;
+}
+.btn-complete-transfer {
+    background: #0D9488;
+    color: #FFFFFF;
+    border: none;
+    font-weight: 700;
+    box-shadow: 0 1px 3px rgba(13, 148, 136, 0.3);
+}
+.btn-complete-transfer:hover {
+    background: #0F766E;
+}
+.inflow-unsaved-dot {
+    width: 7px;
+    height: 7px;
+    background: #EF4444;
+    border-radius: 50%;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+}
+
+/* White Document Card */
+.inflow-trf-card {
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    margin: 18px 20px 24px 20px;
+    padding: 22px 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Document Header */
+.inflow-trf-doc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 16px;
+    border-bottom: 1px solid #F1F5F9;
+    margin-bottom: 16px;
+}
+.inflow-trf-doc-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748B;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+.inflow-trf-number-input {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: monospace;
+    color: #0F172A;
+    border: 1px dashed transparent;
+    padding: 2px 6px;
+    border-radius: 4px;
+    outline: none;
+    background: transparent;
+    width: 220px;
+}
+.inflow-trf-number-input:hover,
+.inflow-trf-number-input:focus {
+    border-color: #CBD5E1;
+    background: #F8FAFC;
+}
+.inflow-trf-number-text {
+    font-size: 20px;
+    font-weight: 800;
+    font-family: monospace;
+    color: #0F172A;
+}
+.inflow-trf-meta-col {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.inflow-trf-date-picker {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    padding: 4px 10px;
+    border-radius: 6px;
+}
+.inflow-trf-date-input {
+    border: none;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 600;
+    color: #0F172A;
+    outline: none;
+}
+.inflow-trf-date-text {
+    font-size: 13px;
+    font-weight: 600;
+    color: #0F172A;
+}
+
+/* Routing Selector Box */
+.inflow-trf-routing-box {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 16px;
+}
+.inflow-trf-route-cell {
+    flex: 1;
+}
+.inflow-trf-route-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #475569;
+    margin-bottom: 6px;
+}
+.inflow-trf-loc-select {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 600;
+    background: #FFFFFF;
+    color: #0F172A;
+    outline: none;
+}
+.inflow-trf-loc-select:focus {
+    border-color: #0D9488;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+}
+.inflow-trf-loc-static {
+    font-size: 14px;
+    padding: 8px 0;
+}
+.inflow-trf-route-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 50%;
+    margin-top: 14px;
+    flex-shrink: 0;
+}
+
+/* Notes Row */
+.inflow-trf-notes-row {
+    margin-bottom: 18px;
+}
+.inflow-trf-section-label {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: #64748B;
+    margin-bottom: 4px;
+}
+.inflow-trf-notes-text {
+    font-size: 13px;
+    color: #334155;
+    padding: 6px 0;
+    font-style: italic;
+}
+
+/* Table Toolbar */
+.inflow-trf-table-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    padding-top: 4px;
+}
+.inflow-trf-tb-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.inflow-trf-tb-label {
+    font-size: 12.5px;
+    font-weight: 700;
+    color: #0F172A;
+}
+.inflow-trf-tb-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Products Table */
+.inflow-trf-table-container {
+    border: 1px solid #E2E8F0;
+    border-radius: 6px;
+    overflow: visible;
+    background: #FFFFFF;
+}
+.inflow-trf-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.inflow-trf-table th {
+    background: #F8FAFC;
+    padding: 9px 12px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid #E2E8F0;
+}
+.inflow-trf-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid #F1F5F9;
+    vertical-align: middle;
+}
+.inflow-trf-row:hover {
+    background: #F8FAFC;
+}
+
+/* Product Info Cell */
+.inflow-trf-prod-cell {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.inflow-trf-prod-thumb {
+    width: 38px;
+    height: 38px;
+    border-radius: 6px;
+    border: 1px solid #E2E8F0;
+    overflow: hidden;
+    background: #F8FAFC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+.inflow-trf-prod-thumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+.inflow-thumb-placeholder {
+    font-size: 18px;
+}
+.inflow-trf-prod-info {
+    min-width: 0;
+}
+.inflow-trf-prod-name {
+    font-weight: 600;
+    color: #0F172A;
+    line-height: 1.3;
+    font-size: 13px;
+}
+.inflow-trf-prod-sku {
+    font-size: 11.5px;
+    font-family: monospace;
+    color: #64748B;
+}
+
+/* Quantity Input & Pills */
+.inflow-trf-qty-input {
+    width: 80px;
+    padding: 5px 8px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-align: center;
+    color: #0F172A;
+    background: #FFFFFF;
+    outline: none;
+}
+.inflow-trf-qty-input:focus {
+    border-color: #0D9488;
+    box-shadow: 0 0 0 2px rgba(13, 148, 136, 0.15);
+}
+.inflow-trf-qty-input.is-insufficient {
+    border-color: #EF4444;
+    background: #FEF2F2;
+    color: #B91C1C;
+}
+.inflow-trf-pill {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 5px;
+    font-weight: 700;
+    font-size: 13px;
+}
+.pill-transfer-qty {
+    background: #F0FDFA;
+    color: #0D9488;
+    border: 1px solid #99F6E4;
+}
+
+/* Availability Status Badges */
+.status-pill-avail {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #DCFCE7;
+    color: #15803D;
+    border: 1px solid #86EFAC;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.status-pill-insufficient {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #FEF2F2;
+    color: #DC2626;
+    border: 1px solid #FCA5A5;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 700;
+}
+.status-pill-zero {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #F1F5F9;
+    color: #64748B;
+    border: 1px solid #CBD5E1;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+}
+
+/* Delete Row Button */
+.inflow-trf-row-del-btn {
+    width: 26px;
+    height: 26px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: none;
+    background: transparent;
+    color: #94A3B8;
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.inflow-trf-row-del-btn:hover {
+    background: #FEE2E2;
+    color: #DC2626;
+}
+
+/* Bottom New Row Entry (Matching Image 1 & 2) */
+.inflow-trf-new-row {
+    background: #FAFAFA;
+    border-top: 1px solid #E2E8F0;
+    cursor: text;
+}
+.inflow-trf-new-row:hover {
+    background: #F1F5F9;
+}
+.inflow-trf-new-prod-cell {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 34px;
+}
+.inflow-trf-thumb-placeholder {
+    width: 32px;
+    height: 32px;
+    border-radius: 5px;
+    background: #F1F5F9;
+    border: 1px dashed #CBD5E1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94A3B8;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+/* Floating Dropdown Table Popup (Matching Image 2 Perfectly) */
+.inflow-item-dropdown-popup {
+    background: #FFFFFF;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    box-shadow: 0 10px 25px -5px rgba(0,0,0,0.2), 0 8px 10px -6px rgba(0,0,0,0.1);
+    max-height: 320px;
+    overflow-y: auto;
+    z-index: 100000;
+}
+.inflow-dropdown-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+}
+.inflow-dropdown-table thead th {
+    position: sticky;
+    top: 0;
+    background: #F8FAFC;
+    padding: 7px 10px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #475569;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #CBD5E1;
+    z-index: 2;
+}
+.inflow-dropdown-row {
+    cursor: pointer;
+    border-bottom: 1px solid #F1F5F9;
+    transition: background 0.1s ease;
+}
+.inflow-dropdown-row:hover,
+.inflow-dropdown-row.selected-keyboard {
+    background-color: #CCFBF1 !important; /* Mint-cyan highlight matching user screenshot */
+}
+.inflow-dropdown-row td {
+    padding: 6px 10px;
+    vertical-align: middle;
+}
+.inflow-dropdown-thumb {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    border: 1px solid #E2E8F0;
+    object-fit: cover;
+    background: #F8FAFC;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+/* Empty State Box */
+.inflow-trf-empty {
+    text-align: center;
+    padding: 36px 16px;
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 8px;
+    margin-top: 14px;
+}
+
+/* Bottom Action Footer Bar */
+.inflow-trf-bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+    padding-top: 16px;
+    border-top: 1px solid #F1F5F9;
+}
+.inflow-trf-footer-shortcuts {
+    font-size: 12px;
+    color: #64748B;
+}
+.inflow-trf-footer-shortcuts kbd {
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #334155;
+}
+.inflow-trf-footer-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Print Styles */
+@media print {
+    body * { visibility: hidden; }
+    .no-print { display: none !important; }
+    #printVoucherArea, #printVoucherArea * {
+        visibility: visible;
+    }
+    #printVoucherArea {
+        display: block !important;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        padding: 20px;
+        background: #FFFFFF;
+        color: #000000;
+    }
+}
+</style>
+
+<script>
+// ==========================================================================
+// Transfer Form State & Interactive Logic
+// ==========================================================================
+const IS_DETAIL = {{ 'true' if is_detail else 'false' }};
+const TRANSFER_ID = {{ transfer.id if transfer.id else 'null' }};
+
+let loadedTransferItems = new Map(); // pid -> item object
+let currentTrfSearchResults = [];
+let searchKeyboardIndex = -1;
+let isDirty = false;
+let isSubmitting = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. Preload lines if viewing existing draft or transfer
+    try {
+        const rawLines = {{ lines_json | safe }};
+        if (Array.isArray(rawLines) && rawLines.length > 0) {
+            rawLines.forEach(l => addTransferRowToTable(l));
+        }
+    } catch (e) {
+        console.warn("Could not preload transfer lines:", e);
+    }
+
+    updateTransferTotals();
+
+    // 2. Global F2 shortcut to jump to product search input
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            focusTrfSearchInput();
+        }
+    });
+
+    // 3. Close search dropdown on click outside
+    document.addEventListener('click', (e) => {
+        const popup = document.getElementById('trfLiveSearchResults');
+        const newRow = document.getElementById('trfNewRowEntry');
+        if (popup && popup.style.display !== 'none') {
+            if (!popup.contains(e.target) && (!newRow || !newRow.contains(e.target))) {
+                popup.style.display = 'none';
+            }
+        }
+    });
+
+    // 4. Reposition dropdown on resize
+    window.addEventListener('resize', () => {
+        const popup = document.getElementById('trfLiveSearchResults');
+        const inp = document.getElementById('trfProductLiveSearch');
+        if (popup && popup.style.display !== 'none' && inp) {
+            positionTrfDropdown(inp);
+        }
+    });
+});
+
+// Mark dirty
+function markTransferDirty() {
+    isDirty = true;
+    const dot = document.getElementById('topBtnSaveDraftDot');
+    if (dot) dot.style.display = 'inline-block';
+}
+
+function clearDirty() {
+    isDirty = false;
+    const dot = document.getElementById('topBtnSaveDraftDot');
+    if (dot) dot.style.display = 'none';
+}
+
+// History Sidebar Toggle
+function toggleTrfSidebar() {
+    const sb = document.getElementById('trfHistorySidebar');
+    if (!sb) return;
+    sb.classList.toggle('is-collapsed');
+    const txt = document.getElementById('sidebarToggleText');
+    if (txt) {
+        txt.innerText = sb.classList.contains('is-collapsed') ? 'Show History' : 'History';
+    }
+}
+
+// History Sidebar Search & Tabs
+function filterSidebarTransfers(query) {
+    const q = (query || '').toLowerCase().trim();
+    const cards = document.querySelectorAll('#sidebarTrfList .inflow-sidebar-card');
+    cards.forEach(c => {
+        const num = c.dataset.number || '';
+        const from = c.dataset.from || '';
+        const to = c.dataset.to || '';
+        const notes = c.dataset.notes || '';
+        const date = c.dataset.date || '';
+        const match = !q || num.includes(q) || from.includes(q) || to.includes(q) || notes.includes(q) || date.includes(q);
+        c.style.display = match ? 'block' : 'none';
+    });
+}
+
+function filterSidebarStatus(statusFilter, btn) {
+    document.querySelectorAll('.inflow-sidebar-tabs .inflow-sidebar-tab').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+
+    const cards = document.querySelectorAll('#sidebarTrfList .inflow-sidebar-card');
+    cards.forEach(c => {
+        const s = (c.dataset.status || '').toUpperCase();
+        if (statusFilter === 'ALL') {
+            c.style.display = 'block';
+        } else if (statusFilter === 'DRAFT') {
+            c.style.display = (s === 'DRAFT' || s === 'REQUESTED') ? 'block' : 'none';
+        } else if (statusFilter === 'COMPLETED') {
+            c.style.display = (s === 'COMPLETED') ? 'block' : 'none';
+        }
+    });
+}
+
+// Source Warehouse Changed -> reload live stock for all loaded items
+async function onSourceWarehouseChanged() {
+    markTransferDirty();
+    const fromLocId = document.getElementById('trfFromLocationSelect').value;
+    if (loadedTransferItems.size === 0) return;
+
+    try {
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${fromLocId}&all=true`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            const freshMap = new Map();
+            data.products.forEach(p => freshMap.set(p.id, p));
+
+            loadedTransferItems.forEach((item, pid) => {
+                const fresh = freshMap.get(pid);
+                if (fresh) {
+                    item.source_on_hand = fresh.on_hand_qty;
+                    item.source_reserved = fresh.reserved_qty;
+                    item.source_available = fresh.available_qty;
+                    updateRowVisuals(pid);
+                }
+            });
+            updateTransferTotals();
+        }
+    } catch (e) {
+        console.warn("Could not refresh warehouse inventory:", e);
+    }
+}
+
+// Focus live search input
+function focusTrfSearchInput() {
+    if (IS_DETAIL) return;
+    const inp = document.getElementById('trfProductLiveSearch');
+    if (inp) {
+        inp.focus();
+        inp.select();
+        inp.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+// ==========================================================================
+// Product Search & Floating Dropdown (Matching Image 2)
+// ==========================================================================
+let searchDebounceTimer = null;
+
+function onLiveTrfSearchInput(query) {
+    clearTimeout(searchDebounceTimer);
+    const q = (query || '').trim();
+    const popup = document.getElementById('trfLiveSearchResults');
+
+    if (!q) {
+        if (popup) popup.style.display = 'none';
+        return;
+    }
+
+    searchDebounceTimer = setTimeout(() => {
+        performLiveProductSearch(q);
+    }, 180);
+}
+
+async function performLiveProductSearch(query) {
+    const fromLocId = document.getElementById('trfFromLocationSelect')?.value || '';
+    const spinner = document.getElementById('trfSearchLoadingSpinner');
+    if (spinner) spinner.style.display = 'inline-block';
+
+    try {
+        const res = await fetch(`/api/inventory/products-for-adjustment?location_id=${fromLocId}&q=${encodeURIComponent(query)}`);
+        const data = await res.json();
+        if (data.success && data.products) {
+            renderTrfSearchResults(data.products);
+        } else {
+            renderTrfSearchResults([]);
+        }
+    } catch (e) {
+        console.warn("Product search error:", e);
+    } finally {
+        if (spinner) spinner.style.display = 'none';
+    }
+}
+
+function renderTrfSearchResults(products) {
+    const popup = document.getElementById('trfLiveSearchResults');
+    const searchInp = document.getElementById('trfProductLiveSearch');
+    if (!popup || !searchInp) return;
+
+    currentTrfSearchResults = products || [];
+    searchKeyboardIndex = -1;
+
+    if (currentTrfSearchResults.length === 0) {
+        popup.innerHTML = `
+            <div style="padding: 16px; text-align: center; color: #94A3B8; font-size: 12.5px;">
+                No matching products found in catalog.
+            </div>
+        `;
+        positionTrfDropdown(searchInp);
+        popup.style.display = 'block';
+        return;
+    }
+
+    let rowsHtml = '';
+    currentTrfSearchResults.forEach((p, idx) => {
+        const thumbHtml = p.image_url 
+            ? `<img src="${p.image_url}" alt="${p.sku}" class="inflow-dropdown-thumb">`
+            : `<div class="inflow-dropdown-thumb">📦</div>`;
+        const onHand = Number(p.on_hand_qty || 0).toLocaleString();
+        const reserved = Number(p.reserved_qty || 0).toLocaleString();
+        const available = Number(p.available_qty || 0).toLocaleString();
+
+        rowsHtml += `
+            <tr class="inflow-dropdown-row" data-index="${idx}" onclick="onPickProductFromSearchIndex(${idx})">
+                <td style="width: 44px; text-align: center;">${thumbHtml}</td>
+                <td style="width: 18%; color: #64748B; font-size: 11.5px;">${p.category_name || 'General'}</td>
+                <td>
+                    <div style="font-weight: 700; color: #0F172A;" class="font-khmer">${p.name}</div>
+                    <div style="font-family: monospace; font-size: 11px; color: #64748B;">${p.sku}</div>
+                </td>
+                <td style="width: 14%; text-align: right; font-weight: 600; color: #334155;">${onHand}</td>
+                <td style="width: 14%; text-align: right; color: #0284C7; font-weight: 600;">${reserved}</td>
+                <td style="width: 14%; text-align: right; font-weight: 700; color: #059669;">${available}</td>
+            </tr>
+        `;
+    });
+
+    popup.innerHTML = `
+        <table class="inflow-dropdown-table">
+            <thead>
+                <tr>
+                    <th style="width: 44px;">PHOTO</th>
+                    <th style="width: 18%;">CATEGORY</th>
+                    <th>ITEM</th>
+                    <th style="width: 14%; text-align: right;">ON HAND</th>
+                    <th style="width: 14%; text-align: right;">RESERVED</th>
+                    <th style="width: 14%; text-align: right;">AVAILABLE</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+    `;
+
+    positionTrfDropdown(searchInp);
+    popup.style.display = 'block';
+}
+
+function positionTrfDropdown(searchInp) {
+    const popup = document.getElementById('trfLiveSearchResults');
+    if (!popup || !searchInp) return;
+
+    const rect = searchInp.getBoundingClientRect();
+    const winHeight = window.innerHeight;
+    const spaceBelow = winHeight - rect.bottom;
+    const popupWidth = Math.max(rect.width + 260, 680);
+
+    popup.style.position = 'fixed';
+    popup.style.width = `${popupWidth}px`;
+    popup.style.left = `${Math.max(16, rect.left - 40)}px`;
+
+    if (spaceBelow < 280 && rect.top > 280) {
+        popup.style.top = 'auto';
+        popup.style.bottom = `${winHeight - rect.top + 4}px`;
+    } else {
+        popup.style.top = `${rect.bottom + 4}px`;
+        popup.style.bottom = 'auto';
+    }
+}
+
+// Keyboard navigation in search results (Arrow Up, Arrow Down, Enter, Escape)
+function onLiveTrfSearchKeyDown(e) {
+    const popup = document.getElementById('trfLiveSearchResults');
+    const isVisible = popup && popup.style.display !== 'none';
+
+    if (e.key === 'Escape') {
+        if (isVisible) {
+            e.preventDefault();
+            popup.style.display = 'none';
+        }
+        return;
+    }
+
+    if (!isVisible) return;
+
+    const rows = popup.querySelectorAll('.inflow-dropdown-row');
+    if (rows.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        searchKeyboardIndex = (searchKeyboardIndex + 1) % rows.length;
+        highlightKeyboardSelection(rows);
+    } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        searchKeyboardIndex = (searchKeyboardIndex - 1 + rows.length) % rows.length;
+        highlightKeyboardSelection(rows);
+    } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (searchKeyboardIndex >= 0 && searchKeyboardIndex < currentTrfSearchResults.length) {
+            onPickProductFromSearchIndex(searchKeyboardIndex);
+        } else if (currentTrfSearchResults.length > 0) {
+            onPickProductFromSearchIndex(0);
+        }
+    }
+}
+
+function highlightKeyboardSelection(rows) {
+    rows.forEach((r, idx) => {
+        if (idx === searchKeyboardIndex) {
+            r.classList.add('selected-keyboard');
+            r.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            r.classList.remove('selected-keyboard');
+        }
+    });
+}
+
+// When a product is selected from search dropdown
+function onPickProductFromSearchIndex(idx) {
+    const product = currentTrfSearchResults[idx];
+    if (!product) return;
+
+    const popup = document.getElementById('trfLiveSearchResults');
+    if (popup) popup.style.display = 'none';
+
+    const searchInp = document.getElementById('trfProductLiveSearch');
+    if (searchInp) {
+        searchInp.value = '';
+    }
+
+    addTransferRowToTable(product);
+    markTransferDirty();
+
+    // Focus transfer quantity input on the newly added row
+    setTimeout(() => {
+        const qtyInp = document.getElementById(`trf_qty_${product.id || product.product_id}`);
+        if (qtyInp) {
+            qtyInp.focus();
+            qtyInp.select();
+        }
+    }, 40);
+}
+
+// ==========================================================================
+// Table Row Management
+// ==========================================================================
+function addTransferRowToTable(product) {
+    const pid = product.id || product.product_id;
+    if (loadedTransferItems.has(pid)) {
+        // If already added, highlight existing row
+        const existingRow = document.getElementById(`trf_row_${pid}`);
+        if (existingRow) {
+            existingRow.style.backgroundColor = '#FEF3C7';
+            setTimeout(() => { existingRow.style.backgroundColor = ''; }, 600);
+            const qtyInp = document.getElementById(`trf_qty_${pid}`);
+            if (qtyInp) {
+                qtyInp.focus();
+                qtyInp.select();
+            }
+        }
+        return;
+    }
+
+    const factor = parseFloat(product.uom_factor || 1.0) || 1.0;
+    const baseUom = product.base_uom || product.product_uom || product.uom || 'pcs.';
+    const chosenUom = product.uom || baseUom;
+    const onHand = parseFloat(product.source_on_hand !== undefined ? product.source_on_hand : (product.on_hand_qty || 0));
+    const reserved = parseFloat(product.source_reserved !== undefined ? product.source_reserved : (product.reserved_qty || 0));
+    const available = parseFloat(product.source_available !== undefined ? product.source_available : (product.available_qty || (onHand - reserved)));
+    const transferQty = parseFloat(product.quantity || 1);
+
+    const item = {
+        product_id: pid,
+        name: product.name || product.product_name,
+        sku: product.sku || product.product_sku,
+        image_url: product.image_url || product.product_image_url || '',
+        category_name: product.category_name || '',
+        base_uom: baseUom,
+        uom: chosenUom,
+        uom_factor: factor,
+        sales_uom: product.sales_uom || '',
+        sales_uom_ratio: parseFloat(product.sales_uom_ratio || product.sales_uom_ratio_std || 1.0) || 1.0,
+        purchasing_uom: product.purchasing_uom || '',
+        purchasing_uom_ratio: parseFloat(product.purchasing_uom_ratio || product.purchasing_uom_ratio_std || 1.0) || 1.0,
+        source_on_hand: onHand,
+        source_reserved: reserved,
+        source_available: available,
+        transfer_qty: transferQty
+    };
+
+    loadedTransferItems.set(pid, item);
+
+    // Hide empty state
+    const emptyState = document.getElementById('trfEmptyState');
+    if (emptyState) emptyState.style.display = 'none';
+
+    const tbody = document.getElementById('trfProductTableBody');
+    const tr = document.createElement('tr');
+    tr.id = `trf_row_${pid}`;
+    tr.className = 'inflow-trf-row';
+    tr.dataset.productId = pid;
+
+    const imgHtml = item.image_url
+        ? `<img src="${item.image_url}" alt="${item.sku}">`
+        : `<div class="inflow-thumb-placeholder">📦</div>`;
+
+    tr.innerHTML = `
+        <!-- Product -->
+        <td>
+            <div class="inflow-trf-prod-cell">
+                <div class="inflow-trf-prod-thumb">
+                    ${imgHtml}
+                </div>
+                <div class="inflow-trf-prod-info">
+                    <div class="inflow-trf-prod-name font-khmer">${item.name}</div>
+                    <div class="inflow-trf-prod-sku">${item.sku}</div>
+                </div>
+            </div>
+        </td>
+
+        <!-- UOM -->
+        <td style="text-align: center;">
+            <select id="uom_select_${pid}" class="inflow-field-input" onchange="onRowUomChanged(${pid}, this.value)" style="padding: 3px 6px; font-size: 12px; height: 30px; font-weight: 600;">
+                ${getTrfUomOptionsHtml(item)}
+            </select>
+        </td>
+
+        <!-- Source On Hand -->
+        <td style="text-align: right; font-weight: 600; color: #334155;" id="on_hand_${pid}">
+            ${formatNum(item.source_on_hand)}
+        </td>
+
+        <!-- Source Reserved -->
+        <td style="text-align: right; color: #0284C7; font-weight: 600;" id="reserved_${pid}">
+            ${formatNum(item.source_reserved)}
+        </td>
+
+        <!-- Source Available -->
+        <td style="text-align: right; font-weight: 700; color: #059669;" id="available_${pid}">
+            ${formatNum(item.source_available)}
+        </td>
+
+        <!-- Transfer Qty -->
+        <td style="text-align: center;">
+            <input type="text" inputmode="decimal" id="trf_qty_${pid}"
+                   class="inflow-trf-qty-input"
+                   value="${item.transfer_qty}"
+                   oninput="onTransferQtyInput(${pid}, this.value)"
+                   onfocus="this.select()"
+                   onkeydown="onQtyKeyDown(event, ${pid})">
+        </td>
+
+        <!-- Availability Status -->
+        <td style="text-align: center;" id="status_cell_${pid}">
+            ${getAvailabilityStatusHtml(item.transfer_qty * item.uom_factor, item.source_available)}
+        </td>
+
+        <!-- Action -->
+        <td style="text-align: center;">
+            <button type="button" class="inflow-trf-row-del-btn" onclick="removeTransferRow(${pid})" title="Remove product">
+                ✕
+            </button>
+        </td>
+    `;
+
+    const newRow = document.getElementById('trfNewRowEntry');
+    if (newRow && newRow.parentNode === tbody) {
+        tbody.insertBefore(tr, newRow);
+    } else {
+        tbody.appendChild(tr);
+    }
+
+    updateRowVisuals(pid);
+    updateTransferTotals();
+}
+
+// UOM options
+function getTrfUomOptionsHtml(item) {
+    let opts = [];
+    opts.push({ name: item.base_uom, factor: 1.0, label: `${item.base_uom} (1x)` });
+    if (item.sales_uom && item.sales_uom.trim().toLowerCase() !== item.base_uom.trim().toLowerCase()) {
+        opts.push({ name: item.sales_uom, factor: item.sales_uom_ratio, label: `${item.sales_uom} (${item.sales_uom_ratio}x)` });
+    }
+    if (item.purchasing_uom && item.purchasing_uom.trim().toLowerCase() !== item.base_uom.trim().toLowerCase() &&
+        (!item.sales_uom || item.purchasing_uom.trim().toLowerCase() !== item.sales_uom.trim().toLowerCase())) {
+        opts.push({ name: item.purchasing_uom, factor: item.purchasing_uom_ratio, label: `${item.purchasing_uom} (${item.purchasing_uom_ratio}x)` });
+    }
+    const existing = opts.find(o => o.name.toLowerCase() === (item.uom || '').toLowerCase());
+    if (!existing && item.uom && item.uom !== item.base_uom) {
+        opts.push({ name: item.uom, factor: item.uom_factor || 1.0, label: `${item.uom} (${item.uom_factor || 1.0}x)` });
+    }
+    return opts.map(o => {
+        const isSel = (item.uom && item.uom.trim().toLowerCase() === o.name.trim().toLowerCase());
+        return `<option value="${o.name}" data-factor="${o.factor}" ${isSel ? 'selected' : ''}>${o.label}</option>`;
+    }).join('');
+}
+
+function onRowUomChanged(pid, newUom) {
+    const item = loadedTransferItems.get(pid);
+    if (!item) return;
+    const select = document.getElementById(`uom_select_${pid}`);
+    if (!select) return;
+    const opt = select.options[select.selectedIndex];
+    item.uom = newUom;
+    item.uom_factor = parseFloat(opt.dataset.factor || 1.0) || 1.0;
+    updateRowVisuals(pid);
+    markTransferDirty();
+}
+
+// Transfer quantity input handler
+function onTransferQtyInput(pid, val) {
+    const item = loadedTransferItems.get(pid);
+    if (!item) return;
+
+    const num = parseFloat(String(val).replace(/,/g, '').trim()) || 0;
+    item.transfer_qty = num;
+    updateRowVisuals(pid);
+    updateTransferTotals();
+    markTransferDirty();
+}
+
+// Update row visuals (Availability status badge & inputs)
+function updateRowVisuals(pid) {
+    const item = loadedTransferItems.get(pid);
+    if (!item) return;
+
+    const factor = item.uom_factor || 1.0;
+    const requiredBaseQty = item.transfer_qty * factor;
+    const available = item.source_available;
+
+    const qtyInp = document.getElementById(`trf_qty_${pid}`);
+    const statusCell = document.getElementById(`status_cell_${pid}`);
+
+    if (statusCell) {
+        statusCell.innerHTML = getAvailabilityStatusHtml(requiredBaseQty, available);
+    }
+
+    if (qtyInp) {
+        if (requiredBaseQty > available && available >= 0) {
+            qtyInp.classList.add('is-insufficient');
+        } else {
+            qtyInp.classList.remove('is-insufficient');
+        }
+    }
+}
+
+// Availability status badge rendering
+function getAvailabilityStatusHtml(requiredQty, availableQty) {
+    if (requiredQty <= 0) {
+        return `<span class="status-pill-zero">Enter Qty</span>`;
+    }
+    if (availableQty <= 0) {
+        return `<span class="status-pill-insufficient">⚠ Out of Stock in Source</span>`;
+    }
+    if (requiredQty <= availableQty) {
+        return `<span class="status-pill-avail">✓ Available to Transfer</span>`;
+    }
+    const shortBy = requiredQty - availableQty;
+    return `<span class="status-pill-insufficient" title="Required: ${requiredQty:g}, Available: ${availableQty:g}">⚠ Short by ${Number(shortBy.toFixed(2))}</span>`;
+}
+
+// Remove row
+function removeTransferRow(pid) {
+    loadedTransferItems.delete(pid);
+    const row = document.getElementById(`trf_row_${pid}`);
+    if (row) row.remove();
+    updateTransferTotals();
+    markTransferDirty();
+}
+
+// Clear all rows
+function clearAllTransferRows() {
+    if (loadedTransferItems.size === 0) return;
+    if (confirm("Clear all products from this stock transfer?")) {
+        loadedTransferItems.clear();
+        document.querySelectorAll('#trfProductTableBody tr.inflow-trf-row').forEach(r => r.remove());
+        const emptyState = document.getElementById('trfEmptyState');
+        if (emptyState) emptyState.style.display = 'block';
+        updateTransferTotals();
+        markTransferDirty();
+    }
+}
+
+// Filter rows
+function filterTransferTableRows(query) {
+    const q = (query || '').toLowerCase().trim();
+    document.querySelectorAll('#trfProductTableBody tr.inflow-trf-row').forEach(r => {
+        const text = r.innerText.toLowerCase();
+        r.style.display = (!q || text.includes(q)) ? '' : 'none';
+    });
+}
+
+// Totals update
+function updateTransferTotals() {
+    let totalItems = loadedTransferItems.size;
+    let totalUnits = 0;
+    loadedTransferItems.forEach(item => {
+        totalUnits += (item.transfer_qty * (item.uom_factor || 1.0));
+    });
+
+    const countBadge = document.getElementById('trfItemCountBadge');
+    if (countBadge) countBadge.innerText = `${totalItems} ${totalItems === 1 ? 'item' : 'items'}`;
+
+    const unitsBadge = document.getElementById('trfTotalUnitsBadge');
+    if (unitsBadge) unitsBadge.innerText = `${formatNum(totalUnits)} units`;
+}
+
+function onQtyKeyDown(e, pid) {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        const rows = Array.from(document.querySelectorAll('.inflow-trf-row'));
+        const idx = rows.findIndex(r => r.dataset.productId == pid);
+        if (idx >= 0 && idx < rows.length - 1) {
+            const nextPid = rows[idx + 1].dataset.productId;
+            const nextInp = document.getElementById(`trf_qty_${nextPid}`);
+            if (nextInp) {
+                nextInp.focus();
+                nextInp.select();
+            }
+        } else {
+            focusTrfSearchInput();
+        }
+    }
+}
+
+// ==========================================================================
+// Submit & Save Handler (DRAFT or COMPLETED)
+// ==========================================================================
+async function saveTransfer(targetStatus) {
+    if (isSubmitting) return;
+
+    if (loadedTransferItems.size === 0) {
+        alert("Please add at least one product to transfer.");
+        focusTrfSearchInput();
+        return;
+    }
+
+    const fromLocId = parseInt(document.getElementById('trfFromLocationSelect').value);
+    const toLocId = parseInt(document.getElementById('trfToLocationSelect').value);
+
+    if (fromLocId === toLocId) {
+        alert("Source and Destination warehouses cannot be the same.");
+        return;
+    }
+
+    const lines = [];
+    let hasInsufficient = false;
+    let hasInvalidQty = false;
+
+    loadedTransferItems.forEach(item => {
+        const qty = parseFloat(item.transfer_qty) || 0;
+        if (qty <= 0) hasInvalidQty = true;
+
+        const baseQty = qty * (item.uom_factor || 1.0);
+        if (baseQty > item.source_available) {
+            hasInsufficient = true;
+        }
+
+        lines.push({
+            product_id: item.product_id,
+            quantity: qty,
+            uom: item.uom || item.base_uom || 'pcs.',
+            uom_factor: item.uom_factor || 1.0,
+            source_on_hand: item.source_on_hand,
+            source_available: item.source_available
+        });
+    });
+
+    if (hasInvalidQty) {
+        alert("Please ensure all transfer quantities are greater than 0.");
+        return;
+    }
+
+    // Validation if user clicks Complete Transfer
+    if (targetStatus === 'COMPLETED' && hasInsufficient) {
+        const proceed = confirm("Warning: One or more products have insufficient available stock in the source warehouse. Completing this transfer now may cause negative inventory. Proceed anyway?");
+        if (!proceed) return;
+    }
+
+    const payload = {
+        transfer_id: TRANSFER_ID,
+        transfer_number: (document.getElementById('trfNumberInput')?.value || '').trim(),
+        from_location_id: fromLocId,
+        to_location_id: toLocId,
+        transfer_date: document.getElementById('trfDateInput')?.value || '',
+        notes: (document.getElementById('trfNotesInput')?.value || '').trim(),
+        status: targetStatus,
+        lines: lines
+    };
+
+    setButtonsSubmitting(true);
+
+    try {
+        const res = await fetch('/inventory/transfers/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.success) {
+            clearDirty();
+            showToast(result.message);
+            setTimeout(() => {
+                window.location.href = `/inventory/transfers/${result.transfer_id}`;
+            }, 500);
+        } else {
+            alert(result.message || "Failed to save stock transfer.");
+            setButtonsSubmitting(false);
+        }
+    } catch (e) {
+        alert("Network error: " + e);
+        setButtonsSubmitting(false);
+    }
+}
+
+function setButtonsSubmitting(submitting) {
+    isSubmitting = submitting;
+    ['topBtnSaveDraft', 'topBtnCompleteTransfer', 'bottomBtnSaveDraft', 'bottomBtnCompleteTransfer'].forEach(id => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = submitting;
+    });
+}
+
+// Close Page & Unsaved Changes Check
+function onCloseTransferPage(e) {
+    if (isDirty) {
+        if (!confirm("You have unsaved transfer changes. Discard changes and leave?")) {
+            if (e) e.preventDefault();
+            return false;
+        }
+    }
+    return true;
+}
+
+// Tab Close Attempt handler for host shell tabs
+window.handleTabCloseAttempt = function(action, tabId) {
+    if (isDirty && loadedTransferItems.size > 0) {
+        const choice = confirm("You have unsaved transfer changes. Click OK to discard and close tab, or Cancel to keep editing.");
+        return choice;
+    }
+    return true;
+};
+
+// ==========================================================================
+// Print & Copy Actions
+// ==========================================================================
+function printTransferSheet() {
+    const printTable = document.getElementById('printTrfTableBody');
+    if (!printTable) return;
+    printTable.innerHTML = '';
+
+    const fromLocSelect = document.getElementById('trfFromLocationSelect');
+    const toLocSelect = document.getElementById('trfToLocationSelect');
+    if (fromLocSelect) document.getElementById('printFromLoc').innerText = fromLocSelect.options[fromLocSelect.selectedIndex].text;
+    if (toLocSelect) document.getElementById('printToLoc').innerText = toLocSelect.options[toLocSelect.selectedIndex].text;
+    document.getElementById('printTrfNumber').innerText = document.getElementById('trfNumberInput')?.value || '';
+    document.getElementById('printTrfDate').innerText = document.getElementById('trfDateInput')?.value || '';
+
+    loadedTransferItems.forEach(item => {
+        const tr = document.createElement('tr');
+        tr.style.borderBottom = '1px solid #E2E8F0';
+        tr.innerHTML = `
+            <td style="padding: 6px;">${item.name}</td>
+            <td style="padding: 6px; font-family: monospace;">${item.sku}</td>
+            <td style="padding: 6px; text-align: center;">${item.uom}</td>
+            <td style="padding: 6px; text-align: right; font-weight: 700;">${formatNum(item.transfer_qty)}</td>
+        `;
+        printTable.appendChild(tr);
+    });
+
+    window.print();
+}
+
+function copyTransferData() {
+    let rows = [['SKU', 'Product Name', 'UOM', 'Transfer Qty', 'Source Available'].join('\t')];
+    loadedTransferItems.forEach(item => {
+        rows.push([
+            item.sku,
+            item.name,
+            item.uom,
+            item.transfer_qty,
+            item.source_available
+        ].join('\t'));
+    });
+    const tsv = rows.join('\n');
+    navigator.clipboard.writeText(tsv).then(() => {
+        showToast("Transfer table copied to clipboard! (Ready to paste in Excel/Sheets)");
+    }).catch(() => {
+        prompt("Copy transfer table:", tsv);
+    });
+}
+
+function formatNum(n) {
+    if (n === undefined || n === null || isNaN(n)) return '0';
+    return Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+function showToast(msg) {
+    const div = document.createElement('div');
+    div.style.cssText = "position: fixed; bottom: 24px; right: 24px; background: #0F172A; color: #FFFFFF; padding: 10px 18px; border-radius: 6px; font-size: 13px; font-weight: 600; box-shadow: 0 4px 12px rgba(0,0,0,0.25); z-index: 100000; transition: opacity 0.3s ease;";
+    div.innerText = msg;
+    document.body.appendChild(div);
+    setTimeout(() => {
+        div.style.opacity = '0';
+        setTimeout(() => div.remove(), 350);
+    }, 2800);
+}
+</script>
+{% endblock %}
