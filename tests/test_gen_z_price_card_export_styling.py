@@ -1,5 +1,7 @@
 import os
 import unittest
+from app import create_app
+from database import get_db_cursor
 
 class TestGenZPriceCardExportStyling(unittest.TestCase):
     def test_gen_z_price_list_html_styling(self):
@@ -56,25 +58,23 @@ class TestGenZPriceCardExportStyling(unittest.TestCase):
         self.assertIn('#cardContentGenZDetail', detail_content)
 
     def test_database_catalog_protection_and_zero_test_sos(self):
-        from app import create_app
-        from extensions import db
-        from models import Product, SalesOrder
-
         app = create_app()
         with app.app_context():
-            # Check products exist and are intact (RULE 1)
-            product_count = Product.query.count()
-            self.assertGreater(product_count, 0, "Product catalog must remain intact")
+            with get_db_cursor() as cursor:
+                # 1. Product Catalog Protection (Rule 1)
+                cursor.execute("SELECT COUNT(*) AS cnt FROM products WHERE is_active = TRUE;")
+                prod_row = cursor.fetchone()
+                self.assertGreater(prod_row['cnt'], 0, "Active products must exist in database")
 
-            # Check for lingering test orders
-            test_sos = SalesOrder.query.filter(
-                db.or_(
-                    SalesOrder.order_number.ilike('%test%'),
-                    SalesOrder.order_number.ilike('%temp%'),
-                    SalesOrder.remarks.ilike('%test%')
-                )
-            ).all()
-            self.assertEqual(len(test_sos), 0, f"Found lingering test sales orders: {[so.order_number for so in test_sos]}")
+                # 2. Check for lingering test orders
+                cursor.execute("""
+                    SELECT order_number, remarks FROM sales_orders 
+                    WHERE order_number ILIKE '%test%' 
+                       OR order_number ILIKE '%temp%' 
+                       OR remarks ILIKE '%test%';
+                """)
+                test_sos = cursor.fetchall()
+                self.assertEqual(len(test_sos), 0, f"Found lingering test sales orders: {[r['order_number'] for r in test_sos]}")
 
 if __name__ == '__main__':
     unittest.main()
