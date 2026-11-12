@@ -41,10 +41,20 @@ class TestPriceCardSquareAspectRatioAndMargins(unittest.TestCase):
         self.assertRegex(css, r'\.inflow-modern-price-wrap\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
         self.assertRegex(css, r'\.inflow-modern-price-wrap\s*\{[^}]*height:\s*calc\(50%\s*-\s*25px\)\s*!important;')
 
+        # .inflow-modern-price-banner: expanded to 46px to prevent losing/clipping subtitle text (Price) and (UNIT PRICE)
+        self.assertRegex(css, r'\.inflow-modern-price-banner\s*\{[^}]*height:\s*46px\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-price-banner\s*\{[^}]*min-height:\s*46px\s*!important;')
+
         # .inflow-modern-price-table-card & tier rows: fill bottom 50% with equal 33.333% distribution
         self.assertRegex(css, r'\.inflow-modern-price-table-card\s*\{[^}]*flex:\s*1\s+1\s+auto\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-price-table-card\s*\{[^}]*height:\s*calc\(100%\s*-\s*46px\)\s*!important;')
         self.assertRegex(css, r'\.inflow-modern-tier-row\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
         self.assertRegex(css, r'\.inflow-modern-tier-row\s*\{[^}]*height:\s*33\.333%\s*!important;')
+
+        # Enlarged typography to fit tall rows
+        self.assertRegex(css, r'\.inflow-modern-qty-badge\s*\{[^}]*font-size:\s*16px\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-tier-tot\s*\{[^}]*font-size:\s*22px\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-tier-unit\s*\{[^}]*font-size:\s*16\.5px\s*!important;')
 
     def test_price_list_html_modern_card_50_50_height_split(self):
         with open(self.price_list_html, 'r', encoding='utf-8') as f:
@@ -61,14 +71,40 @@ class TestPriceCardSquareAspectRatioAndMargins(unittest.TestCase):
         self.assertRegex(pl, r'\.pl-modern-price-wrap\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
         self.assertRegex(pl, r'\.pl-modern-price-wrap\s*\{[^}]*height:\s*calc\(50%\s*-\s*25px\)\s*!important;')
 
+        # .pl-modern-price-banner: expanded to 46px to avoid clipping text
+        self.assertRegex(pl, r'\.pl-modern-price-banner\s*\{[^}]*height:\s*46px\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-price-banner\s*\{[^}]*min-height:\s*46px\s*!important;')
+
         # .pl-modern-price-table-card & tier rows: fill bottom 50%
         self.assertRegex(pl, r'\.pl-modern-price-table-card\s*\{[^}]*flex:\s*1\s+1\s+auto\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-price-table-card\s*\{[^}]*height:\s*calc\(100%\s*-\s*46px\)\s*!important;')
         self.assertRegex(pl, r'\.pl-modern-tier-row\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
         self.assertRegex(pl, r'\.pl-modern-tier-row\s*\{[^}]*height:\s*33\.333%\s*!important;')
+
+        # Enlarged typography
+        self.assertRegex(pl, r'\.pl-modern-qty-badge\s*\{[^}]*font-size:\s*16px\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-tier-tot\s*\{[^}]*font-size:\s*22px\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-tier-unit\s*\{[^}]*font-size:\s*16\.5px\s*!important;')
 
         # Stage enforces 680x680 square
         self.assertIn('id="plBatchExportStage" style="width: 680px; height: 680px;', pl)
         self.assertIn("cardEl.style.height = '680px';", pl)
+
+    def test_detail_and_catalog_html_modern_price_cards(self):
+        """Verify embedded styles in detail.html and catalog.html ensure square 1:1 and no squashed view."""
+        with open(self.detail_html, 'r', encoding='utf-8') as f:
+            det = f.read()
+        self.assertRegex(det, r'#printablePriceCardDetail\.modern\s*\{[^}]*aspect-ratio:\s*1\s*/\s*1\s*!important;')
+        self.assertRegex(det, r'#printablePriceCardDetail\.modern\s*\{[^}]*display:\s*flex\s*!important;')
+        self.assertRegex(det, r'\.inflow-modern-price-banner\s*\{[^}]*height:\s*46px\s*!important;')
+        self.assertRegex(det, r'\.inflow-modern-tier-tot\s*\{[^}]*font-size:\s*22px\s*!important;')
+
+        with open(self.catalog_html, 'r', encoding='utf-8') as f:
+            cat = f.read()
+        self.assertRegex(cat, r'#printablePriceCard\.modern\s*\{[^}]*aspect-ratio:\s*1\s*/\s*1\s*!important;')
+        self.assertRegex(cat, r'#printablePriceCard\.modern\s*\{[^}]*display:\s*flex\s*!important;')
+        self.assertRegex(cat, r'\.inflow-modern-price-banner\s*\{[^}]*height:\s*46px\s*!important;')
+        self.assertRegex(cat, r'\.inflow-modern-tier-tot\s*\{[^}]*font-size:\s*22px\s*!important;')
 
     def test_export_canvas_margin_halved_by_50_percent(self):
         # catalog.html
