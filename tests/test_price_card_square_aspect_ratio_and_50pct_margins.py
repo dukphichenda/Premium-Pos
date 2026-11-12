@@ -33,18 +33,42 @@ class TestPriceCardSquareAspectRatioAndMargins(unittest.TestCase):
         self.assertRegex(css, r'\.inflow-spec-card\.modern\s*\{[^}]*aspect-ratio:\s*1\s*/\s*1\s*!important;')
         self.assertRegex(css, r'\.inflow-spec-card\.modern\s*\{[^}]*padding:\s*8px\s+10px\s*!important;')
 
-        # .inflow-modern-middle-grid margins & gaps halved by 50% (from 12px to 6px)
-        self.assertRegex(css, r'\.inflow-modern-middle-grid\s*\{[^}]*gap:\s*6px\s*!important;')
-        self.assertRegex(css, r'\.inflow-modern-middle-grid\s*\{[^}]*margin-top:\s*6px\s*!important;')
+        # .inflow-modern-middle-grid: 50% height split for picture with description
+        self.assertRegex(css, r'\.inflow-modern-middle-grid\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-middle-grid\s*\{[^}]*height:\s*calc\(50%\s*-\s*25px\)\s*!important;')
 
-        # .inflow-modern-price-wrap margin halved by 50% (from 12px to 6px)
-        self.assertRegex(css, r'\.inflow-modern-price-wrap\s*\{[^}]*margin-top:\s*6px\s*!important;')
+        # .inflow-modern-price-wrap: 50% height split for table below
+        self.assertRegex(css, r'\.inflow-modern-price-wrap\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-price-wrap\s*\{[^}]*height:\s*calc\(50%\s*-\s*25px\)\s*!important;')
 
-        # .inflow-modern-specs-box padding halved by 50%
-        self.assertRegex(css, r'\.inflow-modern-specs-box\s*\{[^}]*padding:\s*6px\s+10px\s*!important;')
+        # .inflow-modern-price-table-card & tier rows: fill bottom 50% with equal 33.333% distribution
+        self.assertRegex(css, r'\.inflow-modern-price-table-card\s*\{[^}]*flex:\s*1\s+1\s+auto\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-tier-row\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
+        self.assertRegex(css, r'\.inflow-modern-tier-row\s*\{[^}]*height:\s*33\.333%\s*!important;')
 
-        # .inflow-modern-header padding halved by 50%
-        self.assertRegex(css, r'\.inflow-modern-header\s*\{[^}]*padding:\s*6px\s+12px\s*!important;')
+    def test_price_list_html_modern_card_50_50_height_split(self):
+        with open(self.price_list_html, 'r', encoding='utf-8') as f:
+            pl = f.read()
+
+        # .pl-price-card.modern aspect ratio 1:1 square
+        self.assertRegex(pl, r'\.pl-price-card\.modern\s*\{[^}]*aspect-ratio:\s*1\s*/\s*1\s*!important;')
+
+        # .pl-modern-middle-grid: 50% height for picture with description
+        self.assertRegex(pl, r'\.pl-modern-middle-grid\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-middle-grid\s*\{[^}]*height:\s*calc\(50%\s*-\s*25px\)\s*!important;')
+
+        # .pl-modern-price-wrap: 50% height for table below
+        self.assertRegex(pl, r'\.pl-modern-price-wrap\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-price-wrap\s*\{[^}]*height:\s*calc\(50%\s*-\s*25px\)\s*!important;')
+
+        # .pl-modern-price-table-card & tier rows: fill bottom 50%
+        self.assertRegex(pl, r'\.pl-modern-price-table-card\s*\{[^}]*flex:\s*1\s+1\s+auto\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-tier-row\s*\{[^}]*flex:\s*1\s+1\s+0\s*!important;')
+        self.assertRegex(pl, r'\.pl-modern-tier-row\s*\{[^}]*height:\s*33\.333%\s*!important;')
+
+        # Stage enforces 680x680 square
+        self.assertIn('id="plBatchExportStage" style="width: 680px; height: 680px;', pl)
+        self.assertIn("cardEl.style.height = '680px';", pl)
 
     def test_export_canvas_margin_halved_by_50_percent(self):
         # catalog.html

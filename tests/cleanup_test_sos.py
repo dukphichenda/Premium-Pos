@@ -17,3 +17,4 @@ with get_db_cursor(commit=True) as cur:
         cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = ANY(%s)", (ids,))
         cur.execute("DELETE FROM sales_orders WHERE id = ANY(%s)", (ids,))
         print("Cleanup done!")
+
