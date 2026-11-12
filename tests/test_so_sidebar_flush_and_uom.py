@@ -1,5 +1,6 @@
 import unittest
 from app import create_app
+from database import query_one
 
 class TestSoSidebarFlushAndUom(unittest.TestCase):
     def setUp(self):
