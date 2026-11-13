@@ -135,5 +135,36 @@ class TestPriceList(unittest.TestCase):
         # Empty state prompt row present
         self.assertIn('No Products Selected Yet', html)
 
+    def test_price_list_table_pdf_export_features(self):
+        """Verify Table PDF export excludes category column, has enlarged picture container, and supports All/Category/Selected scopes."""
+        resp = self.client.get('/products/price-list')
+        self.assertEqual(resp.status_code, 200)
+        html = resp.data.decode('utf-8')
+
+        # Dropdown for PDF export in header & table view
+        self.assertIn('id="plExportPdfDropdownMenu"', html)
+        self.assertIn('id="plExportPdfDropdownMenuTable"', html)
+        self.assertIn("handleExportPdfScope('all'", html)
+        self.assertIn("handleExportPdfScope('category'", html)
+        self.assertIn("handleExportPdfScope('selected'", html)
+
+        # PDF Category Modal exists
+        self.assertIn('id="plPdfCategoryModal"', html)
+        self.assertIn('id="plPdfCategorySelect"', html)
+        self.assertIn('confirmPdfCategoryExport()', html)
+
+        # In Table View PDF export: No Category column in table header or rows
+        pdf_table_idx = html.find("currentViewMode === 'table'")
+        cards_branch_idx = html.find("Branch for Cards View PDF export")
+        pdf_table_export_code = html[pdf_table_idx:cards_branch_idx]
+        self.assertNotIn('>Category<', pdf_table_export_code)
+
+        # Product picture container is 72px x 72px reaching table height
+        self.assertIn('width: 72px; height: 72px;', pdf_table_export_code)
+        self.assertIn('object-fit: contain', pdf_table_export_code)
+
+        # 9 rows per page
+        self.assertIn('ROWS_PER_PAGE = 9', pdf_table_export_code)
+
 if __name__ == '__main__':
     unittest.main()
