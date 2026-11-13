@@ -159,6 +159,28 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         self.assertIn('<option value="brown">☕ Brown Look</option>', html)
         self.assertIn('.cat-card.brown', html)
 
+    def test_styles_css_contains_full_brown_look_rules(self):
+        """Verify static/css/styles.css contains complete styling definitions for Brown Look elements."""
+        with open('static/css/styles.css', 'r', encoding='utf-8') as f:
+            css = f.read()
+
+        self.assertIn('.inflow-spec-card.brown', css)
+        self.assertIn('#printablePriceCard.brown', css)
+        self.assertIn('#printablePriceCardDetail.brown', css)
+        self.assertIn('.inflow-brown-header', css)
+        self.assertIn('.inflow-brown-middle-grid', css)
+        self.assertIn('.inflow-brown-photo-wrap', css)
+        self.assertIn('.inflow-brown-specs-card', css)
+        self.assertIn('.inflow-brown-price-wrap', css)
+        self.assertIn('.inflow-brown-tier-row', css)
+        self.assertIn('.inflow-brown-qty-capsule', css)
+        self.assertIn('.inflow-brown-tot-capsule', css)
+        self.assertIn('.inflow-brown-uprice-capsule', css)
+        self.assertIn('.inflow-brown-best-choice', css)
+        self.assertIn('.inflow-brown-deco-wheat-tr', css)
+        self.assertIn('.inflow-brown-deco-rosemary', css)
+        self.assertIn('.inflow-brown-deco-whisk', css)
+
     def test_zero_test_sales_orders_and_rule1_compliance(self):
         """Verify zero test sales orders exist and database integrity is maintained."""
         with get_db_cursor(commit=False) as cursor:
