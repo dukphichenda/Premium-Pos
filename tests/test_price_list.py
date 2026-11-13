@@ -136,7 +136,7 @@ class TestPriceList(unittest.TestCase):
         self.assertIn('No Products Selected Yet', html)
 
     def test_price_list_table_pdf_export_features(self):
-        """Verify Table PDF export excludes category column, has enlarged picture container, and supports All/Category/Selected scopes."""
+        """Verify Table PDF export excludes category column, has 5:4 aspect ratio product picture, robust Khmer font rendering, and supports All/Category/Selected scopes."""
         resp = self.client.get('/products/price-list')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
@@ -159,9 +159,14 @@ class TestPriceList(unittest.TestCase):
         pdf_table_export_code = html[pdf_table_idx:cards_branch_idx]
         self.assertNotIn('>Category<', pdf_table_export_code)
 
-        # Product picture container is 72px x 72px reaching table height
-        self.assertIn('width: 72px; height: 72px;', pdf_table_export_code)
+        # Product picture container has width 5 and height 4 aspect ratio (90px x 72px)
+        self.assertIn('aspect-ratio: 5 / 4', pdf_table_export_code)
+        self.assertIn('width: 90px; height: 72px;', pdf_table_export_code)
         self.assertIn('object-fit: contain', pdf_table_export_code)
+
+        # Robust Khmer font rendering in Table PDF: Kantumruy Pro with weight 700 and letterRendering: false
+        self.assertIn("'Kantumruy Pro', 'Siemreap', sans-serif !important", pdf_table_export_code)
+        self.assertIn('letterRendering: false', pdf_table_export_code)
 
         # 9 rows per page
         self.assertIn('ROWS_PER_PAGE = 9', pdf_table_export_code)

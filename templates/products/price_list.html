@@ -1271,8 +1271,9 @@
     text-align: center;
 }
 .pl-table-thumb-wrap {
-    width: 54px;
-    height: 54px;
+    width: 65px;
+    height: 52px;
+    aspect-ratio: 5 / 4;
     border-radius: 8px;
     background: #F8FAFC;
     border: 1px solid #E2E8F0;
@@ -1290,10 +1291,11 @@
     z-index: 5;
 }
 .pl-table-thumb-img {
-    max-width: 48px;
-    max-height: 48px;
-    width: auto;
-    height: auto;
+    max-width: 100%;
+    max-height: 100%;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 5 / 4;
     object-fit: contain;
     display: block;
 }
@@ -3482,7 +3484,7 @@
 </div>
 
 <!-- Staged container used strictly for clean PDF compilation (rendered behind modal overlay) -->
-<div id="pdfExportCloneArea" style="position: fixed; left: 0; top: 0; width: 710px; background: #FFFFFF; z-index: 1000; pointer-events: none; opacity: 1; overflow: visible; display: none;"></div>
+<div id="pdfExportCloneArea" style="position: fixed; left: 0; top: 0; width: 750px; min-width: 750px; background: #FFFFFF; z-index: 1000; pointer-events: none; opacity: 1; overflow: visible; display: none;"></div>
 
 <!-- ==========================================================================
      BATCH EXPORT JPG (ZIP) PROGRESS MODAL
@@ -5395,8 +5397,17 @@ async function exportPriceListPDF(scopeMode, categoryId) {
 
     try {
         // 1. Ensure all web fonts (Kantumruy Pro, Siemreap) are completely loaded
-        if (document.fonts && document.fonts.ready) {
+        if (document.fonts) {
             await document.fonts.ready;
+            try {
+                await Promise.all([
+                    document.fonts.load('600 13px "Kantumruy Pro"'),
+                    document.fonts.load('700 13px "Kantumruy Pro"'),
+                    document.fonts.load('400 13px "Siemreap"')
+                ]);
+            } catch (e) {
+                console.warn('Font load wait:', e);
+            }
         }
 
         // Determine scope if not explicitly passed
@@ -5503,7 +5514,7 @@ async function exportPriceListPDF(scopeMode, categoryId) {
                 `;
                 pageDiv.appendChild(hdr);
 
-                // Table for this page (No Category Column, larger picture container)
+                // Table for this page (No Category Column, 5:4 aspect ratio picture, robust Khmer font rendering)
                 const table = document.createElement('table');
                 table.style.width = '100%';
                 table.style.borderCollapse = 'collapse';
@@ -5512,11 +5523,11 @@ async function exportPriceListPDF(scopeMode, categoryId) {
                     <thead>
                         <tr style="background: ${currentThemeColor}; color: #FFFFFF;">
                             <th style="padding: 7px 6px; font-size: 10.5px; text-align: center; width: 32px;">No.</th>
-                            <th style="padding: 7px 8px; font-size: 10.5px; text-align: center; width: 80px;">Picture</th>
+                            <th style="padding: 7px 8px; font-size: 10.5px; text-align: center; width: 102px;">Picture</th>
                             <th style="padding: 7px 10px; font-size: 10.5px; text-align: left;">Product Title</th>
-                            <th style="padding: 7px 8px; font-size: 10.5px; text-align: left; width: 120px;">Size / Spec</th>
-                            <th style="padding: 7px 8px; font-size: 10.5px; text-align: left; width: 170px;">Packaging Breakdown</th>
-                            <th style="padding: 7px 10px; font-size: 10.5px; text-align: right; width: 130px;">Unit Price</th>
+                            <th style="padding: 7px 8px; font-size: 10.5px; text-align: left; width: 110px;">Size / Spec</th>
+                            <th style="padding: 7px 8px; font-size: 10.5px; text-align: left; width: 165px;">Packaging Breakdown</th>
+                            <th style="padding: 7px 10px; font-size: 10.5px; text-align: right; width: 125px;">Unit Price</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -5557,34 +5568,34 @@ async function exportPriceListPDF(scopeMode, categoryId) {
                         <td style="padding: 6px 6px; font-size: 11px; text-align: center; vertical-align: middle; width: 32px; font-weight: 700; color: #64748B;">
                             ${overallIdx + 1}
                         </td>
-                        <td style="padding: 6px 8px; text-align: center; vertical-align: middle; width: 80px;">
-                            <div style="width: 72px; height: 72px; min-height: 72px; max-height: 76px; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #F8FAFC; border-radius: 6px; border: 1px solid #E2E8F0; overflow: hidden;">
+                        <td style="padding: 6px 6px; text-align: center; vertical-align: middle; width: 102px;">
+                            <div style="width: 90px; height: 72px; min-width: 90px; max-width: 90px; min-height: 72px; max-height: 72px; aspect-ratio: 5 / 4; display: flex; align-items: center; justify-content: center; margin: 0 auto; background: #F8FAFC; border-radius: 6px; border: 1px solid #E2E8F0; overflow: hidden;">
                                 ${item.image_url 
-                                    ? `<img src="${escapeHtml(item.image_url)}" style="width: 100%; height: 100%; object-fit: contain; max-width: 72px; max-height: 72px; border-radius: 4px;" alt="${escapeHtml(item.name)}">`
+                                    ? `<img src="${escapeHtml(item.image_url)}" style="width: 100%; height: 100%; aspect-ratio: 5 / 4; object-fit: contain; max-width: 90px; max-height: 72px; border-radius: 4px;" alt="${escapeHtml(item.name)}">`
                                     : `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`
                                 }
                             </div>
                         </td>
                         <td style="padding: 6px 10px; vertical-align: middle;">
-                            <div style="display: flex; flex-direction: column; gap: 2px;">
-                                <div class="font-khmer" style="font-size: 12px; font-weight: 800; color: #0F172A; line-height: 1.35;">${escapeHtml(kmName)}</div>
-                                ${enName ? `<div style="font-size: 11px; font-weight: 600; color: #475569;">${escapeHtml(enName)}</div>` : ''}
+                            <div style="display: flex; flex-direction: column; gap: 3px;">
+                                <div style="font-family: 'Kantumruy Pro', 'Siemreap', sans-serif !important; font-size: 12.5px; font-weight: 700; color: #0F172A; line-height: 1.45; letter-spacing: normal !important; word-break: break-word;">${escapeHtml(kmName)}</div>
+                                ${enName && enName !== kmName ? `<div style="font-family: 'Kantumruy Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; font-weight: 600; color: #475569; letter-spacing: normal; line-height: 1.3;">${escapeHtml(enName)}</div>` : ''}
                                 <div style="margin-top: 2px;">${skuBadge}</div>
                             </div>
                         </td>
-                        <td style="padding: 6px 8px; vertical-align: middle; width: 120px;">
+                        <td style="padding: 6px 8px; vertical-align: middle; width: 110px;">
                             <div>
                                 ${capBadge}
                                 <div style="font-size: 10.5px; color: #334155; margin-top: 2px;">${escapeHtml(dimStr || 'Standard Spec')}</div>
                             </div>
                         </td>
-                        <td style="padding: 6px 8px; vertical-align: middle; width: 170px;">
+                        <td style="padding: 6px 8px; vertical-align: middle; width: 165px;">
                             <div>
                                 <div style="font-size: 10.5px; font-weight: 700; color: #0F172A;">1 Case = ${packsCase} Packs</div>
                                 <div style="font-size: 9.5px; color: #64748B; margin-top: 2px;">1 Pack = ${pcsPack} Pcs (${pcsCase} pcs/case)</div>
                             </div>
                         </td>
-                        <td style="padding: 6px 10px; vertical-align: middle; text-align: right; width: 130px;">
+                        <td style="padding: 6px 10px; vertical-align: middle; text-align: right; width: 125px;">
                             <div style="display: flex; align-items: baseline; justify-content: flex-end; gap: 4px;">
                                 <span style="font-size: 13.5px; font-weight: 800; color: #0F172A;">${priceFormatted}</span>
                                 <span style="font-size: 10.5px; color: #64748B;">${escapeHtml(pricing.uomUnitText)}</span>
@@ -5627,6 +5638,9 @@ async function exportPriceListPDF(scopeMode, categoryId) {
             });
             await Promise.all(imgPromises);
 
+            // Give layout engine enough time to shape Khmer OpenType ligatures in cloned DOM before canvas capture
+            await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 200)));
+
             progressText.textContent = `Rendering high-res A4 PDF table (${itemsToExport.length} items across ${totalPages} pages)...`;
 
             const filename = `Price_List_Table_${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -5634,7 +5648,14 @@ async function exportPriceListPDF(scopeMode, categoryId) {
                 margin: [6, 6, 6, 6],
                 filename: filename,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: '#FFFFFF' },
+                html2canvas: {
+                    scale: 2,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#FFFFFF',
+                    letterRendering: false,
+                    logging: false
+                },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { mode: ['css', 'legacy'] }
             };
