@@ -121,6 +121,12 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         self.assertIn('width: 680', html)
         self.assertIn('height: 612', html)
 
+        # Verify dimension labels and best choice badge are removed from brown card builder
+        brown_builder = html[html.find('function buildBrownCardHtml'):html.find('function buildGenZCardHtml')]
+        self.assertNotIn('inflow-brown-dim-label', brown_builder)
+        self.assertNotIn('inflow-brown-best-choice', brown_builder)
+        self.assertIn('${formatMoney(c.tot_price_1 || 32.50)} $', brown_builder)
+
     def test_product_detail_and_catalog_render_brown(self):
         """Verify product detail and workspace catalog contain #cardContentBrown sections."""
         with get_db_cursor(commit=False) as cursor:
@@ -141,6 +147,11 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         self.assertIn('inflow-brown-specs-card', html)
         self.assertIn('inflow-brown-price-wrap', html)
         self.assertIn('inflow-brown-tot-capsule', html)
+        
+        # Verify no dim labels and no best choice in workspace catalog brown card
+        brown_card_main = html[html.find('id="cardContentBrown"'):html.find('id="internalProfitDrawer"')]
+        self.assertNotIn('inflow-brown-dim-label', brown_card_main)
+        self.assertNotIn('inflow-brown-best-choice', brown_card_main)
 
         # Legacy detail page
         resp_leg = self.client.get(f'/products/{prod_id}?legacy=1')
@@ -150,6 +161,11 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         self.assertIn('inflow-brown-header', leg_html)
         self.assertIn('inflow-brown-specs-card', leg_html)
         self.assertIn('inflow-brown-price-wrap', leg_html)
+        
+        # Verify no dim labels and no best choice in detail brown card
+        brown_card_detail = leg_html[leg_html.find('id="cardContentBrownDetail"'):leg_html.find('id="internalProfitDrawerDetail"')]
+        self.assertNotIn('inflow-brown-dim-label', brown_card_detail)
+        self.assertNotIn('inflow-brown-best-choice', brown_card_detail)
 
     def test_product_catalog_facebook_renders_brown_option(self):
         """Verify /inventory/product-catalog (Card Mode) includes Brown Look option and .cat-card.brown CSS."""
