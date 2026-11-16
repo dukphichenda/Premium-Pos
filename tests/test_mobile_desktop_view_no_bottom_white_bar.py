@@ -40,6 +40,13 @@ class MobileDesktopViewNoBottomWhiteBarTestCase(unittest.TestCase):
         self.assertIn('html.is-embedded #universalMobileNavBar', content)
         self.assertIn('html.is-desktop-view .inflow-mobile-bottom-nav', content)
 
+        # 6. Dynamic viewport synchronization for full-screen desktop mode on mobile
+        self.assertIn('function inflowSyncViewportMeta', content)
+        self.assertIn("width=1080, user-scalable=yes", content)
+        self.assertIn('inflowSyncViewportMeta(savedViewMode);', content)
+        self.assertIn('inflowSyncViewportMeta(mode);', content)
+        self.assertIn('min-height: calc(100% - 47px) !important;', content)
+
     def test_styles_css_desktop_rail_and_no_broken_braces(self):
         """Verify static/css/styles.css has no stray closing braces and enforces edge-to-edge sidebar."""
         css_path = os.path.join(self.base_dir, 'static', 'css', 'styles.css')
@@ -57,6 +64,12 @@ class MobileDesktopViewNoBottomWhiteBarTestCase(unittest.TestCase):
         # Check desktop cloud sidebar height: 100%
         self.assertIn('html.is-desktop-view:not(.is-embedded) #inflowCloudSidebar', content)
         self.assertIn('height: 100% !important;', content)
+
+        # Check embedded full height (not capped by 100vh)
+        self.assertIn('html.is-embedded .inflow-so-workspace', content)
+        self.assertIn('height: calc(100% - 38px) !important;', content)
+        self.assertIn('html.is-embedded body.sales-order-body-fullscreen .main-wrapper', content)
+        self.assertIn('max-height: 100% !important;', content)
 
     def test_sales_order_detail_canvas_eradicates_mobile_bar_in_desktop_view(self):
         """Verify templates/sales/_detail_canvas.html does not show bottom mobile nav bar in desktop view."""

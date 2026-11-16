@@ -75,10 +75,30 @@
             return (window.innerWidth <= 768) ? 'mobile' : 'desktop';
         }
 
+        function inflowSyncViewportMeta(mode) {
+            try {
+                if (window.self !== window.top) return;
+                var meta = document.querySelector('meta[name="viewport"]');
+                if (!meta) {
+                    meta = document.createElement('meta');
+                    meta.name = 'viewport';
+                    document.head.appendChild(meta);
+                }
+                var isPhoneUA = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                var isMobileScreen = (window.screen && (window.screen.width <= 768 || window.screen.height <= 768)) || (window.innerWidth <= 768);
+                if (mode === 'desktop' && (isPhoneUA || isMobileScreen)) {
+                    meta.setAttribute('content', 'width=1080, user-scalable=yes');
+                } else {
+                    meta.setAttribute('content', 'width=device-width, initial-scale=1.0');
+                }
+            } catch(e) {}
+        }
+
         var savedViewMode = inflowDetectDeviceViewMode();
         document.documentElement.setAttribute('data-view-mode', savedViewMode);
         document.documentElement.classList.remove('is-desktop-view', 'is-mobile-view');
         document.documentElement.classList.add(savedViewMode === 'mobile' ? 'is-mobile-view' : 'is-desktop-view');
+        inflowSyncViewportMeta(savedViewMode);
 
         if (window.self !== window.top || window.location.search.indexOf('embed=1') !== -1) {
             document.documentElement.classList.add('is-embedded');
@@ -346,9 +366,10 @@
         html.is-desktop-view:not(.is-embedded) #inflowTabWorkspace {
             display: block !important;
             flex: 1 1 auto !important;
+            height: calc(100% - 47px) !important;
             height: calc(100vh - 47px) !important;
             height: calc(100dvh - 47px) !important;
-            height: calc(100% - 47px) !important;
+            min-height: calc(100% - 47px) !important;
             min-height: calc(100vh - 47px) !important;
             min-height: calc(100dvh - 47px) !important;
             width: 100% !important;
@@ -1966,6 +1987,11 @@
             } else {
                 root.classList.add('is-desktop-view');
                 root.classList.remove('is-mobile-view');
+            }
+
+            // Sync viewport meta tag on mobile devices to prevent bottom white blank bar
+            if (typeof inflowSyncViewportMeta === 'function') {
+                inflowSyncViewportMeta(mode);
             }
 
             // 3. Update Visuals (sidebar button, badge, flyout state)
