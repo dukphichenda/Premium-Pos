@@ -197,6 +197,10 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         self.assertIn('.inflow-brown-deco-rosemary', css)
         self.assertIn('.inflow-brown-deco-whisk', css)
 
+        # Ensure #cardContentBrown does NOT have unconditional display: flex !important (which causes overlapping on modern/classic cards)
+        brown_rule = css[css.find('#cardContentBrown,'):css.find('#cardContentBrown,') + 250]
+        self.assertNotIn('display: flex !important;', brown_rule)
+
     def test_zero_test_sales_orders_and_rule1_compliance(self):
         """Verify zero test sales orders exist and database integrity is maintained."""
         with get_db_cursor(commit=False) as cursor:
