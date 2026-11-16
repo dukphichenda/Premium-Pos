@@ -230,6 +230,90 @@ class TestBranchExpenseSheet(unittest.TestCase):
         self.assertIn('isSheetDirty', html)
         self.assertIn('markSheetDirty', html)
 
+    def test_edited_media_amount_keeps_normal_total_in_table_below(self):
+        """
+        Verify that even when the user edits the Media balance (manual_media_income = $500.00):
+        - Top KPI card shows $500.00 and notes manual override.
+        - The bottom Media table header and footer keep the normal sum of table entries ($46.50).
+        - Print view Media table footer keeps normal sum ($46.50).
+        - Excel export 'Media Receipts' sheet footer keeps normal sum ($46.50).
+        """
+        month_test = "2029-03"
+        try:
+            # Clean up before test
+            execute("DELETE FROM media_receipts WHERE month_key = %s", (month_test,))
+            execute("DELETE FROM monthly_cash_summaries WHERE month_key = %s", (month_test,))
+
+            # 1. Insert two media receipts totaling $46.50 ($17.00 + $29.50)
+            execute("""
+                INSERT INTO media_receipts (receipt_date, customer_name, amount, notes, month_key)
+                VALUES ('2029-03-03', 'Aman Godiyal', 17.00, 'Test 1', %s)
+            """, (month_test,))
+            execute("""
+                INSERT INTO media_receipts (receipt_date, customer_name, amount, notes, month_key)
+                VALUES ('2029-03-09', 'The Sros', 29.50, 'Test 2', %s)
+            """, (month_test,))
+
+            # 2. User manually edits Media balance to $500.00
+            resp_update = self.client.post('/expenses/summary/update', data={
+                'month_key': month_test,
+                'branch_id': 'main',
+                'manual_media_income': '500.00'
+            })
+            self.assertEqual(resp_update.status_code, 200)
+
+            # 3. Check /expenses/monthly HTML
+            resp = self.client.get(f'/expenses/monthly?month={month_test}&branch=main')
+            self.assertEqual(resp.status_code, 200)
+            html = resp.data.decode('utf-8')
+
+            # Top KPI card shows $500.00 and manual note
+            self.assertIn('$500.00', html)
+            self.assertIn('Manual', html)
+            self.assertIn('Sheet: $46.50', html)
+
+            # Table below header shows normal total $46.50
+            self.assertIn('សរុប Media Total: <span style="font-size: 14.5px; font-family: \'Inter\', \'Segoe UI\', -apple-system, BlinkMacSystemFont, Roboto, sans-serif; font-variant-numeric: tabular-nums; color: #15803D;">$46.50</span>', html)
+
+            # Table below footer shows normal total $46.50
+            self.assertIn('សរុបប្រាក់ទទួលបានពី Media (Total Media Received):', html)
+            # Find the footer row
+            footer_idx = html.find('media-table-footer')
+            self.assertNotEqual(footer_idx, -1)
+            footer_snippet = html[footer_idx:footer_idx + 400]
+            self.assertIn('$46.50', footer_snippet)
+            self.assertNotIn('$500.00', footer_snippet)
+
+            # 4. Check /expenses/print HTML
+            resp_print = self.client.get(f'/expenses/print?month={month_test}&branch=main')
+            self.assertEqual(resp_print.status_code, 200)
+            print_html = resp_print.data.decode('utf-8')
+            print_footer_idx = print_html.find('សរុប (Total Media):')
+            self.assertNotEqual(print_footer_idx, -1)
+            print_footer_snippet = print_html[print_footer_idx:print_footer_idx + 250]
+            self.assertIn('$46.50', print_footer_snippet)
+            self.assertNotIn('$500.00', print_footer_snippet)
+
+            # 5. Check Excel export
+            report_data = _get_monthly_report_data(month_test, branch_id="main")
+            self.assertEqual(report_data['media_total'], 500.0)
+            self.assertEqual(report_data['media_sheet_total'], 46.50)
+
+            wb = load_workbook(generate_monthly_excel(report_data))
+            ws2 = wb["Media Receipts"]
+            # Look for Total Media Received row
+            found_normal_total = False
+            for row in ws2.iter_rows(values_only=True):
+                if row[0] and "Total Media Received" in str(row[0]):
+                    self.assertEqual(row[3], 46.50)
+                    found_normal_total = True
+            self.assertTrue(found_normal_total)
+
+        finally:
+            # Clean up test month records
+            execute("DELETE FROM media_receipts WHERE month_key = %s", (month_test,))
+            execute("DELETE FROM monthly_cash_summaries WHERE month_key = %s", (month_test,))
+
 
 if __name__ == '__main__':
     unittest.main()

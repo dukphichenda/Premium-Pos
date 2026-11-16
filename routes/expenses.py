@@ -576,6 +576,7 @@ def print_monthly_report():
         clear_stm=report_data['clear_stm'],
         clear_sk=report_data['clear_sk'],
         media_receipts=report_data['media_receipts'],
+        media_sheet_total=report_data['media_sheet_total'],
         media_total=report_data['media_total'],
         sales_received=report_data['sales_received'],
         total_money_in=report_data['total_money_in'],

@@ -400,7 +400,10 @@ def generate_monthly_excel(data):
             ws2.cell(row=m_row, column=c_i).border = thin_border
             ws2.cell(row=m_row, column=c_i).fill = PatternFill(start_color="DCFCE7", end_color="DCFCE7", fill_type="solid")
 
-        val_tot = ws2.cell(row=m_row, column=4, value=data.get('media_total', 0.0))
+        media_sheet_sum = data.get('media_sheet_total')
+        if media_sheet_sum is None:
+            media_sheet_sum = sum(float(m.get('amount', 0) or 0) for m in data.get('media_receipts', []))
+        val_tot = ws2.cell(row=m_row, column=4, value=float(media_sheet_sum))
         val_tot.number_format = '$#,##0.00'
         val_tot.font = Font(name="Segoe UI", bold=True, size=11, color="166534")
         val_tot.border = thin_border
@@ -681,11 +684,14 @@ def generate_monthly_pdf(data):
                 f"${float(m.get('amount', 0) or 0):,.2f}",
                 m.get('notes', '') or '-'
             ])
+        media_sheet_sum = data.get('media_sheet_total')
+        if media_sheet_sum is None:
+            media_sheet_sum = sum(float(m.get('amount', 0) or 0) for m in data.get('media_receipts', []))
         media_rows.append([
             "",
             Paragraph("<b>Total Media:</b>", cell_style),
             "",
-            f"${data.get('media_total', 0.0):,.2f}",
+            f"${float(media_sheet_sum):,.2f}",
             ""
         ])
 
