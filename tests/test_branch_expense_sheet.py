@@ -280,7 +280,7 @@ class TestBranchExpenseSheet(unittest.TestCase):
             # Find the footer row
             footer_idx = html.find('media-table-footer')
             self.assertNotEqual(footer_idx, -1)
-            footer_snippet = html[footer_idx:footer_idx + 400]
+            footer_snippet = html[footer_idx:footer_idx + 800]
             self.assertIn('$46.50', footer_snippet)
             self.assertNotIn('$500.00', footer_snippet)
 
