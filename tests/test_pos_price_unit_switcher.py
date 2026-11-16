@@ -29,9 +29,12 @@ class TestPosPriceUnitSwitcher(unittest.TestCase):
 
         # Check JavaScript functions
         self.assertIn('function calculateProductPriceForUnit(p, unitMode, schemeId)', content)
+        self.assertIn('function calculateProductStockForUnit(p, unitMode)', content)
         self.assertIn('function switchPriceUnitMode(mode)', content)
         self.assertIn('function refreshGridPrices()', content)
         self.assertIn('let currentPriceUnitMode', content)
+        self.assertIn('const calcStock = calculateProductStockForUnit(p, currentPriceUnitMode);', content)
+        self.assertIn('card.dataset.stock = calcStock.stock;', content)
 
     def test_pos_route_includes_uom_in_products(self):
         """Verify routes/branches.py queries p.uom in POS product catalog."""

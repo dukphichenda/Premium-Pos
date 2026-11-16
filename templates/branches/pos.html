@@ -2138,7 +2138,7 @@ body.pos-modern-body .content-area {
                         {% endif %}
 
                         <!-- Stock Badge at Selected Warehouse -->
-                        <div class="pos-prod-stock-pill {% if stock > 0 %}in-stock{% else %}out-stock{% endif %}">
+                        <div class="pos-prod-stock-pill {% if stock > 0 %}in-stock{% else %}out-stock{% endif %}" id="prod-stock-pill-{{ p.id }}">
                             {% if stock > 0 %}
                             ● {{ stock|int }} in stock
                             {% else %}
@@ -3125,6 +3125,7 @@ function onDirectItemSearch(val) {
     let html = '';
     matched.forEach(p => {
         const calc = calculateProductPriceForUnit(p, currentPriceUnitMode, schemeId);
+        const calcStock = calculateProductStockForUnit(p, currentPriceUnitMode);
         let thumb = '📦';
         if (p.image_url) {
             thumb = `<img src="${p.image_url}" alt="${p.name}" style="width: 28px; height: 28px; object-fit: cover; border-radius: 4px;" onerror="this.outerHTML='📦'">`;
@@ -3136,7 +3137,7 @@ function onDirectItemSearch(val) {
             </div>
             <div style="flex: 1; min-width: 0;">
                 <div style="font-size: 12px; font-weight: 700; color: #0F172A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" class="font-khmer">${escapeHtml(p.name)}</div>
-                <div style="font-size: 10.5px; color: #64748B;">${isKm ? 'កូដ: ' : 'SKU: '}${escapeHtml(p.sku || '-')} | ${isKm ? 'ស្តុក: ' : 'Stock: '}${p.stock_qty}</div>
+                <div style="font-size: 10.5px; color: #64748B;">${isKm ? 'កូដ: ' : 'SKU: '}${escapeHtml(p.sku || '-')} | ${isKm ? 'ស្តុក: ' : 'Stock: '}${calcStock.formattedStock} ${calcStock.unitLabel}</div>
             </div>
             <div style="text-align: right; flex-shrink: 0;">
                 <div style="font-size: 12px; font-weight: 800; color: #0F172A;">${calc.formattedPrice} <span style="font-size: 10px; color: #64748B;">${calc.uomLabel}</span></div>
@@ -3282,6 +3283,71 @@ function calculateItemDetails(item) {
 // -------------------------------------------------------------------------
 // Price Unit Mode & Product Calculations (Per Case / Per Pack / Per Pcs)
 // -------------------------------------------------------------------------
+function calculateProductStockForUnit(p, unitMode) {
+    if (!p) return { stock: 0, formattedStock: '0', isOutOfStock: true, unitLabel: '' };
+
+    const rawStock = parseFloat(p.stock_qty) || 0;
+    if (rawStock <= 0) {
+        return {
+            stock: 0,
+            formattedStock: '0',
+            isOutOfStock: true,
+            unitLabel: unitMode === 'Case' ? 'cases' : (unitMode === 'Pack' ? 'packs' : 'pcs')
+        };
+    }
+
+    let pcsPerPack = parseFloat(p.pcs_per_pack) || 50;
+    if (pcsPerPack <= 0) pcsPerPack = 50;
+
+    let pcsPerCase = parseFloat(p.sales_uom_ratio_std) || 0;
+    let packsPerCase = parseFloat(p.packs_per_case) || 0;
+
+    if (pcsPerCase > 1) {
+        if (packsPerCase <= 0 || packsPerCase === 3 || (packsPerCase * pcsPerPack !== pcsPerCase)) {
+            packsPerCase = Math.round(pcsPerCase / pcsPerPack) || (pcsPerCase / pcsPerPack) || 1;
+        }
+    } else if (packsPerCase > 0 && pcsPerPack > 0 && packsPerCase !== 3) {
+        pcsPerCase = packsPerCase * pcsPerPack;
+    } else {
+        pcsPerCase = 1;
+        packsPerCase = 1;
+    }
+
+    let unitStock = rawStock;
+    let unitLabel = 'pcs';
+
+    if (unitMode === 'Case') {
+        unitStock = pcsPerCase > 0 ? (rawStock / pcsPerCase) : rawStock;
+        unitLabel = 'cases';
+    } else if (unitMode === 'Pack') {
+        unitStock = pcsPerPack > 0 ? (rawStock / pcsPerPack) : rawStock;
+        unitLabel = 'packs';
+    } else {
+        unitStock = rawStock;
+        unitLabel = 'pcs';
+    }
+
+    let formattedStock = '';
+    const roundedInt = Math.round(unitStock);
+    if (Math.abs(unitStock - roundedInt) < 0.0001) {
+        formattedStock = roundedInt.toString();
+    } else {
+        const rounded1 = Math.round(unitStock * 10) / 10;
+        if (Math.abs(unitStock - rounded1) < 0.001) {
+            formattedStock = unitStock.toFixed(1);
+        } else {
+            formattedStock = (Math.round(unitStock * 100) / 100).toFixed(2);
+        }
+    }
+
+    return {
+        stock: unitStock,
+        formattedStock: formattedStock,
+        isOutOfStock: unitStock <= 0,
+        unitLabel: unitLabel
+    };
+}
+
 function calculateProductPriceForUnit(p, unitMode, schemeId) {
     if (!p) return { price: 0, formattedPrice: '$0.00', uomLabel: '/ case', subInfo: '' };
 
@@ -3410,9 +3476,11 @@ function refreshGridPrices() {
 
     productsCatalog.forEach(p => {
         const calc = calculateProductPriceForUnit(p, currentPriceUnitMode, schemeId);
+        const calcStock = calculateProductStockForUnit(p, currentPriceUnitMode);
         const card = document.getElementById(`product-card-${p.id}`);
         if (card) {
             card.dataset.price = calc.price;
+            card.dataset.stock = calcStock.stock;
 
             const priceEl = card.querySelector('.pos-prod-price');
             if (priceEl) priceEl.textContent = calc.formattedPrice;
@@ -3438,10 +3506,26 @@ function refreshGridPrices() {
                     btnLbl.textContent = `+ Add ${currentPriceUnitMode}`;
                 }
             }
+
+            // Update Stock Pill based on current Price Mode
+            const stockPill = card.querySelector('.pos-prod-stock-pill') || document.getElementById(`prod-stock-pill-${p.id}`);
+            if (stockPill) {
+                if (calcStock.isOutOfStock) {
+                    stockPill.className = 'pos-prod-stock-pill out-stock';
+                    stockPill.textContent = isKm ? '● អស់ពីស្តុក' : '● Out of stock';
+                    stockPill.title = isKm ? 'ទំនិញនេះអស់ពីស្តុកហើយ' : 'Out of stock at this warehouse';
+                } else {
+                    stockPill.className = 'pos-prod-stock-pill in-stock';
+                    stockPill.textContent = isKm 
+                        ? `● ${calcStock.formattedStock} ក្នុងស្តុក` 
+                        : `● ${calcStock.formattedStock} in stock`;
+                    stockPill.title = `${calcStock.formattedStock} ${calcStock.unitLabel} in stock (${p.stock_qty} pcs total)`;
+                }
+            }
         }
     });
 
-    if (currentSort === 'price_asc' || currentSort === 'price_desc') {
+    if (currentSort === 'price_asc' || currentSort === 'price_desc' || currentSort === 'stock_asc' || currentSort === 'stock_desc') {
         applyFiltersAndSort();
     }
 }
