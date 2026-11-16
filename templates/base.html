@@ -94,11 +94,68 @@
             } catch(e) {}
         }
 
+        /* -------------------------------------------------------------------
+           inflowSyncFullHeight – Mobile-in-desktop-mode full-screen height fix
+           On phones using "Request Desktop Site", 100vh/100dvh reports the
+           phone's physical viewport, NOT the scaled viewport.  This function
+           measures the real available height using visualViewport / screen,
+           calculates the correct CSS-pixel height for a 1080-wide layout,
+           and writes --inflow-real-vh so CSS can use it instead of 100vh.
+           ------------------------------------------------------------------- */
+        function inflowSyncFullHeight() {
+            try {
+                if (window.self !== window.top) return;             // skip iframes
+                var mode = document.documentElement.getAttribute('data-view-mode');
+                if (mode !== 'desktop') {
+                    document.documentElement.style.removeProperty('--inflow-real-vh');
+                    return;
+                }
+                var isPhoneUA = /Android.*Mobile|iPhone|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                var isMobileScreen = (window.screen && (window.screen.width <= 768 || window.screen.height <= 768));
+                if (!isPhoneUA && !isMobileScreen) {
+                    document.documentElement.style.removeProperty('--inflow-real-vh');
+                    return;  // real desktop – 100vh is fine
+                }
+
+                // On a phone in desktop mode with viewport width=1080:
+                // The browser lays out at 1080 CSS-px wide but physically
+                // renders into ~390px.  Scale factor = 1080 / physicalWidth.
+                // The correct full height in CSS-px = physicalHeight * scale.
+                var physW = window.screen ? window.screen.availWidth || window.screen.width : window.innerWidth;
+                var physH = window.screen ? window.screen.availHeight || window.screen.height : window.innerHeight;
+
+                // Use visualViewport if available (more accurate, excludes browser chrome)
+                if (window.visualViewport) {
+                    physW = window.visualViewport.width;
+                    physH = window.visualViewport.height;
+                }
+
+                var layoutW = window.innerWidth || 1080;
+                var scale = layoutW / (physW || layoutW);
+                var realH = Math.round(physH * scale);
+
+                // Sanity: if the computed height is less than innerHeight, use innerHeight
+                if (realH < window.innerHeight) realH = window.innerHeight;
+
+                document.documentElement.style.setProperty('--inflow-real-vh', realH + 'px');
+            } catch(e) {}
+        }
+
         var savedViewMode = inflowDetectDeviceViewMode();
         document.documentElement.setAttribute('data-view-mode', savedViewMode);
         document.documentElement.classList.remove('is-desktop-view', 'is-mobile-view');
         document.documentElement.classList.add(savedViewMode === 'mobile' ? 'is-mobile-view' : 'is-desktop-view');
         inflowSyncViewportMeta(savedViewMode);
+        inflowSyncFullHeight();
+
+        // Re-calc on resize / orientation change / visual viewport change
+        window.addEventListener('resize', inflowSyncFullHeight);
+        window.addEventListener('orientationchange', function() {
+            setTimeout(inflowSyncFullHeight, 300);
+        });
+        if (window.visualViewport) {
+            window.visualViewport.addEventListener('resize', inflowSyncFullHeight);
+        }
 
         if (window.self !== window.top || window.location.search.indexOf('embed=1') !== -1) {
             document.documentElement.classList.add('is-embedded');
@@ -367,11 +424,9 @@
             display: block !important;
             flex: 1 1 auto !important;
             height: calc(100% - 47px) !important;
-            height: calc(100vh - 47px) !important;
-            height: calc(100dvh - 47px) !important;
+            height: calc(var(--inflow-real-vh, 100vh) - 47px) !important;
             min-height: calc(100% - 47px) !important;
-            min-height: calc(100vh - 47px) !important;
-            min-height: calc(100dvh - 47px) !important;
+            min-height: calc(var(--inflow-real-vh, 100vh) - 47px) !important;
             width: 100% !important;
             min-width: 1024px !important;
             margin-bottom: 0 !important;
