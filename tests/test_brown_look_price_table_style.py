@@ -201,6 +201,34 @@ class TestBrownLookPriceTableStyle(unittest.TestCase):
         brown_rule = css[css.find('#cardContentBrown,'):css.find('#cardContentBrown,') + 250]
         self.assertNotIn('display: flex !important;', brown_rule)
 
+    def test_price_card_mutual_exclusion_css_and_no_brown_stacking(self):
+        """Verify CSS contains strict mutual exclusion rules preventing Brown Look stacking on other styles."""
+        with open('static/css/styles.css', 'r', encoding='utf-8') as f:
+            css = f.read()
+
+        # Strict suppression when not brown
+        self.assertIn('#printablePriceCard:not(.brown):not(.brown_look) #cardContentBrown', css)
+        self.assertIn('#printablePriceCardDetail:not(.brown):not(.brown_look) #cardContentBrownDetail', css)
+        self.assertIn('.inflow-spec-card:not(.brown):not(.brown_look) #cardContentBrown', css)
+        self.assertIn('.inflow-spec-card:not(.brown):not(.brown_look) #cardContentBrownDetail', css)
+
+        # Strict suppression of other styles when not matching
+        self.assertIn('#printablePriceCard:not(.modern) #cardContentModern', css)
+        self.assertIn('#printablePriceCard:not(.classic) #cardContentClassic', css)
+        self.assertIn('#printablePriceCard:not(.cute) #cardContentCute', css)
+        self.assertIn('#printablePriceCard:not(.gen_z):not(.genz) #cardContentGenZ', css)
+
+        # Verify catalog.html and detail.html have mutual exclusion rules in page style
+        with open('templates/products/catalog.html', 'r', encoding='utf-8') as f:
+            cat_html = f.read()
+        self.assertIn('#printablePriceCard:not(.brown):not(.brown_look) #cardContentBrown', cat_html)
+        self.assertIn("brownContent.style.setProperty('display', (style === 'brown') ? 'flex' : 'none', 'important')", cat_html)
+
+        with open('templates/products/detail.html', 'r', encoding='utf-8') as f:
+            det_html = f.read()
+        self.assertIn('#printablePriceCardDetail:not(.brown):not(.brown_look) #cardContentBrownDetail', det_html)
+        self.assertIn("brownContent.style.setProperty('display', (style === 'brown') ? 'flex' : 'none', 'important')", det_html)
+
     def test_zero_test_sales_orders_and_rule1_compliance(self):
         """Verify zero test sales orders exist and database integrity is maintained."""
         with get_db_cursor(commit=False) as cursor:

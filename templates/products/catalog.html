@@ -227,6 +227,53 @@ window.prefetchCatalogProduct = function(id, url) {
     outline: none !important;
 }
 
+/* Price Card Mutual Exclusion: Strictly hide inactive style contents and display only active content */
+#printablePriceCard:not(.brown):not(.brown_look) #cardContentBrown,
+.inflow-spec-card:not(.brown):not(.brown_look) #cardContentBrown {
+    display: none !important;
+}
+#printablePriceCard:not(.modern) #cardContentModern,
+.inflow-spec-card:not(.modern) #cardContentModern {
+    display: none !important;
+}
+#printablePriceCard:not(.classic) #cardContentClassic,
+.inflow-spec-card:not(.classic) #cardContentClassic {
+    display: none !important;
+}
+#printablePriceCard:not(.cute) #cardContentCute,
+.inflow-spec-card:not(.cute) #cardContentCute {
+    display: none !important;
+}
+#printablePriceCard:not(.gen_z):not(.genz) #cardContentGenZ,
+.inflow-spec-card:not(.gen_z):not(.genz) #cardContentGenZ {
+    display: none !important;
+}
+
+#printablePriceCard.brown #cardContentBrown,
+#printablePriceCard.brown_look #cardContentBrown,
+.inflow-spec-card.brown #cardContentBrown,
+.inflow-spec-card.brown_look #cardContentBrown {
+    display: flex !important;
+}
+#printablePriceCard.modern #cardContentModern,
+.inflow-spec-card.modern #cardContentModern {
+    display: flex !important;
+}
+#printablePriceCard.classic #cardContentClassic,
+.inflow-spec-card.classic #cardContentClassic {
+    display: block !important;
+}
+#printablePriceCard.cute #cardContentCute,
+.inflow-spec-card.cute #cardContentCute {
+    display: block !important;
+}
+#printablePriceCard.gen_z #cardContentGenZ,
+#printablePriceCard.genz #cardContentGenZ,
+.inflow-spec-card.gen_z #cardContentGenZ,
+.inflow-spec-card.genz #cardContentGenZ {
+    display: block !important;
+}
+
 .inflow-modern-header {
     background: var(--price-card-light, #F0FDF4) !important;
     border: 1px solid var(--price-card-border, #DCFCE7) !important;
@@ -6405,15 +6452,15 @@ function setProductPriceCardStyle(style) {
     const brownContent = document.getElementById('cardContentBrown');
     
     if (card) {
-        card.classList.remove('classic', 'modern', 'cute', 'gen_z', 'brown');
+        card.classList.remove('classic', 'modern', 'cute', 'gen_z', 'genz', 'brown', 'brown_look');
         card.classList.add(style);
     }
 
-    if (classicContent) classicContent.style.display = (style === 'classic') ? 'block' : 'none';
-    if (modernContent) modernContent.style.display = (style === 'modern') ? 'flex' : 'none';
-    if (cuteContent) cuteContent.style.display = (style === 'cute') ? 'block' : 'none';
-    if (genZContent) genZContent.style.display = (style === 'gen_z') ? 'block' : 'none';
-    if (brownContent) brownContent.style.display = (style === 'brown') ? 'flex' : 'none';
+    if (classicContent) classicContent.style.setProperty('display', (style === 'classic') ? 'block' : 'none', 'important');
+    if (modernContent) modernContent.style.setProperty('display', (style === 'modern') ? 'flex' : 'none', 'important');
+    if (cuteContent) cuteContent.style.setProperty('display', (style === 'cute') ? 'block' : 'none', 'important');
+    if (genZContent) genZContent.style.setProperty('display', (style === 'gen_z') ? 'block' : 'none', 'important');
+    if (brownContent) brownContent.style.setProperty('display', (style === 'brown') ? 'flex' : 'none', 'important');
     
     if (typeof markFieldDirty === 'function') {
         markFieldDirty('price_card_style', style);
@@ -6862,27 +6909,43 @@ function exportCurrentCardAsJpg() {
                 targetCard.style.width = '680px';
                 targetCard.style.height = '612px';
                 targetCard.style.aspectRatio = '1 / 0.9';
+                const activeCardStyle = targetCard.classList.contains('brown') || targetCard.classList.contains('brown_look') ? 'brown' :
+                                        targetCard.classList.contains('modern') ? 'modern' :
+                                        targetCard.classList.contains('cute') ? 'cute' :
+                                        targetCard.classList.contains('gen_z') || targetCard.classList.contains('genz') ? 'gen_z' : 'classic';
+
+                const classicEl = targetCard.querySelector('#cardContentClassic');
                 const modernEl = targetCard.querySelector('#cardContentModern');
-                if (modernEl && window.getComputedStyle(modernEl).display !== 'none') {
-                    modernEl.style.display = 'flex';
-                    modernEl.style.height = '100%';
-                    modernEl.style.width = '100%';
-                }
+                const cuteEl = targetCard.querySelector('#cardContentCute');
                 const genZEl = targetCard.querySelector('#cardContentGenZ');
-                if (genZEl && window.getComputedStyle(genZEl).display !== 'none') {
-                    genZEl.style.display = 'flex';
-                    genZEl.style.flexDirection = 'column';
-                    genZEl.style.height = '100%';
-                    genZEl.style.width = '100%';
-                    genZEl.style.justifyContent = 'space-between';
-                }
                 const brownEl = targetCard.querySelector('#cardContentBrown');
-                if (brownEl && window.getComputedStyle(brownEl).display !== 'none') {
-                    brownEl.style.display = 'flex';
-                    brownEl.style.flexDirection = 'column';
-                    brownEl.style.height = '100%';
-                    brownEl.style.width = '100%';
-                    brownEl.style.justifyContent = 'space-between';
+
+                if (classicEl) classicEl.style.setProperty('display', (activeCardStyle === 'classic') ? 'block' : 'none', 'important');
+                if (modernEl) {
+                    modernEl.style.setProperty('display', (activeCardStyle === 'modern') ? 'flex' : 'none', 'important');
+                    if (activeCardStyle === 'modern') {
+                        modernEl.style.height = '100%';
+                        modernEl.style.width = '100%';
+                    }
+                }
+                if (cuteEl) cuteEl.style.setProperty('display', (activeCardStyle === 'cute') ? 'block' : 'none', 'important');
+                if (genZEl) {
+                    genZEl.style.setProperty('display', (activeCardStyle === 'gen_z') ? 'flex' : 'none', 'important');
+                    if (activeCardStyle === 'gen_z') {
+                        genZEl.style.flexDirection = 'column';
+                        genZEl.style.height = '100%';
+                        genZEl.style.width = '100%';
+                        genZEl.style.justifyContent = 'space-between';
+                    }
+                }
+                if (brownEl) {
+                    brownEl.style.setProperty('display', (activeCardStyle === 'brown') ? 'flex' : 'none', 'important');
+                    if (activeCardStyle === 'brown') {
+                        brownEl.style.flexDirection = 'column';
+                        brownEl.style.height = '100%';
+                        brownEl.style.width = '100%';
+                        brownEl.style.justifyContent = 'space-between';
+                    }
                 }
                 
                 // Replace all input elements with pure styled spans to completely eliminate text clipping/vertical shifting
@@ -7164,8 +7227,8 @@ function renderOffscreenCard(stage, item) {
         </div>`;
     }
     
+    stage.classList.remove('classic', 'modern', 'cute', 'gen_z', 'genz', 'brown', 'brown_look');
     if (activeStyle === 'cute') {
-        stage.classList.remove('modern');
         stage.classList.add('cute');
         const detailText = (c.is_custom_detail && c.custom_detail) ? c.custom_detail : (c.auto_detail_text || `ទំហំ: ${c.dim_str || '14cm x 13cm x 8.5cm'}\n1 កេស មាន ${c.packs_per_case || 8} ដុំ\n1 ដុំ មាន ${c.pcs_per_pack || 50} ${unitWord}\n${c.pcs_per_case || 400} ${unitWord}/1កេស\n(${c.pcs_per_case || 400} PCS/ Carton)`);
         const cuteDetailHtml = `<div style="display: flex; flex-direction: column; gap: 10px;">${renderCuteSpecsHtml(detailText)}</div>`;
@@ -7257,7 +7320,6 @@ function renderOffscreenCard(stage, item) {
             </div>
         `;
     } else if (activeStyle === 'modern') {
-        stage.classList.remove('cute');
         stage.classList.add('modern');
         const detailText = (c.is_custom_detail && c.custom_detail) ? c.custom_detail : (c.auto_detail_text || `ទំហំ: ${c.dim_str || '21cm x 21cm x 4cm'}\n1 កេស មាន ${c.packs_per_case} ដុំ\n1 ដុំ មាន ${c.pcs_per_pack} ${unitWord}\n${c.pcs_per_case} ${unitWord}/1កេស\n(${c.pcs_per_case} PCS/ Carton)`);
         const modernDetailHtml = `<div style="display: flex; flex-direction: column; gap: 9px;">${renderModernSpecsHtml(detailText)}</div>`;
@@ -7343,7 +7405,6 @@ function renderOffscreenCard(stage, item) {
             </div>
         `;
     } else if (activeStyle === 'gen_z' || activeStyle === 'genz') {
-        stage.classList.remove('modern', 'cute');
         stage.classList.add('gen_z');
         const detailText = (c.is_custom_detail && c.custom_detail) ? c.custom_detail : (c.auto_detail_text || `ទំហំ: ${c.dim_str || '25cm x 18cm x 3cm'}\n1 កេស មាន ${c.packs_per_case || 4} ដុំ\n1 ដុំ មាន ${c.pcs_per_pack || 100} ${unitWord}\n${c.pcs_per_case || 400} ${unitWord}/1កេស\n(${c.pcs_per_case || 400} PCS/ Carton)`);
         const genZDetailHtml = `<div style="display: flex; flex-direction: column; gap: 8px;">${renderGenZSpecsHtml(detailText)}</div>`;
@@ -7484,7 +7545,6 @@ function renderOffscreenCard(stage, item) {
             </div>
         `;
     } else if (activeStyle === 'brown' || activeStyle === 'brown_look') {
-        stage.classList.remove('modern', 'cute', 'gen_z');
         stage.classList.add('brown');
         stage.style.display = 'flex';
         stage.style.flexDirection = 'column';
@@ -7595,7 +7655,7 @@ function renderOffscreenCard(stage, item) {
             </div>
         `;
     } else {
-        stage.classList.remove('modern', 'cute', 'gen_z');
+        stage.classList.add('classic');
         let detailBoxHtml = '';
         if (c.is_custom_detail && c.custom_detail) {
             detailBoxHtml = `<div class="inflow-spec-custom-display font-khmer" style="display: block !important; font-size: 15px; font-weight: 700; font-style: italic; color: ${cardColor}; line-height: 1.4; white-space: pre-line; text-align: center;">${c.custom_detail}</div>`;
