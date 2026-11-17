@@ -255,5 +255,43 @@ class TestCategoryPriceTableStyle(unittest.TestCase):
         self.assertIn('onclone: (clonedDoc)', detail_html)
         self.assertIn('changePriceCardColorDetail', detail_html)
 
+    def test_modern_spec_typography_and_box_size(self):
+        """Verify product detail specs in Modern style have increased font size (15.5px) and icon dimensions (32px)."""
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        
+        # 1. static/css/styles.css
+        with open(os.path.join(base_dir, 'static', 'css', 'styles.css'), 'r', encoding='utf-8') as f:
+            css = f.read()
+            self.assertIn('.inflow-modern-spec-text {\n  font-size: 15.5px !important;', css)
+            self.assertIn('.inflow-modern-spec-icon {\n  width: 32px !important;', css)
+            self.assertIn('height: 32px !important;', css)
+            self.assertIn('.inflow-modern-spec-sub', css)
+
+        # 2. templates/products/catalog.html
+        with open(os.path.join(base_dir, 'templates', 'products', 'catalog.html'), 'r', encoding='utf-8') as f:
+            cat_html = f.read()
+            self.assertIn('font-size: 15.5px !important;', cat_html)
+            self.assertIn('width: 32px !important;', cat_html)
+            self.assertIn('MODERN_ICON_SVGS', cat_html)
+
+        # 3. templates/products/detail.html
+        with open(os.path.join(base_dir, 'templates', 'products', 'detail.html'), 'r', encoding='utf-8') as f:
+            det_html = f.read()
+            self.assertIn('font-size: 15.5px !important;', det_html)
+            self.assertIn('width: 32px !important;', det_html)
+
+        # 4. templates/products/price_list.html
+        with open(os.path.join(base_dir, 'templates', 'products', 'price_list.html'), 'r', encoding='utf-8') as f:
+            pl_html = f.read()
+            self.assertIn('.pl-modern-spec-text {\n    font-size: 15.5px !important;', pl_html)
+            self.assertIn('.pl-modern-spec-icon {\n    width: 32px !important;', pl_html)
+
+        # 5. templates/products/_catalog_workspace_main.html
+        with open(os.path.join(base_dir, 'templates', 'products', '_catalog_workspace_main.html'), 'r', encoding='utf-8') as f:
+            ws_html = f.read()
+            self.assertIn('id="specModernSpecsDisplay"', ws_html)
+            self.assertIn('justify-content: space-evenly;', ws_html)
+
 if __name__ == '__main__':
     unittest.main()
