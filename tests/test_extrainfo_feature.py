@@ -25,7 +25,7 @@ class TestExtraInfoFeature(unittest.TestCase):
             execute("DELETE FROM products WHERE id = %s", (cls.test_prod_id,))
 
     def test_product_extra_info_rendering(self):
-        resp = self.client.get(f'/products/{self.test_prod_id}?tab=tabExtraInfo')
+        resp = self.client.get(f'/products/{self.test_prod_id}?tab=tabExtraInfo&legacy=1')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
         
