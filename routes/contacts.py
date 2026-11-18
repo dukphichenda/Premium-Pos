@@ -1153,11 +1153,11 @@ def export_customer_orders(id):
     customer = query_one("SELECT * FROM customers WHERE id = %s", (id,))
     if not customer:
         flash("Customer not found", "error")
-        return redirect(url_for('contacts.customers_view'))
+        return redirect(url_for('contacts.list_customers'))
 
     if not _check_customer_branch_access(customer):
         flash("Access denied.", "error")
-        return redirect(url_for('contacts.customers_view'))
+        return redirect(url_for('contacts.list_customers'))
 
     c_name, c_contact, c_phone = resolve_customer_phone_and_name(
         customer.get('name'), customer.get('contact_name'), customer.get('phone'),
