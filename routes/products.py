@@ -2403,8 +2403,8 @@ def edit_product(id):
                 except (ValueError, TypeError):
                     pass
             recalc_product_bom_cost(id)
-        elif has_bom_submitted and (request.form.get('clear_all_boms') == '1' or request.form.get('active_tab') == 'tabBOM'):
-            # User explicitly cleared all BOM items from the BOM tab
+        elif has_bom_submitted and request.form.get('clear_all_boms') == '1':
+            # User explicitly cleared all BOM items with confirmation
             execute("DELETE FROM product_boms WHERE product_id = %s", (id,))
             recalc_product_bom_cost(id)
 

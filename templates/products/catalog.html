@@ -3974,6 +3974,37 @@ function saveProductChanges(callback) {
         if (typeof callback === 'function') callback(true);
         return;
     }
+
+    // Harvest product title (name) & SKU
+    const titleEl = document.querySelector('.inflow-cat-main-title');
+    if (titleEl) {
+        const curName = (titleEl.innerText || titleEl.textContent || '').trim();
+        const initName = titleEl.getAttribute('data-initial-val') || '';
+        if (curName && (pendingChanges['name'] !== undefined || (initName && curName !== initName))) {
+            pendingChanges['name'] = curName;
+            isDirty = true;
+        }
+    }
+    const skuEl = document.querySelector('.inflow-cat-upper-left .val');
+    if (skuEl) {
+        const curSku = (skuEl.innerText || skuEl.textContent || '').trim();
+        const initSku = skuEl.getAttribute('data-initial-val') || '';
+        if (curSku && (pendingChanges['sku'] !== undefined || (initSku && curSku !== initSku))) {
+            pendingChanges['sku'] = curSku;
+            isDirty = true;
+        }
+    }
+    const bcodeEl = document.getElementById('storageBarcode');
+    if (bcodeEl && (pendingChanges['barcode'] !== undefined || bcodeEl.value.trim() !== String(bcodeEl.defaultValue || '').trim())) {
+        pendingChanges['barcode'] = bcodeEl.value.trim();
+        isDirty = true;
+    }
+    const descEl = document.querySelector('.inflow-cat-desc-textarea');
+    if (descEl && (pendingChanges['description'] !== undefined || descEl.value.trim() !== String(descEl.defaultValue || '').trim())) {
+        pendingChanges['description'] = descEl.value.trim();
+        isDirty = true;
+    }
+
     // Harvest any live card tier quantities and prices that user modified
     [1, 2, 3].forEach(idx => {
         const qEl = document.getElementById('cardTierQtyInput' + idx);
@@ -4141,6 +4172,7 @@ function saveProductChanges(callback) {
                 }
 
                 if (payload.name) {
+                    if (titleEl) titleEl.setAttribute('data-initial-val', payload.name);
                     const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
                     if (curItem) {
                         curItem.setAttribute('data-name', payload.name.toLowerCase());
@@ -4152,6 +4184,7 @@ function saveProductChanges(callback) {
                 }
 
                 if (payload.sku) {
+                    if (skuEl) skuEl.setAttribute('data-initial-val', payload.sku);
                     const curItem = document.querySelector(`.inflow-catalog-item[data-id="${CURRENT_PRODUCT_ID}"]`);
                     if (curItem) {
                         curItem.setAttribute('data-sku', payload.sku.toLowerCase());

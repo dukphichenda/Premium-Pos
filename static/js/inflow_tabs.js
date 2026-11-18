@@ -51,19 +51,52 @@
         if (!url) return null;
         try {
             const clean = getCleanPath(url).toLowerCase();
-            const detailMatch = clean.match(/\/sales\/(\d+)/);
-            if (detailMatch) return `so-${detailMatch[1]}`;
+            const full = (url || '').toLowerCase();
+
+            // 1. New sales order
             if (clean.includes('/sales/new') || clean.includes('/sales/create') || clean.includes('/orders/new') || clean.includes('/order/new')) {
                 return 'so-new';
             }
+
+            // 2. Customers directory
             if (clean.includes('/customers') || clean.includes('/contacts/customers')) {
                 return 'so-customers';
             }
+
             if (clean.includes('/sales') || clean.includes('/orders')) {
-                const full = (url || '').toLowerCase();
-                if (full.includes('status=paid') || full.includes('status_filter=paid')) return 'so-list-paid';
-                if (full.includes('status=open') || full.includes('status_filter=open')) return 'so-list-open';
-                return 'so-list';
+                let urlObj = null;
+                try {
+                    urlObj = new URL(url, window.location.origin);
+                } catch(e) {}
+
+                const customerId = urlObj ? urlObj.searchParams.get('customer_id') : null;
+                const searchParam = urlObj ? (urlObj.searchParams.get('search') || urlObj.searchParams.get('q')) : null;
+                const statusParam = (urlObj ? (urlObj.searchParams.get('status_filter') || urlObj.searchParams.get('status')) : '') || '';
+                const st = statusParam.toLowerCase();
+
+                // Specific customer search / history
+                if (customerId) {
+                    return `so-cust-${customerId}`;
+                }
+                if (searchParam && searchParam.trim()) {
+                    return `so-search-${encodeURIComponent(searchParam.trim().toLowerCase())}`;
+                }
+
+                // Dedicated view categories (Open Invoice vs Paid Invoice vs Sale Order)
+                if (st === 'paid' || full.includes('status=paid') || full.includes('status_filter=paid')) {
+                    return 'so-paid';
+                }
+                if (st === 'open' || full.includes('status=open') || full.includes('status_filter=open')) {
+                    return 'so-open';
+                }
+                if (st === 'cancelled' || full.includes('status=cancelled') || full.includes('status_filter=cancelled')) {
+                    return 'so-cancelled';
+                }
+                if (st === 'all' || full.includes('status=all') || full.includes('status_filter=all')) {
+                    return 'so-all';
+                }
+
+                return 'so-all';
             }
         } catch (e) { }
         return null;
@@ -380,12 +413,23 @@
                 }
                 if (type === 'sales' || type === 'sales_all' || type === 'sales_open' || type === 'sales_paid' || type === 'sales_new') {
                     if (url.includes('/sales/new') || url.includes('/sales/create') || url.includes('/orders/new') || type === 'sales_new') return 'New Sales Order';
-                    const soMatch = url.match(/\/sales\/(\d+)/);
-                    if (soMatch) return `Sale Order #${soMatch[1]}`;
-                    if (url.includes('status=PAID') || url.includes('status_filter=PAID')) return 'Paid Invoice';
-                    if (url.includes('status=OPEN') || url.includes('status_filter=OPEN')) return 'Open Invoice';
-                    if (url.includes('status=ALL') || url.includes('status_filter=ALL') || url.includes('/sales')) return 'Sale Order';
-                    if (url.includes('/customers')) return 'Customer List';
+                    if (url.includes('/customers') || url.includes('/contacts/customers')) return 'Customer List';
+
+                    const full = (url || '').toLowerCase();
+                    let urlObj = null;
+                    try { urlObj = new URL(url, window.location.origin); } catch(e) {}
+                    const customerId = urlObj ? urlObj.searchParams.get('customer_id') : null;
+                    const searchParam = urlObj ? (urlObj.searchParams.get('search') || urlObj.searchParams.get('q')) : null;
+                    const statusParam = (urlObj ? (urlObj.searchParams.get('status_filter') || urlObj.searchParams.get('status')) : '') || '';
+                    const st = statusParam.toLowerCase();
+
+                    if (customerId) return `Customer Sales #${customerId}`;
+                    if (searchParam && searchParam.trim()) return `Sales: ${searchParam.trim()}`;
+
+                    if (st === 'paid' || full.includes('status=paid') || full.includes('status_filter=paid')) return 'Paid Invoice';
+                    if (st === 'open' || full.includes('status=open') || full.includes('status_filter=open')) return 'Open Invoice';
+                    if (st === 'cancelled' || full.includes('status=cancelled') || full.includes('status_filter=cancelled')) return 'Cancelled Invoice';
+                    if (st === 'all' || full.includes('status=all') || full.includes('status_filter=all') || full.includes('/sales')) return 'Sale Order';
                     return 'Sale Order';
                 }
                 if (type === 'purchase') {
@@ -646,10 +690,12 @@
                                 pageTitle = pageTitle.split(' - ')[0].trim();
                             }
                             const isStillNewOrder = (tab.title === 'New Sales Order' && (newPath.includes('/sales/new') || newPath.includes('/orders/new')));
-                            const isSalesDetail = Boolean(newPath.match(/\/sales\/\d+/));
-                            const isStillSalesList = !isSalesDetail && (newPath === '/sales' || newPath === '/orders') && (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order');
-                            if ((isStillSalesList || isStillNewOrder) && !isSalesDetail) {
-                                // Preserve dedicated category tab identities only if still on category list or /sales/new
+                            const isSalesOrderTab = tab.type === 'sales' || (tab.type && tab.type.startsWith('sales'));
+                            const soKey = isSalesOrderTab ? getSalesOrderKey(tab.url) : null;
+                            const isDedicatedSalesTab = isSalesOrderTab && Boolean(soKey && (['so-open', 'so-paid', 'so-all', 'so-cancelled', 'so-new'].includes(soKey) || soKey.startsWith('so-search-') || soKey.startsWith('so-cust-')));
+
+                            if (isStillNewOrder || isDedicatedSalesTab) {
+                                // Preserve dedicated category tab identities (Open Invoice, Paid Invoice, Sale Order, Search)
                             } else if (pageTitle && pageTitle.toLowerCase() !== 'inflow premium' && pageTitle.length > 0) {
                                 tab.origTitleEn = pageTitle;
                                 const curL = MdiShell.getLanguage ? MdiShell.getLanguage() : (localStorage.getItem('inflow_app_lang') || 'en');
