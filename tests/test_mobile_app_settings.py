@@ -18,33 +18,14 @@ class TestMobileAppSettings(unittest.TestCase):
         resp = self.client.get('/settings?tab=tabMobileApp')
         self.assertEqual(resp.status_code, 200)
         html = resp.get_data(as_text=True)
-        # Unified Mobile View & Android App assertions
-        self.assertIn('id="tabMobileSim"', html)
-        self.assertIn('btnTabMobileSim', html)
-        self.assertIn('btnTabMobileApp', html)
-        self.assertIn('Mobile View &amp; Android App', html)
-        self.assertIn('inFlow-Premium.apk', html)
-        self.assertIn('/settings/mobile-app/update', html)
-
-        # Hardware Simulator & Iframe assertions (follows real mobile view)
-        self.assertIn('id="simDeviceChassis"', html)
-        self.assertIn('id="simScreenViewport"', html)
-        self.assertIn('id="simDeviceIframe"', html)
-        self.assertIn('id="simDeviceStatusBar"', html)
-        self.assertIn('id="simDeviceHomeBar"', html)
-
-        # App Configuration Form assertions
-        self.assertIn('id="mobileAppConfigForm"', html)
-        self.assertIn('id="inputAppName"', html)
-        self.assertIn('id="inputAppEmoji"', html)
-        self.assertIn('id="themeColorInput"', html)
-        self.assertIn('id="accentColorInput"', html)
-
-        # Hero Banner Actions & Badges
-        self.assertIn('id="btnHeroPublishMobile"', html)
-        self.assertIn('id="heroLiveVersionLabel"', html)
-        self.assertIn('openPublishMobileModal()', html)
-        self.assertIn('openBottomBarCustomizerModal()', html)
+        # Mobile View in Settings is removed and redirected to tabCompany
+        self.assertNotIn('id="tabMobileSim"', html)
+        self.assertNotIn('btnTabMobileSim', html)
+        self.assertNotIn('btnTabMobileApp', html)
+        self.assertNotIn('id="simDeviceChassis"', html)
+        self.assertNotIn('id="simScreenViewport"', html)
+        self.assertIn('id="tabCompany"', html)
+        self.assertIn('Company Profile', html)
 
     def test_mobile_simulator_real_data(self):
         from routes.settings import get_mobile_simulator_real_data

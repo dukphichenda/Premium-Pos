@@ -646,28 +646,21 @@
                                 iframe.contentWindow.postMessage({ type: 'INFLOW_LANG_CHANGE', lang: curAppLang }, '*');
                             } catch (e) {}
 
-                            // Ensure newly loaded iframe receives current view mode (desktop/mobile) immediately
-                            const curViewMode = (typeof window.getCurrentViewMode === 'function')
-                                ? window.getCurrentViewMode()
-                                : (localStorage.getItem('inflow_view_mode') || ((/Android|iPhone|iPad|Mobile/i.test(navigator.userAgent) || window.innerWidth <= 992) ? 'mobile' : 'desktop'));
+                            // Ensure newly loaded iframe receives desktop view mode immediately
+                            const curViewMode = 'desktop';
                             try {
-                                iframe.contentWindow.localStorage.setItem('inflow_view_mode', curViewMode);
+                                iframe.contentWindow.localStorage.setItem('inflow_view_mode', 'desktop');
                                 if (typeof iframe.contentWindow.applyViewMode === 'function') {
-                                    iframe.contentWindow.applyViewMode(curViewMode, false);
+                                    iframe.contentWindow.applyViewMode('desktop', false);
                                 } else {
                                     const frameDoc = iframe.contentDocument || iframe.contentWindow.document;
                                     if (frameDoc && frameDoc.documentElement) {
-                                        frameDoc.documentElement.setAttribute('data-view-mode', curViewMode);
-                                        if (curViewMode === 'mobile') {
-                                            frameDoc.documentElement.classList.add('is-mobile-view');
-                                            frameDoc.documentElement.classList.remove('is-desktop-view');
-                                        } else {
-                                            frameDoc.documentElement.classList.add('is-desktop-view');
-                                            frameDoc.documentElement.classList.remove('is-mobile-view');
-                                        }
+                                        frameDoc.documentElement.setAttribute('data-view-mode', 'desktop');
+                                        frameDoc.documentElement.classList.add('is-desktop-view');
+                                        frameDoc.documentElement.classList.remove('is-mobile-view');
                                     }
                                 }
-                                iframe.contentWindow.postMessage({ type: 'INFLOW_VIEW_MODE_CHANGE', mode: curViewMode }, '*');
+                                iframe.contentWindow.postMessage({ type: 'INFLOW_VIEW_MODE_CHANGE', mode: 'desktop' }, '*');
                             } catch (e) {}
 
                             // Sync tab category type if page redirected
