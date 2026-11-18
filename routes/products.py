@@ -467,12 +467,12 @@ def _get_catalog_sidebar_products():
         LEFT JOIN inventory i ON p.id = i.product_id
         LEFT JOIN (
             SELECT 
-                sol.product_id, 
-                SUM(sol.quantity) as total_sold_qty, 
+                CASE WHEN sol.product_id IN (675, 676) THEN 675 ELSE sol.product_id END as grouped_product_id,
+                SUM(sol.quantity) as total_sold_qty,
                 COUNT(DISTINCT sol.sales_order_id) as order_count
             FROM sales_order_lines sol
-            GROUP BY sol.product_id
-        ) s ON p.id = s.product_id
+            GROUP BY 1
+        ) s ON (p.id = s.grouped_product_id OR (p.id = 676 AND s.grouped_product_id = 675))
         LEFT JOIN (
             SELECT 
                 product_id, 
@@ -665,6 +665,8 @@ def _get_product_detail_bundle(product_id, is_partial=False):
         ORDER BY version_number DESC, created_at DESC
     """, (product_id,))
 
+    target_pids = [675, 676] if product_id in (675, 676) else [product_id]
+
     # Recent stock movement logs
     recent_movements = query_all("""
         SELECT 
@@ -674,10 +676,10 @@ def _get_product_detail_bundle(product_id, is_partial=False):
         FROM inventory_logs il
         LEFT JOIN locations fl ON il.from_location_id = fl.id
         LEFT JOIN locations tl ON il.to_location_id = tl.id
-        WHERE il.product_id = %s
+        WHERE il.product_id = ANY(%s)
         ORDER BY il.created_at DESC
         LIMIT 25
-    """, (product_id,))
+    """, (target_pids,))
 
     # Order history (SO & PO)
     recent_orders = query_all("""
@@ -692,7 +694,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             LEFT JOIN customers c ON so.customer_id = c.id
-            WHERE sol.product_id = %s
+            WHERE sol.product_id = ANY(%s)
         )
         UNION ALL
         (
@@ -706,7 +708,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             FROM purchase_order_lines pol
             JOIN purchase_orders po ON pol.purchase_order_id = po.id
             LEFT JOIN vendors v ON po.vendor_id = v.id
-            WHERE pol.product_id = %s
+            WHERE pol.product_id = ANY(%s)
         )
         UNION ALL
         (
@@ -731,10 +733,10 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             JOIN products parent_p ON pb.product_id = parent_p.id
             JOIN products p ON pb.component_product_id = p.id
             LEFT JOIN vendors v ON po.vendor_id = v.id
-            WHERE pb.component_product_id = %s
+            WHERE pb.component_product_id = ANY(%s)
         )
         ORDER BY order_date DESC LIMIT 25
-    """, (product_id, product_id, product_id))
+    """, (target_pids, target_pids, target_pids))
 
     # Dedicated Sales Order History (Includes direct sales and sales via kit components, showing both paid & open)
     sales_history = query_all("""
@@ -756,7 +758,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             FROM sales_order_lines sol
             JOIN sales_orders so ON sol.sales_order_id = so.id
             LEFT JOIN customers c ON so.customer_id = c.id
-            WHERE sol.product_id = %s
+            WHERE sol.product_id = ANY(%s)
         )
         UNION ALL
         (
@@ -780,10 +782,10 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             JOIN products parent_p ON pb.product_id = parent_p.id
             JOIN products p ON pb.component_product_id = p.id
             LEFT JOIN customers c ON so.customer_id = c.id
-            WHERE pb.component_product_id = %s
+            WHERE pb.component_product_id = ANY(%s)
         )
         ORDER BY order_date DESC, order_id DESC
-    """, (product_id, product_id))
+    """, (target_pids, target_pids))
 
     sales_history_open_count = 0
     sales_history_paid_count = 0
@@ -823,7 +825,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             FROM purchase_order_lines pol
             JOIN purchase_orders po ON pol.purchase_order_id = po.id
             LEFT JOIN vendors v ON po.vendor_id = v.id
-            WHERE pol.product_id = %s
+            WHERE pol.product_id = ANY(%s)
         )
         UNION ALL
         (
@@ -860,10 +862,10 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             JOIN products parent_p ON pb.product_id = parent_p.id
             JOIN products p ON pb.component_product_id = p.id
             LEFT JOIN vendors v ON po.vendor_id = v.id
-            WHERE pb.component_product_id = %s
+            WHERE pb.component_product_id = ANY(%s)
         )
         ORDER BY order_date DESC, order_id DESC
-    """, (product_id, product_id))
+    """, (target_pids, target_pids))
 
     # Product vendors
     product_vendors = query_all("""
@@ -883,11 +885,11 @@ def _get_product_detail_bundle(product_id, is_partial=False):
                    ROW_NUMBER() OVER(PARTITION BY po.vendor_id ORDER BY po.order_date DESC) as rn
             FROM purchase_order_lines pol
             JOIN purchase_orders po ON pol.purchase_order_id = po.id
-            WHERE pol.product_id = %s
+            WHERE pol.product_id = ANY(%s)
         ) po ON v.id = po.vendor_id AND po.rn = 1
         WHERE pv.product_id = %s AND v.is_active = TRUE
         ORDER BY v.name ASC
-    """, (cost, product_id, product_id))
+    """, (cost, target_pids, product_id))
 
     if not product_vendors:
         product_vendors = query_all("""
@@ -898,11 +900,11 @@ def _get_product_detail_bundle(product_id, is_partial=False):
                        ROW_NUMBER() OVER(PARTITION BY po.vendor_id ORDER BY po.order_date DESC) as rn
                 FROM purchase_order_lines pol
                 JOIN purchase_orders po ON pol.purchase_order_id = po.id
-                WHERE pol.product_id = %s
+                WHERE pol.product_id = ANY(%s)
             ) po ON v.id = po.vendor_id AND po.rn = 1
             WHERE v.is_active = TRUE
             ORDER BY po.unit_cost IS NOT NULL DESC, v.name ASC LIMIT 25
-        """, (product_id,))
+        """, (target_pids,))
 
     attachments = query_all("""
         SELECT * FROM product_attachments WHERE product_id = %s ORDER BY created_at DESC
