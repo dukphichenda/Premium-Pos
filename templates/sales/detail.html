@@ -1393,6 +1393,44 @@ html.is-mobile-view .inflow-so-workspace.mobile-drawer-open #soMasterSidebar .so
     background: #FEF2F2;
 }
 
+.so-open-new-tab-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 19px;
+    height: 17px;
+    border-radius: 4px;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: #FFFFFF;
+    color: #475569;
+    cursor: pointer;
+    padding: 0;
+    transition: all 0.15s ease;
+    opacity: 0;
+    flex-shrink: 0;
+}
+.so-sidebar-card:hover .so-open-new-tab-btn,
+.so-open-new-tab-btn:hover {
+    opacity: 1;
+}
+.so-open-new-tab-btn:hover {
+    background: #0284C7;
+    color: #FFFFFF;
+    border-color: #0284C7;
+    box-shadow: 0 1px 4px rgba(2, 132, 199, 0.35);
+}
+.so-sidebar-card.active .so-open-new-tab-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: #FFFFFF;
+    border-color: rgba(255, 255, 255, 0.4);
+    opacity: 0.7;
+}
+.so-sidebar-card.active .so-open-new-tab-btn:hover {
+    background: #FFFFFF;
+    color: #0F172A;
+    opacity: 1;
+}
+
 .so-card-row-bottom {
     display: flex;
     align-items: center;
@@ -3285,10 +3323,31 @@ window.handleSelectOrder = function(event, targetUrl, clickedEl) {
         clickedEl = targetUrl;
         targetUrl = event;
     }
+    // Ctrl+Click, Cmd+Click, or Middle-Click opens order in a separate new tab!
+    if (event && (event.ctrlKey || event.metaKey || event.button === 1)) {
+        const ordNum = (clickedEl && clickedEl.getAttribute) ? clickedEl.getAttribute('data-order-num') : '';
+        const tabTitle = ordNum ? `Sales Order: ${ordNum}` : 'Sales Order';
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.openTab(targetUrl, tabTitle, 'sales', true);
+            return;
+        }
+    }
     if (typeof executeAnimatedOrderNavigation === 'function') {
         executeAnimatedOrderNavigation(targetUrl, clickedEl);
     } else if (targetUrl) {
         window.location.href = targetUrl;
+    }
+};
+window.openOrderInNewTab = function(event, targetUrl, orderNum) {
+    if (event) {
+        try { if (typeof event.preventDefault === 'function') event.preventDefault(); } catch(e) {}
+        try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
+    }
+    const tabTitle = orderNum ? `Sales Order: ${orderNum}` : 'Sales Order';
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.openTab(targetUrl, tabTitle, 'sales', true);
+    } else {
+        window.open(targetUrl, '_blank');
     }
 };
 function handleSelectOrder(event, targetUrl, clickedEl) {
@@ -3748,7 +3807,19 @@ function closeSoMobileDrawer() {
                         <span class="so-card-order-date" title="Order date: {{ s_ord.order_date }}">{{ s_ord.order_date | format_inflow_date }}</span>
                         {% endif %}
                     </div>
-                    <span class="so-status-pill {{ badge_class }}">{{ badge_display }}</span>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <button type="button" 
+                                class="so-open-new-tab-btn" 
+                                onclick="openOrderInNewTab(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=(branch_scope or None), search=((search_query or session.get('so_search_query')) or None)) }}', '{{ s_ord.order_number }}')" 
+                                title="Open {{ s_ord.order_number }} in New Tab (បើកក្នុង Tab ថ្មី)">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+                                <polyline points="15 3 21 3 21 9"></polyline>
+                                <line x1="10" y1="14" x2="21" y2="3"></line>
+                            </svg>
+                        </button>
+                        <span class="so-status-pill {{ badge_class }}">{{ badge_display }}</span>
+                    </div>
                 </div>
 
                 <!-- Line 2: Minor Text (Total Sale $, Customer Name) -->
@@ -5997,14 +6068,25 @@ function handleSelectOrder(event, targetUrl, clickedEl) {
         // User was scrolling, ignore click/tap
         return;
     }
-    if (event) {
-        try { if (typeof event.preventDefault === 'function') event.preventDefault(); } catch(e) {}
-        try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
-    }
     // Support legacy signature handleSelectOrder(targetUrl, clickedEl)
     if (typeof event === 'string') {
         clickedEl = targetUrl;
         targetUrl = event;
+    }
+    // Ctrl+Click, Cmd+Click, or Middle-Click opens order in a separate new tab!
+    if (event && (event.ctrlKey || event.metaKey || event.button === 1)) {
+        if (event.preventDefault) event.preventDefault();
+        if (event.stopPropagation) event.stopPropagation();
+        const ordNum = (clickedEl && clickedEl.getAttribute) ? clickedEl.getAttribute('data-order-num') : '';
+        const tabTitle = ordNum ? `Sales Order: ${ordNum}` : 'Sales Order';
+        if (window.top && window.top.inflowMdi) {
+            window.top.inflowMdi.openTab(targetUrl, tabTitle, 'sales', true);
+            return;
+        }
+    }
+    if (event) {
+        try { if (typeof event.preventDefault === 'function') event.preventDefault(); } catch(e) {}
+        try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
     }
     // Debounce rapid dual events
     const now = Date.now();
@@ -6028,6 +6110,7 @@ function handleSelectOrder(event, targetUrl, clickedEl) {
         executeAnimatedOrderNavigation(targetUrl, clickedEl);
     }
 }
+window.handleSelectOrder = handleSelectOrder;
 
 function handleCloseOrder(event) {
     if (event) event.preventDefault();
@@ -6082,13 +6165,20 @@ function createNewOrderInTab() {
     {% endif %}
     const targetUrl = buildUrlWithFilters(baseNew);
 
+    {% if not is_new %}
+    if (window.top && window.top.inflowMdi) {
+        window.top.inflowMdi.openTab(targetUrl, "New Sales Order", "sales", true);
+        return;
+    }
+    {% endif %}
+
     if (isDirty) {
         openSavePromptModal(
             function() { saveSalesOrder(); },
             function() {
                 isDirty = false;
                 if (window.top && window.top.inflowMdi) {
-                    window.top.inflowMdi.openTab(targetUrl, "Sales Order", "sales");
+                    window.top.inflowMdi.openTab(targetUrl, "New Sales Order", "sales", true);
                 } else {
                     executeAnimatedOrderNavigation(targetUrl);
                 }
@@ -6097,7 +6187,7 @@ function createNewOrderInTab() {
         );
     } else {
         if (window.top && window.top.inflowMdi) {
-            window.top.inflowMdi.openTab(targetUrl, "Sales Order", "sales");
+            window.top.inflowMdi.openTab(targetUrl, "New Sales Order", "sales", true);
         } else {
             executeAnimatedOrderNavigation(targetUrl);
         }

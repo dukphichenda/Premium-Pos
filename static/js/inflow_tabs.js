@@ -47,6 +47,28 @@
         return null;
     }
 
+    function getSalesOrderKey(url) {
+        if (!url) return null;
+        try {
+            const clean = getCleanPath(url).toLowerCase();
+            const detailMatch = clean.match(/\/sales\/(\d+)/);
+            if (detailMatch) return `so-${detailMatch[1]}`;
+            if (clean.includes('/sales/new') || clean.includes('/sales/create') || clean.includes('/orders/new') || clean.includes('/order/new')) {
+                return 'so-new';
+            }
+            if (clean.includes('/customers') || clean.includes('/contacts/customers')) {
+                return 'so-customers';
+            }
+            if (clean.includes('/sales') || clean.includes('/orders')) {
+                const full = (url || '').toLowerCase();
+                if (full.includes('status=paid') || full.includes('status_filter=paid')) return 'so-list-paid';
+                if (full.includes('status=open') || full.includes('status_filter=open')) return 'so-list-open';
+                return 'so-list';
+            }
+        } catch (e) { }
+        return null;
+    }
+
     // Module Type Detection & Icon Definitions
     function detectTypeFromUrl(url) {
         if (!url) return 'home';
@@ -358,6 +380,8 @@
                 }
                 if (type === 'sales' || type === 'sales_all' || type === 'sales_open' || type === 'sales_paid' || type === 'sales_new') {
                     if (url.includes('/sales/new') || url.includes('/sales/create') || url.includes('/orders/new') || type === 'sales_new') return 'New Sales Order';
+                    const soMatch = url.match(/\/sales\/(\d+)/);
+                    if (soMatch) return `Sale Order #${soMatch[1]}`;
                     if (url.includes('status=PAID') || url.includes('status_filter=PAID')) return 'Paid Invoice';
                     if (url.includes('status=OPEN') || url.includes('status_filter=OPEN')) return 'Open Invoice';
                     if (url.includes('status=ALL') || url.includes('status_filter=ALL') || url.includes('/sales')) return 'Sale Order';
@@ -737,6 +761,7 @@
 
                 const getBaseCategory = (cat) => {
                     if (!cat) return 'home';
+                    if (cat === 'home' || cat === 'dashboard') return 'home';
                     if (cat === 'sales' || cat.startsWith('sales_') || cat.startsWith('sales')) return 'sales';
                     if (cat === 'purchase' || cat.startsWith('purchase_') || cat.startsWith('purchase')) return 'purchase';
                     if (cat === 'product' || cat.startsWith('product_') || cat.startsWith('product')) return 'product';
@@ -752,6 +777,34 @@
                 // Rule A: On Homepage tab -> transform tab to selected category below
                 if (currentCategory === 'home' || currentBase === 'home') {
                     this.transformTab(targetTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                    return;
+                }
+
+                // Rule for Sales Orders: Distinct sales orders open in their own separate tabs
+                const targetSoKey = (targetBase === 'sales') ? getSalesOrderKey(cleanUrl) : null;
+                const currentSoKey = (currentBase === 'sales' && activeTab) ? getSalesOrderKey(activeTab.url) : null;
+
+                if (targetSoKey) {
+                    // 1. If currently viewing the exact same sales order/list, refresh/navigate in current tab
+                    if (currentSoKey && currentSoKey === targetSoKey) {
+                        this.transformTab(targetTabId, cleanUrl, displayTitle, targetCategory, forceReload);
+                        return;
+                    }
+
+                    // 2. If target is already open in another tab, switch to it
+                    const existingSoTab = this.tabs.find(t => {
+                        const sk = getSalesOrderKey(t.url);
+                        if (sk && sk === targetSoKey) return true;
+                        return t.url.replace(/[?&]embed=1/, '') === cleanUrl;
+                    });
+
+                    if (existingSoTab) {
+                        this.switchTab(existingSoTab.id);
+                        return;
+                    }
+
+                    // 3. Create a new tab for this distinct sales order
+                    this.createTab(cleanUrl, displayTitle, 'sales');
                     return;
                 }
 
@@ -785,7 +838,7 @@
                 }
 
                 // Rule B: Staying in same category -> navigate/transform within current tab (no new tab created!)
-                if (currentCategory === targetCategory || currentBase === targetBase || (currentBase === 'sales' && targetBase === 'sales')) {
+                if (currentCategory === targetCategory || currentBase === targetBase) {
                     this.transformTab(targetTabId, cleanUrl, displayTitle, targetCategory, forceReload);
                     return;
                 }
@@ -796,16 +849,6 @@
                 if (existing) {
                     this.switchTab(existing.id);
                     return;
-                }
-
-                // If target is sales (e.g. from customer or search) and a sales tab already exists, reload in that sales tab!
-                if (targetBase === 'sales') {
-                    const existingSalesTab = this.tabs.find(t => getBaseCategory(t.type) === 'sales');
-                    if (existingSalesTab) {
-                        this.switchTab(existingSalesTab.id);
-                        this.transformTab(existingSalesTab.id, cleanUrl, displayTitle, targetCategory, forceReload);
-                        return;
-                    }
                 }
 
                 // Create new tab for the foreign category document
@@ -840,7 +883,7 @@
 
                 const detectedType = newType || detectTypeFromUrl(cleanUrl);
                 let displayTitle = title || this.guessTitle(cleanUrl, detectedType);
-                if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order') {
+                if (!title && tab.title && !['Open Invoice', 'Paid Invoice', 'Sale Order', 'Sales Order', 'New Sales Order'].includes(tab.title)) {
                     displayTitle = tab.title;
                 }
 
@@ -909,16 +952,18 @@
                 tab.url = normalized;
 
                 let finalTitle = displayTitle;
-                if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || tab.title === 'New Sales Order') {
-                    finalTitle = tab.title;
+                if (displayTitle && (displayTitle.includes('SO-') || displayTitle.includes('SO #') || displayTitle.startsWith('Sales Order:'))) {
+                    finalTitle = displayTitle;
                 } else if (normalized.includes('/sales/new') || normalized.includes('/sales/create') || normalized.includes('/orders/new')) {
                     finalTitle = 'New Sales Order';
+                } else if (displayTitle && !['Open Invoice', 'Paid Invoice', 'Sale Order', 'Sales Order'].includes(displayTitle)) {
+                    finalTitle = displayTitle;
                 } else if (normalized.includes('status=PAID') || normalized.includes('status_filter=PAID')) {
                     finalTitle = 'Paid Invoice';
                 } else if (normalized.includes('status=OPEN') || normalized.includes('status_filter=OPEN')) {
                     finalTitle = 'Open Invoice';
                 } else if (normalized.includes('status=ALL') || normalized.includes('status_filter=ALL')) {
-                    finalTitle = 'Sale Order';
+                    finalTitle = 'Sales Orders';
                 }
 
                 if (finalTitle) {
