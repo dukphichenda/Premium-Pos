@@ -646,7 +646,9 @@
                                 pageTitle = pageTitle.split(' - ')[0].trim();
                             }
                             const isStillNewOrder = (tab.title === 'New Sales Order' && (newPath.includes('/sales/new') || newPath.includes('/orders/new')));
-                            if (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order' || isStillNewOrder) {
+                            const isSalesDetail = Boolean(newPath.match(/\/sales\/\d+/));
+                            const isStillSalesList = !isSalesDetail && (newPath === '/sales' || newPath === '/orders') && (tab.title === 'Open Invoice' || tab.title === 'Paid Invoice' || tab.title === 'Sale Order');
+                            if ((isStillSalesList || isStillNewOrder) && !isSalesDetail) {
                                 // Preserve dedicated category tab identities only if still on category list or /sales/new
                             } else if (pageTitle && pageTitle.toLowerCase() !== 'inflow premium' && pageTitle.length > 0) {
                                 tab.origTitleEn = pageTitle;
@@ -951,11 +953,14 @@
                 const normalized = (cleanUrl || '').replace(/[?&]embed=1/, '');
                 tab.url = normalized;
 
+                const soIdMatch = normalized.match(/\/sales\/(\d+)/);
                 let finalTitle = displayTitle;
                 if (displayTitle && (displayTitle.includes('SO-') || displayTitle.includes('SO #') || displayTitle.startsWith('Sales Order:'))) {
                     finalTitle = displayTitle;
                 } else if (normalized.includes('/sales/new') || normalized.includes('/sales/create') || normalized.includes('/orders/new')) {
                     finalTitle = 'New Sales Order';
+                } else if (soIdMatch && (!displayTitle || ['Open Invoice', 'Paid Invoice', 'Sale Order', 'Sales Order'].includes(displayTitle))) {
+                    finalTitle = `Sale Order #${soIdMatch[1]}`;
                 } else if (displayTitle && !['Open Invoice', 'Paid Invoice', 'Sale Order', 'Sales Order'].includes(displayTitle)) {
                     finalTitle = displayTitle;
                 } else if (normalized.includes('status=PAID') || normalized.includes('status_filter=PAID')) {
