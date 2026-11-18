@@ -471,9 +471,10 @@ def resync_all_sequences(cur=None):
         with get_db_cursor(commit=True) as c:
             _resync(c)
 
-def check_duplicate_customer_name(name, exclude_id=None, cur=None):
+def check_duplicate_customer_name(name, exclude_id=None, cur=None, branch_id='unset'):
     """
-    Checks if a customer with the given name already exists (active customers only).
+    Checks if a customer with the given name already exists (active customers only)
+    within the target branch or HQ (independent per HQ and branch).
     Handles both English and Khmer (case-insensitive, trims, collapsed whitespace,
     zero-width space stripping, and Unicode NFC normalization).
     Returns the existing customer record (dict/row) if duplicated, or None.
@@ -487,7 +488,37 @@ def check_duplicate_customer_name(name, exclude_id=None, cur=None):
     no_space_name = clean_name.replace(' ', '').lower()
     has_khmer = bool(re.search(r'[\u1780-\u17FF]', clean_name))
 
-    sql = """
+    # Resolve branch_id if unset from Flask request context / session
+    if branch_id == 'unset':
+        try:
+            from flask import has_request_context, session, request
+            if has_request_context():
+                req_b = request.args.get('branch_id') or request.args.get('branch')
+                if req_b is not None and str(req_b).strip() != '':
+                    branch_id = req_b
+                elif session.get('branch_id') is not None:
+                    branch_id = session.get('branch_id')
+                elif session.get('active_branch_id') is not None:
+                    branch_id = session.get('active_branch_id')
+                else:
+                    branch_id = None
+            else:
+                branch_id = None
+        except Exception:
+            branch_id = None
+
+    branch_cond = ""
+    branch_val = None
+    if branch_id is not None and str(branch_id).strip().lower() == 'all':
+        branch_cond = ""
+    elif branch_id is not None and str(branch_id).strip().isdigit() and int(branch_id) > 0:
+        branch_cond = " AND branch_id = %s"
+        branch_val = int(branch_id)
+    else:
+        # Default to HQ (branch_id IS NULL)
+        branch_cond = " AND branch_id IS NULL"
+
+    sql = f"""
         SELECT id, name, phone, contact_name, branch_id
         FROM customers
         WHERE is_active = TRUE
@@ -497,9 +528,13 @@ def check_duplicate_customer_name(name, exclude_id=None, cur=None):
               OR (%s = TRUE AND REPLACE(REPLACE(LOWER(TRIM(name)), chr(8203), ''), ' ', '') = %s)
           )
           AND (%s IS NULL OR id != %s)
+          {branch_cond}
         LIMIT 1;
     """
-    params = (clean_name, norm_name, has_khmer, no_space_name, exclude_id, exclude_id)
+    params = [clean_name, norm_name, has_khmer, no_space_name, exclude_id, exclude_id]
+    if branch_val is not None:
+        params.append(branch_val)
+    params = tuple(params)
 
     if cur is not None:
         cur.execute(sql, params)

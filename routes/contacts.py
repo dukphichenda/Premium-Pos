@@ -683,8 +683,8 @@ def save_customer(id):
             flash("Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន", "error")
             return redirect(url_for('contacts.detail_customer', id=id))
 
-        # Duplicate customer name check (English & Khmer, case-insensitive, spacing-normalized)
-        dup = check_duplicate_customer_name(name, exclude_id=id)
+        # Duplicate customer name check strictly within the target branch / HQ
+        dup = check_duplicate_customer_name(name, exclude_id=id, branch_id=target_branch_id)
         if dup:
             phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
             msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
@@ -800,8 +800,14 @@ def create_customer():
             flash("Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន", "error")
             return redirect(url_for('contacts.list_customers'))
 
-        # Duplicate customer name check (English & Khmer, case-insensitive, spacing-normalized)
-        dup = check_duplicate_customer_name(name)
+        if is_main_admin:
+            raw_b = data.get('branch_id')
+            branch_id = int(raw_b) if raw_b and str(raw_b).strip().isdigit() else None
+        else:
+            branch_id = user_bid
+
+        # Duplicate customer name check strictly within the target branch / HQ
+        dup = check_duplicate_customer_name(name, branch_id=branch_id)
         if dup:
             phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
             msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
@@ -809,12 +815,6 @@ def create_customer():
                 return jsonify({'success': False, 'message': msg, 'duplicate': True, 'existing_customer': dup}), 400
             flash(msg, "error")
             return redirect(url_for('contacts.new_customer'))
-
-        if is_main_admin:
-            raw_b = data.get('branch_id')
-            branch_id = int(raw_b) if raw_b and str(raw_b).strip().isdigit() else None
-        else:
-            branch_id = user_bid
 
         new_id = execute_returning_id("""
             INSERT INTO customers (
@@ -1307,13 +1307,32 @@ def api_check_duplicate_customer_name():
     name = (request.args.get('name') or '').strip()
     exclude_id = request.args.get('exclude_id')
     ex_id = int(exclude_id) if exclude_id and str(exclude_id).isdigit() else None
-    dup = check_duplicate_customer_name(name, exclude_id=ex_id)
+    
+    # Resolve target branch: explicit parameter -> user branch -> session active branch -> None (HQ)
+    user_role = session.get('role', 'branch_admin')
+    user_bid = session.get('branch_id')
+    is_main_admin = (user_role in ('main_admin', 'admin')) or not user_bid
+
+    raw_b = request.args.get('branch_id') or request.args.get('branch')
+    if raw_b is not None and str(raw_b).strip().lower() in ('main', 'none', 'hq', 'null', ''):
+        target_branch_id = None
+    elif raw_b and str(raw_b).strip().isdigit() and int(raw_b) > 0:
+        target_branch_id = int(raw_b)
+    elif not is_main_admin and user_bid:
+        target_branch_id = int(user_bid)
+    elif session.get('active_branch_id'):
+        target_branch_id = int(session.get('active_branch_id'))
+    else:
+        target_branch_id = None
+
+    dup = check_duplicate_customer_name(name, exclude_id=ex_id, branch_id=target_branch_id)
     if dup:
         phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
         return jsonify({
             'duplicate': True,
             'existing_name': dup['name'],
             'phone': dup.get('phone') or '',
+            'branch_id': dup.get('branch_id'),
             'message': f"Customer name '{dup['name']}'{phone_info} already exists! / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ!"
         })
     return jsonify({'duplicate': False})
@@ -1344,24 +1363,13 @@ def quick_add_customer_ajax():
         if not name:
             return jsonify({'success': False, 'message': 'Customer name is required / សូមបញ្ចូលឈ្មោះអតិថិជន'}), 400
 
-        # Duplicate customer name check (English & Khmer, case-insensitive, spacing-normalized)
-        dup = check_duplicate_customer_name(name)
-        if dup:
-            phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
-            msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
-            return jsonify({
-                'success': False,
-                'message': msg,
-                'duplicate': True,
-                'existing_customer': dup
-            }), 400
-
         # Safely validate pricing_scheme_id exists
         chk_scheme = query_one("SELECT id FROM pricing_schemes WHERE id = %s", (pricing_scheme_id,))
         if not chk_scheme:
             fallback_ps = query_one("SELECT id FROM pricing_schemes ORDER BY id ASC LIMIT 1")
             pricing_scheme_id = fallback_ps['id'] if fallback_ps else 100
 
+        # Resolve target branch for customer creation
         if not is_main_admin:
             branch_id = user_bid
         else:
@@ -1378,6 +1386,18 @@ def quick_add_customer_ajax():
             chk_b = query_one("SELECT id FROM branches WHERE id = %s", (branch_id,))
             if not chk_b:
                 branch_id = None
+
+        # Duplicate customer name check strictly within target branch (HQ vs each branch)
+        dup = check_duplicate_customer_name(name, branch_id=branch_id)
+        if dup:
+            phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
+            msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"
+            return jsonify({
+                'success': False,
+                'message': msg,
+                'duplicate': True,
+                'existing_customer': dup
+            }), 400
 
         new_id = execute_returning_id("""
             INSERT INTO customers (

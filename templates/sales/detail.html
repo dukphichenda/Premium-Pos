@@ -4575,7 +4575,14 @@ window.pricingSchemes = [
 
 window.allCustomersList = [
     {% for c in all_customers %}
-    { id: {{ c.id }}, name: {{ c.name | tojson }}, contact: {{ (c.contact_name or '') | tojson }}, phone: {{ (c.phone or '') | tojson }}, address: {{ (c.customer_address or c.address1 or c.address or c.shipping_address or '') | tojson }} },
+    { 
+        id: {{ c.id }}, 
+        branch_id: {{ (c.branch_id if c.branch_id is not none else '') | tojson }},
+        name: {{ c.name | tojson }}, 
+        contact: {{ (c.contact_name or '') | tojson }}, 
+        phone: {{ (c.phone or '') | tojson }}, 
+        address: {{ (c.customer_address or c.address1 or c.address or c.shipping_address or '') | tojson }} 
+    },
     {% endfor %}
 ];
 
@@ -9204,12 +9211,15 @@ function normalizeKhmerOrEngName(str) {
 
 function findClientSideDuplicateCustomer(name) {
     if (!name || !name.trim()) return null;
+    const activeBranchId = typeof getActiveOrderBranchId === 'function' ? String(getActiveOrderBranchId() || '') : '';
     const norm = normalizeKhmerOrEngName(name);
     const noSpace = norm.replace(/\s+/g, '');
     const hasKhmer = /[\u1780-\u17FF]/.test(norm);
 
     const rows = document.querySelectorAll('#customerDropdownBody tr.main-cust-row');
     for (let i = 0; i < rows.length; i++) {
+        const rowBranchId = String(rows[i].getAttribute('data-branch-id') || '');
+        if (rowBranchId !== activeBranchId) continue; // Only check duplicate within own HQ / branch!
         const cname = rows[i].getAttribute('data-cname') || '';
         const rowNorm = normalizeKhmerOrEngName(cname);
         if (rowNorm === norm) return cname;
@@ -9229,7 +9239,7 @@ function checkQuickAddNameDuplicate(val) {
         return;
     }
 
-    // 1. Instant check against client-side loaded customers
+    // 1. Instant check against client-side loaded customers for active branch
     const localDup = findClientSideDuplicateCustomer(trimmed);
     if (localDup) {
         const msg = `⚠️ ឈ្មោះអតិថិជន "${localDup}" មានរួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។ / Customer name "${localDup}" already exists! Duplicate names not allowed.`;
@@ -9241,10 +9251,11 @@ function checkQuickAddNameDuplicate(val) {
         return;
     }
 
-    // 2. Debounced server-side check against all active customers
+    // 2. Debounced server-side check against active branch/HQ customers
     clearTimeout(quickAddCheckTimer);
     quickAddCheckTimer = setTimeout(() => {
-        fetch('/api/customers/check-duplicate-name?name=' + encodeURIComponent(trimmed))
+        const activeBranchId = typeof getActiveOrderBranchId === 'function' ? String(getActiveOrderBranchId() || '') : '';
+        fetch('/api/customers/check-duplicate-name?name=' + encodeURIComponent(trimmed) + '&branch_id=' + encodeURIComponent(activeBranchId))
             .then(r => r.json())
             .then(d => {
                 if (d.duplicate) {
@@ -9491,6 +9502,7 @@ function submitQuickAddCustomerAjax() {
                 if (!window.allCustomersList) window.allCustomersList = [];
                 window.allCustomersList.unshift({
                     id: cust.id,
+                    branch_id: custBranchAttr,
                     name: cust.name,
                     contact: cust.contact_name || '',
                     phone: cust.phone || '',
@@ -10375,7 +10387,11 @@ function handleSoLiveSearch(val, isUserTyping) {
 
     if (suggestPopup && suggestTbody) {
         if (isUserTyping && q && q.length >= 1 && window.allCustomersList && window.allCustomersList.length > 0) {
+            const activeBranchId = typeof getActiveOrderBranchId === 'function' ? String(getActiveOrderBranchId() || '') : '';
             const matchedCustomers = window.allCustomersList.filter(c => {
+                const cBranchId = String(c.branch_id !== null && c.branch_id !== undefined ? c.branch_id : '');
+                // Strict branch isolation: customer must belong to the active branch (or HQ if activeBranchId is '')
+                if (cBranchId !== activeBranchId) return false;
                 const cName = (c.name || '').toLowerCase();
                 const cContact = (c.contact || '').toLowerCase();
                 const cPhone = (c.phone || '').toLowerCase();

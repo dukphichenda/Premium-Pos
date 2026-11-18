@@ -1522,7 +1522,8 @@ def branch_create_customer(id):
             flash("Customer Name is required / សូមបញ្ចូលឈ្មោះអតិថិជន", "error")
             return redirect(url_for('contacts.list_customers', branch=id))
 
-        dup = check_duplicate_customer_name(name)
+        # Duplicate customer name check strictly within target branch
+        dup = check_duplicate_customer_name(name, branch_id=id)
         if dup:
             phone_info = f" ({dup['phone']})" if dup.get('phone') else ""
             msg = f"Customer name '{dup['name']}'{phone_info} already exists! Duplicate names are not allowed. / មានអតិថិជនឈ្មោះ '{dup['name']}'{phone_info} រួចហើយ! មិនអនុញ្ញាតឱ្យបង្កើតឈ្មោះស្ទួនទេ។"

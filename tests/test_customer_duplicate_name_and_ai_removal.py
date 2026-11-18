@@ -25,7 +25,49 @@ class TestCustomerDuplicateNameAndAiRemoval(unittest.TestCase):
 
     def tearDown(self):
         # Clean up any transient test customers
-        execute("DELETE FROM customers WHERE name IN ('Unique Test Customer 8888', 'តេស្ត អតិថិជន ខ្មែរ')")
+        execute("DELETE FROM customers WHERE name IN ('Unique Test Customer 8888', 'តេស្ត អតិថិជន ខ្មែរ', 'Xiao Long Branch 3 Test') OR (name = 'Xiao Long' AND branch_id IS NOT NULL)")
+
+    def test_check_duplicate_customer_name_branch_isolation(self):
+        """Test that duplicate check is strictly independent per HQ and branch"""
+        # self.eng_cust ('Xiao Long') is in HQ (branch_id IS NULL)
+        # Checking for HQ should be duplicate
+        dup_hq = check_duplicate_customer_name('Xiao Long', branch_id=None)
+        self.assertIsNotNone(dup_hq)
+        self.assertEqual(dup_hq['name'], 'Xiao Long')
+
+        # Checking for Branch 3 should NOT be duplicate because Xiao Long is only in HQ
+        dup_b3 = check_duplicate_customer_name('Xiao Long', branch_id=3)
+        self.assertIsNone(dup_b3)
+
+        # Checking via API for Branch 3
+        resp_b3 = self.client.get('/api/customers/check-duplicate-name?name=Xiao+Long&branch_id=3')
+        self.assertEqual(resp_b3.status_code, 200)
+        self.assertFalse(resp_b3.get_json()['duplicate'])
+
+        # Checking via API for HQ / main
+        resp_hq = self.client.get('/api/customers/check-duplicate-name?name=Xiao+Long&branch_id=main')
+        self.assertEqual(resp_hq.status_code, 200)
+        self.assertTrue(resp_hq.get_json()['duplicate'])
+
+        # Quick add should succeed for Branch 3 even though Xiao Long exists in HQ
+        resp_add = self.client.post('/api/customers/quick-add', json={
+            'name': 'Xiao Long',
+            'phone': '098111222',
+            'branch_id': 3
+        })
+        self.assertEqual(resp_add.status_code, 200)
+        add_data = resp_add.get_json()
+        self.assertTrue(add_data['success'])
+        self.assertEqual(add_data['customer']['branch_id'], 3)
+
+        # Now in branch 3, duplicate check should detect this new branch 3 customer
+        dup_b3_after = check_duplicate_customer_name('Xiao Long', branch_id=3)
+        self.assertIsNotNone(dup_b3_after)
+        self.assertEqual(dup_b3_after['branch_id'], 3)
+
+        # But branch 2 should still NOT have duplicate
+        dup_b2 = check_duplicate_customer_name('Xiao Long', branch_id=2)
+        self.assertIsNone(dup_b2)
 
     def test_check_duplicate_customer_name_english(self):
         """Test English duplicate detection (case-insensitive, trims, collapsed spaces)"""
