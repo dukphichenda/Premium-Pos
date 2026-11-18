@@ -397,9 +397,10 @@
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                     <span>Product vendors</span>
                 </button>
-                <button type="button" class="inflow-cat-pill" onclick="switchCatalogTab('tabOrders', this)">
+                <button type="button" class="inflow-cat-pill" id="pillOrdersTab" onclick="switchCatalogTab('tabOrders', this)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                     <span>Order history</span>
+                    <span id="badgeOrdersCount" style="background: {% if sales_history and sales_history|length > 0 %}#0284C7{% else %}#94A3B8{% endif %}; color: #fff; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 700; margin-left: 2px;">{{ sales_history|length if sales_history else 0 }}</span>
                 </button>
                 <button type="button" class="inflow-cat-pill" onclick="switchCatalogTab('tabPurchases', this)">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
@@ -762,56 +763,169 @@
                 </div>
             </div>
 
-            <!-- TAB 3: ORDER HISTORY (Sales Orders) -->
+            <!-- TAB 3: ORDER HISTORY (Sales Orders - Showing Both Paid and Open Invoices) -->
             <div id="tabOrders" class="inflow-cat-tab-content" style="display: none;">
                 <div class="inflow-cat-panel-box">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
                         <div>
-                            <h2 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Sales Order History</h2>
-                            <span style="font-size: 12px; color: #64748B;">Customer sales records for this product</span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <h2 style="font-size: 15px; font-weight: 700; color: #0F172A; margin: 0;">Sales Order History</h2>
+                                <span style="font-size: 11.5px; font-weight: 700; background: #E0F2FE; color: #0284C7; padding: 2px 8px; border-radius: 12px; border: 1px solid #BAE6FD;" id="soHistoryTotalBadge">
+                                    {{ sales_history|length }} Orders
+                                </span>
+                            </div>
+                            <span style="font-size: 12px; color: #64748B;">Customer sales records for this product (showing both paid and open invoices)</span>
                         </div>
-                        <a href="{{ url_for('sales_orders.create_order', product_id=product.id) }}" class="inflow-tb-btn primary" onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab(this.href, 'New Sales Order', 'sales', true); return false; } else { return handleNavClick(event, this.href); }">+ Create Sales Order</a>
+                        
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                            <!-- Filter Segment: All, Open Invoices, Paid Invoices -->
+                            <div style="display: inline-flex; background: #F1F5F9; padding: 3px; border-radius: 8px; border: 1px solid #E2E8F0; gap: 3px;">
+                                <button type="button" class="so-hist-filter-pill active" id="btnHistFilterAll" onclick="filterSalesHistory('ALL', this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: none; background: #0284C7; color: #FFFFFF; cursor: pointer; transition: all 0.15s ease;">
+                                    All ({{ sales_history|length }})
+                                </button>
+                                <button type="button" class="so-hist-filter-pill" id="btnHistFilterOpen" onclick="filterSalesHistory('OPEN', this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: none; background: transparent; color: #D97706; cursor: pointer; transition: all 0.15s ease;">
+                                    Open Invoices ({{ sales_history_open_count|default(0) }})
+                                </button>
+                                <button type="button" class="so-hist-filter-pill" id="btnHistFilterPaid" onclick="filterSalesHistory('PAID', this)" style="padding: 4px 10px; font-size: 11.5px; font-weight: 700; border-radius: 6px; border: none; background: transparent; color: #059669; cursor: pointer; transition: all 0.15s ease;">
+                                    Paid Invoices ({{ sales_history_paid_count|default(0) }})
+                                </button>
+                            </div>
+
+                            <!-- Live search box -->
+                            <div style="position: relative;">
+                                <input type="text" id="soHistSearchInput" placeholder="Search order #, customer..." oninput="searchSalesHistory(this.value)" style="height: 30px; font-size: 11.5px; padding: 2px 24px 2px 8px; border: 1px solid #CBD5E1; border-radius: 6px; width: 180px;">
+                                <span id="soHistSearchClear" onclick="document.getElementById('soHistSearchInput').value=''; searchSalesHistory(''); this.style.display='none';" style="display: none; position: absolute; right: 7px; top: 6px; cursor: pointer; color: #94A3B8; font-size: 12px; font-weight: 700;">✕</span>
+                            </div>
+
+                            <a href="{{ url_for('sales_orders.create_order', product_id=product.id) }}" class="inflow-tb-btn primary" onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab(this.href, 'New Sales Order', 'sales', true); return false; } else { return handleNavClick(event, this.href); }">+ Create Sales Order</a>
+                        </div>
                     </div>
-                    <table class="inflow-win-grid">
-                        <thead>
-                            <tr>
-                                <th>Order #</th>
-                                <th>Date</th>
-                                <th>Customer</th>
-                                <th style="text-align: right;">Quantity</th>
-                                <th style="text-align: left; width: 75px;">UOM</th>
-                                <th style="text-align: right;">Unit Price</th>
-                                <th style="text-align: right;">Total Amount</th>
-                                <th style="text-align: center;">Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for ord in sales_history %}
-                            <tr>
-                                <td style="font-weight: 600;">
-                                    <a href="{{ url_for('sales_orders.detail_order', id=ord.order_id) }}" onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=ord.order_id) }}', 'Sales Order {{ ord.order_number }}', 'sales', true); return false; } else { return handleNavClick(event, this.href); }">{{ ord.order_number }}</a>
-                                </td>
-                                <td>{{ ord.order_date | format_inflow_date }}</td>
-                                <td>{{ ord.customer_name or ord.party_name or '-' }}</td>
-                                <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(ord.quantity|float) if ord.quantity is not none else '0' }}</td>
-                                <td>
-                                    <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ ord.uom or product.sales_uom or product.uom or 'pcs' }}</span>
-                                </td>
-                                <td style="text-align: right;">${{ "{:,.2f}".format(ord.unit_price|float) }}</td>
-                                <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(ord.total_amount|float) }}</td>
-                                <td style="text-align: center;">
-                                    <span class="badge {% if ord.status == 'Fulfilled' or ord.status == 'Invoiced' %}badge-success{% elif ord.status == 'Canceled' %}badge-danger{% else %}badge-info{% endif %}">
-                                        {{ ord.status }}
-                                    </span>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="8" style="text-align: center; padding: 24px; color: #64748B;">No sales order history found for this product.</td></tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+
+                    <div style="max-height: 600px; overflow-y: auto; border: 1px solid #E2E8F0; border-radius: 6px;">
+                        <table class="inflow-win-grid" style="width: 100%; border-collapse: collapse;">
+                            <thead style="position: sticky; top: 0; background: #F8FAFC; z-index: 1;">
+                                <tr>
+                                    <th style="width: 38px; text-align: center;">#</th>
+                                    <th>Order #</th>
+                                    <th>Date</th>
+                                    <th>Customer</th>
+                                    <th style="text-align: right;">Quantity</th>
+                                    <th style="text-align: left; width: 75px;">UOM</th>
+                                    <th style="text-align: right;">Unit Price</th>
+                                    <th style="text-align: right;">Total Amount</th>
+                                    <th style="text-align: center; width: 90px;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="soHistTableBody">
+                                {% for ord in sales_history %}
+                                <tr class="so-hist-row" 
+                                    data-status="{{ ord.display_status|upper }}" 
+                                    data-search="{{ ord.order_number|lower }} {{ (ord.customer_name or ord.party_name or '')|lower }}"
+                                    style="border-bottom: 1px solid #F1F5F9;">
+                                    <td style="text-align: center; font-size: 11px; color: #94A3B8;">{{ loop.index }}</td>
+                                    <td style="font-weight: 600;">
+                                        <a href="{{ url_for('sales_orders.detail_order', id=ord.order_id) }}" onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=ord.order_id) }}', 'Sales Order {{ ord.order_number }}', 'sales', true); return false; } else { return handleNavClick(event, this.href); }">{{ ord.order_number }}</a>
+                                        {% if ord.parent_kit_sku %}
+                                        <span style="font-size: 10px; background: #EFF6FF; color: #1D4ED8; border: 1px solid #BFDBFE; padding: 1px 4px; border-radius: 4px; margin-left: 4px;" title="Sold as part of kit: {{ ord.parent_kit_name or ord.parent_kit_sku }}">📦 Kit: {{ ord.parent_kit_sku }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ ord.order_date | format_inflow_date }}</td>
+                                    <td>
+                                        <span style="display: flex; align-items: center; gap: 4px;">
+                                            <span>👤</span>
+                                            <span>{{ ord.customer_name or ord.party_name or '-' }}</span>
+                                        </span>
+                                    </td>
+                                    <td style="text-align: right; font-weight: 600;">{{ "{:g}".format(ord.quantity|float) if ord.quantity is not none else '0' }}</td>
+                                    <td>
+                                        <span style="font-size: 11px; font-weight: 600; color: #334155; background: #F1F5F9; border: 1px solid #CBD5E1; padding: 1px 6px; border-radius: 4px;">{{ ord.uom or product.sales_uom or product.uom or 'pcs' }}</span>
+                                    </td>
+                                    <td style="text-align: right;">${{ "{:,.2f}".format(ord.unit_price|float) }}</td>
+                                    <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format(ord.total_amount|float) }}</td>
+                                    <td style="text-align: center;">
+                                        {% if ord.display_status == 'PAID' %}
+                                        <span style="display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: 12px; background: #ECFDF5; color: #059669; border: 1px solid #A7F3D0;">
+                                            PAID
+                                        </span>
+                                        {% elif ord.display_status == 'OPEN' %}
+                                        <span style="display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: 12px; background: #FEF3C7; color: #D97706; border: 1px solid #FDE68A;">
+                                            OPEN
+                                        </span>
+                                        {% elif ord.display_status == 'CANCELLED' %}
+                                        <span style="display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: 12px; background: #FEF2F2; color: #DC2626; border: 1px solid #FECACA;">
+                                            CANCELLED
+                                        </span>
+                                        {% else %}
+                                        <span style="display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: 12px; background: #EFF6FF; color: #2563EB; border: 1px solid #BFDBFE;">
+                                            {{ ord.status }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr id="soHistNoDataRow"><td colspan="9" style="text-align: center; padding: 24px; color: #64748B;">No sales order history found for this product.</td></tr>
+                                {% endfor %}
+                                <tr id="soHistEmptyMatchRow" style="display: none;"><td colspan="9" style="text-align: center; padding: 24px; color: #64748B;">No sales orders match the current filter.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
+            <script>
+            window._curHistStatusFilter = 'ALL';
+            window.filterSalesHistory = function(status, btn) {
+                window._curHistStatusFilter = status;
+                document.querySelectorAll('.so-hist-filter-pill').forEach(b => {
+                    b.style.background = 'transparent';
+                    b.classList.remove('active');
+                    if (b.id === 'btnHistFilterOpen') b.style.color = '#D97706';
+                    else if (b.id === 'btnHistFilterPaid') b.style.color = '#059669';
+                    else b.style.color = '#475569';
+                });
+                if (btn) {
+                    btn.classList.add('active');
+                    btn.style.color = '#FFFFFF';
+                    if (status === 'OPEN') btn.style.background = '#D97706';
+                    else if (status === 'PAID') btn.style.background = '#059669';
+                    else btn.style.background = '#0284C7';
+                }
+                applySalesHistoryFilters();
+            };
+
+            window.searchSalesHistory = function(query) {
+                const clearBtn = document.getElementById('soHistSearchClear');
+                if (clearBtn) clearBtn.style.display = query ? 'inline' : 'none';
+                applySalesHistoryFilters();
+            };
+
+            function applySalesHistoryFilters() {
+                const stFilter = window._curHistStatusFilter || 'ALL';
+                const query = (document.getElementById('soHistSearchInput')?.value || '').toLowerCase().trim();
+                const rows = document.querySelectorAll('.so-hist-row');
+                let visibleCount = 0;
+
+                rows.forEach(r => {
+                    const rowStatus = r.getAttribute('data-status') || '';
+                    const rowSearch = r.getAttribute('data-search') || '';
+
+                    const statusMatch = (stFilter === 'ALL') || (rowStatus === stFilter);
+                    const searchMatch = !query || rowSearch.includes(query);
+
+                    if (statusMatch && searchMatch) {
+                        r.style.display = '';
+                        visibleCount++;
+                    } else {
+                        r.style.display = 'none';
+                    }
+                });
+
+                const emptyMatchRow = document.getElementById('soHistEmptyMatchRow');
+                if (emptyMatchRow) {
+                    emptyMatchRow.style.display = (visibleCount === 0 && rows.length > 0) ? '' : 'none';
+                }
+            }
+            </script>
 
             <!-- TAB 3B: PURCHASE HISTORY (Adjacent to Order History) -->
             <div id="tabPurchases" class="inflow-cat-tab-content" style="display: none;">

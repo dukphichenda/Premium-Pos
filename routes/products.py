@@ -736,25 +736,71 @@ def _get_product_detail_bundle(product_id, is_partial=False):
         ORDER BY order_date DESC LIMIT 25
     """, (product_id, product_id, product_id))
 
-    # Dedicated Sales Order History
+    # Dedicated Sales Order History (Includes direct sales and sales via kit components, showing both paid & open)
     sales_history = query_all("""
-        SELECT 
-            'SO' as order_type, 
-            so.id as order_id, 
-            so.order_number, 
-            so.order_date, 
-            c.name as customer_name, 
-            COALESCE(sol.quantity_display, sol.quantity) as quantity, 
-            sol.uom, 
-            sol.unit_price, 
-            COALESCE(sol.subtotal, (COALESCE(sol.quantity_display, sol.quantity) * sol.unit_price)) as total_amount,
-            so.status
-        FROM sales_order_lines sol
-        JOIN sales_orders so ON sol.sales_order_id = so.id
-        LEFT JOIN customers c ON so.customer_id = c.id
-        WHERE sol.product_id = %s
-        ORDER BY so.order_date DESC, so.id DESC LIMIT 30
-    """, (product_id,))
+        (
+            SELECT 
+                'SO' as order_type, 
+                so.id as order_id, 
+                so.order_number, 
+                so.order_date, 
+                c.name as customer_name, 
+                COALESCE(sol.quantity_display, sol.quantity) as quantity, 
+                sol.uom, 
+                sol.unit_price, 
+                COALESCE(sol.subtotal, (COALESCE(sol.quantity_display, sol.quantity) * sol.unit_price)) as total_amount,
+                so.status,
+                so.payment_status,
+                NULL::text as parent_kit_sku,
+                NULL::text as parent_kit_name
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE sol.product_id = %s
+        )
+        UNION ALL
+        (
+            SELECT 
+                'SO (Kit)' as order_type, 
+                so.id as order_id, 
+                so.order_number, 
+                so.order_date, 
+                c.name as customer_name, 
+                ROUND(COALESCE(sol.quantity_display, sol.quantity) * pb.quantity, 2) as quantity, 
+                p.uom, 
+                ROUND(sol.unit_price * (pb.cost / NULLIF(parent_p.standard_cost, 0)), 4) as unit_price, 
+                ROUND(COALESCE(sol.subtotal, (COALESCE(sol.quantity_display, sol.quantity) * sol.unit_price)) * (pb.cost / NULLIF(parent_p.standard_cost, 0)), 2) as total_amount,
+                so.status,
+                so.payment_status,
+                parent_p.sku as parent_kit_sku,
+                parent_p.name as parent_kit_name
+            FROM product_boms pb
+            JOIN sales_order_lines sol ON pb.product_id = sol.product_id
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            JOIN products parent_p ON pb.product_id = parent_p.id
+            JOIN products p ON pb.component_product_id = p.id
+            LEFT JOIN customers c ON so.customer_id = c.id
+            WHERE pb.component_product_id = %s
+        )
+        ORDER BY order_date DESC, order_id DESC
+    """, (product_id, product_id))
+
+    sales_history_open_count = 0
+    sales_history_paid_count = 0
+    for sh in sales_history:
+        st_raw = (sh.get('status') or '').strip().upper()
+        pst_raw = (sh.get('payment_status') or '').strip().upper()
+        if st_raw == 'CANCELLED' or pst_raw == 'CANCELLED':
+            sh['display_status'] = 'CANCELLED'
+            sh['badge_class'] = 'badge-cancelled'
+        elif st_raw == 'OPEN' or pst_raw == 'UNPAID':
+            sh['display_status'] = 'OPEN'
+            sh['badge_class'] = 'badge-open'
+            sales_history_open_count += 1
+        else:
+            sh['display_status'] = 'PAID'
+            sh['badge_class'] = 'badge-paid'
+            sales_history_paid_count += 1
 
     # Dedicated Purchase Order History
     purchase_history = query_all("""
@@ -816,7 +862,7 @@ def _get_product_detail_bundle(product_id, is_partial=False):
             LEFT JOIN vendors v ON po.vendor_id = v.id
             WHERE pb.component_product_id = %s
         )
-        ORDER BY order_date DESC, order_id DESC LIMIT 30
+        ORDER BY order_date DESC, order_id DESC
     """, (product_id, product_id))
 
     # Product vendors
@@ -922,6 +968,8 @@ def _get_product_detail_bundle(product_id, is_partial=False):
         'recent_movements': recent_movements,
         'recent_orders': recent_orders,
         'sales_history': sales_history,
+        'sales_history_open_count': sales_history_open_count,
+        'sales_history_paid_count': sales_history_paid_count,
         'purchase_history': purchase_history,
         'product_vendors': product_vendors,
         'attachments': attachments,
