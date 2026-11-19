@@ -850,6 +850,7 @@
         <input type="hidden" name="customer_id" id="repCustomerId" value="{{ customer_id or '' }}">
         <input type="hidden" name="customer_search" id="formCustomerSearchInput" value="{{ customer_search or '' }}">
         <input type="hidden" name="sale_amount" id="formSaleAmountInput" value="{{ sale_amount or '' }}">
+        <input type="hidden" name="payment_method" id="formPaymentMethodInput" value="{{ payment_method or '' }}">
         <input type="hidden" name="delivery_man_filter" id="formDeliveryManFilterInput" value="{{ delivery_man_filter or '' }}">
         <input type="hidden" name="category_id" id="formCategoryIdInput" value="{{ category_id }}">
         <input type="hidden" name="costing_scheme_id" id="formCostingSchemeInput" value="{{ costing_scheme_id }}">
@@ -887,6 +888,27 @@
                         <div class="popover-item {% if status == 'Open' %}selected{% endif %}" onclick="selectFilterStatus('Open')">Open</div>
                         <div class="popover-item {% if status == 'Invoiced' %}selected{% endif %}" onclick="selectFilterStatus('Invoiced')">Invoiced</div>
                         <div class="popover-item {% if status == 'All' or not status %}selected{% endif %}" onclick="selectFilterStatus('All')">All Statuses</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1B. Paid By / Payment Method Filter Chip -->
+            <div class="inflow-filter-chip-wrapper" id="chipWrapPaymentMethod">
+                <button type="button" class="inflow-chip-pill {% if payment_method and payment_method != 'All' %}active-purple{% endif %}" onclick="toggleChipPopover('popoverPaymentMethod', event)">
+                    <span>💳</span>
+                    <span id="chipPaymentMethodLabel">{% if payment_method and payment_method != 'All' %}Paid: {{ payment_method }}{% else %}Paid By: All{% endif %}</span>
+                </button>
+                <div id="popoverPaymentMethod" class="inflow-popover-dropdown" style="min-width: 230px;">
+                    <div class="popover-search-wrap">
+                        <input type="text" class="popover-search-input" placeholder="Search payment method..." oninput="filterPopoverList(this, 'popoverPaymentMethodList')">
+                    </div>
+                    <div class="popover-list" id="popoverPaymentMethodList">
+                        <div class="popover-item {% if not payment_method or payment_method == 'All' %}selected{% endif %}" onclick="selectFilterPaymentMethod('')">All Payment Methods</div>
+                        <div class="popover-item {% if payment_method == 'ABA Bank' or payment_method == 'ABA' %}selected{% endif %}" onclick="selectFilterPaymentMethod('ABA Bank')">ABA Bank (ABA Pay / QR)</div>
+                        <div class="popover-item {% if payment_method == 'Cash' %}selected{% endif %}" onclick="selectFilterPaymentMethod('Cash')">Cash (សាច់ប្រាក់)</div>
+                        <div class="popover-item {% if payment_method == 'ACLEDA' %}selected{% endif %}" onclick="selectFilterPaymentMethod('ACLEDA')">ACLEDA (ToanChet)</div>
+                        <div class="popover-item {% if payment_method == 'KB PRASAC' %}selected{% endif %}" onclick="selectFilterPaymentMethod('KB PRASAC')">KB PRASAC</div>
+                        <div class="popover-item {% if payment_method in ['Other Banks', 'Other', 'Other Payment'] %}selected{% endif %}" onclick="selectFilterPaymentMethod('Other Banks')">Other Banks / Other Payment (ធនាគារផ្សេងៗ)</div>
                     </div>
                 </div>
             </div>
@@ -1102,7 +1124,7 @@
                     <span>Export ▾</span>
                 </button>
                 <div id="reportExportMenu" class="inflow-popover-dropdown" style="right: 0; left: auto;">
-                    <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, customer_search=customer_search, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by, sale_amount=sale_amount) }}" download data-no-tab="true" class="popover-item" style="text-decoration: none;">
+                    <a href="{{ url_for('reports.export_report', report_key=report_key, date_range=date_range, status=status, customer_id=customer_id, customer_search=customer_search, vendor_id=vendor_id, category_id=category_id, location_id=location_id, branch=branch_scope, costing_scheme_id=costing_scheme_id, currency=currency, sort_by=sort_by, group_by=group_by, sale_amount=sale_amount, payment_method=payment_method) }}" download data-no-tab="true" class="popover-item" style="text-decoration: none;">
                         📊 Microsoft Excel (*.csv)
                     </a>
                     <a href="javascript:void(0)" onclick="window.print()" class="popover-item" style="text-decoration: none;">
@@ -2364,6 +2386,19 @@
                 </select>
             </div>
 
+            <!-- Paid By (Payment Method / Bank) -->
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Paid By (Payment Method / Bank)</label>
+                <select class="popover-search-input" id="drawerPaymentMethodSelect" onchange="document.getElementById('formPaymentMethodInput').value = this.value">
+                    <option value="" {% if not payment_method or payment_method == 'All' %}selected{% endif %}>All Payment Methods (ទាំងអស់)</option>
+                    <option value="ABA Bank" {% if payment_method == 'ABA Bank' or payment_method == 'ABA' %}selected{% endif %}>ABA Bank (ABA Pay / QR)</option>
+                    <option value="Cash" {% if payment_method == 'Cash' %}selected{% endif %}>Cash (សាច់ប្រាក់)</option>
+                    <option value="ACLEDA" {% if payment_method == 'ACLEDA' %}selected{% endif %}>ACLEDA (ToanChet)</option>
+                    <option value="KB PRASAC" {% if payment_method == 'KB PRASAC' %}selected{% endif %}>KB PRASAC</option>
+                    <option value="Other Banks" {% if payment_method in ['Other Banks', 'Other', 'Other Payment'] %}selected{% endif %}>Other Banks / Other Payment (ធនាគារផ្សេងៗ)</option>
+                </select>
+            </div>
+
             <!-- Sale Amount -->
             <div>
                 <label style="font-size: 12px; font-weight: 600; color: #374151; display: block; margin-bottom: 5px;">Sale Amount</label>
@@ -2828,6 +2863,14 @@ function handleDateSearchKey(e) {
 
 function selectFilterStatus(statusVal) {
     document.getElementById('formStatusInput').value = statusVal;
+    submitReportForm();
+}
+
+function selectFilterPaymentMethod(methodVal) {
+    const input = document.getElementById('formPaymentMethodInput');
+    if (input) input.value = methodVal;
+    const drawerSelect = document.getElementById('drawerPaymentMethodSelect');
+    if (drawerSelect) drawerSelect.value = methodVal;
     submitReportForm();
 }
 

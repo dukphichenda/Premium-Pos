@@ -411,6 +411,51 @@ def apply_sale_amount_filter(base_where, params, sale_amount_str, col_expr="so.t
     except ValueError:
         pass
 
+def apply_payment_method_filter(base_where, params, method, col_expr=None):
+    """
+    Applies payment method / bank filter to sales order SQL queries:
+    Supports:
+    - 'ABA Bank' / 'ABA' -> matches ABA Bank, ABA Pay, ABA QR
+    - 'Cash' / 'សាច់ប្រាក់' -> matches Cash, សាច់ប្រាក់
+    - 'ACLEDA' -> matches ACLEDA, ToanChet
+    - 'KB PRASAC' -> matches KB PRASAC, PRASAC
+    - 'Other Banks' / 'Other Payment' / 'Other' -> matches other custom banks/methods
+    - Any custom string -> matches via ILIKE %s
+    """
+    if not method or method in ('All', '<All>', 'all'):
+        return
+    m = method.strip().upper()
+    pay_expr = col_expr or "COALESCE(NULLIF(so.payment_method, ''), (SELECT op.payment_method FROM order_payments op WHERE op.order_type = 'SO' AND op.order_id = so.id ORDER BY op.id DESC LIMIT 1), '')"
+    if m in ('ABA', 'ABA BANK', 'ABA PAY'):
+        base_where.append(f"{pay_expr} ILIKE %s")
+        params.append('%ABA%')
+    elif m in ('CASH', 'សាច់ប្រាក់'):
+        base_where.append(f"({pay_expr} ILIKE %s OR {pay_expr} ILIKE %s)")
+        params.extend(['%Cash%', '%សាច់ប្រាក់%'])
+    elif m in ('ACLEDA', 'ACLEDA BANK', 'TOANCHET'):
+        base_where.append(f"({pay_expr} ILIKE %s OR {pay_expr} ILIKE %s)")
+        params.extend(['%ACLEDA%', '%ToanChet%'])
+    elif m in ('KB PRASAC', 'PRASAC', 'KB', 'KB PRASAC BANK'):
+        base_where.append(f"({pay_expr} ILIKE %s OR {pay_expr} ILIKE %s)")
+        params.extend(['%PRASAC%', '%KB%'])
+    elif m in ('OTHER', 'OTHER BANKS', 'OTHER PAYMENT', 'ផ្សេងៗ'):
+        base_where.append(f"""(
+            {pay_expr} != ''
+            AND {pay_expr} NOT ILIKE %s
+            AND {pay_expr} NOT ILIKE %s
+            AND {pay_expr} NOT ILIKE %s
+            AND {pay_expr} NOT ILIKE %s
+            AND {pay_expr} NOT ILIKE %s
+            AND {pay_expr} NOT ILIKE %s
+            AND {pay_expr} NOT ILIKE %s
+        )""")
+        params.extend(['%ABA%', '%Cash%', '%សាច់ប្រាក់%', '%ACLEDA%', '%ToanChet%', '%PRASAC%', '%KB%'])
+    elif m in ('NONE', 'UNPAID', 'UNASSIGNED'):
+        base_where.append(f"{pay_expr} = ''")
+    else:
+        base_where.append(f"{pay_expr} ILIKE %s")
+        params.append(f"%{method.strip()}%")
+
 # -------------------------------------------------------------------------
 # Report List / Report Center (Matching screenshot0028.JPEG - screenshot0032.JPEG)
 # -------------------------------------------------------------------------
@@ -538,6 +583,12 @@ def view_report(report_key):
     delivery_man_filter = request.args.get('delivery_man_filter', '').strip()
     all_delivery_men = query_all("SELECT * FROM delivery_men WHERE is_active = TRUE ORDER BY name ASC")
 
+    payment_method = request.args.get('payment_method', '').strip()
+    if not payment_method:
+        payment_method = request.args.get('paid_by', '').strip()
+    if payment_method in ('All', '<All>', 'all'):
+        payment_method = ''
+
     # Costing Tier / Price Sheet selection (Defaults to Branch Costing)
     all_pricing_schemes = query_all("SELECT id, name, currency FROM pricing_schemes WHERE is_active = TRUE ORDER BY CASE WHEN name ILIKE '%%Branch Cost%%' THEN 0 ELSE 1 END, name ASC")
     default_costing_scheme = query_one("SELECT id, name, currency FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
@@ -662,6 +713,9 @@ def view_report(report_key):
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
+
         where_sql = " AND ".join(base_where)
 
         total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so LEFT JOIN customers c ON so.customer_id = c.id WHERE {where_sql}", tuple(params))['cnt']
@@ -729,7 +783,7 @@ def view_report(report_key):
                 so.order_number,
                 so.status,
                 so.payment_status,
-                so.payment_method,
+                COALESCE(NULLIF(so.payment_method, ''), (SELECT op.payment_method FROM order_payments op WHERE op.order_type = 'SO' AND op.order_id = so.id ORDER BY op.id DESC LIMIT 1), '') as payment_method,
                 COALESCE(so.completed_by, '') as completed_by,
                 CASE WHEN so.payment_status = 'PAID' THEN 'Paid' ELSE initcap(so.status) END as status_display,
                 c.name as customer_name,
@@ -780,6 +834,9 @@ def view_report(report_key):
 
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
 
         where_sql = " AND ".join(base_where)
 
@@ -892,7 +949,7 @@ def view_report(report_key):
                 so.order_number,
                 so.status,
                 so.payment_status,
-                so.payment_method,
+                COALESCE(NULLIF(so.payment_method, ''), (SELECT op.payment_method FROM order_payments op WHERE op.order_type = 'SO' AND op.order_id = so.id ORDER BY op.id DESC LIMIT 1), '') as payment_method,
                 COALESCE(so.completed_by, '') as completed_by,
                 CASE WHEN so.payment_status = 'PAID' THEN 'Paid' ELSE initcap(so.status) END as status_display,
                 c.name as customer_name,
@@ -1107,6 +1164,9 @@ def view_report(report_key):
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
+
         where_sql = " AND ".join(base_where)
 
         total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so WHERE {where_sql}", tuple(params))['cnt']
@@ -1168,6 +1228,9 @@ def view_report(report_key):
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
 
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
+
         where_sql = " AND ".join(base_where)
 
         total_count = query_one(f"SELECT COUNT(*) as cnt FROM sales_orders so WHERE {where_sql}", tuple(params))['cnt']
@@ -1212,6 +1275,9 @@ def view_report(report_key):
 
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
 
         where_sql = " AND ".join(base_where)
 
@@ -2397,6 +2463,7 @@ def view_report(report_key):
                            category_groups=locals().get('category_groups', []),
                            customer_groups=locals().get('customer_groups', []),
                            sale_amount=sale_amount,
+                           payment_method=payment_method,
                            all_delivery_men=all_delivery_men,
                            delivery_man_filter=delivery_man_filter,
                            today_str=today_str)
@@ -2423,6 +2490,11 @@ def export_report(report_key):
     sort_by = request.args.get('sort_by', 'Sales Amount').strip()
     group_by = request.args.get('group_by', '').strip()
     sale_amount = request.args.get('sale_amount', '').strip() or request.args.get('sales_amount', '').strip()
+    payment_method = request.args.get('payment_method', '').strip()
+    if not payment_method:
+        payment_method = request.args.get('paid_by', '').strip()
+    if payment_method in ('All', '<All>', 'all'):
+        payment_method = ''
 
     # Store Scope resolution: branch users strictly locked to their branch; HQ can view main, branch, or all
     user_role = session.get('role')
@@ -2486,6 +2558,9 @@ def export_report(report_key):
 
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
 
         where_sql = " AND ".join(base_where)
         line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
@@ -2567,6 +2642,9 @@ def export_report(report_key):
 
         if sale_amount:
             apply_sale_amount_filter(base_where, params, sale_amount, "so.total_amount")
+
+        if payment_method:
+            apply_payment_method_filter(base_where, params, payment_method)
 
         where_sql = " AND ".join(base_where)
         rows = query_all(f"""
