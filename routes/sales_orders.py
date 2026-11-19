@@ -3160,6 +3160,10 @@ def save_order(id=0):
                         target_id = recent_id
                         order_number = recent_order['order_number']
                         if form_sub_token:
+                            sub_keys = [k for k in list(session.keys()) if k.startswith('so_sub_')]
+                            if len(sub_keys) >= 5:
+                                for old_k in sub_keys[:-4]:
+                                    session.pop(old_k, None)
                             session[f'so_sub_{form_sub_token}'] = target_id
                             session.modified = True
                             try:
@@ -3212,6 +3216,10 @@ def save_order(id=0):
                 """, (order_number, customer_id, location_id, order_date, sales_rep, notes, pricing_scheme_id, customer_address, customer_contact, customer_phone, branch_id, delivery_man or None, delivery_helper or None, delivery_fee_khr, delivery_notes or None, payment_method or None, carrier or None, package_count, cod_amount, form_sub_token or None))
                 id = cur.fetchone()['id']
                 if form_sub_token:
+                    sub_keys = [k for k in list(session.keys()) if k.startswith('so_sub_')]
+                    if len(sub_keys) >= 5:
+                        for old_k in sub_keys[:-4]:
+                            session.pop(old_k, None)
                     session[f'so_sub_{form_sub_token}'] = id
                     session.modified = True
             else:
@@ -3244,6 +3252,8 @@ def save_order(id=0):
                 from database import sync_customers_from_latest_orders
                 sync_customers_from_latest_orders(cur=cur, customer_ids=[customer_id])
 
+            subtotal = float(order.get('subtotal') or 0) if order else 0.0
+            total_amount = float(order.get('total_amount') or 0) if order else 0.0
             if lines_data is not None and isinstance(lines_data, list):
                 cur.execute("DELETE FROM sales_order_lines WHERE sales_order_id = %s", (id,))
                 subtotal = 0.0
@@ -3431,6 +3441,9 @@ def save_order(id=0):
             flash(f"Sales Order {order_number} marked Complete & Paid by {user_login_name}!", "success")
         else:
             flash(f"Sales Order {order_number} saved successfully!", "success")
+        if '_flashes' in session and isinstance(session['_flashes'], list) and len(session['_flashes']) > 3:
+            session['_flashes'] = session['_flashes'][-3:]
+            session.modified = True
         return redirect(redirect_url)
 
     except Exception as e:
