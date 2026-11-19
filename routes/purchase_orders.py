@@ -627,8 +627,14 @@ def create_purchase():
     try:
         data = request.get_json(silent=True) or request.form
 
-        vendor_id = int(data.get('vendor_id'))
-        location_id = int(data.get('location_id'))
+        raw_vid = data.get('vendor_id')
+        if not raw_vid or str(raw_vid).strip() in ('', '0'):
+            if is_ajax:
+                return jsonify({'success': False, 'message': 'Please select a vendor before saving.'}), 400
+            flash('Please select a vendor before saving.', 'error')
+            return redirect(url_for('purchase_orders.create_purchase'))
+        vendor_id = int(raw_vid)
+        location_id = int(data.get('location_id') or 1)
         raw_order_date = data.get('order_date')
         order_date = datetime.now().date()
         if raw_order_date:
@@ -751,6 +757,7 @@ def create_purchase():
                 'success': True,
                 'po_id': po_id,
                 'order_number': order_number,
+                'total_amount': total_amount,
                 'redirect_url': url_for('purchase_orders.detail_purchase', id=po_id)
             })
 
@@ -968,6 +975,8 @@ def update_purchase(id):
                 return jsonify({
                     'success': True,
                     'message': 'Purchase order updated successfully!',
+                    'po_id': id,
+                    'order_number': order['order_number'],
                     'total_amount': cur_po_total,
                     'linked_expense': {
                         'id': linked_exp['id'],
@@ -1113,6 +1122,8 @@ def update_purchase(id):
             return jsonify({
                 'success': True,
                 'message': 'Purchase order saved successfully!',
+                'po_id': id,
+                'order_number': order['order_number'],
                 'total_amount': total_amount,
                 'linked_expense': {
                     'id': linked_exp['id'],

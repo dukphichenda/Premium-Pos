@@ -27,16 +27,9 @@ function closeModal(modalId) {
 }
 
 function initModals() {
-    document.querySelectorAll('.modal-overlay, .modal-backdrop').forEach(overlay => {
-        overlay.addEventListener('click', (e) => {
-            if (e.target === overlay) {
-                overlay.classList.remove('active');
-                overlay.style.display = 'none';
-            }
-        });
-    });
-
-    document.querySelectorAll('.modal-close').forEach(btn => {
+    // Backdrop click-to-close disabled per requirement:
+    // "for all pop ups no need to close when clicking mouse out of box. Close only after clicked close sign"
+    document.querySelectorAll('.modal-close, [data-modal-close]').forEach(btn => {
         btn.addEventListener('click', () => {
             const modal = btn.closest('.modal-overlay, .modal-backdrop');
             if (modal) {

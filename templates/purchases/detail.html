@@ -2326,7 +2326,7 @@ input:checked + .po-toggle-slider:before {
                         <span class="po-step-text">Purchase (<span id="poStepProductCount">{{ lines|length }}</span> products)</span>
                     </div>
                     <div class="po-step-connecting-line {% if order.status in ('RECEIVED', 'FULFILLED') %}completed{% endif %}" id="poStepLine"></div>
-                    <div class="po-step-badge {% if order.status in ('RECEIVED', 'FULFILLED') %}completed{% elif order.status in ('PARTIAL_RECEIVED', 'IN_PROGRESS', 'PARTIAL') %}partial{% endif %}" id="poStepReceiveBadge">
+                    <div class="po-step-badge {% if order.status in ('RECEIVED', 'FULFILLED') %}completed{% elif order.status in ('PARTIAL_RECEIVED', 'IN_PROGRESS', 'PARTIAL') %}partial{% endif %}" id="poStepReceiveBadge" style="cursor: pointer;" onclick="openReceiveModal()" title="Click to receive goods (auto-saves order)">
                         <span class="po-step-check">{% if order.status in ('RECEIVED', 'FULFILLED') %}✓{% else %}📦{% endif %}</span>
                         <span class="po-step-text">Receive (<span id="poStepReceivePercent">{{ receiving_percent }}</span>%)</span>
                     </div>
@@ -2810,8 +2810,8 @@ input:checked + .po-toggle-slider:before {
 </div>
 
 <!-- PO Attachment Lightbox Modal (Same-Tab Popup) -->
-<div id="poAttachmentLightboxModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100005; align-items: center; justify-content: center; backdrop-filter: blur(4px);" onclick="closePoAttachmentPreview()">
-    <div style="position: relative; max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center;" onclick="event.stopPropagation()">
+<div id="poAttachmentLightboxModal" class="modal-overlay" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100005; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="position: relative; max-width: 92vw; max-height: 92vh; display: flex; flex-direction: column; align-items: center;">
         <img id="poLightboxImg" src="" alt="Attachment preview" style="max-width: 92vw; max-height: 82vh; object-fit: contain; border-radius: 8px; box-shadow: 0 10px 40px rgba(0,0,0,0.7); display: none; background: #000000;">
         <iframe id="poLightboxFrame" src="" style="width: 85vw; height: 82vh; border: none; border-radius: 8px; display: none; background: #FFFFFF;"></iframe>
         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; margin-top: 10px; gap: 12px;">
@@ -2825,7 +2825,7 @@ input:checked + .po-toggle-slider:before {
 </div>
 
 <!-- 3b. Add to Expenses Sheet Modal -->
-<div class="modal-overlay" id="poAddToExpensesModal" style="display: none;" onclick="if(event.target === this) closeAddToExpensesModal()">
+<div class="modal-overlay" id="poAddToExpensesModal" style="display: none;">
     <div class="modal-dialog" style="max-width: 520px; border-radius: 8px;">
         <div class="modal-header" style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid #E2E8F0;">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -4142,30 +4142,120 @@ function executePoExport(fmt) {
     }
 }
 
-// Receive Goods Modal & Actions
-function openReceiveModal() {
-    const poId = document.getElementById('poIdHidden').value;
-    if (!poId || poId == '0') {
-        alert('Please save the purchase order before receiving goods.');
-        return;
+// Auto-Save Purchase Order (AJAX)
+async function autoSavePoOrder(silent = false) {
+    const poForm = document.getElementById('poMainForm');
+    if (!poForm) return { success: false, message: 'Form not found' };
+
+    // Serialize lines to poLinesJsonHidden
+    handlePoFormSubmit();
+
+    const vendorId = document.getElementById('poVendorIdHidden')?.value;
+    if (!vendorId || vendorId === '0' || String(vendorId).trim() === '') {
+        alert('Please select a vendor before proceeding.');
+        return { success: false, message: 'Vendor missing' };
     }
 
-    // Populate modal lines dynamically
-    if (currentActiveLines && currentActiveLines.length > 0 && String(currentActivePoId) === String(poId)) {
-        populateReceiveModal(poId, currentActiveLines, currentActiveOrder);
-        document.getElementById('poReceiveGoodsModal').style.display = 'flex';
-    } else {
-        fetch(`/api/purchases/${poId}/data`)
-            .then(r => r.json())
-            .then(res => {
-                if (res.success) {
-                    currentActiveOrder = res.order;
-                    currentActiveLines = res.lines;
-                    populateReceiveModal(poId, res.lines, res.order);
-                    document.getElementById('poReceiveGoodsModal').style.display = 'flex';
-                }
-            });
+    let lines = [];
+    try {
+        lines = JSON.parse(document.getElementById('poLinesJsonHidden').value || '[]');
+    } catch(e) {
+        lines = [];
     }
+
+    if (!lines || lines.length === 0) {
+        alert('Please add at least one product line item before proceeding.');
+        return { success: false, message: 'No line items' };
+    }
+
+    const currentPoId = document.getElementById('poIdHidden')?.value;
+    const isNew = (!currentPoId || currentPoId === '0');
+    const url = isNew ? '/purchases/create' : `/purchases/${currentPoId}/save`;
+
+    const formData = new FormData(poForm);
+
+    const saveBtn = document.getElementById('poSaveBtn');
+    let origHtml = '';
+    if (saveBtn) {
+        origHtml = saveBtn.innerHTML;
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span>⏳</span> Saving...';
+    }
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        });
+        const data = await res.json();
+        if (data && data.success) {
+            const savedId = data.po_id || currentPoId;
+            document.getElementById('poIdHidden').value = savedId;
+            if (data.order_number) {
+                const titleDisp = document.getElementById('poOrderTitleDisplay');
+                if (titleDisp) titleDisp.innerText = data.order_number;
+                const numInp = document.getElementById('poOrderNumberInput');
+                if (numInp) numInp.value = data.order_number;
+            }
+            poForm.action = `/purchases/${savedId}/save`;
+
+            isPoDirty = false;
+            updatePoSaveDot();
+
+            if (isNew && savedId) {
+                const newUrl = `/purchases/${savedId}`;
+                window.history.replaceState({ poId: savedId }, '', newUrl);
+            }
+
+            currentActivePoId = savedId;
+
+            if (!silent) {
+                showPoToast('✓ Purchase order auto-saved!');
+            }
+            return { success: true, poId: savedId, data: data };
+        } else {
+            alert(data ? (data.message || 'Failed to save purchase order.') : 'Failed to save purchase order.');
+            return { success: false, message: data?.message };
+        }
+    } catch (err) {
+        console.error('Error auto-saving PO:', err);
+        alert('Error auto-saving purchase order: ' + (err.message || err));
+        return { success: false, error: err };
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = origHtml;
+            updatePoSaveDot();
+        }
+    }
+}
+window.autoSavePoOrder = autoSavePoOrder;
+
+// Receive Goods Modal & Actions (Auto-saves first)
+async function openReceiveModal() {
+    const saveRes = await autoSavePoOrder();
+    if (!saveRes || !saveRes.success) return;
+    const poId = saveRes.poId || document.getElementById('poIdHidden').value;
+
+    // Populate modal lines dynamically with saved lines
+    fetch(`/api/purchases/${poId}/data`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success) {
+                currentActiveOrder = res.order;
+                currentActiveLines = res.lines;
+                populateReceiveModal(poId, res.lines, res.order);
+                document.getElementById('poReceiveGoodsModal').style.display = 'flex';
+            } else {
+                alert(res.message || 'Error loading purchase order lines.');
+            }
+        })
+        .catch(err => {
+            alert('Error loading purchase order lines.');
+        });
 }
 
 function closeReceiveModal() {
@@ -4280,13 +4370,11 @@ function submitReceiveModal(e) {
     });
 }
 
-// 1-Click Receive All
-function quickReceiveAllAction() {
-    const poId = document.getElementById('receiveModalPoId')?.value || document.getElementById('poIdHidden')?.value;
-    if (!poId || poId == '0') {
-        alert('Please save the purchase order before receiving goods.');
-        return;
-    }
+// 1-Click Receive All (Auto-saves first)
+async function quickReceiveAllAction() {
+    const saveRes = await autoSavePoOrder();
+    if (!saveRes || !saveRes.success) return;
+    const poId = saveRes.poId || document.getElementById('receiveModalPoId')?.value || document.getElementById('poIdHidden')?.value;
 
     if (!confirm('Receive all remaining items for this purchase order into warehouse stock?')) {
         return;
@@ -4625,40 +4713,39 @@ function showPoToast(msg) {
     }, 3500);
 }
 
-// Modals: Payment, Attachment Lightbox, Quick Vendor, Reorder
-function openPaymentModal() {
-    const poId = document.getElementById('poIdHidden')?.value;
-    if (!poId || poId === '0') {
-        alert('Please save the Purchase Order first before recording a payment.');
-        return;
-    }
+// Modals: Payment, Attachment Lightbox, Quick Vendor, Reorder (Auto-saves first)
+async function openPaymentModal() {
+    const saveRes = await autoSavePoOrder();
+    if (!saveRes || !saveRes.success) return;
+    const poId = saveRes.poId || document.getElementById('poIdHidden')?.value;
+
     const paymentForm = document.getElementById('poRecordPaymentForm');
     if (paymentForm) {
         paymentForm.action = '/purchases/' + poId + '/pay';
     }
 
-    const amtInput = document.getElementById('poPaymentAmountInput');
-    if (amtInput) {
-        const bal = parseFloat(document.getElementById('poBalanceDueHidden')?.value || 0);
-        const tot = parseFloat(document.getElementById('poTotalAmountHidden')?.value || 0);
-        let suggested = 0;
-        if (bal > 0) {
-            suggested = bal;
-        } else if (tot > 0) {
-            suggested = tot;
-        }
-        if (suggested > 0) {
-            amtInput.value = suggested.toFixed(2);
-        }
-    }
-
-    const dateInput = document.getElementById('poPaymentDateInput');
-    if (dateInput) {
-        const orderDate = document.getElementById('poOrderDateInput')?.value;
-        dateInput.value = orderDate || new Date().toISOString().substring(0, 10);
-    }
-
-    document.getElementById('poRecordPaymentModal').style.display = 'flex';
+    fetch(`/api/purchases/${poId}/data`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success && res.order) {
+                currentActiveOrder = res.order;
+                const bal = parseFloat(res.order.balance_due || 0);
+                const tot = parseFloat(res.order.total_amount || 0);
+                const amtInput = document.getElementById('poPaymentAmountInput');
+                if (amtInput) {
+                    const suggested = (bal > 0 ? bal : tot);
+                    if (suggested > 0) amtInput.value = suggested.toFixed(2);
+                }
+                const dateInput = document.getElementById('poPaymentDateInput');
+                if (dateInput) {
+                    dateInput.value = res.order.order_date_raw || document.getElementById('poOrderDateInput')?.value || new Date().toISOString().substring(0, 10);
+                }
+            }
+            document.getElementById('poRecordPaymentModal').style.display = 'flex';
+        })
+        .catch(() => {
+            document.getElementById('poRecordPaymentModal').style.display = 'flex';
+        });
 }
 function closePaymentModal() { document.getElementById('poRecordPaymentModal').style.display = 'none'; }
 
@@ -4720,43 +4807,35 @@ function closePoAttachmentPreview() {
 function openQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'flex'; }
 function closeQuickVendorModal() { document.getElementById('quickVendorModal').style.display = 'none'; }
 
-// Add to Expenses Modal & Actions
-function openAddToExpensesModal() {
-    const poId = document.getElementById('poIdHidden')?.value;
-    if (!poId || poId === '0') {
-        alert('Please save the Purchase Order first before adding it to the Expenses Sheet.');
-        return;
-    }
+// Add to Expenses Modal & Actions (Auto-saves first)
+async function openAddToExpensesModal() {
+    const saveRes = await autoSavePoOrder();
+    if (!saveRes || !saveRes.success) return;
+    const poId = saveRes.poId || document.getElementById('poIdHidden')?.value;
 
-    // Refresh dynamic fields if blank
-    const dateInput = document.getElementById('poExpDate');
-    if (dateInput && !dateInput.value) {
-        const orderDate = document.getElementById('poOrderDateInput')?.value;
-        dateInput.value = orderDate || new Date().toISOString().substring(0, 10);
-    }
-    if (dateInput) {
-        updatePoExpMonthKey(dateInput.value);
-    }
-
-    const amountInput = document.getElementById('poExpAmount');
-    if (amountInput) {
-        let totalVal = 0;
-        const totalHidden = document.getElementById('poTotalAmountHidden');
-        if (totalHidden && parseFloat(totalHidden.value) > 0) {
-            totalVal = parseFloat(totalHidden.value);
-        } else {
-            const totalPill = document.getElementById('poHeaderAmountPill');
-            if (totalPill) {
-                totalVal = parseFloat(totalPill.innerText.replace(/[^0-9.-]/g, '')) || 0;
+    fetch(`/api/purchases/${poId}/data`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success && res.order) {
+                currentActiveOrder = res.order;
+                const totalVal = parseFloat(res.order.total_amount || 0);
+                const amountInput = document.getElementById('poExpAmount');
+                if (amountInput && totalVal > 0) {
+                    amountInput.value = totalVal.toFixed(2);
+                }
+                const dateInput = document.getElementById('poExpDate');
+                if (dateInput) {
+                    dateInput.value = res.order.order_date_raw || document.getElementById('poOrderDateInput')?.value || new Date().toISOString().substring(0, 10);
+                    updatePoExpMonthKey(dateInput.value);
+                }
             }
-        }
-        if (totalVal > 0) {
-            amountInput.value = totalVal.toFixed(2);
-        }
-    }
-
-    const modal = document.getElementById('poAddToExpensesModal');
-    if (modal) modal.style.display = 'flex';
+            const modal = document.getElementById('poAddToExpensesModal');
+            if (modal) modal.style.display = 'flex';
+        })
+        .catch(() => {
+            const modal = document.getElementById('poAddToExpensesModal');
+            if (modal) modal.style.display = 'flex';
+        });
 }
 
 function closeAddToExpensesModal() {
