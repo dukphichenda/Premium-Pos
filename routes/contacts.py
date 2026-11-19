@@ -3,6 +3,7 @@ from database import query_one, query_all, execute, execute_returning_id, check_
 import re
 import csv
 import io
+import json
 from services.csv_exchange import resolve_customer_phone_and_name
 
 contacts_bp = Blueprint('contacts', __name__)

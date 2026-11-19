@@ -122,6 +122,16 @@ class StockTransfersRedesignTestCase(unittest.TestCase):
         del_res = self.client.post(f'/inventory/transfers/{trf_id}/delete')
         self.assertEqual(del_res.status_code, 200)
 
+    def test_transfer_detail_view_renders_without_json_error(self):
+        """Verify /inventory/transfers/<id> loads properly with lines_json defined and no NameError."""
+        trf = query_one("SELECT id FROM stock_transfers ORDER BY id DESC LIMIT 1")
+        if trf:
+            res = self.client.get(f"/inventory/transfers/{trf['id']}")
+            self.assertEqual(res.status_code, 200)
+            html = res.data.decode('utf-8')
+            self.assertIn('rawLines', html)
+            self.assertNotIn("name 'json' is not defined", html)
+
     def test_adjustment_form_search_popup_matches_sales_order_styling(self):
         """Verify adjustment_form.html renders floating popup table with Image 2 headers."""
         res = self.client.get('/inventory/adjustments/new')
