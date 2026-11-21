@@ -755,12 +755,16 @@ def view_report(report_key):
         }
 
         order_col = "so.order_number ASC"
-        if sort_by == 'Order Date':
+        if sort_by in ('Order Date', 'Date Ascending', 'date_asc', 'ASC'):
             order_col = "so.order_date ASC, so.order_number ASC"
+        elif sort_by in ('Date Descending', 'date_desc', 'DESC'):
+            order_col = "so.order_date DESC, so.order_number DESC"
         elif sort_by == 'Customer':
             order_col = "c.name ASC, so.order_number ASC"
-        elif sort_by == 'Sales Amount':
-            order_col = "so.total_amount DESC"
+        elif sort_by in ('Sales Amount', 'Sales Amount Desc', 'Amount Descending', 'amount_desc', 'Sales Amount High to Low'):
+            order_col = "so.total_amount DESC, so.order_number DESC"
+        elif sort_by in ('Sales Amount Asc', 'Amount Ascending', 'amount_asc', 'Sales Amount Low to High'):
+            order_col = "so.total_amount ASC, so.order_number ASC"
         elif sort_by in ('Total Cost', 'Costing', 'Branch Cost'):
             order_col = "costing DESC"
         elif sort_by in ('Gross Profit', 'Profit'):
@@ -933,12 +937,16 @@ def view_report(report_key):
         order_col = "so.order_date DESC, so.order_number DESC"
         if sort_by == 'Order Number':
             order_col = "so.order_number ASC"
-        elif sort_by == 'Order Date':
+        elif sort_by in ('Order Date', 'Date Ascending', 'date_asc', 'ASC'):
             order_col = "so.order_date ASC, so.order_number ASC"
+        elif sort_by in ('Date Descending', 'date_desc', 'DESC'):
+            order_col = "so.order_date DESC, so.order_number DESC"
         elif sort_by == 'Customer':
             order_col = "c.name ASC, so.order_number ASC"
-        elif sort_by == 'Sales Amount':
-            order_col = "so.total_amount DESC"
+        elif sort_by in ('Sales Amount', 'Sales Amount Desc', 'Amount Descending', 'amount_desc', 'Sales Amount High to Low'):
+            order_col = "so.total_amount DESC, so.order_number DESC"
+        elif sort_by in ('Sales Amount Asc', 'Amount Ascending', 'amount_asc', 'Sales Amount Low to High'):
+            order_col = "so.total_amount ASC, so.order_number ASC"
         elif sort_by == 'Delivery Person':
             order_col = "COALESCE(so.delivery_man, '') ASC, so.order_date DESC"
 
@@ -2571,6 +2579,22 @@ def export_report(report_key):
 
         where_sql = " AND ".join(base_where)
         line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
+        order_col = "so.order_number ASC"
+        if sort_by in ('Order Date', 'Date Ascending', 'date_asc', 'ASC'):
+            order_col = "so.order_date ASC, so.order_number ASC"
+        elif sort_by in ('Date Descending', 'date_desc', 'DESC'):
+            order_col = "so.order_date DESC, so.order_number DESC"
+        elif sort_by == 'Customer':
+            order_col = "c.name ASC, so.order_number ASC"
+        elif sort_by in ('Sales Amount', 'Sales Amount Desc', 'Amount Descending', 'amount_desc', 'Sales Amount High to Low'):
+            order_col = "so.total_amount DESC, so.order_number DESC"
+        elif sort_by in ('Sales Amount Asc', 'Amount Ascending', 'amount_asc', 'Sales Amount Low to High'):
+            order_col = "so.total_amount ASC, so.order_number ASC"
+        elif sort_by in ('Total Cost', 'Costing', 'Branch Cost'):
+            order_col = "costing DESC"
+        elif sort_by in ('Gross Profit', 'Profit'):
+            order_col = "gross_profit DESC"
+
         rows = query_all(f"""
             WITH order_costs AS (
                 SELECT 
@@ -2595,7 +2619,7 @@ def export_report(report_key):
             LEFT JOIN customers c ON so.customer_id = c.id
             LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
             WHERE {where_sql}
-            ORDER BY so.order_date ASC, so.order_number ASC
+            ORDER BY {order_col}
         """, tuple(params))
 
         for r in rows:
@@ -2654,6 +2678,22 @@ def export_report(report_key):
             apply_payment_method_filter(base_where, params, payment_method)
 
         where_sql = " AND ".join(base_where)
+        order_col = "so.order_date DESC, so.order_number DESC"
+        if sort_by == 'Order Number':
+            order_col = "so.order_number ASC"
+        elif sort_by in ('Order Date', 'Date Ascending', 'date_asc', 'ASC'):
+            order_col = "so.order_date ASC, so.order_number ASC"
+        elif sort_by in ('Date Descending', 'date_desc', 'DESC'):
+            order_col = "so.order_date DESC, so.order_number DESC"
+        elif sort_by == 'Customer':
+            order_col = "c.name ASC, so.order_number ASC"
+        elif sort_by in ('Sales Amount', 'Sales Amount Desc', 'Amount Descending', 'amount_desc', 'Sales Amount High to Low'):
+            order_col = "so.total_amount DESC, so.order_number DESC"
+        elif sort_by in ('Sales Amount Asc', 'Amount Ascending', 'amount_asc', 'Sales Amount Low to High'):
+            order_col = "so.total_amount ASC, so.order_number ASC"
+        elif sort_by == 'Delivery Person':
+            order_col = "COALESCE(so.delivery_man, '') ASC, so.order_date DESC"
+
         rows = query_all(f"""
             SELECT 
                 so.order_number,
@@ -2670,7 +2710,7 @@ def export_report(report_key):
             FROM sales_orders so
             LEFT JOIN customers c ON so.customer_id = c.id
             WHERE {where_sql}
-            ORDER BY so.order_date DESC, so.order_number ASC
+            ORDER BY {order_col}
         """, tuple(params))
 
         for r in rows:

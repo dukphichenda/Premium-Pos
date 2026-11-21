@@ -95,13 +95,13 @@ class TestSalesOrderProfitAmountFilter(unittest.TestCase):
         target_num = order['order_number']
 
         # Matching export
-        resp = self.client.get(f'/reports/export/sales-order-profit?date_range=All&status=All&sale_amount={target_amount:.2f}')
+        resp = self.client.get(f'/reports/export/sales-order-profit?branch=all&date_range=All&status=All&sale_amount={target_amount:.2f}')
         self.assertEqual(resp.status_code, 200)
         content = resp.data.decode('utf-8')
         self.assertIn(target_num, content)
 
         # Non-matching export
-        resp_none = self.client.get('/reports/export/sales-order-profit?date_range=All&status=All&sale_amount=9999999.99')
+        resp_none = self.client.get('/reports/export/sales-order-profit?branch=all&date_range=All&status=All&sale_amount=9999999.99')
         self.assertEqual(resp_none.status_code, 200)
         content_none = resp_none.data.decode('utf-8')
         self.assertNotIn(target_num, content_none)

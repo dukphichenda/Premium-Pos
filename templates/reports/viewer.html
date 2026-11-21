@@ -704,8 +704,21 @@
 .inflow-sortable-date-th:hover .inflow-date-sort-arrow {
   color: #9A3412 !important;
 }
+.inflow-sortable-col-th {
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+.inflow-sortable-col-th:hover {
+  color: #4C1D95 !important;
+}
+.inflow-sortable-col-th:hover .inflow-col-sort-arrow {
+  color: #4C1D95 !important;
+  opacity: 1 !important;
+}
 @media print {
-  .inflow-date-sort-arrow {
+  .inflow-date-sort-arrow,
+  .inflow-col-sort-arrow {
     display: none !important;
   }
 }
@@ -1279,8 +1292,34 @@
                     <th style="width: 15%;">STATUS / ACTION</th>
                     <th style="width: 20%;">CUSTOMER</th>
                     <th style="width: 20%;">BILLING ADDRESS</th>
-                    <th style="width: 9%;">ORDER DATE</th>
-                    <th style="width: 8%; text-align: right; cursor: pointer; user-select: none;" onclick="toggleSortBySalesAmount()" title="Click to sort by Sales Amount">SALES AMOUNT {% if sort_by == 'Sales Amount' %}▼{% endif %}</th>
+                    <th style="width: 9%; cursor: pointer; user-select: none;" class="inflow-sortable-col-th" onclick="toggleSortByOrderDate()" title="Click to sort by date (Recent to Oldest / Oldest to Recent)">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            <span>ORDER DATE</span>
+                            <span class="inflow-col-sort-arrow" style="font-size: 11px; font-weight: 800; display: inline-block;">
+                                {% if sort_by in ['Date Descending', 'date_desc', 'DESC'] %}
+                                    <span style="color: #4C1D95;" title="Sorted: Recent to Oldest">▼</span>
+                                {% elif sort_by in ['Order Date', 'Date Ascending', 'date_asc', 'ASC'] %}
+                                    <span style="color: #4C1D95;" title="Sorted: Oldest to Recent">▲</span>
+                                {% else %}
+                                    <span style="opacity: 0.35; font-size: 10px;">⇅</span>
+                                {% endif %}
+                            </span>
+                        </span>
+                    </th>
+                    <th style="width: 8%; text-align: right; cursor: pointer; user-select: none;" class="inflow-sortable-col-th" onclick="toggleSortBySalesAmount()" title="Click to sort by amount (High to Less / Less to High)">
+                        <span style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; width: 100%;">
+                            <span>SALES AMOUNT</span>
+                            <span class="inflow-col-sort-arrow" style="font-size: 11px; font-weight: 800; display: inline-block;">
+                                {% if sort_by in ['Sales Amount', 'Sales Amount Desc', 'Amount Descending', 'amount_desc'] %}
+                                    <span style="color: #4C1D95;" title="Sorted: High to Less">▼</span>
+                                {% elif sort_by in ['Sales Amount Asc', 'Amount Ascending', 'amount_asc'] %}
+                                    <span style="color: #4C1D95;" title="Sorted: Less to High">▲</span>
+                                {% else %}
+                                    <span style="opacity: 0.35; font-size: 10px;">⇅</span>
+                                {% endif %}
+                            </span>
+                        </span>
+                    </th>
                     <th style="width: 8%; text-align: right;">{% if branch_scope not in ['main', 'all'] %}BRANCH COST{% else %}COSTING{% endif %}</th>
                     <th style="width: 8%; text-align: right;">{% if branch_scope not in ['main', 'all'] %}PROFIT{% else %}GROSS PROFIT{% endif %}</th>
                 </tr>
@@ -1364,8 +1403,34 @@
                     <th style="width: 13%;">STATUS / ACTION</th>
                     <th style="width: 17%;">CUSTOMER</th>
                     <th style="width: 21%;">DELIVERY ADDRESS &amp; PHONE</th>
-                    <th style="width: 9%;">ORDER DATE</th>
-                    <th style="width: 9%; text-align: right; cursor: pointer; user-select: none;" onclick="toggleSortBySalesAmount()" title="Click to sort by Sales Amount">SALES AMOUNT {% if sort_by == 'Sales Amount' %}▼{% endif %}</th>
+                    <th style="width: 9%; cursor: pointer; user-select: none;" class="inflow-sortable-col-th" onclick="toggleSortByOrderDate()" title="Click to sort by date (Recent to Oldest / Oldest to Recent)">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            <span>ORDER DATE</span>
+                            <span class="inflow-col-sort-arrow" style="font-size: 11px; font-weight: 800; display: inline-block;">
+                                {% if sort_by in ['Date Descending', 'date_desc', 'DESC'] %}
+                                    <span style="color: #4C1D95;" title="Sorted: Recent to Oldest">▼</span>
+                                {% elif sort_by in ['Order Date', 'Date Ascending', 'date_asc', 'ASC'] %}
+                                    <span style="color: #4C1D95;" title="Sorted: Oldest to Recent">▲</span>
+                                {% else %}
+                                    <span style="opacity: 0.35; font-size: 10px;">⇅</span>
+                                {% endif %}
+                            </span>
+                        </span>
+                    </th>
+                    <th style="width: 9%; text-align: right; cursor: pointer; user-select: none;" class="inflow-sortable-col-th" onclick="toggleSortBySalesAmount()" title="Click to sort by amount (High to Less / Less to High)">
+                        <span style="display: inline-flex; align-items: center; justify-content: flex-end; gap: 4px; width: 100%;">
+                            <span>SALES AMOUNT</span>
+                            <span class="inflow-col-sort-arrow" style="font-size: 11px; font-weight: 800; display: inline-block;">
+                                {% if sort_by in ['Sales Amount', 'Sales Amount Desc', 'Amount Descending', 'amount_desc'] %}
+                                    <span style="color: #4C1D95;" title="High to Less">▼</span>
+                                {% elif sort_by in ['Sales Amount Asc', 'Amount Ascending', 'amount_asc'] %}
+                                    <span style="color: #4C1D95;" title="Less to High">▲</span>
+                                {% else %}
+                                    <span style="opacity: 0.35; font-size: 10px;">⇅</span>
+                                {% endif %}
+                            </span>
+                        </span>
+                    </th>
                     <th style="width: 19%;">DELIVERY PERSON ASSIGN</th>
                 </tr>
             </thead>
@@ -2444,7 +2509,8 @@
                     <option value="Order Number" {% if sort_by in ['Order Number', 'SKU', 'Order Number / SKU'] %}selected{% endif %}>Order Number / SKU</option>
                     <option value="Item Name" {% if sort_by in ['Item Name', 'Product Name'] %}selected{% endif %}>Item Name</option>
                     <option value="Category" {% if sort_by == 'Category' %}selected{% endif %}>Category</option>
-                    <option value="Sales Amount" {% if sort_by in ['Sales Amount', 'Total Sales'] %}selected{% endif %}>Sales Amount</option>
+                    <option value="Sales Amount" {% if sort_by in ['Sales Amount', 'Total Sales', 'Sales Amount Desc'] %}selected{% endif %}>Sales Amount (High to Less)</option>
+                    <option value="Sales Amount Asc" {% if sort_by in ['Sales Amount Asc', 'Amount Ascending'] %}selected{% endif %}>Sales Amount (Less to High)</option>
                     <option value="Costing" {% if sort_by in ['Total Cost', 'Costing', 'Branch Cost'] %}selected{% endif %}>{% if branch_scope not in ['main', 'all'] %}Branch Cost{% else %}Costing{% endif %}</option>
                     <option value="Gross Profit" {% if sort_by in ['Gross Profit', 'Profit'] %}selected{% endif %}>{% if branch_scope not in ['main', 'all'] %}Profit{% else %}Gross Profit{% endif %}</option>
                     {% if report_key == 'hq-branch-earnings' %}
@@ -3323,12 +3389,27 @@ function updateLiveSummaryTotals() {
 }
 
 function toggleSortBySalesAmount() {
-    const curSort = document.getElementById('formSortByInput')?.value || '';
-    document.getElementById('formSortByInput').value = (curSort === 'Sales Amount') ? 'Order Number' : 'Sales Amount';
+    let sortInput = document.getElementById('formSortByInput');
+    if (!sortInput) {
+        const form = document.getElementById('reportFilterForm');
+        if (form) {
+            sortInput = document.createElement('input');
+            sortInput.type = 'hidden';
+            sortInput.name = 'sort_by';
+            sortInput.id = 'formSortByInput';
+            form.appendChild(sortInput);
+        }
+    }
+    const curSort = (sortInput ? sortInput.value : '') || '';
+    if (curSort === 'Sales Amount' || curSort === 'Sales Amount Desc' || curSort === 'Amount Descending' || curSort === 'amount_desc') {
+        if (sortInput) sortInput.value = 'Sales Amount Asc';
+    } else {
+        if (sortInput) sortInput.value = 'Sales Amount';
+    }
     submitReportForm();
 }
 
-function toggleCustomerOrderHistoryDateSort() {
+function toggleSortByOrderDate() {
     let sortInput = document.getElementById('formSortByInput');
     if (!sortInput) {
         const form = document.getElementById('reportFilterForm');
@@ -3347,6 +3428,10 @@ function toggleCustomerOrderHistoryDateSort() {
         if (sortInput) sortInput.value = 'Date Descending';
     }
     submitReportForm();
+}
+
+function toggleCustomerOrderHistoryDateSort() {
+    toggleSortByOrderDate();
 }
 
 /* ==========================================================================
