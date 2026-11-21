@@ -1433,7 +1433,7 @@ def view_report(report_key):
         query_params = list(params) + [per_page, offset]
 
         # Chronological sort matching inFlow screenshot: customer name ASC, order date ASC, order number ASC
-        if sort_by == 'Date Descending':
+        if sort_by in ('Date Descending', 'date_desc', 'DESC'):
             order_clause = "c.name ASC, so.order_date DESC, so.order_number DESC, sol.id ASC"
         elif sort_by == 'Customer (Z-A)':
             order_clause = "c.name DESC, so.order_date ASC, so.order_number ASC, sol.id ASC"
@@ -2796,6 +2796,13 @@ def export_report(report_key):
             elif status == 'Open':
                 base_where.append("so.status IN ('OPEN', 'PICKED', 'PACKED')")
         where_sql = " AND ".join(base_where)
+        if sort_by in ('Date Descending', 'date_desc', 'DESC'):
+            order_clause = "c.name ASC, so.order_date DESC, so.order_number DESC, sol.id ASC"
+        elif sort_by == 'Customer (Z-A)':
+            order_clause = "c.name DESC, so.order_date ASC, so.order_number ASC, sol.id ASC"
+        else:
+            order_clause = "c.name ASC, so.order_date ASC, so.order_number ASC, sol.id ASC"
+
         rows = query_all(f"""
             SELECT 
                 c.name as customer_name, so.order_number, so.order_date,
@@ -2809,7 +2816,7 @@ def export_report(report_key):
             JOIN sales_order_lines sol ON sol.sales_order_id = so.id
             LEFT JOIN products p ON sol.product_id = p.id
             WHERE {where_sql}
-            ORDER BY c.name ASC, so.order_date DESC, so.order_number DESC
+            ORDER BY {order_clause}
         """, tuple(params))
         for r in rows:
             sku_val = (r.get('sku') or '').strip()

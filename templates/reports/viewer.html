@@ -693,6 +693,22 @@
 .inflow-crys-th-row {
   border-bottom: 2px solid #E06D53;
 }
+.inflow-sortable-date-th {
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: color 0.15s ease;
+}
+.inflow-sortable-date-th:hover {
+  color: #C2410C !important;
+}
+.inflow-sortable-date-th:hover .inflow-date-sort-arrow {
+  color: #9A3412 !important;
+}
+@media print {
+  .inflow-date-sort-arrow {
+    display: none !important;
+  }
+}
 .inflow-crys-cust-name {
   color: #0284C7;
   font-size: 20px;
@@ -2018,7 +2034,14 @@
             <thead>
                 <tr class="inflow-crys-th-row">
                     <th style="width: 38%; text-align: left;">ITEM</th>
-                    <th style="width: 14%; text-align: left;">ORDER DATE</th>
+                    <th style="width: 14%; text-align: left;" class="inflow-sortable-date-th" onclick="toggleCustomerOrderHistoryDateSort()" title="Click to sort by date (Recent to Last / Last to Recent)">
+                        <span style="display: inline-flex; align-items: center; gap: 4px;">
+                            <span>ORDER DATE</span>
+                            <span class="inflow-date-sort-arrow" style="font-size: 11px; font-weight: 800; display: inline-block;">
+                                {% if sort_by in ['Date Descending', 'date_desc', 'DESC'] %}▼{% else %}▲{% endif %}
+                            </span>
+                        </span>
+                    </th>
                     <th style="width: 10%; text-align: left;">STATUS</th>
                     <th style="width: 12%; text-align: right;">QUANTITY</th>
                     <th style="width: 12%; text-align: right;">UNIT PRICE</th>
@@ -2428,7 +2451,8 @@
                     <option value="HQ Earnings" {% if sort_by in ['HQ Earnings', 'HQ Earning', 'Earnings'] %}selected{% endif %}>HQ Net Earnings</option>
                     <option value="HQ Costing" {% if sort_by in ['HQ Costing', 'HQ Cost', 'Total HQ Cost'] %}selected{% endif %}>HQ Costing</option>
                     {% endif %}
-                    <option value="Order Date" {% if sort_by == 'Order Date' %}selected{% endif %}>Order Date</option>
+                    <option value="Date Ascending" {% if sort_by in ['Date Ascending', 'Order Date'] %}selected{% endif %}>Order Date (Oldest to Recent)</option>
+                    <option value="Date Descending" {% if sort_by in ['Date Descending', 'date_desc', 'DESC'] %}selected{% endif %}>Order Date (Recent to Oldest)</option>
                     <option value="Customer" {% if sort_by == 'Customer' %}selected{% endif %}>Customer</option>
                 </select>
             </div>
@@ -3301,6 +3325,27 @@ function updateLiveSummaryTotals() {
 function toggleSortBySalesAmount() {
     const curSort = document.getElementById('formSortByInput')?.value || '';
     document.getElementById('formSortByInput').value = (curSort === 'Sales Amount') ? 'Order Number' : 'Sales Amount';
+    submitReportForm();
+}
+
+function toggleCustomerOrderHistoryDateSort() {
+    let sortInput = document.getElementById('formSortByInput');
+    if (!sortInput) {
+        const form = document.getElementById('reportFilterForm');
+        if (form) {
+            sortInput = document.createElement('input');
+            sortInput.type = 'hidden';
+            sortInput.name = 'sort_by';
+            sortInput.id = 'formSortByInput';
+            form.appendChild(sortInput);
+        }
+    }
+    const curSort = (sortInput ? sortInput.value : '') || '';
+    if (curSort === 'Date Descending' || curSort === 'date_desc' || curSort === 'DESC') {
+        if (sortInput) sortInput.value = 'Date Ascending';
+    } else {
+        if (sortInput) sortInput.value = 'Date Descending';
+    }
     submitReportForm();
 }
 
