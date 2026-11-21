@@ -125,7 +125,7 @@ def _get_customer_full_data(customer_id, user_bid=None, is_main_admin=False):
                (
                    SELECT STRING_AGG(COALESCE(sub.p_name, sub.description, 'Item') || ' (' || sub.quantity || ')', ', ')
                    FROM (
-                       SELECT sol.description, sol.quantity, p.name as p_name
+                       SELECT sol.description, sol.quantity, CASE WHEN p.sku IS NOT NULL AND p.sku != '' AND NOT p.name ILIKE p.sku || '%%' THEN p.sku || ' ' || p.name ELSE p.name END as p_name
                        FROM sales_order_lines sol
                        LEFT JOIN products p ON sol.product_id = p.id
                        WHERE sol.sales_order_id = so.id

@@ -1475,6 +1475,13 @@ def view_report(report_key):
         cur_all_lines = []
 
         for r in rows:
+            sku_val = (r.get('sku') or '').strip()
+            item_val = (r.get('item_name') or 'Item').strip()
+            if sku_val and not item_val.lower().startswith(sku_val.lower()):
+                r['item_name_with_sku'] = f"{sku_val} {item_val}"
+            else:
+                r['item_name_with_sku'] = item_val
+
             cust_name = r['customer_name'] or 'Unassigned'
             cust_id = r['customer_id']
             so_id = r['sales_order_id']
@@ -2805,9 +2812,12 @@ def export_report(report_key):
             ORDER BY c.name ASC, so.order_date DESC, so.order_number DESC
         """, tuple(params))
         for r in rows:
+            sku_val = (r.get('sku') or '').strip()
+            item_val = (r.get('item_name') or 'Item').strip()
+            item_with_sku = f"{sku_val} {item_val}" if (sku_val and not item_val.lower().startswith(sku_val.lower())) else item_val
             writer.writerow([
                 r['customer_name'] or '', r['order_number'], str(r['order_date']),
-                r['status_display'], r['item_name'], r['sku'] or '',
+                r['status_display'], item_with_sku, r['sku'] or '',
                 f"{float(r['quantity'] or 0):.2f}", r['uom'] or 'pcs',
                 f"{float(r['unit_price'] or 0):.2f}", f"{float(r['amount'] or 0):.2f}"
             ])

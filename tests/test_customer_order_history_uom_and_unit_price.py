@@ -38,7 +38,7 @@ class TestCustomerOrderHistoryUomAndUnitPrice(unittest.TestCase):
         so = query_one("SELECT customer_id FROM sales_orders WHERE order_number = 'SO-022914'")
         if so:
             cid = so['customer_id']
-            res = self.client.get(f'/reports/view/customer-order-history?customer_id={cid}&date_from=2026-10-01&date_to=2026-10-31')
+            res = self.client.get(f'/reports/view/customer-order-history?customer_id={cid}&date_range=Custom&date_from=2026-10-01&date_to=2026-10-31')
             self.assertEqual(res.status_code, 200)
             html = res.data.decode('utf-8')
 
