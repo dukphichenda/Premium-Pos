@@ -39,7 +39,7 @@ class TestInvoiceRemarksStyling(unittest.TestCase):
         self.assertIn('.totals-remarks-title', html)
         self.assertIn('.totals-remarks-text', html)
         self.assertIn('#DC2626', html)
-        self.assertIn('14px', html)
+        self.assertIn('11px', html)
         self.assertIn('font-weight: 800', html)
 
 if __name__ == '__main__':
