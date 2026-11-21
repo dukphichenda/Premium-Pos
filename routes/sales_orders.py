@@ -1109,13 +1109,22 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             search_query = (request.args.get('search') or request.args.get('q') or '').strip()
             if not search_query:
                 session.pop('so_search_query', None)
+                session.pop('so_search_branch', None)
         else:
-            search_query = (session.get('so_search_query') or '').strip()
+            saved_search_branch = session.get('so_search_branch')
+            current_b_str = str(branch_id or 'main')
+            if saved_search_branch and saved_search_branch != current_b_str:
+                session.pop('so_search_query', None)
+                session.pop('so_search_branch', None)
+                search_query = ''
+            else:
+                search_query = (session.get('so_search_query') or '').strip()
 
     # Never auto-search the current user's login username (e.g. 'chenda' or 'admin')
     if search_query and curr_user and search_query.lower() == curr_user:
         search_query = ''
         session.pop('so_search_query', None)
+        session.pop('so_search_branch', None)
 
     if search_query:
         sp = f"%{search_query}%"
@@ -2245,25 +2254,37 @@ def new_order():
         status_filter = 'Open'
 
     curr_user = (session.get('username') or '').strip().lower()
+    current_scope_str = str(branch['id']) if branch else (str(session.get('active_branch_id')) if session.get('active_branch_id') else 'main')
     if 'search' in request.args:
         search_query = request.args.get('search', '').strip()
         if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
+            session['so_search_branch'] = current_scope_str
         else:
             session.pop('so_search_query', None)
+            session.pop('so_search_branch', None)
             search_query = ''
     elif 'q' in request.args:
         search_query = request.args.get('q', '').strip()
         if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
+            session['so_search_branch'] = current_scope_str
         else:
             session.pop('so_search_query', None)
+            session.pop('so_search_branch', None)
             search_query = ''
     elif 'so_search_query' in session and session.get('so_search_query'):
-        search_query = session['so_search_query'].strip()
-        if curr_user and search_query.lower() == curr_user:
+        saved_branch = session.get('so_search_branch')
+        if saved_branch and saved_branch != current_scope_str:
             session.pop('so_search_query', None)
+            session.pop('so_search_branch', None)
             search_query = ''
+        else:
+            search_query = session['so_search_query'].strip()
+            if curr_user and search_query.lower() == curr_user:
+                session.pop('so_search_query', None)
+                session.pop('so_search_branch', None)
+                search_query = ''
     else:
         search_query = ''
 
@@ -2509,26 +2530,38 @@ def detail_order(id):
         status_filter = 'Open'
 
     curr_user = (session.get('username') or '').strip().lower()
+    order_branch_str = str(order.get('branch_id')) if order.get('branch_id') else 'main'
     if 'search' in request.args:
         search_query = request.args.get('search', '').strip()
         if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
+            session['so_search_branch'] = order_branch_str
         else:
             session.pop('so_search_query', None)
+            session.pop('so_search_branch', None)
             search_query = ''
     elif 'q' in request.args:
         search_query = request.args.get('q', '').strip()
         if search_query and search_query.lower() != curr_user:
             session['so_search_query'] = search_query
+            session['so_search_branch'] = order_branch_str
         else:
             session.pop('so_search_query', None)
+            session.pop('so_search_branch', None)
             search_query = ''
     else:
         # Check session search query if previously set
-        search_query = (session.get('so_search_query') or '').strip()
-        if curr_user and search_query.lower() == curr_user:
+        saved_branch = session.get('so_search_branch')
+        if saved_branch and saved_branch != order_branch_str:
             session.pop('so_search_query', None)
+            session.pop('so_search_branch', None)
             search_query = ''
+        else:
+            search_query = (session.get('so_search_query') or '').strip()
+            if curr_user and search_query.lower() == curr_user:
+                session.pop('so_search_query', None)
+                session.pop('so_search_branch', None)
+                search_query = ''
 
     if 'customer_search' in request.args and request.args.get('customer_search'):
         customer_search = request.args.get('customer_search', '').strip()

@@ -496,6 +496,11 @@ def switch_branch(id):
         flash(f"🔒 Access Restricted: You are logged in as Branch Admin and can only access Branch #{user_bid}. / គ្មានសិទ្ធិចូលសាខាផ្សេងទេ", "error")
         return redirect(url_for('branches.branch_workspace', id=user_bid))
 
+    # Reset any previous branch search query so it does not persist across stores
+    session.pop('so_search_query', None)
+    session.pop('so_customer_search', None)
+    session.pop('so_search_branch', None)
+
     if id == 0:
         session.pop('active_branch_id', None)
         flash("🏢 Switched to Main Store (HQ - Headquarters). Full enterprise view active.", "info")
@@ -548,6 +553,9 @@ def launch_branch_system(id):
         return redirect(url_for('branches.list_branches'))
     
     session['active_branch_id'] = id
+    session.pop('so_search_query', None)
+    session.pop('so_customer_search', None)
+    session.pop('so_search_branch', None)
     flash(f"🚀 Launched {branch['name']} ({branch['code']}) System!", "success")
     return redirect(url_for('branches.branch_workspace', id=id))
 
@@ -837,6 +845,9 @@ def branch_new_order(id):
         return redirect(url_for('branches.branch_workspace', id=id))
 
     session['active_branch_id'] = id
+    session.pop('so_search_query', None)
+    session.pop('so_customer_search', None)
+    session.pop('so_search_branch', None)
     cust_id = request.args.get('customer_id')
     return redirect(url_for('sales_orders.new_order', branch=id, customer_id=cust_id) if cust_id else url_for('sales_orders.new_order', branch=id))
 

@@ -5359,6 +5359,8 @@ window.handleTabCloseAttempt = function(targetUrl) {
 /* ==========================================================================
    Drawer Filter State Synchronization across Actions (Copy, New, Save, Pay)
    ========================================================================== */
+window.CURRENT_BRANCH_SCOPE = String("{{ current_branch.id if current_branch else (order.branch_id if (order and order.branch_id) else (session.get('active_branch_id') or (branch_scope if (branch_scope and branch_scope.isdigit()) else '0'))) }}");
+
 function getDrawerFilterParams() {
     const dateSelect = document.getElementById('drawerDateFilterSelect');
     let dateVal = (dateSelect ? dateSelect.value : '') ||
@@ -5368,9 +5370,16 @@ function getDrawerFilterParams() {
     let statusVal = (statusInput ? statusInput.value : '') ||
                     sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter }}' || 'Open, In Progress, Paid';
 
+    let lastSB = '';
+    try { lastSB = sessionStorage.getItem('inflow_so_search_branch') || ''; } catch(e) {}
+
     const custInput = document.getElementById('drawerCustomerSearchInput');
-    let custVal = (custInput ? custInput.value : '')?.trim() ||
-                  sessionStorage.getItem('inflow_so_drawer_customer_search') || '{{ customer_search or "" }}';
+    let custVal = (custInput ? custInput.value : '')?.trim();
+    if (!custVal && (!lastSB || lastSB === window.CURRENT_BRANCH_SCOPE)) {
+        custVal = sessionStorage.getItem('inflow_so_drawer_customer_search') || '{{ customer_search or "" }}';
+    } else if (!custVal) {
+        custVal = '';
+    }
 
     const branchInput = document.getElementById('drawerBranchFilterInput');
     let branchVal = (branchInput ? branchInput.value : '') || '{{ branch_scope or "" }}';
@@ -5390,6 +5399,7 @@ function syncDrawerFiltersToStorage() {
         if (params.status_filter) sessionStorage.setItem('inflow_so_status_filter', params.status_filter);
         if (params.customer_search) {
             sessionStorage.setItem('inflow_so_drawer_customer_search', params.customer_search);
+            sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
         } else {
             sessionStorage.removeItem('inflow_so_drawer_customer_search');
         }
@@ -5699,7 +5709,10 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     if (liveSearchVal) {
         const qTrim = liveSearchVal;
         url.searchParams.set('search', qTrim);
-        try { sessionStorage.setItem('inflow_so_search_query', qTrim); } catch(e) {}
+        try {
+            sessionStorage.setItem('inflow_so_search_query', qTrim);
+            sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
+        } catch(e) {}
         if (liveSearchInput && liveSearchInput.value !== qTrim) {
             liveSearchInput.value = qTrim;
         }
@@ -6218,11 +6231,17 @@ document.addEventListener('DOMContentLoaded', function () {
     // Persist drawer customer search across copy SO, save SO, and navigation
     const drawerCustInput = document.getElementById('drawerCustomerSearchInput');
     const urlParams = new URLSearchParams(window.location.search);
-    const savedCust = sessionStorage.getItem('inflow_so_drawer_customer_search');
+    let lastSearchBranch = '';
+    try { lastSearchBranch = sessionStorage.getItem('inflow_so_search_branch') || ''; } catch(e) {}
+    if (lastSearchBranch && lastSearchBranch !== window.CURRENT_BRANCH_SCOPE && !urlParams.has('customer_search')) {
+        try { sessionStorage.removeItem('inflow_so_drawer_customer_search'); } catch(e) {}
+    }
+    const savedCust = (lastSearchBranch && lastSearchBranch !== window.CURRENT_BRANCH_SCOPE && !urlParams.has('customer_search')) ? '' : sessionStorage.getItem('inflow_so_drawer_customer_search');
 
     if (drawerCustInput) {
         if (drawerCustInput.value && drawerCustInput.value.trim()) {
             sessionStorage.setItem('inflow_so_drawer_customer_search', drawerCustInput.value.trim());
+            sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
         } else if (urlParams.has('customer_search') && !urlParams.get('customer_search')) {
             // User intentionally cleared search
             sessionStorage.removeItem('inflow_so_drawer_customer_search');
@@ -6239,6 +6258,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 sessionStorage.removeItem('inflow_so_drawer_customer_search');
             } else {
                 sessionStorage.setItem('inflow_so_drawer_customer_search', v);
+                sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
             }
             if (typeof onDrawerCustomerType === 'function') {
                 onDrawerCustomerType(v);
@@ -6367,11 +6387,32 @@ document.addEventListener('DOMContentLoaded', function () {
     const urlSearch = (soSearchUrlParams.get('search') || soSearchUrlParams.get('q') || '').trim();
 
     const loggedInUserInit = ("{{ session.get('username') or '' }}").toLowerCase().trim();
+    const currentBranchScope = window.CURRENT_BRANCH_SCOPE || String("{{ current_branch.id if current_branch else (order.branch_id if (order and order.branch_id) else (session.get('active_branch_id') or (branch_scope if (branch_scope and branch_scope.isdigit()) else '0'))) }}");
+
+    let lastSearchBranch = '';
+    try {
+        lastSearchBranch = sessionStorage.getItem('inflow_so_search_branch') || '';
+    } catch(e) {}
+
+    // When switching to another branch, do not remember/restore customer/sidebar search query
+    if (lastSearchBranch && lastSearchBranch !== currentBranchScope && !hasSearchParam) {
+        try {
+            sessionStorage.removeItem('inflow_so_search_query');
+            sessionStorage.removeItem('inflow_so_drawer_customer_search');
+        } catch(e) {}
+    }
+    try {
+        sessionStorage.setItem('inflow_so_search_branch', currentBranchScope);
+    } catch(e) {}
+
     let activeSearch = '';
     if (hasSearchParam) {
         activeSearch = urlSearch;
         if (activeSearch && (!loggedInUserInit || activeSearch.toLowerCase() !== loggedInUserInit)) {
-            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+            try {
+                sessionStorage.setItem('inflow_so_search_query', activeSearch);
+                sessionStorage.setItem('inflow_so_search_branch', currentBranchScope);
+            } catch(e) {}
         } else {
             activeSearch = '';
             try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
@@ -6379,10 +6420,15 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
         // No search query in URL: check sessionStorage or template server render
         let savedSearch = '';
-        try { savedSearch = (sessionStorage.getItem('inflow_so_search_query') || '{{ clean_search_val or "" }}').trim(); } catch(e) {}
+        if (!lastSearchBranch || lastSearchBranch === currentBranchScope) {
+            try { savedSearch = (sessionStorage.getItem('inflow_so_search_query') || '{{ clean_search_val or "" }}').trim(); } catch(e) {}
+        }
         if (savedSearch && (!loggedInUserInit || savedSearch.toLowerCase() !== loggedInUserInit)) {
             activeSearch = savedSearch;
-            try { sessionStorage.setItem('inflow_so_search_query', activeSearch); } catch(e) {}
+            try {
+                sessionStorage.setItem('inflow_so_search_query', activeSearch);
+                sessionStorage.setItem('inflow_so_search_branch', currentBranchScope);
+            } catch(e) {}
         } else {
             activeSearch = '';
             try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
@@ -10412,6 +10458,7 @@ function handleSoLiveSearch(val, isUserTyping) {
     try {
         if (q) {
             sessionStorage.setItem('inflow_so_search_query', rawVal.trim());
+            sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
         } else {
             sessionStorage.removeItem('inflow_so_search_query');
         }
@@ -10586,7 +10633,10 @@ function executeSoSearch(query, customerId) {
     const url = new URL(window.location.href);
     if (val) {
         url.searchParams.set('search', val);
-        try { sessionStorage.setItem('inflow_so_search_query', val); } catch(err) {}
+        try {
+            sessionStorage.setItem('inflow_so_search_query', val);
+            sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
+        } catch(err) {}
     } else {
         url.searchParams.set('search', '');
         url.searchParams.delete('q');

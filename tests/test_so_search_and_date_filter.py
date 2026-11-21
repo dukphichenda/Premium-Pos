@@ -111,9 +111,10 @@ class TestSoSearchAndDateFilter(unittest.TestCase):
     def test_so_sidebar_does_not_auto_filter_by_customer_id(self):
         # When customer_id is supplied on /sales/new (e.g. from clicking + New SO for matched customer),
         # it pre-fills the new order customer but does NOT filter the sidebar to only that customer
-        cust = query_one("SELECT id, name FROM customers LIMIT 1")
+        cust = query_one("SELECT id, name, branch_id FROM customers WHERE branch_id IS NULL LIMIT 1") or query_one("SELECT id, name, branch_id FROM customers LIMIT 1")
         if cust:
-            res = self.client.get(f'/sales/new?customer_id={cust["id"]}')
+            b_param = f'&branch={cust["branch_id"]}' if cust.get('branch_id') else ''
+            res = self.client.get(f'/sales/new?customer_id={cust["id"]}{b_param}')
             self.assertEqual(res.status_code, 200)
             # The new order should have the customer name pre-selected
             html = res.data.decode('utf-8')

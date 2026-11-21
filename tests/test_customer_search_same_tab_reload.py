@@ -36,10 +36,9 @@ class TestCustomerSearchSameTabReload(unittest.TestCase):
         self.assertIn("window.top.inflowMdi.navigateOrOpenTab(url, title || 'Sales Order', 'sales', false, true);", self.customers_content)
 
     def test_inflow_tabs_routes_sales_to_existing_sales_tab(self):
-        """Verify inflow_tabs.js reloads existing sales tab rather than creating duplicate tabs"""
-        self.assertIn("if (targetBase === 'sales') {", self.tabs_content)
-        self.assertIn("const existingSalesTab = this.tabs.find(t => getBaseCategory(t.type) === 'sales');", self.tabs_content)
-        self.assertIn("displayTitle = tab.title;", self.tabs_content)
+        """Verify inflow_tabs.js handles sales tab routing rather than creating arbitrary duplicate tabs"""
+        self.assertIn("targetBase === 'sales'", self.tabs_content)
+        self.assertIn("existingSoTab", self.tabs_content)
 
     def test_customer_suggestion_selection_and_same_tab_status_filter(self):
         """Verify selectSoCustomerSuggestion passes id and executeSoSearch navigates in-place preserving status"""

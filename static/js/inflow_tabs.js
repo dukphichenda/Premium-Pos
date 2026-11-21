@@ -1579,6 +1579,19 @@
                     localStorage.removeItem(STORAGE_KEY);
                     localStorage.removeItem(ACTIVE_TAB_KEY);
                     localStorage.setItem('inflow_active_store_id', targetId);
+                    sessionStorage.removeItem('inflow_so_search_query');
+                    sessionStorage.removeItem('inflow_so_drawer_customer_search');
+                    sessionStorage.removeItem('inflow_so_search_branch');
+                    sessionStorage.removeItem('inflow_so_last_branch');
+                } catch (e) { }
+
+                try {
+                    if (window.top && window.top !== window && window.top.sessionStorage) {
+                        window.top.sessionStorage.removeItem('inflow_so_search_query');
+                        window.top.sessionStorage.removeItem('inflow_so_drawer_customer_search');
+                        window.top.sessionStorage.removeItem('inflow_so_search_branch');
+                        window.top.sessionStorage.removeItem('inflow_so_last_branch');
+                    }
                 } catch (e) { }
 
                 const targetUrl = targetId === '0' ? '/branches/switch/0' : `/branches/switch/${targetId}`;
@@ -1665,6 +1678,18 @@
                 }
             },
             switchStoreContext: function (branchId, e) {
+                try {
+                    sessionStorage.removeItem('inflow_so_search_query');
+                    sessionStorage.removeItem('inflow_so_drawer_customer_search');
+                    sessionStorage.removeItem('inflow_so_search_branch');
+                    sessionStorage.removeItem('inflow_so_last_branch');
+                    if (window.top && window.top !== window && window.top.sessionStorage) {
+                        window.top.sessionStorage.removeItem('inflow_so_search_query');
+                        window.top.sessionStorage.removeItem('inflow_so_drawer_customer_search');
+                        window.top.sessionStorage.removeItem('inflow_so_search_branch');
+                        window.top.sessionStorage.removeItem('inflow_so_last_branch');
+                    }
+                } catch (err) {}
                 if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.switchStoreContext === 'function') {
                     window.top.inflowMdi.switchStoreContext(branchId, e);
                 } else {
