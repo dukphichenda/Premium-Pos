@@ -2580,31 +2580,20 @@
                     </tr>
                     {% endif %}
                 </table>
-
-                {% set order_remark = (order.notes or order.delivery_notes or '').strip() %}
-                {% if order_remark %}
-                <div class="totals-remarks-box" style="margin-top: 0; padding: 5px 8px; background: #FEF2F2; border-top: 1.5px solid #FCA5A5; line-height: 1.35; word-break: break-word; text-align: left;">
-                    <div class="totals-remarks-title" style="font-weight: 800; color: #B91C1C; font-size: 9.5px; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
-                        <span>📝</span>
-                        <span>សម្គាល់ / Remarks:</span>
-                    </div>
-                    <div class="totals-remarks-text" style="font-weight: 800; color: #DC2626; font-size: 11px; line-height: 1.35; white-space: pre-line;">{{ order_remark }}</div>
-                </div>
-                {% endif %}
-            </div>
-            {% else %}
-            {% set order_remark = (order.notes or order.delivery_notes or '').strip() %}
-            {% if order_remark %}
-            <div class="totals-card" style="width: 100%; max-width: 270px; border: 1.5px solid #FCA5A5; border-radius: 6px; overflow: hidden; background: #FEF2F2;">
-                <div class="totals-remarks-box" style="padding: 5px 8px; background: #FEF2F2; line-height: 1.35; word-break: break-word; text-align: left;">
-                    <div class="totals-remarks-title" style="font-weight: 800; color: #B91C1C; font-size: 9.5px; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
-                        <span>📝</span>
-                        <span>សម្គាល់ / Remarks:</span>
-                    </div>
-                    <div class="totals-remarks-text" style="font-weight: 800; color: #DC2626; font-size: 11px; line-height: 1.35; white-space: pre-line;">{{ order_remark }}</div>
-                </div>
             </div>
             {% endif %}
+        {% endmacro %}
+
+        {% macro render_remarks_box() %}
+            {% set order_remark = (order.notes or order.delivery_notes or '').strip() %}
+            {% if order_remark %}
+            <div class="totals-remarks-box" style="width: 100%; box-sizing: border-box; padding: 6px 10px; background: #FEF2F2; border: 1.5px solid #FCA5A5; border-radius: 6px; line-height: 1.35; word-break: break-word; text-align: left;">
+                <div class="totals-remarks-title" style="font-weight: 800; color: #B91C1C; font-size: 9.5px; margin-bottom: 2px; display: flex; align-items: center; gap: 4px;">
+                    <span>📝</span>
+                    <span>សម្គាល់ / Remarks:</span>
+                </div>
+                <div class="totals-remarks-text" style="font-weight: 800; color: #DC2626; font-size: 11px; line-height: 1.35; white-space: pre-line;">{{ order_remark }}</div>
+            </div>
             {% endif %}
         {% endmacro %}
 
@@ -2617,20 +2606,31 @@
                         {{ render_bank_info_card() }}
                     </div>
                 </div>
-                <div style="display: flex; justify-content: flex-end;">
+                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
                     {{ render_totals_table() }}
+                    {{ render_remarks_box() }}
                 </div>
             </div>
             {% elif bank_pos == 'beside_qr' %}
-            <div class="inv-bottom-grid inv-grid-left-beside" style="display: grid; grid-template-columns: 1fr 270px; gap: 14px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
-                <div style="display: flex; gap: 12px; align-items: start;">
+            <div class="inv-bottom-grid inv-grid-left-beside" style="display: flex; gap: 14px; align-items: flex-start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="flex-shrink: 0;">
                     {{ render_khqr_card() }}
-                    <div style="flex: 1;">
-                        {{ render_bank_info_card() }}
-                    </div>
                 </div>
-                <div style="display: flex; justify-content: flex-end;">
-                    {{ render_totals_table() }}
+                <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                    <div style="display: grid; grid-template-columns: 1fr 270px; gap: 14px; align-items: start;">
+                        <div>
+                            {{ render_bank_info_card() }}
+                        </div>
+                        <div style="display: flex; justify-content: flex-end;">
+                            {{ render_totals_table() }}
+                        </div>
+                    </div>
+                    {% set order_remark = (order.notes or order.delivery_notes or '').strip() %}
+                    {% if order_remark %}
+                    <div style="margin-top: 6px;">
+                        {{ render_remarks_box() }}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             {% else %}
@@ -2647,13 +2647,17 @@
                 <div style="width: 100%;">
                     {{ render_bank_info_card() }}
                 </div>
+                <div style="margin-top: 6px;">
+                    {{ render_remarks_box() }}
+                </div>
             </div>
             {% endif %}
         {% elif qr_pos == 'right' %}
             {% if bank_pos == 'below_qr' %}
             <div class="inv-bottom-grid inv-grid-right-below" style="display: grid; grid-template-columns: 1fr {{ col_w }}px; gap: 16px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
-                <div style="display: flex; justify-content: flex-start;">
+                <div style="display: flex; flex-direction: column; justify-content: flex-start; gap: 6px;">
                     {{ render_totals_table() }}
+                    {{ render_remarks_box() }}
                 </div>
                 <div>
                     {{ render_khqr_card() }}
@@ -2663,14 +2667,21 @@
                 </div>
             </div>
             {% elif bank_pos == 'beside_qr' %}
-            <div class="inv-bottom-grid inv-grid-right-beside" style="display: grid; grid-template-columns: 270px 1fr; gap: 14px; align-items: start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
-                <div style="display: flex; justify-content: flex-start;">
-                    {{ render_totals_table() }}
-                </div>
-                <div style="display: flex; gap: 12px; align-items: start;">
-                    <div style="flex: 1;">
-                        {{ render_bank_info_card() }}
+            <div class="inv-bottom-grid inv-grid-right-beside" style="display: flex; gap: 14px; align-items: flex-start; margin-top: 8px; margin-bottom: 12px; page-break-inside: avoid;">
+                <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+                    <div style="display: grid; grid-template-columns: 270px 1fr; gap: 14px; align-items: start;">
+                        <div style="display: flex; justify-content: flex-start;">
+                            {{ render_totals_table() }}
+                        </div>
+                        <div>
+                            {{ render_bank_info_card() }}
+                        </div>
                     </div>
+                    <div style="margin-top: 6px;">
+                        {{ render_remarks_box() }}
+                    </div>
+                </div>
+                <div style="flex-shrink: 0;">
                     {{ render_khqr_card() }}
                 </div>
             </div>
@@ -2687,6 +2698,9 @@
                 </div>
                 <div style="width: 100%;">
                     {{ render_bank_info_card() }}
+                </div>
+                <div style="margin-top: 6px;">
+                    {{ render_remarks_box() }}
                 </div>
             </div>
             {% endif %}
@@ -2711,6 +2725,9 @@
                     </div>
                 </div>
                 {% endif %}
+                <div style="margin-top: 6px;">
+                    {{ render_remarks_box() }}
+                </div>
             </div>
         {% endif %}
 
