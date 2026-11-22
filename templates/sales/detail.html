@@ -3281,13 +3281,24 @@ window.handleSelectOrder = function(event, targetUrl, clickedEl) {
         try { if (typeof event.preventDefault === 'function') event.preventDefault(); } catch(e) {}
         try { if (typeof event.stopPropagation === 'function') event.stopPropagation(); } catch(e) {}
     }
+    // Support handleSelectOrder(event, clickedEl)
+    if (targetUrl && (targetUrl.nodeType || (typeof targetUrl === 'object' && targetUrl.tagName)) && !clickedEl) {
+        clickedEl = targetUrl;
+        targetUrl = null;
+    }
+    // Support legacy signature handleSelectOrder(targetUrl, clickedEl)
     if (typeof event === 'string') {
         clickedEl = targetUrl;
         targetUrl = event;
     }
+    const el = (clickedEl && clickedEl.closest) ? (clickedEl.closest('.so-sidebar-card') || clickedEl) : clickedEl;
+    if (!targetUrl && el) {
+        const oid = (el.getAttribute && el.getAttribute('data-order-id')) || (el.dataset && el.dataset.orderId);
+        if (oid) targetUrl = '/sales/' + oid;
+    }
     // Ctrl+Click, Cmd+Click, or Middle-Click opens order in a separate new tab!
     if (event && (event.ctrlKey || event.metaKey || event.button === 1)) {
-        const ordNum = (clickedEl && clickedEl.getAttribute) ? clickedEl.getAttribute('data-order-num') : '';
+        const ordNum = (el && el.getAttribute) ? el.getAttribute('data-order-num') : '';
         const tabTitle = ordNum ? `Sales Order: ${ordNum}` : 'Sales Order';
         if (window.top && window.top.inflowMdi) {
             window.top.inflowMdi.openTab(targetUrl, tabTitle, 'sales', true);
@@ -3295,7 +3306,7 @@ window.handleSelectOrder = function(event, targetUrl, clickedEl) {
         }
     }
     if (typeof executeAnimatedOrderNavigation === 'function') {
-        executeAnimatedOrderNavigation(targetUrl, clickedEl);
+        executeAnimatedOrderNavigation(targetUrl, el);
     } else if (targetUrl) {
         window.location.href = targetUrl;
     }
@@ -3751,7 +3762,7 @@ function closeSoMobileDrawer() {
             {% endif %}
 
             <a href="javascript:void(0)" 
-               onclick="handleSelectOrder(event, '{{ url_for('sales_orders.detail_order', id=s_ord.id, date_filter=date_filter, status_filter=status_filter, branch=(branch_scope or None), search=((search_query or session.get('so_search_query')) or None)) }}', this)" 
+               onclick="handleSelectOrder(event, this)" 
                class="so-sidebar-card {% if not is_new and s_ord.id == order.id %}active{% endif %}"
                data-order-id="{{ s_ord.id }}"
                data-order-num="{{ s_ord.order_number }}"
@@ -5619,6 +5630,11 @@ function getCurrentOrderId() {
 
 // Instant Direct Navigation (Zero Animation Latency - Appear As Fast As Possible via SPA Canvas Swap)
 function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
+    if (!targetUrl && clickedEl) {
+        const el = (clickedEl.closest) ? (clickedEl.closest('.so-sidebar-card') || clickedEl) : clickedEl;
+        const oid = (el.getAttribute && el.getAttribute('data-order-id')) || (el.dataset && el.dataset.orderId);
+        if (oid) targetUrl = '/sales/' + oid;
+    }
     if (!targetUrl) return;
     closeSoMobileDrawer();
 
@@ -5656,15 +5672,33 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     // Immediate active state highlight (0ms latency!)
     document.querySelectorAll('.so-sidebar-card, .inflow-drawer-row, .inflow-expanded-row').forEach(r => r.classList.remove('active'));
     if (clickedEl) {
-        clickedEl.classList.add('active');
+        const cardEl = (clickedEl.closest) ? (clickedEl.closest('.so-sidebar-card') || clickedEl) : clickedEl;
+        cardEl.classList.add('active');
     } else if (targetOrderId) {
         const matchingCard = document.querySelector(`.so-sidebar-card[data-order-id="${targetOrderId}"]`);
         if (matchingCard) matchingCard.classList.add('active');
     }
 
-    // When filtering by Open, any previously completed/paid SO that was kept on screen disappears once user clicks another SO
+    // Live search query handling
+    const liveSearchInput = document.getElementById('soSidebarSearchInput');
+    const loggedInUser = ("{{ session.get('username') or '' }}").toLowerCase().trim();
+
+    // Maintain search query in SO sidebar across selections until user clicks cross (✕) or clears it
+    let liveSearchVal = '';
+    if (liveSearchInput) {
+        liveSearchVal = liveSearchInput.value.trim();
+    } else {
+        liveSearchVal = (sessionStorage.getItem('inflow_so_search_query') || url.searchParams.get('search') || '').trim();
+    }
+
+    if (loggedInUser && liveSearchVal.toLowerCase() === loggedInUser) {
+        liveSearchVal = '';
+        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
+    }
+
+    // When filtering by Open, any previously completed/paid SO that was kept on screen disappears once user clicks another SO (ONLY if NOT actively searching!)
     const curStatusFilter = (sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}').toLowerCase().trim();
-    if (curStatusFilter === 'open' || curStatusFilter === 'unfulfilled') {
+    if (!liveSearchVal && (curStatusFilter === 'open' || curStatusFilter === 'unfulfilled')) {
         let removedAny = false;
         document.querySelectorAll('.so-sidebar-card[data-status="paid"]').forEach(card => {
             const cardOid = parseInt(card.getAttribute('data-order-id'), 10);
@@ -5689,22 +5723,6 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     // Clear stale customer search in storage so it never wipes out the orders list
     sessionStorage.removeItem('inflow_so_drawer_customer_search');
     closeSoCustSuggestPopup();
-
-    const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const loggedInUser = ("{{ session.get('username') or '' }}").toLowerCase().trim();
-
-    // Maintain search query in SO sidebar across selections until user clicks cross (✕) or clears it
-    let liveSearchVal = '';
-    if (liveSearchInput) {
-        liveSearchVal = liveSearchInput.value.trim();
-    } else {
-        liveSearchVal = (sessionStorage.getItem('inflow_so_search_query') || url.searchParams.get('search') || '').trim();
-    }
-
-    if (loggedInUser && liveSearchVal.toLowerCase() === loggedInUser) {
-        liveSearchVal = '';
-        try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
-    }
 
     if (liveSearchVal) {
         const qTrim = liveSearchVal;
@@ -5736,10 +5754,21 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
     url.searchParams.delete('customer_id');
     url.searchParams.delete('customer_search');
 
-    // Preserve sale status (e.g. Open sale stays Open) only if user is not actively searching
-    if (!liveSearchVal && !url.searchParams.has('status_filter')) {
-        const curStatus = sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}';
+    // Preserve sale status (e.g. Open stays Open, All stays All)
+    if (!url.searchParams.has('status_filter')) {
+        const curStatus = sessionStorage.getItem('inflow_so_status_filter') || new URL(window.location.href).searchParams.get('status_filter') || '{{ status_filter or "Open" }}';
         if (curStatus) url.searchParams.set('status_filter', curStatus);
+    }
+    if (!url.searchParams.has('branch')) {
+        const curBranch = window.CURRENT_BRANCH_SCOPE || new URL(window.location.href).searchParams.get('branch') || '{{ branch_scope or "" }}';
+        if (curBranch) url.searchParams.set('branch', curBranch);
+    }
+    if (!url.searchParams.has('date_filter')) {
+        const curDate = sessionStorage.getItem('inflow_so_date_filter') || new URL(window.location.href).searchParams.get('date_filter') || '{{ date_filter or "All" }}';
+        if (curDate) url.searchParams.set('date_filter', curDate);
+    }
+    if (new URL(window.location.href).searchParams.get('_from_list') === '1') {
+        url.searchParams.set('_from_list', '1');
     }
 
     const finalUrl = url.pathname + url.search;
@@ -6055,16 +6084,26 @@ function handleSelectOrder(event, targetUrl, clickedEl) {
         // User was scrolling, ignore click/tap
         return;
     }
+    // Support handleSelectOrder(event, clickedEl)
+    if (targetUrl && (targetUrl.nodeType || (typeof targetUrl === 'object' && targetUrl.tagName)) && !clickedEl) {
+        clickedEl = targetUrl;
+        targetUrl = null;
+    }
     // Support legacy signature handleSelectOrder(targetUrl, clickedEl)
     if (typeof event === 'string') {
         clickedEl = targetUrl;
         targetUrl = event;
     }
+    const el = (clickedEl && clickedEl.closest) ? (clickedEl.closest('.so-sidebar-card') || clickedEl) : clickedEl;
+    if (!targetUrl && el) {
+        const oid = (el.getAttribute && el.getAttribute('data-order-id')) || (el.dataset && el.dataset.orderId);
+        if (oid) targetUrl = '/sales/' + oid;
+    }
     // Ctrl+Click, Cmd+Click, or Middle-Click opens order in a separate new tab!
     if (event && (event.ctrlKey || event.metaKey || event.button === 1)) {
         if (event.preventDefault) event.preventDefault();
         if (event.stopPropagation) event.stopPropagation();
-        const ordNum = (clickedEl && clickedEl.getAttribute) ? clickedEl.getAttribute('data-order-num') : '';
+        const ordNum = (el && el.getAttribute) ? el.getAttribute('data-order-num') : '';
         const tabTitle = ordNum ? `Sales Order: ${ordNum}` : 'Sales Order';
         if (window.top && window.top.inflowMdi) {
             window.top.inflowMdi.openTab(targetUrl, tabTitle, 'sales', true);
@@ -6089,12 +6128,12 @@ function handleSelectOrder(event, targetUrl, clickedEl) {
             function() { saveSalesOrder(); },
             function() {
                 isDirty = false;
-                executeAnimatedOrderNavigation(targetUrl, clickedEl);
+                executeAnimatedOrderNavigation(targetUrl, el);
             },
             function() { /* cancel: stay */ }
         );
     } else {
-        executeAnimatedOrderNavigation(targetUrl, clickedEl);
+        executeAnimatedOrderNavigation(targetUrl, el);
     }
 }
 window.handleSelectOrder = handleSelectOrder;
