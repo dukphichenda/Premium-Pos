@@ -8123,16 +8123,29 @@ function handleBillDateChange(input) {
     if (origDate && newDate && origDate !== newDate) {
         const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
         if (remarksEl) {
-            // ONLY add to note once - if remarks already contains previous bill date, do not add more
+            // ONLY add to note once - if remarks already contains previous bill date, do not ask or add again
             if (/previous\s+bill\s+date\s*:/i.test(remarksEl.value)) {
                 return;
             }
-            const dateNote = `Previous bill date: ${origDate}`;
-            remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
-            if (typeof updateRemarksCharCount === 'function') {
-                updateRemarksCharCount(remarksEl);
+            // If user already declined in this session for this date change, don't keep nagging
+            if (input.getAttribute('data-skip-prev-date-note') === '1') {
+                return;
+            }
+            const wantNote = confirm(`Do you want to note the previous date (${origDate}) in Remarks?\n\nតើអ្នកចង់កត់កាលបរិច្ឆេទមុន (${origDate}) ក្នុងកំណត់សម្គាល់ដែរឬទេ?`);
+            if (wantNote) {
+                const dateNote = `Previous bill date: ${origDate}`;
+                remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
+                if (typeof updateRemarksCharCount === 'function') {
+                    updateRemarksCharCount(remarksEl);
+                }
+                input.removeAttribute('data-skip-prev-date-note');
+            } else {
+                input.setAttribute('data-skip-prev-date-note', '1');
             }
         }
+    } else if (origDate && newDate && origDate === newDate) {
+        // If user reverts back to original date, reset the skip flag
+        input.removeAttribute('data-skip-prev-date-note');
     }
 }
 
@@ -8150,23 +8163,6 @@ function saveSalesOrder() {
             openCustomerDropdown();
         }
         return;
-    }
-
-    // Ensure previous bill date is recorded if changed (only for existing saved orders, and only once)
-    const orderId = typeof getCurrentOrderId === 'function' ? getCurrentOrderId() : null;
-    if (!isNewOrder && !isCopiedDraft && orderId && orderId !== '0' && orderId !== 0) {
-        const dateInput = document.getElementById('orderDateInput');
-        if (dateInput) {
-            const origDate = dateInput.getAttribute('data-original-date');
-            const newDate = (dateInput.value || '').trim();
-            if (origDate && newDate && origDate !== newDate) {
-                const remarksEl = document.getElementById('orderNotesInput') || document.querySelector('textarea[name="notes"]');
-                if (remarksEl && !/previous\s+bill\s+date\s*:/i.test(remarksEl.value)) {
-                    const dateNote = `Previous bill date: ${origDate}`;
-                    remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
-                }
-            }
-        }
     }
 
     // Deduplicate any duplicate Previous bill date lines in remarks before submitting
