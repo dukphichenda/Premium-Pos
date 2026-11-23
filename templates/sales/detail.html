@@ -5696,11 +5696,11 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
         try { sessionStorage.removeItem('inflow_so_search_query'); } catch(e) {}
     }
 
-    // When filtering by Open, any previously completed/paid SO that was kept on screen disappears once user clicks another SO (ONLY if NOT actively searching!)
+    // When filtering by Open, any previously completed/paid SO that was just completed in this session disappears once user clicks another SO (ONLY if NOT actively searching!)
     const curStatusFilter = (sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}').toLowerCase().trim();
     if (!liveSearchVal && (curStatusFilter === 'open' || curStatusFilter === 'unfulfilled')) {
         let removedAny = false;
-        document.querySelectorAll('.so-sidebar-card[data-status="paid"]').forEach(card => {
+        document.querySelectorAll('.so-sidebar-card[data-status="paid"][data-just-completed="true"]').forEach(card => {
             const cardOid = parseInt(card.getAttribute('data-order-id'), 10);
             if (card !== clickedEl && (!targetOrderId || cardOid !== targetOrderId)) {
                 card.remove();
@@ -5712,10 +5712,6 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
             const countDisplay = document.getElementById('soVisibleCountDisplay');
             if (countDisplay) {
                 countDisplay.innerText = visibleCards.length;
-            }
-            const pillCount = document.getElementById('soStatusPillCount');
-            if (pillCount) {
-                pillCount.innerText = visibleCards.length;
             }
         }
     }
@@ -10482,7 +10478,7 @@ function toggleSoSidebarSearch() {
 
 function handleSoLiveSearch(val, isUserTyping) {
     const rawVal = val !== undefined && val !== null ? String(val) : '';
-    const q = rawVal.toLowerCase().trim();
+    const q = rawVal.toLowerCase().trim().replace(/[’‘`]/g, "'");
 
     // Toggle cross sign (✕) button exactly as in PO
     const clearBtn = document.getElementById('btnClearSoSearch');
@@ -10502,7 +10498,7 @@ function handleSoLiveSearch(val, isUserTyping) {
     const cards = document.querySelectorAll('.so-sidebar-card:not(.so-customer-match-card)');
     let visibleOrders = 0;
     cards.forEach(card => {
-        const searchTxt = card.dataset.search || '';
+        const searchTxt = (card.dataset.search || '').toLowerCase().replace(/[’‘`]/g, "'");
         if (!q || searchTxt.includes(q)) {
             card.style.display = 'block';
             if (q) {
@@ -10671,6 +10667,11 @@ function executeSoSearch(query, customerId) {
         try {
             sessionStorage.setItem('inflow_so_search_query', val);
             sessionStorage.setItem('inflow_so_search_branch', window.CURRENT_BRANCH_SCOPE || '0');
+            // Save pre-search status filter so clearing search restores it!
+            if (!sessionStorage.getItem('inflow_so_status_filter_before_search')) {
+                const curSt = sessionStorage.getItem('inflow_so_status_filter') || '{{ status_filter or "Open" }}';
+                sessionStorage.setItem('inflow_so_status_filter_before_search', curSt);
+            }
         } catch(err) {}
     } else {
         url.searchParams.set('search', '');
@@ -10785,8 +10786,17 @@ function clearSoLiveSearch() {
 
     let curStatus = '';
     try {
-        curStatus = sessionStorage.getItem('inflow_so_status_filter');
+        curStatus = sessionStorage.getItem('inflow_so_status_filter_before_search');
+        sessionStorage.removeItem('inflow_so_status_filter_before_search');
+        if (curStatus) {
+            sessionStorage.setItem('inflow_so_status_filter', curStatus);
+        }
     } catch(e) {}
+    if (!curStatus) {
+        try {
+            curStatus = sessionStorage.getItem('inflow_so_status_filter');
+        } catch(e) {}
+    }
     if (!curStatus) {
         curStatus = url.searchParams.get('status_filter') || url.searchParams.get('status') || '{{ status_filter or "Open" }}';
     }

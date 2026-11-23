@@ -537,9 +537,10 @@ def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, se
         params.append(int(customer_id))
 
     if search and search.strip():
-        base_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
-        sp = f"%{search.strip()}%"
-        params.extend([sp, sp, sp, sp])
+        clean_search = search.strip().replace('’', "'").replace('‘', "'").replace('`', "'")
+        base_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR REPLACE(c.name, '’', '''') ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
+        sp = f"%{clean_search}%"
+        params.extend([sp, sp, sp, sp, sp])
 
     base_where.append("NOT (so.customer_id IS NULL AND so.total_amount = 0)")
     where_sql = (" WHERE " + " AND ".join(base_where)) if base_where else ""
@@ -581,7 +582,7 @@ def list_orders():
         else:
             branch_filter = 'main'  # HQ default overview: Main Store (HQ)
 
-    status_filter = request.args.get('status_filter') or request.args.get('status') or 'Open'
+    status_filter = request.args.get('status_filter') or request.args.get('status') or session.get('so_status_filter') or 'Open'
     date_filter = request.args.get('date_filter') or 'All'
     search = (request.args.get('search') or request.args.get('q') or '').strip()
     customer_id = request.args.get('customer_id') or None
@@ -590,12 +591,34 @@ def list_orders():
     if not search or (curr_user and search.lower() == curr_user):
         session.pop('so_search_query', None)
         search = ''
+        if 'so_status_filter_before_search' in session:
+            status_filter = session.pop('so_status_filter_before_search')
+            session['so_status_filter'] = status_filter
     else:
         session['so_search_query'] = search
+        if 'so_status_filter' in session and 'so_status_filter_before_search' not in session:
+            session['so_status_filter_before_search'] = session['so_status_filter']
 
     # Desktop PC view: Preserve direct workspace with modern sidebar unless user requested table/mobile view
     if not is_mobile_req and view_mode not in ('table', 'list'):
         latest = _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, search=search, customer_id=customer_id)
+        # If user searched for a customer or order, and nothing matched the restrictive status_filter:
+        if not latest and (search or customer_id):
+            # 1. Fallback to All statuses in active branch
+            latest = _find_latest_matching_so(is_main, user_bid, branch_filter, 'All', search=search, customer_id=customer_id)
+            if latest:
+                status_filter = 'All'
+            elif is_main and branch_filter != 'all':
+                # 2. Fallback to All statuses across all branches
+                latest = _find_latest_matching_so(True, None, 'all', 'All', search=search, customer_id=customer_id)
+                if latest:
+                    status_filter = 'All'
+                    matched_order = query_one("SELECT branch_id FROM sales_orders WHERE id = %s", (latest['id'],))
+                    if matched_order and matched_order.get('branch_id'):
+                        branch_filter = str(matched_order['branch_id'])
+                    else:
+                        branch_filter = 'main'
+
         if latest:
             redirect_kwargs = {'id': latest['id'], 'branch': branch_filter, 'status_filter': status_filter, 'date_filter': date_filter, '_from_list': '1'}
             if 'search' in request.args or 'q' in request.args:
@@ -1127,15 +1150,20 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         session.pop('so_search_branch', None)
 
     if search_query:
-        sp = f"%{search_query}%"
-        drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
-        drawer_params.extend([sp, sp, sp, sp])
+        clean_sq = search_query.strip().replace('’', "'").replace('‘', "'").replace('`', "'")
+        sp = f"%{clean_sq}%"
+        drawer_where.append("(so.order_number ILIKE %s OR c.name ILIKE %s OR REPLACE(c.name, '’', '''') ILIKE %s OR so.delivery_man ILIKE %s OR CAST(so.total_amount AS TEXT) ILIKE %s)")
+        drawer_params.extend([sp, sp, sp, sp, sp])
+
+    # Save pre-status filter conditions for search fallback
+    base_search_where = list(drawer_where)
+    base_search_params = list(drawer_params)
 
     # Status filter (supports multi-select comma separated statuses, e.g. Open, Unfulfilled, Fulfilled, Paid, All)
     # Respect status_filter so sale status (e.g. Open sale) stays as selected
+    status_clauses = []
     if status_filter and status_filter.strip() and status_filter.strip().lower() != 'all':
         tokens = [t.strip().lower() for t in status_filter.split(',') if t.strip()]
-        status_clauses = []
         for token in tokens:
             if token == 'quote':
                 status_clauses.append("UPPER(so.status) = 'QUOTE'")
@@ -1215,6 +1243,54 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
         LIMIT {drawer_limit}
     """
     sidebar_orders = query_all(drawer_sql, tuple(drawer_params))
+
+    # Automatic fallback for customer/order searches: if 0 orders found under restrictive status_clauses,
+    # fallback to querying across All statuses so the user never gets "0 orders" when orders exist!
+    if not sidebar_orders and (search_query or customer_search or customer_filter) and status_clauses:
+        fallback_where = list(base_search_where)
+        fallback_where.append("NOT (so.customer_id IS NULL AND so.total_amount = 0)")
+        fallback_sql = f"""
+            SELECT 
+                so.id, 
+                so.order_number, 
+                so.order_date, 
+                CASE 
+                    WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
+                    WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
+                    WHEN UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS') THEN 'Open'
+                    WHEN UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID' THEN 'Paid'
+                    ELSE 'Open'
+                END as fulfillment_badge,
+                CASE 
+                    WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
+                    WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
+                    WHEN UPPER(so.status) IN ('IN_PROGRESS', 'PICKED', 'PACKED') THEN 'In Progress'
+                    WHEN UPPER(so.status) = 'SHIPPED' THEN 'Fully Shipped'
+                    WHEN UPPER(so.status) = 'OPEN' THEN 'Open'
+                    WHEN UPPER(so.status) IN ('PAID', 'INVOICED') OR UPPER(so.payment_status) = 'PAID' THEN 'Paid'
+                    ELSE 'Open'
+                END as status, 
+                COALESCE(so.po_number, '') as po_number,
+                so.shipped_date,
+                COALESCE(so.total_amount, 0) as total_amount, 
+                COALESCE(so.paid_amount, 0) as paid_amount, 
+                COALESCE(so.balance_due, 0) as balance_due, 
+                COALESCE(so.payment_method, '') as payment_method,
+                COALESCE(so.completed_by, '') as completed_by,
+                COALESCE(so.delivery_man, '') as delivery_man,
+                COALESCE(so.delivery_fee_khr, 0) as delivery_fee_khr,
+                COALESCE(c.name, 'N/A') as customer_name,
+                COALESCE(l.name, '') as location_name
+            FROM sales_orders so
+            LEFT JOIN customers c ON so.customer_id = c.id
+            LEFT JOIN locations l ON so.location_id = l.id
+            WHERE {' AND '.join(fallback_where)}
+            ORDER BY so.id DESC
+            LIMIT 500
+        """
+        fallback_orders = query_all(fallback_sql, tuple(base_search_params))
+        if fallback_orders:
+            sidebar_orders = fallback_orders
 
     # Ensure current_order_id is never excluded from sidebar_orders while viewing it
     if current_order_id and not any(o['id'] == int(current_order_id) for o in sidebar_orders):
@@ -2245,9 +2321,14 @@ def new_order():
     else:
         date_filter = 'All'
 
+    curr_user = (session.get('username') or '').strip().lower()
+    search_param = (request.args.get('search') or request.args.get('q') or session.get('so_search_query') or '').strip()
+    has_search = bool(search_param and search_param.lower() != curr_user) or bool(request.args.get('customer_id')) or bool(request.args.get('customer_search'))
+
     if 'status_filter' in request.args:
         status_filter = request.args.get('status_filter', 'Open').strip()
-        session['so_status_filter'] = status_filter
+        if not has_search:
+            session['so_status_filter'] = status_filter
     elif 'so_status_filter' in session and session.get('so_status_filter'):
         status_filter = session['so_status_filter']
     else:
@@ -2511,10 +2592,14 @@ def detail_order(id):
     else:
         date_filter = 'All'
 
+    curr_user = (session.get('username') or '').strip().lower()
+    search_param = (request.args.get('search') or request.args.get('q') or session.get('so_search_query') or '').strip()
+    has_search = bool(search_param and search_param.lower() != curr_user) or bool(request.args.get('customer_id')) or bool(request.args.get('customer_search'))
+
     if 'status_filter' in request.args:
         status_filter = request.args.get('status_filter', 'Open').strip()
-        session['so_status_filter'] = status_filter
-        has_search = bool((request.args.get('search') or request.args.get('q') or session.get('so_search_query') or '').strip())
+        if not has_search:
+            session['so_status_filter'] = status_filter
         if not has_search and status_filter and status_filter.lower() not in ('all', 'all orders'):
             if not request.args.get('just_saved') and not _order_matches_status_filter(order, status_filter):
                 if not request.args.get('_from_list'):
