@@ -2327,7 +2327,7 @@ def new_order():
 
     if 'status_filter' in request.args:
         status_filter = request.args.get('status_filter', 'Open').strip()
-        if not has_search:
+        if not has_search or 'so_status_filter' not in session:
             session['so_status_filter'] = status_filter
     elif 'so_status_filter' in session and session.get('so_status_filter'):
         status_filter = session['so_status_filter']
@@ -2598,7 +2598,7 @@ def detail_order(id):
 
     if 'status_filter' in request.args:
         status_filter = request.args.get('status_filter', 'Open').strip()
-        if not has_search:
+        if not has_search or 'so_status_filter' not in session:
             session['so_status_filter'] = status_filter
         if not has_search and status_filter and status_filter.lower() not in ('all', 'all orders'):
             if not request.args.get('just_saved') and not _order_matches_status_filter(order, status_filter):
