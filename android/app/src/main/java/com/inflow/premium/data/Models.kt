@@ -133,3 +133,42 @@ data class ProductItem(
     val schemePrices: Map<String, Double>,
     val stockAvailable: Double
 )
+
+data class DashboardSummary(
+    val todayOrders: Int,
+    val todayPaidTotal: Double,
+    val paidCountToday: Int,
+    val openCount: Int,
+    val openAmount: Double,
+    val totalOrders: Int,
+    val totalProducts: Int,
+    val khrRate: Double,
+    val recentOrders: List<SalesOrderSummary>
+)
+
+data class PaymentBreakdownItem(
+    val paymentMethod: String,
+    val count: Int,
+    val amount: Double
+)
+
+data class TopProductItem(
+    val sku: String,
+    val productName: String,
+    val qty: Double,
+    val amount: Double
+)
+
+data class ReportSummary(
+    val dateFilter: String,
+    val orderCount: Int,
+    val paidCount: Int,
+    val openCount: Int,
+    val cancelledCount: Int,
+    val grossSales: Double,
+    val paidSales: Double,
+    val openSales: Double,
+    val deliveryFeesKhr: Double,
+    val paymentBreakdown: List<PaymentBreakdownItem>,
+    val topProducts: List<TopProductItem>
+)

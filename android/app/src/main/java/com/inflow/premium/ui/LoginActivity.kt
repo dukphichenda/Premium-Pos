@@ -92,7 +92,7 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun goToSalesOrders() {
-        startActivity(Intent(this, SalesOrdersActivity::class.java))
+        startActivity(Intent(this, HomeActivity::class.java))
         finish()
     }
 

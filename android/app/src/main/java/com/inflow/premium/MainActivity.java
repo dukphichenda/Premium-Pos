@@ -82,7 +82,8 @@ public class MainActivity extends AppCompatActivity {
         if (savedInstanceState != null) {
             webView.restoreState(savedInstanceState);
         } else {
-            webView.loadUrl(APP_URL);
+            String customUrl = getIntent().getStringExtra("extra_url");
+            webView.loadUrl((customUrl != null && !customUrl.isEmpty()) ? customUrl : APP_URL);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.inflow.premium.data
 
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
@@ -97,31 +98,7 @@ class ApiClient(private val session: SessionManager) {
         val arr = json.optJSONArray("orders") ?: JSONArray()
         val orders = mutableListOf<SalesOrderSummary>()
         for (i in 0 until arr.length()) {
-            val o = arr.getJSONObject(i)
-            orders.add(
-                SalesOrderSummary(
-                    id = o.optInt("id"),
-                    orderNumber = o.optString("order_number", ""),
-                    orderDate = o.optString("order_date", ""),
-                    orderDateDisplay = o.optString("order_date_display", o.optString("order_date", "")),
-                    status = o.optString("status", "OPEN"),
-                    paymentStatus = o.optString("payment_status", "UNPAID"),
-                    fulfillmentBadge = o.optString("fulfillment_badge", "Open"),
-                    customerId = if (o.isNull("customer_id")) null else o.optInt("customer_id"),
-                    customerName = o.optString("customer_name", "No Customer"),
-                    customerPhone = o.optString("customer_phone", ""),
-                    customerAddress = o.optString("customer_address", ""),
-                    branchId = if (o.isNull("branch_id")) null else o.optInt("branch_id"),
-                    branchName = o.optString("branch_name", "Main Store (HQ)"),
-                    totalAmount = o.optDouble("total_amount", 0.0),
-                    paidAmount = o.optDouble("paid_amount", 0.0),
-                    balanceDue = o.optDouble("balance_due", 0.0),
-                    paymentMethod = o.optString("payment_method", ""),
-                    deliveryMan = o.optString("delivery_man", ""),
-                    deliveryFeeKhr = o.optDouble("delivery_fee_khr", 0.0),
-                    lineCount = o.optInt("line_count", 0)
-                )
-            )
+            orders.add(parseOrderSummary(arr.getJSONObject(i)))
         }
         val cObj = json.optJSONObject("counts")
         val counts = if (cObj != null) {
@@ -336,5 +313,105 @@ class ApiClient(private val session: SessionManager) {
             )
         }
         return list
+    }
+
+    private fun parseOrderSummary(o: JSONObject): SalesOrderSummary {
+        return SalesOrderSummary(
+            id = o.optInt("id"),
+            orderNumber = o.optString("order_number", ""),
+            orderDate = o.optString("order_date", ""),
+            orderDateDisplay = o.optString("order_date_display", o.optString("order_date", "")),
+            status = o.optString("status", "OPEN"),
+            paymentStatus = o.optString("payment_status", "UNPAID"),
+            fulfillmentBadge = o.optString("fulfillment_badge", "Open"),
+            customerId = if (o.isNull("customer_id")) null else o.optInt("customer_id"),
+            customerName = o.optString("customer_name", "No Customer"),
+            customerPhone = o.optString("customer_phone", ""),
+            customerAddress = o.optString("customer_address", ""),
+            branchId = if (o.isNull("branch_id")) null else o.optInt("branch_id"),
+            branchName = o.optString("branch_name", "Main Store (HQ)"),
+            totalAmount = o.optDouble("total_amount", 0.0),
+            paidAmount = o.optDouble("paid_amount", 0.0),
+            balanceDue = o.optDouble("balance_due", 0.0),
+            paymentMethod = o.optString("payment_method", ""),
+            deliveryMan = o.optString("delivery_man", ""),
+            deliveryFeeKhr = o.optDouble("delivery_fee_khr", 0.0),
+            lineCount = o.optInt("line_count", 0)
+        )
+    }
+
+    suspend fun getDashboard(branch: String): DashboardSummary {
+        val json = requestJson("GET", "/api/mobile/dashboard", mapOf("branch" to branch))
+        val arr = json.optJSONArray("recent_orders") ?: JSONArray()
+        val recent = mutableListOf<SalesOrderSummary>()
+        for (i in 0 until arr.length()) {
+            recent.add(parseOrderSummary(arr.getJSONObject(i)))
+        }
+        return DashboardSummary(
+            todayOrders = json.optInt("today_orders", 0),
+            todayPaidTotal = json.optDouble("today_paid_total", 0.0),
+            paidCountToday = json.optInt("paid_count_today", 0),
+            openCount = json.optInt("open_count", 0),
+            openAmount = json.optDouble("open_amount", 0.0),
+            totalOrders = json.optInt("total_orders", 0),
+            totalProducts = json.optInt("total_products", 0),
+            khrRate = json.optDouble("khr_rate", 4100.0),
+            recentOrders = recent
+        )
+    }
+
+    suspend fun getReportsSummary(branch: String, dateFilter: String): ReportSummary {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/reports/summary",
+            mapOf("branch" to branch, "date_filter" to dateFilter)
+        )
+        val payArr = json.optJSONArray("payment_breakdown") ?: JSONArray()
+        val payments = mutableListOf<PaymentBreakdownItem>()
+        for (i in 0 until payArr.length()) {
+            val p = payArr.getJSONObject(i)
+            payments.add(
+                PaymentBreakdownItem(
+                    paymentMethod = p.optString("payment_method", "Unspecified"),
+                    count = p.optInt("count", 0),
+                    amount = p.optDouble("amount", 0.0)
+                )
+            )
+        }
+        val prodArr = json.optJSONArray("top_products") ?: JSONArray()
+        val topProducts = mutableListOf<TopProductItem>()
+        for (i in 0 until prodArr.length()) {
+            val tp = prodArr.getJSONObject(i)
+            topProducts.add(
+                TopProductItem(
+                    sku = tp.optString("sku", ""),
+                    productName = tp.optString("product_name", "Item"),
+                    qty = tp.optDouble("qty", 0.0),
+                    amount = tp.optDouble("amount", 0.0)
+                )
+            )
+        }
+        return ReportSummary(
+            dateFilter = json.optString("date_filter", dateFilter),
+            orderCount = json.optInt("order_count", 0),
+            paidCount = json.optInt("paid_count", 0),
+            openCount = json.optInt("open_count", 0),
+            cancelledCount = json.optInt("cancelled_count", 0),
+            grossSales = json.optDouble("gross_sales", 0.0),
+            paidSales = json.optDouble("paid_sales", 0.0),
+            openSales = json.optDouble("open_sales", 0.0),
+            deliveryFeesKhr = json.optDouble("delivery_fees_khr", 0.0),
+            paymentBreakdown = payments,
+            topProducts = topProducts
+        )
+    }
+
+    fun buildWebPortalUrl(nextPath: String = "/"): String {
+        val tok = session.token
+        return if (tok.isNotBlank()) {
+            "${session.baseUrl}/api/mobile/web-handoff?token=${Uri.encode(tok)}&next=${Uri.encode(nextPath)}"
+        } else {
+            "${session.baseUrl}$nextPath"
+        }
     }
 }

@@ -73,12 +73,20 @@ class SalesOrdersActivity : AppCompatActivity() {
         setupToolbar()
         setupRecycler()
         setupFilters()
+        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.SO)
 
         binding.fabNewOrder.setOnClickListener {
             openOrderDetail(0)
         }
 
         refreshBootstrapThenLoad()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::session.isInitialized) {
+            updateBranchSubtitle()
+        }
     }
 
     private fun setupToolbar() {
@@ -98,7 +106,10 @@ class SalesOrdersActivity : AppCompatActivity() {
                     true
                 }
                 R.id.action_web_portal -> {
-                    startActivity(Intent(this, MainActivity::class.java))
+                    startActivity(
+                        Intent(this, MainActivity::class.java)
+                            .putExtra("extra_url", api.buildWebPortalUrl("/"))
+                    )
                     true
                 }
                 R.id.action_sign_out -> {

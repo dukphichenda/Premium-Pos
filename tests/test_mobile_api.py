@@ -50,6 +50,22 @@ class TestMobileApi(unittest.TestCase):
         self.assertEqual(res_p.status_code, 200)
         self.assertTrue(res_p.get_json()['success'])
 
+    def test_mobile_dashboard_and_reports_summary(self):
+        res_dash = self.client.get('/api/mobile/dashboard?branch=main', headers=self.headers)
+        self.assertEqual(res_dash.status_code, 200)
+        dash = res_dash.get_json()
+        self.assertTrue(dash['success'])
+        self.assertIn('today_orders', dash)
+        self.assertIn('recent_orders', dash)
+
+        res_rep = self.client.get('/api/mobile/reports/summary?branch=main&date_filter=Today', headers=self.headers)
+        self.assertEqual(res_rep.status_code, 200)
+        rep = res_rep.get_json()
+        self.assertTrue(rep['success'])
+        self.assertIn('gross_sales', rep)
+        self.assertIn('payment_breakdown', rep)
+        self.assertIn('top_products', rep)
+
     def test_mobile_create_detail_complete_reopen_cancel_so(self):
         cust = query_one("SELECT id, branch_id FROM customers WHERE branch_id IS NULL LIMIT 1") or query_one("SELECT id, branch_id FROM customers LIMIT 1")
         prod = query_one("SELECT id, default_price, uom FROM products WHERE is_active = TRUE LIMIT 1")

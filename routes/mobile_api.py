@@ -633,3 +633,250 @@ def mobile_products_search():
         })
 
     return jsonify({'success': True, 'products': products})
+
+
+def _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so'):
+    """Build parameterized SQL branch filter clause."""
+    raw = (raw_branch or '').strip().lower()
+    if not is_main:
+        if user_bid:
+            return f"{alias}.branch_id = %s", [user_bid]
+        return "1=0", []
+    if raw in ('main', '0', 'hq', 'none', ''):
+        return f"{alias}.branch_id IS NULL", []
+    if raw == 'all':
+        return None, []
+    if raw.isdigit():
+        return f"{alias}.branch_id = %s", [int(raw)]
+    return f"{alias}.branch_id IS NULL", []
+
+
+def _resolve_date_clause(date_filter, alias='so'):
+    """Return SQL date filter clause for Sales Order lists & reports."""
+    df = (date_filter or 'All').strip()
+    if df == 'Today':
+        return f"{alias}.order_date = CURRENT_DATE"
+    if df == 'Yesterday':
+        return f"{alias}.order_date = CURRENT_DATE - INTERVAL '1 day'"
+    if df == 'This Week':
+        return f"date_trunc('week', {alias}.order_date::timestamp) = date_trunc('week', CURRENT_DATE::timestamp)"
+    if df == 'This Month':
+        return f"date_trunc('month', {alias}.order_date::timestamp) = date_trunc('month', CURRENT_DATE::timestamp)"
+    if df == 'Last 30 Days':
+        return f"{alias}.order_date >= CURRENT_DATE - INTERVAL '30 days' AND {alias}.order_date <= CURRENT_DATE"
+    return None
+
+
+@mobile_api_bp.route('/api/mobile/dashboard', methods=['GET'])
+@mobile_auth_required
+def mobile_dashboard():
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id, _get_khr_rates_context
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+    raw_branch = (request.args.get('branch') or '').strip().lower()
+
+    where = ["NOT (so.customer_id IS NULL AND so.total_amount = 0)"]
+    params = []
+    b_clause, b_params = _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so')
+    if b_clause:
+        where.append(b_clause)
+        params.extend(b_params)
+
+    stats = query_one(f"""
+        SELECT
+            COUNT(*) FILTER (WHERE so.order_date = CURRENT_DATE AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')) as today_orders,
+            COALESCE(SUM(so.total_amount) FILTER (
+                WHERE so.order_date = CURRENT_DATE
+                  AND (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID')
+                  AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ), 0) as today_paid_total,
+            COUNT(*) FILTER (
+                WHERE so.order_date = CURRENT_DATE
+                  AND (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID')
+                  AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ) as paid_count_today,
+            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')) as open_count,
+            COALESCE(SUM(so.total_amount) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')), 0) as open_amount,
+            COUNT(*) FILTER (WHERE UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')) as total_orders
+        FROM sales_orders so
+        WHERE {' AND '.join(where)}
+    """, tuple(params)) or {}
+
+    prod_row = query_one("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE") or {}
+
+    recent_rows = query_all(f"""
+        SELECT
+            so.id, so.order_number, TO_CHAR(so.order_date, 'YYYY-MM-DD') as order_date,
+            TO_CHAR(so.order_date, 'DD-Mon-YY') as order_date_display,
+            so.status, so.payment_status,
+            CASE
+                WHEN UPPER(so.status) = 'CANCELLED' THEN 'Cancelled'
+                WHEN UPPER(so.status) = 'QUOTE' THEN 'Quote'
+                WHEN UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS') THEN 'Open'
+                WHEN UPPER(so.status) IN ('SHIPPED', 'INVOICED', 'PAID') OR UPPER(so.payment_status) = 'PAID' THEN 'Paid'
+                ELSE 'Open'
+            END as fulfillment_badge,
+            so.customer_id,
+            COALESCE(c.name, NULLIF(so.customer_contact, ''), CASE WHEN so.order_number LIKE '%%-P-%%' THEN 'Walk-in Customer' ELSE 'No Customer' END) as customer_name,
+            COALESCE(NULLIF(so.customer_phone, ''), NULLIF(c.phone, ''), '') as customer_phone,
+            COALESCE(NULLIF(so.customer_address, ''), NULLIF(c.shipping_address, ''), NULLIF(c.address1, ''), '') as customer_address,
+            so.branch_id, COALESCE(b.name, 'Main Store (HQ)') as branch_name,
+            COALESCE(so.total_amount, 0) as total_amount,
+            COALESCE(so.paid_amount, 0) as paid_amount,
+            COALESCE(so.balance_due, 0) as balance_due,
+            COALESCE(so.payment_method, '') as payment_method,
+            COALESCE(so.delivery_man, '') as delivery_man,
+            COALESCE(so.delivery_fee_khr, 0) as delivery_fee_khr,
+            (SELECT COUNT(*) FROM sales_order_lines sol WHERE sol.sales_order_id = so.id) as line_count
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        LEFT JOIN branches b ON so.branch_id = b.id
+        WHERE {' AND '.join(where)}
+        ORDER BY so.id DESC
+        LIMIT 8
+    """, tuple(params))
+
+    recent = []
+    for r in recent_rows:
+        d = dict(r)
+        d['total_amount'] = float(d.get('total_amount') or 0)
+        d['paid_amount'] = float(d.get('paid_amount') or 0)
+        d['balance_due'] = float(d.get('balance_due') or 0)
+        d['delivery_fee_khr'] = float(d.get('delivery_fee_khr') or 0)
+        recent.append(d)
+
+    eff_bid = int(raw_branch) if (is_main and raw_branch.isdigit()) else (user_bid if not is_main else None)
+    khr_ctx = _get_khr_rates_context(eff_bid)
+
+    return jsonify({
+        'success': True,
+        'today_orders': int(stats.get('today_orders') or 0),
+        'today_paid_total': float(stats.get('today_paid_total') or 0),
+        'paid_count_today': int(stats.get('paid_count_today') or 0),
+        'open_count': int(stats.get('open_count') or 0),
+        'open_amount': float(stats.get('open_amount') or 0),
+        'total_orders': int(stats.get('total_orders') or 0),
+        'total_products': int(prod_row.get('cnt') or 0),
+        'khr_rate': float(khr_ctx.get('default_khr_rate') or 4100),
+        'recent_orders': recent,
+    })
+
+
+@mobile_api_bp.route('/api/mobile/reports/summary', methods=['GET'])
+@mobile_auth_required
+def mobile_reports_summary():
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+    raw_branch = (request.args.get('branch') or '').strip().lower()
+    date_filter = (request.args.get('date_filter') or 'Today').strip()
+
+    where = ["NOT (so.customer_id IS NULL AND so.total_amount = 0)"]
+    params = []
+    b_clause, b_params = _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so')
+    if b_clause:
+        where.append(b_clause)
+        params.extend(b_params)
+
+    d_clause = _resolve_date_clause(date_filter, alias='so')
+    if d_clause:
+        where.append(d_clause)
+
+    where_sql = ' AND '.join(where)
+
+    summary = query_one(f"""
+        SELECT
+            COUNT(*) FILTER (WHERE UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')) as order_count,
+            COUNT(*) FILTER (
+                WHERE (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID')
+                  AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ) as paid_count,
+            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')) as open_count,
+            COUNT(*) FILTER (WHERE UPPER(so.status) IN ('CANCELLED', 'CANCELED')) as cancelled_count,
+            COALESCE(SUM(so.total_amount) FILTER (WHERE UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')), 0) as gross_sales,
+            COALESCE(SUM(so.total_amount) FILTER (
+                WHERE (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID')
+                  AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ), 0) as paid_sales,
+            COALESCE(SUM(so.total_amount) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')), 0) as open_sales,
+            COALESCE(SUM(so.delivery_fee_khr) FILTER (WHERE UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')), 0) as delivery_fees_khr
+        FROM sales_orders so
+        WHERE {where_sql}
+    """, tuple(params)) or {}
+
+    pay_rows = query_all(f"""
+        SELECT
+            COALESCE(NULLIF(TRIM(so.payment_method), ''), 'Unspecified') as payment_method,
+            COUNT(*) as order_count,
+            COALESCE(SUM(so.total_amount), 0) as amount
+        FROM sales_orders so
+        WHERE {where_sql}
+          AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+          AND (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID')
+        GROUP BY COALESCE(NULLIF(TRIM(so.payment_method), ''), 'Unspecified')
+        ORDER BY amount DESC
+    """, tuple(params))
+
+    top_rows = query_all(f"""
+        SELECT
+            COALESCE(p.sku, '') as sku,
+            COALESCE(p.name, sol.description, 'Item') as product_name,
+            COALESCE(SUM(sol.quantity), 0) as qty,
+            COALESCE(SUM(sol.subtotal), 0) as amount
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON sol.sales_order_id = so.id
+        LEFT JOIN products p ON sol.product_id = p.id
+        WHERE {where_sql}
+          AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+        GROUP BY COALESCE(p.sku, ''), COALESCE(p.name, sol.description, 'Item')
+        ORDER BY amount DESC
+        LIMIT 12
+    """, tuple(params))
+
+    return jsonify({
+        'success': True,
+        'date_filter': date_filter,
+        'order_count': int(summary.get('order_count') or 0),
+        'paid_count': int(summary.get('paid_count') or 0),
+        'open_count': int(summary.get('open_count') or 0),
+        'cancelled_count': int(summary.get('cancelled_count') or 0),
+        'gross_sales': float(summary.get('gross_sales') or 0),
+        'paid_sales': float(summary.get('paid_sales') or 0),
+        'open_sales': float(summary.get('open_sales') or 0),
+        'delivery_fees_khr': float(summary.get('delivery_fees_khr') or 0),
+        'payment_breakdown': [
+            {
+                'payment_method': r['payment_method'],
+                'count': int(r['order_count'] or 0),
+                'amount': float(r['amount'] or 0),
+            }
+            for r in pay_rows
+        ],
+        'top_products': [
+            {
+                'sku': r['sku'],
+                'product_name': r['product_name'],
+                'qty': float(r['qty'] or 0),
+                'amount': float(r['amount'] or 0),
+            }
+            for r in top_rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
+def mobile_web_handoff():
+    """Authenticate a mobile WebView session using a valid Bearer/query token and redirect to an internal page."""
+    from flask import redirect
+    token = (request.args.get('token') or '').strip()
+    next_path = (request.args.get('next') or '/').strip()
+    if not next_path.startswith('/') or next_path.startswith('//'):
+        next_path = '/'
+    claims = verify_mobile_token(token)
+    if claims:
+        user = _load_user_by_id(claims['user_id'])
+        if user:
+            _populate_session_from_user(user)
+            session.permanent = True
+            return redirect(next_path)
+    return redirect('/login')
