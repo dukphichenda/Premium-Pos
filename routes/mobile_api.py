@@ -868,15 +868,21 @@ def mobile_products_search():
     for r in rows:
         pid = r['id']
         sp_map = prices_map.get(pid, {})
-        unit_price = sp_map.get(str(scheme_id), float(r.get('default_price') or 0))
+        raw_price = float(sp_map.get(str(scheme_id), float(r.get('default_price') or 0)))
+        ratio = float(r.get('sales_uom_ratio_std') or 1.0)
+        std_uom = (r.get('uom') or 'pcs.').strip()
+        sales_uom = (r.get('sales_uom') or '').strip()
+        has_case = bool(sales_uom) and sales_uom.lower() != std_uom.lower() and ratio > 1.0
+        price_per_pcs = (raw_price / ratio) if (has_case and raw_price > 2) else raw_price
         products.append({
             'id': pid,
             'sku': r['sku'],
             'name': r['name'],
-            'uom': r['uom'],
-            'sales_uom': r['sales_uom'],
-            'sales_uom_ratio_std': float(r.get('sales_uom_ratio_std') or 1.0),
-            'unit_price': float(unit_price),
+            'uom': std_uom,
+            'sales_uom': sales_uom,
+            'sales_uom_ratio_std': ratio,
+            'unit_price': raw_price,
+            'price_per_pcs': round(price_per_pcs, 4),
             'default_price': float(r.get('default_price') or 0),
             'scheme_prices': sp_map,
             'image_url': r['image_url'],
@@ -892,10 +898,13 @@ def mobile_products_search():
 @mobile_auth_required
 def mobile_product_detail(pid):
     """Read-only product detail lookup for mobile Product Detail screen."""
+    from routes.products import _build_price_card_data
+
     p = query_one("""
         SELECT
             p.*,
             COALESCE(c.name, 'Uncategorized') as category_name,
+            COALESCE(c.color, '#00A3E0') as category_color,
             COALESCE(l.name, 'Main Warehouse') as default_location_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
@@ -920,7 +929,7 @@ def mobile_product_detail(pid):
 
     scheme_rows = query_all("""
         SELECT
-            ps.id as scheme_id,
+            ps.id as pricing_scheme_id,
             ps.name as scheme_name,
             COALESCE(pp.unit_price, %s) as unit_price
         FROM pricing_schemes ps
@@ -931,18 +940,105 @@ def mobile_product_detail(pid):
 
     std_cost = float(p.get('standard_cost') or p.get('average_cost') or p.get('cost') or 0)
     ratio = float(p.get('sales_uom_ratio_std') or 1.0)
+    std_uom = (p.get('uom') or 'pcs.').strip()
+    sales_uom = (p.get('sales_uom') or '').strip()
+    has_case = bool(sales_uom) and sales_uom.lower() != std_uom.lower() and ratio > 1.0
+    effective_cost = std_cost * (ratio if has_case else 1.0)
+
     tiers = []
     for sr in scheme_rows:
-        u_price = float(sr.get('unit_price') or 0)
-        case_price = u_price * ratio if ratio > 0 else u_price
-        margin_pct = ((u_price - std_cost) / std_cost * 100.0) if std_cost > 0 else 0.0
+        raw_p = float(sr.get('unit_price') or 0)
+        if has_case and raw_p > 2:
+            case_price = raw_p
+            pcs_price = raw_p / ratio
+        elif has_case:
+            pcs_price = raw_p
+            case_price = raw_p * ratio
+        else:
+            pcs_price = raw_p
+            case_price = raw_p
+
+        margin_pct = ((case_price - effective_cost) / effective_cost * 100.0) if effective_cost > 0 else 0.0
         tiers.append({
-            'scheme_id': sr['scheme_id'],
+            'scheme_id': sr['pricing_scheme_id'],
             'scheme_name': sr['scheme_name'],
-            'unit_price': u_price,
-            'case_price': case_price,
+            'unit_price': round(pcs_price, 4),
+            'case_price': round(case_price, 2),
             'margin_pct': round(margin_pct, 2),
         })
+
+    price_card = _build_price_card_data(dict(p), [dict(sr) for sr in scheme_rows], can_view_costs=False)
+
+    # Combined / Kit BOMs
+    boms = query_all("""
+        SELECT pb.id, pb.component_product_id,
+               COALESCE(comp.sku, '') as sku,
+               COALESCE(comp.name, '') as name,
+               COALESCE(comp.uom, 'pcs.') as uom,
+               pb.quantity,
+               COALESCE(comp.standard_cost, pb.cost, 0) as unit_cost
+        FROM product_boms pb
+        LEFT JOIN products comp ON pb.component_product_id = comp.id
+        WHERE pb.product_id = %s
+        ORDER BY pb.id ASC
+    """, (pid,))
+
+    # Product vendors
+    vendors = query_all("""
+        SELECT pv.id, v.id as vendor_id, v.name as vendor_name,
+               COALESCE(v.phone, '') as vendor_phone,
+               COALESCE(pv.vendor_item_code, '') as vendor_item_code,
+               COALESCE(pv.cost, 0) as cost
+        FROM product_vendors pv
+        JOIN vendors v ON pv.vendor_id = v.id
+        WHERE pv.product_id = %s AND v.is_active = TRUE
+        ORDER BY v.name ASC
+    """, (pid,))
+
+    # Sales Order history
+    so_history = query_all("""
+        SELECT so.id as order_id, so.order_number, so.order_date, so.status,
+               COALESCE(c.name, 'Walk-in Customer') as party_name,
+               COALESCE(sol.quantity_display, sol.quantity) as quantity,
+               COALESCE(sol.uom, p.uom, 'pcs.') as uom,
+               COALESCE(sol.subtotal, 0) as total_amount
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON sol.sales_order_id = so.id
+        LEFT JOIN products p ON sol.product_id = p.id
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE sol.product_id = %s AND so.status != 'CANCELLED'
+        ORDER BY so.order_date DESC, so.id DESC
+        LIMIT 20
+    """, (pid,))
+
+    # Purchase Order history
+    po_history = query_all("""
+        SELECT po.id as order_id, po.order_number, po.order_date, po.status,
+               COALESCE(v.name, 'Vendor') as party_name,
+               pol.quantity,
+               COALESCE(pol.uom, 'pcs.') as uom,
+               COALESCE(pol.subtotal, 0) as total_amount
+        FROM purchase_order_lines pol
+        JOIN purchase_orders po ON pol.purchase_order_id = po.id
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        WHERE pol.product_id = %s
+        ORDER BY po.order_date DESC, po.id DESC
+        LIMIT 20
+    """, (pid,))
+
+    # Movement history
+    movements = query_all("""
+        SELECT il.id, il.movement_type, il.quantity, il.created_at,
+               COALESCE(il.reference_number, '') as reference_number,
+               COALESCE(fl.name, '') as from_location,
+               COALESCE(tl.name, '') as to_location
+        FROM inventory_logs il
+        LEFT JOIN locations fl ON il.from_location_id = fl.id
+        LEFT JOIN locations tl ON il.to_location_id = tl.id
+        WHERE il.product_id = %s
+        ORDER BY il.created_at DESC
+        LIMIT 25
+    """, (pid,))
 
     total_on_hand = sum(float(r.get('on_hand') or 0) for r in inv_rows)
 
@@ -957,8 +1053,8 @@ def mobile_product_detail(pid):
             'category_name': p.get('category_name') or 'Uncategorized',
             'is_active': bool(p.get('is_active', True)),
             'image_url': p.get('image_url') or '',
-            'uom': p.get('uom') or 'pcs.',
-            'sales_uom': p.get('sales_uom') or '',
+            'uom': std_uom,
+            'sales_uom': sales_uom,
             'sales_uom_ratio_std': ratio,
             'purchasing_uom': p.get('purchasing_uom') or '',
             'default_price': float(p.get('default_price') or 0),
@@ -981,6 +1077,80 @@ def mobile_product_detail(pid):
                 for r in inv_rows
             ],
             'pricing_tiers': tiers,
+            'price_table': {
+                'cat_color': price_card.get('cat_color') or '#00A3E0',
+                'dim_str': price_card.get('dim_str') or '',
+                'detail_lines': price_card.get('auto_detail_lines') or [],
+                'tier_qty_1': price_card.get('tier_qty_1') or 100,
+                'tier_qty_2': price_card.get('tier_qty_2') or 400,
+                'tier_qty_3': price_card.get('tier_qty_3') or 800,
+                'u_price_1': price_card.get('u_price_1') or 0,
+                'u_price_2': price_card.get('u_price_2') or 0,
+                'u_price_3': price_card.get('u_price_3') or 0,
+                'tot_price_1': price_card.get('tot_price_1') or 0,
+                'tot_price_2': price_card.get('tot_price_2') or 0,
+                'tot_price_3': price_card.get('tot_price_3') or 0,
+            },
+            'boms': [
+                {
+                    'id': b['id'],
+                    'component_id': b['component_product_id'],
+                    'sku': b['sku'],
+                    'name': b['name'],
+                    'uom': b['uom'],
+                    'quantity': float(b['quantity'] or 0),
+                    'unit_cost': float(b['unit_cost'] or 0),
+                }
+                for b in boms
+            ],
+            'vendors': [
+                {
+                    'id': v['vendor_id'],
+                    'name': v['vendor_name'],
+                    'phone': v['vendor_phone'],
+                    'item_code': v['vendor_item_code'],
+                    'cost': float(v['cost'] or 0),
+                }
+                for v in vendors
+            ],
+            'order_history': [
+                {
+                    'order_id': o['order_id'],
+                    'order_number': o['order_number'],
+                    'order_date': o['order_date'].strftime('%d-%b-%y') if o.get('order_date') else '',
+                    'status': o['status'] or 'OPEN',
+                    'party_name': o['party_name'] or '',
+                    'quantity': float(o['quantity'] or 0),
+                    'uom': o['uom'] or 'pcs.',
+                    'total_amount': float(o['total_amount'] or 0),
+                }
+                for o in so_history
+            ],
+            'purchase_history': [
+                {
+                    'order_id': o['order_id'],
+                    'order_number': o['order_number'],
+                    'order_date': o['order_date'].strftime('%d-%b-%y') if o.get('order_date') else '',
+                    'status': o['status'] or 'ISSUED',
+                    'party_name': o['party_name'] or '',
+                    'quantity': float(o['quantity'] or 0),
+                    'uom': o['uom'] or 'pcs.',
+                    'total_amount': float(o['total_amount'] or 0),
+                }
+                for o in po_history
+            ],
+            'movement_history': [
+                {
+                    'id': m['id'],
+                    'movement_type': m['movement_type'] or 'ADJUST',
+                    'quantity': float(m['quantity'] or 0),
+                    'created_at': m['created_at'].strftime('%d-%b-%y %H:%M') if m.get('created_at') else '',
+                    'reference_number': m['reference_number'] or '',
+                    'from_location': m['from_location'] or '',
+                    'to_location': m['to_location'] or '',
+                }
+                for m in movements
+            ],
         }
     })
 
