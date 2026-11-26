@@ -95,7 +95,6 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
         setupToolbar()
         setupListeners()
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.SO)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
@@ -105,7 +104,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             bottomScrimView = binding.bottomScrim,
             scrollableView = binding.scrollDetail,
             extraTopDp = 2,
-            extraBottomScrollDp = 220
+            extraBottomScrollDp = 140
         )
         binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
             val topH = v.height
