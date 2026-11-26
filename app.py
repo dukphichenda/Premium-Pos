@@ -212,7 +212,7 @@ def create_app():
         # Public endpoints and static assets
         if request.endpoint in ('static', 'health_check', 'auth.login', 'auth.logout', 'auth.quick_login', 'download_app_page'):
             return None
-        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language') or request.path.startswith('/download') or request.path.startswith('/app') or request.path.startswith('/api/mobile-config'):
+        if request.path.startswith('/static') or request.path.startswith('/health') or request.path.startswith('/login') or request.path.startswith('/logout') or request.path.startswith('/quick-login') or request.path.startswith('/api/set-language') or request.path.startswith('/download') or request.path.startswith('/app') or request.path.startswith('/api/mobile-config') or request.path.startswith('/api/mobile/'):
             return None
 
         # Allow public direct print for sales orders with valid share token
@@ -612,7 +612,15 @@ def create_app():
     @app.route('/download-app')
     @app.route('/app')
     def download_app_page():
-        return render_template('download_app.html')
+        apk_path = os.path.join(base_dir, 'static', 'downloads', 'inFlow-Premium.apk')
+        apk_size_mb = '5.0 MB'
+        try:
+            if os.path.exists(apk_path):
+                sz = os.path.getsize(apk_path) / (1024 * 1024)
+                apk_size_mb = f"{sz:.1f} MB"
+        except Exception:
+            pass
+        return render_template('download_app.html', apk_size_mb=apk_size_mb)
 
     @app.route('/static/uploads/<path:filename>')
     def serve_uploaded_media(filename):
