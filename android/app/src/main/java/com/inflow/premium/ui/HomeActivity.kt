@@ -115,6 +115,8 @@ class HomeActivity : AppCompatActivity() {
         binding.wfCustomer.setOnClickListener { openWebPath("/customers") }
         binding.wfExpenses.setOnClickListener { openWebPath("/expenses") }
         binding.wfReports.setOnClickListener { switchToTab(ReportActivity::class.java) }
+        binding.wfTransfer.setOnClickListener { openWebPath("/inventory") }
+        binding.wfBranches.setOnClickListener { openWebPath("/branches") }
 
         binding.cardKpiMonthSales.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
         binding.cardKpiReceivables.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
