@@ -107,6 +107,17 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             extraTopDp = 2,
             extraBottomScrollDp = 220
         )
+        binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val topH = v.height
+            if (topH > 0 && binding.scrollDetail.paddingTop != topH) {
+                binding.scrollDetail.setPadding(
+                    binding.scrollDetail.paddingLeft,
+                    topH,
+                    binding.scrollDetail.paddingRight,
+                    binding.scrollDetail.paddingBottom
+                )
+            }
+        }
 
         if (orderId > 0) {
             loadOrderDetail()
