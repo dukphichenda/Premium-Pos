@@ -1029,7 +1029,7 @@ def mobile_product_detail(pid):
     # Movement history
     movements = query_all("""
         SELECT il.id, il.movement_type, il.quantity, il.created_at,
-               COALESCE(il.reference_number, '') as reference_number,
+               COALESCE(il.reference_id, '') as reference_number,
                COALESCE(fl.name, '') as from_location,
                COALESCE(tl.name, '') as to_location
         FROM inventory_logs il
