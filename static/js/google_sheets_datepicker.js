@@ -310,20 +310,20 @@
 
     function selectDateAndClose(date) {
         if (!activeInput) return;
+        const targetInput = activeInput;
         selectedDate = date;
-        const formatted = formatDate(date, activeInput);
-        activeInput.value = formatted;
-
-        // Dispatch input & change events (which triggers inline onchange and listeners)
-        activeInput.dispatchEvent(new Event('input', { bubbles: true }));
-        activeInput.dispatchEvent(new Event('change', { bubbles: true }));
+        const formatted = formatDate(date, targetInput);
+        targetInput.value = formatted;
+        closePicker();
 
         // Call markDirty if present in page
         if (typeof window.markDirty === 'function') {
             window.markDirty();
         }
 
-        closePicker();
+        // Dispatch input & change events (which triggers inline onchange and listeners)
+        targetInput.dispatchEvent(new Event('input', { bubbles: true }));
+        targetInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
     function commitInputAndClose() {

@@ -4500,7 +4500,7 @@ function closeSoMobileDrawer() {
 
 <script>
 let isNewOrder = {{ 'true' if is_new else 'false' }};
-const isCopiedDraft = {{ 'true' if is_copied_draft else 'false' }};
+let isCopiedDraft = {{ 'true' if is_copied_draft else 'false' }};
 const canEditPrices = {{ 'true' if can_edit_prices else 'false' }};
 let _soIsDirty = isCopiedDraft ? true : false;
 Object.defineProperty(window, 'isDirty', {
@@ -5865,6 +5865,7 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
             window.currentOrderId = window.currentActiveOrderId;
             window.isNewOrder = false;
             isNewOrder = false;
+            isCopiedDraft = false;
             document.title = pageTitle;
 
             // Update modal badges & headers
@@ -8121,13 +8122,15 @@ function handleBillDateChange(input) {
         if (remarksEl) {
             // ONLY add to note once - if remarks already contains previous bill date, do not ask or add again
             if (/previous\s+bill\s+date\s*:/i.test(remarksEl.value)) {
+                input.setAttribute('data-prev-date-prompted', '1');
                 return;
             }
-            // If user already declined in this session for this date change, don't keep nagging
-            if (input.getAttribute('data-skip-prev-date-note') === '1') {
+            // If user already answered (OK or Cancel) for this date change, don't keep nagging
+            if (input.getAttribute('data-skip-prev-date-note') === '1' || input.getAttribute('data-prev-date-prompted') === '1') {
                 return;
             }
             const wantNote = confirm(`Do you want to note the previous date (${origDate}) in Remarks?\n\nតើអ្នកចង់កត់កាលបរិច្ឆេទមុន (${origDate}) ក្នុងកំណត់សម្គាល់ដែរឬទេ?`);
+            input.setAttribute('data-prev-date-prompted', '1');
             if (wantNote) {
                 const dateNote = `Previous bill date: ${origDate}`;
                 remarksEl.value = remarksEl.value.trim() ? `${remarksEl.value.trim()}\n${dateNote}` : dateNote;
@@ -8140,8 +8143,9 @@ function handleBillDateChange(input) {
             }
         }
     } else if (origDate && newDate && origDate === newDate) {
-        // If user reverts back to original date, reset the skip flag
+        // If user reverts back to original date, reset the prompt/skip flags
         input.removeAttribute('data-skip-prev-date-note');
+        input.removeAttribute('data-prev-date-prompted');
     }
 }
 
@@ -8159,6 +8163,16 @@ function saveSalesOrder() {
             openCustomerDropdown();
         }
         return;
+    }
+
+    // If user typed a new date and immediately clicked Save / pressed Ctrl+S without triggering change yet, prompt once now
+    const dateInputEl = document.getElementById('orderDateInput');
+    if (dateInputEl && !isNewOrder && !isCopiedDraft) {
+        const origD = (dateInputEl.getAttribute('data-original-date') || '').trim();
+        const curD = (dateInputEl.value || '').trim();
+        if (origD && curD && origD !== curD && dateInputEl.getAttribute('data-prev-date-prompted') !== '1' && dateInputEl.getAttribute('data-skip-prev-date-note') !== '1') {
+            handleBillDateChange(dateInputEl);
+        }
     }
 
     // Deduplicate any duplicate Previous bill date lines in remarks before submitting

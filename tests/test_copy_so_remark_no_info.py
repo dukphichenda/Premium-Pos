@@ -177,5 +177,39 @@ class TestCopySoRemarkNoInfo(unittest.TestCase):
         self.assertEqual(len(lines), 1, f"Expected duplicate lines to be deduplicated to 1, got: {saved['notes']}")
         self.assertEqual(lines[0], 'Previous bill date: 01-Nov-26')
 
+    def test_existing_order_date_change_cancelled_prompt_does_not_add_previous_bill_date(self):
+        """When changing an existing order's date and declining the prompt (Cancel), 'Previous bill date' must NOT be forced into remarks on save."""
+        cust = query_one("SELECT id, branch_id FROM customers LIMIT 1")
+        cust_id = cust['id'] if cust else 1
+        branch_id = cust.get('branch_id') if cust else None
+        import time
+        t_str = str(int(time.time() * 1000))
+
+        order_id = execute_returning_id(
+            "INSERT INTO sales_orders (order_number, customer_id, branch_id, total_amount, status, payment_status, order_date, notes) "
+            "VALUES (%s, %s, %s, 82, 'OPEN', 'UNPAID', '2026-11-26', %s) RETURNING id",
+            (f'TEST-CANCEL-DATE-{t_str}', cust_id, branch_id, 'Keep existing remark')
+        )
+        self.created_so_ids.append(order_id)
+
+        # User changed order_date from 2026-11-26 to 2026-11-27, clicked Cancel on popup -> notes has NO 'Previous bill date'
+        post_data = {
+            'order_id': order_id,
+            'customer_id': cust_id,
+            'branch_id': branch_id or '',
+            'order_date': '2026-11-27',
+            'notes': 'Keep existing remark',
+            'lines_json': '[]',
+            'subtotal': 82.0,
+            'total_amount': 82.0
+        }
+        resp = self.client.post(f'/sales/{order_id}/save', data=post_data, follow_redirects=True)
+        self.assertEqual(resp.status_code, 200)
+
+        saved = query_one("SELECT order_date, notes FROM sales_orders WHERE id = %s", (order_id,))
+        self.assertEqual(str(saved['order_date']), '2026-11-27')
+        self.assertEqual((saved['notes'] or '').strip(), 'Keep existing remark')
+        self.assertNotIn('Previous bill date', saved['notes'] or '')
+
 if __name__ == '__main__':
     unittest.main()
