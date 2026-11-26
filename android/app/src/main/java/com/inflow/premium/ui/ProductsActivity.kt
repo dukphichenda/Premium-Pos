@@ -1,6 +1,8 @@
 package com.inflow.premium.ui
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -9,12 +11,14 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.ApiClient
 import com.inflow.premium.data.ApiException
@@ -29,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.text.DecimalFormat
 import java.util.Locale
 
 class ProductsActivity : AppCompatActivity() {
@@ -42,7 +47,9 @@ class ProductsActivity : AppCompatActivity() {
     private var selectedSchemeId = 100
     private var selectedLocationId = 100
     private var currentQuery = ""
+    private var sortAsc = true
     private var searchJob: Job? = null
+    private val loadedItems = mutableListOf<ProductItem>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -68,26 +75,78 @@ class ProductsActivity : AppCompatActivity() {
             extraTopDp = 4,
             extraBottomScrollDp = 104
         )
+        binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val topH = v.height
+            if (topH > 0 && binding.rvProducts.paddingTop != topH) {
+                binding.rvProducts.setPadding(
+                    binding.rvProducts.paddingLeft,
+                    topH,
+                    binding.rvProducts.paddingRight,
+                    binding.rvProducts.paddingBottom
+                )
+            }
+        }
 
         selectedSchemeId = session.getPricingSchemes().firstOrNull()?.id ?: 100
         selectedLocationId = session.getLocations().firstOrNull()?.id ?: 100
-        updateFilterLabels()
+        updateFilterBadge()
 
-        adapter = ProductCatalogAdapter()
+        adapter = ProductCatalogAdapter(uiScope, session.baseUrl) { item ->
+            val intent = Intent(this, ProductDetailActivity::class.java).apply {
+                putExtra(ProductDetailActivity.EXTRA_PRODUCT_ID, item.id)
+                putExtra(ProductDetailActivity.EXTRA_PRODUCT_SKU, item.sku)
+                putExtra(ProductDetailActivity.EXTRA_PRODUCT_NAME, item.name)
+            }
+            startActivity(intent)
+        }
         binding.rvProducts.layoutManager = LinearLayoutManager(this)
         binding.rvProducts.adapter = adapter
 
         binding.swipeRefresh.setColorSchemeResources(R.color.primary, R.color.primary_dark)
         binding.swipeRefresh.setOnRefreshListener { loadProducts() }
 
-        binding.btnProdScheme.setOnClickListener { showSchemePicker() }
-        binding.btnProdLocation.setOnClickListener { showLocationPicker() }
+        binding.btnProdBack.setOnClickListener { finish() }
+        binding.btnProdFilters.setOnClickListener { showFilterMenu() }
+        binding.btnProdAdd.setOnClickListener {
+            startActivity(
+                Intent(this, MainActivity::class.java).putExtra(
+                    "extra_url",
+                    "${session.baseUrl}/products/new"
+                )
+            )
+        }
+        binding.btnProdRefresh.setOnClickListener { loadProducts() }
+        binding.btnProdMore.setOnClickListener { anchor ->
+            val popup = PopupMenu(this, anchor)
+            val schemeName = session.getPricingSchemes().firstOrNull { it.id == selectedSchemeId }?.name ?: "Retail 1"
+            val locName = session.getLocations().firstOrNull { it.id == selectedLocationId }?.name ?: "Main Warehouse"
+            popup.menu.add(0, 1, 1, "Price Group: $schemeName")
+            popup.menu.add(0, 2, 2, "Warehouse: $locName")
+            popup.menu.add(0, 3, 3, if (sortAsc) "Sort Z → A" else "Sort A → Z")
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> showSchemePicker()
+                    2 -> showLocationPicker()
+                    3 -> toggleSort()
+                }
+                true
+            }
+            popup.show()
+        }
+
+        binding.tvProdSortHeader.setOnClickListener { toggleSort() }
+        binding.tvProdCount.setOnClickListener { showFilterMenu() }
+
+        binding.btnClearSearch.setOnClickListener {
+            binding.etProductSearch.setText("")
+        }
 
         binding.etProductSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
                 val q = s?.toString()?.trim().orEmpty()
+                binding.btnClearSearch.visibility = if (q.isNotEmpty()) View.VISIBLE else View.GONE
                 if (q == currentQuery) return
                 currentQuery = q
                 searchJob?.cancel()
@@ -112,11 +171,44 @@ class ProductsActivity : AppCompatActivity() {
         loadProducts()
     }
 
-    private fun updateFilterLabels() {
+    private fun toggleSort() {
+        sortAsc = !sortAsc
+        binding.tvProdSortHeader.text = if (sortAsc) "PRODUCT ▲" else "PRODUCT ▼"
+        applySortedList()
+    }
+
+    private fun applySortedList() {
+        val sorted = if (sortAsc) {
+            loadedItems.sortedBy { it.sku.lowercase(Locale.US) }
+        } else {
+            loadedItems.sortedByDescending { it.sku.lowercase(Locale.US) }
+        }
+        adapter.submitList(sorted)
+    }
+
+    private fun updateFilterBadge() {
+        val defaultScheme = session.getPricingSchemes().firstOrNull()?.id ?: 100
+        val defaultLoc = session.getLocations().firstOrNull()?.id ?: 100
+        var active = 1
+        if (selectedSchemeId != defaultScheme) active++
+        if (selectedLocationId != defaultLoc) active++
+        binding.tvFilterCount.text = active.toString()
+    }
+
+    private fun showFilterMenu() {
         val schemeName = session.getPricingSchemes().firstOrNull { it.id == selectedSchemeId }?.name ?: "Retail 1"
         val locName = session.getLocations().firstOrNull { it.id == selectedLocationId }?.name ?: "Main Warehouse"
-        binding.btnProdScheme.text = "Price: $schemeName"
-        binding.btnProdLocation.text = "Stock: $locName"
+        val options = arrayOf("Price Group: $schemeName", "Warehouse: $locName")
+        val dlg = MaterialAlertDialogBuilder(this)
+            .setTitle("Product Filters")
+            .setItems(options) { d, which ->
+                d.dismiss()
+                if (which == 0) showSchemePicker() else showLocationPicker()
+            }
+            .setNegativeButton("Close") { d, _ -> d.dismiss() }
+            .create()
+        attachEscClose(dlg)
+        dlg.show()
     }
 
     private fun showSchemePicker() {
@@ -129,7 +221,7 @@ class ProductsActivity : AppCompatActivity() {
             .setTitle("Price Group")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 selectedSchemeId = schemes[which].id
-                updateFilterLabels()
+                updateFilterBadge()
                 d.dismiss()
                 loadProducts()
             }
@@ -151,7 +243,7 @@ class ProductsActivity : AppCompatActivity() {
             .setTitle("Warehouse / Location")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 selectedLocationId = locs[which].id
-                updateFilterLabels()
+                updateFilterBadge()
                 d.dismiss()
                 loadProducts()
             }
@@ -167,9 +259,13 @@ class ProductsActivity : AppCompatActivity() {
         binding.swipeRefresh.isRefreshing = true
         uiScope.launch {
             try {
-                val list = api.searchProducts(currentQuery, selectedSchemeId, selectedLocationId)
-                adapter.submitList(list)
-                binding.tvEmptyProducts.visibility = if (list.isEmpty()) View.VISIBLE else View.GONE
+                val res = api.searchProductsCatalog(currentQuery, selectedSchemeId, selectedLocationId)
+                loadedItems.clear()
+                loadedItems.addAll(res.products)
+                applySortedList()
+                val fmtCount = DecimalFormat("#,###").format(res.totalCount)
+                binding.tvProdCount.text = "$fmtCount Items ⌄"
+                binding.tvEmptyProducts.visibility = if (res.products.isEmpty()) View.VISIBLE else View.GONE
             } catch (e: ApiException) {
                 if (e.statusCode == 401) {
                     redirectToLogin()
@@ -208,8 +304,13 @@ class ProductsActivity : AppCompatActivity() {
         uiScope.cancel()
     }
 
-    private class ProductCatalogAdapter : RecyclerView.Adapter<ProductCatalogAdapter.VH>() {
+    private class ProductCatalogAdapter(
+        private val scope: CoroutineScope,
+        private val baseUrl: String,
+        private val onClick: (ProductItem) -> Unit
+    ) : RecyclerView.Adapter<ProductCatalogAdapter.VH>() {
         private val items = mutableListOf<ProductItem>()
+        private val numFmt = DecimalFormat("#,##0")
 
         fun submitList(newItems: List<ProductItem>) {
             items.clear()
@@ -228,19 +329,37 @@ class ProductsActivity : AppCompatActivity() {
 
         override fun onBindViewHolder(holder: VH, position: Int) {
             val p = items[position]
-            holder.binding.tvProdSku.text = p.sku
-            holder.binding.tvProdName.text = p.name
-            holder.binding.tvProdPrice.text = String.format(Locale.US, "$%.4f", p.unitPrice)
+            val b = holder.binding
+            b.tvProdName.text = p.name.ifBlank { p.sku }
+            b.tvProdSku.text = p.sku
+
+            ImageLoader.load(scope, baseUrl, p.imageUrl, b.ivProdThumb, b.ivProdIcon)
+
             val stockStr = if (p.stockAvailable == p.stockAvailable.toLong().toDouble()) {
-                p.stockAvailable.toLong().toString()
+                numFmt.format(p.stockAvailable.toLong())
             } else {
                 String.format(Locale.US, "%.2f", p.stockAvailable)
             }
-            val casePart = if (p.salesUom.isNotBlank() && !p.salesUom.equals(p.uom, ignoreCase = true)) {
-                val rStr = if (p.salesUomRatioStd == p.salesUomRatioStd.toLong().toDouble()) p.salesUomRatioStd.toLong().toString() else String.format(Locale.US, "%.2f", p.salesUomRatioStd)
-                " • 1 ${p.salesUom} = $rStr ${p.uom}"
-            } else ""
-            holder.binding.tvProdMeta.text = "UOM: ${p.uom}$casePart • Stock: $stockStr"
+            b.tvProdStock.text = "Stock: $stockStr ${p.uom}"
+            if (p.stockAvailable > 0) {
+                b.tvProdStock.setTextColor(Color.parseColor("#059669"))
+                b.tvProdStock.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#DCFCE7"))
+            } else {
+                b.tvProdStock.setTextColor(Color.parseColor("#DC2626"))
+                b.tvProdStock.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FEE2E2"))
+            }
+
+            val hasCase = p.salesUom.isNotBlank() && !p.salesUom.equals(p.uom, ignoreCase = true) && p.salesUomRatioStd > 1.0
+            val displayPrice = if (hasCase) p.unitPrice * p.salesUomRatioStd else p.unitPrice
+            val displayUnit = if (hasCase) p.salesUom else p.uom
+            val priceStr = if (displayPrice >= 1.0) {
+                String.format(Locale.US, "$%.2f / %s", displayPrice, displayUnit)
+            } else {
+                String.format(Locale.US, "$%.4f / %s", displayPrice, displayUnit)
+            }
+            b.tvProdPrice.text = priceStr
+
+            b.root.setOnClickListener { onClick(p) }
         }
 
         override fun getItemCount(): Int = items.size

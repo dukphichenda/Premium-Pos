@@ -132,7 +132,57 @@ data class ProductItem(
     val unitPrice: Double,
     val defaultPrice: Double,
     val schemePrices: Map<String, Double>,
-    val stockAvailable: Double
+    val stockAvailable: Double,
+    val imageUrl: String = "",
+    val barcode: String = "",
+    val categoryName: String = ""
+)
+
+data class ProductCatalogResult(
+    val products: List<ProductItem>,
+    val totalCount: Int
+)
+
+data class ProductInventoryLocation(
+    val locationId: Int,
+    val locationName: String,
+    val available: Double,
+    val onHand: Double
+)
+
+data class ProductPricingTier(
+    val schemeId: Int,
+    val schemeName: String,
+    val unitPrice: Double,
+    val casePrice: Double,
+    val marginPct: Double
+)
+
+data class ProductDetail(
+    val id: Int,
+    val sku: String,
+    val name: String,
+    val description: String,
+    val barcode: String,
+    val categoryName: String,
+    val isActive: Boolean,
+    val imageUrl: String,
+    val uom: String,
+    val salesUom: String,
+    val salesUomRatioStd: Double,
+    val purchasingUom: String,
+    val defaultPrice: Double,
+    val standardCost: Double,
+    val defaultLocationName: String,
+    val sublocation: String,
+    val reorderPoint: Double,
+    val reorderQty: Double,
+    val length: Double,
+    val width: Double,
+    val height: Double,
+    val totalOnHand: Double,
+    val inventory: List<ProductInventoryLocation>,
+    val pricingTiers: List<ProductPricingTier>
 )
 
 data class MonthlyChartPoint(

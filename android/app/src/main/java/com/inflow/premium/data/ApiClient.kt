@@ -280,6 +280,10 @@ class ApiClient(private val session: SessionManager) {
     }
 
     suspend fun searchProducts(query: String, schemeId: Int, locationId: Int): List<ProductItem> {
+        return searchProductsCatalog(query, schemeId, locationId).products
+    }
+
+    suspend fun searchProductsCatalog(query: String, schemeId: Int, locationId: Int): ProductCatalogResult {
         val json = requestJson(
             "GET",
             "/api/mobile/products",
@@ -309,11 +313,73 @@ class ApiClient(private val session: SessionManager) {
                     unitPrice = p.optDouble("unit_price", 0.0),
                     defaultPrice = p.optDouble("default_price", 0.0),
                     schemePrices = spMap,
-                    stockAvailable = p.optDouble("stock_available", 0.0)
+                    stockAvailable = p.optDouble("stock_available", 0.0),
+                    imageUrl = p.optString("image_url", ""),
+                    barcode = p.optString("barcode", ""),
+                    categoryName = p.optString("category_name", "")
                 )
             )
         }
-        return list
+        val total = json.optInt("total_count", list.size)
+        return ProductCatalogResult(list, total)
+    }
+
+    suspend fun getProductDetail(productId: Int): ProductDetail {
+        val json = requestJson("GET", "/api/mobile/products/$productId")
+        val p = json.getJSONObject("product")
+        val invArr = p.optJSONArray("inventory") ?: JSONArray()
+        val invList = mutableListOf<ProductInventoryLocation>()
+        for (i in 0 until invArr.length()) {
+            val row = invArr.getJSONObject(i)
+            invList.add(
+                ProductInventoryLocation(
+                    locationId = row.optInt("location_id"),
+                    locationName = row.optString("location_name", "Warehouse"),
+                    available = row.optDouble("available", 0.0),
+                    onHand = row.optDouble("on_hand", 0.0)
+                )
+            )
+        }
+        val tierArr = p.optJSONArray("pricing_tiers") ?: JSONArray()
+        val tierList = mutableListOf<ProductPricingTier>()
+        for (i in 0 until tierArr.length()) {
+            val row = tierArr.getJSONObject(i)
+            tierList.add(
+                ProductPricingTier(
+                    schemeId = row.optInt("scheme_id"),
+                    schemeName = row.optString("scheme_name", "Tier"),
+                    unitPrice = row.optDouble("unit_price", 0.0),
+                    casePrice = row.optDouble("case_price", 0.0),
+                    marginPct = row.optDouble("margin_pct", 0.0)
+                )
+            )
+        }
+        return ProductDetail(
+            id = p.optInt("id"),
+            sku = p.optString("sku", ""),
+            name = p.optString("name", ""),
+            description = p.optString("description", ""),
+            barcode = p.optString("barcode", ""),
+            categoryName = p.optString("category_name", "Uncategorized"),
+            isActive = p.optBoolean("is_active", true),
+            imageUrl = p.optString("image_url", ""),
+            uom = p.optString("uom", "pcs."),
+            salesUom = p.optString("sales_uom", ""),
+            salesUomRatioStd = p.optDouble("sales_uom_ratio_std", 1.0),
+            purchasingUom = p.optString("purchasing_uom", ""),
+            defaultPrice = p.optDouble("default_price", 0.0),
+            standardCost = p.optDouble("standard_cost", 0.0),
+            defaultLocationName = p.optString("default_location_name", "Main Warehouse"),
+            sublocation = p.optString("sublocation", "Unassigned"),
+            reorderPoint = p.optDouble("reorder_point", 0.0),
+            reorderQty = p.optDouble("reorder_qty", 0.0),
+            length = p.optDouble("length", 0.0),
+            width = p.optDouble("width", 0.0),
+            height = p.optDouble("height", 0.0),
+            totalOnHand = p.optDouble("total_on_hand", 0.0),
+            inventory = invList,
+            pricingTiers = tierList
+        )
     }
 
     private fun parseOrderSummary(o: JSONObject): SalesOrderSummary {

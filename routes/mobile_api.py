@@ -591,8 +591,11 @@ def mobile_products_search():
             COALESCE(p.sales_uom_ratio_std, 1.0) as sales_uom_ratio_std,
             COALESCE(p.default_price, 0) as default_price,
             COALESCE(p.image_url, '') as image_url,
+            COALESCE(p.barcode, '') as barcode,
+            COALESCE(c.name, '') as category_name,
             COALESCE(inv.avail, 0) as stock_available
         FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
         LEFT JOIN (
             SELECT product_id, SUM(COALESCE(quantity, 0) - COALESCE(reserved_quantity, 0)) as avail
             FROM inventory
@@ -603,6 +606,13 @@ def mobile_products_search():
         ORDER BY p.sku ASC
         LIMIT %s
     """, tuple(params + [limit]))
+
+    total_row = query_one(f"""
+        SELECT COUNT(*) as cnt
+        FROM products p
+        WHERE {' AND '.join(where)}
+    """, tuple(params[1:]))
+    total_count = int((total_row or {}).get('cnt') or len(rows))
 
     pids = [r['id'] for r in rows]
     prices_map = {}
@@ -630,10 +640,109 @@ def mobile_products_search():
             'default_price': float(r.get('default_price') or 0),
             'scheme_prices': sp_map,
             'image_url': r['image_url'],
+            'barcode': r.get('barcode') or '',
+            'category_name': r.get('category_name') or '',
             'stock_available': float(r.get('stock_available') or 0),
         })
 
-    return jsonify({'success': True, 'products': products})
+    return jsonify({'success': True, 'products': products, 'total_count': total_count})
+
+
+@mobile_api_bp.route('/api/mobile/products/<int:pid>', methods=['GET'])
+@mobile_auth_required
+def mobile_product_detail(pid):
+    """Read-only product detail lookup for mobile Product Detail screen."""
+    p = query_one("""
+        SELECT
+            p.*,
+            COALESCE(c.name, 'Uncategorized') as category_name,
+            COALESCE(l.name, 'Main Warehouse') as default_location_name
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN locations l ON p.default_location_id = l.id
+        WHERE p.id = %s
+    """, (pid,))
+    if not p:
+        return jsonify({'success': False, 'error': 'Product not found'}), 404
+
+    inv_rows = query_all("""
+        SELECT
+            l.id as location_id,
+            l.name as location_name,
+            COALESCE(SUM(COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)), 0) as available,
+            COALESCE(SUM(COALESCE(i.quantity, 0)), 0) as on_hand
+        FROM inventory i
+        JOIN locations l ON i.location_id = l.id
+        WHERE i.product_id = %s
+        GROUP BY l.id, l.name
+        ORDER BY l.id ASC
+    """, (pid,))
+
+    scheme_rows = query_all("""
+        SELECT
+            ps.id as scheme_id,
+            ps.name as scheme_name,
+            COALESCE(pp.unit_price, %s) as unit_price
+        FROM pricing_schemes ps
+        LEFT JOIN product_prices pp ON pp.pricing_scheme_id = ps.id AND pp.product_id = %s
+        WHERE ps.is_active = TRUE
+        ORDER BY ps.id ASC
+    """, (float(p.get('default_price') or 0), pid))
+
+    std_cost = float(p.get('standard_cost') or p.get('average_cost') or p.get('cost') or 0)
+    ratio = float(p.get('sales_uom_ratio_std') or 1.0)
+    tiers = []
+    for sr in scheme_rows:
+        u_price = float(sr.get('unit_price') or 0)
+        case_price = u_price * ratio if ratio > 0 else u_price
+        margin_pct = ((u_price - std_cost) / std_cost * 100.0) if std_cost > 0 else 0.0
+        tiers.append({
+            'scheme_id': sr['scheme_id'],
+            'scheme_name': sr['scheme_name'],
+            'unit_price': u_price,
+            'case_price': case_price,
+            'margin_pct': round(margin_pct, 2),
+        })
+
+    total_on_hand = sum(float(r.get('on_hand') or 0) for r in inv_rows)
+
+    return jsonify({
+        'success': True,
+        'product': {
+            'id': p['id'],
+            'sku': p.get('sku') or '',
+            'name': p.get('name') or '',
+            'description': p.get('description') or '',
+            'barcode': p.get('barcode') or '',
+            'category_name': p.get('category_name') or 'Uncategorized',
+            'is_active': bool(p.get('is_active', True)),
+            'image_url': p.get('image_url') or '',
+            'uom': p.get('uom') or 'pcs.',
+            'sales_uom': p.get('sales_uom') or '',
+            'sales_uom_ratio_std': ratio,
+            'purchasing_uom': p.get('purchasing_uom') or '',
+            'default_price': float(p.get('default_price') or 0),
+            'standard_cost': std_cost,
+            'default_location_name': p.get('default_location_name') or 'Main Warehouse',
+            'sublocation': p.get('default_sublocation') or 'Unassigned',
+            'reorder_point': float(p.get('reorder_point') or 0),
+            'reorder_qty': float(p.get('reorder_quantity') or 0),
+            'length': float(p.get('length') or 0),
+            'width': float(p.get('width') or 0),
+            'height': float(p.get('height') or 0),
+            'total_on_hand': total_on_hand,
+            'inventory': [
+                {
+                    'location_id': r['location_id'],
+                    'location_name': r['location_name'],
+                    'available': float(r['available'] or 0),
+                    'on_hand': float(r['on_hand'] or 0),
+                }
+                for r in inv_rows
+            ],
+            'pricing_tiers': tiers,
+        }
+    })
 
 
 def _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so'):

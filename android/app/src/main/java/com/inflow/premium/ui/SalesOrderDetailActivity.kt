@@ -138,21 +138,20 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             val popup = PopupMenu(this, anchor)
             val editable = isEditable()
             val canPrintLabel = orderId > 0 && (labelPrintUrl.isNotBlank() || printUrl.isNotBlank())
+            popup.menu.add(0, 5, 1, "+ New Order")
+            popup.menu.add(0, 6, 2, "Copy Order")
             if (orderId > 0 && printUrl.isNotBlank()) {
-                popup.menu.add(0, 1, 1, "Print Invoice")
+                popup.menu.add(0, 1, 3, "Preview / Print Invoice")
+                popup.menu.add(0, 7, 4, "Export JPG to Gallery")
             }
             if (canPrintLabel) {
-                popup.menu.add(0, 2, 2, "Print Delivery Label")
+                popup.menu.add(0, 2, 5, "Print Delivery Label")
             }
             if (orderId > 0) {
-                popup.menu.add(0, 3, 3, "Share / Telegram")
+                popup.menu.add(0, 3, 6, "Share / Telegram")
             }
             if (orderId > 0 && editable) {
-                popup.menu.add(0, 4, 4, "Cancel Order")
-            }
-            if (popup.menu.size() == 0) {
-                Toast.makeText(this, "Save the order first for print & share", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
+                popup.menu.add(0, 4, 7, "Delete Order")
             }
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
@@ -160,6 +159,9 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                     2 -> openLabelPrintPreview()
                     3 -> shareOrder()
                     4 -> confirmCancelOrder()
+                    5 -> resetToNewOrder()
+                    6 -> copyCurrentOrder()
+                    7 -> openExportJpg()
                 }
                 true
             }
@@ -194,7 +196,6 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.btnDockCopy.setOnClickListener { copyCurrentOrder() }
         binding.btnDockPreview.setOnClickListener { openPrintPreview() }
         binding.btnDockExportJpg.setOnClickListener { openExportJpg() }
-        binding.btnDockDelete.setOnClickListener { confirmCancelOrder() }
 
         binding.etDeliveryFee.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -377,7 +378,6 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
         val canPrintLabel = orderId > 0 && (labelPrintUrl.isNotBlank() || printUrl.isNotBlank())
         binding.btnPrintDeliveryLabel.visibility = if (canPrintLabel) View.VISIBLE else View.GONE
-        binding.btnDockDelete.visibility = if (orderId > 0 && editable) View.VISIBLE else View.GONE
 
         when {
             isPaid -> {
