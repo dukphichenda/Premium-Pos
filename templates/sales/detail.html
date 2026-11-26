@@ -3662,6 +3662,143 @@ function closeSoMobileDrawer() {
                 </button>
             </div>
         </div>
+        <script>
+        (function() {
+            window.toggleSoDateDropdown = function(e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                const menu = document.getElementById('soDateDropdownMenu');
+                if (!menu) return;
+                const isOpen = (menu.style.display === 'block');
+                menu.style.display = isOpen ? 'none' : 'block';
+                const stMenu = document.getElementById('soStatusDropdownMenu');
+                if (stMenu) stMenu.style.display = 'none';
+            };
+
+            window.toggleSoStatusDropdown = function(e) {
+                if (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                }
+                const menu = document.getElementById('soStatusDropdownMenu');
+                if (!menu) return;
+                const isOpen = (menu.style.display === 'block');
+                menu.style.display = isOpen ? 'none' : 'block';
+                const dtMenu = document.getElementById('soDateDropdownMenu');
+                if (dtMenu) dtMenu.style.display = 'none';
+            };
+
+            document.addEventListener('click', function(e) {
+                const dateMenu = document.getElementById('soDateDropdownMenu');
+                if (dateMenu && !e.target.closest('#btnToggleSoDate') && !dateMenu.contains(e.target)) {
+                    dateMenu.style.display = 'none';
+                }
+                const statusMenu = document.getElementById('soStatusDropdownMenu');
+                if (statusMenu && !e.target.closest('#btnSoStatusPill') && !statusMenu.contains(e.target)) {
+                    statusMenu.style.display = 'none';
+                }
+            });
+
+            window.addEventListener('pageshow', function() {
+                window._soSwitchingStatus = false;
+                document.body.style.cursor = '';
+            });
+
+            window.selectSoStatusFilter = function(status) {
+                if (window._soSwitchingStatus) return;
+                window._soSwitchingStatus = true;
+                setTimeout(function() {
+                    window._soSwitchingStatus = false;
+                    document.body.style.cursor = '';
+                }, 8000);
+
+                // Immediately close dropdown menu and give visual loading feedback
+                const menu = document.getElementById('soStatusDropdownMenu');
+                if (menu) menu.style.display = 'none';
+
+                const pillBtn = document.getElementById('btnSoStatusPill');
+                const pillLabel = document.getElementById('soStatusPillLabel');
+                if (pillLabel) pillLabel.textContent = status;
+                if (pillBtn) {
+                    if (['open', 'unfulfilled'].includes(String(status).toLowerCase())) {
+                        pillBtn.classList.add('pill-open-orange');
+                    } else {
+                        pillBtn.classList.remove('pill-open-orange');
+                    }
+                }
+                const listBody = document.getElementById('soSidebarListBody');
+                if (listBody) {
+                    listBody.style.opacity = '0.5';
+                    listBody.style.pointerEvents = 'none';
+                }
+                document.body.style.cursor = 'wait';
+                let pBar = document.getElementById('soFastNavProgressBar');
+                if (!pBar) {
+                    pBar = document.createElement('div');
+                    pBar.id = 'soFastNavProgressBar';
+                    pBar.style.cssText = 'position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,#0D9488,#10B981);z-index:100007;transition:width 0.25s ease;width:0;pointer-events:none;';
+                    document.body.appendChild(pBar);
+                }
+                pBar.style.display = 'block';
+                pBar.style.width = '65%';
+
+                const url = new URL(window.location.href);
+                url.searchParams.set('status_filter', status);
+                url.searchParams.set('status', status);
+                try {
+                    sessionStorage.setItem('inflow_so_status_filter', status);
+                    sessionStorage.removeItem('inflow_so_status_filter_before_search');
+                } catch(e) {}
+
+                // Retain search query only if input has text
+                const liveSearchInput = document.getElementById('soSidebarSearchInput');
+                const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : '';
+                if (liveSearch) {
+                    url.searchParams.set('search', liveSearch);
+                } else {
+                    url.searchParams.set('search', '');
+                    url.searchParams.delete('q');
+                }
+
+                url.searchParams.delete('customer_id');
+                url.searchParams.delete('delivery_man');
+                url.searchParams.delete('just_saved');
+                url.searchParams.delete('partial');
+
+                // Check if the currently active order card matches the newly selected status filter
+                const activeCard = document.querySelector('.so-sidebar-card.active');
+                const curCardStatus = activeCard
+                    ? (activeCard.getAttribute('data-status') || '').toLowerCase()
+                    : '{{ ("paid" if is_paid else ("cancelled" if (order.status or "")|upper == "CANCELLED" else ("quote" if (order.status or "")|upper == "QUOTE" else "open"))) if not is_new else "" }}';
+                const targetStatus = String(status || '').trim().toLowerCase();
+
+                let orderMatchesFilter = true;
+                if (targetStatus && targetStatus !== 'all' && targetStatus !== 'all orders') {
+                    if (targetStatus === 'open' || targetStatus === 'unfulfilled') {
+                        orderMatchesFilter = (curCardStatus === 'open' || curCardStatus === 'unfulfilled');
+                    } else if (['paid', 'fulfilled', 'fully shipped', 'shipped', 'invoiced'].includes(targetStatus)) {
+                        orderMatchesFilter = (curCardStatus === 'paid' || curCardStatus === 'fulfilled' || curCardStatus === 'invoiced');
+                    } else if (targetStatus === 'cancelled' || targetStatus === 'canceled') {
+                        orderMatchesFilter = (curCardStatus === 'cancelled' || curCardStatus === 'canceled');
+                    } else if (targetStatus === 'quote') {
+                        orderMatchesFilter = (curCardStatus === 'quote');
+                    }
+                }
+
+                // If currently viewed order does not match new status filter, navigate to /sales to load the newest order of that status
+                const targetPath = orderMatchesFilter ? url.pathname : '/sales';
+                const targetUrl = targetPath + url.search;
+                try {
+                    if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
+                        window.top.inflowMdi.updateActiveTabMeta(targetUrl, typeof getSoTabTitle === 'function' ? getSoTabTitle() : 'Sales Order');
+                    }
+                } catch(e) {}
+                window.location.href = targetUrl;
+            };
+        })();
+        </script>
 
         <!-- Wider Search Input Box (Directly visible) -->
         <div class="so-search-box-wrap" id="soSearchBoxWrap" style="display: block; padding: 6px 12px 4px; position: relative;">
@@ -10886,102 +11023,6 @@ function handleSoSearchKey(e) {
     }
 }
 
-function toggleSoDateDropdown(e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    const menu = document.getElementById('soDateDropdownMenu');
-    if (!menu) return;
-    const isOpen = (menu.style.display === 'block');
-    menu.style.display = isOpen ? 'none' : 'block';
-    const stMenu = document.getElementById('soStatusDropdownMenu');
-    if (stMenu) stMenu.style.display = 'none';
-}
-
-function toggleSoStatusDropdown(e) {
-    if (e) {
-        e.preventDefault();
-        e.stopPropagation();
-    }
-    const menu = document.getElementById('soStatusDropdownMenu');
-    if (!menu) return;
-    const isOpen = (menu.style.display === 'block');
-    menu.style.display = isOpen ? 'none' : 'block';
-    const dtMenu = document.getElementById('soDateDropdownMenu');
-    if (dtMenu) dtMenu.style.display = 'none';
-}
-
-document.addEventListener('click', function(e) {
-    const dateMenu = document.getElementById('soDateDropdownMenu');
-    if (dateMenu && !e.target.closest('#btnToggleSoDate') && !dateMenu.contains(e.target)) {
-        dateMenu.style.display = 'none';
-    }
-    const statusMenu = document.getElementById('soStatusDropdownMenu');
-    if (statusMenu && !e.target.closest('#btnSoStatusPill') && !statusMenu.contains(e.target)) {
-        statusMenu.style.display = 'none';
-    }
-});
-
-function selectSoStatusFilter(status) {
-    const pillBtn = document.getElementById('btnSoStatusPill');
-    if (pillBtn) {
-        if (['open', 'unfulfilled'].includes(String(status).toLowerCase())) {
-            pillBtn.classList.add('pill-open-orange');
-        } else {
-            pillBtn.classList.remove('pill-open-orange');
-        }
-    }
-    const url = new URL(window.location.href);
-    url.searchParams.set('status_filter', status);
-    url.searchParams.set('status', status);
-    try {
-        sessionStorage.setItem('inflow_so_status_filter', status);
-    } catch(e) {}
-
-    // Retain search query only if input has text
-    const liveSearchInput = document.getElementById('soSidebarSearchInput');
-    const liveSearch = liveSearchInput ? liveSearchInput.value.trim() : '';
-    if (liveSearch) {
-        url.searchParams.set('search', liveSearch);
-    } else {
-        url.searchParams.set('search', '');
-        url.searchParams.delete('q');
-    }
-
-    url.searchParams.delete('customer_id');
-    url.searchParams.delete('delivery_man');
-    url.searchParams.delete('just_saved');
-
-    // Check if the currently active order card matches the newly selected status filter
-    const activeCard = document.querySelector('.so-sidebar-card.active');
-    const curCardStatus = activeCard ? (activeCard.getAttribute('data-status') || '').toLowerCase() : '';
-    const targetStatus = String(status || '').trim().toLowerCase();
-
-    let orderMatchesFilter = true;
-    if (targetStatus && targetStatus !== 'all' && targetStatus !== 'all orders') {
-        if (targetStatus === 'open' || targetStatus === 'unfulfilled') {
-            orderMatchesFilter = (curCardStatus === 'open' || curCardStatus === 'unfulfilled');
-        } else if (['paid', 'fulfilled', 'fully shipped', 'shipped', 'invoiced'].includes(targetStatus)) {
-            orderMatchesFilter = (curCardStatus === 'paid' || curCardStatus === 'fulfilled' || curCardStatus === 'invoiced');
-        } else if (targetStatus === 'cancelled' || targetStatus === 'canceled') {
-            orderMatchesFilter = (curCardStatus === 'cancelled' || curCardStatus === 'canceled');
-        } else if (targetStatus === 'quote') {
-            orderMatchesFilter = (curCardStatus === 'quote');
-        }
-    }
-
-    // If currently viewed order does not match new status filter, navigate to /sales to load the newest order of that status
-    const targetPath = orderMatchesFilter ? url.pathname : '/sales';
-    const targetUrl = targetPath + url.search;
-    // Navigate within the current iframe — no new MDI tab
-    try {
-        if (window.top && window.top.inflowMdi && typeof window.top.inflowMdi.updateActiveTabMeta === 'function') {
-            window.top.inflowMdi.updateActiveTabMeta(targetUrl, typeof getSoTabTitle === 'function' ? getSoTabTitle() : 'Sales Order');
-        }
-    } catch(e) {}
-    window.location.href = targetUrl;
-}
 
 function applySoDateFilter(val) {
     const url = new URL(window.location.href);
