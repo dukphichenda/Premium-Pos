@@ -67,15 +67,15 @@ class ReportActivity : AppCompatActivity() {
             webPath = "/reports/product-sales"
         ) { s ->
             val top = s?.topProducts?.firstOrNull()
-            val badge = if (top != null) "Top: $${moneyFmt.format(top.total)}" else "Top: $0.00"
-            val sub = if (top != null) "• ${top.name.take(22)}" else "• Updated now"
+            val badge = if (top != null) "Top: $${moneyFmt.format(top.amount)}" else "Top: $0.00"
+            val sub = if (top != null) "• ${top.productName.take(22)}" else "• Updated now"
             badge to sub
         },
         ReportDef(
             category = "Sales",
             title = "Product price list ›",
             desc = "List of products, with prices and active pricing tier rules.",
-            iconRes = R.drawable.ic_wf_inventory,
+            iconRes = R.drawable.ic_nav_product,
             iconBgHex = "#FFF1F2",
             iconTintHex = "#E11D48",
             badgeBgHex = "#F1F5F9",
@@ -123,9 +123,9 @@ class ReportActivity : AppCompatActivity() {
             webPath = "/reports"
         ) { s ->
             val gross = s?.grossSales ?: 0.0
-            val profit = s?.grossProfit ?: 0.0
-            val margin = if (gross > 0) (profit / gross) * 100.0 else 0.0
-            String.format(Locale.US, "Avg Margin: %.1f%%", margin) to "• Profit $${moneyFmt.format(profit)}"
+            val paid = s?.paidSales ?: 0.0
+            val rate = if (gross > 0) (paid / gross) * 100.0 else 0.0
+            String.format(Locale.US, "Collection: %.1f%%", rate) to "• Paid $${moneyFmt.format(paid)}"
         },
         ReportDef(
             category = "Sales",
@@ -138,7 +138,7 @@ class ReportActivity : AppCompatActivity() {
             badgeTextHex = "#1D4ED8",
             webPath = "/reports/delivery"
         ) { s ->
-            val paid = s?.paidTotal ?: 0.0
+            val paid = s?.paidSales ?: 0.0
             "Paid: $${moneyFmt.format(paid)}" to "• Delivery Sync"
         },
         ReportDef(
@@ -163,8 +163,8 @@ class ReportActivity : AppCompatActivity() {
             badgeTextHex = "#4F46E5",
             webPath = "/customers"
         ) { s ->
-            val unpaid = s?.unpaidBalance ?: 0.0
-            "Unpaid: $${moneyFmt.format(unpaid)}" to "• Customer Profiles"
+            val unpaid = s?.openSales ?: 0.0
+            "Open: $${moneyFmt.format(unpaid)}" to "• Customer Profiles"
         }
     )
 
