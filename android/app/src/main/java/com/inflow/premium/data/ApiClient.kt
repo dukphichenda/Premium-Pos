@@ -316,7 +316,8 @@ class ApiClient(private val session: SessionManager) {
                     stockAvailable = p.optDouble("stock_available", 0.0),
                     imageUrl = p.optString("image_url", ""),
                     barcode = p.optString("barcode", ""),
-                    categoryName = p.optString("category_name", "")
+                    categoryName = p.optString("category_name", ""),
+                    pricePerPcs = p.optDouble("price_per_pcs", p.optDouble("unit_price", 0.0))
                 )
             )
         }
@@ -354,6 +355,53 @@ class ApiClient(private val session: SessionManager) {
                 )
             )
         }
+        val ptObj = p.optJSONObject("price_table")
+        val priceTable = ptObj?.let {
+            val dlArr = it.optJSONArray("detail_lines") ?: JSONArray()
+            val dl = mutableListOf<String>()
+            for (k in 0 until dlArr.length()) dl.add(dlArr.optString(k))
+            ProductPriceTable(
+                catColor = it.optString("cat_color", "#00A3E0"),
+                dimStr = it.optString("dim_str", ""),
+                detailLines = dl,
+                tierQty1 = it.optInt("tier_qty_1", 100),
+                tierQty2 = it.optInt("tier_qty_2", 400),
+                tierQty3 = it.optInt("tier_qty_3", 800),
+                uPrice1 = it.optDouble("u_price_1", 0.0),
+                uPrice2 = it.optDouble("u_price_2", 0.0),
+                uPrice3 = it.optDouble("u_price_3", 0.0),
+                totPrice1 = it.optDouble("tot_price_1", 0.0),
+                totPrice2 = it.optDouble("tot_price_2", 0.0),
+                totPrice3 = it.optDouble("tot_price_3", 0.0)
+            )
+        }
+        val bomsArr = p.optJSONArray("boms") ?: JSONArray()
+        val boms = mutableListOf<ProductBomComponent>()
+        for (i in 0 until bomsArr.length()) {
+            val r = bomsArr.getJSONObject(i)
+            boms.add(ProductBomComponent(r.optInt("id"), r.optInt("component_id"), r.optString("sku"), r.optString("name"), r.optString("uom", "pcs."), r.optDouble("quantity", 0.0), r.optDouble("unit_cost", 0.0)))
+        }
+        val vendArr = p.optJSONArray("vendors") ?: JSONArray()
+        val vendors = mutableListOf<ProductVendorItem>()
+        for (i in 0 until vendArr.length()) {
+            val r = vendArr.getJSONObject(i)
+            vendors.add(ProductVendorItem(r.optInt("id"), r.optString("name"), r.optString("phone"), r.optString("item_code"), r.optDouble("cost", 0.0)))
+        }
+        fun parseOrders(arrName: String): List<ProductOrderHistoryRow> {
+            val arr = p.optJSONArray(arrName) ?: JSONArray()
+            val out = mutableListOf<ProductOrderHistoryRow>()
+            for (i in 0 until arr.length()) {
+                val r = arr.getJSONObject(i)
+                out.add(ProductOrderHistoryRow(r.optInt("order_id"), r.optString("order_number"), r.optString("order_date"), r.optString("status"), r.optString("party_name"), r.optDouble("quantity", 0.0), r.optString("uom", "pcs."), r.optDouble("total_amount", 0.0)))
+            }
+            return out
+        }
+        val movArr = p.optJSONArray("movement_history") ?: JSONArray()
+        val movements = mutableListOf<ProductMovementRow>()
+        for (i in 0 until movArr.length()) {
+            val r = movArr.getJSONObject(i)
+            movements.add(ProductMovementRow(r.optInt("id"), r.optString("movement_type"), r.optDouble("quantity", 0.0), r.optString("created_at"), r.optString("reference_number"), r.optString("from_location"), r.optString("to_location")))
+        }
         return ProductDetail(
             id = p.optInt("id"),
             sku = p.optString("sku", ""),
@@ -378,7 +426,13 @@ class ApiClient(private val session: SessionManager) {
             height = p.optDouble("height", 0.0),
             totalOnHand = p.optDouble("total_on_hand", 0.0),
             inventory = invList,
-            pricingTiers = tierList
+            pricingTiers = tierList,
+            priceTable = priceTable,
+            boms = boms,
+            vendors = vendors,
+            orderHistory = parseOrders("order_history"),
+            purchaseHistory = parseOrders("purchase_history"),
+            movementHistory = movements
         )
     }
 

@@ -350,12 +350,15 @@ class ProductsActivity : AppCompatActivity() {
             }
 
             val hasCase = p.salesUom.isNotBlank() && !p.salesUom.equals(p.uom, ignoreCase = true) && p.salesUomRatioStd > 1.0
-            val displayPrice = if (hasCase) p.unitPrice * p.salesUomRatioStd else p.unitPrice
-            val displayUnit = if (hasCase) p.salesUom else p.uom
-            val priceStr = if (displayPrice >= 1.0) {
-                String.format(Locale.US, "$%.2f / %s", displayPrice, displayUnit)
+            val perPcsPrice = when {
+                p.pricePerPcs > 0 -> p.pricePerPcs
+                hasCase && p.unitPrice > 2.0 -> p.unitPrice / p.salesUomRatioStd
+                else -> p.unitPrice
+            }
+            val priceStr = if (perPcsPrice >= 1.0) {
+                String.format(Locale.US, "$%.2f / %s", perPcsPrice, p.uom)
             } else {
-                String.format(Locale.US, "$%.4f / %s", displayPrice, displayUnit)
+                String.format(Locale.US, "$%.4f / %s", perPcsPrice, p.uom)
             }
             b.tvProdPrice.text = priceStr
 

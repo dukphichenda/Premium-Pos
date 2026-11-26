@@ -60,7 +60,6 @@ class CustomersActivity : AppCompatActivity() {
         setContentView(binding.root)
         api = ApiClient(session)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
@@ -70,7 +69,7 @@ class CustomersActivity : AppCompatActivity() {
             bottomScrimView = binding.bottomScrim,
             scrollableView = binding.rvCustomers,
             extraTopDp = 4,
-            extraBottomScrollDp = 140
+            extraBottomScrollDp = 64
         )
         binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
             val topH = v.height

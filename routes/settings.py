@@ -47,17 +47,46 @@ DEFAULT_MOBILE_CONFIG = {
     "ota_update_available": True
 }
 
+def get_apk_gradle_version():
+    """Reads versionName from android/app/build.gradle so web UI never displays a stale APK version."""
+    try:
+        import os, re
+        gradle_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'android', 'app', 'build.gradle')
+        if os.path.exists(gradle_path):
+            with open(gradle_path, 'r', encoding='utf-8') as f:
+                m = re.search(r'versionName\s+"([^"]+)"', f.read())
+                if m:
+                    return m.group(1).strip()
+    except Exception:
+        pass
+    return "3.1.0"
+
+def _parse_ver_tuple(ver_str):
+    import re
+    m = re.search(r'(\d+)\.(\d+)\.(\d+)', str(ver_str or ''))
+    if m:
+        return tuple(int(x) for x in m.groups())
+    return (0, 0, 0)
+
 def get_mobile_app_config():
+    apk_ver = get_apk_gradle_version()
+    apk_tag = f"v{apk_ver.lstrip('vV')}"
     try:
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
         if row and row.get('setting_value'):
             saved = json.loads(row['setting_value'])
             cfg = dict(DEFAULT_MOBILE_CONFIG)
             cfg.update(saved)
+            if _parse_ver_tuple(apk_tag) > _parse_ver_tuple(cfg.get('published_version')):
+                cfg['published_version'] = apk_tag
+            cfg['apk_version'] = apk_tag
             return cfg
     except Exception as e:
         logger.warning(f"Error fetching mobile_app_config: {e}")
-    return dict(DEFAULT_MOBILE_CONFIG)
+    cfg = dict(DEFAULT_MOBILE_CONFIG)
+    cfg['published_version'] = apk_tag
+    cfg['apk_version'] = apk_tag
+    return cfg
 
 
 def get_mobile_simulator_real_data():

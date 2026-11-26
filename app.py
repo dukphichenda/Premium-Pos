@@ -620,7 +620,9 @@ def create_app():
                 apk_size_mb = f"{sz:.1f} MB"
         except Exception:
             pass
-        return render_template('download_app.html', apk_size_mb=apk_size_mb)
+        from routes.settings import get_apk_gradle_version
+        apk_version = f"v{get_apk_gradle_version().lstrip('vV')}"
+        return render_template('download_app.html', apk_size_mb=apk_size_mb, apk_version=apk_version)
 
     @app.route('/static/uploads/<path:filename>')
     def serve_uploaded_media(filename):

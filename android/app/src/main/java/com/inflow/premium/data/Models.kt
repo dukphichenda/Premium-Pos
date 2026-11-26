@@ -135,7 +135,8 @@ data class ProductItem(
     val stockAvailable: Double,
     val imageUrl: String = "",
     val barcode: String = "",
-    val categoryName: String = ""
+    val categoryName: String = "",
+    val pricePerPcs: Double = unitPrice
 )
 
 data class ProductCatalogResult(
@@ -156,6 +157,60 @@ data class ProductPricingTier(
     val unitPrice: Double,
     val casePrice: Double,
     val marginPct: Double
+)
+
+data class ProductPriceTable(
+    val catColor: String,
+    val dimStr: String,
+    val detailLines: List<String>,
+    val tierQty1: Int,
+    val tierQty2: Int,
+    val tierQty3: Int,
+    val uPrice1: Double,
+    val uPrice2: Double,
+    val uPrice3: Double,
+    val totPrice1: Double,
+    val totPrice2: Double,
+    val totPrice3: Double
+)
+
+data class ProductBomComponent(
+    val id: Int,
+    val componentId: Int,
+    val sku: String,
+    val name: String,
+    val uom: String,
+    val quantity: Double,
+    val unitCost: Double
+)
+
+data class ProductVendorItem(
+    val id: Int,
+    val name: String,
+    val phone: String,
+    val itemCode: String,
+    val cost: Double
+)
+
+data class ProductOrderHistoryRow(
+    val orderId: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val status: String,
+    val partyName: String,
+    val quantity: Double,
+    val uom: String,
+    val totalAmount: Double
+)
+
+data class ProductMovementRow(
+    val id: Int,
+    val movementType: String,
+    val quantity: Double,
+    val createdAt: String,
+    val referenceNumber: String,
+    val fromLocation: String,
+    val toLocation: String
 )
 
 data class ProductDetail(
@@ -182,7 +237,13 @@ data class ProductDetail(
     val height: Double,
     val totalOnHand: Double,
     val inventory: List<ProductInventoryLocation>,
-    val pricingTiers: List<ProductPricingTier>
+    val pricingTiers: List<ProductPricingTier>,
+    val priceTable: ProductPriceTable? = null,
+    val boms: List<ProductBomComponent> = emptyList(),
+    val vendors: List<ProductVendorItem> = emptyList(),
+    val orderHistory: List<ProductOrderHistoryRow> = emptyList(),
+    val purchaseHistory: List<ProductOrderHistoryRow> = emptyList(),
+    val movementHistory: List<ProductMovementRow> = emptyList()
 )
 
 data class PurchaseOrderListItem(

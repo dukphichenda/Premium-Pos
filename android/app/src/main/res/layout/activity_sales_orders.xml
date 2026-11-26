@@ -7,133 +7,11 @@
     android:clipChildren="false"
     android:clipToPadding="false">
 
-    <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        app:elevation="0dp">
-
-        <LinearLayout
-            android:id="@+id/topHeader"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#F8FAFC"
-            android:orientation="vertical"
-            app:layout_scrollFlags="scroll|enterAlways|snap">
-
-            <com.google.android.material.appbar.MaterialToolbar
-                android:id="@+id/toolbar"
-                android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                app:subtitleTextColor="#0F766E"
-                app:title="Sales Orders"
-                app:titleTextColor="#0F172A" />
-
-            <!-- Search + Branch/Date Controls -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="#FFFFFF"
-                android:orientation="vertical"
-                android:paddingHorizontal="12dp"
-                android:paddingTop="8dp"
-                android:paddingBottom="6dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.Dense"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="Search order #, customer, phone..."
-                    app:boxCornerRadiusBottomEnd="10dp"
-                    app:boxCornerRadiusBottomStart="10dp"
-                    app:boxCornerRadiusTopEnd="10dp"
-                    app:boxCornerRadiusTopStart="10dp"
-                    app:endIconMode="clear_text">
-
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/etSearch"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:imeOptions="actionSearch"
-                        android:inputType="text"
-                        android:singleLine="true"
-                        android:textSize="13.5sp" />
-                </com.google.android.material.textfield.TextInputLayout>
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnDateFilter"
-                    style="@style/Widget.Material3.Button.OutlinedButton"
-                    android:layout_width="wrap_content"
-                    android:layout_height="44dp"
-                    android:layout_marginStart="8dp"
-                    android:minWidth="0dp"
-                    android:paddingHorizontal="12dp"
-                    android:text="All Dates"
-                    android:textSize="12sp"
-                    app:cornerRadius="10dp" />
-            </LinearLayout>
-
-            <HorizontalScrollView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:scrollbars="none">
-
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chipGroupStatus"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    app:selectionRequired="true"
-                    app:singleLine="true"
-                    app:singleSelection="true">
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipOpen"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:checked="true"
-                        android:text="Open" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipPaid"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Paid" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipCancelled"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Cancelled" />
-
-                    <com.google.android.material.chip.Chip
-                        android:id="@+id/chipAll"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="All" />
-                </com.google.android.material.chip.ChipGroup>
-            </HorizontalScrollView>
-        </LinearLayout>
-        </LinearLayout>
-    </com.google.android.material.appbar.AppBarLayout>
-
+    <!-- Full-screen Order List scrolling underneath floating capsules & bottom nav -->
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior">
+        android:layout_height="match_parent">
 
         <FrameLayout
             android:layout_width="match_parent"
@@ -145,7 +23,7 @@
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
                 android:paddingHorizontal="10dp"
-                android:paddingTop="8dp"
+                android:paddingTop="104dp"
                 android:paddingBottom="146dp" />
 
             <TextView
@@ -161,12 +39,174 @@
         </FrameLayout>
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <!-- Soft Top Glow Scrim -->
     <View
         android:id="@+id/topScrim"
         android:layout_width="match_parent"
-        android:layout_height="68dp"
+        android:layout_height="112dp"
         android:layout_gravity="top"
         android:background="@drawable/bg_top_glow_scrim" />
+
+    <!-- Floating Capsules: Search + Date Row, then Open / Paid / All / Cancelled Chips -->
+    <LinearLayout
+        android:id="@+id/topHeader"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@android:color/transparent"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+        android:elevation="8dp"
+        android:orientation="vertical"
+        android:paddingBottom="6dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <!-- Floating Search Capsule -->
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="42dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_floating_top_capsule"
+                android:elevation="4dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp">
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:alpha="0.55"
+                    android:src="@android:drawable/ic_menu_search" />
+
+                <EditText
+                    android:id="@+id/etSearch"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="8dp"
+                    android:layout_weight="1"
+                    android:background="@null"
+                    android:hint="Search order #, customer, phone..."
+                    android:imeOptions="actionSearch"
+                    android:inputType="text"
+                    android:singleLine="true"
+                    android:textColor="#0F172A"
+                    android:textColorHint="#94A3B8"
+                    android:textSize="13sp" />
+
+                <ImageButton
+                    android:id="@+id/btnClearSearch"
+                    android:layout_width="24dp"
+                    android:layout_height="24dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="Clear search"
+                    android:src="@android:drawable/ic_menu_close_clear_cancel"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- Floating Date Capsule -->
+            <TextView
+                android:id="@+id/btnDateFilter"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_floating_top_capsule"
+                android:clickable="true"
+                android:elevation="4dp"
+                android:focusable="true"
+                android:gravity="center"
+                android:paddingHorizontal="14dp"
+                android:text="All Dates"
+                android:textColor="#0F766E"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- Floating Status Filter Capsules: Open | Paid | All | Cancelled -->
+        <HorizontalScrollView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:clipChildren="false"
+            android:clipToPadding="false"
+            android:paddingHorizontal="12dp"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/chipGroupStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:chipSpacingHorizontal="6dp"
+                app:selectionRequired="true"
+                app:singleLine="true"
+                app:singleSelection="true">
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipOpen"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true"
+                    android:elevation="3dp"
+                    android:text="Open"
+                    android:textColor="@color/so_chip_text"
+                    app:checkedIconTint="#0F766E"
+                    app:chipBackgroundColor="@color/so_chip_bg"
+                    app:chipCornerRadius="999dp"
+                    app:chipStrokeColor="@color/so_chip_stroke"
+                    app:chipStrokeWidth="1dp" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipPaid"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:elevation="3dp"
+                    android:text="Paid"
+                    android:textColor="@color/so_chip_text"
+                    app:checkedIconTint="#0F766E"
+                    app:chipBackgroundColor="@color/so_chip_bg"
+                    app:chipCornerRadius="999dp"
+                    app:chipStrokeColor="@color/so_chip_stroke"
+                    app:chipStrokeWidth="1dp" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipAll"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:elevation="3dp"
+                    android:text="All"
+                    android:textColor="@color/so_chip_text"
+                    app:checkedIconTint="#0F766E"
+                    app:chipBackgroundColor="@color/so_chip_bg"
+                    app:chipCornerRadius="999dp"
+                    app:chipStrokeColor="@color/so_chip_stroke"
+                    app:chipStrokeWidth="1dp" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/chipCancelled"
+                    style="@style/Widget.Material3.Chip.Filter"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:elevation="3dp"
+                    android:text="Cancelled"
+                    android:textColor="@color/so_chip_text"
+                    app:checkedIconTint="#0F766E"
+                    app:chipBackgroundColor="@color/so_chip_bg"
+                    app:chipCornerRadius="999dp"
+                    app:chipStrokeColor="@color/so_chip_stroke"
+                    app:chipStrokeWidth="1dp" />
+            </com.google.android.material.chip.ChipGroup>
+        </HorizontalScrollView>
+    </LinearLayout>
 
     <View
         android:id="@+id/bottomScrim"

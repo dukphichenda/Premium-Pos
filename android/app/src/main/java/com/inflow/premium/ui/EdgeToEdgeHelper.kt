@@ -73,7 +73,7 @@ object EdgeToEdgeHelper {
                 bottomNavContainer.paddingLeft,
                 bottomNavContainer.paddingTop,
                 bottomNavContainer.paddingRight,
-                bottomInset + dp(10)
+                (bottomInset * 0.7f).toInt() + dp(3)
             )
 
             bottomScrimView?.let { v ->

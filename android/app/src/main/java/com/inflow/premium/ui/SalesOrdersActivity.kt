@@ -15,7 +15,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.ApiClient
 import com.inflow.premium.data.ApiException
@@ -70,7 +69,6 @@ class SalesOrdersActivity : AppCompatActivity() {
             session.selectedBranch = session.getUserBranchId()?.toString() ?: "main"
         }
 
-        setupToolbar()
         setupRecycler()
         setupFilters()
         BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.SO)
@@ -86,63 +84,23 @@ class SalesOrdersActivity : AppCompatActivity() {
             extraTopDp = 4,
             extraBottomScrollDp = 152
         )
+        binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val topH = v.height
+            if (topH > 0 && binding.rvOrders.paddingTop != topH) {
+                binding.rvOrders.setPadding(
+                    binding.rvOrders.paddingLeft,
+                    topH,
+                    binding.rvOrders.paddingRight,
+                    binding.rvOrders.paddingBottom
+                )
+            }
+        }
 
         binding.fabNewOrder.setOnClickListener {
             openOrderDetail(0)
         }
 
         refreshBootstrapThenLoad()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (::session.isInitialized) {
-            updateBranchSubtitle()
-        }
-    }
-
-    private fun setupToolbar() {
-        binding.toolbar.inflateMenu(R.menu.menu_sales_orders)
-        binding.toolbar.overflowIcon?.setTint(android.graphics.Color.parseColor("#0F172A"))
-        binding.toolbar.menu.findItem(R.id.action_switch_branch)?.isVisible = session.isMainAdmin()
-        updateBranchSubtitle()
-
-        binding.toolbar.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.action_switch_branch -> {
-                    showBranchPicker()
-                    true
-                }
-                R.id.action_refresh -> {
-                    currentPage = 1
-                    loadOrders(append = false)
-                    true
-                }
-                R.id.action_web_portal -> {
-                    startActivity(
-                        Intent(this, MainActivity::class.java)
-                            .putExtra("extra_url", api.buildWebPortalUrl("/"))
-                    )
-                    true
-                }
-                R.id.action_sign_out -> {
-                    confirmSignOut()
-                    true
-                }
-                else -> false
-            }
-        }
-    }
-
-    private fun updateBranchSubtitle() {
-        val branchKey = session.selectedBranch
-        val label = when {
-            branchKey == "all" -> "All Branches"
-            branchKey == "main" || branchKey == "0" -> "Main Store (HQ)"
-            else -> session.getBranches().firstOrNull { it.id == branchKey }?.name ?: "Branch #$branchKey"
-        }
-        val user = session.getDisplayName().ifBlank { session.getUsername() }
-        binding.toolbar.subtitle = "$label • $user"
     }
 
     private fun setupRecycler() {
@@ -193,11 +151,17 @@ class SalesOrdersActivity : AppCompatActivity() {
 
         binding.btnDateFilter.setOnClickListener { showDateFilterDialog() }
 
+        binding.btnClearSearch.setOnClickListener {
+            binding.etSearch.setText("")
+        }
+
         binding.etSearch.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) {
-                val q = s?.toString()?.trim().orEmpty()
+                val raw = s?.toString().orEmpty()
+                binding.btnClearSearch.visibility = if (raw.isEmpty()) View.GONE else View.VISIBLE
+                val q = raw.trim()
                 if (q == currentSearch) return
                 currentSearch = q
                 searchJob?.cancel()
@@ -226,11 +190,9 @@ class SalesOrdersActivity : AppCompatActivity() {
         uiScope.launch {
             try {
                 api.bootstrap()
-                binding.toolbar.menu.findItem(R.id.action_switch_branch)?.isVisible = session.isMainAdmin()
                 if (!session.isMainAdmin()) {
                     session.selectedBranch = session.getUserBranchId()?.toString() ?: "main"
                 }
-                updateBranchSubtitle()
             } catch (e: ApiException) {
                 if (e.statusCode == 401) {
                     redirectToLogin()
@@ -298,36 +260,6 @@ class SalesOrdersActivity : AppCompatActivity() {
         }
     }
 
-    private fun showBranchPicker() {
-        val options = mutableListOf<Pair<String, String>>()
-        options.add("main" to "Main Store (HQ)")
-        for (b in session.getBranches()) {
-            if (b.id != "0" && b.id != "main") {
-                options.add(b.id to b.name)
-            }
-        }
-        options.add("all" to "All Branches")
-
-        val labels = options.map { it.second }.toTypedArray()
-        val checkedIdx = options.indexOfFirst { it.first == session.selectedBranch }.coerceAtLeast(0)
-
-        val dlg = MaterialAlertDialogBuilder(this)
-            .setTitle("Select Store / Branch")
-            .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
-                session.selectedBranch = options[which].first
-                updateBranchSubtitle()
-                dialog.dismiss()
-                currentPage = 1
-                loadOrders(append = false)
-            }
-            .setNegativeButton("Close") { d, _ -> d.dismiss() }
-            .setCancelable(false)
-            .create()
-        attachEscClose(dlg)
-        dlg.setCanceledOnTouchOutside(false)
-        dlg.show()
-    }
-
     private fun showDateFilterDialog() {
         val keys = arrayOf("All", "Today", "Yesterday", "This Week", "This Month", "Last 30 Days")
         val labels = arrayOf("All Dates", "Today", "Yesterday", "This Week", "This Month", "Last 30 Days")
@@ -343,19 +275,6 @@ class SalesOrdersActivity : AppCompatActivity() {
                 loadOrders(append = false)
             }
             .setNegativeButton("Close") { d, _ -> d.dismiss() }
-            .setCancelable(false)
-            .create()
-        attachEscClose(dlg)
-        dlg.setCanceledOnTouchOutside(false)
-        dlg.show()
-    }
-
-    private fun confirmSignOut() {
-        val dlg = MaterialAlertDialogBuilder(this)
-            .setTitle("Sign Out")
-            .setMessage("Sign out of ${session.getDisplayName().ifBlank { session.getUsername() }}?")
-            .setPositiveButton("Sign Out") { _, _ -> redirectToLogin() }
-            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
             .setCancelable(false)
             .create()
         attachEscClose(dlg)
