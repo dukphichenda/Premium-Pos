@@ -70,6 +70,7 @@ def create_app():
     from routes.branches import branches_bp
     from routes.data_exchange import data_exchange_bp
     from routes.auth import auth_bp
+    from routes.mobile_api import mobile_api_bp
 
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(products_bp)
@@ -85,6 +86,7 @@ def create_app():
     app.register_blueprint(branches_bp)
     app.register_blueprint(data_exchange_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(mobile_api_bp)
 
     # Initialize Automated Database Backup Scheduler
     try:
