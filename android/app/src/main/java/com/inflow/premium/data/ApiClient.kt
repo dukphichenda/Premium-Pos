@@ -520,6 +520,122 @@ class ApiClient(private val session: SessionManager) {
         )
     }
 
+    suspend fun getProfitReport(branch: String, dateFilter: String, query: String): ProfitReportResult {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/reports/profit",
+            mapOf("branch" to branch, "date_filter" to dateFilter, "q" to query)
+        )
+        val arr = json.optJSONArray("orders") ?: JSONArray()
+        val list = mutableListOf<ProfitOrderItem>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            list.add(
+                ProfitOrderItem(
+                    id = o.optInt("id"),
+                    orderNumber = o.optString("order_number", ""),
+                    orderDate = o.optString("order_date", ""),
+                    customerName = o.optString("customer_name", ""),
+                    paymentMethod = o.optString("payment_method", "Cash"),
+                    isPaid = o.optBoolean("is_paid", false),
+                    sales = o.optDouble("sales", 0.0),
+                    cost = o.optDouble("cost", 0.0),
+                    profit = o.optDouble("profit", 0.0)
+                )
+            )
+        }
+        return ProfitReportResult(
+            totalOrders = json.optInt("total_orders", list.size),
+            paidCount = json.optInt("paid_count", 0),
+            totalSales = json.optDouble("total_sales", 0.0),
+            totalCost = json.optDouble("total_cost", 0.0),
+            grossProfit = json.optDouble("gross_profit", 0.0),
+            marginPct = json.optDouble("margin_pct", 0.0),
+            orders = list
+        )
+    }
+
+    suspend fun getDeliveryReport(branch: String, dateFilter: String, query: String): DeliveryReportResult {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/reports/delivery",
+            mapOf("branch" to branch, "date_filter" to dateFilter, "q" to query)
+        )
+        val arr = json.optJSONArray("orders") ?: JSONArray()
+        val list = mutableListOf<DeliveryOrderItem>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            list.add(
+                DeliveryOrderItem(
+                    id = o.optInt("id"),
+                    orderNumber = o.optString("order_number", ""),
+                    orderDate = o.optString("order_date", ""),
+                    totalAmount = o.optDouble("total_amount", 0.0),
+                    isPaid = o.optBoolean("is_paid", false),
+                    paymentMethod = o.optString("payment_method", "Cash"),
+                    customerName = o.optString("customer_name", ""),
+                    phone = o.optString("phone", ""),
+                    address = o.optString("address", ""),
+                    deliveryMan = o.optString("delivery_man", "")
+                )
+            )
+        }
+        return DeliveryReportResult(
+            totalOrders = json.optInt("total_orders", list.size),
+            totalSales = json.optDouble("total_sales", 0.0),
+            assignedCount = json.optInt("assigned_count", 0),
+            unassignedCount = json.optInt("unassigned_count", 0),
+            orders = list
+        )
+    }
+
+    suspend fun assignDeliveryMan(orderId: Int, deliveryMan: String) {
+        val body = JSONObject().apply {
+            put("order_id", orderId)
+            put("delivery_man", deliveryMan)
+        }
+        requestJson("POST", "/api/mobile/reports/delivery/assign", body = body)
+    }
+
+    suspend fun getBranchSummaryReport(branch: String, dateFilter: String, query: String, mode: String): BranchSummaryReportResult {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/reports/branch-summary",
+            mapOf("branch" to branch, "date_filter" to dateFilter, "q" to query, "mode" to mode)
+        )
+        val arr = json.optJSONArray("items") ?: JSONArray()
+        val list = mutableListOf<BranchProductSummaryItem>()
+        for (i in 0 until arr.length()) {
+            val it = arr.getJSONObject(i)
+            list.add(
+                BranchProductSummaryItem(
+                    id = it.optInt("id"),
+                    sku = it.optString("sku", ""),
+                    productName = it.optString("product_name", ""),
+                    categoryName = it.optString("category_name", "General"),
+                    uom = it.optString("uom", "pcs."),
+                    salesUom = it.optString("sales_uom", "case"),
+                    ratio = it.optDouble("ratio", 1.0),
+                    qtySold = it.optDouble("qty_sold", 0.0),
+                    salesAmount = it.optDouble("sales_amount", 0.0),
+                    branchCost = it.optDouble("branch_cost", 0.0),
+                    branchProfit = it.optDouble("branch_profit", 0.0),
+                    hqCost = it.optDouble("hq_cost", 0.0),
+                    hqEarning = it.optDouble("hq_earning", 0.0)
+                )
+            )
+        }
+        return BranchSummaryReportResult(
+            totalSales = json.optDouble("total_sales", 0.0),
+            totalBranchCost = json.optDouble("total_branch_cost", 0.0),
+            totalBranchProfit = json.optDouble("total_branch_profit", 0.0),
+            totalHqCost = json.optDouble("total_hq_cost", 0.0),
+            totalHqEarning = json.optDouble("total_hq_earning", 0.0),
+            totalQty = json.optDouble("total_qty", 0.0),
+            items = list
+        )
+    }
+
     private fun parseOrderSummary(o: JSONObject): SalesOrderSummary {
         return SalesOrderSummary(
             id = o.optInt("id"),

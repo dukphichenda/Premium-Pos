@@ -79,18 +79,39 @@ class AppSettingsActivity : AppCompatActivity() {
             )
         }
 
-        binding.btnOpenWebSettings.setOnClickListener {
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .putExtra("extra_url", api.buildWebPortalUrl("/settings"))
-            )
+        binding.btnOpenWebSettings.setOnClickListener { openWebPath("/settings") }
+
+        binding.rowCompanyProfile.setOnClickListener { openWebPath("/settings?tab=tabCompany") }
+        binding.rowPricingCurrency.setOnClickListener { openWebPath("/settings?tab=tabPricing") }
+        binding.rowDecimalPrecision.setOnClickListener { openWebPath("/settings?tab=tabDecimals") }
+        binding.rowInvoiceCustom.setOnClickListener { openWebPath("/settings?tab=tabInvoice") }
+        if (session.isMainAdmin()) {
+            binding.rowUsersPerms.setOnClickListener { openWebPath("/settings?tab=tabUsers") }
+        } else {
+            binding.rowUsersPerms.visibility = View.GONE
+            binding.divUsersPerms.visibility = View.GONE
         }
+        binding.rowImportExport.setOnClickListener { openWebPath("/settings?tab=tabImport") }
+        binding.rowBackupSql.setOnClickListener { openWebPath("/settings?tab=tabBackup") }
+
+        binding.rowLocations.setOnClickListener { openWebPath("/locations") }
+        binding.rowCategories.setOnClickListener { openWebPath("/categories") }
+        binding.rowImportWizard.setOnClickListener { openWebPath("/data/import") }
+        binding.rowExportCenter.setOnClickListener { openWebPath("/data/export") }
+        binding.rowSqlMigration.setOnClickListener { openWebPath("/settings/migration") }
 
         binding.btnCheckUpdate.setOnClickListener {
             startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${session.baseUrl}/download-app")))
         }
 
         binding.btnSignOut.setOnClickListener { confirmSignOut() }
+    }
+
+    private fun openWebPath(path: String) {
+        startActivity(
+            Intent(this, MainActivity::class.java)
+                .putExtra("extra_url", api.buildWebPortalUrl(path))
+        )
     }
 
     override fun onResume() {

@@ -280,6 +280,75 @@ data class CustomerDetail(
     val orders: List<CustomerOrderHistoryItem>
 )
 
+data class ProfitOrderItem(
+    val id: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val customerName: String,
+    val paymentMethod: String,
+    val isPaid: Boolean,
+    val sales: Double,
+    val cost: Double,
+    val profit: Double
+)
+
+data class ProfitReportResult(
+    val totalOrders: Int,
+    val paidCount: Int,
+    val totalSales: Double,
+    val totalCost: Double,
+    val grossProfit: Double,
+    val marginPct: Double,
+    val orders: List<ProfitOrderItem>
+)
+
+data class DeliveryOrderItem(
+    val id: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val totalAmount: Double,
+    val isPaid: Boolean,
+    val paymentMethod: String,
+    val customerName: String,
+    val phone: String,
+    val address: String,
+    var deliveryMan: String
+)
+
+data class DeliveryReportResult(
+    val totalOrders: Int,
+    val totalSales: Double,
+    val assignedCount: Int,
+    val unassignedCount: Int,
+    val orders: List<DeliveryOrderItem>
+)
+
+data class BranchProductSummaryItem(
+    val id: Int,
+    val sku: String,
+    val productName: String,
+    val categoryName: String,
+    val uom: String,
+    val salesUom: String,
+    val ratio: Double,
+    val qtySold: Double,
+    val salesAmount: Double,
+    val branchCost: Double,
+    val branchProfit: Double,
+    val hqCost: Double,
+    val hqEarning: Double
+)
+
+data class BranchSummaryReportResult(
+    val totalSales: Double,
+    val totalBranchCost: Double,
+    val totalBranchProfit: Double,
+    val totalHqCost: Double,
+    val totalHqEarning: Double,
+    val totalQty: Double,
+    val items: List<BranchProductSummaryItem>
+)
+
 data class MonthlyChartPoint(
     val label: String,
     val monthLabel: String,
