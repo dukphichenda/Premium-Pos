@@ -509,18 +509,259 @@ def mobile_customers_search():
         where.append("(name ILIKE %s OR REPLACE(name, '’', '''') ILIKE %s OR COALESCE(contact_name,'') ILIKE %s OR COALESCE(phone,'') ILIKE %s)")
         params.extend([sp, sp, sp, sp])
 
+    c_where = [w.replace('is_active', 'c.is_active').replace('branch_id', 'c.branch_id').replace('name ILIKE', 'c.name ILIKE').replace("REPLACE(name", "REPLACE(c.name").replace("COALESCE(contact_name", "COALESCE(c.contact_name").replace("COALESCE(phone", "COALESCE(c.phone") for w in where]
+    where_sql = ' AND '.join(c_where)
+
     rows = query_all(f"""
-        SELECT id, name, COALESCE(contact_name, '') as contact_name, COALESCE(phone, '') as phone,
-               COALESCE(NULLIF(shipping_address, ''), NULLIF(address1, ''), NULLIF(billing_address, ''), NULLIF(address2, ''), '') as address,
-               COALESCE(default_pricing_scheme_id, 100) as default_pricing_scheme_id,
-               branch_id
-        FROM customers
-        WHERE {' AND '.join(where)}
-        ORDER BY name ASC
+        SELECT c.id, c.name, COALESCE(c.contact_name, '') as contact_name, COALESCE(c.phone, '') as phone,
+               COALESCE(NULLIF(c.shipping_address, ''), NULLIF(c.address1, ''), NULLIF(c.billing_address, ''), NULLIF(c.address2, ''), '') as address,
+               COALESCE(c.default_pricing_scheme_id, 100) as default_pricing_scheme_id,
+               c.branch_id,
+               COALESCE(c.is_active, TRUE) as is_active,
+               COALESCE(bal.open_bal, 0) as open_balance
+        FROM customers c
+        LEFT JOIN (
+            SELECT customer_id, SUM(COALESCE(balance_due, 0)) as open_bal
+            FROM sales_orders
+            WHERE status != 'CANCELLED'
+            GROUP BY customer_id
+        ) bal ON c.id = bal.customer_id
+        WHERE {where_sql}
+        ORDER BY c.name ASC
         LIMIT %s
     """, tuple(params + [limit]))
 
-    return jsonify({'success': True, 'customers': [dict(r) for r in rows]})
+    stats = query_one(f"""
+        SELECT COUNT(*) as total_count,
+               COALESCE(SUM(COALESCE(bal.open_bal, 0)), 0) as total_due
+        FROM customers c
+        LEFT JOIN (
+            SELECT customer_id, SUM(COALESCE(balance_due, 0)) as open_bal
+            FROM sales_orders
+            WHERE status != 'CANCELLED'
+            GROUP BY customer_id
+        ) bal ON c.id = bal.customer_id
+        WHERE {where_sql}
+    """, tuple(params))
+
+    return jsonify({
+        'success': True,
+        'total_count': int((stats or {}).get('total_count') or len(rows)),
+        'total_due': float((stats or {}).get('total_due') or 0),
+        'customers': [
+            {
+                **dict(r),
+                'open_balance': float(r.get('open_balance') or 0),
+                'is_active': bool(r.get('is_active', True)),
+            }
+            for r in rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/customers/<int:cid>', methods=['GET'])
+@mobile_auth_required
+def mobile_customer_detail(cid):
+    """Read-only customer detail + sales order history."""
+    c = query_one("""
+        SELECT c.*,
+               COALESCE(ps.name, 'Retail 1') as pricing_scheme_name,
+               COALESCE(b.name, 'Main Store (HQ)') as branch_name
+        FROM customers c
+        LEFT JOIN pricing_schemes ps ON c.default_pricing_scheme_id = ps.id
+        LEFT JOIN branches b ON c.branch_id = b.id
+        WHERE c.id = %s
+    """, (cid,))
+    if not c:
+        return jsonify({'success': False, 'error': 'Customer not found'}), 404
+
+    orders = query_all("""
+        SELECT so.id, so.order_number, so.order_date, so.status, so.payment_status,
+               COALESCE(so.total_amount, 0) as total_amount,
+               COALESCE(so.paid_amount, 0) as paid_amount,
+               COALESCE(so.balance_due, 0) as balance_due,
+               COALESCE(l.name, 'Main Warehouse') as location_name,
+               (SELECT string_agg(COALESCE(p.name, sol.description, ''), ', ')
+                FROM sales_order_lines sol
+                LEFT JOIN products p ON sol.product_id = p.id
+                WHERE sol.sales_order_id = so.id) as items_summary,
+               (SELECT COALESCE(SUM(sol.quantity), 0)
+                FROM sales_order_lines sol
+                WHERE sol.sales_order_id = so.id) as total_qty
+        FROM sales_orders so
+        LEFT JOIN locations l ON so.location_id = l.id
+        WHERE so.customer_id = %s AND so.status != 'CANCELLED'
+        ORDER BY so.order_date DESC, so.id DESC
+        LIMIT 30
+    """, (cid,))
+
+    total_spent = sum(float(o.get('total_amount') or 0) for o in orders)
+    open_balance = sum(float(o.get('balance_due') or 0) for o in orders)
+    created_str = c['created_at'].strftime('%Y-%m-%d') if c.get('created_at') else ''
+    addr = (c.get('shipping_address') or c.get('address1') or c.get('billing_address') or c.get('address2') or '').strip()
+
+    return jsonify({
+        'success': True,
+        'customer': {
+            'id': c['id'],
+            'name': c.get('name') or '',
+            'contact_name': c.get('contact_name') or '',
+            'phone': c.get('phone') or '',
+            'email': c.get('email') or '',
+            'address': addr,
+            'pricing_scheme_name': c.get('pricing_scheme_name') or 'Retail 1',
+            'branch_name': c.get('branch_name') or 'Main Store (HQ)',
+            'payment_terms': c.get('payment_terms') or 'Due on Receipt',
+            'notes': c.get('remarks') or c.get('notes') or '',
+            'is_active': bool(c.get('is_active', True)),
+            'created_at': created_str,
+            'total_spent': total_spent,
+            'open_balance': open_balance,
+            'orders': [
+                {
+                    'id': o['id'],
+                    'order_number': o['order_number'],
+                    'order_date': o['order_date'].strftime('%Y-%m-%d') if o.get('order_date') else '',
+                    'status': o.get('status') or 'OPEN',
+                    'payment_status': o.get('payment_status') or 'UNPAID',
+                    'total_amount': float(o.get('total_amount') or 0),
+                    'paid_amount': float(o.get('paid_amount') or 0),
+                    'balance_due': float(o.get('balance_due') or 0),
+                    'location_name': o.get('location_name') or 'Main Warehouse',
+                    'items_summary': o.get('items_summary') or '',
+                    'total_qty': float(o.get('total_qty') or 0),
+                }
+                for o in orders
+            ],
+        }
+    })
+
+
+@mobile_api_bp.route('/api/mobile/purchases', methods=['GET'])
+@mobile_auth_required
+def mobile_purchases_list():
+    """Read-only purchase orders list."""
+    q = (request.args.get('q') or '').strip()
+    status_filter = (request.args.get('status') or 'All').strip()
+    limit = min(80, max(10, int(request.args.get('limit', 40) or 40)))
+
+    where = ["1=1"]
+    params = []
+    if status_filter.lower() == 'unfulfilled':
+        where.append("po.status IN ('DRAFT', 'ISSUED', 'PARTIAL_RECEIVED')")
+    elif status_filter.lower() == 'fulfilled':
+        where.append("po.status IN ('RECEIVED', 'FULFILLED', 'COMPLETED')")
+
+    if q:
+        sp = f"%{q}%"
+        where.append("(po.order_number ILIKE %s OR COALESCE(v.name, '') ILIKE %s OR CAST(COALESCE(po.total_amount, 0) AS TEXT) ILIKE %s)")
+        params.extend([sp, sp, sp])
+
+    rows = query_all(f"""
+        SELECT po.id, po.order_number, po.order_date, po.status, po.payment_status,
+               COALESCE(po.total_amount, 0) as total_amount,
+               COALESCE(v.name, 'Unknown Vendor') as vendor_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        WHERE {' AND '.join(where)}
+        ORDER BY po.order_date DESC, po.id DESC
+        LIMIT %s
+    """, tuple(params + [limit]))
+
+    cnt_row = query_one(f"""
+        SELECT COUNT(*) as cnt
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        WHERE {' AND '.join(where)}
+    """, tuple(params))
+    total_count = int((cnt_row or {}).get('cnt') or len(rows))
+
+    return jsonify({
+        'success': True,
+        'total_count': total_count,
+        'orders': [
+            {
+                'id': r['id'],
+                'order_number': r['order_number'],
+                'order_date': r['order_date'].strftime('%d-%b-%y') if r.get('order_date') else '',
+                'status': r.get('status') or 'ISSUED',
+                'payment_status': r.get('payment_status') or 'UNPAID',
+                'total': float(r.get('total_amount') or 0),
+                'vendor_name': r.get('vendor_name') or 'Unknown Vendor',
+                'is_fulfilled': (r.get('status') or '').upper() in ('RECEIVED', 'FULFILLED', 'COMPLETED'),
+                'is_paid': (r.get('payment_status') or '').upper() == 'PAID',
+            }
+            for r in rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/purchases/<int:pid>', methods=['GET'])
+@mobile_auth_required
+def mobile_purchase_detail(pid):
+    """Read-only purchase order detail."""
+    po = query_one("""
+        SELECT po.*,
+               COALESCE(v.name, 'Unknown Vendor') as vendor_name,
+               COALESCE(l.name, 'Main Warehouse') as location_name,
+               COALESCE(u.username, 'Admin') as assigned_to
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN locations l ON po.location_id = l.id
+        LEFT JOIN users u ON po.created_by = u.id
+        WHERE po.id = %s
+    """, (pid,))
+    if not po:
+        return jsonify({'success': False, 'error': 'Purchase order not found'}), 404
+
+    lines = query_all("""
+        SELECT pol.*,
+               COALESCE(p.sku, '') as sku,
+               COALESCE(p.name, pol.description, '') as product_name,
+               COALESCE(p.image_url, '') as image_url,
+               COALESCE(p.uom, 'pcs.') as std_uom
+        FROM purchase_order_lines pol
+        LEFT JOIN products p ON pol.product_id = p.id
+        WHERE pol.purchase_order_id = %s
+        ORDER BY pol.id ASC
+    """, (pid,))
+
+    total = float(po.get('total_amount') or 0)
+    paid = float(po.get('paid_amount') or 0)
+    balance = max(0.0, total - paid)
+
+    return jsonify({
+        'success': True,
+        'order': {
+            'id': po['id'],
+            'order_number': po['order_number'],
+            'order_date': po['order_date'].strftime('%b %d, %Y') if po.get('order_date') else '',
+            'status': po.get('status') or 'ISSUED',
+            'payment_status': po.get('payment_status') or 'UNPAID',
+            'is_fulfilled': (po.get('status') or '').upper() in ('RECEIVED', 'FULFILLED', 'COMPLETED'),
+            'is_paid': (po.get('payment_status') or '').upper() == 'PAID',
+            'vendor_name': po.get('vendor_name') or 'Unknown Vendor',
+            'location_name': po.get('location_name') or 'Main Warehouse',
+            'assigned_to': po.get('assigned_to') or 'Admin',
+            'total_amount': total,
+            'paid_amount': paid,
+            'balance_due': balance,
+            'notes': po.get('notes') or '',
+            'lines': [
+                {
+                    'id': l['id'],
+                    'sku': l.get('sku') or '',
+                    'product_name': l.get('product_name') or '',
+                    'image_url': l.get('image_url') or '',
+                    'quantity': float(l.get('quantity') or 0),
+                    'uom': l.get('uom') or l.get('std_uom') or 'pcs.',
+                    'unit_price': float(l.get('unit_cost') or l.get('unit_price') or 0),
+                    'subtotal': float(l.get('subtotal') or 0),
+                }
+                for l in lines
+            ],
+        }
+    })
 
 
 @mobile_api_bp.route('/api/mobile/customers/quick-add', methods=['POST'])

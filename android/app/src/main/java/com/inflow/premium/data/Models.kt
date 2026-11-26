@@ -185,6 +185,101 @@ data class ProductDetail(
     val pricingTiers: List<ProductPricingTier>
 )
 
+data class PurchaseOrderListItem(
+    val id: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val status: String,
+    val paymentStatus: String,
+    val total: Double,
+    val vendorName: String,
+    val isFulfilled: Boolean,
+    val isPaid: Boolean
+)
+
+data class PurchaseOrderListResult(
+    val orders: List<PurchaseOrderListItem>,
+    val totalCount: Int
+)
+
+data class PurchaseOrderLine(
+    val id: Int,
+    val sku: String,
+    val productName: String,
+    val imageUrl: String,
+    val quantity: Double,
+    val uom: String,
+    val unitPrice: Double,
+    val subtotal: Double
+)
+
+data class PurchaseOrderDetail(
+    val id: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val status: String,
+    val paymentStatus: String,
+    val isFulfilled: Boolean,
+    val isPaid: Boolean,
+    val vendorName: String,
+    val locationName: String,
+    val assignedTo: String,
+    val totalAmount: Double,
+    val paidAmount: Double,
+    val balanceDue: Double,
+    val notes: String,
+    val lines: List<PurchaseOrderLine>
+)
+
+data class CustomerCatalogItem(
+    val id: Int,
+    val name: String,
+    val contactName: String,
+    val phone: String,
+    val address: String,
+    val defaultPricingSchemeId: Int,
+    val isActive: Boolean,
+    val openBalance: Double
+)
+
+data class CustomerCatalogResult(
+    val customers: List<CustomerCatalogItem>,
+    val totalCount: Int,
+    val totalDue: Double
+)
+
+data class CustomerOrderHistoryItem(
+    val id: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val status: String,
+    val paymentStatus: String,
+    val totalAmount: Double,
+    val paidAmount: Double,
+    val balanceDue: Double,
+    val locationName: String,
+    val itemsSummary: String,
+    val totalQty: Double
+)
+
+data class CustomerDetail(
+    val id: Int,
+    val name: String,
+    val contactName: String,
+    val phone: String,
+    val email: String,
+    val address: String,
+    val pricingSchemeName: String,
+    val branchName: String,
+    val paymentTerms: String,
+    val notes: String,
+    val isActive: Boolean,
+    val createdAt: String,
+    val totalSpent: Double,
+    val openBalance: Double,
+    val orders: List<CustomerOrderHistoryItem>
+)
+
 data class MonthlyChartPoint(
     val label: String,
     val monthLabel: String,

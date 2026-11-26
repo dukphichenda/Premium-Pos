@@ -1,22 +1,24 @@
 package com.inflow.premium.ui
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
-import android.view.KeyEvent
-import android.view.ViewGroup
-import android.widget.LinearLayout
+import android.text.Editable
+import android.text.TextWatcher
+import android.view.LayoutInflater
+import android.widget.PopupMenu
 import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.ApiClient
 import com.inflow.premium.data.ApiException
+import com.inflow.premium.data.ReportSummary
 import com.inflow.premium.data.SessionManager
 import com.inflow.premium.databinding.ActivityReportBinding
+import com.inflow.premium.databinding.ItemReportCardBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -31,7 +33,140 @@ class ReportActivity : AppCompatActivity() {
     private lateinit var session: SessionManager
     private lateinit var api: ApiClient
     private val uiScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
     private var currentDateFilter = "Today"
+    private var currentCategory = "Sales" // Sales, Recent, Stock
+    private var currentQuery = ""
+    private var latestSummary: ReportSummary? = null
+
+    private data class ReportDef(
+        val category: String,
+        val title: String,
+        val desc: String,
+        val iconRes: Int,
+        val iconBgHex: String,
+        val iconTintHex: String,
+        val badgeBgHex: String,
+        val badgeTextHex: String,
+        val webPath: String,
+        val metricProvider: (ReportSummary?) -> Pair<String, String>
+    )
+
+    private val moneyFmt = DecimalFormat("#,##0.00")
+
+    private val reportDefs = listOf(
+        ReportDef(
+            category = "Sales",
+            title = "Product sales ›",
+            desc = "Summary or breakdown of products and how well they have been selling.",
+            iconRes = R.drawable.ic_nav_product,
+            iconBgHex = "#FFF7ED",
+            iconTintHex = "#D97706",
+            badgeBgHex = "#F1F5F9",
+            badgeTextHex = "#0F172A",
+            webPath = "/reports/product-sales"
+        ) { s ->
+            val top = s?.topProducts?.firstOrNull()
+            val badge = if (top != null) "Top: $${moneyFmt.format(top.total)}" else "Top: $0.00"
+            val sub = if (top != null) "• ${top.name.take(22)}" else "• Updated now"
+            badge to sub
+        },
+        ReportDef(
+            category = "Sales",
+            title = "Product price list ›",
+            desc = "List of products, with prices and active pricing tier rules.",
+            iconRes = R.drawable.ic_wf_inventory,
+            iconBgHex = "#FFF1F2",
+            iconTintHex = "#E11D48",
+            badgeBgHex = "#F1F5F9",
+            badgeTextHex = "#0F172A",
+            webPath = "/products"
+        ) { _ -> "Catalog Tiers" to "• Includes Wholesale" },
+        ReportDef(
+            category = "Sales",
+            title = "Operations ›",
+            desc = "List of Sales with their statuses & open orders awaiting fulfillment.",
+            iconRes = R.drawable.ic_wf_transfer,
+            iconBgHex = "#EFF6FF",
+            iconTintHex = "#2563EB",
+            badgeBgHex = "#FEF3C7",
+            badgeTextHex = "#B45309",
+            webPath = "/sales"
+        ) { s ->
+            val openCnt = s?.openCount ?: 0
+            "$openCnt Open Orders" to "• Priority routing"
+        },
+        ReportDef(
+            category = "Sales",
+            title = "Sales order summary ›",
+            desc = "Summary of financial information for selected sales orders.",
+            iconRes = R.drawable.ic_nav_so,
+            iconBgHex = "#F8FAFC",
+            iconTintHex = "#475569",
+            badgeBgHex = "#F1F5F9",
+            badgeTextHex = "#0F172A",
+            webPath = "/reports"
+        ) { s ->
+            val gross = s?.grossSales ?: 0.0
+            val cnt = s?.orderCount ?: 0
+            "Gross: $${moneyFmt.format(gross)}" to "• $cnt Invoices"
+        },
+        ReportDef(
+            category = "Sales",
+            title = "Sales order profit ›",
+            desc = "List of sales orders and their gross profit & margin analysis.",
+            iconRes = R.drawable.ic_nav_report,
+            iconBgHex = "#F0FDF4",
+            iconTintHex = "#059669",
+            badgeBgHex = "#DCFCE7",
+            badgeTextHex = "#059669",
+            webPath = "/reports"
+        ) { s ->
+            val gross = s?.grossSales ?: 0.0
+            val profit = s?.grossProfit ?: 0.0
+            val margin = if (gross > 0) (profit / gross) * 100.0 else 0.0
+            String.format(Locale.US, "Avg Margin: %.1f%%", margin) to "• Profit $${moneyFmt.format(profit)}"
+        },
+        ReportDef(
+            category = "Sales",
+            title = "Delivery Person Assign ›",
+            desc = "Assign and track delivery persons for sales orders with customer details.",
+            iconRes = R.drawable.ic_wf_customer,
+            iconBgHex = "#FEF2F2",
+            iconTintHex = "#DC2626",
+            badgeBgHex = "#EFF6FF",
+            badgeTextHex = "#1D4ED8",
+            webPath = "/reports/delivery"
+        ) { s ->
+            val paid = s?.paidTotal ?: 0.0
+            "Paid: $${moneyFmt.format(paid)}" to "• Delivery Sync"
+        },
+        ReportDef(
+            category = "Recent",
+            title = "Sales by product details ›",
+            desc = "Detailed itemized line transactions of products sold over time.",
+            iconRes = R.drawable.ic_nav_report,
+            iconBgHex = "#F1F5F9",
+            iconTintHex = "#334155",
+            badgeBgHex = "#F1F5F9",
+            badgeTextHex = "#0F172A",
+            webPath = "/reports"
+        ) { _ -> "Export CSV / PDF" to "• Itemized SKU" },
+        ReportDef(
+            category = "Stock",
+            title = "Customer order history ›",
+            desc = "Complete chronological order and invoice history per customer.",
+            iconRes = R.drawable.ic_wf_customer,
+            iconBgHex = "#EEF2FF",
+            iconTintHex = "#4F46E5",
+            badgeBgHex = "#EEF2FF",
+            badgeTextHex = "#4F46E5",
+            webPath = "/customers"
+        ) { s ->
+            val unpaid = s?.unpaidBalance ?: 0.0
+            "Unpaid: $${moneyFmt.format(unpaid)}" to "• Customer Profiles"
+        }
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -57,105 +192,113 @@ class ReportActivity : AppCompatActivity() {
             extraTopDp = 4,
             extraBottomScrollDp = 104
         )
+        binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
+            val topH = v.height
+            if (topH > 0 && binding.scrollReport.paddingTop != topH) {
+                binding.scrollReport.setPadding(
+                    binding.scrollReport.paddingLeft,
+                    topH,
+                    binding.scrollReport.paddingRight,
+                    binding.scrollReport.paddingBottom
+                )
+            }
+        }
 
         binding.swipeRefresh.setColorSchemeResources(R.color.primary, R.color.primary_dark)
         binding.swipeRefresh.setOnRefreshListener { loadReport() }
-        binding.btnReportDate.setOnClickListener { showDateFilterDialog() }
-        binding.btnReportWeb.setOnClickListener {
-            startActivity(
-                Intent(this, MainActivity::class.java)
-                    .putExtra("extra_url", api.buildWebPortalUrl("/reports"))
-            )
+        binding.btnReportBack.setOnClickListener { finish() }
+        binding.btnReportRefresh.setOnClickListener { loadReport() }
+        binding.btnReportMore.setOnClickListener { anchor ->
+            val popup = PopupMenu(this, anchor)
+            popup.menu.add(0, 1, 1, "Open Full Web Reports")
+            popup.setOnMenuItemClickListener {
+                startActivity(
+                    Intent(this, MainActivity::class.java)
+                        .putExtra("extra_url", api.buildWebPortalUrl("/reports"))
+                )
+                true
+            }
+            popup.show()
         }
 
+        binding.pillPeriodToday.setOnClickListener { selectPeriod("Today") }
+        binding.pillPeriodWeek.setOnClickListener { selectPeriod("This Week") }
+        binding.pillPeriodMonth.setOnClickListener { selectPeriod("This Month") }
+        binding.pillPeriodAll.setOnClickListener { selectPeriod("All") }
+
+        binding.tabReportSales.setOnClickListener { selectCategory("Sales") }
+        binding.tabReportRecent.setOnClickListener { selectCategory("Recent") }
+        binding.tabReportStock.setOnClickListener { selectCategory("Stock") }
+
+        binding.etReportSearch.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                currentQuery = s?.toString()?.trim().orEmpty()
+                renderCards()
+            }
+        })
+
         updateBranchSubtitle()
+        updatePeriodPills()
+        updateCategoryTabs()
+        renderCards()
         loadReport()
     }
 
-    override fun onResume() {
-        super.onResume()
-        if (::session.isInitialized) {
-            updateBranchSubtitle()
-            loadReport()
+    private fun selectPeriod(period: String) {
+        currentDateFilter = period
+        updatePeriodPills()
+        loadReport()
+    }
+
+    private fun selectCategory(cat: String) {
+        currentCategory = cat
+        updateCategoryTabs()
+        renderCards()
+    }
+
+    private fun stylePill(tv: TextView, active: Boolean) {
+        if (active) {
+            tv.setBackgroundResource(R.drawable.bg_pill_teal_solid)
+            tv.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#0F172A"))
+            tv.setTextColor(Color.WHITE)
+        } else {
+            tv.setBackgroundResource(R.drawable.bg_floating_top_capsule)
+            tv.backgroundTintList = null
+            tv.setTextColor(Color.parseColor("#334155"))
         }
+    }
+
+    private fun updatePeriodPills() {
+        stylePill(binding.pillPeriodToday, currentDateFilter == "Today")
+        stylePill(binding.pillPeriodWeek, currentDateFilter == "This Week")
+        stylePill(binding.pillPeriodMonth, currentDateFilter == "This Month")
+        stylePill(binding.pillPeriodAll, currentDateFilter == "All")
+    }
+
+    private fun updateCategoryTabs() {
+        stylePill(binding.tabReportSales, currentCategory == "Sales")
+        stylePill(binding.tabReportRecent, currentCategory == "Recent")
+        stylePill(binding.tabReportStock, currentCategory == "Stock")
     }
 
     private fun updateBranchSubtitle() {
         val branchKey = session.selectedBranch
         val branchLabel = when {
             branchKey == "all" -> "All Branches"
-            branchKey == "main" || branchKey == "0" -> "Main Store (HQ)"
+            branchKey == "main" || branchKey == "0" -> "Sales Reports"
             else -> session.getBranches().firstOrNull { it.id == branchKey }?.name ?: "Branch #$branchKey"
         }
-        binding.toolbar.subtitle = branchLabel
-    }
-
-    private fun showDateFilterDialog() {
-        val keys = arrayOf("Today", "Yesterday", "This Week", "This Month", "Last 30 Days", "All")
-        val labels = arrayOf("Today", "Yesterday", "This Week", "This Month", "Last 30 Days", "All Dates")
-        val idx = keys.indexOf(currentDateFilter).coerceAtLeast(0)
-
-        val dlg = MaterialAlertDialogBuilder(this)
-            .setTitle("Report Period")
-            .setSingleChoiceItems(labels, idx) { d, which ->
-                currentDateFilter = keys[which]
-                binding.btnReportDate.text = "Period: ${labels[which]}"
-                d.dismiss()
-                loadReport()
-            }
-            .setNegativeButton("Close") { d, _ -> d.dismiss() }
-            .setCancelable(false)
-            .create()
-        attachEscClose(dlg)
-        dlg.setCanceledOnTouchOutside(false)
-        dlg.show()
+        binding.tvReportHeaderSub.text = "• $branchLabel"
     }
 
     private fun loadReport() {
         binding.swipeRefresh.isRefreshing = true
         uiScope.launch {
             try {
-                val rep = api.getReportsSummary(session.selectedBranch, currentDateFilter)
-                binding.tvGrossSales.text = String.format(Locale.US, "$%.2f", rep.grossSales)
-                binding.tvSalesSplit.text = String.format(
-                    Locale.US,
-                    "Paid: $%.2f (%d) • Open: $%.2f (%d)",
-                    rep.paidSales,
-                    rep.paidCount,
-                    rep.openSales,
-                    rep.openCount
-                )
-                val df = DecimalFormat("#,##0")
-                binding.tvDeliveryFees.text =
-                    "Delivery Fees: ${df.format(Math.round(rep.deliveryFeesKhr))} KHR • Cancelled: ${rep.cancelledCount}"
-
-                binding.llPaymentBreakdown.removeAllViews()
-                if (rep.paymentBreakdown.isEmpty()) {
-                    addEmptyLine(binding.llPaymentBreakdown, "No paid transactions in this period")
-                } else {
-                    for (pm in rep.paymentBreakdown) {
-                        addKeyValueRow(
-                            binding.llPaymentBreakdown,
-                            "${pm.paymentMethod} (${pm.count})",
-                            String.format(Locale.US, "$%.2f", pm.amount)
-                        )
-                    }
-                }
-
-                binding.llTopProducts.removeAllViews()
-                if (rep.topProducts.isEmpty()) {
-                    addEmptyLine(binding.llTopProducts, "No items sold in this period")
-                } else {
-                    for (tp in rep.topProducts) {
-                        val qtyStr = if (tp.qty == tp.qty.toLong().toDouble()) tp.qty.toLong().toString() else String.format(Locale.US, "%.2f", tp.qty)
-                        val title = if (tp.sku.isNotBlank()) "${tp.sku} • ${tp.productName}" else tp.productName
-                        addKeyValueRow(
-                            binding.llTopProducts,
-                            "$title (Qty: $qtyStr)",
-                            String.format(Locale.US, "$%.2f", tp.amount)
-                        )
-                    }
-                }
+                latestSummary = api.getReportsSummary(session.selectedBranch, currentDateFilter)
+                renderCards()
             } catch (e: ApiException) {
                 if (e.statusCode == 401) {
                     redirectToLogin()
@@ -170,51 +313,39 @@ class ReportActivity : AppCompatActivity() {
         }
     }
 
-    private fun addEmptyLine(container: LinearLayout, msg: String) {
-        val tv = TextView(this).apply {
-            text = msg
-            setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.gray))
-            textSize = 13f
+    private fun renderCards() {
+        val filtered = reportDefs.filter { def ->
+            val matchCat = currentCategory == "Sales" || def.category == currentCategory
+            val matchQuery = currentQuery.isBlank() ||
+                def.title.contains(currentQuery, ignoreCase = true) ||
+                def.desc.contains(currentQuery, ignoreCase = true)
+            matchCat && matchQuery
         }
-        container.addView(tv)
-    }
 
-    private fun addKeyValueRow(container: LinearLayout, left: String, right: String) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            ).apply { bottomMargin = (6 * resources.displayMetrics.density).toInt() }
-        }
-        val tvLeft = TextView(this).apply {
-            text = left
-            setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.black))
-            textSize = 13f
-            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        }
-        val tvRight = TextView(this).apply {
-            text = right
-            setTextColor(ContextCompat.getColor(this@ReportActivity, R.color.primary_dark))
-            textSize = 13.5f
-            setTypeface(null, android.graphics.Typeface.BOLD)
-            setPadding((8 * resources.displayMetrics.density).toInt(), 0, 0, 0)
-        }
-        row.addView(tvLeft)
-        row.addView(tvRight)
-        container.addView(row)
-    }
+        binding.tvReportShowingCount.text = "Showing ${filtered.size} reports"
+        binding.llReportCards.removeAllViews()
+        val inflater = LayoutInflater.from(this)
+        for (def in filtered) {
+            val cb = ItemReportCardBinding.inflate(inflater, binding.llReportCards, false)
+            cb.tvReportTitle.text = def.title
+            cb.tvReportDesc.text = def.desc
+            cb.ivReportIcon.setImageResource(def.iconRes)
+            cb.flReportIconBg.backgroundTintList = ColorStateList.valueOf(Color.parseColor(def.iconBgHex))
+            cb.ivReportIcon.imageTintList = ColorStateList.valueOf(Color.parseColor(def.iconTintHex))
 
-    private fun attachEscClose(dialog: AlertDialog) {
-        dialog.setOnKeyListener { d, keyCode, event ->
-            if (event.action == KeyEvent.ACTION_UP &&
-                (keyCode == KeyEvent.KEYCODE_ESCAPE || keyCode == KeyEvent.KEYCODE_BACK)
-            ) {
-                d.dismiss()
-                true
-            } else {
-                false
+            val (badgeText, subText) = def.metricProvider(latestSummary)
+            cb.tvReportMetricBadge.text = badgeText
+            cb.tvReportMetricBadge.backgroundTintList = ColorStateList.valueOf(Color.parseColor(def.badgeBgHex))
+            cb.tvReportMetricBadge.setTextColor(Color.parseColor(def.badgeTextHex))
+            cb.tvReportSubMeta.text = subText
+
+            cb.root.setOnClickListener {
+                startActivity(
+                    Intent(this, MainActivity::class.java)
+                        .putExtra("extra_url", api.buildWebPortalUrl(def.webPath))
+                )
             }
+            binding.llReportCards.addView(cb.root)
         }
     }
 

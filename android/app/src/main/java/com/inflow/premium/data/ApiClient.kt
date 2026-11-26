@@ -382,6 +382,144 @@ class ApiClient(private val session: SessionManager) {
         )
     }
 
+    suspend fun getPurchaseOrders(query: String, statusFilter: String): PurchaseOrderListResult {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/purchases",
+            mapOf("q" to query, "status" to statusFilter, "limit" to "50")
+        )
+        val arr = json.optJSONArray("orders") ?: JSONArray()
+        val list = mutableListOf<PurchaseOrderListItem>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            list.add(
+                PurchaseOrderListItem(
+                    id = o.optInt("id"),
+                    orderNumber = o.optString("order_number", ""),
+                    orderDate = o.optString("order_date", ""),
+                    status = o.optString("status", "ISSUED"),
+                    paymentStatus = o.optString("payment_status", "UNPAID"),
+                    total = o.optDouble("total", 0.0),
+                    vendorName = o.optString("vendor_name", "Vendor"),
+                    isFulfilled = o.optBoolean("is_fulfilled", false),
+                    isPaid = o.optBoolean("is_paid", false)
+                )
+            )
+        }
+        return PurchaseOrderListResult(list, json.optInt("total_count", list.size))
+    }
+
+    suspend fun getPurchaseOrderDetail(poId: Int): PurchaseOrderDetail {
+        val json = requestJson("GET", "/api/mobile/purchases/$poId")
+        val o = json.getJSONObject("order")
+        val arr = o.optJSONArray("lines") ?: JSONArray()
+        val lines = mutableListOf<PurchaseOrderLine>()
+        for (i in 0 until arr.length()) {
+            val l = arr.getJSONObject(i)
+            lines.add(
+                PurchaseOrderLine(
+                    id = l.optInt("id"),
+                    sku = l.optString("sku", ""),
+                    productName = l.optString("product_name", ""),
+                    imageUrl = l.optString("image_url", ""),
+                    quantity = l.optDouble("quantity", 0.0),
+                    uom = l.optString("uom", "pcs."),
+                    unitPrice = l.optDouble("unit_price", 0.0),
+                    subtotal = l.optDouble("subtotal", 0.0)
+                )
+            )
+        }
+        return PurchaseOrderDetail(
+            id = o.optInt("id"),
+            orderNumber = o.optString("order_number", ""),
+            orderDate = o.optString("order_date", ""),
+            status = o.optString("status", "ISSUED"),
+            paymentStatus = o.optString("payment_status", "UNPAID"),
+            isFulfilled = o.optBoolean("is_fulfilled", false),
+            isPaid = o.optBoolean("is_paid", false),
+            vendorName = o.optString("vendor_name", "Vendor"),
+            locationName = o.optString("location_name", "Main Warehouse"),
+            assignedTo = o.optString("assigned_to", "Admin"),
+            totalAmount = o.optDouble("total_amount", 0.0),
+            paidAmount = o.optDouble("paid_amount", 0.0),
+            balanceDue = o.optDouble("balance_due", 0.0),
+            notes = o.optString("notes", ""),
+            lines = lines
+        )
+    }
+
+    suspend fun getCustomersCatalog(query: String, branchParam: String): CustomerCatalogResult {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/customers",
+            mapOf("q" to query, "branch" to branchParam, "limit" to "60")
+        )
+        val arr = json.optJSONArray("customers") ?: JSONArray()
+        val list = mutableListOf<CustomerCatalogItem>()
+        for (i in 0 until arr.length()) {
+            val c = arr.getJSONObject(i)
+            list.add(
+                CustomerCatalogItem(
+                    id = c.optInt("id"),
+                    name = c.optString("name", ""),
+                    contactName = c.optString("contact_name", ""),
+                    phone = c.optString("phone", ""),
+                    address = c.optString("address", ""),
+                    defaultPricingSchemeId = c.optInt("default_pricing_scheme_id", 100),
+                    isActive = c.optBoolean("is_active", true),
+                    openBalance = c.optDouble("open_balance", 0.0)
+                )
+            )
+        }
+        return CustomerCatalogResult(
+            customers = list,
+            totalCount = json.optInt("total_count", list.size),
+            totalDue = json.optDouble("total_due", 0.0)
+        )
+    }
+
+    suspend fun getCustomerDetail(customerId: Int): CustomerDetail {
+        val json = requestJson("GET", "/api/mobile/customers/$customerId")
+        val c = json.getJSONObject("customer")
+        val arr = c.optJSONArray("orders") ?: JSONArray()
+        val orders = mutableListOf<CustomerOrderHistoryItem>()
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            orders.add(
+                CustomerOrderHistoryItem(
+                    id = o.optInt("id"),
+                    orderNumber = o.optString("order_number", ""),
+                    orderDate = o.optString("order_date", ""),
+                    status = o.optString("status", "OPEN"),
+                    paymentStatus = o.optString("payment_status", "UNPAID"),
+                    totalAmount = o.optDouble("total_amount", 0.0),
+                    paidAmount = o.optDouble("paid_amount", 0.0),
+                    balanceDue = o.optDouble("balance_due", 0.0),
+                    locationName = o.optString("location_name", "Main Warehouse"),
+                    itemsSummary = o.optString("items_summary", ""),
+                    totalQty = o.optDouble("total_qty", 0.0)
+                )
+            )
+        }
+        return CustomerDetail(
+            id = c.optInt("id"),
+            name = c.optString("name", ""),
+            contactName = c.optString("contact_name", ""),
+            phone = c.optString("phone", ""),
+            email = c.optString("email", ""),
+            address = c.optString("address", ""),
+            pricingSchemeName = c.optString("pricing_scheme_name", "Retail 1"),
+            branchName = c.optString("branch_name", "Main Store (HQ)"),
+            paymentTerms = c.optString("payment_terms", "Due on Receipt"),
+            notes = c.optString("notes", ""),
+            isActive = c.optBoolean("is_active", true),
+            createdAt = c.optString("created_at", ""),
+            totalSpent = c.optDouble("total_spent", 0.0),
+            openBalance = c.optDouble("open_balance", 0.0),
+            orders = orders
+        )
+    }
+
     private fun parseOrderSummary(o: JSONObject): SalesOrderSummary {
         return SalesOrderSummary(
             id = o.optInt("id"),

@@ -102,8 +102,8 @@ class HomeActivity : AppCompatActivity() {
         binding.btnActionNewSo.setOnClickListener(openNewSo)
         binding.wfSalesOrder.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
 
-        binding.btnActionNewPo.setOnClickListener { openWebPath("/purchase-orders") }
-        binding.wfPo.setOnClickListener { openWebPath("/purchase-orders") }
+        binding.btnActionNewPo.setOnClickListener { openWebPath("/purchases/new") }
+        binding.wfPo.setOnClickListener { startActivity(Intent(this, PurchaseOrdersActivity::class.java)) }
 
         binding.btnActionAdjustStock.setOnClickListener { openWebPath("/inventory") }
         binding.btnActionTransferStock.setOnClickListener { openWebPath("/inventory") }
@@ -112,7 +112,7 @@ class HomeActivity : AppCompatActivity() {
         binding.cardKpiProducts.setOnClickListener { switchToTab(ProductsActivity::class.java) }
 
         binding.wfVendor.setOnClickListener { openWebPath("/vendors") }
-        binding.wfCustomer.setOnClickListener { openWebPath("/customers") }
+        binding.wfCustomer.setOnClickListener { startActivity(Intent(this, CustomersActivity::class.java)) }
         binding.wfExpenses.setOnClickListener { openWebPath("/expenses") }
         binding.wfReports.setOnClickListener { switchToTab(ReportActivity::class.java) }
         binding.wfTransfer.setOnClickListener { openWebPath("/inventory") }
@@ -180,8 +180,6 @@ class HomeActivity : AppCompatActivity() {
                 binding.tvMetaFulfillment.text = "📍 Fulfillment: ${dash.fulfillmentName}"
                 binding.tvMetaCatalog.text = "📦 Catalog: ${dash.totalProducts} Products"
                 binding.tvMetaBranches.text = "🏪 Branches: ${dash.activeBranchesCount} Active Outlets"
-                binding.tvEnterpriseTip.text =
-                    "💡 Enterprise Tip: Managing ${dash.storeName}. All sales orders, purchase shipments, expenses, and branch stocks deduct in real-time."
 
                 binding.tvKpiInvValue.text = "$${moneyFmt.format(dash.inventoryValuation)}"
                 binding.tvKpiProducts.text = "${dash.totalProducts} items"
