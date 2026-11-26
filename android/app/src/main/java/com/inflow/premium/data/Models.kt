@@ -134,7 +134,31 @@ data class ProductItem(
     val stockAvailable: Double
 )
 
+data class MonthlyChartPoint(
+    val label: String,
+    val monthLabel: String,
+    val paidSales: Double,
+    val openSales: Double,
+    val profit: Double
+)
+
+data class CategoryStockSlice(
+    val name: String,
+    val value: Double,
+    val pct: Double
+)
+
 data class DashboardSummary(
+    val storeName: String,
+    val storeBadge: String,
+    val fulfillmentName: String,
+    val activeBranchesCount: Int,
+    val inventoryValuation: Double,
+    val lowStockCount: Int,
+    val pendingPurchaseOrders: Int,
+    val monthSalesTotal: Double,
+    val monthPaidTotal: Double,
+    val totalReceivables: Double,
     val todayOrders: Int,
     val todayPaidTotal: Double,
     val paidCountToday: Int,
@@ -143,6 +167,8 @@ data class DashboardSummary(
     val totalOrders: Int,
     val totalProducts: Int,
     val khrRate: Double,
+    val monthlyChart: List<MonthlyChartPoint>,
+    val categoryStock: List<CategoryStockSlice>,
     val recentOrders: List<SalesOrderSummary>
 )
 

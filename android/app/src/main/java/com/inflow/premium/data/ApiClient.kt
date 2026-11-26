@@ -347,7 +347,43 @@ class ApiClient(private val session: SessionManager) {
         for (i in 0 until arr.length()) {
             recent.add(parseOrderSummary(arr.getJSONObject(i)))
         }
+        val mArr = json.optJSONArray("monthly_chart") ?: JSONArray()
+        val monthly = mutableListOf<MonthlyChartPoint>()
+        for (i in 0 until mArr.length()) {
+            val m = mArr.getJSONObject(i)
+            monthly.add(
+                MonthlyChartPoint(
+                    label = m.optString("label", ""),
+                    monthLabel = m.optString("month_label", ""),
+                    paidSales = m.optDouble("paid_sales", 0.0),
+                    openSales = m.optDouble("open_sales", 0.0),
+                    profit = m.optDouble("profit", 0.0)
+                )
+            )
+        }
+        val cArr = json.optJSONArray("category_stock") ?: JSONArray()
+        val categories = mutableListOf<CategoryStockSlice>()
+        for (i in 0 until cArr.length()) {
+            val c = cArr.getJSONObject(i)
+            categories.add(
+                CategoryStockSlice(
+                    name = c.optString("name", "Other"),
+                    value = c.optDouble("value", 0.0),
+                    pct = c.optDouble("pct", 0.0)
+                )
+            )
+        }
         return DashboardSummary(
+            storeName = json.optString("store_name", "Main Store (HQ)"),
+            storeBadge = json.optString("store_badge", "Enterprise HQ"),
+            fulfillmentName = json.optString("fulfillment_name", "Main Warehouse"),
+            activeBranchesCount = json.optInt("active_branches_count", 0),
+            inventoryValuation = json.optDouble("inventory_valuation", 0.0),
+            lowStockCount = json.optInt("low_stock_count", 0),
+            pendingPurchaseOrders = json.optInt("pending_purchase_orders", 0),
+            monthSalesTotal = json.optDouble("month_sales_total", 0.0),
+            monthPaidTotal = json.optDouble("month_paid_total", 0.0),
+            totalReceivables = json.optDouble("total_receivables", 0.0),
             todayOrders = json.optInt("today_orders", 0),
             todayPaidTotal = json.optDouble("today_paid_total", 0.0),
             paidCountToday = json.optInt("paid_count_today", 0),
@@ -356,6 +392,8 @@ class ApiClient(private val session: SessionManager) {
             totalOrders = json.optInt("total_orders", 0),
             totalProducts = json.optInt("total_products", 0),
             khrRate = json.optDouble("khr_rate", 4100.0),
+            monthlyChart = monthly,
+            categoryStock = categories,
             recentOrders = recent
         )
     }

@@ -671,8 +671,10 @@ def _resolve_date_clause(date_filter, alias='so'):
 @mobile_auth_required
 def mobile_dashboard():
     from routes.sales_orders import _is_main_admin, _get_user_branch_id, _get_khr_rates_context
+    from routes.reports import _get_line_cogs_sql_expr
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
+    user_role = session.get('role', 'main_admin')
     raw_branch = (request.args.get('branch') or '').strip().lower()
 
     where = ["NOT (so.customer_id IS NULL AND so.total_amount = 0)"]
@@ -697,12 +699,123 @@ def mobile_dashboard():
             ) as paid_count_today,
             COUNT(*) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')) as open_count,
             COALESCE(SUM(so.total_amount) FILTER (WHERE UPPER(so.status) IN ('OPEN', 'PICKED', 'PACKED', 'IN_PROGRESS')), 0) as open_amount,
+            COALESCE(SUM(so.total_amount) FILTER (
+                WHERE so.order_date >= date_trunc('month', CURRENT_DATE)
+                  AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ), 0) as month_sales_total,
+            COALESCE(SUM(so.total_amount) FILTER (
+                WHERE so.order_date >= date_trunc('month', CURRENT_DATE)
+                  AND (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID')
+                  AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ), 0) as month_paid_total,
+            COALESCE(SUM(so.balance_due) FILTER (
+                WHERE so.balance_due > 0 AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+            ), 0) as total_receivables,
             COUNT(*) FILTER (WHERE UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')) as total_orders
         FROM sales_orders so
         WHERE {' AND '.join(where)}
     """, tuple(params)) or {}
 
-    prod_row = query_one("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE") or {}
+    inv_kpis = query_one("""
+        SELECT
+            (SELECT COUNT(*) FROM products WHERE is_active = TRUE) as total_products,
+            (SELECT COALESCE(SUM(GREATEST(i.quantity, 0) * COALESCE(p.average_cost, p.standard_cost, 0)), 0)
+             FROM inventory i JOIN products p ON i.product_id = p.id) as total_inventory_value,
+            (SELECT COUNT(DISTINCT p.id)
+             FROM products p
+             LEFT JOIN (SELECT product_id, SUM(quantity) as total_qty FROM inventory GROUP BY product_id) inv ON p.id = inv.product_id
+             WHERE p.is_active = TRUE AND COALESCE(inv.total_qty, 0) <= p.reorder_point AND p.reorder_point > 0) as low_stock_count,
+            (SELECT COUNT(*) FROM purchase_orders WHERE status IN ('DRAFT', 'ISSUED', 'PARTIAL_RECEIVED')) as pending_purchase_orders,
+            (SELECT COUNT(*) FROM branches WHERE is_active = TRUE) as active_branches_count
+    """) or {}
+
+    eff_bid = int(raw_branch) if (is_main and raw_branch.isdigit()) else (user_bid if not is_main else None)
+    store_name = 'Main Store (HQ)'
+    store_badge = 'Enterprise HQ'
+    fulfillment_name = 'Main Warehouse'
+    if eff_bid:
+        b_row = query_one("""
+            SELECT b.name, b.code, l.name as location_name
+            FROM branches b LEFT JOIN locations l ON b.location_id = l.id
+            WHERE b.id = %s
+        """, (eff_bid,))
+        if b_row:
+            store_name = b_row['name']
+            store_badge = b_row.get('code') or 'Branch Outlet'
+            fulfillment_name = b_row.get('location_name') or 'Main Warehouse'
+    elif is_main and raw_branch == 'all':
+        store_name = 'All Outlets Combined'
+        store_badge = 'ALL'
+    else:
+        cwh = query_one("SELECT name FROM locations WHERE is_central = TRUE LIMIT 1") or query_one("SELECT name FROM locations WHERE is_default = TRUE LIMIT 1")
+        if cwh:
+            fulfillment_name = cwh['name']
+
+    default_costing_scheme = query_one("SELECT id FROM pricing_schemes WHERE name ILIKE '%%Branch Cost%%' LIMIT 1")
+    branch_cost_scheme_id = default_costing_scheme['id'] if default_costing_scheme else 107
+    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
+
+    monthly_rows = query_all(f"""
+        WITH order_costs AS (
+            SELECT
+                sol.sales_order_id,
+                COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            LEFT JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = {branch_cost_scheme_id}
+            GROUP BY sol.sales_order_id
+        )
+        SELECT
+            TO_CHAR(so.order_date, 'Mon') as short_label,
+            TO_CHAR(so.order_date, 'Mon YY') as month_label,
+            date_trunc('month', so.order_date) as month_date,
+            COALESCE(SUM(CASE WHEN UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID' THEN so.total_amount ELSE 0 END), 0) as paid_sales,
+            COALESCE(SUM(CASE WHEN (UPPER(so.status) = 'OPEN' OR so.balance_due > 0) AND NOT (UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID') THEN so.total_amount ELSE 0 END), 0) as open_sales,
+            COALESCE(SUM(CASE WHEN UPPER(so.status) IN ('PAID', 'INVOICED', 'SHIPPED') OR UPPER(so.payment_status) = 'PAID' THEN (so.total_amount - COALESCE(oc.total_cogs, 0)) ELSE 0 END), 0) as paid_profit
+        FROM sales_orders so
+        LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
+        WHERE {' AND '.join(where)}
+          AND UPPER(so.status) NOT IN ('CANCELLED', 'CANCELED', 'QUOTE')
+          AND so.order_date >= CURRENT_DATE - INTERVAL '11 months'
+        GROUP BY date_trunc('month', so.order_date), TO_CHAR(so.order_date, 'Mon'), TO_CHAR(so.order_date, 'Mon YY')
+        ORDER BY month_date ASC
+    """, tuple(params))
+
+    show_profit = user_role not in ('branch_admin', 'branch_cashier')
+    monthly_chart = [
+        {
+            'label': r['short_label'],
+            'month_label': r['month_label'],
+            'paid_sales': round(float(r.get('paid_sales') or 0), 2),
+            'open_sales': round(float(r.get('open_sales') or 0), 2),
+            'profit': round(float(r.get('paid_profit') or 0), 2) if show_profit else 0.0,
+        }
+        for r in monthly_rows
+    ]
+
+    cat_rows = query_all("""
+        SELECT
+            COALESCE(c.name, 'Other') as category_name,
+            COALESCE(SUM(GREATEST(i.quantity, 0) * COALESCE(p.average_cost, p.standard_cost, 0)), 0) as total_value
+        FROM categories c
+        RIGHT JOIN products p ON c.id = p.category_id
+        LEFT JOIN inventory i ON p.id = i.product_id
+        WHERE p.is_active = TRUE
+        GROUP BY c.name
+        HAVING COALESCE(SUM(GREATEST(i.quantity, 0) * COALESCE(p.average_cost, p.standard_cost, 0)), 0) > 0
+        ORDER BY total_value DESC
+        LIMIT 7
+    """)
+    total_cat_val = sum(float(r.get('total_value') or 0) for r in cat_rows) or 1.0
+    category_stock = [
+        {
+            'name': r['category_name'],
+            'value': round(float(r.get('total_value') or 0), 2),
+            'pct': round((float(r.get('total_value') or 0) / total_cat_val) * 100.0, 1),
+        }
+        for r in cat_rows
+    ]
 
     recent_rows = query_all(f"""
         SELECT
@@ -745,19 +858,30 @@ def mobile_dashboard():
         d['delivery_fee_khr'] = float(d.get('delivery_fee_khr') or 0)
         recent.append(d)
 
-    eff_bid = int(raw_branch) if (is_main and raw_branch.isdigit()) else (user_bid if not is_main else None)
     khr_ctx = _get_khr_rates_context(eff_bid)
 
     return jsonify({
         'success': True,
+        'store_name': store_name,
+        'store_badge': store_badge,
+        'fulfillment_name': fulfillment_name,
+        'active_branches_count': int(inv_kpis.get('active_branches_count') or 0),
+        'inventory_valuation': float(inv_kpis.get('total_inventory_value') or 0),
+        'low_stock_count': int(inv_kpis.get('low_stock_count') or 0),
+        'pending_purchase_orders': int(inv_kpis.get('pending_purchase_orders') or 0),
+        'month_sales_total': float(stats.get('month_sales_total') or 0),
+        'month_paid_total': float(stats.get('month_paid_total') or 0),
+        'total_receivables': float(stats.get('total_receivables') or 0),
         'today_orders': int(stats.get('today_orders') or 0),
         'today_paid_total': float(stats.get('today_paid_total') or 0),
         'paid_count_today': int(stats.get('paid_count_today') or 0),
         'open_count': int(stats.get('open_count') or 0),
         'open_amount': float(stats.get('open_amount') or 0),
         'total_orders': int(stats.get('total_orders') or 0),
-        'total_products': int(prod_row.get('cnt') or 0),
+        'total_products': int(inv_kpis.get('total_products') or 0),
         'khr_rate': float(khr_ctx.get('default_khr_rate') or 4100),
+        'monthly_chart': monthly_chart,
+        'category_stock': category_stock,
         'recent_orders': recent,
     })
 

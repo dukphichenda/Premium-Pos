@@ -56,6 +56,10 @@ class TestMobileApi(unittest.TestCase):
         dash = res_dash.get_json()
         self.assertTrue(dash['success'])
         self.assertIn('today_orders', dash)
+        self.assertIn('inventory_valuation', dash)
+        self.assertIn('month_sales_total', dash)
+        self.assertIn('monthly_chart', dash)
+        self.assertIn('category_stock', dash)
         self.assertIn('recent_orders', dash)
 
         res_rep = self.client.get('/api/mobile/reports/summary?branch=main&date_filter=Today', headers=self.headers)
