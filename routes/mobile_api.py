@@ -1338,6 +1338,300 @@ def mobile_reports_summary():
     })
 
 
+@mobile_api_bp.route('/api/mobile/reports/profit', methods=['GET'])
+@mobile_auth_required
+def mobile_report_profit():
+    """Sales Order Profit Report matching /reports/view/sales-order-profit."""
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    from routes.reports import _get_line_cogs_sql_expr
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
+    raw_branch = (request.args.get('branch') or 'main').strip()
+    date_filter = (request.args.get('date_filter') or 'This Month').strip()
+    q = (request.args.get('q') or '').strip()
+
+    where = ["so.status != 'CANCELLED'"]
+    params = []
+    b_clause, b_params = _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so')
+    if b_clause:
+        where.append(b_clause)
+        params.extend(b_params)
+    d_clause = _resolve_date_clause(date_filter, alias='so')
+    if d_clause:
+        where.append(d_clause)
+    if q:
+        sp = f"%{q}%"
+        where.append("(so.order_number ILIKE %s OR COALESCE(c.name, '') ILIKE %s OR CAST(COALESCE(so.total_amount, 0) AS TEXT) ILIKE %s)")
+        params.extend([sp, sp, sp])
+
+    where_sql = " AND ".join(where)
+    line_cogs_sql = _get_line_cogs_sql_expr('sol', 'p', pp_alias='pp_bc', so_alias='so')
+
+    rows = query_all(f"""
+        WITH order_costs AS (
+            SELECT sol.sales_order_id,
+                   COALESCE(SUM({line_cogs_sql}), 0) as total_cogs
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            LEFT JOIN products p ON sol.product_id = p.id
+            LEFT JOIN product_prices pp_bc ON pp_bc.product_id = p.id AND pp_bc.pricing_scheme_id = 107
+            GROUP BY sol.sales_order_id
+        )
+        SELECT so.id, so.order_number, so.order_date, so.status, so.payment_status,
+               COALESCE(so.payment_method, '') as payment_method,
+               COALESCE(c.name, 'Walk-in Customer') as customer_name,
+               COALESCE(so.total_amount, 0) as total_sales,
+               COALESCE(oc.total_cogs, 0) as total_cost,
+               (COALESCE(so.total_amount, 0) - COALESCE(oc.total_cogs, 0)) as gross_profit
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        LEFT JOIN order_costs oc ON so.id = oc.sales_order_id
+        WHERE {where_sql}
+        ORDER BY so.order_date DESC, so.id DESC
+        LIMIT 60
+    """, tuple(params))
+
+    total_sales = sum(float(r['total_sales'] or 0) for r in rows)
+    total_cost = sum(float(r['total_cost'] or 0) for r in rows)
+    gross_profit = total_sales - total_cost
+    margin_pct = (gross_profit / total_sales * 100.0) if total_sales > 0 else 0.0
+    paid_count = sum(1 for r in rows if (r.get('payment_status') or '').upper() == 'PAID' or (r.get('status') or '').upper() == 'PAID')
+
+    return jsonify({
+        'success': True,
+        'date_filter': date_filter,
+        'total_orders': len(rows),
+        'paid_count': paid_count,
+        'total_sales': round(total_sales, 2),
+        'total_cost': round(total_cost, 2),
+        'gross_profit': round(gross_profit, 2),
+        'margin_pct': round(margin_pct, 1),
+        'orders': [
+            {
+                'id': r['id'],
+                'order_number': r['order_number'],
+                'order_date': r['order_date'].strftime('%d-%b-%y') if r.get('order_date') else '',
+                'customer_name': r['customer_name'],
+                'payment_method': r['payment_method'] or 'Cash',
+                'is_paid': (r.get('payment_status') or '').upper() == 'PAID' or (r.get('status') or '').upper() == 'PAID',
+                'sales': float(r['total_sales'] or 0),
+                'cost': float(r['total_cost'] or 0),
+                'profit': float(r['gross_profit'] or 0),
+            }
+            for r in rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/reports/delivery', methods=['GET'])
+@mobile_auth_required
+def mobile_report_delivery():
+    """Delivery Person Assign report matching /reports/view/delivery-person-assign."""
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
+    raw_branch = (request.args.get('branch') or 'main').strip()
+    date_filter = (request.args.get('date_filter') or 'This Month').strip()
+    q = (request.args.get('q') or '').strip()
+
+    where = ["so.status != 'CANCELLED'"]
+    params = []
+    b_clause, b_params = _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so')
+    if b_clause:
+        where.append(b_clause)
+        params.extend(b_params)
+    d_clause = _resolve_date_clause(date_filter, alias='so')
+    if d_clause:
+        where.append(d_clause)
+    if q:
+        sp = f"%{q}%"
+        where.append("(so.order_number ILIKE %s OR COALESCE(c.name, '') ILIKE %s OR COALESCE(so.shipping_address, '') ILIKE %s)")
+        params.extend([sp, sp, sp])
+
+    where_sql = " AND ".join(where)
+
+    totals = query_one(f"""
+        SELECT COUNT(*) as total_orders,
+               COALESCE(SUM(so.total_amount), 0) as total_sales,
+               COALESCE(COUNT(CASE WHEN so.delivery_man IS NOT NULL AND TRIM(so.delivery_man) != '' THEN 1 END), 0) as assigned_count,
+               COALESCE(COUNT(CASE WHEN so.delivery_man IS NULL OR TRIM(so.delivery_man) = '' THEN 1 END), 0) as unassigned_count
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE {where_sql}
+    """, tuple(params)) or {}
+
+    rows = query_all(f"""
+        SELECT so.id, so.order_number, so.order_date, so.status, so.payment_status,
+               COALESCE(so.payment_method, '') as payment_method,
+               COALESCE(so.total_amount, 0) as total_amount,
+               COALESCE(so.delivery_man, '') as delivery_man,
+               COALESCE(so.phone, c.phone, '') as phone,
+               COALESCE(NULLIF(so.shipping_address, ''), c.shipping_address, '') as address,
+               COALESCE(c.name, 'Walk-in Customer') as customer_name
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE {where_sql}
+        ORDER BY so.order_date DESC, so.id DESC
+        LIMIT 60
+    """, tuple(params))
+
+    return jsonify({
+        'success': True,
+        'date_filter': date_filter,
+        'total_orders': int(totals.get('total_orders') or 0),
+        'total_sales': float(totals.get('total_sales') or 0),
+        'assigned_count': int(totals.get('assigned_count') or 0),
+        'unassigned_count': int(totals.get('unassigned_count') or 0),
+        'orders': [
+            {
+                'id': r['id'],
+                'order_number': r['order_number'],
+                'order_date': r['order_date'].strftime('%d-%b-%y') if r.get('order_date') else '',
+                'total_amount': float(r['total_amount'] or 0),
+                'is_paid': (r.get('payment_status') or '').upper() == 'PAID' or (r.get('status') or '').upper() == 'PAID',
+                'payment_method': r['payment_method'] or 'Cash',
+                'customer_name': r['customer_name'],
+                'phone': r['phone'],
+                'address': r['address'],
+                'delivery_man': r['delivery_man'],
+            }
+            for r in rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/reports/delivery/assign', methods=['POST'])
+@mobile_auth_required
+def mobile_report_delivery_assign():
+    """Assign delivery rider to a Sales Order from Delivery Assign report."""
+    data = request.get_json(silent=True) or {}
+    order_id = int(data.get('order_id') or 0)
+    delivery_man = (data.get('delivery_man') or '').strip()
+    if order_id <= 0:
+        return jsonify({'success': False, 'error': 'Invalid order_id'}), 400
+    execute("UPDATE sales_orders SET delivery_man = %s WHERE id = %s", (delivery_man, order_id))
+    return jsonify({'success': True, 'order_id': order_id, 'delivery_man': delivery_man})
+
+
+@mobile_api_bp.route('/api/mobile/reports/branch-summary', methods=['GET'])
+@mobile_auth_required
+def mobile_report_branch_summary():
+    """Branch Sales Summary & HQ Branch Earnings data."""
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
+    raw_branch = (request.args.get('branch') or 'all').strip()
+    date_filter = (request.args.get('date_filter') or 'This Month').strip()
+    q = (request.args.get('q') or '').strip()
+    mode = (request.args.get('mode') or 'branch').strip()
+
+    where = ["so.status != 'CANCELLED'"]
+    params = []
+    b_clause, b_params = _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so')
+    if b_clause:
+        where.append(b_clause)
+        params.extend(b_params)
+    d_clause = _resolve_date_clause(date_filter, alias='so')
+    if d_clause:
+        where.append(d_clause)
+    if q:
+        sp = f"%{q}%"
+        where.append("(p.sku ILIKE %s OR p.name ILIKE %s OR COALESCE(c.name, '') ILIKE %s)")
+        params.extend([sp, sp, sp])
+
+    where_sql = " AND ".join(where)
+    cost_unit_expr = """
+        CASE
+            WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0 AND p.sales_uom_ratio_std > 1
+                THEN (pp.unit_price / p.sales_uom_ratio_std)
+            WHEN pp.unit_price IS NOT NULL AND pp.unit_price > 0
+                THEN pp.unit_price
+            WHEN p.costing_method = 'Average' AND p.average_cost IS NOT NULL AND p.average_cost > 0
+                THEN p.average_cost
+            WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0
+                THEN p.standard_cost
+            WHEN p.average_cost IS NOT NULL AND p.average_cost > 0
+                THEN p.average_cost
+            ELSE 0
+        END
+    """
+    hq_cost_unit_expr = """
+        CASE
+            WHEN p.costing_method = 'Average' AND p.average_cost IS NOT NULL AND p.average_cost > 0
+                THEN p.average_cost
+            WHEN p.standard_cost IS NOT NULL AND p.standard_cost > 0
+                THEN p.standard_cost
+            WHEN p.average_cost IS NOT NULL AND p.average_cost > 0
+                THEN p.average_cost
+            ELSE 0
+        END
+    """
+
+    order_col = "hq_earning DESC" if mode == 'hq' else "sales_amount DESC"
+    rows = query_all(f"""
+        SELECT p.id, p.sku, p.name as product_name,
+               COALESCE(c.name, 'General') as category_name,
+               COALESCE(p.uom, 'pcs.') as uom,
+               COALESCE(p.sales_uom, 'case') as sales_uom,
+               COALESCE(p.sales_uom_ratio_std, 1.0) as ratio,
+               COALESCE(SUM(sol.quantity), 0) as qty_sold,
+               COALESCE(SUM(sol.subtotal), 0) as sales_amount,
+               COALESCE(SUM(sol.quantity * ({cost_unit_expr})), 0) as branch_cost,
+               COALESCE(SUM(sol.subtotal - (sol.quantity * ({cost_unit_expr}))), 0) as branch_profit,
+               COALESCE(SUM(sol.quantity * ({hq_cost_unit_expr})), 0) as hq_cost,
+               COALESCE(SUM((sol.quantity * ({cost_unit_expr})) - (sol.quantity * ({hq_cost_unit_expr}))), 0) as hq_earning
+        FROM sales_order_lines sol
+        JOIN sales_orders so ON sol.sales_order_id = so.id
+        JOIN products p ON sol.product_id = p.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN product_prices pp ON pp.product_id = p.id AND pp.pricing_scheme_id = 107
+        WHERE {where_sql}
+        GROUP BY p.id, p.sku, p.name, c.name, p.uom, p.sales_uom, p.sales_uom_ratio_std
+        ORDER BY {order_col}
+        LIMIT 60
+    """, tuple(params))
+
+    total_sales = sum(float(r['sales_amount'] or 0) for r in rows)
+    total_branch_cost = sum(float(r['branch_cost'] or 0) for r in rows)
+    total_branch_profit = sum(float(r['branch_profit'] or 0) for r in rows)
+    total_hq_cost = sum(float(r['hq_cost'] or 0) for r in rows)
+    total_hq_earning = sum(float(r['hq_earning'] or 0) for r in rows)
+    total_qty = sum(float(r['qty_sold'] or 0) for r in rows)
+
+    return jsonify({
+        'success': True,
+        'date_filter': date_filter,
+        'mode': mode,
+        'total_sales': round(total_sales, 2),
+        'total_branch_cost': round(total_branch_cost, 2),
+        'total_branch_profit': round(total_branch_profit, 2),
+        'total_hq_cost': round(total_hq_cost, 2),
+        'total_hq_earning': round(total_hq_earning, 2),
+        'total_qty': round(total_qty, 2),
+        'items': [
+            {
+                'id': r['id'],
+                'sku': r['sku'],
+                'product_name': r['product_name'],
+                'category_name': r['category_name'],
+                'uom': r['uom'],
+                'sales_uom': r['sales_uom'],
+                'ratio': float(r['ratio'] or 1.0),
+                'qty_sold': float(r['qty_sold'] or 0),
+                'sales_amount': float(r['sales_amount'] or 0),
+                'branch_cost': float(r['branch_cost'] or 0),
+                'branch_profit': float(r['branch_profit'] or 0),
+                'hq_cost': float(r['hq_cost'] or 0),
+                'hq_earning': float(r['hq_earning'] or 0),
+            }
+            for r in rows
+        ],
+    })
+
+
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
 def mobile_web_handoff():
     """Authenticate a mobile WebView session using a valid Bearer/query token and redirect to an internal page."""
