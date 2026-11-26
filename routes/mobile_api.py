@@ -704,11 +704,10 @@ def mobile_purchase_detail(pid):
         SELECT po.*,
                COALESCE(v.name, 'Unknown Vendor') as vendor_name,
                COALESCE(l.name, 'Main Warehouse') as location_name,
-               COALESCE(u.username, 'Admin') as assigned_to
+               'Admin' as assigned_to
         FROM purchase_orders po
         LEFT JOIN vendors v ON po.vendor_id = v.id
         LEFT JOIN locations l ON po.location_id = l.id
-        LEFT JOIN users u ON po.created_by = u.id
         WHERE po.id = %s
     """, (pid,))
     if not po:
