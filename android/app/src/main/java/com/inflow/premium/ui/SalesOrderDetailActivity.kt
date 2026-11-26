@@ -14,6 +14,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -93,6 +94,18 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
         setupToolbar()
         setupListeners()
+        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.SO)
+        EdgeToEdgeHelper.apply(
+            activity = this,
+            rootView = binding.root,
+            topContentView = binding.topHeader,
+            topScrimView = binding.topScrim,
+            bottomNavContainer = binding.bottomDockGroup,
+            bottomScrimView = binding.bottomScrim,
+            scrollableView = binding.scrollDetail,
+            extraTopDp = 2,
+            extraBottomScrollDp = 220
+        )
 
         if (orderId > 0) {
             loadOrderDetail()
@@ -102,28 +115,44 @@ class SalesOrderDetailActivity : AppCompatActivity() {
     }
 
     private fun setupToolbar() {
-        binding.toolbar.setNavigationOnClickListener { finish() }
-        binding.toolbar.inflateMenu(R.menu.menu_sales_order_detail)
-        binding.toolbar.setOnMenuItemClickListener { item ->
-            when (item.itemId) {
-                R.id.action_print -> {
-                    openPrintPreview()
-                    true
-                }
-                R.id.action_print_label -> {
-                    openLabelPrintPreview()
-                    true
-                }
-                R.id.action_share -> {
-                    shareOrder()
-                    true
-                }
-                R.id.action_cancel_order -> {
-                    confirmCancelOrder()
-                    true
-                }
-                else -> false
+        binding.btnDetailBack.setOnClickListener { finish() }
+        binding.btnDetailRefresh.setOnClickListener {
+            if (orderId > 0) {
+                loadOrderDetail()
+            } else {
+                Toast.makeText(this, "New draft order", Toast.LENGTH_SHORT).show()
             }
+        }
+        binding.btnDetailMore.setOnClickListener { anchor ->
+            val popup = PopupMenu(this, anchor)
+            val editable = isEditable()
+            val canPrintLabel = orderId > 0 && (labelPrintUrl.isNotBlank() || printUrl.isNotBlank())
+            if (orderId > 0 && printUrl.isNotBlank()) {
+                popup.menu.add(0, 1, 1, "Print Invoice")
+            }
+            if (canPrintLabel) {
+                popup.menu.add(0, 2, 2, "Print Delivery Label")
+            }
+            if (orderId > 0) {
+                popup.menu.add(0, 3, 3, "Share / Telegram")
+            }
+            if (orderId > 0 && editable) {
+                popup.menu.add(0, 4, 4, "Cancel Order")
+            }
+            if (popup.menu.size() == 0) {
+                Toast.makeText(this, "Save the order first for print & share", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            popup.setOnMenuItemClickListener { item ->
+                when (item.itemId) {
+                    1 -> openPrintPreview()
+                    2 -> openLabelPrintPreview()
+                    3 -> shareOrder()
+                    4 -> confirmCancelOrder()
+                }
+                true
+            }
+            popup.show()
         }
     }
 
@@ -134,6 +163,12 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         }
         binding.btnSchemeSelect.setOnClickListener { if (isEditable()) showSchemePicker() }
         binding.btnSelectCustomer.setOnClickListener { if (isEditable()) openCustomerPicker() }
+        binding.tvSelectedCustomer.setOnClickListener { if (isEditable()) openCustomerPicker() }
+        binding.btnToggleCustEdit.setOnClickListener {
+            val isShown = binding.llCustomerEditFields.visibility == View.VISIBLE
+            binding.llCustomerEditFields.visibility = if (isShown) View.GONE else View.VISIBLE
+            binding.btnToggleCustEdit.text = if (isShown) "Edit" else "Done"
+        }
         binding.btnCallCustomer.setOnClickListener {
             val phone = binding.etPhone.text?.toString()?.trim().orEmpty()
             if (phone.isNotBlank()) {
@@ -144,11 +179,60 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.btnDeliveryMan.setOnClickListener { if (isEditable()) showDeliveryManPicker() }
         binding.btnPrintDeliveryLabel.setOnClickListener { openLabelPrintPreview() }
 
+        binding.btnDockNew.setOnClickListener { resetToNewOrder() }
+        binding.btnDockCopy.setOnClickListener { copyCurrentOrder() }
+        binding.btnDockPreview.setOnClickListener { openPrintPreview() }
+        binding.btnDockExportJpg.setOnClickListener { openExportJpg() }
+        binding.btnDockDelete.setOnClickListener { confirmCancelOrder() }
+
         binding.etDeliveryFee.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
             override fun afterTextChanged(s: Editable?) { recalculateTotals() }
         })
+    }
+
+    private fun resetToNewOrder() {
+        orderId = 0
+        orderNumber = "New Sales Order"
+        customerId = null
+        customerName = ""
+        deliveryMan = ""
+        printUrl = ""
+        labelPrintUrl = ""
+        telegramUrl = ""
+        shareCaption = ""
+        lines.clear()
+        binding.tvSelectedCustomer.text = "Tap 'Change' to choose customer"
+        binding.tvCustomerAddressSummary.text = ""
+        binding.tvCustomerAddressSummary.visibility = View.GONE
+        binding.etContact.setText("")
+        binding.etPhone.setText("")
+        binding.etAddress.setText("")
+        binding.etDeliveryFee.setText("0")
+        binding.etNotes.setText("")
+        initNewOrderDefaults()
+        Toast.makeText(this, "Started new draft Sales Order", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun copyCurrentOrder() {
+        orderId = 0
+        orderNumber = "Copy • Draft"
+        status = "OPEN"
+        paymentStatus = "UNPAID"
+        isPaid = false
+        orderDate = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
+        printUrl = ""
+        labelPrintUrl = ""
+        telegramUrl = ""
+        shareCaption = ""
+        val copied = lines.map { it.copy(id = 0) }
+        lines.clear()
+        lines.addAll(copied)
+        renderHeaderAndActions()
+        renderLines()
+        recalculateTotals()
+        Toast.makeText(this, "Copied to new draft — tap Save to create", Toast.LENGTH_SHORT).show()
     }
 
     private fun initNewOrderDefaults() {
@@ -232,7 +316,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
     }
 
     private fun renderHeaderAndActions() {
-        binding.toolbar.title = if (orderId > 0) orderNumber else "New Sales Order"
+        binding.tvDetailTitle.text = if (orderId > 0) orderNumber else "New Sales Order"
         binding.btnOrderDate.text = orderDate
 
         val branchLabel = if (branchId == null || branchId == 0) {
@@ -248,7 +332,12 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.btnDeliveryMan.text = if (deliveryMan.isBlank()) "Delivery: Unassigned" else "Delivery: $deliveryMan"
 
         val phone = binding.etPhone.text?.toString()?.trim().orEmpty()
+        binding.btnCallCustomer.text = phone
         binding.btnCallCustomer.visibility = if (phone.isNotBlank()) View.VISIBLE else View.GONE
+
+        val addr = binding.etAddress.text?.toString()?.trim().orEmpty()
+        binding.tvCustomerAddressSummary.text = addr
+        binding.tvCustomerAddressSummary.visibility = if (addr.isNotBlank()) View.VISIBLE else View.GONE
 
         val isCancelled = status.equals("CANCELLED", ignoreCase = true) || status.equals("CANCELED", ignoreCase = true)
         val (badgeLabel, fgRes, bgRes) = when {
@@ -265,7 +354,8 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.btnOrderDate.isEnabled = editable
         binding.btnBranchSelect.isEnabled = editable && session.isMainAdmin()
         binding.btnSchemeSelect.isEnabled = editable
-        binding.btnSelectCustomer.isEnabled = editable
+        binding.btnSelectCustomer.visibility = if (editable) View.VISIBLE else View.GONE
+        binding.btnToggleCustEdit.visibility = if (editable) View.VISIBLE else View.GONE
         binding.etContact.isEnabled = editable
         binding.etPhone.isEnabled = editable
         binding.etAddress.isEnabled = editable
@@ -275,11 +365,8 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.etNotes.isEnabled = editable
 
         val canPrintLabel = orderId > 0 && (labelPrintUrl.isNotBlank() || printUrl.isNotBlank())
-        binding.toolbar.menu.findItem(R.id.action_print)?.isVisible = orderId > 0 && printUrl.isNotBlank()
-        binding.toolbar.menu.findItem(R.id.action_print_label)?.isVisible = canPrintLabel
         binding.btnPrintDeliveryLabel.visibility = if (canPrintLabel) View.VISIBLE else View.GONE
-        binding.toolbar.menu.findItem(R.id.action_share)?.isVisible = orderId > 0
-        binding.toolbar.menu.findItem(R.id.action_cancel_order)?.isVisible = orderId > 0 && editable
+        binding.btnDockDelete.visibility = if (orderId > 0 && editable) View.VISIBLE else View.GONE
 
         when {
             isPaid -> {
@@ -304,9 +391,9 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                 binding.btnActionLeft.text = "Save"
                 binding.btnActionLeft.setOnClickListener { saveOrder(markCompletePay = false) }
 
-                binding.btnActionRight.text = "Complete & Pay"
+                binding.btnActionRight.text = "Complete & Pay ›"
                 binding.btnActionRight.backgroundTintList =
-                    ColorStateList.valueOf(ContextCompat.getColor(this, R.color.paid_green))
+                    ColorStateList.valueOf(android.graphics.Color.parseColor("#0A6C62"))
                 binding.btnActionRight.setOnClickListener { showPaymentMethodDialog() }
             }
         }
@@ -924,7 +1011,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
     private fun openPrintPreview() {
         if (orderId <= 0 || printUrl.isBlank()) {
-            Toast.makeText(this, "Save the order first to print", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Save the order first to preview", Toast.LENGTH_SHORT).show()
             return
         }
         startActivity(
@@ -933,6 +1020,21 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                 .putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, printUrl)
                 .putExtra(InvoicePrintActivity.EXTRA_TELEGRAM_URL, telegramUrl)
                 .putExtra(InvoicePrintActivity.EXTRA_SHARE_CAPTION, shareCaption)
+        )
+    }
+
+    private fun openExportJpg() {
+        if (orderId <= 0 || printUrl.isBlank()) {
+            Toast.makeText(this, "Save the order first to export JPG", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(this, InvoicePrintActivity::class.java)
+                .putExtra(InvoicePrintActivity.EXTRA_ORDER_NUMBER, orderNumber)
+                .putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, printUrl)
+                .putExtra(InvoicePrintActivity.EXTRA_TELEGRAM_URL, telegramUrl)
+                .putExtra(InvoicePrintActivity.EXTRA_SHARE_CAPTION, shareCaption)
+                .putExtra(InvoicePrintActivity.EXTRA_AUTO_EXPORT_JPG, true)
         )
     }
 
