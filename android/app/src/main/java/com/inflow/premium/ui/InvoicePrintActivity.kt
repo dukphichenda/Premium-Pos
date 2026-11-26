@@ -2,23 +2,17 @@ package com.inflow.premium.ui
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.net.Uri
 import android.os.Bundle
 import android.print.PrintAttributes
 import android.print.PrintManager
-import android.view.View
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.FileProvider
 import com.inflow.premium.data.SessionManager
 import com.inflow.premium.databinding.ActivityInvoicePrintBinding
-import java.io.File
-import java.io.FileOutputStream
 
 class InvoicePrintActivity : AppCompatActivity() {
 
@@ -28,24 +22,26 @@ class InvoicePrintActivity : AppCompatActivity() {
     private var printUrl: String = ""
     private var telegramUrl: String = ""
     private var shareCaption: String = ""
-    private var autoExportJpg: Boolean = false
-    private var hasAutoExported: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WebView.enableSlowWholeDocumentDraw()
         binding = ActivityInvoicePrintBinding.inflate(layoutInflater)
         setContentView(binding.root)
         session = SessionManager(this)
 
         orderNumber = intent.getStringExtra(EXTRA_ORDER_NUMBER) ?: "Invoice"
         val rawPrintUrl = intent.getStringExtra(EXTRA_PRINT_URL).orEmpty()
-        printUrl = if (rawPrintUrl.startsWith("http")) rawPrintUrl else "${session.baseUrl}$rawPrintUrl"
+        val autoExportJpg = intent.getBooleanExtra(EXTRA_AUTO_EXPORT_JPG, false)
+        val basePrintUrl = if (rawPrintUrl.startsWith("http")) rawPrintUrl else "${session.baseUrl}$rawPrintUrl"
+        printUrl = if (autoExportJpg && basePrintUrl.isNotBlank() && !basePrintUrl.contains("autojpg=1")) {
+            if (basePrintUrl.contains("?")) "$basePrintUrl&autojpg=1" else "$basePrintUrl?autojpg=1"
+        } else {
+            basePrintUrl
+        }
         telegramUrl = intent.getStringExtra(EXTRA_TELEGRAM_URL).orEmpty()
         shareCaption = intent.getStringExtra(EXTRA_SHARE_CAPTION).orEmpty()
         val customTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
         val customPrintBtnText = intent.getStringExtra(EXTRA_PRINT_BTN_TEXT).orEmpty()
-        autoExportJpg = intent.getBooleanExtra(EXTRA_AUTO_EXPORT_JPG, false)
 
         binding.toolbar.title = customTitle.ifBlank { "Invoice • $orderNumber" }
         if (customPrintBtnText.isNotBlank()) {
@@ -61,17 +57,23 @@ class InvoicePrintActivity : AppCompatActivity() {
             builtInZoomControls = true
             displayZoomControls = false
         }
+        binding.webInvoice.addJavascriptInterface(
+            GallerySaver.AndroidGalleryBridge(this) { ok, info ->
+                val msg = if (ok) "Saved $info to Gallery!" else "Export failed: $info"
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            },
+            "AndroidGalleryBridge"
+        )
+        binding.webInvoice.setDownloadListener { url, _, _, _, _ ->
+            if (url != null && url.startsWith("data:image/")) {
+                val (ok, info) = GallerySaver.saveDataUrlToGallery(this, "Invoice_$orderNumber.jpg", url)
+                val msg = if (ok) "Saved $info to Gallery!" else "Export failed: $info"
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+            }
+        }
         binding.webInvoice.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 return false
-            }
-
-            override fun onPageFinished(view: WebView?, url: String?) {
-                super.onPageFinished(view, url)
-                if (autoExportJpg && !hasAutoExported) {
-                    hasAutoExported = true
-                    binding.webInvoice.postDelayed({ exportInvoiceJpg() }, 500)
-                }
             }
         }
 
@@ -83,40 +85,6 @@ class InvoicePrintActivity : AppCompatActivity() {
 
         binding.btnShareInvoice.setOnClickListener { shareInvoice() }
         binding.btnPrintInvoice.setOnClickListener { printWebPage() }
-    }
-
-    private fun exportInvoiceJpg() {
-        try {
-            val w = binding.webInvoice.width.coerceAtLeast(720)
-            @Suppress("DEPRECATION")
-            val contentH = (binding.webInvoice.contentHeight * binding.webInvoice.scale).toInt()
-            val h = contentH.coerceAtLeast(binding.webInvoice.height).coerceIn(400, 4200)
-            binding.webInvoice.measure(
-                View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY)
-            )
-            val bitmap = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(android.graphics.Color.WHITE)
-            binding.webInvoice.draw(canvas)
-
-            val file = File(cacheDir, "${orderNumber.replace(" ", "_")}.jpg")
-            FileOutputStream(file).use { out ->
-                bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)
-            }
-            bitmap.recycle()
-
-            val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
-            val share = Intent(Intent.ACTION_SEND).apply {
-                type = "image/jpeg"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                putExtra(Intent.EXTRA_TEXT, shareCaption.ifBlank { "Invoice $orderNumber" })
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            startActivity(Intent.createChooser(share, "Export Invoice JPG"))
-        } catch (e: Exception) {
-            Toast.makeText(this, "JPG export failed: ${e.message}", Toast.LENGTH_SHORT).show()
-        }
     }
 
     private fun shareInvoice() {

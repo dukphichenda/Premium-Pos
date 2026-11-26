@@ -131,6 +131,10 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new CustomWebViewClient());
         webView.setWebChromeClient(new CustomWebChromeClient());
         webView.setDownloadListener(new CustomDownloadListener());
+        webView.addJavascriptInterface(
+                new com.inflow.premium.ui.GallerySaver.AndroidGalleryBridge(this, null),
+                "AndroidGalleryBridge"
+        );
     }
 
     private void checkAndRequestPermissions() {
@@ -326,6 +330,18 @@ public class MainActivity extends AppCompatActivity {
         @Override
         public void onDownloadStart(String url, String userAgent, String contentDisposition, String mimeType, long contentLength) {
             try {
+                if (url != null && url.startsWith("data:image/")) {
+                    String fname = URLUtil.guessFileName(url, contentDisposition, "image/jpeg");
+                    kotlin.Pair<Boolean, String> res = com.inflow.premium.ui.GallerySaver.saveDataUrlToGallery(
+                            getApplicationContext(), fname, url
+                    );
+                    Toast.makeText(
+                            getApplicationContext(),
+                            res.getFirst() ? ("Saved " + res.getSecond() + " to Gallery!") : ("Export failed: " + res.getSecond()),
+                            Toast.LENGTH_LONG
+                    ).show();
+                    return;
+                }
                 DownloadManager.Request request = new DownloadManager.Request(Uri.parse(url));
                 request.setMimeType(mimeType);
 

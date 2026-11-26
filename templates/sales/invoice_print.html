@@ -3489,12 +3489,16 @@
                 const filename = `Invoice_${orderNum}.jpg`;
 
                 const dataUrl = a5Canvas.toDataURL('image/jpeg', 0.98);
-                const link = document.createElement('a');
-                link.download = filename;
-                link.href = dataUrl;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                if (window.AndroidGalleryBridge && typeof window.AndroidGalleryBridge.saveJpg === 'function') {
+                    window.AndroidGalleryBridge.saveJpg(filename, dataUrl);
+                } else {
+                    const link = document.createElement('a');
+                    link.download = filename;
+                    link.href = dataUrl;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
 
                 showToast('✅ 4x High-Res A5 Image downloaded successfully!');
             } catch (err) {

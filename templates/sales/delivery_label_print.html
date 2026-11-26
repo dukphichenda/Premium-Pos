@@ -1014,12 +1014,17 @@
                     const canvas = await worker.toCanvas().get('canvas');
                     if (canvas) {
                         const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                        const link = document.createElement('a');
-                        link.download = `DeliveryLabel_${orderNum}_Case${i + 1}.jpg`;
-                        link.href = dataUrl;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
+                        const lblName = `DeliveryLabel_${orderNum}_Case${i + 1}.jpg`;
+                        if (window.AndroidGalleryBridge && typeof window.AndroidGalleryBridge.saveJpg === 'function') {
+                            window.AndroidGalleryBridge.saveJpg(lblName, dataUrl);
+                        } else {
+                            const link = document.createElement('a');
+                            link.download = lblName;
+                            link.href = dataUrl;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                        }
                     }
                 }
             } catch (err) {
