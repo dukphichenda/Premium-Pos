@@ -436,6 +436,7 @@ def mobile_sales_detail(id):
         'is_paid': is_paid,
         'khr_rate': float(khr_ctx.get('current_khr_rate') or 4100),
         'print_url': share_data['preview_url'],
+        'label_print_url': f"{base_host}/sales/{id}/print?type=label&token={share_data['token']}",
         'direct_print_url': share_data['direct_print_url'],
         'telegram_url': share_data['telegram_url'],
         'share_caption': share_data['caption'],

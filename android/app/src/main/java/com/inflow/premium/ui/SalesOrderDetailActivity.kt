@@ -14,7 +14,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.webkit.WebView
 import android.widget.PopupMenu
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -77,7 +76,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
     private var shareCaption: String = ""
     private val lines = mutableListOf<OrderLineItem>()
     private var isSaving = false
-    private var exportWebView: WebView? = null
+    // Export JPG is handled by launching InvoicePrintActivity with auto-export flag
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -1030,64 +1029,18 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             Toast.makeText(this, "Save the order first to export JPG", Toast.LENGTH_SHORT).show()
             return
         }
-        val fullBase = if (printUrl.startsWith("http")) printUrl else "${session.baseUrl}$printUrl"
-        val exportUrl = if (fullBase.contains("?")) "$fullBase&autojpg=1" else "$fullBase?autojpg=1"
-
-        Toast.makeText(this, "Exporting invoice JPG to Gallery...", Toast.LENGTH_SHORT).show()
-        setBusy(true)
-
-        cleanupExportWebView()
-
-        val wv = WebView(this)
-        exportWebView = wv
-        wv.alpha = 0f
-        wv.visibility = View.INVISIBLE
-        wv.settings.apply {
-            javaScriptEnabled = true
-            domStorageEnabled = true
-            useWideViewPort = true
-            loadWithOverviewMode = false
+        // Launch InvoicePrintActivity with auto-export flag.
+        // The visible WebView renders the invoice fully, html2canvas works correctly,
+        // and the AndroidGalleryBridge JS interface saves the JPG directly to Gallery.
+        val intent = Intent(this, InvoicePrintActivity::class.java).apply {
+            putExtra(InvoicePrintActivity.EXTRA_ORDER_NUMBER, orderNumber)
+            putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, printUrl)
+            putExtra(InvoicePrintActivity.EXTRA_TELEGRAM_URL, telegramUrl)
+            putExtra(InvoicePrintActivity.EXTRA_SHARE_CAPTION, shareCaption)
+            putExtra(InvoicePrintActivity.EXTRA_TITLE, "Exporting • $orderNumber")
+            putExtra(InvoicePrintActivity.EXTRA_AUTO_EXPORT_JPG, true)
         }
-
-        val timeoutRunnable = Runnable {
-            cleanupExportWebView()
-            setBusy(false)
-            Toast.makeText(this, "Export timed out. Try Preview -> Export JPG.", Toast.LENGTH_SHORT).show()
-        }
-        wv.postDelayed(timeoutRunnable, 22000)
-
-        wv.addJavascriptInterface(
-            GallerySaver.AndroidGalleryBridge(this) { ok, info ->
-                wv.removeCallbacks(timeoutRunnable)
-                cleanupExportWebView()
-                setBusy(false)
-                val msg = if (ok) "Saved $info to Gallery!" else "Export failed: $info"
-                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-            },
-            "AndroidGalleryBridge"
-        )
-        wv.setDownloadListener { url, _, _, _, _ ->
-            if (url != null && url.startsWith("data:image/")) {
-                wv.removeCallbacks(timeoutRunnable)
-                val (ok, info) = GallerySaver.saveDataUrlToGallery(this, "Invoice_$orderNumber.jpg", url)
-                cleanupExportWebView()
-                setBusy(false)
-                val msg = if (ok) "Saved $info to Gallery!" else "Export failed: $info"
-                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
-            }
-        }
-
-        val rootGroup = binding.root as? ViewGroup
-        rootGroup?.addView(wv, ViewGroup.LayoutParams(900, 1280))
-        wv.loadUrl(exportUrl)
-    }
-
-    private fun cleanupExportWebView() {
-        exportWebView?.let { wv ->
-            (wv.parent as? ViewGroup)?.removeView(wv)
-            wv.destroy()
-        }
-        exportWebView = null
+        startActivity(intent)
     }
 
     private fun openLabelPrintPreview() {
@@ -1161,7 +1114,6 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        cleanupExportWebView()
         uiScope.cancel()
     }
 

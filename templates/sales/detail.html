@@ -3137,6 +3137,10 @@ html.is-mobile-view .so-main-right {
                     <span class="win-menu-check" id="checkDocReceipt"></span>
                     <span class="win-menu-text">Receipt</span>
                 </div>
+                <div class="win-menu-item" onclick="selectAndExecuteDoc('label')">
+                    <span class="win-menu-check" id="checkDocLabel"></span>
+                    <span class="win-menu-text">Delivery Label (80x100mm)</span>
+                </div>
                 <div class="win-menu-separator win-separator-etched"></div>
                 <div class="win-menu-item" id="modeItemPreview" onclick="setPreviewMode('preview')">
                     <span class="win-menu-check" id="checkPreview">✓</span>
@@ -3214,6 +3218,10 @@ html.is-mobile-view .so-main-right {
                 </div>
             </div>
         </div>
+        <button type="button" class="inflow-tb-btn btn-so-label" id="soDirectLabelBtn" onclick="openDeliveryModal()" title="Print Delivery Label (80x100mm)">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+            <span>Label</span>
+        </button>
     </div>
     <div>
         <a href="javascript:void(0)" class="inflow-tb-btn danger btn-so-close" onclick="handleCloseOrder(event)" title="Close document">
@@ -6038,6 +6046,17 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
                 customer_address: meta.getAttribute('data-customer-address') || ''
             };
 
+            const carrierBadge = document.getElementById('savedCarrierBadge');
+            const rawCarrier = (meta.getAttribute('data-carrier') || '').trim();
+            if (carrierBadge) {
+                if (rawCarrier) {
+                    carrierBadge.textContent = '🚚 ' + rawCarrier;
+                    carrierBadge.style.display = 'inline-flex';
+                } else {
+                    carrierBadge.style.display = 'none';
+                }
+            }
+
             // Update Complete & Pay modal
             const cpTotal = document.getElementById('completePayTotalUsd');
             if (cpTotal) cpTotal.innerText = '$' + totalAmount;
@@ -8465,10 +8484,12 @@ function updateDocTypeUI(docType) {
     const cPick = document.getElementById('checkDocPick');
     const cInvoice = document.getElementById('checkDocInvoice');
     const cReceipt = document.getElementById('checkDocReceipt');
+    const cLabel = document.getElementById('checkDocLabel');
     if (cOrder) cOrder.innerHTML = (lastSelectedDocType === 'order' ? '&#10003;' : '');
     if (cPick) cPick.innerHTML = (lastSelectedDocType === 'pick' ? '&#10003;' : '');
     if (cInvoice) cInvoice.innerHTML = (lastSelectedDocType === 'invoice' ? '&#10003;' : '');
     if (cReceipt) cReceipt.innerHTML = (lastSelectedDocType === 'receipt' ? '&#10003;' : '');
+    if (cLabel) cLabel.innerHTML = (lastSelectedDocType === 'label' ? '&#10003;' : '');
 }
 
 function updatePreviewModeUI(mode) {
@@ -8854,7 +8875,11 @@ function executePreviewAction(docType) {
     if (currentPreviewMode === 'print') {
         window.open('/sales/' + orderId + '/print?type=' + docType + '&autoprint=1', '_blank');
     } else if (currentPreviewMode === 'export') {
-        window.location.href = '/sales/' + orderId + '/export?type=' + docType;
+        if (docType === 'label') {
+            window.open('/sales/' + orderId + '/print?type=label&autopdf=1', '_blank');
+        } else {
+            window.location.href = '/sales/' + orderId + '/export?type=' + docType;
+        }
     } else {
         // Preview mode
         window.open('/sales/' + orderId + '/print?type=' + docType, '_blank');
@@ -8913,14 +8938,14 @@ function openDeliveryModal() {
     const ship = window.currentSavedShipping || {};
 
     // Populate modal address
-    const currentAddr = (ship.customer_address !== undefined && ship.customer_address !== '') ? ship.customer_address : (document.getElementById('addressInput')?.value || `{{ (order.customer_address if order else '') or '' }}`);
+    const currentAddr = (ship.customer_address !== undefined && ship.customer_address !== '') ? ship.customer_address : (document.getElementById('addressInput')?.value || {{ ((order.customer_address if order else '') or '')|tojson }});
     const modalAddrInput = document.getElementById('modalDeliveryAddressInput');
     if (modalAddrInput) {
         modalAddrInput.value = currentAddr;
     }
 
     // Populate modal notes
-    const currentNotes = (ship.delivery_notes !== undefined && ship.delivery_notes !== '') ? ship.delivery_notes : (document.querySelector('input[name="delivery_notes"]')?.value || `{{ (order.delivery_notes if order else '') or '' }}`);
+    const currentNotes = (ship.delivery_notes !== undefined && ship.delivery_notes !== '') ? ship.delivery_notes : (document.querySelector('input[name="delivery_notes"]')?.value || {{ ((order.delivery_notes if order else '') or '')|tojson }});
     const modalNotesInput = document.getElementById('modalDeliveryNotesInput');
     if (modalNotesInput) {
         modalNotesInput.value = currentNotes;
@@ -8955,7 +8980,7 @@ function closeDeliveryModal() {
 function loadModalDeliveryServices(callback) {
     const targetCarrier = (window.currentSavedShipping && window.currentSavedShipping.carrier)
         ? window.currentSavedShipping.carrier
-        : (document.getElementById('modalCarrierSelect')?.value || "{{ order.carrier or 'Virak Buntham' }}");
+        : (document.getElementById('modalCarrierSelect')?.value || {{ ((order.carrier if order else '') or 'Virak Buntham')|tojson }});
 
     fetch('/api/delivery-services')
     .then(res => res.json())

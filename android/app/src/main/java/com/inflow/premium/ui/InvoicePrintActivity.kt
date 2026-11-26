@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.print.PrintAttributes
 import android.print.PrintManager
 import android.webkit.WebResourceRequest
@@ -22,6 +24,7 @@ class InvoicePrintActivity : AppCompatActivity() {
     private var printUrl: String = ""
     private var telegramUrl: String = ""
     private var shareCaption: String = ""
+    private var autoExportJpg: Boolean = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -31,7 +34,7 @@ class InvoicePrintActivity : AppCompatActivity() {
 
         orderNumber = intent.getStringExtra(EXTRA_ORDER_NUMBER) ?: "Invoice"
         val rawPrintUrl = intent.getStringExtra(EXTRA_PRINT_URL).orEmpty()
-        val autoExportJpg = intent.getBooleanExtra(EXTRA_AUTO_EXPORT_JPG, false)
+        autoExportJpg = intent.getBooleanExtra(EXTRA_AUTO_EXPORT_JPG, false)
         val basePrintUrl = if (rawPrintUrl.startsWith("http")) rawPrintUrl else "${session.baseUrl}$rawPrintUrl"
         printUrl = if (autoExportJpg && basePrintUrl.isNotBlank() && !basePrintUrl.contains("autojpg=1")) {
             if (basePrintUrl.contains("?")) "$basePrintUrl&autojpg=1" else "$basePrintUrl?autojpg=1"
@@ -57,20 +60,35 @@ class InvoicePrintActivity : AppCompatActivity() {
             builtInZoomControls = true
             displayZoomControls = false
         }
+
+        // Register the Gallery bridge: when the web JS calls
+        // AndroidGalleryBridge.saveJpg(filename, dataUrl), the image is saved
+        // directly to Pictures/inFlow/ in the device Gallery.
+        // If this was an auto-export launch, finish() after save to return to SO detail.
         binding.webInvoice.addJavascriptInterface(
             GallerySaver.AndroidGalleryBridge(this) { ok, info ->
                 val msg = if (ok) "Saved $info to Gallery!" else "Export failed: $info"
                 Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                if (autoExportJpg) {
+                    // Auto-close after a short delay so the toast is visible
+                    Handler(Looper.getMainLooper()).postDelayed({ finish() }, 1200)
+                }
             },
             "AndroidGalleryBridge"
         )
+
+        // Fallback: if the web triggers a data:image download instead of calling the bridge
         binding.webInvoice.setDownloadListener { url, _, _, _, _ ->
             if (url != null && url.startsWith("data:image/")) {
                 val (ok, info) = GallerySaver.saveDataUrlToGallery(this, "Invoice_$orderNumber.jpg", url)
                 val msg = if (ok) "Saved $info to Gallery!" else "Export failed: $info"
                 Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                if (autoExportJpg) {
+                    Handler(Looper.getMainLooper()).postDelayed({ finish() }, 1200)
+                }
             }
         }
+
         binding.webInvoice.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
                 return false
@@ -78,6 +96,9 @@ class InvoicePrintActivity : AppCompatActivity() {
         }
 
         if (printUrl.isNotBlank()) {
+            if (autoExportJpg) {
+                Toast.makeText(this, "Exporting invoice JPG to Gallery...", Toast.LENGTH_SHORT).show()
+            }
             binding.webInvoice.loadUrl(printUrl)
         } else {
             Toast.makeText(this, "Print URL unavailable", Toast.LENGTH_SHORT).show()
