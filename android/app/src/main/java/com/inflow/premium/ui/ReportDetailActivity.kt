@@ -254,7 +254,7 @@ class ReportDetailActivity : AppCompatActivity() {
     }
 
     private fun showDriverPicker(order: DeliveryOrderItem) {
-        val drivers = listOf("Unassigned") + session.getDeliveryMen()
+        val drivers = listOf("Unassigned") + session.getDeliveryMen().map { it.name }
         val idx = drivers.indexOfFirst {
             if (order.deliveryMan.isBlank()) it == "Unassigned" else it.equals(order.deliveryMan, true)
         }.coerceAtLeast(0)
