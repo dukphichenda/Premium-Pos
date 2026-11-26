@@ -111,9 +111,56 @@ function initKeyboardShortcuts() {
             }
         }
 
-        // Escape: Close any open modal
+        // Escape: Close topmost open pop-up modal (must click cross sign or press ESC, not outside box)
         if (e.key === 'Escape') {
-            document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+            const dp = document.getElementById('gsDatepickerPopup');
+            if (dp && dp.style.display !== 'none') return;
+
+            const modalSelectors = [
+                '.modal-overlay',
+                '.modal-backdrop',
+                '.inflow-modal-backdrop',
+                '.pl-modal-backdrop',
+                '.sig-modal-backdrop',
+                '.inflow-adj-modal-backdrop',
+                '.inflow-win-modal-overlay',
+                '.pos-receipt-modal-backdrop'
+            ].join(', ');
+
+            const openModals = Array.from(document.querySelectorAll(modalSelectors)).filter(m => {
+                const cs = window.getComputedStyle(m);
+                return cs.display !== 'none' && cs.visibility !== 'hidden';
+            });
+
+            if (openModals.length > 0) {
+                // Pick the topmost visible modal (highest z-index, tie-broken by last in DOM)
+                openModals.sort((a, b) => {
+                    const za = parseInt(window.getComputedStyle(a).zIndex, 10) || 0;
+                    const zb = parseInt(window.getComputedStyle(b).zIndex, 10) || 0;
+                    return za - zb;
+                });
+                const topModal = openModals[openModals.length - 1];
+                const byClass = topModal.querySelector('.modal-close, .modal-close-btn, .sig-modal-close, [data-modal-close]');
+                let closeBtn = byClass;
+                if (!closeBtn) {
+                    const btns = Array.from(topModal.querySelectorAll('button'));
+                    closeBtn = btns.find(b => {
+                        const t = (b.textContent || '').trim();
+                        return (t === '✕' || t === '×' || t === '✖' || t === 'X') &&
+                               /close|cancel|hide|dismiss/i.test(b.getAttribute('onclick') || '');
+                    }) || btns.find(b => {
+                        const t = (b.textContent || '').trim().toLowerCase();
+                        return (t === 'close' || t === 'cancel') &&
+                               /close|cancel|hide|dismiss/i.test(b.getAttribute('onclick') || '');
+                    }) || null;
+                }
+                if (closeBtn) {
+                    closeBtn.click();
+                } else {
+                    topModal.classList.remove('active');
+                    topModal.style.display = 'none';
+                }
+            }
         }
     });
 }
