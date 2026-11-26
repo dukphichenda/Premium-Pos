@@ -493,13 +493,14 @@ def _find_latest_matching_so(is_main, user_bid, branch_filter, status_filter, se
         else:
             base_where.append("1=0")
     else:
-        if not branch_filter or str(branch_filter).strip().lower() == 'main':
+        b_str = str(branch_filter or 'main').strip().lower()
+        if b_str in ('main', '0', 'hq', 'none', ''):
             base_where.append("so.branch_id IS NULL")
-        elif str(branch_filter).strip().isdigit():
-            base_where.append("so.branch_id = %s")
-            params.append(int(branch_filter))
-        elif str(branch_filter).strip().lower() == 'all':
+        elif b_str == 'all':
             pass
+        elif b_str.isdigit():
+            base_where.append("so.branch_id = %s")
+            params.append(int(b_str))
         else:
             base_where.append("so.branch_id IS NULL")
 
@@ -1041,11 +1042,11 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
     else:
         if branch_id:
             b_str = str(branch_id).strip().lower()
-            if b_str == 'main':
+            if b_str in ('main', '0', 'hq', 'none', ''):
                 drawer_where.append("so.branch_id IS NULL")
             elif b_str == 'all':
                 pass
-            elif b_str not in ('none', ''):
+            else:
                 try:
                     bid = int(b_str)
                     drawer_where.append("so.branch_id = %s")
@@ -1404,7 +1405,7 @@ def _get_drawer_and_metadata(date_filter='All', status_filter='Open, In Progress
             branch_count_where.append("1=0")
     else:
         if branch_id and str(branch_id).lower() != 'all':
-            if str(branch_id).lower() == 'main':
+            if str(branch_id).lower() in ('main', '0', 'hq', 'none', ''):
                 branch_count_where.append("so.branch_id IS NULL")
             elif str(branch_id).isdigit():
                 branch_count_where.append("so.branch_id = %s")

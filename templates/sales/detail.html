@@ -3766,6 +3766,9 @@ function closeSoMobileDrawer() {
                 url.searchParams.delete('delivery_man');
                 url.searchParams.delete('just_saved');
                 url.searchParams.delete('partial');
+                if (url.searchParams.get('branch') === '0') {
+                    url.searchParams.set('branch', 'main');
+                }
 
                 // Check if the currently active order card matches the newly selected status filter
                 const activeCard = document.querySelector('.so-sidebar-card.active');
@@ -5507,7 +5510,7 @@ window.handleTabCloseAttempt = function(targetUrl) {
 /* ==========================================================================
    Drawer Filter State Synchronization across Actions (Copy, New, Save, Pay)
    ========================================================================== */
-window.CURRENT_BRANCH_SCOPE = String("{{ current_branch.id if current_branch else (order.branch_id if (order and order.branch_id) else (session.get('active_branch_id') or (branch_scope if (branch_scope and branch_scope.isdigit()) else '0'))) }}");
+window.CURRENT_BRANCH_SCOPE = String("{{ current_branch.id if current_branch else (order.branch_id if (order and order.branch_id) else (session.get('active_branch_id') or (branch_scope if (branch_scope and (branch_scope.isdigit() or branch_scope in ('main', 'all'))) else 'main'))) }}");
 
 function getDrawerFilterParams() {
     const dateSelect = document.getElementById('drawerDateFilterSelect');
