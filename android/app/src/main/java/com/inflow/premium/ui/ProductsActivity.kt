@@ -57,6 +57,17 @@ class ProductsActivity : AppCompatActivity() {
         api = ApiClient(session)
 
         BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.PRODUCT)
+        EdgeToEdgeHelper.apply(
+            activity = this,
+            rootView = binding.root,
+            topContentView = binding.topHeader,
+            topScrimView = binding.topScrim,
+            bottomNavContainer = binding.bottomNav.root,
+            bottomScrimView = binding.bottomScrim,
+            scrollableView = binding.rvProducts,
+            extraTopDp = 4,
+            extraBottomScrollDp = 104
+        )
 
         selectedSchemeId = session.getPricingSchemes().firstOrNull()?.id ?: 100
         selectedLocationId = session.getLocations().firstOrNull()?.id ?: 100

@@ -74,6 +74,18 @@ class SalesOrdersActivity : AppCompatActivity() {
         setupRecycler()
         setupFilters()
         BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.SO)
+        EdgeToEdgeHelper.apply(
+            activity = this,
+            rootView = binding.root,
+            topContentView = binding.topHeader,
+            topScrimView = binding.topScrim,
+            bottomNavContainer = binding.bottomNav.root,
+            bottomScrimView = binding.bottomScrim,
+            scrollableView = binding.rvOrders,
+            fabView = binding.fabNewOrder,
+            extraTopDp = 4,
+            extraBottomScrollDp = 152
+        )
 
         binding.fabNewOrder.setOnClickListener {
             openOrderDetail(0)
@@ -91,6 +103,7 @@ class SalesOrdersActivity : AppCompatActivity() {
 
     private fun setupToolbar() {
         binding.toolbar.inflateMenu(R.menu.menu_sales_orders)
+        binding.toolbar.overflowIcon?.setTint(android.graphics.Color.parseColor("#0F172A"))
         binding.toolbar.menu.findItem(R.id.action_switch_branch)?.isVisible = session.isMainAdmin()
         updateBranchSubtitle()
 

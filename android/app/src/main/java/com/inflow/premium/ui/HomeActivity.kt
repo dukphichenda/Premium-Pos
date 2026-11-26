@@ -62,6 +62,17 @@ class HomeActivity : AppCompatActivity() {
         }
 
         BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
+        EdgeToEdgeHelper.apply(
+            activity = this,
+            rootView = binding.root,
+            topContentView = null,
+            topScrimView = binding.topScrim,
+            bottomNavContainer = binding.bottomNav.root,
+            bottomScrimView = binding.bottomScrim,
+            scrollableView = binding.scrollHome,
+            extraTopDp = 12,
+            extraBottomScrollDp = 104
+        )
 
         binding.swipeRefresh.setColorSchemeResources(R.color.primary, R.color.primary_dark)
         binding.swipeRefresh.setOnRefreshListener { loadDashboard() }

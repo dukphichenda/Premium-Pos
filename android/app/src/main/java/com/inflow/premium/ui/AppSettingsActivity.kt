@@ -40,6 +40,17 @@ class AppSettingsActivity : AppCompatActivity() {
         api = ApiClient(session)
 
         BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.SETTINGS)
+        EdgeToEdgeHelper.apply(
+            activity = this,
+            rootView = binding.root,
+            topContentView = binding.topHeader,
+            topScrimView = binding.topScrim,
+            bottomNavContainer = binding.bottomNav.root,
+            bottomScrimView = binding.bottomScrim,
+            scrollableView = binding.scrollSettings,
+            extraTopDp = 4,
+            extraBottomScrollDp = 104
+        )
 
         bindInfo()
 

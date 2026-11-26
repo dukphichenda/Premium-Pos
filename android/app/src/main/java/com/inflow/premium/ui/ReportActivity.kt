@@ -46,6 +46,17 @@ class ReportActivity : AppCompatActivity() {
         api = ApiClient(session)
 
         BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.REPORT)
+        EdgeToEdgeHelper.apply(
+            activity = this,
+            rootView = binding.root,
+            topContentView = binding.topHeader,
+            topScrimView = binding.topScrim,
+            bottomNavContainer = binding.bottomNav.root,
+            bottomScrimView = binding.bottomScrim,
+            scrollableView = binding.scrollReport,
+            extraTopDp = 4,
+            extraBottomScrollDp = 104
+        )
 
         binding.swipeRefresh.setColorSchemeResources(R.color.primary, R.color.primary_dark)
         binding.swipeRefresh.setOnRefreshListener { loadReport() }
