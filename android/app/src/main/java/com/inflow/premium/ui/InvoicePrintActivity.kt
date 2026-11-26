@@ -34,8 +34,13 @@ class InvoicePrintActivity : AppCompatActivity() {
         printUrl = if (rawPrintUrl.startsWith("http")) rawPrintUrl else "${session.baseUrl}$rawPrintUrl"
         telegramUrl = intent.getStringExtra(EXTRA_TELEGRAM_URL).orEmpty()
         shareCaption = intent.getStringExtra(EXTRA_SHARE_CAPTION).orEmpty()
+        val customTitle = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+        val customPrintBtnText = intent.getStringExtra(EXTRA_PRINT_BTN_TEXT).orEmpty()
 
-        binding.toolbar.title = "Invoice • $orderNumber"
+        binding.toolbar.title = customTitle.ifBlank { "Invoice • $orderNumber" }
+        if (customPrintBtnText.isNotBlank()) {
+            binding.btnPrintInvoice.text = customPrintBtnText
+        }
         binding.toolbar.setNavigationOnClickListener { finish() }
 
         binding.webInvoice.settings.apply {
@@ -105,5 +110,7 @@ class InvoicePrintActivity : AppCompatActivity() {
         const val EXTRA_PRINT_URL = "extra_print_url"
         const val EXTRA_TELEGRAM_URL = "extra_telegram_url"
         const val EXTRA_SHARE_CAPTION = "extra_share_caption"
+        const val EXTRA_TITLE = "extra_title"
+        const val EXTRA_PRINT_BTN_TEXT = "extra_print_btn_text"
     }
 }

@@ -106,6 +106,7 @@ data class SalesOrderDetail(
     val balanceDue: Double,
     val khrRate: Double,
     val printUrl: String,
+    val labelPrintUrl: String = "",
     val telegramUrl: String,
     val shareCaption: String,
     val lines: MutableList<OrderLineItem>

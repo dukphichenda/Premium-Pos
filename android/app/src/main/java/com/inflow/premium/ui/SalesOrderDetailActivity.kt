@@ -70,6 +70,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
     private var paymentMethod: String = "ABA Bank"
     private var khrRate: Double = 4100.0
     private var printUrl: String = ""
+    private var labelPrintUrl: String = ""
     private var telegramUrl: String = ""
     private var shareCaption: String = ""
     private val lines = mutableListOf<OrderLineItem>()
@@ -109,6 +110,10 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                     openPrintPreview()
                     true
                 }
+                R.id.action_print_label -> {
+                    openLabelPrintPreview()
+                    true
+                }
                 R.id.action_share -> {
                     shareOrder()
                     true
@@ -137,6 +142,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         }
         binding.btnAddProduct.setOnClickListener { if (isEditable()) openProductPicker() }
         binding.btnDeliveryMan.setOnClickListener { if (isEditable()) showDeliveryManPicker() }
+        binding.btnPrintDeliveryLabel.setOnClickListener { openLabelPrintPreview() }
 
         binding.etDeliveryFee.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -201,6 +207,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         paymentMethod = d.paymentMethod
         khrRate = if (d.khrRate > 0) d.khrRate else session.defaultKhrRate
         printUrl = d.printUrl
+        labelPrintUrl = d.labelPrintUrl
         telegramUrl = d.telegramUrl
         shareCaption = d.shareCaption
 
@@ -267,7 +274,10 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.etDeliveryFee.isEnabled = editable
         binding.etNotes.isEnabled = editable
 
+        val canPrintLabel = orderId > 0 && (labelPrintUrl.isNotBlank() || printUrl.isNotBlank())
         binding.toolbar.menu.findItem(R.id.action_print)?.isVisible = orderId > 0 && printUrl.isNotBlank()
+        binding.toolbar.menu.findItem(R.id.action_print_label)?.isVisible = canPrintLabel
+        binding.btnPrintDeliveryLabel.visibility = if (canPrintLabel) View.VISIBLE else View.GONE
         binding.toolbar.menu.findItem(R.id.action_share)?.isVisible = orderId > 0
         binding.toolbar.menu.findItem(R.id.action_cancel_order)?.isVisible = orderId > 0 && editable
 
@@ -923,6 +933,27 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                 .putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, printUrl)
                 .putExtra(InvoicePrintActivity.EXTRA_TELEGRAM_URL, telegramUrl)
                 .putExtra(InvoicePrintActivity.EXTRA_SHARE_CAPTION, shareCaption)
+        )
+    }
+
+    private fun openLabelPrintPreview() {
+        val resolvedLabelUrl = when {
+            labelPrintUrl.isNotBlank() -> labelPrintUrl
+            printUrl.isNotBlank() -> printUrl.replace("type=invoice", "type=label")
+            else -> ""
+        }
+        if (orderId <= 0 || resolvedLabelUrl.isBlank()) {
+            Toast.makeText(this, "Save the order first to print delivery label", Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(this, InvoicePrintActivity::class.java)
+                .putExtra(InvoicePrintActivity.EXTRA_ORDER_NUMBER, orderNumber)
+                .putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, resolvedLabelUrl)
+                .putExtra(InvoicePrintActivity.EXTRA_TELEGRAM_URL, "")
+                .putExtra(InvoicePrintActivity.EXTRA_SHARE_CAPTION, "Delivery Label $orderNumber")
+                .putExtra(InvoicePrintActivity.EXTRA_TITLE, "Delivery Label • $orderNumber")
+                .putExtra(InvoicePrintActivity.EXTRA_PRINT_BTN_TEXT, "Print Label")
         )
     }
 

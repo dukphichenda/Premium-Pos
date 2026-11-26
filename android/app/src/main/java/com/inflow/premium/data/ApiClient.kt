@@ -170,6 +170,7 @@ class ApiClient(private val session: SessionManager) {
             balanceDue = o.optDouble("balance_due", 0.0),
             khrRate = json.optDouble("khr_rate", 4100.0),
             printUrl = json.optString("print_url", ""),
+            labelPrintUrl = json.optString("label_print_url", ""),
             telegramUrl = json.optString("telegram_url", ""),
             shareCaption = json.optString("share_caption", ""),
             lines = lines

@@ -3,11 +3,11 @@ package com.inflow.premium.ui
 import android.app.Activity
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.Color
 import android.graphics.Typeface
 import android.view.View
 import android.widget.ImageView
 import android.widget.TextView
-import androidx.core.content.ContextCompat
 import com.inflow.premium.R
 
 object BottomNavHelper {
@@ -17,47 +17,46 @@ object BottomNavHelper {
     }
 
     fun setup(activity: Activity, navRoot: View, activeTab: NavTab) {
-        val activeColor = ContextCompat.getColor(activity, R.color.primary_dark)
-        val inactiveColor = ContextCompat.getColor(activity, R.color.gray)
+        val activeColor = Color.parseColor("#2E9E95")
+        val inactiveColor = Color.parseColor("#111827")
 
         val tabSettings = navRoot.findViewById<View>(R.id.navTabSettings)
         val ivSettings = navRoot.findViewById<ImageView>(R.id.ivNavSettings)
         val tvSettings = navRoot.findViewById<TextView>(R.id.tvNavSettings)
-        val indSettings = navRoot.findViewById<View>(R.id.indNavSettings)
 
         val tabReport = navRoot.findViewById<View>(R.id.navTabReport)
         val ivReport = navRoot.findViewById<ImageView>(R.id.ivNavReport)
         val tvReport = navRoot.findViewById<TextView>(R.id.tvNavReport)
-        val indReport = navRoot.findViewById<View>(R.id.indNavReport)
 
-        val tabHomeLabel = navRoot.findViewById<View>(R.id.navTabHomeLabel)
-        val btnHomeCircle = navRoot.findViewById<View>(R.id.btnNavHomeCircle)
+        val tabHome = navRoot.findViewById<View>(R.id.navTabHome)
+        val ivHome = navRoot.findViewById<ImageView>(R.id.ivNavHome)
         val tvHome = navRoot.findViewById<TextView>(R.id.tvNavHome)
-        val indHome = navRoot.findViewById<View>(R.id.indNavHome)
 
         val tabSo = navRoot.findViewById<View>(R.id.navTabSo)
         val ivSo = navRoot.findViewById<ImageView>(R.id.ivNavSo)
         val tvSo = navRoot.findViewById<TextView>(R.id.tvNavSo)
-        val indSo = navRoot.findViewById<View>(R.id.indNavSo)
 
         val tabProduct = navRoot.findViewById<View>(R.id.navTabProduct)
         val ivProduct = navRoot.findViewById<ImageView>(R.id.ivNavProduct)
         val tvProduct = navRoot.findViewById<TextView>(R.id.tvNavProduct)
-        val indProduct = navRoot.findViewById<View>(R.id.indNavProduct)
 
-        fun styleItem(iv: ImageView?, tv: TextView, ind: View, isActive: Boolean) {
+        fun styleItem(container: View, iv: ImageView, tv: TextView, isActive: Boolean) {
             val c = if (isActive) activeColor else inactiveColor
-            iv?.imageTintList = ColorStateList.valueOf(c)
+            if (isActive) {
+                container.setBackgroundResource(R.drawable.bg_nav_active_pill)
+            } else {
+                container.background = null
+            }
+            iv.imageTintList = ColorStateList.valueOf(c)
             tv.setTextColor(c)
-            tv.setTypeface(null, if (isActive) Typeface.BOLD else Typeface.NORMAL)
-            ind.visibility = if (isActive) View.VISIBLE else View.INVISIBLE
+            tv.setTypeface(null, Typeface.BOLD)
         }
 
-        styleItem(ivSettings, tvSettings, indSettings, activeTab == NavTab.SETTINGS)
-        styleItem(ivReport, tvReport, indReport, activeTab == NavTab.REPORT)
-        styleItem(null, tvHome, indHome, activeTab == NavTab.HOME)
-        styleItem(ivSo, tvSo, indSo, activeTab == NavTab.SO)
-        styleItem(ivProduct, tvProduct, indProduct, activeTab == NavTab.PRODUCT)
+        styleItem(tabSettings, ivSettings, tvSettings, activeTab == NavTab.SETTINGS)
+        styleItem(tabReport, ivReport, tvReport, activeTab == NavTab.REPORT)
+        styleItem(tabHome, ivHome, tvHome, activeTab == NavTab.HOME)
+        styleItem(tabSo, ivSo, tvSo, activeTab == NavTab.SO)
+        styleItem(tabProduct, ivProduct, tvProduct, activeTab == NavTab.PRODUCT)
 
         fun navigateTo(tab: NavTab, cls: Class<*>) {
             if (activeTab == tab) return
@@ -71,8 +70,7 @@ object BottomNavHelper {
 
         tabSettings.setOnClickListener { navigateTo(NavTab.SETTINGS, AppSettingsActivity::class.java) }
         tabReport.setOnClickListener { navigateTo(NavTab.REPORT, ReportActivity::class.java) }
-        btnHomeCircle.setOnClickListener { navigateTo(NavTab.HOME, HomeActivity::class.java) }
-        tabHomeLabel.setOnClickListener { navigateTo(NavTab.HOME, HomeActivity::class.java) }
+        tabHome.setOnClickListener { navigateTo(NavTab.HOME, HomeActivity::class.java) }
         tabSo.setOnClickListener { navigateTo(NavTab.SO, SalesOrdersActivity::class.java) }
         tabProduct.setOnClickListener { navigateTo(NavTab.PRODUCT, ProductsActivity::class.java) }
     }
