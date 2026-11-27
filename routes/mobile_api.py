@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+import re
 import time
 from datetime import datetime, date
 from functools import wraps
@@ -2781,6 +2782,140 @@ def mobile_report_customer_order_history():
         'period_revenue': round(period_revenue, 2),
         'payment_methods': payment_methods,
         'orders': out_orders,
+    })
+
+
+@mobile_api_bp.route('/api/mobile/price-list', methods=['GET'])
+@mobile_auth_required
+def mobile_price_list():
+    """Read-only Product Price List endpoint mirroring /inventory/price-list."""
+    from routes.products import _build_price_card_data
+
+    q = (request.args.get('q') or '').strip().lower()
+    cat_id_raw = (request.args.get('category_id') or '').strip()
+    cat_id_filter = int(cat_id_raw) if cat_id_raw.isdigit() and int(cat_id_raw) > 0 else None
+
+    categories = query_all("""
+        SELECT c.id, c.name, COALESCE(c.color, '#047857') as color,
+               COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON p.category_id = c.id AND p.is_active = TRUE
+        WHERE c.is_active = TRUE
+        GROUP BY c.id, c.name, c.color
+        HAVING COUNT(p.id) > 0
+        ORDER BY c.name ASC
+    """)
+
+    pricing_schemes = query_all("""
+        SELECT id, name, currency, is_default
+        FROM pricing_schemes
+        WHERE is_active = TRUE
+        ORDER BY is_default DESC, id ASC
+    """)
+
+    products = query_all("""
+        SELECT p.*,
+               COALESCE(c.name, 'General') as category_name,
+               COALESCE(c.color, '#047857') as category_color
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.is_active = TRUE
+        ORDER BY c.name ASC, p.name ASC, p.id ASC
+    """)
+
+    p_ids = [p['id'] for p in products]
+    tiers_by_pid = {}
+    if p_ids:
+        all_tiers = query_all("""
+            SELECT pp.product_id, ps.id as pricing_scheme_id, ps.name as scheme_name, pp.unit_price
+            FROM product_prices pp
+            JOIN pricing_schemes ps ON pp.pricing_scheme_id = ps.id
+            WHERE pp.product_id = ANY(%s) AND ps.is_active = TRUE
+            ORDER BY ps.is_default DESC, ps.id ASC
+        """, (p_ids,))
+        for t in all_tiers:
+            tiers_by_pid.setdefault(t['product_id'], []).append(t)
+
+    items = []
+    for prod in products:
+        if cat_id_filter and (prod.get('category_id') or 0) != cat_id_filter:
+            continue
+        sku_s = (prod.get('sku') or '').strip()
+        name_s = (prod.get('name') or '').strip()
+        cat_s = (prod.get('category_name') or 'General').strip()
+        p_tiers = tiers_by_pid.get(prod['id'], [])
+        card_data = _build_price_card_data(prod, p_tiers, can_view_costs=False)
+
+        badge = str(prod['capacity']).strip() if prod.get('capacity') else ''
+        if not badge:
+            m = re.search(r'(\d+\s*(?:ml|ML|oz|OZ|g|G|kg|KG|l|L)\b)', name_s)
+            if m:
+                badge = m.group(1).strip()
+
+        dim_str = card_data.get('dim_str') or ''
+        detail_lines = card_data.get('auto_detail_lines') or []
+        if q:
+            hay = f"{sku_s} {name_s} {cat_s} {dim_str} {' '.join(detail_lines)}".lower()
+            if q not in hay:
+                continue
+
+        pcs_case = float(card_data.get('pcs_per_case') or 400)
+        scheme_pcs = _normalize_scheme_prices_pcs(
+            {str(t['pricing_scheme_id']): float(t['unit_price'] or 0) for t in p_tiers},
+            (prod.get('uom') or 'pcs.').strip(),
+            (prod.get('sales_uom') or '').strip(),
+            float(prod.get('sales_uom_ratio_std') or pcs_case or 1.0),
+        )
+
+        items.append({
+            'id': prod['id'],
+            'sku': sku_s,
+            'name': name_s,
+            'uom': (prod.get('uom') or 'pcs.').strip(),
+            'category_id': prod.get('category_id') or 0,
+            'category_name': cat_s,
+            'image_url': prod.get('image_url') or '',
+            'badge': badge,
+            'dim_str': dim_str,
+            'pcs_case': pcs_case,
+            'packs_per_case': float(card_data.get('packs_per_case') or 8),
+            'pcs_per_pack': float(card_data.get('pcs_per_pack') or 50),
+            'detail_lines': detail_lines,
+            'tier_qty_1': int(card_data.get('tier_qty_1') or 100),
+            'tier_qty_2': int(card_data.get('tier_qty_2') or 200),
+            'tier_qty_3': int(card_data.get('tier_qty_3') or 400),
+            'u_price_1': float(card_data.get('u_price_1') or 0),
+            'u_price_2': float(card_data.get('u_price_2') or 0),
+            'u_price_3': float(card_data.get('u_price_3') or 0),
+            'tot_price_1': float(card_data.get('tot_price_1') or 0),
+            'tot_price_2': float(card_data.get('tot_price_2') or 0),
+            'tot_price_3': float(card_data.get('tot_price_3') or 0),
+            'scheme_prices_pcs': scheme_pcs,
+        })
+
+    return jsonify({
+        'success': True,
+        'total_products': len(products),
+        'filtered_count': len(items),
+        'categories': [
+            {
+                'id': c['id'],
+                'name': c['name'],
+                'color': c['color'],
+                'product_count': int(c['product_count'] or 0),
+            }
+            for c in categories
+        ],
+        'pricing_schemes': [
+            {
+                'id': s['id'],
+                'name': s['name'],
+                'currency': s.get('currency') or 'USD',
+                'is_default': bool(s.get('is_default')),
+            }
+            for s in pricing_schemes
+        ],
+        'items': items,
     })
 
 
