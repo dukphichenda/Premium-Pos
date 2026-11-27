@@ -4,11 +4,12 @@ import hmac
 import json
 import logging
 import time
+from datetime import datetime
 from functools import wraps
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import check_password_hash
 from config import Config
-from database import query_one, query_all, execute, execute_returning_id
+from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val
 
 logger = logging.getLogger('inflow.mobile_api')
 
@@ -1924,6 +1925,422 @@ def mobile_stock_matrix():
         'categories': [{'id': c['id'], 'name': c['name']} for c in categories],
         'items': items,
     })
+
+
+def _next_transfer_number():
+    try:
+        row = query_one("SELECT MAX(CAST(SUBSTRING(transfer_number FROM 'TRF-([0-9]+)') AS INTEGER)) as max_val FROM stock_transfers WHERE transfer_number ~ '^TRF-[0-9]+$'")
+        max_val = row['max_val'] if row and row.get('max_val') else 0
+        return f"TRF-{max_val + 1:05d}"
+    except Exception:
+        seq = get_next_sequence_val('trf_number_seq')
+        return f"TRF-{seq:05d}"
+
+
+@mobile_api_bp.route('/api/mobile/transfers', methods=['GET'])
+@mobile_auth_required
+def mobile_transfers_list():
+    """List stock transfers with KPI stats and filters matching web Stock Transfers page."""
+    status_filter = (request.args.get('status') or 'all').strip().upper()
+    search = (request.args.get('q') or '').strip()
+    warehouse_id = (request.args.get('warehouse_id') or '').strip()
+
+    stats_row = query_one("""
+        SELECT
+            COUNT(*) as total_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(status, '')) IN ('DRAFT', 'REQUESTED')) as draft_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(status, '')) = 'COMPLETED') as completed_count
+        FROM stock_transfers
+    """) or {}
+    total_units_row = query_one("""
+        SELECT COALESCE(SUM(stl.quantity), 0) as total_units
+        FROM stock_transfer_lines stl
+        JOIN stock_transfers st ON stl.transfer_id = st.id
+        WHERE UPPER(COALESCE(st.status, '')) = 'COMPLETED'
+    """) or {}
+
+    where_clauses = ["1=1"]
+    params = []
+    if status_filter in ('DRAFT', 'REQUESTED'):
+        where_clauses.append("UPPER(COALESCE(st.status, '')) IN ('DRAFT', 'REQUESTED')")
+    elif status_filter == 'COMPLETED':
+        where_clauses.append("UPPER(COALESCE(st.status, '')) = 'COMPLETED'")
+
+    if search:
+        where_clauses.append("(st.transfer_number ILIKE %s OR COALESCE(st.notes, '') ILIKE %s OR fl.name ILIKE %s OR tl.name ILIKE %s)")
+        like_q = f"%{search}%"
+        params.extend([like_q, like_q, like_q, like_q])
+    if warehouse_id:
+        try:
+            wid = int(warehouse_id)
+            where_clauses.append("(st.from_location_id = %s OR st.to_location_id = %s)")
+            params.extend([wid, wid])
+        except ValueError:
+            pass
+
+    rows = query_all(f"""
+        SELECT
+            st.id, st.transfer_number, st.transfer_date, st.status, st.notes,
+            st.from_location_id, st.to_location_id,
+            fl.name as from_location_name,
+            tl.name as to_location_name,
+            COUNT(stl.id) as item_count,
+            COALESCE(SUM(stl.quantity), 0) as total_units
+        FROM stock_transfers st
+        JOIN locations fl ON st.from_location_id = fl.id
+        JOIN locations tl ON st.to_location_id = tl.id
+        LEFT JOIN stock_transfer_lines stl ON st.id = stl.transfer_id
+        WHERE {" AND ".join(where_clauses)}
+        GROUP BY st.id, fl.name, tl.name
+        ORDER BY st.transfer_date DESC, st.id DESC
+        LIMIT 100
+    """, tuple(params))
+
+    locations = query_all("""
+        SELECT id, name, is_default
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_default DESC, is_central DESC, name ASC
+    """)
+
+    transfers = []
+    for r in rows:
+        td = r.get('transfer_date')
+        td_display = td.strftime('%d %b %Y') if hasattr(td, 'strftime') else str(td or '')
+        td_iso = td.strftime('%Y-%m-%d') if hasattr(td, 'strftime') else str(td or '')
+        transfers.append({
+            'id': r['id'],
+            'transfer_number': r['transfer_number'] or '',
+            'transfer_date': td_display,
+            'transfer_date_iso': td_iso,
+            'status': (r.get('status') or 'DRAFT').upper(),
+            'notes': r.get('notes') or '',
+            'from_location_id': r['from_location_id'],
+            'from_location_name': r['from_location_name'] or '',
+            'to_location_id': r['to_location_id'],
+            'to_location_name': r['to_location_name'] or '',
+            'item_count': int(r.get('item_count') or 0),
+            'total_units': float(r.get('total_units') or 0),
+        })
+
+    return jsonify({
+        'success': True,
+        'stats': {
+            'total': int(stats_row.get('total_count') or 0),
+            'draft': int(stats_row.get('draft_count') or 0),
+            'completed': int(stats_row.get('completed_count') or 0),
+            'total_units': float(total_units_row.get('total_units') or 0),
+        },
+        'locations': [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations],
+        'transfers': transfers,
+    })
+
+
+@mobile_api_bp.route('/api/mobile/transfers/<int:trf_id>', methods=['GET'])
+@mobile_auth_required
+def mobile_transfer_detail(trf_id):
+    """Fetch existing transfer detail or defaults for creating a new transfer (trf_id=0)."""
+    locations = query_all("""
+        SELECT id, name, is_default
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_default DESC, is_central DESC, name ASC
+    """)
+
+    if trf_id == 0:
+        from_loc = locations[0]['id'] if locations else 0
+        to_loc = locations[1]['id'] if len(locations) > 1 else from_loc
+        return jsonify({
+            'success': True,
+            'locations': [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations],
+            'transfer': {
+                'id': 0,
+                'transfer_number': _next_transfer_number(),
+                'transfer_date': datetime.now().strftime('%d - %b - %Y'),
+                'transfer_date_iso': datetime.now().strftime('%Y-%m-%d'),
+                'status': 'DRAFT',
+                'from_location_id': from_loc,
+                'from_location_name': locations[0]['name'] if locations else '',
+                'to_location_id': to_loc,
+                'to_location_name': locations[1]['name'] if len(locations) > 1 else (locations[0]['name'] if locations else ''),
+                'notes': '',
+                'lines': [],
+            }
+        })
+
+    trf = query_one("""
+        SELECT st.*, fl.name as from_location_name, tl.name as to_location_name
+        FROM stock_transfers st
+        JOIN locations fl ON st.from_location_id = fl.id
+        JOIN locations tl ON st.to_location_id = tl.id
+        WHERE st.id = %s
+    """, (trf_id,))
+    if not trf:
+        return jsonify({'success': False, 'error': 'Stock transfer not found'}), 404
+
+    lines = query_all("""
+        SELECT
+            stl.*,
+            p.sku as product_sku,
+            p.name as product_name,
+            p.uom as product_uom,
+            p.sales_uom,
+            COALESCE(p.sales_uom_ratio_std, p.sales_uom_ratio, 1.0) as sales_ratio,
+            COALESCE(src_inv.quantity, 0) as current_on_hand,
+            COALESCE(open_so.reserved_qty, 0) as current_reserved,
+            (COALESCE(src_inv.quantity, 0) - COALESCE(open_so.reserved_qty, 0)) as current_available
+        FROM stock_transfer_lines stl
+        JOIN products p ON stl.product_id = p.id
+        LEFT JOIN inventory src_inv ON src_inv.product_id = p.id AND src_inv.location_id = %s
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status = 'OPEN'
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
+        WHERE stl.transfer_id = %s
+        ORDER BY stl.id ASC
+    """, (trf['from_location_id'], trf['from_location_id'], trf['from_location_id'], trf_id))
+
+    td = trf.get('transfer_date')
+    td_display = td.strftime('%d - %b - %Y') if hasattr(td, 'strftime') else str(td or '')
+    td_iso = td.strftime('%Y-%m-%d') if hasattr(td, 'strftime') else str(td or '')
+
+    return jsonify({
+        'success': True,
+        'locations': [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations],
+        'transfer': {
+            'id': trf['id'],
+            'transfer_number': trf['transfer_number'] or '',
+            'transfer_date': td_display,
+            'transfer_date_iso': td_iso,
+            'status': (trf.get('status') or 'DRAFT').upper(),
+            'from_location_id': trf['from_location_id'],
+            'from_location_name': trf['from_location_name'] or '',
+            'to_location_id': trf['to_location_id'],
+            'to_location_name': trf['to_location_name'] or '',
+            'notes': trf.get('notes') or '',
+            'lines': [
+                {
+                    'product_id': l['product_id'],
+                    'sku': l.get('product_sku') or '',
+                    'name': l.get('product_name') or '',
+                    'uom': l.get('uom') or l.get('product_uom') or 'pcs.',
+                    'base_uom': l.get('product_uom') or 'pcs.',
+                    'sales_uom': l.get('sales_uom') or '',
+                    'sales_ratio': float(l.get('sales_ratio') or 1.0),
+                    'uom_factor': float(l.get('uom_factor') or 1.0),
+                    'source_on_hand': float(l.get('current_on_hand') or 0),
+                    'source_available': float(l.get('current_available') or 0),
+                    'quantity': float(l.get('quantity') or 1),
+                }
+                for l in lines
+            ],
+        }
+    })
+
+
+@mobile_api_bp.route('/api/mobile/transfers/products-lookup', methods=['GET'])
+@mobile_auth_required
+def mobile_transfers_product_lookup():
+    """Read-only product catalog lookup with live source warehouse stock for transfer line selection."""
+    q = (request.args.get('q') or '').strip()
+    from_loc_id = int(request.args.get('from_location_id') or 0)
+
+    where_sql = "p.is_active = TRUE"
+    params = [from_loc_id, from_loc_id, from_loc_id]
+    if q:
+        where_sql += " AND (p.sku ILIKE %s OR p.name ILIKE %s OR COALESCE(p.barcode, '') ILIKE %s)"
+        like_q = f"%{q}%"
+        params.extend([like_q, like_q, like_q])
+
+    rows = query_all(f"""
+        SELECT
+            p.id, p.sku, p.name, COALESCE(p.uom, 'pcs.') as uom,
+            COALESCE(p.sales_uom, '') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, p.sales_uom_ratio, 1.0) as sales_ratio,
+            COALESCE(src_inv.quantity, 0) as source_on_hand,
+            COALESCE(open_so.reserved_qty, 0) as reserved_qty
+        FROM products p
+        LEFT JOIN inventory src_inv ON src_inv.product_id = p.id AND src_inv.location_id = %s
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status = 'OPEN'
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
+        WHERE {where_sql}
+        ORDER BY p.name ASC
+        LIMIT 50
+    """, tuple(params))
+
+    return jsonify({
+        'success': True,
+        'products': [
+            {
+                'id': r['id'],
+                'sku': r['sku'] or '',
+                'name': r['name'] or '',
+                'uom': r['uom'] or 'pcs.',
+                'sales_uom': r['sales_uom'] or '',
+                'sales_ratio': float(r['sales_ratio'] or 1.0),
+                'source_on_hand': float(r['source_on_hand'] or 0),
+                'source_available': float(r['source_on_hand'] or 0) - float(r['reserved_qty'] or 0),
+            }
+            for r in rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/transfers/save', methods=['POST'])
+@mobile_auth_required
+def mobile_transfer_save():
+    """Save transfer as DRAFT or execute COMPLETED inter-warehouse stock movement (never touches product catalog)."""
+    try:
+        data = request.get_json(silent=True) or {}
+        transfer_id = int(data.get('transfer_id') or 0) or None
+        transfer_number = (data.get('transfer_number') or '').strip()
+        from_location_id = int(data.get('from_location_id') or 0)
+        to_location_id = int(data.get('to_location_id') or 0)
+        transfer_date = (data.get('transfer_date_iso') or data.get('transfer_date') or datetime.now().strftime('%Y-%m-%d')).strip()
+        notes = (data.get('notes') or '').strip()
+        status = (data.get('status') or 'DRAFT').strip().upper()
+        if status not in ('DRAFT', 'COMPLETED'):
+            status = 'DRAFT'
+        lines = data.get('lines') or []
+
+        if not from_location_id or not to_location_id:
+            return jsonify({'success': False, 'error': 'Please select both source and destination warehouses.'}), 400
+        if from_location_id == to_location_id:
+            return jsonify({'success': False, 'error': 'Source and destination warehouse cannot be the same.'}), 400
+        if not lines:
+            return jsonify({'success': False, 'error': 'Please add at least one product to transfer.'}), 400
+
+        if not transfer_number:
+            transfer_number = _next_transfer_number()
+
+        with get_db_cursor(commit=True) as cur:
+            if transfer_id:
+                cur.execute("SELECT status FROM stock_transfers WHERE id = %s", (transfer_id,))
+                existing = cur.fetchone()
+                if existing and (existing.get('status') or '').upper() == 'COMPLETED':
+                    return jsonify({'success': False, 'error': 'This transfer has already been completed.'}), 400
+
+            if status == 'COMPLETED':
+                insufficient = []
+                for l in lines:
+                    pid = int(l['product_id'])
+                    qty = float(l.get('quantity') or 0)
+                    factor = float(l.get('uom_factor') or 1.0)
+                    base_qty = qty * factor
+                    if qty <= 0:
+                        return jsonify({'success': False, 'error': f'Invalid transfer quantity ({qty}).'}), 400
+                    cur.execute("""
+                        SELECT COALESCE(quantity, 0) as qty
+                        FROM inventory
+                        WHERE product_id = %s AND location_id = %s
+                        FOR UPDATE
+                    """, (pid, from_location_id))
+                    inv_row = cur.fetchone()
+                    src_on_hand = float(inv_row['qty']) if inv_row else 0.0
+                    if src_on_hand < base_qty:
+                        cur.execute("SELECT sku, name FROM products WHERE id = %s", (pid,))
+                        p_info = cur.fetchone() or {'sku': '', 'name': f'Product #{pid}'}
+                        insufficient.append(f"{p_info['sku']} (Avail: {src_on_hand:g}, Need: {base_qty:g})")
+                if insufficient:
+                    return jsonify({'success': False, 'error': 'Insufficient source stock: ' + '; '.join(insufficient)}), 400
+
+            if transfer_id:
+                cur.execute("""
+                    UPDATE stock_transfers
+                    SET transfer_number = %s, from_location_id = %s, to_location_id = %s,
+                        status = %s, transfer_date = %s, notes = %s
+                    WHERE id = %s
+                    RETURNING id;
+                """, (transfer_number, from_location_id, to_location_id, status, transfer_date, notes, transfer_id))
+                trf_id = transfer_id
+            else:
+                cur.execute("""
+                    INSERT INTO stock_transfers (transfer_number, from_location_id, to_location_id, status, transfer_date, notes)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """, (transfer_number, from_location_id, to_location_id, status, transfer_date, notes))
+                trf_id = cur.fetchone()['id']
+
+            cur.execute("DELETE FROM stock_transfer_lines WHERE transfer_id = %s", (trf_id,))
+            for l in lines:
+                pid = int(l['product_id'])
+                qty = float(l.get('quantity') or 0)
+                uom = l.get('uom') or 'pcs.'
+                factor = float(l.get('uom_factor') or 1.0)
+                src_on_hand = float(l.get('source_on_hand') or 0)
+                src_avail = float(l.get('source_available') or 0)
+                cur.execute("""
+                    INSERT INTO stock_transfer_lines (transfer_id, product_id, quantity, uom, uom_factor, source_on_hand, source_available)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (trf_id, pid, qty, uom, factor, src_on_hand, src_avail))
+
+            if status == 'COMPLETED':
+                for l in lines:
+                    pid = int(l['product_id'])
+                    qty = float(l.get('quantity') or 0)
+                    factor = float(l.get('uom_factor') or 1.0)
+                    base_qty = qty * factor
+                    cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s", (pid, from_location_id))
+                    src_row = cur.fetchone()
+                    qty_before_src = float(src_row['qty']) if src_row else 0.0
+
+                    cur.execute("""
+                        UPDATE inventory
+                        SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE product_id = %s AND location_id = %s;
+                    """, (base_qty, pid, from_location_id))
+
+                    cur.execute("""
+                        INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                        VALUES (%s, %s, '', %s)
+                        ON CONFLICT (product_id, location_id, sublocation)
+                        DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                    """, (pid, to_location_id, base_qty))
+
+                    cur.execute("""
+                        INSERT INTO inventory_logs (
+                            product_id, movement_type, reference_type, reference_id,
+                            from_location_id, to_location_id, quantity, qty_before, qty_after, reason, notes
+                        ) VALUES (%s, 'TRANSFER', 'TRANSFER', %s, %s, %s, %s, %s, %s, 'Warehouse Transfer Out', %s);
+                    """, (pid, transfer_number, from_location_id, to_location_id, -base_qty, qty_before_src, qty_before_src - base_qty, notes))
+
+        return jsonify({
+            'success': True,
+            'transfer_id': trf_id,
+            'transfer_number': transfer_number,
+            'status': status,
+            'message': f"Transfer {transfer_number} completed!" if status == 'COMPLETED' else f"Saved {transfer_number} as Draft."
+        })
+    except Exception as e:
+        logger.error(f"Mobile transfer save error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@mobile_api_bp.route('/api/mobile/transfers/<int:trf_id>/delete', methods=['POST'])
+@mobile_auth_required
+def mobile_transfer_delete(trf_id):
+    """Delete a DRAFT stock transfer."""
+    trf = query_one("SELECT id, status, transfer_number FROM stock_transfers WHERE id = %s", (trf_id,))
+    if not trf:
+        return jsonify({'success': False, 'error': 'Transfer not found.'}), 404
+    if (trf.get('status') or '').upper() == 'COMPLETED':
+        return jsonify({'success': False, 'error': 'Cannot delete an already completed transfer.'}), 400
+    with get_db_cursor(commit=True) as cur:
+        cur.execute("DELETE FROM stock_transfer_lines WHERE transfer_id = %s", (trf_id,))
+        cur.execute("DELETE FROM stock_transfers WHERE id = %s", (trf_id,))
+    return jsonify({'success': True, 'message': f"Draft {trf['transfer_number']} deleted."})
 
 
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
