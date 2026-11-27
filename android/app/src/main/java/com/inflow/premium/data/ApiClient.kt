@@ -118,6 +118,17 @@ class ApiClient(private val session: SessionManager) {
         )
     }
 
+    private fun parseDoubleMap(obj: JSONObject?): Map<String, Double> {
+        if (obj == null) return emptyMap()
+        val map = mutableMapOf<String, Double>()
+        val keys = obj.keys()
+        while (keys.hasNext()) {
+            val k = keys.next()
+            map[k] = obj.optDouble(k, 0.0)
+        }
+        return map
+    }
+
     suspend fun getSalesOrderDetail(orderId: Int): SalesOrderDetail {
         val json = requestJson("GET", "/api/mobile/sales/$orderId")
         val o = json.getJSONObject("order")
@@ -139,7 +150,8 @@ class ApiClient(private val session: SessionManager) {
                     salesUomRatioStd = l.optDouble("sales_uom_ratio_std", 1.0),
                     unitPrice = l.optDouble("unit_price", 0.0),
                     discountPercent = l.optDouble("discount_percent", 0.0),
-                    pricingSchemeId = l.optInt("pricing_scheme_id", 100)
+                    pricingSchemeId = l.optInt("pricing_scheme_id", 100),
+                    schemePricesPcs = parseDoubleMap(l.optJSONObject("scheme_prices_pcs"))
                 )
             )
         }
@@ -293,15 +305,8 @@ class ApiClient(private val session: SessionManager) {
         val list = mutableListOf<ProductItem>()
         for (i in 0 until arr.length()) {
             val p = arr.getJSONObject(i)
-            val spObj = p.optJSONObject("scheme_prices")
-            val spMap = mutableMapOf<String, Double>()
-            if (spObj != null) {
-                val keys = spObj.keys()
-                while (keys.hasNext()) {
-                    val k = keys.next()
-                    spMap[k] = spObj.optDouble(k, 0.0)
-                }
-            }
+            val spMap = parseDoubleMap(p.optJSONObject("scheme_prices"))
+            val spPcsMap = parseDoubleMap(p.optJSONObject("scheme_prices_pcs"))
             list.add(
                 ProductItem(
                     id = p.optInt("id"),
@@ -313,6 +318,7 @@ class ApiClient(private val session: SessionManager) {
                     unitPrice = p.optDouble("unit_price", 0.0),
                     defaultPrice = p.optDouble("default_price", 0.0),
                     schemePrices = spMap,
+                    schemePricesPcs = spPcsMap,
                     stockAvailable = p.optDouble("stock_available", 0.0),
                     imageUrl = p.optString("image_url", ""),
                     barcode = p.optString("barcode", ""),

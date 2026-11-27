@@ -357,6 +357,19 @@ def mobile_sales_list():
     })
 
 
+def _normalize_scheme_prices_pcs(sp_map, std_uom, sales_uom, ratio):
+    std = (std_uom or 'pcs.').strip().lower()
+    suom = (sales_uom or '').strip().lower()
+    r = float(ratio or 1.0)
+    has_case = bool(suom) and suom != std and r > 1.0
+    out = {}
+    for k, v in (sp_map or {}).items():
+        val = float(v or 0)
+        pcs_val = (val / r) if (has_case and val > 2) else val
+        out[str(k)] = round(pcs_val, 4)
+    return out
+
+
 @mobile_api_bp.route('/api/mobile/sales/<int:id>', methods=['GET'])
 @mobile_auth_required
 def mobile_sales_detail(id):
@@ -413,11 +426,25 @@ def mobile_sales_detail(id):
         ORDER BY sol.line_num ASC
     """, (id,))
 
+    # Load scheme prices for all lines so mobile can switch price tiers per item
+    pids = list({l['product_id'] for l in lines if l.get('product_id')})
+    prices_map = {}
+    if pids:
+        ph = ','.join(['%s'] * len(pids))
+        for pr in query_all(f"SELECT product_id, pricing_scheme_id, unit_price FROM product_prices WHERE product_id IN ({ph})", tuple(pids)):
+            prices_map.setdefault(pr['product_id'], {})[str(pr['pricing_scheme_id'])] = float(pr['unit_price'] or 0)
+
     clean_lines = []
     for l in lines:
         d = dict(l)
         for fk in ('quantity', 'std_quantity', 'unit_price', 'discount_percent', 'subtotal', 'sales_uom_ratio_std'):
             d[fk] = float(d.get(fk) or 0)
+        d['scheme_prices_pcs'] = _normalize_scheme_prices_pcs(
+            prices_map.get(d['product_id'], {}),
+            d.get('base_uom'),
+            d.get('sales_uom'),
+            d.get('sales_uom_ratio_std') or 1.0,
+        )
         clean_lines.append(d)
 
     base_host = request.host_url.rstrip('/')
@@ -886,6 +913,7 @@ def mobile_products_search():
             'price_per_pcs': round(price_per_pcs, 4),
             'default_price': float(r.get('default_price') or 0),
             'scheme_prices': sp_map,
+            'scheme_prices_pcs': _normalize_scheme_prices_pcs(sp_map, std_uom, sales_uom, ratio),
             'image_url': r['image_url'],
             'barcode': r.get('barcode') or '',
             'category_name': r.get('category_name') or '',

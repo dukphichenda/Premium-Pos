@@ -74,7 +74,8 @@ data class OrderLineItem(
     val salesUomRatioStd: Double = 1.0,
     var unitPrice: Double = 0.0,
     var discountPercent: Double = 0.0,
-    var pricingSchemeId: Int = 100
+    var pricingSchemeId: Int = 100,
+    var schemePricesPcs: Map<String, Double> = emptyMap()
 ) {
     val subtotal: Double
         get() = (quantity * unitPrice) * (1.0 - (discountPercent / 100.0))
@@ -132,6 +133,7 @@ data class ProductItem(
     val unitPrice: Double,
     val defaultPrice: Double,
     val schemePrices: Map<String, Double>,
+    val schemePricesPcs: Map<String, Double> = emptyMap(),
     val stockAvailable: Double,
     val imageUrl: String = "",
     val barcode: String = "",

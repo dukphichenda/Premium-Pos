@@ -429,6 +429,17 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             lb.etLinePrice.setText(formatNumber(line.unitPrice, 4))
             lb.btnLineUom.text = line.uom.ifBlank { line.baseUom }
 
+            val schemes = session.getPricingSchemes()
+            val tierLabel = schemes.firstOrNull { it.id == line.pricingSchemeId }?.name ?: "Retail 1"
+            lb.btnLineTier.text = "$tierLabel ▾"
+            lb.btnLineTier.isEnabled = editable
+            if (line.salesUom.isNotBlank() && !line.salesUom.equals(line.baseUom, ignoreCase = true) && line.salesUomRatioStd > 1.0) {
+                lb.tvLinePackHint.visibility = View.VISIBLE
+                lb.tvLinePackHint.text = "1 ${line.salesUom} = ${formatNumber(line.salesUomRatioStd, 0)} ${line.baseUom}"
+            } else {
+                lb.tvLinePackHint.visibility = View.GONE
+            }
+
             lb.btnDeleteLine.visibility = if (editable) View.VISIBLE else View.GONE
             lb.btnQtyMinus.isEnabled = editable
             lb.btnQtyPlus.isEnabled = editable
@@ -436,6 +447,10 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             lb.etLinePrice.isEnabled = editable
             lb.btnLineUom.isEnabled = editable && line.salesUom.isNotBlank() &&
                 !line.salesUom.equals(line.baseUom, ignoreCase = true)
+
+            lb.btnLineTier.setOnClickListener {
+                showLineTierPicker(line, lb)
+            }
 
             lb.btnDeleteLine.setOnClickListener {
                 lines.removeAt(idx)
@@ -570,6 +585,50 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             .setSingleChoiceItems(labels, checked) { d, which ->
                 branchId = opts[which].first
                 binding.btnBranchSelect.text = opts[which].second
+                d.dismiss()
+            }
+            .setNegativeButton("Close") { d, _ -> d.dismiss() }
+            .setCancelable(false)
+            .create()
+        attachEscClose(dlg)
+        dlg.setCanceledOnTouchOutside(false)
+        dlg.show()
+    }
+
+    private fun priceForLineUom(pcsPrice: Double, line: OrderLineItem): Double {
+        val ratio = if (line.salesUomRatioStd > 0) line.salesUomRatioStd else 1.0
+        val isSalesUom = line.salesUom.isNotBlank() && line.uom.equals(line.salesUom, ignoreCase = true)
+        return if (isSalesUom) pcsPrice * ratio else pcsPrice
+    }
+
+    private fun showLineTierPicker(line: OrderLineItem, lb: ItemOrderLineBinding) {
+        val schemes = session.getPricingSchemes()
+        if (schemes.isEmpty()) return
+        val unitLabel = line.uom.ifBlank { line.baseUom.ifBlank { "pcs." } }
+        val labels = schemes.map { s ->
+            val pcs = line.schemePricesPcs[s.id.toString()]
+            if (pcs != null) {
+                val uomPrice = priceForLineUom(pcs, line)
+                "${s.name}  •  $${formatNumber(uomPrice, 4)} / $unitLabel"
+            } else {
+                s.name
+            }
+        }.toTypedArray()
+        val checked = schemes.indexOfFirst { it.id == line.pricingSchemeId }.coerceAtLeast(0)
+
+        val dlg = MaterialAlertDialogBuilder(this)
+            .setTitle("Price Tier • ${line.sku.ifBlank { line.productName }}")
+            .setSingleChoiceItems(labels, checked) { d, which ->
+                val chosen = schemes[which]
+                line.pricingSchemeId = chosen.id
+                lb.btnLineTier.text = "${chosen.name} ▾"
+                val pcs = line.schemePricesPcs[chosen.id.toString()]
+                if (pcs != null) {
+                    line.unitPrice = priceForLineUom(pcs, line)
+                    lb.etLinePrice.setText(formatNumber(line.unitPrice, 4))
+                    lb.tvLineSubtotal.text = String.format(Locale.US, "$%.2f", line.subtotal)
+                    recalculateTotals()
+                }
                 d.dismiss()
             }
             .setNegativeButton("Close") { d, _ -> d.dismiss() }
@@ -811,10 +870,13 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                     products.clear()
                     products.addAll(res)
                     pickerAdapter.setItems(res.map {
+                        val packInfo = if (it.salesUom.isNotBlank() && !it.salesUom.equals(it.uom, ignoreCase = true) && it.salesUomRatioStd > 1.0) {
+                            " (1 ${it.salesUom}=${formatNumber(it.salesUomRatioStd, 0)})"
+                        } else ""
                         Triple(
                             "${it.sku} • ${it.name}",
-                            "UOM: ${it.uom} • Stock: ${formatNumber(it.stockAvailable, 2)}",
-                            String.format(Locale.US, "$%.4f", it.unitPrice)
+                            "UOM: ${it.uom}$packInfo • Stock: ${formatNumber(it.stockAvailable, 2)}",
+                            String.format(Locale.US, "$%.4f", it.pricePerPcs)
                         )
                     })
                 } catch (e: Exception) {
@@ -848,7 +910,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         if (existing != null) {
             existing.quantity += 1.0
         } else {
-            val price = p.schemePrices[pricingSchemeId.toString()] ?: p.unitPrice
+            val pcsPrice = p.schemePricesPcs[pricingSchemeId.toString()] ?: p.pricePerPcs
             lines.add(
                 OrderLineItem(
                     productId = p.id,
@@ -859,8 +921,9 @@ class SalesOrderDetailActivity : AppCompatActivity() {
                     baseUom = base,
                     salesUom = p.salesUom,
                     salesUomRatioStd = p.salesUomRatioStd,
-                    unitPrice = price,
-                    pricingSchemeId = pricingSchemeId
+                    unitPrice = pcsPrice,
+                    pricingSchemeId = pricingSchemeId,
+                    schemePricesPcs = p.schemePricesPcs
                 )
             )
         }
