@@ -2611,6 +2611,151 @@ def mobile_vendor_create():
     return jsonify({'success': True, 'id': new_id, 'message': f"Vendor '{name}' added!"})
 
 
+@mobile_api_bp.route('/api/mobile/reports/customer-order-history', methods=['GET'])
+@mobile_auth_required
+def mobile_report_customer_order_history():
+    """Customer Order History chronological audit report matching /reports/view/customer-order-history."""
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    is_main = _is_main_admin()
+    user_bid = _get_user_branch_id()
+
+    raw_branch = (request.args.get('branch') or 'main').strip()
+    date_filter = (request.args.get('date_filter') or 'This Month').strip()
+    status_filter = (request.args.get('status') or 'All').strip()
+    paid_by = (request.args.get('paid_by') or 'All').strip()
+    q = (request.args.get('q') or '').strip()
+    page = max(1, int(request.args.get('page') or 1))
+    page_size = 15
+
+    where = ["so.status != 'CANCELLED'"]
+    params = []
+    b_clause, b_params = _resolve_branch_clause(raw_branch, is_main, user_bid, alias='so')
+    if b_clause:
+        where.append(b_clause)
+        params.extend(b_params)
+    d_clause = _resolve_date_clause(date_filter, alias='so')
+    if d_clause:
+        where.append(d_clause)
+
+    if status_filter.lower() == 'paid':
+        where.append("(so.payment_status = 'PAID' OR so.status = 'PAID')")
+    elif status_filter.lower() == 'open':
+        where.append("(so.payment_status IS NULL OR so.payment_status != 'PAID') AND so.status != 'PAID'")
+
+    if paid_by and paid_by.lower() != 'all':
+        where.append("COALESCE(so.payment_method, 'Cash') = %s")
+        params.append(paid_by)
+
+    if q:
+        sp = f"%{q}%"
+        where.append("(COALESCE(c.name, '') ILIKE %s OR so.order_number ILIKE %s OR COALESCE(so.customer_phone, c.phone, '') ILIKE %s)")
+        params.extend([sp, sp, sp])
+
+    where_sql = " AND ".join(where)
+
+    kpi = query_one(f"""
+        SELECT
+            COUNT(*) as total_orders,
+            COUNT(*) FILTER (WHERE so.payment_status = 'PAID' OR so.status = 'PAID') as paid_orders,
+            COALESCE(SUM(so.total_amount), 0) as period_revenue
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE {where_sql}
+    """, tuple(params)) or {'total_orders': 0, 'paid_orders': 0, 'period_revenue': 0}
+
+    total_orders = int(kpi.get('total_orders') or 0)
+    paid_orders = int(kpi.get('paid_orders') or 0)
+    period_revenue = float(kpi.get('period_revenue') or 0)
+    collection_pct = round((paid_orders / total_orders) * 100.0) if total_orders > 0 else 0
+    total_pages = max(1, (total_orders + page_size - 1) // page_size)
+    page = min(page, total_pages)
+    offset = (page - 1) * page_size
+
+    orders = query_all(f"""
+        SELECT
+            so.id, so.order_number, so.order_date, so.status, so.payment_status,
+            COALESCE(so.payment_method, 'Cash') as payment_method,
+            COALESCE(so.total_amount, 0) as total_amount,
+            COALESCE(so.shipping_fee, 0) as shipping_fee,
+            COALESCE(c.id, 0) as customer_id,
+            COALESCE(c.name, NULLIF(so.customer_contact, ''), 'Walk-in Customer') as customer_name
+        FROM sales_orders so
+        LEFT JOIN customers c ON so.customer_id = c.id
+        WHERE {where_sql}
+        ORDER BY COALESCE(c.name, 'Walk-in Customer') ASC, so.order_date ASC, so.order_number ASC
+        LIMIT %s OFFSET %s
+    """, tuple(params) + (page_size, offset))
+
+    lines_by_oid = {}
+    if orders:
+        oids = [o['id'] for o in orders]
+        line_rows = query_all("""
+            SELECT
+                sol.sales_order_id, sol.id as line_id,
+                COALESCE(p.sku, '') as sku,
+                COALESCE(p.name, sol.description, 'Item') as item_name,
+                COALESCE(sol.description, '') as description,
+                COALESCE(sol.quantity_display, sol.quantity, 1) as quantity,
+                COALESCE(sol.uom, p.uom, 'pcs.') as uom,
+                COALESCE(sol.unit_price, 0) as unit_price,
+                COALESCE(sol.subtotal, 0) as subtotal
+            FROM sales_order_lines sol
+            LEFT JOIN products p ON sol.product_id = p.id
+            WHERE sol.sales_order_id = ANY(%s)
+            ORDER BY sol.line_num ASC, sol.id ASC
+        """, (oids,))
+        for lr in line_rows:
+            lines_by_oid.setdefault(lr['sales_order_id'], []).append({
+                'sku': lr['sku'] or '',
+                'item_name': lr['item_name'] or 'Item',
+                'description': lr['description'] or '',
+                'quantity': float(lr['quantity'] or 0),
+                'uom': lr['uom'] or 'pcs.',
+                'unit_price': float(lr['unit_price'] or 0),
+                'subtotal': float(lr['subtotal'] or 0),
+            })
+
+    pm_rows = query_all("""
+        SELECT DISTINCT COALESCE(NULLIF(payment_method, ''), 'Cash') as pm
+        FROM sales_orders
+        WHERE status != 'CANCELLED'
+        ORDER BY pm ASC
+    """)
+    payment_methods = [r['pm'] for r in pm_rows if r.get('pm')]
+
+    out_orders = []
+    for o in orders:
+        od = o.get('order_date')
+        od_str = od.strftime('%d-%b-%y') if hasattr(od, 'strftime') else str(od or '')
+        is_paid = (o.get('payment_status') or '').upper() == 'PAID' or (o.get('status') or '').upper() == 'PAID'
+        out_orders.append({
+            'id': o['id'],
+            'order_number': o['order_number'] or '',
+            'order_date': od_str,
+            'customer_id': o['customer_id'],
+            'customer_name': o['customer_name'] or 'Walk-in Customer',
+            'is_paid': is_paid,
+            'payment_method': o['payment_method'] or 'Cash',
+            'shipping_fee': round(float(o['shipping_fee'] or 0), 2),
+            'total_amount': round(float(o['total_amount'] or 0), 2),
+            'lines': lines_by_oid.get(o['id'], []),
+        })
+
+    return jsonify({
+        'success': True,
+        'date_filter': date_filter,
+        'today_label': datetime.now().strftime('%b %d, %Y'),
+        'page': page,
+        'total_pages': total_pages,
+        'total_orders': total_orders,
+        'paid_orders': paid_orders,
+        'collection_pct': collection_pct,
+        'period_revenue': round(period_revenue, 2),
+        'payment_methods': payment_methods,
+        'orders': out_orders,
+    })
+
+
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
 def mobile_web_handoff():
     """Authenticate a mobile WebView session using a valid Bearer/query token and redirect to an internal page."""
