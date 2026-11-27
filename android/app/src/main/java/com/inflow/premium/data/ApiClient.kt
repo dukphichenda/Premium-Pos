@@ -1038,6 +1038,205 @@ class ApiClient(private val session: SessionManager) {
         return json.optString("message", "Deleted")
     }
 
+    suspend fun getAdjustmentsList(
+        status: String = "all",
+        query: String = "",
+        locationId: Int? = null
+    ): StockAdjustmentListResult {
+        val params = mutableMapOf("status" to status, "q" to query)
+        if (locationId != null && locationId > 0) {
+            params["location_id"] = locationId.toString()
+        }
+        val json = requestJson("GET", "/api/mobile/adjustments", params)
+        val statsObj = json.optJSONObject("stats") ?: JSONObject()
+        val stats = StockAdjustmentStats(
+            total = statsObj.optInt("total", 0),
+            draft = statsObj.optInt("draft", 0),
+            completed = statsObj.optInt("completed", 0)
+        )
+        val locsArr = json.optJSONArray("locations") ?: JSONArray()
+        val locs = mutableListOf<TransferLocationOption>()
+        for (i in 0 until locsArr.length()) {
+            val l = locsArr.getJSONObject(i)
+            locs.add(TransferLocationOption(l.optInt("id"), l.optString("name", ""), l.optBoolean("is_default", false)))
+        }
+        val arr = json.optJSONArray("adjustments") ?: JSONArray()
+        val list = mutableListOf<StockAdjustmentSummary>()
+        for (i in 0 until arr.length()) {
+            val a = arr.getJSONObject(i)
+            list.add(
+                StockAdjustmentSummary(
+                    id = a.optInt("id"),
+                    adjustmentNumber = a.optString("adjustment_number", ""),
+                    adjustmentDate = a.optString("adjustment_date", ""),
+                    adjustmentDateIso = a.optString("adjustment_date_iso", ""),
+                    status = a.optString("status", "COMPLETED"),
+                    reason = a.optString("reason", "Correction"),
+                    notes = a.optString("notes", ""),
+                    locationId = a.optInt("location_id"),
+                    locationName = a.optString("location_name", ""),
+                    createdBy = a.optString("created_by", ""),
+                    itemCount = a.optInt("item_count", 0),
+                    netChangeUnits = a.optDouble("net_change_units", 0.0)
+                )
+            )
+        }
+        return StockAdjustmentListResult(stats, locs, list)
+    }
+
+    suspend fun getAdjustmentDetail(adjId: Int): StockAdjustmentDetail {
+        val json = requestJson("GET", "/api/mobile/adjustments/$adjId")
+        val locsArr = json.optJSONArray("locations") ?: JSONArray()
+        val locs = mutableListOf<TransferLocationOption>()
+        for (i in 0 until locsArr.length()) {
+            val l = locsArr.getJSONObject(i)
+            locs.add(TransferLocationOption(l.optInt("id"), l.optString("name", ""), l.optBoolean("is_default", false)))
+        }
+        val catsArr = json.optJSONArray("categories") ?: JSONArray()
+        val cats = mutableListOf<AdjustmentCategoryOption>()
+        for (i in 0 until catsArr.length()) {
+            val c = catsArr.getJSONObject(i)
+            cats.add(AdjustmentCategoryOption(c.optInt("id"), c.optString("name", ""), c.optInt("product_count", 0)))
+        }
+        val a = json.getJSONObject("adjustment")
+        val linesArr = a.optJSONArray("lines") ?: JSONArray()
+        val lines = mutableListOf<StockAdjustmentLine>()
+        for (i in 0 until linesArr.length()) {
+            val ln = linesArr.getJSONObject(i)
+            lines.add(
+                StockAdjustmentLine(
+                    productId = ln.optInt("product_id"),
+                    sku = ln.optString("sku", ""),
+                    name = ln.optString("name", ""),
+                    uom = ln.optString("uom", "pcs."),
+                    baseUom = ln.optString("base_uom", "pcs."),
+                    salesUom = ln.optString("sales_uom", ""),
+                    salesRatio = ln.optDouble("sales_ratio", 1.0),
+                    uomFactor = ln.optDouble("uom_factor", 1.0),
+                    imageUrl = ln.optString("image_url", ""),
+                    sublocation = ln.optString("sublocation", ""),
+                    oldQty = ln.optDouble("old_qty", 0.0),
+                    diffQty = ln.optDouble("diff_qty", 0.0),
+                    newQty = ln.optDouble("new_qty", 0.0),
+                    onHandQty = ln.optDouble("on_hand_qty", 0.0),
+                    reservedQty = ln.optDouble("reserved_qty", 0.0)
+                )
+            )
+        }
+        return StockAdjustmentDetail(
+            id = a.optInt("id", 0),
+            adjustmentNumber = a.optString("adjustment_number", ""),
+            adjustmentDate = a.optString("adjustment_date", ""),
+            adjustmentDateIso = a.optString("adjustment_date_iso", ""),
+            status = a.optString("status", "DRAFT"),
+            locationId = a.optInt("location_id"),
+            locationName = a.optString("location_name", ""),
+            auditor = a.optString("auditor", ""),
+            refDoc = a.optString("ref_doc", ""),
+            auditDept = a.optString("audit_dept", ""),
+            reason = a.optString("reason", "Correction"),
+            notes = a.optString("notes", ""),
+            itemsChanged = a.optInt("items_changed", lines.size),
+            netChangeUnits = a.optDouble("net_change_units", 0.0),
+            totalActiveProducts = json.optInt("total_active_products", 0),
+            locations = locs,
+            categories = cats,
+            lines = lines
+        )
+    }
+
+    suspend fun searchAdjustmentProducts(
+        query: String,
+        locationId: Int,
+        categoryIds: List<Int> = emptyList(),
+        fetchAll: Boolean = false,
+        sortBy: String = ""
+    ): List<AdjustmentCatalogProduct> {
+        val params = mutableMapOf(
+            "q" to query,
+            "location_id" to locationId.toString()
+        )
+        if (categoryIds.isNotEmpty()) {
+            params["category_ids"] = categoryIds.joinToString(",")
+        }
+        if (fetchAll) {
+            params["all"] = "true"
+        }
+        if (sortBy.isNotBlank()) {
+            params["sort_by"] = sortBy
+        }
+        val json = requestJson("GET", "/api/mobile/adjustments/products-lookup", params)
+        val arr = json.optJSONArray("products") ?: JSONArray()
+        val list = mutableListOf<AdjustmentCatalogProduct>()
+        for (i in 0 until arr.length()) {
+            val p = arr.getJSONObject(i)
+            list.add(
+                AdjustmentCatalogProduct(
+                    id = p.optInt("id"),
+                    sku = p.optString("sku", ""),
+                    name = p.optString("name", ""),
+                    uom = p.optString("uom", "pcs."),
+                    salesUom = p.optString("sales_uom", ""),
+                    salesRatio = p.optDouble("sales_ratio", 1.0),
+                    imageUrl = p.optString("image_url", ""),
+                    categoryName = p.optString("category_name", "General"),
+                    onHandQty = p.optDouble("on_hand_qty", 0.0),
+                    reservedQty = p.optDouble("reserved_qty", 0.0),
+                    sublocation = p.optString("sublocation", "")
+                )
+            )
+        }
+        return list
+    }
+
+    suspend fun saveAdjustment(
+        adjustmentId: Int,
+        adjustmentNumber: String,
+        locationId: Int,
+        adjustmentDateIso: String,
+        reason: String,
+        notes: String,
+        auditor: String,
+        refDoc: String,
+        auditDept: String,
+        status: String,
+        lines: List<StockAdjustmentLine>
+    ): Pair<Int, String> {
+        val lineArr = JSONArray()
+        for (ln in lines) {
+            lineArr.put(
+                JSONObject().apply {
+                    put("product_id", ln.productId)
+                    put("uom", ln.uom)
+                    put("uom_factor", ln.uomFactor)
+                    put("sublocation", ln.sublocation)
+                    put("change_qty", ln.diffQty)
+                    put("final_qty", ln.newQty)
+                }
+            )
+        }
+        val body = JSONObject().apply {
+            if (adjustmentId > 0) put("adjustment_id", adjustmentId)
+            put("adjustment_number", adjustmentNumber)
+            put("location_id", locationId)
+            put("adjustment_date_iso", adjustmentDateIso)
+            put("reason", reason)
+            put("notes", notes)
+            put("auditor", auditor)
+            put("ref_doc", refDoc)
+            put("audit_dept", auditDept)
+            put("status", status)
+            put("lines", lineArr)
+        }
+        val json = requestJson("POST", "/api/mobile/adjustments/save", body = body)
+        return json.optInt("adjustment_id", adjustmentId) to json.optString("message", "Saved")
+    }
+
+    suspend fun deleteAdjustment(adjId: Int): String {
+        val json = requestJson("POST", "/api/mobile/adjustments/$adjId/delete", body = JSONObject())
+        return json.optString("message", "Deleted")
+    }
+
     suspend fun getMonthlyExpenses(monthKey: String, branch: String): MonthlyExpensesData {
         val params = mutableMapOf("branch" to branch)
         if (monthKey.isNotBlank()) params["month"] = monthKey
@@ -1307,6 +1506,255 @@ class ApiClient(private val session: SessionManager) {
             paymentMethods = pms,
             orders = orders
         )
+    }
+
+    suspend fun getPriceList(query: String = "", categoryId: Int? = null): PriceListResult {
+        val params = mutableMapOf<String, String>()
+        if (query.isNotBlank()) params["q"] = query
+        if (categoryId != null && categoryId > 0) params["category_id"] = categoryId.toString()
+        val json = requestJson("GET", "/api/mobile/price-list", params)
+
+        val catsArr = json.optJSONArray("categories") ?: JSONArray()
+        val categories = mutableListOf<PriceListCategory>()
+        for (i in 0 until catsArr.length()) {
+            val c = catsArr.getJSONObject(i)
+            categories.add(
+                PriceListCategory(
+                    id = c.optInt("id"),
+                    name = c.optString("name", "General"),
+                    color = c.optString("color", "#047857"),
+                    productCount = c.optInt("product_count", 0)
+                )
+            )
+        }
+
+        val schArr = json.optJSONArray("pricing_schemes") ?: JSONArray()
+        val schemes = mutableListOf<PricingSchemeItem>()
+        for (i in 0 until schArr.length()) {
+            val s = schArr.getJSONObject(i)
+            schemes.add(
+                PricingSchemeItem(
+                    id = s.optInt("id"),
+                    name = s.optString("name", "Retail 1"),
+                    currency = s.optString("currency", "USD"),
+                    isDefault = s.optBoolean("is_default", false)
+                )
+            )
+        }
+
+        val itemsArr = json.optJSONArray("items") ?: JSONArray()
+        val items = mutableListOf<PriceListCardItem>()
+        for (i in 0 until itemsArr.length()) {
+            val p = itemsArr.getJSONObject(i)
+            val dlArr = p.optJSONArray("detail_lines") ?: JSONArray()
+            val detailLines = mutableListOf<String>()
+            for (j in 0 until dlArr.length()) detailLines.add(dlArr.optString(j, ""))
+            items.add(
+                PriceListCardItem(
+                    id = p.optInt("id"),
+                    sku = p.optString("sku", ""),
+                    name = p.optString("name", ""),
+                    uom = p.optString("uom", "pcs."),
+                    categoryId = p.optInt("category_id", 0),
+                    categoryName = p.optString("category_name", "General"),
+                    imageUrl = p.optString("image_url", ""),
+                    badge = p.optString("badge", ""),
+                    dimStr = p.optString("dim_str", ""),
+                    pcsCase = p.optDouble("pcs_case", 400.0),
+                    packsPerCase = p.optDouble("packs_per_case", 8.0),
+                    pcsPerPack = p.optDouble("pcs_per_pack", 50.0),
+                    detailLines = detailLines,
+                    tierQty1 = p.optInt("tier_qty_1", 100),
+                    tierQty2 = p.optInt("tier_qty_2", 200),
+                    tierQty3 = p.optInt("tier_qty_3", 400),
+                    uPrice1 = p.optDouble("u_price_1", 0.0),
+                    uPrice2 = p.optDouble("u_price_2", 0.0),
+                    uPrice3 = p.optDouble("u_price_3", 0.0),
+                    totPrice1 = p.optDouble("tot_price_1", 0.0),
+                    totPrice2 = p.optDouble("tot_price_2", 0.0),
+                    totPrice3 = p.optDouble("tot_price_3", 0.0),
+                    schemePricesPcs = parseDoubleMap(p.optJSONObject("scheme_prices_pcs"))
+                )
+            )
+        }
+
+        return PriceListResult(
+            totalProducts = json.optInt("total_products", items.size),
+            filteredCount = json.optInt("filtered_count", items.size),
+            categories = categories,
+            pricingSchemes = schemes,
+            items = items
+        )
+    }
+
+    suspend fun getSettingsOverview(): MobileSettingsOverview {
+        val json = requestJson("GET", "/api/mobile/settings/overview")
+        val c = json.optJSONObject("company") ?: JSONObject()
+        val company = CompanySettingsData(
+            name = c.optString("name", ""),
+            phone = c.optString("phone", ""),
+            email = c.optString("email", ""),
+            website = c.optString("website", ""),
+            address1 = c.optString("address1", ""),
+            city = c.optString("city", ""),
+            country = c.optString("country", ""),
+            taxNumber = c.optString("tax_number", ""),
+            currencyCode = c.optString("currency_code", "USD"),
+            currencySymbol = c.optString("currency_symbol", "$"),
+            decimalPlacesPrice = c.optInt("decimal_places_price", 2),
+            decimalPlacesCost = c.optInt("decimal_places_cost", 3),
+            decimalPlacesQty = c.optInt("decimal_places_qty", 0),
+            decimalPlacesMarkup = c.optInt("decimal_places_markup", 2),
+            decimalPlacesTotal = c.optInt("decimal_places_total", 2),
+            decimalPlacesMeasurement = c.optInt("decimal_places_measurement", 2)
+        )
+        val invObj = json.optJSONObject("invoice_settings") ?: JSONObject()
+        val invoice = InvoiceSettingsData(
+            shopNameKh = invObj.optString("shop_name_kh", ""),
+            shopNameEn = invObj.optString("shop_name_en", ""),
+            invoiceTitleKh = invObj.optString("invoice_title_kh", "វិក្កយបត្រ"),
+            invoiceTitleEn = invObj.optString("invoice_title_en", "INVOICE"),
+            phone = invObj.optString("phone", ""),
+            vatTin = invObj.optString("vat_tin", ""),
+            enableKhrTotal = invObj.optBoolean("enable_khr_total", true),
+            khrExchangeRate = invObj.optDouble("khr_exchange_rate", 4100.0),
+            bankName = invObj.optString("bank_name", ""),
+            accountName = invObj.optString("account_name", ""),
+            accountNumber = invObj.optString("account_number", ""),
+            paymentTerms = invObj.optString("payment_terms", ""),
+            footerNotesEn = invObj.optString("footer_notes_en", ""),
+            showSku = invObj.optBoolean("show_sku", true),
+            showTax = invObj.optBoolean("show_tax", false),
+            showSignature = invObj.optBoolean("show_signature", true)
+        )
+        val schArr = json.optJSONArray("pricing_schemes") ?: JSONArray()
+        val schemes = mutableListOf<SettingsSchemeInfo>()
+        for (i in 0 until schArr.length()) {
+            val s = schArr.getJSONObject(i)
+            schemes.add(SettingsSchemeInfo(s.optInt("id"), s.optString("name", ""), s.optString("currency", "USD"), s.optBoolean("is_active", true), s.optBoolean("is_default", false)))
+        }
+        val locArr = json.optJSONArray("locations") ?: JSONArray()
+        val locations = mutableListOf<SettingsLocationInfo>()
+        for (i in 0 until locArr.length()) {
+            val l = locArr.getJSONObject(i)
+            locations.add(SettingsLocationInfo(l.optInt("id"), l.optString("name", ""), l.optBoolean("is_default", false), l.optBoolean("is_central", false)))
+        }
+        val catArr = json.optJSONArray("categories") ?: JSONArray()
+        val categories = mutableListOf<AdjustmentCategoryOption>()
+        for (i in 0 until catArr.length()) {
+            val ct = catArr.getJSONObject(i)
+            categories.add(AdjustmentCategoryOption(ct.optInt("id"), ct.optString("name", ""), ct.optInt("product_count", 0)))
+        }
+        val usrArr = json.optJSONArray("users") ?: JSONArray()
+        val users = mutableListOf<SettingsUserInfo>()
+        for (i in 0 until usrArr.length()) {
+            val u = usrArr.getJSONObject(i)
+            users.add(SettingsUserInfo(u.optInt("id"), u.optString("username", ""), u.optString("display_name", ""), u.optString("role", "user"), u.optBoolean("is_active", true), u.optString("branch_name", "")))
+        }
+        val bkArr = json.optJSONArray("backups") ?: JSONArray()
+        val backups = mutableListOf<SettingsBackupInfo>()
+        for (i in 0 until bkArr.length()) {
+            val b = bkArr.getJSONObject(i)
+            backups.add(SettingsBackupInfo(b.optString("filename", ""), b.optString("formatted_size", ""), b.optString("created_at", "")))
+        }
+        val counts = json.optJSONObject("counts") ?: JSONObject()
+        return MobileSettingsOverview(
+            company = company,
+            invoice = invoice,
+            pricingSchemes = schemes,
+            locations = locations,
+            categories = categories,
+            users = users,
+            backups = backups,
+            productsCount = counts.optInt("products", 0),
+            customersCount = counts.optInt("customers", 0),
+            salesOrdersCount = counts.optInt("sales_orders", 0),
+            locationsCount = counts.optInt("locations", locations.size)
+        )
+    }
+
+    suspend fun saveCompanySettings(data: CompanySettingsData): String {
+        val body = JSONObject().apply {
+            put("name", data.name)
+            put("phone", data.phone)
+            put("email", data.email)
+            put("website", data.website)
+            put("address1", data.address1)
+            put("city", data.city)
+            put("country", data.country)
+            put("tax_number", data.taxNumber)
+        }
+        val json = requestJson("POST", "/api/mobile/settings/company", body = body)
+        return json.optString("message", "Saved")
+    }
+
+    suspend fun savePricingSettings(
+        currencyCode: String,
+        currencySymbol: String,
+        khrRate: Double,
+        enableKhrTotal: Boolean,
+        defaultSchemeId: Int?
+    ): String {
+        val body = JSONObject().apply {
+            put("currency_code", currencyCode)
+            put("currency_symbol", currencySymbol)
+            put("khr_exchange_rate", khrRate)
+            put("enable_khr_total", enableKhrTotal)
+            if (defaultSchemeId != null && defaultSchemeId > 0) put("default_scheme_id", defaultSchemeId)
+        }
+        val json = requestJson("POST", "/api/mobile/settings/pricing", body = body)
+        return json.optString("message", "Saved")
+    }
+
+    suspend fun saveDecimalSettings(
+        price: Int,
+        cost: Int,
+        qty: Int,
+        markup: Int,
+        total: Int,
+        measurement: Int
+    ): String {
+        val body = JSONObject().apply {
+            put("decimal_places_price", price)
+            put("decimal_places_cost", cost)
+            put("decimal_places_qty", qty)
+            put("decimal_places_markup", markup)
+            put("decimal_places_total", total)
+            put("decimal_places_measurement", measurement)
+        }
+        val json = requestJson("POST", "/api/mobile/settings/decimals", body = body)
+        return json.optString("message", "Saved")
+    }
+
+    suspend fun saveInvoiceSettings(inv: InvoiceSettingsData): String {
+        val body = JSONObject().apply {
+            put("shop_name_kh", inv.shopNameKh)
+            put("shop_name_en", inv.shopNameEn)
+            put("invoice_title_kh", inv.invoiceTitleKh)
+            put("invoice_title_en", inv.invoiceTitleEn)
+            put("phone", inv.phone)
+            put("vat_tin", inv.vatTin)
+            put("bank_name", inv.bankName)
+            put("account_name", inv.accountName)
+            put("account_number", inv.accountNumber)
+            put("payment_terms", inv.paymentTerms)
+            put("footer_notes_en", inv.footerNotesEn)
+            put("show_sku", inv.showSku)
+            put("show_tax", inv.showTax)
+            put("show_signature", inv.showSignature)
+        }
+        val json = requestJson("POST", "/api/mobile/settings/invoice", body = body)
+        return json.optString("message", "Saved")
+    }
+
+    suspend fun toggleUserActive(uid: Int): Pair<Boolean, String> {
+        val json = requestJson("POST", "/api/mobile/settings/users/$uid/toggle", body = JSONObject())
+        return json.optBoolean("is_active", true) to json.optString("message", "Updated")
+    }
+
+    suspend fun createCloudBackup(): String {
+        val json = requestJson("POST", "/api/mobile/settings/backup/create", body = JSONObject())
+        return json.optString("message", "Backup created")
     }
 
     fun buildWebPortalUrl(nextPath: String = "/"): String {

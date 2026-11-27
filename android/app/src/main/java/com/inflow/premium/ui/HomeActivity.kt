@@ -23,6 +23,7 @@ import com.inflow.premium.data.ApiException
 import com.inflow.premium.data.CategoryStockSlice
 import com.inflow.premium.data.SessionManager
 import com.inflow.premium.databinding.ActivityHomeBinding
+import com.inflow.premium.databinding.DialogQuickCustomerBinding
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -105,23 +106,17 @@ class HomeActivity : AppCompatActivity() {
         binding.btnActionNewPo.setOnClickListener { openWebPath("/purchases/new") }
         binding.wfPo.setOnClickListener { startActivity(Intent(this, PurchaseOrdersActivity::class.java)) }
 
-        binding.btnActionAdjustStock.setOnClickListener { openWebPath("/inventory/adjustments/new") }
-        binding.btnActionTransferStock.setOnClickListener {
-            startActivity(
-                Intent(this, StockTransferDetailActivity::class.java)
-                    .putExtra(StockTransferDetailActivity.EXTRA_TRANSFER_ID, 0)
-            )
-        }
+        binding.btnActionNewCustomer.setOnClickListener { openQuickAddCustomerDialog() }
 
         binding.wfInventory.setOnClickListener { switchToTab(ProductsActivity::class.java) }
         binding.cardKpiProducts.setOnClickListener { switchToTab(ProductsActivity::class.java) }
 
-        binding.wfVendor.setOnClickListener { startActivity(Intent(this, VendorsActivity::class.java)) }
+        binding.wfPriceList.setOnClickListener { startActivity(Intent(this, PriceListActivity::class.java)) }
         binding.wfCustomer.setOnClickListener { startActivity(Intent(this, CustomersActivity::class.java)) }
         binding.wfExpenses.setOnClickListener { startActivity(Intent(this, MonthlyExpensesActivity::class.java)) }
         binding.wfReports.setOnClickListener { switchToTab(ReportActivity::class.java) }
         binding.wfTransfer.setOnClickListener { startActivity(Intent(this, StockTransfersActivity::class.java)) }
-        binding.wfCurrentStock.setOnClickListener { startActivity(Intent(this, CurrentStockActivity::class.java)) }
+        binding.wfStockAdjust.setOnClickListener { startActivity(Intent(this, StockAdjustmentsActivity::class.java)) }
 
         binding.cardKpiMonthSales.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
         binding.cardKpiReceivables.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
@@ -146,14 +141,20 @@ class HomeActivity : AppCompatActivity() {
     }
 
     private fun showBranchPicker() {
+        if (session.selectedBranch == "all") {
+            session.selectedBranch = "main"
+        }
+
         val options = mutableListOf<Pair<String, String>>()
         options.add("main" to "Main Store (HQ)")
         for (b in session.getBranches()) {
-            if (b.id != "0" && b.id != "main") {
+            val lower = b.name.lowercase()
+            if (b.id != "0" && b.id != "main" && !b.code.equals("ALL", true) &&
+                !lower.contains("all stores") && !lower.contains("all branch") && !lower.contains("consolidated")
+            ) {
                 options.add(b.id to b.name)
             }
         }
-        options.add("all" to "All Branches")
 
         val labels = options.map { it.second }.toTypedArray()
         val checkedIdx = options.indexOfFirst { it.first == session.selectedBranch }.coerceAtLeast(0)
@@ -180,11 +181,18 @@ class HomeActivity : AppCompatActivity() {
                 val dash = api.getDashboard(session.selectedBranch)
                 val moneyFmt = DecimalFormat("#,##0.00")
 
-                binding.tvHomeStoreName.text = dash.storeName
-                binding.tvHomeStoreBadge.text = dash.storeBadge.uppercase(Locale.US)
-                binding.tvMetaFulfillment.text = "📍 Fulfillment: ${dash.fulfillmentName}"
-                binding.tvMetaCatalog.text = "📦 Catalog: ${dash.totalProducts} Products"
-                binding.tvMetaBranches.text = "🏪 Branches: ${dash.activeBranchesCount} Active Outlets"
+                val badgeRaw = dash.storeBadge.trim().uppercase(Locale.US)
+                val shortCode = when {
+                    session.selectedBranch == "main" || dash.storeName.contains("HQ", ignoreCase = true) -> "HQ"
+                    session.selectedBranch == "all" -> "ALL"
+                    badgeRaw.isNotBlank() && badgeRaw.length <= 4 -> badgeRaw
+                    else -> dash.storeName.trim().take(3).uppercase(Locale.US).ifBlank { "BR" }
+                }
+                binding.tvHomeBranchCode.text = shortCode
+                val shortWh = dash.fulfillmentName.removePrefix("Main ").trim().ifBlank { dash.fulfillmentName }
+                binding.tvMetaFulfillment.text = "📍 $shortWh"
+                binding.tvMetaCatalog.text = "📦 ${dash.totalProducts} Items"
+                binding.tvMetaBranches.text = "🏢 ${dash.activeBranchesCount} Outlets"
 
                 binding.tvKpiInvValue.text = "$${moneyFmt.format(dash.inventoryValuation)}"
                 binding.tvKpiProducts.text = "${dash.totalProducts} items"
@@ -252,6 +260,57 @@ class HomeActivity : AppCompatActivity() {
             row.addView(label)
             binding.llCategoryLegend.addView(row)
         }
+    }
+
+    private fun openQuickAddCustomerDialog() {
+        val qb = DialogQuickCustomerBinding.inflate(layoutInflater)
+        val dlg = MaterialAlertDialogBuilder(this)
+            .setTitle("Quick Add Customer")
+            .setView(qb.root)
+            .setPositiveButton("Create Customer", null)
+            .setNegativeButton("Cancel") { d, _ -> d.dismiss() }
+            .setCancelable(false)
+            .create()
+
+        attachEscClose(dlg)
+        dlg.setCanceledOnTouchOutside(false)
+        dlg.setOnShowListener {
+            val btnOk = dlg.getButton(AlertDialog.BUTTON_POSITIVE)
+            btnOk.setOnClickListener {
+                val name = qb.etQcName.text?.toString()?.trim().orEmpty()
+                if (name.isBlank()) {
+                    Toast.makeText(this, "Customer name is required", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+                val bId = session.selectedBranch.toIntOrNull()
+                btnOk.isEnabled = false
+                uiScope.launch {
+                    try {
+                        val created = api.quickAddCustomer(
+                            name = name,
+                            contactName = qb.etQcContact.text?.toString()?.trim().orEmpty(),
+                            phone = qb.etQcPhone.text?.toString()?.trim().orEmpty(),
+                            address = qb.etQcAddress.text?.toString()?.trim().orEmpty(),
+                            branchId = bId
+                        )
+                        dlg.dismiss()
+                        Toast.makeText(
+                            this@HomeActivity,
+                            "Customer added: ${created.name}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } catch (e: Exception) {
+                        btnOk.isEnabled = true
+                        Toast.makeText(
+                            this@HomeActivity,
+                            e.message ?: "Failed to create customer",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+        }
+        dlg.show()
     }
 
     private fun attachEscClose(dialog: AlertDialog) {

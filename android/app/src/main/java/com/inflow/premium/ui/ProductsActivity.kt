@@ -134,9 +134,6 @@ class ProductsActivity : AppCompatActivity() {
             popup.show()
         }
 
-        binding.tvProdSortHeader.setOnClickListener { toggleSort() }
-        binding.tvProdCount.setOnClickListener { showFilterMenu() }
-
         binding.btnClearSearch.setOnClickListener {
             binding.etProductSearch.setText("")
         }
@@ -171,9 +168,17 @@ class ProductsActivity : AppCompatActivity() {
         loadProducts()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::binding.isInitialized) {
+            binding.etProductSearch.clearFocus()
+            binding.root.requestFocus()
+            BottomNavHelper.dismissKeyboardAndClearFocus(this)
+        }
+    }
+
     private fun toggleSort() {
         sortAsc = !sortAsc
-        binding.tvProdSortHeader.text = if (sortAsc) "PRODUCT ▲" else "PRODUCT ▼"
         applySortedList()
     }
 
@@ -263,8 +268,6 @@ class ProductsActivity : AppCompatActivity() {
                 loadedItems.clear()
                 loadedItems.addAll(res.products)
                 applySortedList()
-                val fmtCount = DecimalFormat("#,###").format(res.totalCount)
-                binding.tvProdCount.text = "$fmtCount Items ⌄"
                 binding.tvEmptyProducts.visibility = if (res.products.isEmpty()) View.VISIBLE else View.GONE
             } catch (e: ApiException) {
                 if (e.statusCode == 401) {

@@ -697,3 +697,213 @@ data class CustomerOrderHistoryReport(
     val paymentMethods: List<String>,
     val orders: List<CustomerHistoryOrder>
 )
+
+data class PriceListCategory(
+    val id: Int,
+    val name: String,
+    val color: String,
+    val productCount: Int
+)
+
+data class PriceListCardItem(
+    val id: Int,
+    val sku: String,
+    val name: String,
+    val uom: String,
+    val categoryId: Int,
+    val categoryName: String,
+    val imageUrl: String,
+    val badge: String,
+    val dimStr: String,
+    val pcsCase: Double,
+    val packsPerCase: Double,
+    val pcsPerPack: Double,
+    val detailLines: List<String>,
+    val tierQty1: Int,
+    val tierQty2: Int,
+    val tierQty3: Int,
+    val uPrice1: Double,
+    val uPrice2: Double,
+    val uPrice3: Double,
+    val totPrice1: Double,
+    val totPrice2: Double,
+    val totPrice3: Double,
+    val schemePricesPcs: Map<String, Double> = emptyMap()
+)
+
+data class PriceListResult(
+    val totalProducts: Int,
+    val filteredCount: Int,
+    val categories: List<PriceListCategory>,
+    val pricingSchemes: List<PricingSchemeItem>,
+    val items: List<PriceListCardItem>
+)
+
+data class StockAdjustmentStats(
+    val total: Int,
+    val draft: Int,
+    val completed: Int
+)
+
+data class StockAdjustmentSummary(
+    val id: Int,
+    val adjustmentNumber: String,
+    val adjustmentDate: String,
+    val adjustmentDateIso: String,
+    val status: String,
+    val reason: String,
+    val notes: String,
+    val locationId: Int,
+    val locationName: String,
+    val createdBy: String,
+    val itemCount: Int,
+    val netChangeUnits: Double
+)
+
+data class StockAdjustmentListResult(
+    val stats: StockAdjustmentStats,
+    val locations: List<TransferLocationOption>,
+    val adjustments: List<StockAdjustmentSummary>
+)
+
+data class StockAdjustmentLine(
+    val productId: Int,
+    val sku: String,
+    val name: String,
+    var uom: String,
+    val baseUom: String,
+    val salesUom: String,
+    val salesRatio: Double,
+    var uomFactor: Double,
+    val imageUrl: String,
+    var sublocation: String,
+    val oldQty: Double,
+    var diffQty: Double,
+    var newQty: Double,
+    val onHandQty: Double,
+    val reservedQty: Double,
+    val categoryName: String = "General"
+)
+
+data class AdjustmentCategoryOption(
+    val id: Int,
+    val name: String,
+    val productCount: Int
+)
+
+data class StockAdjustmentDetail(
+    val id: Int,
+    val adjustmentNumber: String,
+    val adjustmentDate: String,
+    val adjustmentDateIso: String,
+    val status: String,
+    val locationId: Int,
+    val locationName: String,
+    val auditor: String,
+    val refDoc: String,
+    val auditDept: String,
+    val reason: String,
+    val notes: String,
+    val itemsChanged: Int,
+    val netChangeUnits: Double,
+    val totalActiveProducts: Int,
+    val locations: List<TransferLocationOption>,
+    val categories: List<AdjustmentCategoryOption>,
+    val lines: List<StockAdjustmentLine>
+)
+
+data class AdjustmentCatalogProduct(
+    val id: Int,
+    val sku: String,
+    val name: String,
+    val uom: String,
+    val salesUom: String,
+    val salesRatio: Double,
+    val imageUrl: String,
+    val categoryName: String,
+    val onHandQty: Double,
+    val reservedQty: Double,
+    val sublocation: String
+)
+
+data class CompanySettingsData(
+    val name: String,
+    val phone: String,
+    val email: String,
+    val website: String,
+    val address1: String,
+    val city: String,
+    val country: String,
+    val taxNumber: String,
+    val currencyCode: String,
+    val currencySymbol: String,
+    val decimalPlacesPrice: Int,
+    val decimalPlacesCost: Int,
+    val decimalPlacesQty: Int,
+    val decimalPlacesMarkup: Int,
+    val decimalPlacesTotal: Int,
+    val decimalPlacesMeasurement: Int
+)
+
+data class InvoiceSettingsData(
+    val shopNameKh: String,
+    val shopNameEn: String,
+    val invoiceTitleKh: String,
+    val invoiceTitleEn: String,
+    val phone: String,
+    val vatTin: String,
+    val enableKhrTotal: Boolean,
+    val khrExchangeRate: Double,
+    val bankName: String,
+    val accountName: String,
+    val accountNumber: String,
+    val paymentTerms: String,
+    val footerNotesEn: String,
+    val showSku: Boolean,
+    val showTax: Boolean,
+    val showSignature: Boolean
+)
+
+data class SettingsSchemeInfo(
+    val id: Int,
+    val name: String,
+    val currency: String,
+    val isActive: Boolean,
+    val isDefault: Boolean
+)
+
+data class SettingsLocationInfo(
+    val id: Int,
+    val name: String,
+    val isDefault: Boolean,
+    val isCentral: Boolean
+)
+
+data class SettingsUserInfo(
+    val id: Int,
+    val username: String,
+    val displayName: String,
+    val role: String,
+    var isActive: Boolean,
+    val branchName: String
+)
+
+data class SettingsBackupInfo(
+    val filename: String,
+    val formattedSize: String,
+    val createdAt: String
+)
+
+data class MobileSettingsOverview(
+    val company: CompanySettingsData,
+    val invoice: InvoiceSettingsData,
+    val pricingSchemes: List<SettingsSchemeInfo>,
+    val locations: List<SettingsLocationInfo>,
+    val categories: List<AdjustmentCategoryOption>,
+    val users: List<SettingsUserInfo>,
+    val backups: List<SettingsBackupInfo>,
+    val productsCount: Int,
+    val customersCount: Int,
+    val salesOrdersCount: Int,
+    val locationsCount: Int
+)

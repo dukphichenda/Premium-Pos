@@ -339,9 +339,12 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
                 binding.tvCohPageBadge.text = "Page ${res.page} / ${res.totalPages}"
                 binding.tvCohPageIndicator.text = "${res.page} / ${res.totalPages}"
 
+                val pageTotal = res.orders.sumOf { it.totalAmount }
                 binding.tvCohTotalOrders.text = "${res.totalOrders} Orders"
                 binding.tvCohCollectionPct.text = "✓ ${res.collectionPct}% Paid"
                 binding.tvCohPeriodRevenue.text = "$${moneyFmt.format(res.periodRevenue)}"
+                binding.tvCohFooterTotalAmount.text = "$${moneyFmt.format(res.periodRevenue)}"
+                binding.tvCohTotalSub.text = "${res.totalOrders} orders (${res.paidOrders} paid) • Page: $${moneyFmt.format(pageTotal)}"
 
                 adapter.submitList(res.orders)
                 binding.tvCohEmpty.visibility = if (res.orders.isEmpty()) View.VISIBLE else View.GONE

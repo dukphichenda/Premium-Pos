@@ -103,6 +103,15 @@ class SalesOrdersActivity : AppCompatActivity() {
         refreshBootstrapThenLoad()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::binding.isInitialized) {
+            binding.etSearch.clearFocus()
+            binding.root.requestFocus()
+            BottomNavHelper.dismissKeyboardAndClearFocus(this)
+        }
+    }
+
     private fun setupRecycler() {
         adapter = SalesOrdersAdapter { order ->
             openOrderDetail(order.id)

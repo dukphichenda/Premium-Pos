@@ -112,7 +112,16 @@ def _get_bootstrap_payload():
     user_bid = _get_user_branch_id()
 
     if is_main:
-        branches = query_all("SELECT id, code, name, color FROM branches WHERE is_active = TRUE ORDER BY id ASC")
+        branches = query_all("""
+            SELECT id, code, name, color
+            FROM branches
+            WHERE is_active = TRUE
+              AND COALESCE(LOWER(code), '') NOT IN ('all', 'consolidated')
+              AND COALESCE(LOWER(name), '') NOT LIKE 'all stores%%'
+              AND COALESCE(LOWER(name), '') NOT LIKE 'all branch%%'
+              AND COALESCE(LOWER(name), '') NOT LIKE '%%consolidated%%'
+            ORDER BY id ASC
+        """)
     else:
         branches = query_all("SELECT id, code, name, color FROM branches WHERE id = %s", (user_bid,)) if user_bid else []
 
@@ -2372,6 +2381,515 @@ def mobile_transfer_delete(trf_id):
     return jsonify({'success': True, 'message': f"Draft {trf['transfer_number']} deleted."})
 
 
+def _next_adjustment_number():
+    try:
+        row = query_one(
+            "SELECT MAX(SUBSTRING(adjustment_number FROM '[0-9]+')::bigint) as max_val "
+            "FROM stock_adjustments WHERE adjustment_number ~ 'ADJ-[0-9]+'"
+        )
+        max_val = row['max_val'] if row and row.get('max_val') else 0
+        return f"ADJ-{max_val + 1:05d}"
+    except Exception:
+        seq = get_next_sequence_val('adj_number_seq')
+        return f"ADJ-{seq:05d}"
+
+
+@mobile_api_bp.route('/api/mobile/adjustments', methods=['GET'])
+@mobile_auth_required
+def mobile_adjustments_list():
+    """List stock adjustments ledger with status counts, search, and warehouse filter."""
+    status_filter = (request.args.get('status') or 'all').strip().upper()
+    search = (request.args.get('q') or '').strip()
+    location_id = (request.args.get('location_id') or '').strip()
+
+    stats_row = query_one("""
+        SELECT
+            COUNT(*) as total_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(status, 'COMPLETED')) = 'DRAFT') as draft_count,
+            COUNT(*) FILTER (WHERE UPPER(COALESCE(status, 'COMPLETED')) = 'COMPLETED') as completed_count
+        FROM stock_adjustments
+    """) or {}
+
+    where_clauses = ["1=1"]
+    params = []
+    if status_filter == 'DRAFT':
+        where_clauses.append("UPPER(COALESCE(sa.status, 'COMPLETED')) = 'DRAFT'")
+    elif status_filter == 'COMPLETED':
+        where_clauses.append("UPPER(COALESCE(sa.status, 'COMPLETED')) = 'COMPLETED'")
+
+    if search:
+        where_clauses.append(
+            "(sa.adjustment_number ILIKE %s OR COALESCE(sa.reason, '') ILIKE %s "
+            "OR COALESCE(sa.notes, '') ILIKE %s OR COALESCE(l.name, '') ILIKE %s)"
+        )
+        like_q = f"%{search}%"
+        params.extend([like_q, like_q, like_q, like_q])
+
+    if location_id:
+        try:
+            lid = int(location_id)
+            where_clauses.append("sa.location_id = %s")
+            params.append(lid)
+        except ValueError:
+            pass
+
+    rows = query_all(f"""
+        SELECT
+            sa.id,
+            sa.adjustment_number,
+            sa.adjustment_date,
+            sa.reason,
+            sa.notes,
+            COALESCE(sa.status, 'COMPLETED') as status,
+            sa.location_id,
+            COALESCE(l.name, '') as location_name,
+            COALESCE(sa.created_by, '') as created_by,
+            COUNT(sal.id) as item_count,
+            COALESCE(SUM(sal.diff_qty), 0) as net_change_units
+        FROM stock_adjustments sa
+        LEFT JOIN locations l ON sa.location_id = l.id
+        LEFT JOIN stock_adjustment_lines sal ON sa.id = sal.adjustment_id
+        WHERE {" AND ".join(where_clauses)}
+        GROUP BY sa.id, l.name
+        ORDER BY sa.adjustment_date DESC, sa.id DESC
+        LIMIT 100
+    """, tuple(params))
+
+    locations = query_all("""
+        SELECT id, name, is_default
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_default DESC, is_central DESC, name ASC
+    """)
+
+    adjustments = []
+    for r in rows:
+        ad = r.get('adjustment_date')
+        ad_display = ad.strftime('%d %b %Y') if hasattr(ad, 'strftime') else str(ad or '')
+        ad_iso = ad.strftime('%Y-%m-%d') if hasattr(ad, 'strftime') else str(ad or '')
+        adjustments.append({
+            'id': r['id'],
+            'adjustment_number': r.get('adjustment_number') or '',
+            'adjustment_date': ad_display,
+            'adjustment_date_iso': ad_iso,
+            'status': (r.get('status') or 'COMPLETED').upper(),
+            'reason': r.get('reason') or 'Correction',
+            'notes': r.get('notes') or '',
+            'location_id': int(r.get('location_id') or 0),
+            'location_name': r.get('location_name') or '',
+            'created_by': r.get('created_by') or '',
+            'item_count': int(r.get('item_count') or 0),
+            'net_change_units': float(r.get('net_change_units') or 0),
+        })
+
+    return jsonify({
+        'success': True,
+        'stats': {
+            'total': int(stats_row.get('total_count') or 0),
+            'draft': int(stats_row.get('draft_count') or 0),
+            'completed': int(stats_row.get('completed_count') or 0),
+        },
+        'locations': [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations],
+        'adjustments': adjustments,
+    })
+
+
+@mobile_api_bp.route('/api/mobile/adjustments/<int:adj_id>', methods=['GET'])
+@mobile_auth_required
+def mobile_adjustment_detail(adj_id):
+    """Fetch stock adjustment detail or defaults for creating a new adjustment (adj_id=0)."""
+    import json as _json
+    locations = query_all("""
+        SELECT id, name, is_default
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_default DESC, is_central DESC, name ASC
+    """)
+
+    user_name = (g.mobile_user.get('display_name') or g.mobile_user.get('username') or 'admin') if getattr(g, 'mobile_user', None) else 'admin'
+    categories = query_all("""
+        SELECT c.id, c.name, COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON c.id = p.category_id AND p.is_active = TRUE AND p.is_sellable = TRUE
+        GROUP BY c.id, c.name
+        HAVING COUNT(p.id) > 0
+        ORDER BY c.name ASC
+    """)
+    total_active_row = query_one("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE AND is_sellable = TRUE")
+    total_active_prods = int(total_active_row['cnt']) if total_active_row else 0
+    cats_payload = [{'id': c['id'], 'name': c['name'], 'product_count': int(c.get('product_count') or 0)} for c in categories]
+
+    if adj_id == 0:
+        def_loc = locations[0] if locations else {'id': 0, 'name': ''}
+        return jsonify({
+            'success': True,
+            'locations': [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations],
+            'categories': cats_payload,
+            'total_active_products': total_active_prods,
+            'adjustment': {
+                'id': 0,
+                'adjustment_number': _next_adjustment_number(),
+                'adjustment_date': datetime.now().strftime('%d %b %Y'),
+                'adjustment_date_iso': datetime.now().strftime('%Y-%m-%d'),
+                'status': 'DRAFT',
+                'location_id': def_loc['id'],
+                'location_name': def_loc['name'],
+                'auditor': user_name,
+                'ref_doc': '',
+                'audit_dept': '',
+                'reason': 'Correction',
+                'notes': '',
+                'items_changed': 0,
+                'net_change_units': 0.0,
+                'lines': [],
+            }
+        })
+
+    adj = query_one("""
+        SELECT sa.*, COALESCE(l.name, '') as location_name
+        FROM stock_adjustments sa
+        LEFT JOIN locations l ON sa.location_id = l.id
+        WHERE sa.id = %s
+    """, (adj_id,))
+    if not adj:
+        return jsonify({'success': False, 'error': 'Stock adjustment not found'}), 404
+
+    custom_fields = {}
+    if adj.get('custom_fields_json'):
+        try:
+            custom_fields = _json.loads(adj['custom_fields_json']) if isinstance(adj['custom_fields_json'], str) else adj['custom_fields_json']
+        except Exception:
+            custom_fields = {}
+
+    loc_id = int(adj.get('location_id') or 0)
+    lines = query_all("""
+        SELECT
+            sal.*,
+            p.sku as product_sku,
+            p.name as product_name,
+            COALESCE(p.uom, 'pcs.') as product_uom,
+            COALESCE(p.sales_uom, '') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, p.sales_uom_ratio, 1.0) as sales_ratio,
+            COALESCE(p.image_url, '') as product_image_url,
+            COALESCE(inv.quantity, 0) as current_on_hand_qty,
+            COALESCE(NULLIF(inv.reserved_quantity, 0), open_so.reserved_qty, 0) as reserved_qty
+        FROM stock_adjustment_lines sal
+        JOIN products p ON sal.product_id = p.id
+        LEFT JOIN inventory inv ON p.id = inv.product_id AND inv.location_id = %s AND COALESCE(inv.sublocation, '') = COALESCE(sal.sublocation, '')
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
+        WHERE sal.adjustment_id = %s
+        ORDER BY sal.id ASC
+    """, (loc_id, loc_id, loc_id, adj_id))
+
+    ad = adj.get('adjustment_date')
+    ad_display = ad.strftime('%d %b %Y') if hasattr(ad, 'strftime') else str(ad or '')
+    ad_iso = ad.strftime('%Y-%m-%d') if hasattr(ad, 'strftime') else str(ad or '')
+
+    status = (adj.get('status') or 'COMPLETED').upper()
+    is_draft = (status == 'DRAFT')
+    line_items = []
+    net_change = 0.0
+    changed_count = 0
+
+    for l in lines:
+        old_qty = float(l.get('current_on_hand_qty') if (is_draft and l.get('current_on_hand_qty') is not None) else (l.get('old_qty') or 0.0))
+        diff_qty = float(l.get('diff_qty') or 0.0)
+        new_qty = (old_qty + diff_qty) if is_draft else float(l.get('new_qty') or 0.0)
+        net_change += diff_qty
+        if abs(diff_qty) > 0.0001:
+            changed_count += 1
+        line_items.append({
+            'product_id': l['product_id'],
+            'sku': l.get('product_sku') or '',
+            'name': l.get('product_name') or '',
+            'uom': l.get('uom') or l.get('product_uom') or 'pcs.',
+            'base_uom': l.get('product_uom') or 'pcs.',
+            'sales_uom': l.get('sales_uom') or '',
+            'sales_ratio': float(l.get('sales_ratio') or 1.0),
+            'uom_factor': float(l.get('uom_factor') or 1.0),
+            'image_url': l.get('product_image_url') or '',
+            'sublocation': l.get('sublocation') or '',
+            'old_qty': old_qty,
+            'diff_qty': diff_qty,
+            'new_qty': new_qty,
+            'on_hand_qty': float(l.get('current_on_hand_qty') or 0.0),
+            'reserved_qty': float(l.get('reserved_qty') or 0.0),
+        })
+
+    return jsonify({
+        'success': True,
+        'locations': [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations],
+        'categories': cats_payload,
+        'total_active_products': total_active_prods,
+        'adjustment': {
+            'id': adj['id'],
+            'adjustment_number': adj.get('adjustment_number') or '',
+            'adjustment_date': ad_display,
+            'adjustment_date_iso': ad_iso,
+            'status': status,
+            'location_id': loc_id,
+            'location_name': adj.get('location_name') or '',
+            'auditor': adj.get('created_by') or custom_fields.get('auditor') or '-',
+            'ref_doc': custom_fields.get('reference_doc') or '',
+            'audit_dept': custom_fields.get('tag') or '',
+            'reason': adj.get('reason') or 'Correction',
+            'notes': adj.get('notes') or '',
+            'items_changed': changed_count if changed_count > 0 else len(line_items),
+            'net_change_units': net_change,
+            'lines': line_items,
+        }
+    })
+
+
+@mobile_api_bp.route('/api/mobile/adjustments/products-lookup', methods=['GET'])
+@mobile_auth_required
+def mobile_adjustments_product_lookup():
+    """Read-only product catalog lookup with live location stock, category batching, and sorting."""
+    q = (request.args.get('q') or '').strip()
+    loc_id = int(request.args.get('location_id') or 0)
+    if not loc_id:
+        def_loc = query_one("SELECT id FROM locations WHERE is_default = TRUE LIMIT 1") or query_one("SELECT id FROM locations LIMIT 1")
+        loc_id = def_loc['id'] if def_loc else 100
+
+    raw_cats = (request.args.get('category_ids') or '').strip()
+    cat_ids = [int(c.strip()) for c in raw_cats.split(',') if c.strip().isdigit()]
+    fetch_all = (request.args.get('all') or 'false').strip().lower() in ('1', 'true', 'yes')
+    sort_by = (request.args.get('sort_by') or '').strip().lower()
+
+    where_clauses = ["p.is_active = TRUE", "p.is_sellable = TRUE"]
+    params = [loc_id, loc_id, loc_id]
+    if cat_ids:
+        where_clauses.append("p.category_id = ANY(%s)")
+        params.append(cat_ids)
+    if q:
+        where_clauses.append("(p.sku ILIKE %s OR p.name ILIKE %s OR COALESCE(p.barcode, '') ILIKE %s)")
+        like_q = f"%{q}%"
+        params.extend([like_q, like_q, like_q])
+
+    if sort_by in ('category', 'by_category'):
+        order_sql = "ORDER BY LOWER(COALESCE(c.name, 'General')) ASC, LOWER(p.name) ASC"
+    elif sort_by in ('lowest', 'lowest_stock'):
+        order_sql = "ORDER BY COALESCE(inv.quantity, 0) ASC, LOWER(p.name) ASC"
+    elif sort_by in ('highest', 'highest_stock'):
+        order_sql = "ORDER BY COALESCE(inv.quantity, 0) DESC, LOWER(p.name) ASC"
+    else:
+        order_sql = "ORDER BY LOWER(p.name) ASC"
+
+    limit_sql = "" if (fetch_all or cat_ids) else "LIMIT 60"
+    where_sql = " AND ".join(where_clauses)
+
+    rows = query_all(f"""
+        SELECT
+            p.id, p.sku, p.name, COALESCE(p.uom, 'pcs.') as uom,
+            COALESCE(p.sales_uom, '') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, p.sales_uom_ratio, 1.0) as sales_ratio,
+            COALESCE(p.image_url, '') as image_url,
+            COALESCE(c.name, 'General') as category_name,
+            COALESCE(inv.quantity, 0) as on_hand_qty,
+            COALESCE(NULLIF(inv.reserved_quantity, 0), open_so.reserved_qty, 0) as reserved_qty,
+            COALESCE(inv.sublocation, '') as sublocation
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN inventory inv ON inv.product_id = p.id AND inv.location_id = %s
+        LEFT JOIN (
+            SELECT sol.product_id, SUM(sol.quantity) as reserved_qty
+            FROM sales_order_lines sol
+            JOIN sales_orders so ON sol.sales_order_id = so.id
+            WHERE so.status NOT IN ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED')
+              AND (so.payment_status IS NULL OR so.payment_status != 'PAID')
+              AND (so.location_id = %s OR (so.location_id IS NULL AND %s = (SELECT id FROM locations WHERE is_default = TRUE LIMIT 1)))
+            GROUP BY sol.product_id
+        ) open_so ON p.id = open_so.product_id
+        WHERE {where_sql}
+        {order_sql}
+        {limit_sql}
+    """, tuple(params))
+
+    return jsonify({
+        'success': True,
+        'products': [
+            {
+                'id': r['id'],
+                'sku': r['sku'] or '',
+                'name': r['name'] or '',
+                'uom': r['uom'] or 'pcs.',
+                'sales_uom': r['sales_uom'] or '',
+                'sales_ratio': float(r['sales_ratio'] or 1.0),
+                'image_url': r['image_url'] or '',
+                'category_name': r['category_name'] or 'General',
+                'on_hand_qty': float(r['on_hand_qty'] or 0.0),
+                'reserved_qty': float(r['reserved_qty'] or 0.0),
+                'sublocation': r['sublocation'] or '',
+            }
+            for r in rows
+        ],
+    })
+
+
+@mobile_api_bp.route('/api/mobile/adjustments/save', methods=['POST'])
+@mobile_auth_required
+def mobile_adjustment_save():
+    """Save stock adjustment as DRAFT or execute COMPLETED stock reconciliation (never touches product catalog)."""
+    import json as _json
+    try:
+        data = request.get_json(silent=True) or {}
+        adj_id = int(data.get('adjustment_id') or 0) or None
+        adj_number = (data.get('adjustment_number') or '').strip()
+        location_id = int(data.get('location_id') or 0)
+        adj_date = (data.get('adjustment_date_iso') or data.get('adjustment_date') or datetime.now().strftime('%Y-%m-%d')).strip()
+        reason = (data.get('reason') or 'Correction').strip()
+        notes = (data.get('notes') or '').strip()
+        auditor = (data.get('auditor') or '').strip()
+        if not auditor and getattr(g, 'mobile_user', None):
+            auditor = g.mobile_user.get('display_name') or g.mobile_user.get('username') or 'admin'
+        if not auditor:
+            auditor = 'admin'
+        ref_doc = (data.get('ref_doc') or '').strip()
+        audit_dept = (data.get('audit_dept') or '').strip()
+        custom_fields_json = _json.dumps({'reference_doc': ref_doc, 'tag': audit_dept}) if (ref_doc or audit_dept) else None
+
+        status = (data.get('status') or 'DRAFT').strip().upper()
+        if status not in ('DRAFT', 'COMPLETED'):
+            status = 'DRAFT'
+
+        lines = data.get('lines') or []
+        if not location_id:
+            return jsonify({'success': False, 'error': 'Please select a warehouse location.'}), 400
+        if not lines:
+            return jsonify({'success': False, 'error': 'Please add at least one product to adjust.'}), 400
+        if not adj_number:
+            adj_number = _next_adjustment_number()
+
+        with get_db_cursor(commit=True) as cur:
+            if adj_id:
+                cur.execute("SELECT status, adjustment_number FROM stock_adjustments WHERE id = %s", (adj_id,))
+                existing = cur.fetchone()
+                if existing and (existing.get('status') or '').upper() == 'COMPLETED':
+                    return jsonify({'success': False, 'error': 'Completed stock adjustments are locked and cannot be edited.'}), 400
+                cur.execute("""
+                    UPDATE stock_adjustments SET
+                        location_id = %s, adjustment_date = %s, reason = %s,
+                        status = %s, notes = %s, custom_fields_json = %s, created_by = %s
+                    WHERE id = %s
+                    RETURNING id, adjustment_number;
+                """, (location_id, adj_date, reason, status, notes, custom_fields_json, auditor, adj_id))
+                row = cur.fetchone()
+                if row:
+                    adj_id = row['id']
+                    adj_number = row['adjustment_number'] or adj_number
+                else:
+                    adj_id = None
+
+            if not adj_id:
+                cur.execute("""
+                    INSERT INTO stock_adjustments (
+                        adjustment_number, location_id, adjustment_date, reason, status, notes, custom_fields_json, created_by
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING id;
+                """, (adj_number, location_id, adj_date, reason, status, notes, custom_fields_json, auditor))
+                adj_id = cur.fetchone()['id']
+
+            cur.execute("DELETE FROM stock_adjustment_lines WHERE adjustment_id = %s", (adj_id,))
+            total_lines = 0
+            for item in lines:
+                pid = int(item['product_id'])
+                subloc = (item.get('sublocation') or '').strip()
+                line_uom = (item.get('uom') or 'pcs.').strip()
+                uom_factor = float(item.get('uom_factor') or 1.0)
+                if uom_factor <= 0:
+                    uom_factor = 1.0
+
+                if status == 'COMPLETED':
+                    cur.execute(
+                        "SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s AND sublocation = %s FOR UPDATE",
+                        (pid, location_id, subloc)
+                    )
+                else:
+                    cur.execute(
+                        "SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s AND sublocation = %s",
+                        (pid, location_id, subloc)
+                    )
+                cur_inv = cur.fetchone()
+                old_qty = float(cur_inv['qty']) if cur_inv else 0.0
+
+                if item.get('change_qty') is not None and str(item.get('change_qty')).strip() != '':
+                    diff_qty = float(item['change_qty'])
+                    new_qty = old_qty + diff_qty
+                elif item.get('final_qty') is not None:
+                    new_qty = float(item['final_qty'])
+                    diff_qty = new_qty - old_qty
+                elif item.get('new_qty') is not None:
+                    new_qty = float(item['new_qty'])
+                    diff_qty = new_qty - old_qty
+                else:
+                    continue
+
+                cur.execute("SELECT average_cost, standard_cost FROM products WHERE id = %s", (pid,))
+                prod = cur.fetchone()
+                unit_cost = float(prod['average_cost'] or prod['standard_cost'] or 0) if prod else 0.0
+
+                cur.execute("""
+                    INSERT INTO stock_adjustment_lines (
+                        adjustment_id, product_id, old_qty, new_qty, diff_qty, unit_cost, sublocation, uom, uom_factor
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                """, (adj_id, pid, old_qty, new_qty, diff_qty, unit_cost, subloc, line_uom, uom_factor))
+
+                if status == 'COMPLETED':
+                    cur.execute("""
+                        INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                        VALUES (%s, %s, %s, %s)
+                        ON CONFLICT (product_id, location_id, sublocation)
+                        DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                    """, (pid, location_id, subloc, new_qty))
+                    cur.execute("""
+                        INSERT INTO inventory_logs (
+                            product_id, movement_type, reference_type, reference_id,
+                            to_location_id, quantity, qty_before, qty_after, unit_cost, reason, notes
+                        ) VALUES (%s, 'ADJUSTMENT', 'ADJUST', %s, %s, %s, %s, %s, %s, %s, %s);
+                    """, (pid, adj_number, location_id, diff_qty, old_qty, new_qty, unit_cost, reason, notes))
+
+                total_lines += 1
+
+        msg = (
+            f"Stock Adjustment {adj_number} completed ({total_lines} item(s))."
+            if status == 'COMPLETED'
+            else f"Saved draft {adj_number}."
+        )
+        return jsonify({
+            'success': True,
+            'adjustment_id': adj_id,
+            'adjustment_number': adj_number,
+            'status': status,
+            'message': msg,
+        })
+    except Exception as e:
+        logger.error(f"Mobile adjustment save error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@mobile_api_bp.route('/api/mobile/adjustments/<int:adj_id>/delete', methods=['POST'])
+@mobile_auth_required
+def mobile_adjustment_delete(adj_id):
+    """Delete a DRAFT stock adjustment."""
+    adj = query_one("SELECT id, status, adjustment_number FROM stock_adjustments WHERE id = %s", (adj_id,))
+    if not adj:
+        return jsonify({'success': False, 'error': 'Stock adjustment not found.'}), 404
+    if (adj.get('status') or 'COMPLETED').upper() == 'COMPLETED':
+        return jsonify({'success': False, 'error': 'Cannot delete an already completed stock adjustment.'}), 400
+    with get_db_cursor(commit=True) as cur:
+        cur.execute("DELETE FROM stock_adjustment_lines WHERE adjustment_id = %s", (adj_id,))
+        cur.execute("DELETE FROM stock_adjustments WHERE id = %s", (adj_id,))
+    return jsonify({'success': True, 'message': f"Draft {adj['adjustment_number']} deleted."})
+
+
 @mobile_api_bp.route('/api/mobile/expenses/monthly', methods=['GET'])
 @mobile_auth_required
 def mobile_expenses_monthly():
@@ -2917,6 +3435,313 @@ def mobile_price_list():
         ],
         'items': items,
     })
+
+
+@mobile_api_bp.route('/api/mobile/settings/overview', methods=['GET'])
+@mobile_auth_required
+def mobile_settings_overview():
+    """Return full Settings payload (company, pricing, decimals, invoice, users, locations, categories, backups)."""
+    from routes.sales_orders import _is_main_admin
+    from routes.settings import get_invoice_settings
+    from services.backup_service import list_backups
+
+    company = query_one("SELECT * FROM companies LIMIT 1") or {}
+    inv = get_invoice_settings() or {}
+    is_main = _is_main_admin()
+
+    pricing_schemes = query_all("""
+        SELECT id, name, COALESCE(currency, 'USD') as currency, COALESCE(is_active, TRUE) as is_active, COALESCE(is_default, FALSE) as is_default
+        FROM pricing_schemes
+        ORDER BY is_default DESC, is_active DESC, id ASC
+    """)
+    locations = query_all("""
+        SELECT id, name, COALESCE(is_default, FALSE) as is_default, COALESCE(is_central, FALSE) as is_central
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_central DESC, is_default DESC, name ASC
+    """)
+    categories = query_all("""
+        SELECT c.id, c.name, COUNT(p.id) as product_count
+        FROM categories c
+        LEFT JOIN products p ON c.id = p.category_id AND p.is_active = TRUE
+        GROUP BY c.id, c.name
+        ORDER BY c.name ASC
+    """)
+
+    prod_cnt = (query_one("SELECT COUNT(*) as cnt FROM products WHERE is_active = TRUE") or {}).get('cnt', 0)
+    cust_cnt = (query_one("SELECT COUNT(*) as cnt FROM customers WHERE is_active = TRUE") or {}).get('cnt', 0)
+    so_cnt = (query_one("SELECT COUNT(*) as cnt FROM sales_orders") or {}).get('cnt', 0)
+
+    users_list = []
+    if is_main:
+        u_rows = query_all("""
+            SELECT u.id, u.username, u.display_name, u.role, COALESCE(u.is_active, TRUE) as is_active,
+                   COALESCE(b.name, 'Main Store (HQ)') as branch_name
+            FROM users u
+            LEFT JOIN branches b ON u.branch_id = b.id
+            ORDER BY u.id ASC
+        """)
+        users_list = [
+            {
+                'id': u['id'],
+                'username': u.get('username') or '',
+                'display_name': u.get('display_name') or u.get('username') or '',
+                'role': u.get('role') or 'user',
+                'is_active': bool(u.get('is_active')),
+                'branch_name': u.get('branch_name') or 'Main Store (HQ)',
+            }
+            for u in u_rows
+        ]
+
+    backups_list = []
+    try:
+        for bk in (list_backups() or [])[:12]:
+            backups_list.append({
+                'filename': bk.get('filename') or '',
+                'formatted_size': bk.get('formatted_size') or '',
+                'created_at': str(bk.get('created_at_str') or bk.get('created_at') or ''),
+            })
+    except Exception:
+        backups_list = []
+
+    return jsonify({
+        'success': True,
+        'company': {
+            'name': company.get('name') or '',
+            'phone': company.get('phone') or '',
+            'email': company.get('email') or '',
+            'website': company.get('website') or '',
+            'address1': company.get('address1') or '',
+            'city': company.get('city') or '',
+            'country': company.get('country') or '',
+            'tax_number': company.get('tax_number') or '',
+            'currency_code': company.get('currency_code') or 'USD',
+            'currency_symbol': company.get('currency_symbol') or '$',
+            'decimal_places_price': int(company.get('decimal_places_price') if company.get('decimal_places_price') is not None else 2),
+            'decimal_places_cost': int(company.get('decimal_places_cost') if company.get('decimal_places_cost') is not None else 3),
+            'decimal_places_qty': int(company.get('decimal_places_qty') if company.get('decimal_places_qty') is not None else 0),
+            'decimal_places_markup': int(company.get('decimal_places_markup') if company.get('decimal_places_markup') is not None else 2),
+            'decimal_places_total': int(company.get('decimal_places_total') if company.get('decimal_places_total') is not None else 2),
+            'decimal_places_measurement': int(company.get('decimal_places_measurement') if company.get('decimal_places_measurement') is not None else 2),
+        },
+        'invoice_settings': {
+            'shop_name_kh': inv.get('shop_name_kh') or '',
+            'shop_name_en': inv.get('shop_name_en') or '',
+            'invoice_title_kh': inv.get('invoice_title_kh') or 'វិក្កយបត្រ',
+            'invoice_title_en': inv.get('invoice_title_en') or 'INVOICE',
+            'phone': inv.get('phone') or '',
+            'vat_tin': inv.get('vat_tin') or '',
+            'enable_khr_total': bool(inv.get('enable_khr_total')),
+            'khr_exchange_rate': float(inv.get('khr_exchange_rate') or 4100.0),
+            'bank_name': inv.get('bank_name') or '',
+            'account_name': inv.get('account_name') or '',
+            'account_number': inv.get('account_number') or '',
+            'payment_terms': inv.get('payment_terms') or '',
+            'footer_notes_en': inv.get('footer_notes_en') or '',
+            'show_sku': bool(inv.get('show_sku', True)),
+            'show_tax': bool(inv.get('show_tax', False)),
+            'show_signature': bool(inv.get('show_signature', True)),
+        },
+        'pricing_schemes': [
+            {
+                'id': s['id'],
+                'name': s['name'],
+                'currency': s['currency'],
+                'is_active': bool(s['is_active']),
+                'is_default': bool(s['is_default']),
+            }
+            for s in pricing_schemes
+        ],
+        'locations': [
+            {
+                'id': l['id'],
+                'name': l['name'],
+                'is_default': bool(l['is_default']),
+                'is_central': bool(l['is_central']),
+            }
+            for l in locations
+        ],
+        'categories': [
+            {
+                'id': c['id'],
+                'name': c['name'],
+                'product_count': int(c['product_count'] or 0),
+            }
+            for c in categories
+        ],
+        'users': users_list,
+        'backups': backups_list,
+        'counts': {
+            'products': int(prod_cnt or 0),
+            'customers': int(cust_cnt or 0),
+            'sales_orders': int(so_cnt or 0),
+            'locations': len(locations),
+        },
+    })
+
+
+@mobile_api_bp.route('/api/mobile/settings/company', methods=['POST'])
+@mobile_auth_required
+def mobile_settings_save_company():
+    """Update Company Profile fields."""
+    data = request.get_json(silent=True) or {}
+    execute("""
+        UPDATE companies SET
+            name = %s, phone = %s, email = %s, website = %s,
+            address1 = %s, city = %s, country = %s, tax_number = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM companies LIMIT 1);
+    """, (
+        (data.get('name') or '').strip(),
+        (data.get('phone') or '').strip(),
+        (data.get('email') or '').strip(),
+        (data.get('website') or '').strip(),
+        (data.get('address1') or '').strip(),
+        (data.get('city') or '').strip(),
+        (data.get('country') or '').strip(),
+        (data.get('tax_number') or '').strip(),
+    ))
+    return jsonify({'success': True, 'message': 'Company profile updated'})
+
+
+@mobile_api_bp.route('/api/mobile/settings/pricing', methods=['POST'])
+@mobile_auth_required
+def mobile_settings_save_pricing():
+    """Update Pricing & Currency preferences and optional default pricing scheme."""
+    data = request.get_json(silent=True) or {}
+    currency_code = (data.get('currency_code') or 'USD').strip()
+    currency_symbol = (data.get('currency_symbol') or '$').strip()
+    khr_rate = float(data.get('khr_exchange_rate') or 4100.0)
+    enable_khr = bool(data.get('enable_khr_total', True))
+    default_scheme_id = data.get('default_scheme_id')
+
+    execute("""
+        UPDATE companies SET currency_code = %s, currency_symbol = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM companies LIMIT 1);
+    """, (currency_code, currency_symbol))
+
+    execute("""
+        UPDATE invoice_settings SET enable_khr_total = %s, khr_exchange_rate = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM invoice_settings LIMIT 1);
+    """, (enable_khr, khr_rate))
+
+    if default_scheme_id:
+        try:
+            sid = int(default_scheme_id)
+            with get_db_cursor(commit=True) as cur:
+                cur.execute("UPDATE pricing_schemes SET is_default = FALSE")
+                cur.execute("UPDATE pricing_schemes SET is_default = TRUE, is_active = TRUE WHERE id = %s", (sid,))
+        except Exception:
+            pass
+
+    return jsonify({'success': True, 'message': 'Pricing & currency updated', 'khr_exchange_rate': khr_rate})
+
+
+@mobile_api_bp.route('/api/mobile/settings/decimals', methods=['POST'])
+@mobile_auth_required
+def mobile_settings_save_decimals():
+    """Update Decimal Precision preferences."""
+    data = request.get_json(silent=True) or {}
+    execute("""
+        UPDATE companies SET
+            decimal_places_price = %s,
+            decimal_places_cost = %s,
+            decimal_places_qty = %s,
+            decimal_places_markup = %s,
+            decimal_places_total = %s,
+            decimal_places_measurement = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM companies LIMIT 1);
+    """, (
+        int(data.get('decimal_places_price', 2) or 0),
+        int(data.get('decimal_places_cost', 3) or 0),
+        int(data.get('decimal_places_qty', 0) or 0),
+        int(data.get('decimal_places_markup', 2) or 0),
+        int(data.get('decimal_places_total', 2) or 0),
+        int(data.get('decimal_places_measurement', 2) or 0),
+    ))
+    return jsonify({'success': True, 'message': 'Decimal precision updated'})
+
+
+@mobile_api_bp.route('/api/mobile/settings/invoice', methods=['POST'])
+@mobile_auth_required
+def mobile_settings_save_invoice():
+    """Update Invoice Customization settings."""
+    data = request.get_json(silent=True) or {}
+    execute("""
+        UPDATE invoice_settings SET
+            shop_name_kh = %s,
+            shop_name_en = %s,
+            invoice_title_kh = %s,
+            invoice_title_en = %s,
+            phone = %s,
+            vat_tin = %s,
+            bank_name = %s,
+            account_name = %s,
+            account_number = %s,
+            payment_terms = %s,
+            footer_notes_en = %s,
+            show_sku = %s,
+            show_tax = %s,
+            show_signature = %s,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE id = (SELECT id FROM invoice_settings LIMIT 1);
+    """, (
+        (data.get('shop_name_kh') or '').strip(),
+        (data.get('shop_name_en') or '').strip(),
+        (data.get('invoice_title_kh') or 'វិក្កយបត្រ').strip(),
+        (data.get('invoice_title_en') or 'INVOICE').strip(),
+        (data.get('phone') or '').strip(),
+        (data.get('vat_tin') or '').strip(),
+        (data.get('bank_name') or '').strip(),
+        (data.get('account_name') or '').strip(),
+        (data.get('account_number') or '').strip(),
+        (data.get('payment_terms') or '').strip(),
+        (data.get('footer_notes_en') or '').strip(),
+        bool(data.get('show_sku', True)),
+        bool(data.get('show_tax', False)),
+        bool(data.get('show_signature', True)),
+    ))
+    return jsonify({'success': True, 'message': 'Invoice settings updated'})
+
+
+@mobile_api_bp.route('/api/mobile/settings/users/<int:uid>/toggle', methods=['POST'])
+@mobile_auth_required
+def mobile_settings_toggle_user(uid):
+    """Toggle user active status (main admin only)."""
+    from routes.sales_orders import _is_main_admin
+    if not _is_main_admin():
+        return jsonify({'success': False, 'error': 'Admin permission required'}), 403
+    me_id = g.mobile_user.get('id') if getattr(g, 'mobile_user', None) else None
+    if me_id and int(me_id) == uid:
+        return jsonify({'success': False, 'error': 'Cannot deactivate your own active account'}), 400
+    row = query_one("SELECT id, username, COALESCE(is_active, TRUE) as is_active FROM users WHERE id = %s", (uid,))
+    if not row:
+        return jsonify({'success': False, 'error': 'User not found'}), 404
+    new_active = not bool(row.get('is_active'))
+    execute("UPDATE users SET is_active = %s WHERE id = %s", (new_active, uid))
+    return jsonify({
+        'success': True,
+        'is_active': new_active,
+        'message': f"User @{row['username']} {'activated' if new_active else 'disabled'}"
+    })
+
+
+@mobile_api_bp.route('/api/mobile/settings/backup/create', methods=['POST'])
+@mobile_auth_required
+def mobile_settings_create_backup():
+    """Trigger a manual cloud SQL backup directly from mobile app."""
+    from services.backup_service import create_backup
+    data = request.get_json(silent=True) or {}
+    note = (data.get('note') or 'Mobile manual backup').strip()
+    res = create_backup(backup_type='manual', note=note)
+    if res and res.get('success'):
+        return jsonify({
+            'success': True,
+            'message': f"Backup created: {res.get('filename')} ({res.get('formatted_size', '')})",
+            'filename': res.get('filename') or '',
+        })
+    return jsonify({'success': False, 'error': (res or {}).get('error', 'Backup failed')}), 500
 
 
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])

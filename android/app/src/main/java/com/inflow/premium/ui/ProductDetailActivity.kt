@@ -334,57 +334,128 @@ class ProductDetailActivity : AppCompatActivity() {
         // Bottom Product Price Table Card
         val pt = d.priceTable
         if (pt != null) {
+            binding.llPriceTableSectionBar.visibility = View.VISIBLE
             binding.cardPriceTable.visibility = View.VISIBLE
-            binding.tvPriceTableProductTitle.text = if (d.name.isNotBlank()) "${d.sku} • ${d.name}" else d.sku
-            val accentColor = try {
-                Color.parseColor(pt.catColor)
-            } catch (_: Exception) {
-                Color.parseColor("#00A3E0")
+            binding.tvPriceTableSku.text = d.sku.ifBlank { "#${d.id}" }
+            binding.tvPriceTableProductTitle.text = d.name.ifBlank { d.sku }
+            ImageLoader.load(uiScope, session.baseUrl, d.imageUrl, binding.ivPriceTablePhoto, binding.tvPriceTablePhotoEmpty)
+
+            // Specs column with warm peach circular icon badges matching Image 1
+            binding.llPriceTableSpecs.removeAllViews()
+            val rawSpecs = pt.detailLines.ifEmpty { listOfNotNull(pt.dimStr.takeIf { it.isNotBlank() }) }
+            val specGroups = mutableListOf<Pair<String, String?>>()
+            var idxSpec = 0
+            while (idxSpec < rawSpecs.size) {
+                val cur = rawSpecs[idxSpec]
+                val next = rawSpecs.getOrNull(idxSpec + 1)
+                if (next != null && next.trim().startsWith("(")) {
+                    specGroups.add(cur to next.trim())
+                    idxSpec += 2
+                } else {
+                    specGroups.add(cur to null)
+                    idxSpec += 1
+                }
             }
-            binding.vPriceTableAccent.setBackgroundColor(accentColor)
-            binding.llPriceTableHeader.setBackgroundColor(accentColor)
-            binding.tvPriceTableSpecs.text = pt.detailLines.joinToString("\n").ifBlank { pt.dimStr }
+            val specGlyphs = arrayOf("↔", "📦", "⛁", "📦")
+            specGroups.forEachIndexed { i, (mainText, subText) ->
+                val specRow = LinearLayout(this).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(0, dp(4), 0, dp(4))
+                }
+                val iconCircle = TextView(this).apply {
+                    text = specGlyphs.getOrElse(i) { "•" }
+                    gravity = Gravity.CENTER
+                    textSize = 11f
+                    setTextColor(Color.parseColor("#B45309"))
+                    setBackgroundResource(R.drawable.bg_price_table_peach_pill)
+                    layoutParams = LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                        marginEnd = dp(8)
+                    }
+                }
+                val textCol = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                }
+                textCol.addView(TextView(this).apply {
+                    text = mainText
+                    setTextColor(Color.parseColor("#1E293B"))
+                    textSize = 11.5f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                })
+                if (!subText.isNullOrBlank()) {
+                    textCol.addView(TextView(this).apply {
+                        text = subText
+                        setTextColor(Color.parseColor("#64748B"))
+                        textSize = 10.5f
+                    })
+                }
+                specRow.addView(iconCircle)
+                specRow.addView(textCol)
+                binding.llPriceTableSpecs.addView(specRow)
+            }
+
+            // Detect Khmer unit name (e.g. "ប្រអប់") from detail lines if present
+            val detectedKhUnit = rawSpecs.firstOrNull { it.contains("1 ដុំ") }
+                ?.substringAfterLast(" ")?.trim()?.takeIf { it.isNotBlank() } ?: "ប្រអប់"
+            val qtyPillSuffix = "$detectedKhUnit(PCS)"
 
             binding.llPriceTableRows.removeAllViews()
             val tierRows = listOf(
-                Triple("${pt.tierQty1} ${d.uom}", pt.uPrice1, pt.totPrice1),
-                Triple("${pt.tierQty2} ${d.uom}", pt.uPrice2, pt.totPrice2),
-                Triple("${pt.tierQty3} ${d.uom}", pt.uPrice3, pt.totPrice3)
+                Triple(pt.tierQty1, pt.uPrice1, pt.totPrice1),
+                Triple(pt.tierQty2, pt.uPrice2, pt.totPrice2),
+                Triple(pt.tierQty3, pt.uPrice3, pt.totPrice3)
             )
-            tierRows.forEachIndexed { idx, (qtyLabel, unitP, totP) ->
+            val copperColor = Color.parseColor("#B45309")
+            tierRows.forEachIndexed { idx, (qtyInt, unitP, totP) ->
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
-                    setPadding(dp(10), dp(8), dp(10), dp(8))
-                    if (idx % 2 == 1) setBackgroundColor(Color.parseColor("#F8FAFC"))
+                    gravity = Gravity.CENTER_VERTICAL
+                    setPadding(dp(2), dp(9), dp(2), dp(9))
                 }
-                val tvQ = TextView(this).apply {
-                    text = qtyLabel
-                    setTextColor(Color.parseColor("#0F172A"))
+                val qtyPill = TextView(this).apply {
+                    text = "$qtyInt  $qtyPillSuffix"
+                    setBackgroundResource(R.drawable.bg_price_table_peach_pill)
+                    setPadding(dp(10), dp(5), dp(10), dp(5))
+                    setTextColor(copperColor)
                     textSize = 12f
                     setTypeface(null, android.graphics.Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1.1f)
                 }
-                val tvU = TextView(this).apply {
-                    text = String.format(Locale.US, "$%.4f", unitP)
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.parseColor("#334155"))
-                    textSize = 12f
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                val eqSign = TextView(this).apply {
+                    text = "="
+                    setTextColor(Color.parseColor("#475569"))
+                    textSize = 13f
+                    setPadding(dp(8), 0, dp(8), 0)
                 }
                 val tvT = TextView(this).apply {
-                    text = "$${moneyFmt.format(totP)}"
-                    gravity = Gravity.END
-                    setTextColor(accentColor)
-                    textSize = 12.5f
+                    text = "${moneyFmt.format(totP)} $"
+                    setTextColor(copperColor)
+                    textSize = 15.5f
                     setTypeface(null, android.graphics.Typeface.BOLD)
                     layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
                 }
-                row.addView(tvQ)
-                row.addView(tvU)
+                val unitDec = if ((unitP * 1000.0) % 1.0 != 0.0) 4 else 3
+                val tvU = TextView(this).apply {
+                    text = "(${String.format(Locale.US, "%.${unitDec}f", unitP)} $/PCS)"
+                    gravity = Gravity.END
+                    setTextColor(Color.parseColor("#0F172A"))
+                    textSize = 12.5f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                }
+                row.addView(qtyPill)
+                row.addView(eqSign)
                 row.addView(tvT)
+                row.addView(tvU)
                 binding.llPriceTableRows.addView(row)
+                if (idx < tierRows.lastIndex) {
+                    binding.llPriceTableRows.addView(View(this).apply {
+                        layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(1))
+                        setBackgroundColor(Color.parseColor("#F1F5F9"))
+                    })
+                }
             }
         } else {
+            binding.llPriceTableSectionBar.visibility = View.GONE
             binding.cardPriceTable.visibility = View.GONE
         }
     }
@@ -402,22 +473,16 @@ class ProductDetailActivity : AppCompatActivity() {
             return
         }
 
-        // Hide the Save JPG button during capture so the exported JPG looks clean
-        binding.btnSavePriceJpg.visibility = View.INVISIBLE
         val scale = 2
         val pad = 28
         val bmpW = card.width * scale + pad * 2
         val bmpH = card.height * scale + pad * 2
         val bitmap = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
-        try {
-            val canvas = Canvas(bitmap)
-            canvas.drawColor(Color.WHITE)
-            canvas.translate(pad.toFloat(), pad.toFloat())
-            canvas.scale(scale.toFloat(), scale.toFloat())
-            card.draw(canvas)
-        } finally {
-            binding.btnSavePriceJpg.visibility = View.VISIBLE
-        }
+        val canvas = Canvas(bitmap)
+        canvas.drawColor(Color.WHITE)
+        canvas.translate(pad.toFloat(), pad.toFloat())
+        canvas.scale(scale.toFloat(), scale.toFloat())
+        card.draw(canvas)
 
         val safeSku = (productSku.ifBlank { "product_$productId" }).replace(Regex("[^A-Za-z0-9._-]"), "_")
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())

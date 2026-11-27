@@ -196,6 +196,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         binding.btnDockCopy.setOnClickListener { copyCurrentOrder() }
         binding.btnDockPreview.setOnClickListener { openPrintPreview() }
         binding.btnDockExportJpg.setOnClickListener { openExportJpg() }
+        binding.btnActionShare.setOnClickListener { shareOrder() }
 
         binding.etDeliveryFee.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -381,28 +382,31 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
         when {
             isPaid -> {
-                binding.btnActionLeft.text = "Print Invoice"
+                binding.btnActionShare.visibility = View.VISIBLE
+                binding.btnActionLeft.text = "Print"
                 binding.btnActionLeft.setOnClickListener { openPrintPreview() }
 
-                binding.btnActionRight.text = "Reopen Order"
+                binding.btnActionRight.text = "Reopen"
                 binding.btnActionRight.backgroundTintList =
                     ColorStateList.valueOf(ContextCompat.getColor(this, R.color.open_orange))
                 binding.btnActionRight.setOnClickListener { confirmReopenOrder() }
             }
             isCancelled -> {
+                binding.btnActionShare.visibility = View.GONE
                 binding.btnActionLeft.text = "Share"
                 binding.btnActionLeft.setOnClickListener { shareOrder() }
 
-                binding.btnActionRight.text = "Reopen Order"
+                binding.btnActionRight.text = "Reopen"
                 binding.btnActionRight.backgroundTintList =
                     ColorStateList.valueOf(ContextCompat.getColor(this, R.color.primary))
                 binding.btnActionRight.setOnClickListener { confirmReopenOrder() }
             }
             else -> {
+                binding.btnActionShare.visibility = View.VISIBLE
                 binding.btnActionLeft.text = "Save"
                 binding.btnActionLeft.setOnClickListener { saveOrder(markCompletePay = false) }
 
-                binding.btnActionRight.text = "Complete & Pay ›"
+                binding.btnActionRight.text = "Complete"
                 binding.btnActionRight.backgroundTintList =
                     ColorStateList.valueOf(android.graphics.Color.parseColor("#0A6C62"))
                 binding.btnActionRight.setOnClickListener { showPaymentMethodDialog() }
@@ -1138,30 +1142,24 @@ class SalesOrderDetailActivity : AppCompatActivity() {
     }
 
     private fun shareOrder() {
-        if (telegramUrl.isNotBlank()) {
-            try {
-                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(telegramUrl)))
-                return
-            } catch (_: Exception) {
-            }
+        if (orderId <= 0 || printUrl.isBlank()) {
+            Toast.makeText(this, "Save the order first to share", Toast.LENGTH_SHORT).show()
+            return
         }
-        val fullPrint = if (printUrl.startsWith("http")) printUrl else "${session.baseUrl}$printUrl"
-        val text = buildString {
-            append(if (shareCaption.isNotBlank()) shareCaption else "Sales Order $orderNumber")
-            if (printUrl.isNotBlank()) {
-                append("\n")
-                append(fullPrint)
-            }
+        val intent = Intent(this, InvoicePrintActivity::class.java).apply {
+            putExtra(InvoicePrintActivity.EXTRA_ORDER_NUMBER, orderNumber)
+            putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, printUrl)
+            putExtra(InvoicePrintActivity.EXTRA_TELEGRAM_URL, telegramUrl)
+            putExtra(InvoicePrintActivity.EXTRA_SHARE_CAPTION, shareCaption)
+            putExtra(InvoicePrintActivity.EXTRA_TITLE, "Share • $orderNumber")
+            putExtra(InvoicePrintActivity.EXTRA_AUTO_SHARE_JPG, true)
         }
-        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        startActivity(Intent.createChooser(sendIntent, "Share Sales Order"))
+        startActivity(intent)
     }
 
     private fun setBusy(busy: Boolean) {
         binding.progressDetail.visibility = if (busy) View.VISIBLE else View.GONE
+        binding.btnActionShare.isEnabled = !busy
         binding.btnActionLeft.isEnabled = !busy
         binding.btnActionRight.isEnabled = !busy
     }
