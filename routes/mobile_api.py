@@ -2347,15 +2347,15 @@ def mobile_transfer_delete(trf_id):
 @mobile_auth_required
 def mobile_expenses_monthly():
     """Fetch Monthly Expenses dashboard, breakdown, and cash accounts count."""
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
     from routes.expenses import (
         _get_current_month_key, _get_available_months, _format_month_display, _get_monthly_report_data
     )
-    user = getattr(request, 'mobile_user', {})
-    is_main = _is_main_admin(user)
+    is_main = _is_main_admin()
     if is_main:
         branch_scope = (request.args.get('branch') or 'main').strip().lower()
     else:
-        ubid = user.get('branch_id')
+        ubid = _get_user_branch_id()
         branch_scope = str(ubid) if ubid else 'main'
 
     month_key = (request.args.get('month') or '').strip() or _get_current_month_key()
@@ -2446,12 +2446,12 @@ def mobile_expenses_add():
     notes = (data.get('notes') or '').strip()
     month_key = (data.get('month_key') or '').strip() or exp_date.strftime('%Y-%m')
 
-    user = getattr(request, 'mobile_user', {})
-    if _is_main_admin(user):
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    if _is_main_admin():
         b_raw = (data.get('branch') or 'main').strip().lower()
         branch_id = int(b_raw) if b_raw.isdigit() else None
     else:
-        branch_id = user.get('branch_id')
+        branch_id = _get_user_branch_id()
 
     new_id = execute_returning_id("""
         INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key, branch_id)
@@ -2503,8 +2503,8 @@ def mobile_expenses_accounts_update():
     month_key = (data.get('month_key') or '').strip()
     if not month_key:
         return jsonify({'success': False, 'error': 'month_key required'}), 400
-    user = getattr(request, 'mobile_user', {})
-    b_raw = (data.get('branch') or 'main').strip().lower() if _is_main_admin(user) else str(user.get('branch_id') or 'main')
+    from routes.sales_orders import _is_main_admin, _get_user_branch_id
+    b_raw = (data.get('branch') or 'main').strip().lower() if _is_main_admin() else str(_get_user_branch_id() or 'main')
     summary = _get_or_create_monthly_summary(month_key, branch_id=b_raw)
     accounts = _normalize_accounts(data.get('accounts'))
     execute(
