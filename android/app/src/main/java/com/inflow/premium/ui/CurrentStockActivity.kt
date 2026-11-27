@@ -64,12 +64,12 @@ class CurrentStockActivity : AppCompatActivity() {
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
-            topContentView = null,
+            topContentView = binding.topHeader,
             topScrimView = binding.topScrim,
             bottomNavContainer = binding.bottomNav.root,
             bottomScrimView = binding.bottomScrim,
             scrollableView = binding.scrollCurrentStock,
-            extraTopDp = 10,
+            extraTopDp = 6,
             extraBottomScrollDp = 120
         )
 

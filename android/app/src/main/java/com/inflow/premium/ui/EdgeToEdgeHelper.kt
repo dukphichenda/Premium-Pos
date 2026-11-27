@@ -54,6 +54,35 @@ object EdgeToEdgeHelper {
 
         val density = activity.resources.displayMetrics.density
         fun dp(v: Int): Int = (v * density).toInt()
+        val initialScrollPadTop = scrollableView?.paddingTop ?: 0
+        var lastTopInset = 0
+
+        fun syncFloatingTopMetrics(topInset: Int) {
+            val headerBottom = topContentView?.height?.takeIf { it > 0 } ?: 0
+            topScrimView?.let { v ->
+                val lp = v.layoutParams
+                val targetH = if (topContentView != null) {
+                    max(topInset + dp(52), headerBottom + dp(10))
+                } else {
+                    topInset + dp(22)
+                }
+                if (lp.height != targetH) {
+                    lp.height = targetH
+                    v.layoutParams = lp
+                }
+            }
+            if (topContentView != null && scrollableView != null && headerBottom > 0) {
+                val desiredTop = max(initialScrollPadTop, headerBottom + dp(6))
+                if (scrollableView.paddingTop != desiredTop) {
+                    scrollableView.setPadding(
+                        scrollableView.paddingLeft,
+                        desiredTop,
+                        scrollableView.paddingRight,
+                        scrollableView.paddingBottom
+                    )
+                }
+            }
+        }
 
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { _, windowInsets ->
             val sysBars = windowInsets.getInsets(
@@ -63,6 +92,7 @@ object EdgeToEdgeHelper {
 
             val topInset = sysBars.top
             val bottomInset = navBars.bottom
+            lastTopInset = topInset
 
             topContentView?.setPadding(
                 topContentView.paddingLeft,
@@ -70,15 +100,6 @@ object EdgeToEdgeHelper {
                 topContentView.paddingRight,
                 topContentView.paddingBottom
             )
-
-            topScrimView?.let { v ->
-                val lp = v.layoutParams
-                val targetH = topInset + dp(56)
-                if (lp.height != targetH) {
-                    lp.height = targetH
-                    v.layoutParams = lp
-                }
-            }
 
             bottomNavContainer?.setPadding(
                 bottomNavContainer.paddingLeft,
@@ -103,6 +124,8 @@ object EdgeToEdgeHelper {
                 bottomInset + dp(extraBottomScrollDp)
             )
 
+            syncFloatingTopMetrics(topInset)
+
             fabView?.let { fab ->
                 val lp = fab.layoutParams as? ViewGroup.MarginLayoutParams
                 val targetMargin = bottomInset + dp(96)
@@ -114,6 +137,9 @@ object EdgeToEdgeHelper {
 
             windowInsets
         }
+        topContentView?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            syncFloatingTopMetrics(lastTopInset)
+        }
         ViewCompat.requestApplyInsets(rootView)
 
         if (topScrimView != null && scrollableView != null) {
@@ -123,14 +149,14 @@ object EdgeToEdgeHelper {
 
     /**
      * Real-time Telegram-style frosted blur across the status bar region:
-     * samples only [scrollableView] underneath [topScrimView] at 1/8 resolution,
-     * applies a fast dual box-blur + smooth top-to-bottom fade mask so scrolled text/cards
-     * soften into translucent frosted glass beneath status bar icons.
+     * samples the live scrolled content beneath [topScrimView] (capturing the inner child
+     * of ScrollView/NestedScrollView so scrollY offsets are honored accurately), applies a
+     * smooth dual box-blur + bright frosted glaze + feathered alpha mask.
      */
     private fun installTopStatusBlur(topScrimView: View, scrollableView: View) {
-        val scale = 0.16f
+        val scale = 0.24f
         var needsBlur = true
-        var lastScrollMarker = Int.MIN_VALUE
+        var lastScrollY = Int.MIN_VALUE
         var smallBmp: Bitmap? = null
         var outBmp: Bitmap? = null
         var smallPixels: IntArray? = null
@@ -142,32 +168,46 @@ object EdgeToEdgeHelper {
             xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
         }
         val scrimLoc = IntArray(2)
-        val scrollLoc = IntArray(2)
+        val targetLoc = IntArray(2)
+
+        fun resolveCaptureTarget(): View {
+            // ScrollView / NestedScrollView store scroll offset in mScrollY without shifting child.top,
+            // so View.draw(canvas) would otherwise render scrollY=0; drawing child(0) with its window
+            // location reflects the exact scrolled content underneath the status bar.
+            if ((scrollableView is android.widget.ScrollView || scrollableView is androidx.core.widget.NestedScrollView) &&
+                scrollableView is ViewGroup &&
+                scrollableView.childCount > 0
+            ) {
+                return scrollableView.getChildAt(0)
+            }
+            return scrollableView
+        }
 
         fun updateBlurDrawable() {
             val w = topScrimView.width
             val h = topScrimView.height
             if (w <= 0 || h <= 0 || scrollableView.width <= 0 || scrollableView.height <= 0) return
 
-            val sw = max(4, (w * scale).toInt())
-            val sh = max(4, (h * scale).toInt())
+            val sw = max(6, (w * scale).toInt())
+            val sh = max(6, (h * scale).toInt())
 
             val sb = smallBmp?.takeIf { it.width == sw && it.height == sh }
                 ?: Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888).also { smallBmp = it }
             val ob = outBmp?.takeIf { it.width == sw && it.height == sh }
                 ?: Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888).also { outBmp = it }
 
+            val target = resolveCaptureTarget()
             topScrimView.getLocationInWindow(scrimLoc)
-            scrollableView.getLocationInWindow(scrollLoc)
-            val dx = (scrollLoc[0] - scrimLoc[0]).toFloat()
-            val dy = (scrollLoc[1] - scrimLoc[1]).toFloat()
+            target.getLocationInWindow(targetLoc)
+            val dx = (targetLoc[0] - scrimLoc[0]).toFloat()
+            val dy = (targetLoc[1] - scrimLoc[1]).toFloat()
 
             val c = Canvas(sb)
             c.drawColor(Color.parseColor("#F8FAFC"))
             c.save()
             c.scale(scale, scale)
             c.translate(dx, dy)
-            scrollableView.draw(c)
+            target.draw(c)
             c.restore()
 
             val len = sw * sh
@@ -176,38 +216,38 @@ object EdgeToEdgeHelper {
             sb.getPixels(pix, 0, sw, 0, 0, sw, sh)
             boxBlurPass(pix, tmp, sw, sh, radius = 4)
             boxBlurPass(pix, tmp, sw, sh, radius = 3)
-            boxBlurPass(pix, tmp, sw, sh, radius = 2)
             sb.setPixels(pix, 0, sw, 0, 0, sw, sh)
 
             val outCanvas = Canvas(ob)
             outCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
             outCanvas.drawBitmap(sb, 0f, 0f, filterPaint)
 
-            // More transparent frosted glass glaze combined with soft top-to-bottom gradient
+            // Clean light frosted glaze so scrolled dark headers soften into pastel instead of dark soot
             tintPaint.shader = LinearGradient(
                 0f, 0f, 0f, sh.toFloat(),
                 intArrayOf(
-                    Color.argb(148, 255, 255, 255),
-                    Color.argb(90, 248, 250, 252),
-                    Color.argb(26, 248, 250, 252),
+                    Color.argb(216, 248, 250, 252),
+                    Color.argb(165, 248, 250, 252),
+                    Color.argb(72, 248, 250, 252),
                     Color.argb(0, 248, 250, 252)
                 ),
-                floatArrayOf(0f, 0.45f, 0.78f, 1f),
+                floatArrayOf(0f, 0.42f, 0.76f, 1f),
                 Shader.TileMode.CLAMP
             )
             outCanvas.drawRect(0f, 0f, sw.toFloat(), sh.toFloat(), tintPaint)
 
-            // Smooth 5-stop feathered alpha mask so blur dissolves seamlessly without any hard line
+            // Smooth 6-stop feathered alpha mask dissolving cleanly with zero hard edge or shadow band
             maskPaint.shader = LinearGradient(
                 0f, 0f, 0f, sh.toFloat(),
                 intArrayOf(
-                    Color.argb(245, 0, 0, 0),
+                    Color.argb(252, 0, 0, 0),
                     Color.argb(215, 0, 0, 0),
-                    Color.argb(128, 0, 0, 0),
-                    Color.argb(38, 0, 0, 0),
+                    Color.argb(138, 0, 0, 0),
+                    Color.argb(62, 0, 0, 0),
+                    Color.argb(16, 0, 0, 0),
                     Color.argb(0, 0, 0, 0)
                 ),
-                floatArrayOf(0f, 0.30f, 0.60f, 0.84f, 1f),
+                floatArrayOf(0f, 0.28f, 0.52f, 0.74f, 0.90f, 1f),
                 Shader.TileMode.CLAMP
             )
             outCanvas.drawRect(0f, 0f, sw.toFloat(), sh.toFloat(), maskPaint)
@@ -215,10 +255,12 @@ object EdgeToEdgeHelper {
             topScrimView.background = BitmapDrawable(topScrimView.resources, ob)
         }
 
-        scrollableView.setOnScrollChangeListener { _, _, scrollY, _, _ ->
-            if (scrollY != lastScrollMarker) {
-                lastScrollMarker = scrollY
+        scrollableView.viewTreeObserver.addOnScrollChangedListener {
+            val curY = scrollableView.scrollY
+            if (curY != lastScrollY || scrollableView is androidx.recyclerview.widget.RecyclerView) {
+                lastScrollY = curY
                 needsBlur = true
+                topScrimView.postInvalidateOnAnimation()
             }
         }
         scrollableView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
