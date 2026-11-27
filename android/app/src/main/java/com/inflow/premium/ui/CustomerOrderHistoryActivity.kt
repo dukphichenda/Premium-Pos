@@ -262,7 +262,7 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
             pickJob?.cancel()
             pickJob = uiScope.launch {
                 try {
-                    val res = api.searchCustomersCatalog(branch = session.selectedBranch, query = qStr, filter = "all", page = 1)
+                    val res = api.getCustomersCatalog(query = qStr, branchParam = session.selectedBranch)
                     listCol.removeAllViews()
                     for (c in res.customers) {
                         val row = LinearLayout(this@CustomerOrderHistoryActivity).apply {
