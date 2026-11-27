@@ -577,7 +577,9 @@ def create_app():
             return jsonify({'error': 'Internal server error occurred', 'details': str(orig)}), 500
         
         err_str = str(orig)
-        is_db = any(k in err_str.lower() for k in ['psycopg2', 'connection to server', 'connection refused', 'postgresql', 'pool'])
+        is_db = (not isinstance(orig, (AttributeError, KeyError, TypeError, ValueError))) and any(
+            k in err_str.lower() for k in ['psycopg2', 'connection to server', 'connection refused', 'postgresql', 'pool']
+        )
         return render_template(
             'error.html',
             error_title="Database Connection Notice" if is_db else "Internal Server Error",

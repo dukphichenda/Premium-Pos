@@ -2197,6 +2197,112 @@
             {% endif %}
             {% endif %}
 
+            {% elif report_key == 'inventory-valuation' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 12%;">SKU</th>
+                    <th style="width: 24%;">ITEM NAME</th>
+                    <th style="width: 12%;">CATEGORY</th>
+                    <th style="width: 12%;">WAREHOUSE</th>
+                    <th style="width: 10%; text-align: right;">ON HAND</th>
+                    <th style="width: 10%; text-align: right;">UNIT COST</th>
+                    <th style="width: 10%; text-align: right;">ASSET VALUE</th>
+                    <th style="width: 10%; text-align: right;">RETAIL VALUE</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% for r in rows %}
+                <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                    <td class="wrench-th"></td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('products.detail_product', id=r.id) }}"
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('products.detail_product', id=r.id) }}', '{{ (r.sku or r.item_name)|replace("'", "\\'") }}', 'product', true); }"
+                           style="color: #4C1D95; text-decoration: none;">{{ r.sku or r.id }}</a>
+                    </td>
+                    <td style="font-weight: 500; color: #0F172A;">{{ r.item_name or '' }}</td>
+                    <td>{{ r.category_name or 'General' }}</td>
+                    <td>{{ r.location_name or 'Main Warehouse' }}</td>
+                    <td style="text-align: right; font-weight: 600;">
+                        {{ "{:,.0f}".format(r.quantity or 0) if (r.quantity or 0) % 1 == 0 else "{:,.2f}".format(r.quantity or 0) }}
+                        <span style="font-size: 11px; color: #64748B;">{{ r.uom or 'pcs' }}</span>
+                    </td>
+                    <td style="text-align: right;">${{ "{:,.4f}".format((r.unit_cost or 0)|float) if ((r.unit_cost or 0)|float) < 1 and ((r.unit_cost or 0)|float) > 0 else "{:,.2f}".format((r.unit_cost or 0)|float) }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format((r.asset_value or 0)|float) }}</td>
+                    <td style="text-align: right; font-weight: 600; color: #047857;">${{ "{:,.2f}".format((r.retail_value or 0)|float) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="inflow-crys-totals-row" style="background: #F8FAFC; border-top: 2px solid #CBD5E1; border-bottom: 2.5px solid #94A3B8;">
+                    <td class="wrench-th"></td>
+                    <td colspan="4" style="text-align: right; font-weight: 800; font-size: 13.5px; color: #1E293B; padding: 12px 14px;">
+                        Total Inventory Valuation ({{ total_count if total_count is defined else rows|length }} items):
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: #0F172A; padding: 12px 14px; white-space: nowrap;">
+                        {{ "{:,.0f}".format((totals.get('quantity') or 0)|float) if ((totals.get('quantity') or 0)|float) % 1 == 0 else "{:,.2f}".format((totals.get('quantity') or 0)|float) }}
+                    </td>
+                    <td></td>
+                    <td style="text-align: right; font-weight: 800; font-size: 15px; color: #0F172A; padding: 12px 14px; white-space: nowrap;">
+                        ${{ "{:,.2f}".format((totals.get('asset_value') or 0)|float) }}
+                    </td>
+                    <td style="text-align: right; font-weight: 800; font-size: 15px; color: #047857; padding: 12px 14px; white-space: nowrap;">
+                        ${{ "{:,.2f}".format((totals.get('retail_value') or 0)|float) }}
+                    </td>
+                </tr>
+            </tfoot>
+            {% endif %}
+
+            {% elif report_key == 'inventory-summary' %}
+            <thead>
+                <tr>
+                    <th class="wrench-th">🔧</th>
+                    <th style="width: 14%;">CATEGORY</th>
+                    <th style="width: 12%;">SKU</th>
+                    <th style="width: 24%;">ITEM NAME</th>
+                    <th style="width: 10%; text-align: right;">ON HAND</th>
+                    <th style="width: 10%; text-align: right;">RESERVED</th>
+                    <th style="width: 10%; text-align: right;">AVAILABLE</th>
+                    <th style="width: 10%; text-align: right;">UNIT COST</th>
+                    <th style="width: 10%; text-align: right;">TOTAL VALUE</th>
+                </tr>
+            </thead>
+            {% if rows %}
+            <tbody>
+                {% for r in rows %}
+                <tr class="{% if loop.index is even %}alt-row{% endif %}">
+                    <td class="wrench-th"></td>
+                    <td>{{ r.category_name or 'General' }}</td>
+                    <td style="font-weight: 600;">
+                        <a href="{{ url_for('products.detail_product', id=r.id) }}"
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('products.detail_product', id=r.id) }}', '{{ (r.sku or r.item_name)|replace("'", "\\'") }}', 'product', true); }"
+                           style="color: #4C1D95; text-decoration: none;">{{ r.sku or r.id }}</a>
+                    </td>
+                    <td style="font-weight: 500; color: #0F172A;">{{ r.item_name or '' }}</td>
+                    <td style="text-align: right; font-weight: 600;">{{ "{:,.0f}".format(r.on_hand or 0) if (r.on_hand or 0) % 1 == 0 else "{:,.2f}".format(r.on_hand or 0) }} {{ r.uom or 'pcs' }}</td>
+                    <td style="text-align: right; color: #D97706;">{{ "{:,.0f}".format(r.reserved_quantity or 0) if (r.reserved_quantity or 0) % 1 == 0 else "{:,.2f}".format(r.reserved_quantity or 0) }}</td>
+                    <td style="text-align: right; font-weight: 600; color: #047857;">{{ "{:,.0f}".format(r.available_quantity or 0) if (r.available_quantity or 0) % 1 == 0 else "{:,.2f}".format(r.available_quantity or 0) }}</td>
+                    <td style="text-align: right;">${{ "{:,.2f}".format((r.unit_cost or 0)|float) }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #0F172A;">${{ "{:,.2f}".format((r.total_cost_value or 0)|float) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="inflow-crys-totals-row" style="background: #F8FAFC; border-top: 2px solid #CBD5E1; border-bottom: 2.5px solid #94A3B8;">
+                    <td class="wrench-th"></td>
+                    <td colspan="3" style="text-align: right; font-weight: 800; font-size: 13.5px; color: #1E293B; padding: 12px 14px;">
+                        Total ({{ total_count if total_count is defined else rows|length }} products):
+                    </td>
+                    <td style="text-align: right; font-weight: 800; color: #0F172A; padding: 12px 14px;">{{ "{:,.0f}".format((totals.get('on_hand') or 0)|float) if ((totals.get('on_hand') or 0)|float) % 1 == 0 else "{:,.2f}".format((totals.get('on_hand') or 0)|float) }}</td>
+                    <td style="text-align: right; font-weight: 700; color: #D97706; padding: 12px 14px;">{{ "{:,.0f}".format((totals.get('reserved_quantity') or 0)|float) if ((totals.get('reserved_quantity') or 0)|float) % 1 == 0 else "{:,.2f}".format((totals.get('reserved_quantity') or 0)|float) }}</td>
+                    <td style="text-align: right; font-weight: 800; color: #047857; padding: 12px 14px;">{{ "{:,.0f}".format((totals.get('available_quantity') or 0)|float) if ((totals.get('available_quantity') or 0)|float) % 1 == 0 else "{:,.2f}".format((totals.get('available_quantity') or 0)|float) }}</td>
+                    <td></td>
+                    <td style="text-align: right; font-weight: 800; font-size: 15px; color: #0F172A; padding: 12px 14px;">${{ "{:,.2f}".format((totals.get('total_cost_value') or 0)|float) }}</td>
+                </tr>
+            </tfoot>
+            {% endif %}
+
             {% else %}
             <thead>
                 <tr>
@@ -2209,27 +2315,30 @@
                 </tr>
             </thead>
             {% if rows %}
+            {% set ns_gen = namespace(total=0.0) %}
             <tbody>
                 {% for r in rows %}
+                {% set row_amt = (r.get('total_amount') if r.get('total_amount') is not none else (r.get('sales_amount') if r.get('sales_amount') is not none else (r.get('asset_value') if r.get('asset_value') is not none else (r.get('total_cost_value') if r.get('total_cost_value') is not none else (r.get('subtotal') if r.get('subtotal') is not none else (r.get('balance') if r.get('balance') is not none else 0))))))|float %}
+                {% set ns_gen.total = ns_gen.total + row_amt %}
                 <tr>
                     <td class="wrench-th"></td>
                     <td style="font-weight: 600;">
-                        {% if 'purchase-order' in report_key and r.id %}
-                        <a href="{{ url_for('purchase_orders.detail_purchase', id=r.id) }}" 
-                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.detail_purchase', id=r.id) }}', 'Purchase Order {{ r.order_number }}', 'purchase', true); }"
-                           style="color: #4C1D95; text-decoration: none; font-weight: 700;">{{ r.order_number }}</a>
-                        {% elif r.sales_order_id %}
-                        <a href="{{ url_for('sales_orders.detail_order', id=r.sales_order_id) }}"
-                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=r.sales_order_id) }}', 'Sales Order {{ r.order_number }}', 'sales', true); }"
-                           style="color: #4C1D95; text-decoration: none; font-weight: 700;">{{ r.order_number }}</a>
+                        {% if 'purchase-order' in report_key and r.get('id') %}
+                        <a href="{{ url_for('purchase_orders.detail_purchase', id=r.get('id')) }}" 
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('purchase_orders.detail_purchase', id=r.get('id')) }}', 'Purchase Order {{ r.get('order_number', '') }}', 'purchase', true); }"
+                           style="color: #4C1D95; text-decoration: none; font-weight: 700;">{{ r.get('order_number', '') }}</a>
+                        {% elif r.get('sales_order_id') %}
+                        <a href="{{ url_for('sales_orders.detail_order', id=r.get('sales_order_id')) }}"
+                           onclick="if(window.top && window.top.inflowMdi){ event.preventDefault(); window.top.inflowMdi.openTab('{{ url_for('sales_orders.detail_order', id=r.get('sales_order_id')) }}', 'Sales Order {{ r.get('order_number', '') }}', 'sales', true); }"
+                           style="color: #4C1D95; text-decoration: none; font-weight: 700;">{{ r.get('order_number', '') }}</a>
                         {% else %}
-                        {{ r.order_number or r.sku or r.id }}
+                        {{ r.get('order_number') or r.get('sku') or r.get('id') or '' }}
                         {% endif %}
                     </td>
-                    <td>{{ r.vendor_name or r.customer_name or r.name or r.item_name or '' }}</td>
-                    <td>{{ r.order_date or r.created_at or today_str }}</td>
-                    <td>{{ r.status_display or r.status or 'Active' }}</td>
-                    <td style="text-align: right; font-weight: 600;">${{ "%.2f"|format(r.total_amount or r.sales_amount or 0) }}</td>
+                    <td>{{ r.get('vendor_name') or r.get('customer_name') or r.get('name') or r.get('item_name') or r.get('product_name') or '' }}</td>
+                    <td>{{ r.get('order_date') or r.get('created_at') or today_str }}</td>
+                    <td>{{ r.get('status_display') or r.get('status') or r.get('movement_type') or 'Active' }}</td>
+                    <td style="text-align: right; font-weight: 600;">${{ "%.2f"|format(row_amt) }}</td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -2244,7 +2353,8 @@
                         {% endif %}
                     </td>
                     <td style="text-align: right; font-weight: 800; font-size: 15px; color: #0F172A; padding: 12px 14px; white-space: nowrap;">
-                        ${{ "%.2f"|format(totals.total_amount if (totals and totals.total_amount is defined) else (totals.amount if (totals and totals.amount is defined) else (totals.total_po if (totals and totals.total_po is defined) else (rows | sum(attribute='total_amount'))))) }}
+                        {% set grand_amt = totals.get('total_amount') if (totals and totals.get('total_amount') is not none) else (totals.get('amount') if (totals and totals.get('amount') is not none) else (totals.get('total_po') if (totals and totals.get('total_po') is not none) else (totals.get('sales_amount') if (totals and totals.get('sales_amount') is not none) else (totals.get('asset_value') if (totals and totals.get('asset_value') is not none) else ns_gen.total)))) %}
+                        ${{ "%.2f"|format((grand_amt or 0)|float) }}
                     </td>
                 </tr>
             </tfoot>

@@ -181,6 +181,7 @@ REPORT_CATALOG = {
 }
 
 def get_report_meta(report_key):
+    report_key = (report_key or '').strip().lower().replace('_', '-')
     for cat in REPORT_CATALOG.values():
         for item in cat['items']:
             if item['key'] == report_key:
@@ -529,6 +530,7 @@ def reports_center():
 # -------------------------------------------------------------------------
 @reports_bp.route('/reports/view/<report_key>')
 def view_report(report_key):
+    report_key = (report_key or '').strip().lower().replace('_', '-')
     meta, cat = get_report_meta(report_key)
 
     # Store Scope: Branch users strictly locked to their branch; HQ can view main, branch, or all
@@ -1972,10 +1974,10 @@ def view_report(report_key):
     elif report_key == 'inventory-valuation':
         base_where = ["p.is_active = TRUE", "i.quantity > 0"]
         params = []
-        if category_id and category_id != 'all':
+        if category_id and category_id != 'all' and str(category_id).isdigit():
             base_where.append("p.category_id = %s")
             params.append(int(category_id))
-        if location_id and location_id != 'all':
+        if location_id and location_id != 'all' and str(location_id).isdigit():
             base_where.append("i.location_id = %s")
             params.append(int(location_id))
 
@@ -2417,6 +2419,7 @@ def view_report(report_key):
             ORDER BY so.order_date DESC
             LIMIT %s OFFSET %s
         """, (per_page, offset))
+        totals = {'total_amount': sum(float(r['total_amount'] or 0) for r in rows)}
 
     today_str = datetime.now().strftime('%B %d, %Y')
 
@@ -2488,6 +2491,7 @@ def view_report(report_key):
 # -------------------------------------------------------------------------
 @reports_bp.route('/reports/export/<report_key>')
 def export_report(report_key):
+    report_key = (report_key or '').strip().lower().replace('_', '-')
     date_range = request.args.get('date_range', 'This Month')
     custom_from = request.args.get('date_from', '')
     custom_to = request.args.get('date_to', '')
