@@ -1231,6 +1231,78 @@ class ApiClient(private val session: SessionManager) {
         return json.optString("message", "Vendor created")
     }
 
+    suspend fun getCustomerOrderHistoryReport(
+        branch: String,
+        dateFilter: String,
+        status: String,
+        paidBy: String,
+        query: String,
+        page: Int
+    ): CustomerOrderHistoryReport {
+        val params = mutableMapOf(
+            "branch" to branch,
+            "date_filter" to dateFilter,
+            "status" to status,
+            "paid_by" to paidBy,
+            "page" to page.toString()
+        )
+        if (query.isNotBlank()) params["q"] = query
+        val json = requestJson("GET", "/api/mobile/reports/customer-order-history", params)
+
+        val pmsArr = json.optJSONArray("payment_methods") ?: JSONArray()
+        val pms = mutableListOf<String>()
+        for (i in 0 until pmsArr.length()) pms.add(pmsArr.optString(i, ""))
+
+        val ordArr = json.optJSONArray("orders") ?: JSONArray()
+        val orders = mutableListOf<CustomerHistoryOrder>()
+        for (i in 0 until ordArr.length()) {
+            val o = ordArr.getJSONObject(i)
+            val lArr = o.optJSONArray("lines") ?: JSONArray()
+            val lines = mutableListOf<CustomerHistoryLine>()
+            for (j in 0 until lArr.length()) {
+                val ln = lArr.getJSONObject(j)
+                lines.add(
+                    CustomerHistoryLine(
+                        sku = ln.optString("sku", ""),
+                        itemName = ln.optString("item_name", "Item"),
+                        description = ln.optString("description", ""),
+                        quantity = ln.optDouble("quantity", 1.0),
+                        uom = ln.optString("uom", "pcs."),
+                        unitPrice = ln.optDouble("unit_price", 0.0),
+                        subtotal = ln.optDouble("subtotal", 0.0)
+                    )
+                )
+            }
+            orders.add(
+                CustomerHistoryOrder(
+                    id = o.optInt("id"),
+                    orderNumber = o.optString("order_number", ""),
+                    orderDate = o.optString("order_date", ""),
+                    customerId = o.optInt("customer_id"),
+                    customerName = o.optString("customer_name", "Walk-in Customer"),
+                    isPaid = o.optBoolean("is_paid", false),
+                    paymentMethod = o.optString("payment_method", "Cash"),
+                    shippingFee = o.optDouble("shipping_fee", 0.0),
+                    totalAmount = o.optDouble("total_amount", 0.0),
+                    lines = lines
+                )
+            )
+        }
+
+        return CustomerOrderHistoryReport(
+            dateFilter = json.optString("date_filter", dateFilter),
+            todayLabel = json.optString("today_label", ""),
+            page = json.optInt("page", 1),
+            totalPages = json.optInt("total_pages", 1),
+            totalOrders = json.optInt("total_orders", 0),
+            paidOrders = json.optInt("paid_orders", 0),
+            collectionPct = json.optInt("collection_pct", 0),
+            periodRevenue = json.optDouble("period_revenue", 0.0),
+            paymentMethods = pms,
+            orders = orders
+        )
+    }
+
     fun buildWebPortalUrl(nextPath: String = "/"): String {
         val tok = session.token
         return if (tok.isNotBlank()) {

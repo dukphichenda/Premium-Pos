@@ -659,3 +659,39 @@ data class VendorListResult(
     val stats: VendorListStats,
     val vendors: List<VendorItem>
 )
+
+data class CustomerHistoryLine(
+    val sku: String,
+    val itemName: String,
+    val description: String,
+    val quantity: Double,
+    val uom: String,
+    val unitPrice: Double,
+    val subtotal: Double
+)
+
+data class CustomerHistoryOrder(
+    val id: Int,
+    val orderNumber: String,
+    val orderDate: String,
+    val customerId: Int,
+    val customerName: String,
+    val isPaid: Boolean,
+    val paymentMethod: String,
+    val shippingFee: Double,
+    val totalAmount: Double,
+    val lines: List<CustomerHistoryLine>
+)
+
+data class CustomerOrderHistoryReport(
+    val dateFilter: String,
+    val todayLabel: String,
+    val page: Int,
+    val totalPages: Int,
+    val totalOrders: Int,
+    val paidOrders: Int,
+    val collectionPct: Int,
+    val periodRevenue: Double,
+    val paymentMethods: List<String>,
+    val orders: List<CustomerHistoryOrder>
+)

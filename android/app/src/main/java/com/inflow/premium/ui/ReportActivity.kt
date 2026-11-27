@@ -80,7 +80,7 @@ class ReportActivity : AppCompatActivity() {
             iconRes = R.drawable.ic_wf_customer,
             iconBgHex = "#EEF2FF",
             iconTintHex = "#4F46E5",
-            onOpen = { startActivity(Intent(this, CustomersActivity::class.java)) }
+            onOpen = { startActivity(Intent(this, CustomerOrderHistoryActivity::class.java)) }
         ),
         ReportModule(
             title = "Inventory valuation",
