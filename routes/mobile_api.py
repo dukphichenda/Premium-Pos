@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import re
 import time
 from datetime import datetime, date
@@ -2506,7 +2507,7 @@ def mobile_adjustment_detail(adj_id):
         ORDER BY is_default DESC, is_central DESC, name ASC
     """)
 
-    user_name = (g.mobile_user.get('display_name') or g.mobile_user.get('username') or 'admin') if getattr(g, 'mobile_user', None) else 'admin'
+    user_name = session.get('display_name') or session.get('username') or 'admin'
     categories = query_all("""
         SELECT c.id, c.name, COUNT(p.id) as product_count
         FROM categories c
@@ -2748,8 +2749,8 @@ def mobile_adjustment_save():
         reason = (data.get('reason') or 'Correction').strip()
         notes = (data.get('notes') or '').strip()
         auditor = (data.get('auditor') or '').strip()
-        if not auditor and getattr(g, 'mobile_user', None):
-            auditor = g.mobile_user.get('display_name') or g.mobile_user.get('username') or 'admin'
+        if not auditor:
+            auditor = session.get('display_name') or session.get('username') or 'admin'
         if not auditor:
             auditor = 'admin'
         ref_doc = (data.get('ref_doc') or '').strip()
@@ -3712,7 +3713,7 @@ def mobile_settings_toggle_user(uid):
     from routes.sales_orders import _is_main_admin
     if not _is_main_admin():
         return jsonify({'success': False, 'error': 'Admin permission required'}), 403
-    me_id = g.mobile_user.get('id') if getattr(g, 'mobile_user', None) else None
+    me_id = session.get('user_id')
     if me_id and int(me_id) == uid:
         return jsonify({'success': False, 'error': 'Cannot deactivate your own active account'}), 400
     row = query_one("SELECT id, username, COALESCE(is_active, TRUE) as is_active FROM users WHERE id = %s", (uid,))
@@ -3742,6 +3743,68 @@ def mobile_settings_create_backup():
             'filename': res.get('filename') or '',
         })
     return jsonify({'success': False, 'error': (res or {}).get('error', 'Backup failed')}), 500
+
+
+@mobile_api_bp.route('/api/mobile/app-update', methods=['GET'])
+def mobile_app_update_check():
+    """Return latest published Android APK version & direct OTA download path."""
+    import json as _json
+    import re as _re
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    apk_path = os.path.join(base_dir, 'static', 'downloads', 'inFlow-Premium.apk')
+    meta_path = os.path.join(base_dir, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'output-metadata.json')
+    gradle_path = os.path.join(base_dir, 'android', 'app', 'build.gradle')
+
+    ver_code = 1
+    ver_name = '1.0.0'
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path, 'r', encoding='utf-8') as f:
+                meta = _json.load(f)
+            elems = meta.get('elements') or []
+            if elems:
+                ver_code = int(elems[0].get('versionCode') or 1)
+                ver_name = str(elems[0].get('versionName') or '1.0.0')
+        except Exception:
+            pass
+
+    if ver_code <= 1 and os.path.exists(gradle_path):
+        try:
+            with open(gradle_path, 'r', encoding='utf-8') as f:
+                gtxt = f.read()
+            mc = _re.search(r'versionCode\s+(\d+)', gtxt)
+            mn = _re.search(r'versionName\s+"([^"]+)"', gtxt)
+            if mc:
+                ver_code = int(mc.group(1))
+            if mn:
+                ver_name = mn.group(1).strip()
+        except Exception:
+            pass
+
+    apk_available = os.path.exists(apk_path)
+    apk_size_bytes = os.path.getsize(apk_path) if apk_available else 0
+    apk_size_mb = f"{apk_size_bytes / (1024 * 1024):.1f} MB" if apk_size_bytes > 0 else "0.0 MB"
+
+    notes = "New updates, bug fixes & performance improvements."
+    try:
+        row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
+        if row and row.get('setting_value'):
+            cfg = _json.loads(row['setting_value'])
+            if cfg.get('publish_notes'):
+                notes = str(cfg['publish_notes']).strip()
+    except Exception:
+        pass
+
+    return jsonify({
+        'success': True,
+        'version_code': ver_code,
+        'version_name': ver_name,
+        'apk_available': apk_available,
+        'apk_url': f"/static/downloads/inFlow-Premium.apk?v={ver_code}",
+        'apk_size_bytes': apk_size_bytes,
+        'apk_size_mb': apk_size_mb,
+        'release_notes': notes,
+    })
 
 
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
