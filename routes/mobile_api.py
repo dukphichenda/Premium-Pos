@@ -1802,6 +1802,130 @@ def mobile_report_branch_summary():
     })
 
 
+@mobile_api_bp.route('/api/mobile/stock-matrix', methods=['GET'])
+@mobile_auth_required
+def mobile_stock_matrix():
+    """Read-only Multi-Warehouse Stock Matrix & inventory valuation for mobile Current Stock screen."""
+    q = (request.args.get('q') or '').strip()
+    cat_raw = (request.args.get('category_id') or '').strip()
+    page = max(1, int(request.args.get('page') or 1))
+    page_size = 60
+    offset = (page - 1) * page_size
+
+    where_clauses = ["p.is_active = TRUE"]
+    params = []
+
+    if q:
+        where_clauses.append("(p.name ILIKE %s OR p.sku ILIKE %s OR COALESCE(p.barcode, '') ILIKE %s)")
+        like_q = f"%{q}%"
+        params.extend([like_q, like_q, like_q])
+
+    if cat_raw:
+        try:
+            where_clauses.append("p.category_id = %s")
+            params.append(int(cat_raw))
+        except ValueError:
+            pass
+
+    where_sql = " AND ".join(where_clauses)
+
+    locations = query_all("""
+        SELECT id, name
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_default DESC, id ASC
+    """)
+    categories = query_all("""
+        SELECT id, name
+        FROM categories
+        WHERE is_active = TRUE
+        ORDER BY name ASC
+    """)
+
+    cost_expr = "(CASE WHEN p.costing_method = 'Average' THEN COALESCE(NULLIF(p.average_cost, 0), p.standard_cost, 0) ELSE COALESCE(NULLIF(p.standard_cost, 0), p.average_cost, 0) END)"
+
+    summary = query_one(f"""
+        SELECT
+            COUNT(*) as total_skus,
+            COALESCE(SUM(CASE WHEN COALESCE(tot.total_qty, 0) < 0 THEN 1 ELSE 0 END), 0) as negative_count,
+            COALESCE(SUM(COALESCE(tot.total_qty, 0) * {cost_expr}), 0) as net_valuation
+        FROM products p
+        LEFT JOIN (
+            SELECT product_id, SUM(quantity) as total_qty
+            FROM inventory
+            GROUP BY product_id
+        ) tot ON p.id = tot.product_id
+        WHERE {where_sql}
+    """, tuple(params)) or {'total_skus': 0, 'negative_count': 0, 'net_valuation': 0}
+
+    rows = query_all(f"""
+        SELECT
+            p.id, p.sku, p.name, COALESCE(p.uom, 'pcs.') as uom,
+            COALESCE(c.name, 'General') as category_name,
+            {cost_expr} as unit_cost,
+            COALESCE(tot.total_qty, 0) as total_qty,
+            (COALESCE(tot.total_qty, 0) * {cost_expr}) as total_value
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN (
+            SELECT product_id, SUM(quantity) as total_qty
+            FROM inventory
+            GROUP BY product_id
+        ) tot ON p.id = tot.product_id
+        WHERE {where_sql}
+        ORDER BY p.id ASC
+        LIMIT %s OFFSET %s
+    """, tuple(params) + (page_size + 1, offset))
+
+    has_more = len(rows) > page_size
+    rows = rows[:page_size]
+
+    matrix = {}
+    if rows:
+        prod_ids = [r['id'] for r in rows]
+        stock_rows = query_all("""
+            SELECT product_id, location_id, quantity
+            FROM inventory
+            WHERE product_id = ANY(%s)
+        """, (prod_ids,))
+        for sr in stock_rows:
+            matrix[(sr['product_id'], sr['location_id'])] = float(sr['quantity'] or 0)
+
+    items = []
+    for r in rows:
+        pid = r['id']
+        wh_list = [
+            {
+                'id': loc['id'],
+                'name': loc['name'],
+                'qty': matrix.get((pid, loc['id']), 0.0),
+            }
+            for loc in locations
+        ]
+        items.append({
+            'id': pid,
+            'sku': r['sku'] or '',
+            'name': r['name'] or '',
+            'uom': r['uom'] or 'pcs.',
+            'category_name': r['category_name'] or 'General',
+            'unit_cost': float(r['unit_cost'] or 0),
+            'total_qty': float(r['total_qty'] or 0),
+            'total_value': float(r['total_value'] or 0),
+            'warehouses': wh_list,
+        })
+
+    return jsonify({
+        'success': True,
+        'total_skus': int(summary.get('total_skus') or 0),
+        'negative_count': int(summary.get('negative_count') or 0),
+        'net_valuation': round(float(summary.get('net_valuation') or 0), 2),
+        'warehouse_count': len(locations),
+        'has_more': has_more,
+        'categories': [{'id': c['id'], 'name': c['name']} for c in categories],
+        'items': items,
+    })
+
+
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
 def mobile_web_handoff():
     """Authenticate a mobile WebView session using a valid Bearer/query token and redirect to an internal page."""
