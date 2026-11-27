@@ -105,22 +105,27 @@ class HomeActivity : AppCompatActivity() {
         binding.btnActionNewPo.setOnClickListener { openWebPath("/purchases/new") }
         binding.wfPo.setOnClickListener { startActivity(Intent(this, PurchaseOrdersActivity::class.java)) }
 
-        binding.btnActionAdjustStock.setOnClickListener { openWebPath("/inventory") }
-        binding.btnActionTransferStock.setOnClickListener { openWebPath("/inventory") }
+        binding.btnActionAdjustStock.setOnClickListener { openWebPath("/inventory/adjustments/new") }
+        binding.btnActionTransferStock.setOnClickListener {
+            startActivity(
+                Intent(this, StockTransferDetailActivity::class.java)
+                    .putExtra(StockTransferDetailActivity.EXTRA_TRANSFER_ID, 0)
+            )
+        }
 
         binding.wfInventory.setOnClickListener { switchToTab(ProductsActivity::class.java) }
         binding.cardKpiProducts.setOnClickListener { switchToTab(ProductsActivity::class.java) }
 
-        binding.wfVendor.setOnClickListener { openWebPath("/vendors") }
+        binding.wfVendor.setOnClickListener { startActivity(Intent(this, VendorsActivity::class.java)) }
         binding.wfCustomer.setOnClickListener { startActivity(Intent(this, CustomersActivity::class.java)) }
-        binding.wfExpenses.setOnClickListener { openWebPath("/expenses") }
+        binding.wfExpenses.setOnClickListener { startActivity(Intent(this, MonthlyExpensesActivity::class.java)) }
         binding.wfReports.setOnClickListener { switchToTab(ReportActivity::class.java) }
-        binding.wfTransfer.setOnClickListener { openWebPath("/inventory") }
-        binding.wfBranches.setOnClickListener { openWebPath("/branches") }
+        binding.wfTransfer.setOnClickListener { startActivity(Intent(this, StockTransfersActivity::class.java)) }
+        binding.wfCurrentStock.setOnClickListener { startActivity(Intent(this, CurrentStockActivity::class.java)) }
 
         binding.cardKpiMonthSales.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
         binding.cardKpiReceivables.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
-        binding.cardKpiLowStock.setOnClickListener { openWebPath("/inventory") }
+        binding.cardKpiLowStock.setOnClickListener { startActivity(Intent(this, CurrentStockActivity::class.java)) }
         binding.cardKpiPendingPos.setOnClickListener { openWebPath("/purchase-orders") }
         binding.cardBranchPerformance.setOnClickListener { openWebPath("/branches") }
     }

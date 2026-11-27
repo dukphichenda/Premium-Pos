@@ -819,6 +819,418 @@ class ApiClient(private val session: SessionManager) {
         )
     }
 
+    suspend fun getStockMatrix(search: String, categoryId: Int?, page: Int = 1): StockMatrixResponse {
+        val params = mutableMapOf("page" to page.toString())
+        if (search.isNotBlank()) params["q"] = search
+        if (categoryId != null && categoryId > 0) params["category_id"] = categoryId.toString()
+        val json = requestJson("GET", "/api/mobile/stock-matrix", params)
+
+        val catsArr = json.optJSONArray("categories") ?: JSONArray()
+        val categories = mutableListOf<StockMatrixCategory>()
+        for (i in 0 until catsArr.length()) {
+            val c = catsArr.getJSONObject(i)
+            categories.add(StockMatrixCategory(id = c.optInt("id"), name = c.optString("name", "")))
+        }
+
+        val itemsArr = json.optJSONArray("items") ?: JSONArray()
+        val items = mutableListOf<StockMatrixItem>()
+        for (i in 0 until itemsArr.length()) {
+            val it = itemsArr.getJSONObject(i)
+            val whArr = it.optJSONArray("warehouses") ?: JSONArray()
+            val whList = mutableListOf<StockWarehouseQty>()
+            for (j in 0 until whArr.length()) {
+                val w = whArr.getJSONObject(j)
+                whList.add(
+                    StockWarehouseQty(
+                        id = w.optInt("id"),
+                        name = w.optString("name", ""),
+                        qty = w.optDouble("qty", 0.0)
+                    )
+                )
+            }
+            items.add(
+                StockMatrixItem(
+                    id = it.optInt("id"),
+                    sku = it.optString("sku", ""),
+                    name = it.optString("name", ""),
+                    uom = it.optString("uom", "pcs."),
+                    categoryName = it.optString("category_name", "General"),
+                    unitCost = it.optDouble("unit_cost", 0.0),
+                    totalQty = it.optDouble("total_qty", 0.0),
+                    totalValue = it.optDouble("total_value", 0.0),
+                    warehouses = whList
+                )
+            )
+        }
+
+        return StockMatrixResponse(
+            totalSkus = json.optInt("total_skus", 0),
+            negativeCount = json.optInt("negative_count", 0),
+            netValuation = json.optDouble("net_valuation", 0.0),
+            warehouseCount = json.optInt("warehouse_count", 0),
+            hasMore = json.optBoolean("has_more", false),
+            categories = categories,
+            items = items
+        )
+    }
+
+    suspend fun getTransfersList(status: String, query: String, warehouseId: Int?): StockTransferListResult {
+        val params = mutableMapOf("status" to status)
+        if (query.isNotBlank()) params["q"] = query
+        if (warehouseId != null && warehouseId > 0) params["warehouse_id"] = warehouseId.toString()
+        val json = requestJson("GET", "/api/mobile/transfers", params)
+
+        val stObj = json.optJSONObject("stats") ?: JSONObject()
+        val stats = StockTransferListStats(
+            total = stObj.optInt("total", 0),
+            draft = stObj.optInt("draft", 0),
+            completed = stObj.optInt("completed", 0),
+            totalUnits = stObj.optDouble("total_units", 0.0)
+        )
+
+        val locsArr = json.optJSONArray("locations") ?: JSONArray()
+        val locs = mutableListOf<TransferLocationOption>()
+        for (i in 0 until locsArr.length()) {
+            val l = locsArr.getJSONObject(i)
+            locs.add(TransferLocationOption(l.optInt("id"), l.optString("name", ""), l.optBoolean("is_default", false)))
+        }
+
+        val trArr = json.optJSONArray("transfers") ?: JSONArray()
+        val list = mutableListOf<StockTransferSummary>()
+        for (i in 0 until trArr.length()) {
+            val t = trArr.getJSONObject(i)
+            list.add(
+                StockTransferSummary(
+                    id = t.optInt("id"),
+                    transferNumber = t.optString("transfer_number", ""),
+                    transferDate = t.optString("transfer_date", ""),
+                    transferDateIso = t.optString("transfer_date_iso", ""),
+                    status = t.optString("status", "DRAFT"),
+                    notes = t.optString("notes", ""),
+                    fromLocationId = t.optInt("from_location_id"),
+                    fromLocationName = t.optString("from_location_name", ""),
+                    toLocationId = t.optInt("to_location_id"),
+                    toLocationName = t.optString("to_location_name", ""),
+                    itemCount = t.optInt("item_count", 0),
+                    totalUnits = t.optDouble("total_units", 0.0)
+                )
+            )
+        }
+        return StockTransferListResult(stats, locs, list)
+    }
+
+    suspend fun getTransferDetail(trfId: Int): StockTransferDetail {
+        val json = requestJson("GET", "/api/mobile/transfers/$trfId")
+        val locsArr = json.optJSONArray("locations") ?: JSONArray()
+        val locs = mutableListOf<TransferLocationOption>()
+        for (i in 0 until locsArr.length()) {
+            val l = locsArr.getJSONObject(i)
+            locs.add(TransferLocationOption(l.optInt("id"), l.optString("name", ""), l.optBoolean("is_default", false)))
+        }
+        val t = json.getJSONObject("transfer")
+        val linesArr = t.optJSONArray("lines") ?: JSONArray()
+        val lines = mutableListOf<StockTransferLine>()
+        for (i in 0 until linesArr.length()) {
+            val ln = linesArr.getJSONObject(i)
+            lines.add(
+                StockTransferLine(
+                    productId = ln.optInt("product_id"),
+                    sku = ln.optString("sku", ""),
+                    name = ln.optString("name", ""),
+                    uom = ln.optString("uom", "pcs."),
+                    baseUom = ln.optString("base_uom", "pcs."),
+                    salesUom = ln.optString("sales_uom", ""),
+                    salesRatio = ln.optDouble("sales_ratio", 1.0),
+                    uomFactor = ln.optDouble("uom_factor", 1.0),
+                    sourceOnHand = ln.optDouble("source_on_hand", 0.0),
+                    sourceAvailable = ln.optDouble("source_available", 0.0),
+                    quantity = ln.optDouble("quantity", 1.0)
+                )
+            )
+        }
+        return StockTransferDetail(
+            id = t.optInt("id", 0),
+            transferNumber = t.optString("transfer_number", ""),
+            transferDate = t.optString("transfer_date", ""),
+            transferDateIso = t.optString("transfer_date_iso", ""),
+            status = t.optString("status", "DRAFT"),
+            fromLocationId = t.optInt("from_location_id"),
+            fromLocationName = t.optString("from_location_name", ""),
+            toLocationId = t.optInt("to_location_id"),
+            toLocationName = t.optString("to_location_name", ""),
+            notes = t.optString("notes", ""),
+            locations = locs,
+            lines = lines
+        )
+    }
+
+    suspend fun searchTransferProducts(query: String, fromLocationId: Int): List<TransferCatalogProduct> {
+        val json = requestJson(
+            "GET",
+            "/api/mobile/transfers/products-lookup",
+            mapOf("q" to query, "from_location_id" to fromLocationId.toString())
+        )
+        val arr = json.optJSONArray("products") ?: JSONArray()
+        val list = mutableListOf<TransferCatalogProduct>()
+        for (i in 0 until arr.length()) {
+            val p = arr.getJSONObject(i)
+            list.add(
+                TransferCatalogProduct(
+                    id = p.optInt("id"),
+                    sku = p.optString("sku", ""),
+                    name = p.optString("name", ""),
+                    uom = p.optString("uom", "pcs."),
+                    salesUom = p.optString("sales_uom", ""),
+                    salesRatio = p.optDouble("sales_ratio", 1.0),
+                    sourceOnHand = p.optDouble("source_on_hand", 0.0),
+                    sourceAvailable = p.optDouble("source_available", 0.0)
+                )
+            )
+        }
+        return list
+    }
+
+    suspend fun saveTransfer(
+        transferId: Int,
+        transferNumber: String,
+        fromLocationId: Int,
+        toLocationId: Int,
+        transferDateIso: String,
+        notes: String,
+        status: String,
+        lines: List<StockTransferLine>
+    ): Pair<Int, String> {
+        val lineArr = JSONArray()
+        for (ln in lines) {
+            lineArr.put(
+                JSONObject().apply {
+                    put("product_id", ln.productId)
+                    put("quantity", ln.quantity)
+                    put("uom", ln.uom)
+                    put("uom_factor", ln.uomFactor)
+                    put("source_on_hand", ln.sourceOnHand)
+                    put("source_available", ln.sourceAvailable)
+                }
+            )
+        }
+        val body = JSONObject().apply {
+            if (transferId > 0) put("transfer_id", transferId)
+            put("transfer_number", transferNumber)
+            put("from_location_id", fromLocationId)
+            put("to_location_id", toLocationId)
+            put("transfer_date_iso", transferDateIso)
+            put("notes", notes)
+            put("status", status)
+            put("lines", lineArr)
+        }
+        val json = requestJson("POST", "/api/mobile/transfers/save", body = body)
+        return json.optInt("transfer_id", transferId) to json.optString("message", "Saved")
+    }
+
+    suspend fun deleteTransfer(trfId: Int): String {
+        val json = requestJson("POST", "/api/mobile/transfers/$trfId/delete", body = JSONObject())
+        return json.optString("message", "Deleted")
+    }
+
+    suspend fun getMonthlyExpenses(monthKey: String, branch: String): MonthlyExpensesData {
+        val params = mutableMapOf("branch" to branch)
+        if (monthKey.isNotBlank()) params["month"] = monthKey
+        val json = requestJson("GET", "/api/mobile/expenses/monthly", params)
+
+        val tabsArr = json.optJSONArray("month_tabs") ?: JSONArray()
+        val tabs = mutableListOf<ExpenseMonthTab>()
+        for (i in 0 until tabsArr.length()) {
+            val t = tabsArr.getJSONObject(i)
+            tabs.add(ExpenseMonthTab(t.optString("key", ""), t.optString("label", "")))
+        }
+
+        val accArr = json.optJSONArray("accounts") ?: JSONArray()
+        val accounts = mutableListOf<CashAccountRow>()
+        for (i in 0 until accArr.length()) {
+            val a = accArr.getJSONObject(i)
+            accounts.add(CashAccountRow(a.optString("name", ""), a.optDouble("amount", 0.0), a.optString("expr", "0.00")))
+        }
+
+        val catsArr = json.optJSONArray("categories") ?: JSONArray()
+        val cats = mutableListOf<String>()
+        for (i in 0 until catsArr.length()) cats.add(catsArr.optString(i, ""))
+
+        val payersArr = json.optJSONArray("payers") ?: JSONArray()
+        val payers = mutableListOf<String>()
+        for (i in 0 until payersArr.length()) payers.add(payersArr.optString(i, ""))
+
+        val expArr = json.optJSONArray("expenses") ?: JSONArray()
+        val exps = mutableListOf<ExpenseRow>()
+        for (i in 0 until expArr.length()) {
+            val e = expArr.getJSONObject(i)
+            exps.add(
+                ExpenseRow(
+                    id = e.optInt("id"),
+                    item = e.optString("item", ""),
+                    category = e.optString("category", "General"),
+                    paidBy = e.optString("paid_by", ""),
+                    unitPrice = e.optDouble("unit_price", 0.0),
+                    quantity = e.optDouble("quantity", 1.0),
+                    totalPrice = e.optDouble("total_price", 0.0),
+                    expenseDate = e.optString("expense_date", ""),
+                    expenseDateIso = e.optString("expense_date_iso", ""),
+                    notes = e.optString("notes", "")
+                )
+            )
+        }
+
+        return MonthlyExpensesData(
+            monthKey = json.optString("month_key", ""),
+            monthDisplay = json.optString("month_display", ""),
+            prevMonthDisplay = json.optString("prev_month_display", ""),
+            monthTabs = tabs,
+            totalExpenses = json.optDouble("total_expenses", 0.0),
+            itemCount = json.optInt("item_count", exps.size),
+            openingBalance = json.optDouble("opening_balance", 0.0),
+            isManualOpening = json.optBoolean("is_manual_opening", false),
+            salesReceived = json.optDouble("sales_received", 0.0),
+            paidInvoiceCount = json.optInt("paid_invoice_count", 0),
+            clearStm = json.optDouble("clear_stm", 0.0),
+            clearSk = json.optDouble("clear_sk", 0.0),
+            mediaTotal = json.optDouble("media_total", 0.0),
+            mediaSheetTotal = json.optDouble("media_sheet_total", 0.0),
+            moneyInHand = json.optDouble("money_in_hand", 0.0),
+            totalCountedCash = json.optDouble("total_counted_cash", 0.0),
+            cashVariance = json.optDouble("cash_variance", 0.0),
+            accounts = accounts,
+            categories = cats,
+            payers = payers,
+            expenses = exps
+        )
+    }
+
+    suspend fun addExpense(
+        monthKey: String,
+        branch: String,
+        item: String,
+        unitPrice: Double,
+        quantity: Double,
+        paidBy: String,
+        category: String,
+        expenseDateIso: String
+    ): String {
+        val body = JSONObject().apply {
+            put("month_key", monthKey)
+            put("branch", branch)
+            put("item", item)
+            put("unit_price", unitPrice)
+            put("quantity", quantity)
+            put("total_price", unitPrice * quantity)
+            put("paid_by", paidBy)
+            put("category", category)
+            put("expense_date", expenseDateIso)
+        }
+        val json = requestJson("POST", "/api/mobile/expenses/add", body = body)
+        return json.optString("message", "Added expense")
+    }
+
+    suspend fun updateExpense(
+        expId: Int,
+        item: String,
+        unitPrice: Double,
+        quantity: Double,
+        paidBy: String,
+        category: String
+    ): String {
+        val body = JSONObject().apply {
+            put("item", item)
+            put("unit_price", unitPrice)
+            put("quantity", quantity)
+            put("total_price", unitPrice * quantity)
+            put("paid_by", paidBy)
+            put("category", category)
+        }
+        val json = requestJson("POST", "/api/mobile/expenses/$expId/update", body = body)
+        return json.optString("message", "Updated expense")
+    }
+
+    suspend fun deleteExpense(expId: Int): String {
+        val json = requestJson("POST", "/api/mobile/expenses/$expId/delete", body = JSONObject())
+        return json.optString("message", "Deleted")
+    }
+
+    suspend fun saveExpenseAccounts(monthKey: String, branch: String, accounts: List<CashAccountRow>): String {
+        val arr = JSONArray()
+        for (a in accounts) {
+            arr.put(
+                JSONObject().apply {
+                    put("name", a.name)
+                    put("amount", a.amount)
+                    put("expr", String.format(java.util.Locale.US, "%.2f", a.amount))
+                }
+            )
+        }
+        val body = JSONObject().apply {
+            put("month_key", monthKey)
+            put("branch", branch)
+            put("accounts", arr)
+        }
+        val json = requestJson("POST", "/api/mobile/expenses/accounts/update", body = body)
+        return json.optString("message", "Accounts updated")
+    }
+
+    suspend fun getVendorsList(query: String, filter: String): VendorListResult {
+        val params = mutableMapOf("filter" to filter)
+        if (query.isNotBlank()) params["q"] = query
+        val json = requestJson("GET", "/api/mobile/vendors", params)
+
+        val stObj = json.optJSONObject("stats") ?: JSONObject()
+        val stats = VendorListStats(
+            totalVendors = stObj.optInt("total_vendors", 0),
+            totalPurchased = stObj.optDouble("total_purchased", 0.0),
+            openPayable = stObj.optDouble("open_payable", 0.0),
+            dueCount = stObj.optInt("due_count", 0),
+            totalPoOrders = stObj.optInt("total_po_orders", 0),
+            cambodiaCount = stObj.optInt("cambodia_count", 0),
+            recentCount = stObj.optInt("recent_count", 0)
+        )
+        val arr = json.optJSONArray("vendors") ?: JSONArray()
+        val list = mutableListOf<VendorItem>()
+        for (i in 0 until arr.length()) {
+            val v = arr.getJSONObject(i)
+            list.add(
+                VendorItem(
+                    id = v.optInt("id"),
+                    name = v.optString("name", ""),
+                    contactName = v.optString("contact_name", ""),
+                    phone = v.optString("phone", ""),
+                    email = v.optString("email", ""),
+                    country = v.optString("country", "Cambodia"),
+                    city = v.optString("city", ""),
+                    address1 = v.optString("address1", ""),
+                    poCount = v.optInt("po_count", 0),
+                    totalPurchased = v.optDouble("total_purchased", 0.0),
+                    openPayable = v.optDouble("open_payable", 0.0),
+                    lastPoDate = v.optString("last_po_date", "")
+                )
+            )
+        }
+        return VendorListResult(stats, list)
+    }
+
+    suspend fun createVendor(
+        name: String,
+        contactName: String,
+        phone: String,
+        country: String,
+        city: String
+    ): String {
+        val body = JSONObject().apply {
+            put("name", name)
+            put("contact_name", contactName)
+            put("phone", phone)
+            put("country", country)
+            put("city", city)
+        }
+        val json = requestJson("POST", "/api/mobile/vendors/create", body = body)
+        return json.optString("message", "Vendor created")
+    }
+
     fun buildWebPortalUrl(nextPath: String = "/"): String {
         val tok = session.token
         return if (tok.isNotBlank()) {

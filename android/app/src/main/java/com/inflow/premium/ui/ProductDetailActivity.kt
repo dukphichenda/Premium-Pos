@@ -1,9 +1,18 @@
 package com.inflow.premium.ui
 
+import android.Manifest
+import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.media.MediaScannerConnection
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
@@ -11,7 +20,9 @@ import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import com.google.android.material.card.MaterialCardView
 import com.inflow.premium.MainActivity
 import com.inflow.premium.R
@@ -24,7 +35,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.text.DecimalFormat
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
 class ProductDetailActivity : AppCompatActivity() {
@@ -40,6 +56,15 @@ class ProductDetailActivity : AppCompatActivity() {
     private var activeTab = TAB_OVERVIEW
     private val numFmt = DecimalFormat("#,##0.##")
     private val moneyFmt = DecimalFormat("#,##0.00")
+
+    private val requestLegacyStorageLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                savePriceTableAsJpg()
+            } else {
+                Toast.makeText(this, "Storage permission needed to save JPG to Pictures", Toast.LENGTH_SHORT).show()
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -109,7 +134,7 @@ class ProductDetailActivity : AppCompatActivity() {
         binding.btnEditProduct.setOnClickListener { openWebProduct() }
         binding.btnStockAdjust.setOnClickListener { openWebProduct() }
         binding.btnInvAdjust.setOnClickListener { openWebProduct() }
-        binding.btnOpenWebPriceCard.setOnClickListener { openWebProduct("#productPriceCardSection") }
+        binding.btnSavePriceJpg.setOnClickListener { savePriceTableAsJpg() }
 
         loadDetail()
     }
@@ -306,84 +331,11 @@ class ProductDetailActivity : AppCompatActivity() {
         binding.tvDimW.text = numFmt.format(d.width)
         binding.tvDimH.text = numFmt.format(d.height)
 
-        // Pricing & Cost Tiers (Corrected per-case and per-pcs)
-        binding.llPricingTiers.removeAllViews()
-        for (tier in d.pricingTiers) {
-            val card = LinearLayout(this).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_HORIZONTAL
-                setBackgroundResource(R.drawable.bg_product_thumb)
-                setPadding(dp(12), dp(10), dp(12), dp(10))
-                layoutParams = LinearLayout.LayoutParams(dp(124), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    marginEnd = dp(8)
-                }
-            }
-            val tvName = TextView(this).apply {
-                text = tier.schemeName
-                setTextColor(Color.parseColor("#0F172A"))
-                textSize = 12.5f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            }
-            val tvMargin = TextView(this).apply {
-                val sign = if (tier.marginPct >= 0) "+" else ""
-                text = String.format(Locale.US, "%s%.2f%%", sign, tier.marginPct)
-                setTextColor(if (tier.marginPct >= 0) Color.parseColor("#059669") else Color.parseColor("#DC2626"))
-                setBackgroundResource(R.drawable.bg_pill_emerald_dark)
-                backgroundTintList = ColorStateList.valueOf(
-                    Color.parseColor(if (tier.marginPct >= 0) "#DCFCE7" else "#FEE2E2")
-                )
-                setPadding(dp(8), dp(2), dp(8), dp(2))
-                textSize = 10.5f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dp(4) }
-            }
-            val tvCaseLbl = TextView(this).apply {
-                text = if (d.salesUom.isNotBlank()) d.salesUom else "Case"
-                setTextColor(Color.parseColor("#64748B"))
-                textSize = 10.5f
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dp(8) }
-            }
-            val tvCasePrice = TextView(this).apply {
-                text = "$${moneyFmt.format(tier.casePrice)}"
-                setTextColor(Color.parseColor("#0F172A"))
-                textSize = 14f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            }
-            val tvUnitLbl = TextView(this).apply {
-                text = d.uom
-                setTextColor(Color.parseColor("#64748B"))
-                textSize = 10.5f
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { topMargin = dp(6) }
-            }
-            val tvUnitPrice = TextView(this).apply {
-                text = String.format(Locale.US, "$%.4f", tier.unitPrice)
-                setTextColor(Color.parseColor("#0A6C62"))
-                textSize = 12.5f
-                setTypeface(null, android.graphics.Typeface.BOLD)
-            }
-
-            card.addView(tvName)
-            card.addView(tvMargin)
-            card.addView(tvCaseLbl)
-            card.addView(tvCasePrice)
-            card.addView(tvUnitLbl)
-            card.addView(tvUnitPrice)
-            binding.llPricingTiers.addView(card)
-        }
-
         // Bottom Product Price Table Card
         val pt = d.priceTable
         if (pt != null) {
             binding.cardPriceTable.visibility = View.VISIBLE
+            binding.tvPriceTableProductTitle.text = if (d.name.isNotBlank()) "${d.sku} • ${d.name}" else d.sku
             val accentColor = try {
                 Color.parseColor(pt.catColor)
             } catch (_: Exception) {
@@ -434,6 +386,100 @@ class ProductDetailActivity : AppCompatActivity() {
             }
         } else {
             binding.cardPriceTable.visibility = View.GONE
+        }
+    }
+
+    private fun savePriceTableAsJpg() {
+        val card = binding.cardPriceTable
+        if (card.visibility != View.VISIBLE || card.width <= 0 || card.height <= 0) {
+            Toast.makeText(this, "Price table not ready yet", Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestLegacyStorageLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
+
+        // Hide the Save JPG button during capture so the exported JPG looks clean
+        binding.btnSavePriceJpg.visibility = View.INVISIBLE
+        val scale = 2
+        val pad = 28
+        val bmpW = card.width * scale + pad * 2
+        val bmpH = card.height * scale + pad * 2
+        val bitmap = Bitmap.createBitmap(bmpW, bmpH, Bitmap.Config.ARGB_8888)
+        try {
+            val canvas = Canvas(bitmap)
+            canvas.drawColor(Color.WHITE)
+            canvas.translate(pad.toFloat(), pad.toFloat())
+            canvas.scale(scale.toFloat(), scale.toFloat())
+            card.draw(canvas)
+        } finally {
+            binding.btnSavePriceJpg.visibility = View.VISIBLE
+        }
+
+        val safeSku = (productSku.ifBlank { "product_$productId" }).replace(Regex("[^A-Za-z0-9._-]"), "_")
+        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val fileName = "PriceTable_${safeSku}_$stamp.jpg"
+
+        binding.btnSavePriceJpg.isEnabled = false
+        uiScope.launch {
+            val savedPath = withContext(Dispatchers.IO) {
+                writeJpgToGallery(bitmap, fileName)
+            }
+            bitmap.recycle()
+            binding.btnSavePriceJpg.isEnabled = true
+            if (savedPath != null) {
+                Toast.makeText(
+                    this@ProductDetailActivity,
+                    "Saved JPG to Pictures/inFlow Premium",
+                    Toast.LENGTH_LONG
+                ).show()
+            } else {
+                Toast.makeText(
+                    this@ProductDetailActivity,
+                    "Failed to save Price Table JPG",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    private fun writeJpgToGallery(bitmap: Bitmap, fileName: String): String? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, fileName)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/inFlow Premium")
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+                val resolver = contentResolver
+                val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+                resolver.openOutputStream(uri)?.use { out ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) return null
+                } ?: return null
+                values.clear()
+                values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+                uri.toString()
+            } else {
+                @Suppress("DEPRECATION")
+                val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                    "inFlow Premium"
+                )
+                if (!dir.exists()) dir.mkdirs()
+                val file = File(dir, fileName)
+                FileOutputStream(file).use { out ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, out)) return null
+                }
+                MediaScannerConnection.scanFile(this, arrayOf(file.absolutePath), arrayOf("image/jpeg"), null)
+                file.absolutePath
+            }
+        } catch (_: Exception) {
+            null
         }
     }
 

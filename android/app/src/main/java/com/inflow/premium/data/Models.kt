@@ -474,3 +474,188 @@ data class ReportSummary(
     val paymentBreakdown: List<PaymentBreakdownItem>,
     val topProducts: List<TopProductItem>
 )
+
+data class StockWarehouseQty(
+    val id: Int,
+    val name: String,
+    val qty: Double
+)
+
+data class StockMatrixCategory(
+    val id: Int,
+    val name: String
+)
+
+data class StockMatrixItem(
+    val id: Int,
+    val sku: String,
+    val name: String,
+    val uom: String,
+    val categoryName: String,
+    val unitCost: Double,
+    val totalQty: Double,
+    val totalValue: Double,
+    val warehouses: List<StockWarehouseQty>
+)
+
+data class StockMatrixResponse(
+    val totalSkus: Int,
+    val negativeCount: Int,
+    val netValuation: Double,
+    val warehouseCount: Int,
+    val hasMore: Boolean,
+    val categories: List<StockMatrixCategory>,
+    val items: List<StockMatrixItem>
+)
+
+data class TransferLocationOption(
+    val id: Int,
+    val name: String,
+    val isDefault: Boolean = false
+)
+
+data class StockTransferListStats(
+    val total: Int,
+    val draft: Int,
+    val completed: Int,
+    val totalUnits: Double
+)
+
+data class StockTransferSummary(
+    val id: Int,
+    val transferNumber: String,
+    val transferDate: String,
+    val transferDateIso: String,
+    val status: String,
+    val notes: String,
+    val fromLocationId: Int,
+    val fromLocationName: String,
+    val toLocationId: Int,
+    val toLocationName: String,
+    val itemCount: Int,
+    val totalUnits: Double
+)
+
+data class StockTransferListResult(
+    val stats: StockTransferListStats,
+    val locations: List<TransferLocationOption>,
+    val transfers: List<StockTransferSummary>
+)
+
+data class StockTransferLine(
+    val productId: Int,
+    val sku: String,
+    val name: String,
+    val uom: String,
+    val baseUom: String,
+    val salesUom: String,
+    val salesRatio: Double,
+    val uomFactor: Double,
+    var sourceOnHand: Double,
+    var sourceAvailable: Double,
+    var quantity: Double
+)
+
+data class StockTransferDetail(
+    val id: Int,
+    val transferNumber: String,
+    val transferDate: String,
+    val transferDateIso: String,
+    val status: String,
+    val fromLocationId: Int,
+    val fromLocationName: String,
+    val toLocationId: Int,
+    val toLocationName: String,
+    val notes: String,
+    val locations: List<TransferLocationOption>,
+    val lines: MutableList<StockTransferLine>
+)
+
+data class TransferCatalogProduct(
+    val id: Int,
+    val sku: String,
+    val name: String,
+    val uom: String,
+    val salesUom: String,
+    val salesRatio: Double,
+    val sourceOnHand: Double,
+    val sourceAvailable: Double
+)
+
+data class ExpenseMonthTab(
+    val key: String,
+    val label: String
+)
+
+data class ExpenseRow(
+    val id: Int,
+    val item: String,
+    val category: String,
+    val paidBy: String,
+    val unitPrice: Double,
+    val quantity: Double,
+    val totalPrice: Double,
+    val expenseDate: String,
+    val expenseDateIso: String,
+    val notes: String
+)
+
+data class CashAccountRow(
+    var name: String,
+    var amount: Double,
+    var expr: String
+)
+
+data class MonthlyExpensesData(
+    val monthKey: String,
+    val monthDisplay: String,
+    val prevMonthDisplay: String,
+    val monthTabs: List<ExpenseMonthTab>,
+    val totalExpenses: Double,
+    val itemCount: Int,
+    val openingBalance: Double,
+    val isManualOpening: Boolean,
+    val salesReceived: Double,
+    val paidInvoiceCount: Int,
+    val clearStm: Double,
+    val clearSk: Double,
+    val mediaTotal: Double,
+    val mediaSheetTotal: Double,
+    val moneyInHand: Double,
+    val totalCountedCash: Double,
+    val cashVariance: Double,
+    val accounts: List<CashAccountRow>,
+    val categories: List<String>,
+    val payers: List<String>,
+    val expenses: List<ExpenseRow>
+)
+
+data class VendorListStats(
+    val totalVendors: Int,
+    val totalPurchased: Double,
+    val openPayable: Double,
+    val dueCount: Int,
+    val totalPoOrders: Int,
+    val cambodiaCount: Int,
+    val recentCount: Int
+)
+
+data class VendorItem(
+    val id: Int,
+    val name: String,
+    val contactName: String,
+    val phone: String,
+    val email: String,
+    val country: String,
+    val city: String,
+    val address1: String,
+    val poCount: Int,
+    val totalPurchased: Double,
+    val openPayable: Double,
+    val lastPoDate: String
+)
+
+data class VendorListResult(
+    val stats: VendorListStats,
+    val vendors: List<VendorItem>
+)
