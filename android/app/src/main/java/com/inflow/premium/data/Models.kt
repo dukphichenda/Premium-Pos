@@ -17,7 +17,9 @@ data class BranchItem(
 
 data class PricingSchemeItem(
     val id: Int,
-    val name: String
+    val name: String,
+    val currency: String = "USD",
+    val isDefault: Boolean = false
 )
 
 data class LocationItem(

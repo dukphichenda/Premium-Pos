@@ -21,6 +21,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.NestedScrollView
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.AdjustmentCatalogProduct
 import com.inflow.premium.data.AdjustmentCategoryOption

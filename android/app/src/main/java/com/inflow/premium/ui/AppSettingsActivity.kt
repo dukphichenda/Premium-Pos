@@ -22,7 +22,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.ApiClient
-import com.inflow.premium.data.BranchInfo
+import com.inflow.premium.data.BranchItem
 import com.inflow.premium.data.CompanySettingsData
 import com.inflow.premium.data.InvoiceSettingsData
 import com.inflow.premium.data.MobileSettingsOverview
@@ -143,7 +143,7 @@ class AppSettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun isRealBranch(b: BranchInfo): Boolean {
+    private fun isRealBranch(b: BranchItem): Boolean {
         if (b.id == "0" || b.id == "main" || b.id.equals("all", ignoreCase = true)) return false
         if (b.code.equals("ALL", ignoreCase = true)) return false
         val lower = b.name.lowercase()
