@@ -105,6 +105,13 @@ object GallerySaver {
         private val onCompleteWithFile: ((Boolean, String, File?) -> Unit)? = null,
         private val onComplete: ((Boolean, String) -> Unit)? = null
     ) {
+        constructor(context: Context, onComplete: ((Boolean, String) -> Unit)?) : this(
+            context = context,
+            saveToGallery = true,
+            onCompleteWithFile = null,
+            onComplete = onComplete
+        )
+
         private val mainHandler = Handler(Looper.getMainLooper())
 
         @JavascriptInterface
