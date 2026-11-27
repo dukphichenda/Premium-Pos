@@ -4,7 +4,7 @@ import hmac
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, date
 from functools import wraps
 from flask import Blueprint, request, jsonify, session
 from werkzeug.security import check_password_hash
@@ -2341,6 +2341,274 @@ def mobile_transfer_delete(trf_id):
         cur.execute("DELETE FROM stock_transfer_lines WHERE transfer_id = %s", (trf_id,))
         cur.execute("DELETE FROM stock_transfers WHERE id = %s", (trf_id,))
     return jsonify({'success': True, 'message': f"Draft {trf['transfer_number']} deleted."})
+
+
+@mobile_api_bp.route('/api/mobile/expenses/monthly', methods=['GET'])
+@mobile_auth_required
+def mobile_expenses_monthly():
+    """Fetch Monthly Expenses dashboard, breakdown, and cash accounts count."""
+    from routes.expenses import (
+        _get_current_month_key, _get_available_months, _format_month_display, _get_monthly_report_data
+    )
+    user = getattr(request, 'mobile_user', {})
+    is_main = _is_main_admin(user)
+    if is_main:
+        branch_scope = (request.args.get('branch') or 'main').strip().lower()
+    else:
+        ubid = user.get('branch_id')
+        branch_scope = str(ubid) if ubid else 'main'
+
+    month_key = (request.args.get('month') or '').strip() or _get_current_month_key()
+    all_months = _get_available_months()
+    if month_key not in all_months:
+        all_months.insert(0, month_key)
+    month_tabs = [{'key': m, 'label': _format_month_display(m)} for m in all_months[:12]]
+
+    report = _get_monthly_report_data(month_key, branch_id=branch_scope)
+
+    cats = query_all("SELECT DISTINCT category FROM expenses WHERE category IS NOT NULL AND category != '' ORDER BY category ASC")
+    cat_names = [c['category'] for c in cats]
+    for dc in ['Salary', 'Supplier', 'Food', 'Rent/Office', 'Supplies', 'Delivery', 'Packaging', 'General']:
+        if dc not in cat_names:
+            cat_names.append(dc)
+
+    payers = query_all("SELECT DISTINCT paid_by FROM expenses WHERE paid_by IS NOT NULL AND paid_by != '' ORDER BY paid_by ASC")
+    payer_names = [p['paid_by'] for p in payers]
+    for dp in ['Chenda', 'Veasna', 'Office']:
+        if dp not in payer_names:
+            payer_names.append(dp)
+
+    exp_list = []
+    for e in report['expenses']:
+        ed = e.get('expense_date')
+        ed_disp = ed.strftime('%d-%b') if hasattr(ed, 'strftime') else str(ed or '')
+        ed_iso = ed.strftime('%Y-%m-%d') if hasattr(ed, 'strftime') else str(ed or '')
+        exp_list.append({
+            'id': e['id'],
+            'item': e.get('item') or '',
+            'category': e.get('category') or 'General',
+            'paid_by': e.get('paid_by') or '',
+            'unit_price': float(e.get('unit_price') or 0),
+            'quantity': float(e.get('quantity') or 1),
+            'total_price': float(e.get('total_price') or 0),
+            'expense_date': ed_disp,
+            'expense_date_iso': ed_iso,
+            'notes': e.get('notes') or '',
+        })
+
+    return jsonify({
+        'success': True,
+        'month_key': report['month_key'],
+        'month_display': report['month_display'],
+        'prev_month_display': report['prev_month_display'],
+        'month_tabs': month_tabs,
+        'total_expenses': round(float(report['total_expenses'] or 0), 2),
+        'item_count': len(exp_list),
+        'opening_balance': round(float(report['opening_balance'] or 0), 2),
+        'is_manual_opening': bool(report['is_manual_opening']),
+        'sales_received': round(float(report['sales_received'] or 0), 2),
+        'paid_invoice_count': int(report['inflow_data'].get('paid_invoice_count') or 0),
+        'clear_stm': round(float(report['clear_stm'] or 0), 2),
+        'clear_sk': round(float(report['clear_sk'] or 0), 2),
+        'media_total': round(float(report['media_total'] or 0), 2),
+        'media_sheet_total': round(float(report['media_sheet_total'] or 0), 2),
+        'money_in_hand': round(float(report['money_in_hand'] or 0), 2),
+        'total_counted_cash': round(float(report['total_counted_cash'] or 0), 2),
+        'cash_variance': round(float(report['cash_variance'] or 0), 2),
+        'accounts': report['accounts'],
+        'categories': cat_names,
+        'payers': payer_names,
+        'expenses': exp_list,
+    })
+
+
+@mobile_api_bp.route('/api/mobile/expenses/add', methods=['POST'])
+@mobile_auth_required
+def mobile_expenses_add():
+    """Record a new monthly expense entry."""
+    from routes.expenses import _get_or_create_monthly_summary
+    data = request.get_json(silent=True) or {}
+    item = (data.get('item') or '').strip()
+    if not item:
+        return jsonify({'success': False, 'error': 'Item description is required.'}), 400
+
+    exp_date_str = (data.get('expense_date') or '').strip()
+    try:
+        exp_date = datetime.strptime(exp_date_str, '%Y-%m-%d').date() if exp_date_str else date.today()
+    except Exception:
+        exp_date = date.today()
+
+    unit_price = float(data.get('unit_price') or 0)
+    quantity = float(data.get('quantity') or 1)
+    total_price = float(data.get('total_price') or (unit_price * quantity))
+    paid_by = (data.get('paid_by') or '').strip()
+    category = (data.get('category') or 'General').strip() or 'General'
+    notes = (data.get('notes') or '').strip()
+    month_key = (data.get('month_key') or '').strip() or exp_date.strftime('%Y-%m')
+
+    user = getattr(request, 'mobile_user', {})
+    if _is_main_admin(user):
+        b_raw = (data.get('branch') or 'main').strip().lower()
+        branch_id = int(b_raw) if b_raw.isdigit() else None
+    else:
+        branch_id = user.get('branch_id')
+
+    new_id = execute_returning_id("""
+        INSERT INTO expenses (expense_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key, branch_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        RETURNING id;
+    """, (exp_date, item, category, unit_price, quantity, total_price, paid_by, notes, month_key, branch_id))
+
+    _get_or_create_monthly_summary(month_key, branch_id=str(branch_id) if branch_id else 'main')
+    return jsonify({'success': True, 'id': new_id, 'message': f"Added '{item}' (${total_price:,.2f})"})
+
+
+@mobile_api_bp.route('/api/mobile/expenses/<int:exp_id>/update', methods=['POST'])
+@mobile_auth_required
+def mobile_expenses_update(exp_id):
+    """Update an existing expense row."""
+    data = request.get_json(silent=True) or {}
+    item = (data.get('item') or '').strip()
+    if not item:
+        return jsonify({'success': False, 'error': 'Item description is required.'}), 400
+    unit_price = float(data.get('unit_price') or 0)
+    quantity = float(data.get('quantity') or 1)
+    total_price = float(data.get('total_price') or (unit_price * quantity))
+    paid_by = (data.get('paid_by') or '').strip()
+    category = (data.get('category') or 'General').strip() or 'General'
+    notes = (data.get('notes') or '').strip()
+    execute("""
+        UPDATE expenses
+        SET item = %s, unit_price = %s, quantity = %s, total_price = %s,
+            paid_by = %s, category = %s, notes = %s, updated_at = CURRENT_TIMESTAMP
+        WHERE id = %s
+    """, (item, unit_price, quantity, total_price, paid_by, category, notes, exp_id))
+    return jsonify({'success': True, 'message': 'Expense updated'})
+
+
+@mobile_api_bp.route('/api/mobile/expenses/<int:exp_id>/delete', methods=['POST'])
+@mobile_auth_required
+def mobile_expenses_delete(exp_id):
+    """Delete an expense row."""
+    execute("DELETE FROM expenses WHERE id = %s", (exp_id,))
+    return jsonify({'success': True, 'message': 'Expense deleted'})
+
+
+@mobile_api_bp.route('/api/mobile/expenses/accounts/update', methods=['POST'])
+@mobile_auth_required
+def mobile_expenses_accounts_update():
+    """Update cash & bank accounts JSON for a monthly expense summary."""
+    from routes.expenses import _get_or_create_monthly_summary, _normalize_accounts
+    data = request.get_json(silent=True) or {}
+    month_key = (data.get('month_key') or '').strip()
+    if not month_key:
+        return jsonify({'success': False, 'error': 'month_key required'}), 400
+    user = getattr(request, 'mobile_user', {})
+    b_raw = (data.get('branch') or 'main').strip().lower() if _is_main_admin(user) else str(user.get('branch_id') or 'main')
+    summary = _get_or_create_monthly_summary(month_key, branch_id=b_raw)
+    accounts = _normalize_accounts(data.get('accounts'))
+    execute(
+        "UPDATE monthly_cash_summaries SET accounts_json = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s",
+        (json.dumps(accounts, ensure_ascii=False), summary['id'])
+    )
+    return jsonify({'success': True, 'message': 'Accounts updated'})
+
+
+@mobile_api_bp.route('/api/mobile/vendors', methods=['GET'])
+@mobile_auth_required
+def mobile_vendors_list():
+    """List active vendors with purchasing totals, open payables, and filter counts."""
+    q = (request.args.get('q') or '').strip().lower()
+    flt = (request.args.get('filter') or 'all').strip().lower()
+
+    rows = query_all("""
+        SELECT
+            v.id, v.name, COALESCE(v.contact_name, '') as contact_name,
+            COALESCE(v.phone, '') as phone, COALESCE(v.email, '') as email,
+            COALESCE(v.country, 'Cambodia') as country,
+            COALESCE(v.city, '') as city, COALESCE(v.address1, '') as address1,
+            COUNT(po.id) as po_count,
+            COALESCE(SUM(po.total_amount), 0) as total_purchased,
+            COALESCE(SUM(po.balance_due), 0) as open_payable,
+            MAX(po.order_date) as last_po_date
+        FROM vendors v
+        LEFT JOIN purchase_orders po ON v.id = po.vendor_id AND po.status != 'CANCELLED'
+        WHERE v.is_active = TRUE
+        GROUP BY v.id
+        ORDER BY v.name ASC
+    """)
+
+    total_purchased = sum(float(r['total_purchased'] or 0) for r in rows)
+    open_payable = sum(float(r['open_payable'] or 0) for r in rows)
+    total_po_orders = sum(int(r['po_count'] or 0) for r in rows)
+    due_count = sum(1 for r in rows if float(r['open_payable'] or 0) > 0.005)
+    cambodia_count = sum(1 for r in rows if 'cambodia' in (r['country'] or '').lower())
+    recent_count = sum(1 for r in rows if int(r['po_count'] or 0) > 0)
+
+    filtered = []
+    for r in rows:
+        if q:
+            hay = f"{r['name']} {r['contact_name']} {r['phone']} {r['country']} {r['city']}".lower()
+            if q not in hay:
+                continue
+        if flt == 'payable' and float(r['open_payable'] or 0) <= 0.005:
+            continue
+        if flt == 'cambodia' and 'cambodia' not in (r['country'] or '').lower():
+            continue
+        if flt == 'recent' and int(r['po_count'] or 0) <= 0:
+            continue
+
+        lpd = r.get('last_po_date')
+        filtered.append({
+            'id': r['id'],
+            'name': r['name'] or '',
+            'contact_name': r['contact_name'] or '',
+            'phone': r['phone'] or '',
+            'email': r['email'] or '',
+            'country': r['country'] or 'Cambodia',
+            'city': r['city'] or '',
+            'address1': r['address1'] or '',
+            'po_count': int(r['po_count'] or 0),
+            'total_purchased': round(float(r['total_purchased'] or 0), 2),
+            'open_payable': round(float(r['open_payable'] or 0), 2),
+            'last_po_date': lpd.strftime('%d %b %Y') if hasattr(lpd, 'strftime') else '',
+        })
+
+    return jsonify({
+        'success': True,
+        'stats': {
+            'total_vendors': len(rows),
+            'total_purchased': round(total_purchased, 2),
+            'open_payable': round(open_payable, 2),
+            'due_count': due_count,
+            'total_po_orders': total_po_orders,
+            'cambodia_count': cambodia_count,
+            'recent_count': recent_count,
+        },
+        'vendors': filtered,
+    })
+
+
+@mobile_api_bp.route('/api/mobile/vendors/create', methods=['POST'])
+@mobile_auth_required
+def mobile_vendor_create():
+    """Create a new active vendor account."""
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'error': 'Vendor name is required.'}), 400
+    contact_name = (data.get('contact_name') or '').strip()
+    phone = (data.get('phone') or '').strip()
+    email = (data.get('email') or '').strip()
+    address1 = (data.get('address1') or '').strip()
+    city = (data.get('city') or '').strip()
+    country = (data.get('country') or 'Cambodia').strip() or 'Cambodia'
+    new_id = execute_returning_id("""
+        INSERT INTO vendors (name, contact_name, phone, email, address1, city, country)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING id;
+    """, (name, contact_name, phone, email, address1, city, country))
+    return jsonify({'success': True, 'id': new_id, 'message': f"Vendor '{name}' added!"})
 
 
 @mobile_api_bp.route('/api/mobile/web-handoff', methods=['GET'])
