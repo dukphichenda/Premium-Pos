@@ -2,14 +2,20 @@ package com.inflow.premium.ui
 
 import android.app.Activity
 import android.app.DatePickerDialog
+import android.content.ClipData
+import android.content.ContentValues
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
@@ -19,9 +25,9 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.widget.NestedScrollView
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.ApiClient
@@ -40,6 +46,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.text.DecimalFormat
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -115,12 +124,16 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
         binding.btnPoDetRefresh.setOnClickListener { loadDetail() }
         binding.btnPoDetMore.setOnClickListener { anchor ->
             val popup = PopupMenu(this, anchor)
-            popup.menu.add(0, 1, 1, "Open in Web App")
-            popup.menu.add(0, 2, 2, "Refresh")
+            popup.menu.add(0, 3, 1, "Export PDF")
+            popup.menu.add(0, 4, 2, "Export Excel (.xlsx)")
+            popup.menu.add(0, 1, 3, "Open in Web App")
+            popup.menu.add(0, 2, 4, "Refresh")
             popup.setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     1 -> openWebPo()
                     2 -> loadDetail()
+                    3 -> exportPoAsPdf()
+                    4 -> exportPoAsExcel()
                 }
                 true
             }
@@ -133,6 +146,8 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
         binding.tvPoDetailFulfillBadge.setOnClickListener { showStatusPicker() }
         binding.tvPoDetailPayBadge.setOnClickListener { showPaymentStatusPicker() }
         binding.btnPoAddItem.setOnClickListener { showAddProductDialog() }
+        binding.btnPoAddMoreBottom.setOnClickListener { showAddProductDialog() }
+        binding.btnPoExport.setOnClickListener { showExportPoDialog() }
 
         binding.btnPoOpenWeb.setOnClickListener { savePo(markReceiveAndPay = false) }
         binding.btnPoPayReceive.setOnClickListener {
@@ -397,16 +412,125 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showExportPoDialog() {
+        if (poId <= 0) {
+            Toast.makeText(this, "Save the PO first before exporting", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val options = arrayOf(
+            "📄 Export as PDF (Print / Save PDF)",
+            "📊 Export as Excel (.xlsx)"
+        )
+        LiquidGlassDialog.builder(this)
+            .setTitle("Export $poNumber")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> exportPoAsPdf()
+                    1 -> exportPoAsExcel()
+                }
+            }
+            .setNegativeButton("Close", null)
+            .show()
+    }
+
+    private fun exportPoAsPdf() {
+        if (poId <= 0) {
+            Toast.makeText(this, "Save the PO first before exporting PDF", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val pdfUrl = api.buildPurchaseExportPdfUrl(poId)
+        startActivity(
+            Intent(this, InvoicePrintActivity::class.java)
+                .putExtra(InvoicePrintActivity.EXTRA_ORDER_NUMBER, poNumber)
+                .putExtra(InvoicePrintActivity.EXTRA_PRINT_URL, pdfUrl)
+                .putExtra(InvoicePrintActivity.EXTRA_TITLE, "PO PDF • $poNumber")
+                .putExtra(InvoicePrintActivity.EXTRA_PRINT_BTN_TEXT, "Save / Print PDF")
+        )
+    }
+
+    private fun exportPoAsExcel() {
+        if (poId <= 0) {
+            Toast.makeText(this, "Save the PO first before exporting Excel", Toast.LENGTH_SHORT).show()
+            return
+        }
+        binding.btnPoExport.isEnabled = false
+        Toast.makeText(this, "Generating Excel for $poNumber...", Toast.LENGTH_SHORT).show()
+        uiScope.launch {
+            try {
+                val (filename, bytes) = api.downloadPurchaseOrderExcel(poId, poNumber)
+                val cachedFile = withContext(Dispatchers.IO) {
+                    // Save a permanent copy into Downloads/inFlow
+                    saveExcelToDownloads(filename, bytes)
+                    // Also write to cache/share for immediate Share / Open intent
+                    val shareDir = File(cacheDir, "share").apply { if (!exists()) mkdirs() }
+                    File(shareDir, filename).also { f ->
+                        FileOutputStream(f).use { it.write(bytes) }
+                    }
+                }
+                Toast.makeText(this@PurchaseOrderDetailActivity, "Saved $filename to Downloads", Toast.LENGTH_LONG).show()
+                val uri = FileProvider.getUriForFile(this@PurchaseOrderDetailActivity, "$packageName.fileprovider", cachedFile)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    clipData = ClipData.newRawUri(filename, uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                startActivity(Intent.createChooser(shareIntent, "Share / Open $filename").apply {
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                })
+            } catch (e: Exception) {
+                Toast.makeText(this@PurchaseOrderDetailActivity, e.message ?: "Excel export failed", Toast.LENGTH_LONG).show()
+            } finally {
+                binding.btnPoExport.isEnabled = true
+            }
+        }
+    }
+
+    private fun saveExcelToDownloads(filename: String, bytes: ByteArray) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val values = ContentValues().apply {
+                    put(MediaStore.Downloads.DISPLAY_NAME, filename)
+                    put(MediaStore.Downloads.MIME_TYPE, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+                    put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/inFlow")
+                    put(MediaStore.Downloads.IS_PENDING, 1)
+                }
+                val uri = contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return
+                contentResolver.openOutputStream(uri)?.use { it.write(bytes) }
+                values.clear()
+                values.put(MediaStore.Downloads.IS_PENDING, 0)
+                contentResolver.update(uri, values, null, null)
+            } else {
+                @Suppress("DEPRECATION")
+                val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "inFlow")
+                if (!dir.exists()) dir.mkdirs()
+                FileOutputStream(File(dir, filename)).use { it.write(bytes) }
+            }
+        } catch (_: Exception) {
+        }
+    }
+
     private fun showAddProductDialog() {
         val dp = resources.displayMetrics.density
-        val pad = (16 * dp).toInt()
+        val pad = (4 * dp).toInt()
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, (10 * dp).toInt(), pad, pad)
+            setPadding(pad, 0, pad, 0)
         }
         val etSearch = EditText(this).apply {
             hint = "Search product name, SKU or barcode..."
             isSingleLine = true
+            setBackgroundResource(R.drawable.bg_search_box_clean)
+            setPadding((12 * dp).toInt(), (10 * dp).toInt(), (12 * dp).toInt(), (10 * dp).toInt())
+            setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_muted))
+            textSize = 13.5f
+        }
+        val tvHelper = TextView(this).apply {
+            text = "Tap any product to add it to this PO (you can add multiple items)"
+            setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_secondary))
+            textSize = 11.5f
+            setPadding((2 * dp).toInt(), (6 * dp).toInt(), (2 * dp).toInt(), (8 * dp).toInt())
         }
         val resultsScroll = NestedScrollView(this).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, (340 * dp).toInt())
@@ -414,12 +538,13 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
         val resultsList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         resultsScroll.addView(resultsList)
         root.addView(etSearch)
+        root.addView(tvHelper)
         root.addView(resultsScroll)
 
         val dlg = LiquidGlassDialog.builder(this)
-            .setTitle("Add Item to PO")
+            .setTitle("Add Products to PO")
             .setView(root)
-            .setNegativeButton("Close", null)
+            .setPositiveButton("Done") { d, _ -> d.dismiss() }
             .create()
 
         var searchJob: Job? = null
@@ -438,7 +563,7 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
                         })
                     } else {
                         for (p in prods) {
-                            resultsList.addView(buildProductPickCard(p, dlg))
+                            resultsList.addView(buildProductPickCard(p))
                         }
                     }
                 } catch (_: Exception) {}
@@ -457,7 +582,7 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
         runSearch("")
     }
 
-    private fun buildProductPickCard(p: ProductItem, dlg: androidx.appcompat.app.AlertDialog): View {
+    private fun buildProductPickCard(p: ProductItem): View {
         val dp = resources.displayMetrics.density
         val card = MaterialCardView(this).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -470,28 +595,65 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
             strokeColor = ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.surface_stroke)
             setCardBackgroundColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.surface_card))
         }
-        val inner = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
             val p12 = (12 * dp).toInt()
             setPadding(p12, (10 * dp).toInt(), p12, (10 * dp).toInt())
         }
-        inner.addView(TextView(this).apply {
+        val infoCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        infoCol.addView(TextView(this).apply {
             text = p.name.ifBlank { p.sku }
             setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_primary))
             textSize = 13.5f
             setTypeface(null, Typeface.BOLD)
         })
-        inner.addView(TextView(this).apply {
+        infoCol.addView(TextView(this).apply {
             text = "${p.sku}  •  Avail: ${qtyFmt.format(p.stockAvailable)} ${p.uom}"
             setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_secondary))
             textSize = 11.5f
         })
-        card.addView(inner)
+        val badge = TextView(this).apply {
+            setPadding((10 * dp).toInt(), (5 * dp).toInt(), (10 * dp).toInt(), (5 * dp).toInt())
+            textSize = 11.5f
+            setTypeface(null, Typeface.BOLD)
+            setBackgroundResource(R.drawable.bg_pill_teal_solid)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { marginStart = (8 * dp).toInt() }
+        }
+
+        fun syncBadge() {
+            val existing = lines.firstOrNull { it.productId == p.id && p.id > 0 }
+            if (existing != null) {
+                badge.text = "✓ ${qtyFmt.format(existing.quantity)}"
+                badge.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#059669"))
+                badge.setTextColor(Color.WHITE)
+                card.strokeColor = Color.parseColor("#0A6C62")
+            } else {
+                badge.text = "+ Add"
+                badge.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#0A6C62"))
+                badge.setTextColor(Color.WHITE)
+                card.strokeColor = ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.surface_stroke)
+            }
+        }
+        syncBadge()
+
+        row.addView(infoCol)
+        row.addView(badge)
+        card.addView(row)
         card.setOnClickListener {
-            val existing = lines.indexOfFirst { it.productId == p.id && p.id > 0 }
-            if (existing >= 0) {
-                dlg.dismiss()
-                showEditLineDialog(existing)
+            val existingIdx = lines.indexOfFirst { it.productId == p.id && p.id > 0 }
+            if (existingIdx >= 0) {
+                lines[existingIdx].quantity += 1.0
+                lines[existingIdx].subtotal = lines[existingIdx].quantity * lines[existingIdx].unitPrice
+                renderLinesAndTotals()
+                syncBadge()
+                Toast.makeText(this, "${p.sku} qty → ${qtyFmt.format(lines[existingIdx].quantity)}", Toast.LENGTH_SHORT).show()
             } else {
                 lines.add(
                     PurchaseOrderLine(
@@ -507,8 +669,8 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
                     )
                 )
                 renderLinesAndTotals()
-                dlg.dismiss()
-                showEditLineDialog(lines.lastIndex)
+                syncBadge()
+                Toast.makeText(this, "Added ${p.sku} to PO", Toast.LENGTH_SHORT).show()
             }
         }
         return card

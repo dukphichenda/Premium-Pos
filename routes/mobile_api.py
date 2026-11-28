@@ -8,7 +8,7 @@ import re
 import time
 from datetime import datetime, date
 from functools import wraps
-from flask import Blueprint, request, jsonify, session
+from flask import Blueprint, request, jsonify, session, send_file, render_template
 from werkzeug.security import check_password_hash
 from config import Config
 from database import query_one, query_all, execute, execute_returning_id, get_db_cursor, get_next_sequence_val
@@ -1046,6 +1046,104 @@ def mobile_purchase_save():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+def _authenticate_mobile_query_or_header():
+    """Authenticate either via Authorization: Bearer <token>, ?token=<token>, or active session."""
+    auth_header = request.headers.get('Authorization', '')
+    token = auth_header[7:].strip() if auth_header.startswith('Bearer ') else (request.args.get('token') or '').strip()
+    if token:
+        claims = verify_mobile_token(token)
+        if not claims:
+            return None
+        user = _load_user_by_id(claims['user_id'])
+        if not user:
+            return None
+        _populate_session_from_user(user)
+        return user
+    if session.get('user_id'):
+        return _load_user_by_id(session.get('user_id'))
+    return None
+
+
+def _load_po_for_export(pid):
+    order = query_one("""
+        SELECT
+            po.*,
+            v.name as vendor_name,
+            COALESCE(po.contact, v.contact_name, '') as contact,
+            COALESCE(po.phone, v.phone, '') as phone,
+            COALESCE(po.vendor_address, v.address1, '') as vendor_address,
+            l.name as location_name
+        FROM purchase_orders po
+        LEFT JOIN vendors v ON po.vendor_id = v.id
+        LEFT JOIN locations l ON po.location_id = l.id
+        WHERE po.id = %s
+    """, (pid,))
+    if not order:
+        return None, [], None
+    raw_lines = query_all("""
+        SELECT
+            pol.*,
+            COALESCE(pol.uom, p.purchasing_uom, p.uom, 'pcs.') as line_uom,
+            COALESCE(p.name, pol.description, '') as product_name,
+            COALESCE(p.sku, '') as product_sku,
+            COALESCE(p.barcode, '') as product_barcode,
+            COALESCE(p.uom, 'pcs.') as base_uom,
+            COALESCE(p.purchasing_uom, p.uom, 'pcs.') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.master_pack_qty, p.inner_pack_qty, 1.0) as purchasing_ratio,
+            COALESCE(p.sales_uom, p.uom, 'pcs.') as sales_uom,
+            COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
+            COALESCE(p.packs_per_case, 0) as packs_per_case,
+            COALESCE(p.pcs_per_pack, 0) as pcs_per_pack
+        FROM purchase_order_lines pol
+        LEFT JOIN products p ON pol.product_id = p.id
+        WHERE pol.purchase_order_id = %s
+        ORDER BY pol.line_num ASC, pol.id ASC
+    """, (pid,))
+    company = query_one("SELECT * FROM companies LIMIT 1")
+    return order, raw_lines, company
+
+
+@mobile_api_bp.route('/api/mobile/purchases/<int:pid>/export/excel', methods=['GET'])
+def mobile_purchase_export_excel(pid):
+    """Export Purchase Order as Excel (.xlsx) for mobile app."""
+    if not _authenticate_mobile_query_or_header():
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+    from routes.purchase_orders import generate_po_excel
+    order, lines, company = _load_po_for_export(pid)
+    if not order:
+        return jsonify({'success': False, 'error': 'Purchase order not found'}), 404
+    buf = generate_po_excel(order, lines, company)
+    order_num = order.get('order_number') or f"PO-{pid}"
+    filename = f"{order_num}_packing_list.xlsx"
+    return send_file(
+        buf,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+
+@mobile_api_bp.route('/api/mobile/purchases/<int:pid>/export/pdf', methods=['GET'])
+def mobile_purchase_export_pdf(pid):
+    """Render printable/PDF Purchase Order view for mobile app WebView & Android PrintManager."""
+    if not _authenticate_mobile_query_or_header():
+        return "Authentication required", 401
+    from routes.purchase_orders import process_po_lines_for_export
+    order, raw_lines, company = _load_po_for_export(pid)
+    if not order:
+        return "Purchase order not found", 404
+    lines, has_case, total_cases, total_pcs = process_po_lines_for_export(raw_lines)
+    return render_template(
+        'purchases/po_export_pdf.html',
+        order=order,
+        lines=lines,
+        company=company,
+        has_case=has_case,
+        total_cases=total_cases,
+        total_pcs=total_pcs
+    )
+
+
 @mobile_api_bp.route('/api/mobile/customers/quick-add', methods=['POST'])
 @mobile_auth_required
 def mobile_customer_quick_add():
@@ -1220,6 +1318,7 @@ def mobile_product_detail(pid):
             p.*,
             COALESCE(c.name, 'Uncategorized') as category_name,
             COALESCE(c.color, '#00A3E0') as category_color,
+            COALESCE(c.price_table_style, 'classic') as category_price_table_style,
             COALESCE(l.name, 'Main Warehouse') as default_location_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
@@ -1310,10 +1409,11 @@ def mobile_product_detail(pid):
         ORDER BY v.name ASC
     """, (pid,))
 
-    # Sales Order history
+    # Sales Order history (ALL non-cancelled orders for this product)
     so_history = query_all("""
         SELECT so.id as order_id, so.order_number, so.order_date, so.status,
                COALESCE(c.name, 'Walk-in Customer') as party_name,
+               COALESCE(c.phone, so.customer_phone, '') as party_phone,
                COALESCE(sol.quantity_display, sol.quantity) as quantity,
                COALESCE(sol.uom, p.uom, 'pcs.') as uom,
                COALESCE(sol.subtotal, 0) as total_amount
@@ -1323,13 +1423,13 @@ def mobile_product_detail(pid):
         LEFT JOIN customers c ON so.customer_id = c.id
         WHERE sol.product_id = %s AND so.status != 'CANCELLED'
         ORDER BY so.order_date DESC, so.id DESC
-        LIMIT 20
     """, (pid,))
 
-    # Purchase Order history
+    # Purchase Order history (ALL purchase orders for this product)
     po_history = query_all("""
         SELECT po.id as order_id, po.order_number, po.order_date, po.status,
                COALESCE(v.name, 'Vendor') as party_name,
+               COALESCE(v.phone, '') as party_phone,
                pol.quantity,
                COALESCE(pol.uom, 'pcs.') as uom,
                COALESCE(pol.subtotal, 0) as total_amount
@@ -1338,7 +1438,6 @@ def mobile_product_detail(pid):
         LEFT JOIN vendors v ON po.vendor_id = v.id
         WHERE pol.product_id = %s
         ORDER BY po.order_date DESC, po.id DESC
-        LIMIT 20
     """, (pid,))
 
     # Movement history
@@ -1356,6 +1455,13 @@ def mobile_product_detail(pid):
     """, (pid,))
 
     total_on_hand = sum(float(r.get('on_hand') or 0) for r in inv_rows)
+
+    raw_detail_text = (
+        (price_card.get('custom_detail') or '').strip()
+        if price_card.get('is_custom_detail') and (price_card.get('custom_detail') or '').strip()
+        else (price_card.get('auto_detail_text') or '').strip()
+    )
+    resolved_detail_lines = [ln.strip() for ln in raw_detail_text.splitlines() if ln.strip()]
 
     return jsonify({
         'success': True,
@@ -1393,9 +1499,14 @@ def mobile_product_detail(pid):
             ],
             'pricing_tiers': tiers,
             'price_table': {
-                'cat_color': price_card.get('cat_color') or '#00A3E0',
+                'cat_color': price_card.get('card_color') or p.get('category_color') or '#00A3E0',
+                'card_unit': price_card.get('card_unit') or 'ប្រអប់',
+                'standard_uom_display': price_card.get('standard_uom_display') or 'PCS',
+                'notes': price_card.get('notes') or '',
+                'price_table_style': price_card.get('price_table_style') or 'classic',
                 'dim_str': price_card.get('dim_str') or '',
-                'detail_lines': price_card.get('auto_detail_lines') or [],
+                'detail_lines': resolved_detail_lines,
+                'spec_rows': price_card.get('modern_specs_rows') or [],
                 'tier_qty_1': price_card.get('tier_qty_1') or 100,
                 'tier_qty_2': price_card.get('tier_qty_2') or 400,
                 'tier_qty_3': price_card.get('tier_qty_3') or 800,
@@ -1435,6 +1546,7 @@ def mobile_product_detail(pid):
                     'order_date': o['order_date'].strftime('%d-%b-%y') if o.get('order_date') else '',
                     'status': o['status'] or 'OPEN',
                     'party_name': o['party_name'] or '',
+                    'party_phone': o.get('party_phone') or '',
                     'quantity': float(o['quantity'] or 0),
                     'uom': o['uom'] or 'pcs.',
                     'total_amount': float(o['total_amount'] or 0),
@@ -1448,6 +1560,7 @@ def mobile_product_detail(pid):
                     'order_date': o['order_date'].strftime('%d-%b-%y') if o.get('order_date') else '',
                     'status': o['status'] or 'ISSUED',
                     'party_name': o['party_name'] or '',
+                    'party_phone': o.get('party_phone') or '',
                     'quantity': float(o['quantity'] or 0),
                     'uom': o['uom'] or 'pcs.',
                     'total_amount': float(o['total_amount'] or 0),
@@ -4080,7 +4193,7 @@ def mobile_app_update_check():
     apk_size_bytes = os.path.getsize(apk_path) if apk_available else 0
     apk_size_mb = f"{apk_size_bytes / (1024 * 1024):.1f} MB" if apk_size_bytes > 0 else "0.0 MB"
 
-    notes = "v3.6.0: Dark/Light/Adaptive mode, iOS Liquid Glass nav bar & popups, in-app PO editing, Stock Adjustment direct Reserve/Available editing, Product filters & HQ/Branch store logos."
+    notes = "v3.7.0: Pure image-only Android share (ABA style), modern blurred bottom-sheet popups, frosted #0A6E80 liquid-glass nav bar, PO multi-product add + PDF/Excel export, fixed Product Detail Price Table specs, and full Order History with customer search."
     try:
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
         if row and row.get('setting_value'):

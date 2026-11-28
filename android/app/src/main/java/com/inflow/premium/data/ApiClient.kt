@@ -382,6 +382,18 @@ class ApiClient(private val session: SessionManager) {
             val dlArr = it.optJSONArray("detail_lines") ?: JSONArray()
             val dl = mutableListOf<String>()
             for (k in 0 until dlArr.length()) dl.add(dlArr.optString(k))
+            val specArr = it.optJSONArray("spec_rows") ?: JSONArray()
+            val specs = mutableListOf<ProductPriceSpecRow>()
+            for (k in 0 until specArr.length()) {
+                val sr = specArr.optJSONObject(k) ?: continue
+                specs.add(
+                    ProductPriceSpecRow(
+                        main = sr.optString("main", ""),
+                        sub = sr.optString("sub", ""),
+                        icon = sr.optString("icon", "size")
+                    )
+                )
+            }
             ProductPriceTable(
                 catColor = it.optString("cat_color", "#00A3E0"),
                 dimStr = it.optString("dim_str", ""),
@@ -394,7 +406,11 @@ class ApiClient(private val session: SessionManager) {
                 uPrice3 = it.optDouble("u_price_3", 0.0),
                 totPrice1 = it.optDouble("tot_price_1", 0.0),
                 totPrice2 = it.optDouble("tot_price_2", 0.0),
-                totPrice3 = it.optDouble("tot_price_3", 0.0)
+                totPrice3 = it.optDouble("tot_price_3", 0.0),
+                cardUnit = it.optString("card_unit", "ប្រអប់").ifBlank { "ប្រអប់" },
+                stdUomDisplay = it.optString("standard_uom_display", "PCS").ifBlank { "PCS" },
+                notes = it.optString("notes", ""),
+                specRows = specs
             )
         }
         val bomsArr = p.optJSONArray("boms") ?: JSONArray()
@@ -414,7 +430,19 @@ class ApiClient(private val session: SessionManager) {
             val out = mutableListOf<ProductOrderHistoryRow>()
             for (i in 0 until arr.length()) {
                 val r = arr.getJSONObject(i)
-                out.add(ProductOrderHistoryRow(r.optInt("order_id"), r.optString("order_number"), r.optString("order_date"), r.optString("status"), r.optString("party_name"), r.optDouble("quantity", 0.0), r.optString("uom", "pcs."), r.optDouble("total_amount", 0.0)))
+                out.add(
+                    ProductOrderHistoryRow(
+                        orderId = r.optInt("order_id"),
+                        orderNumber = r.optString("order_number"),
+                        orderDate = r.optString("order_date"),
+                        status = r.optString("status"),
+                        partyName = r.optString("party_name"),
+                        quantity = r.optDouble("quantity", 0.0),
+                        uom = r.optString("uom", "pcs."),
+                        totalAmount = r.optDouble("total_amount", 0.0),
+                        partyPhone = r.optString("party_phone", "")
+                    )
+                )
             }
             return out
         }
@@ -581,6 +609,28 @@ class ApiClient(private val session: SessionManager) {
         val json = requestJson("POST", "/api/mobile/purchases/save", body = body)
         return json.optInt("po_id", poId) to json.optString("message", "Purchase order saved")
     }
+
+    fun buildPurchaseExportPdfUrl(poId: Int): String {
+        val tok = Uri.encode(session.token)
+        return "${session.baseUrl}/api/mobile/purchases/$poId/export/pdf?token=$tok"
+    }
+
+    suspend fun downloadPurchaseOrderExcel(poId: Int, fallbackOrderNum: String): Pair<String, ByteArray> =
+        withContext(Dispatchers.IO) {
+            val url = "${session.baseUrl}/api/mobile/purchases/$poId/export/excel"
+            val reqBuilder = Request.Builder().url(url).get()
+            if (session.token.isNotBlank()) {
+                reqBuilder.addHeader("Authorization", "Bearer ${session.token}")
+            }
+            client.newCall(reqBuilder.build()).execute().use { resp ->
+                if (!resp.isSuccessful) {
+                    throw ApiException("Excel export failed (${resp.code})", resp.code)
+                }
+                val bytes = resp.body?.bytes() ?: throw ApiException("Empty Excel file")
+                val safeNum = fallbackOrderNum.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "PO-$poId" }
+                "${safeNum}_packing_list.xlsx" to bytes
+            }
+        }
 
     suspend fun getCustomersCatalog(query: String, branchParam: String): CustomerCatalogResult {
         val json = requestJson(

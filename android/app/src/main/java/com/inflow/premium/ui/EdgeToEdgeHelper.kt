@@ -7,6 +7,7 @@ import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.PorterDuff
 import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.drawable.BitmapDrawable
 import android.os.Build
@@ -18,6 +19,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import com.inflow.premium.R
 import kotlin.math.max
 import kotlin.math.min
 
@@ -145,6 +147,144 @@ object EdgeToEdgeHelper {
 
         if (topScrimView != null && scrollableView != null) {
             installTopStatusBlur(topScrimView, scrollableView)
+        }
+        if (bottomNavContainer != null && scrollableView != null) {
+            val navCapsule = bottomNavContainer.findViewById<View>(R.id.navCapsulePill)
+            val navBlurBackdrop = bottomNavContainer.findViewById<View>(R.id.navBlurBackdrop)
+            if (navCapsule != null && navBlurBackdrop != null) {
+                installBottomNavBlur(navCapsule, navBlurBackdrop, scrollableView)
+            }
+        }
+    }
+
+    /**
+     * Real-time frosted glass blur behind the floating bottom navigation capsule:
+     * captures live scrolled content behind [navCapsule], runs a heavy 3-pass box blur,
+     * overlays a less-transparent frosted glaze, and clips to a crisp capsule pill shape.
+     */
+    private fun installBottomNavBlur(navCapsule: View, blurBackdrop: View, scrollableView: View) {
+        val scale = 0.22f
+        var needsBlur = true
+        var lastScrollY = Int.MIN_VALUE
+        var smallBmp: Bitmap? = null
+        var outBmp: Bitmap? = null
+        var smallPixels: IntArray? = null
+        var tempPixels: IntArray? = null
+
+        val filterPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        val tintPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.BLACK
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+        }
+        val pillRect = RectF()
+        val backdropLoc = IntArray(2)
+        val targetLoc = IntArray(2)
+
+        fun resolveCaptureTarget(): View {
+            if ((scrollableView is android.widget.ScrollView || scrollableView is androidx.core.widget.NestedScrollView) &&
+                scrollableView is ViewGroup &&
+                scrollableView.childCount > 0
+            ) {
+                return scrollableView.getChildAt(0)
+            }
+            return scrollableView
+        }
+
+        fun updateNavBlurDrawable() {
+            val w = blurBackdrop.width
+            val h = blurBackdrop.height
+            if (w <= 0 || h <= 0 || scrollableView.width <= 0 || scrollableView.height <= 0) return
+
+            val sw = max(8, (w * scale).toInt())
+            val sh = max(8, (h * scale).toInt())
+
+            val sb = smallBmp?.takeIf { it.width == sw && it.height == sh }
+                ?: Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888).also { smallBmp = it }
+            val ob = outBmp?.takeIf { it.width == sw && it.height == sh }
+                ?: Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888).also { outBmp = it }
+
+            val target = resolveCaptureTarget()
+            blurBackdrop.getLocationInWindow(backdropLoc)
+            target.getLocationInWindow(targetLoc)
+            val dx = (targetLoc[0] - backdropLoc[0]).toFloat()
+            val dy = (targetLoc[1] - backdropLoc[1]).toFloat()
+
+            val isDark = ThemeHelper.isNightMode(blurBackdrop.context)
+            val c = Canvas(sb)
+            c.drawColor(Color.parseColor(if (isDark) "#0B1220" else "#F8FAFC"))
+            c.save()
+            c.scale(scale, scale)
+            c.translate(dx, dy)
+            target.draw(c)
+            c.restore()
+
+            val len = sw * sh
+            val pix = smallPixels?.takeIf { it.size == len } ?: IntArray(len).also { smallPixels = it }
+            val tmp = tempPixels?.takeIf { it.size == len } ?: IntArray(len).also { tempPixels = it }
+            sb.getPixels(pix, 0, sw, 0, 0, sw, sh)
+            boxBlurPass(pix, tmp, sw, sh, radius = 6)
+            boxBlurPass(pix, tmp, sw, sh, radius = 5)
+            boxBlurPass(pix, tmp, sw, sh, radius = 4)
+            sb.setPixels(pix, 0, sw, 0, 0, sw, sh)
+
+            val outCanvas = Canvas(ob)
+            outCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+            outCanvas.drawBitmap(sb, 0f, 0f, filterPaint)
+
+            // Less-transparent frosted glaze over the blurred backdrop
+            tintPaint.shader = if (isDark) {
+                LinearGradient(
+                    0f, 0f, 0f, sh.toFloat(),
+                    intArrayOf(
+                        Color.argb(228, 30, 41, 59),
+                        Color.argb(220, 15, 23, 42)
+                    ),
+                    null,
+                    Shader.TileMode.CLAMP
+                )
+            } else {
+                LinearGradient(
+                    0f, 0f, 0f, sh.toFloat(),
+                    intArrayOf(
+                        Color.argb(226, 255, 255, 255),
+                        Color.argb(214, 241, 245, 249)
+                    ),
+                    null,
+                    Shader.TileMode.CLAMP
+                )
+            }
+            outCanvas.drawRect(0f, 0f, sw.toFloat(), sh.toFloat(), tintPaint)
+
+            // Clip softly into capsule pill corners
+            pillRect.set(0f, 0f, sw.toFloat(), sh.toFloat())
+            val pillRadius = sh / 2f
+            outCanvas.drawRoundRect(pillRect, pillRadius, pillRadius, maskPaint)
+
+            blurBackdrop.background = BitmapDrawable(blurBackdrop.resources, ob)
+        }
+
+        scrollableView.viewTreeObserver.addOnScrollChangedListener {
+            val curY = scrollableView.scrollY
+            if (curY != lastScrollY || scrollableView is androidx.recyclerview.widget.RecyclerView) {
+                lastScrollY = curY
+                needsBlur = true
+                blurBackdrop.postInvalidateOnAnimation()
+            }
+        }
+        scrollableView.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> needsBlur = true }
+        navCapsule.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> needsBlur = true }
+        blurBackdrop.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> needsBlur = true }
+
+        blurBackdrop.viewTreeObserver.addOnPreDrawListener {
+            if (needsBlur && blurBackdrop.isAttachedToWindow) {
+                needsBlur = false
+                try {
+                    updateNavBlurDrawable()
+                } catch (_: Throwable) {
+                }
+            }
+            true
         }
     }
 

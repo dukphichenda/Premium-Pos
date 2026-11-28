@@ -13,8 +13,11 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.provider.MediaStore
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.Gravity
 import android.view.View
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.ProgressBar
@@ -219,6 +222,7 @@ class ProductDetailActivity : AppCompatActivity() {
 
         binding.tabKit.text = "Combined / Kit (${d.boms.size})"
         binding.tabOrderHistory.text = "Order history (${d.orderHistory.size})"
+        binding.tabPurchaseHistory.text = "Purchase history (${d.purchaseHistory.size})"
 
         if (d.isActive) {
             binding.tvProdActiveBadge.text = "ACTIVE ITEM"
@@ -340,31 +344,46 @@ class ProductDetailActivity : AppCompatActivity() {
             binding.tvPriceTableProductTitle.text = d.name.ifBlank { d.sku }
             ImageLoader.load(uiScope, session.baseUrl, d.imageUrl, binding.ivPriceTablePhoto, binding.tvPriceTablePhotoEmpty)
 
-            // Specs column with warm peach circular icon badges matching Image 1
+            // Specs column with warm peach circular icon badges matching Desktop Price Card 1-to-1
             binding.llPriceTableSpecs.removeAllViews()
-            val rawSpecs = pt.detailLines.ifEmpty { listOfNotNull(pt.dimStr.takeIf { it.isNotBlank() }) }
-            val specGroups = mutableListOf<Pair<String, String?>>()
-            var idxSpec = 0
-            while (idxSpec < rawSpecs.size) {
-                val cur = rawSpecs[idxSpec]
-                val next = rawSpecs.getOrNull(idxSpec + 1)
-                if (next != null && next.trim().startsWith("(")) {
-                    specGroups.add(cur to next.trim())
-                    idxSpec += 2
-                } else {
-                    specGroups.add(cur to null)
-                    idxSpec += 1
+            val specItems: List<Triple<String, String, String>> = if (pt.specRows.isNotEmpty()) {
+                pt.specRows.map { r ->
+                    val glyph = when (r.icon.lowercase(Locale.US)) {
+                        "size" -> "↔"
+                        "carton" -> "📦"
+                        "layers" -> "⛁"
+                        "package" -> "📦"
+                        else -> "•"
+                    }
+                    Triple(glyph, r.main, r.sub)
                 }
+            } else {
+                val rawSpecs = pt.detailLines.ifEmpty { listOfNotNull(pt.dimStr.takeIf { it.isNotBlank() }) }
+                val grouped = mutableListOf<Pair<String, String>>()
+                var idxSpec = 0
+                while (idxSpec < rawSpecs.size) {
+                    val cur = rawSpecs[idxSpec]
+                    val next = rawSpecs.getOrNull(idxSpec + 1)
+                    if (next != null && next.trim().startsWith("(")) {
+                        grouped.add(cur to next.trim())
+                        idxSpec += 2
+                    } else {
+                        grouped.add(cur to "")
+                        idxSpec += 1
+                    }
+                }
+                val specGlyphs = arrayOf("↔", "📦", "⛁", "📦")
+                grouped.mapIndexed { i, (m, s) -> Triple(specGlyphs.getOrElse(i) { "•" }, m, s) }
             }
-            val specGlyphs = arrayOf("↔", "📦", "⛁", "📦")
-            specGroups.forEachIndexed { i, (mainText, subText) ->
+
+            specItems.forEach { (glyph, mainText, subText) ->
                 val specRow = LinearLayout(this).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(0, dp(4), 0, dp(4))
                 }
                 val iconCircle = TextView(this).apply {
-                    text = specGlyphs.getOrElse(i) { "•" }
+                    text = glyph
                     gravity = Gravity.CENTER
                     textSize = 11f
                     setTextColor(Color.parseColor("#B45309"))
@@ -383,7 +402,7 @@ class ProductDetailActivity : AppCompatActivity() {
                     textSize = 11.5f
                     setTypeface(null, android.graphics.Typeface.BOLD)
                 })
-                if (!subText.isNullOrBlank()) {
+                if (subText.isNotBlank()) {
                     textCol.addView(TextView(this).apply {
                         text = subText
                         setTextColor(Color.parseColor("#64748B"))
@@ -395,10 +414,10 @@ class ProductDetailActivity : AppCompatActivity() {
                 binding.llPriceTableSpecs.addView(specRow)
             }
 
-            // Detect Khmer unit name (e.g. "ប្រអប់") from detail lines if present
-            val detectedKhUnit = rawSpecs.firstOrNull { it.contains("1 ដុំ") }
-                ?.substringAfterLast(" ")?.trim()?.takeIf { it.isNotBlank() } ?: "ប្រអប់"
-            val qtyPillSuffix = "$detectedKhUnit(PCS)"
+            val unitWord = pt.cardUnit.ifBlank { "ប្រអប់" }
+            val stdUomBadge = pt.stdUomDisplay.ifBlank { "PCS" }
+            binding.tvPriceTableUnitHeader.text = "តម្លៃក្នុង1$unitWord"
+            val qtyPillSuffix = "$unitWord($stdUomBadge)"
 
             binding.llPriceTableRows.removeAllViews()
             val tierRows = listOf(
@@ -436,7 +455,7 @@ class ProductDetailActivity : AppCompatActivity() {
                 }
                 val unitDec = if ((unitP * 1000.0) % 1.0 != 0.0) 4 else 3
                 val tvU = TextView(this).apply {
-                    text = "(${String.format(Locale.US, "%.${unitDec}f", unitP)} $/PCS)"
+                    text = "(${String.format(Locale.US, "%.${unitDec}f", unitP)} $/$stdUomBadge)"
                     gravity = Gravity.END
                     setTextColor(Color.parseColor("#0F172A"))
                     textSize = 12.5f
@@ -453,6 +472,14 @@ class ProductDetailActivity : AppCompatActivity() {
                         setBackgroundColor(Color.parseColor("#F1F5F9"))
                     })
                 }
+            }
+            if (pt.notes.isNotBlank()) {
+                binding.llPriceTableRows.addView(TextView(this).apply {
+                    text = pt.notes
+                    setTextColor(Color.parseColor("#64748B"))
+                    textSize = 11f
+                    setPadding(dp(4), dp(8), dp(4), dp(2))
+                })
             }
         } else {
             binding.llPriceTableSectionBar.visibility = View.GONE
@@ -591,43 +618,132 @@ class ProductDetailActivity : AppCompatActivity() {
     }
 
     private fun renderOrderHistoryTab(d: ProductDetail, isPo: Boolean) {
-        val list = if (isPo) d.purchaseHistory else d.orderHistory
-        if (list.isEmpty()) {
+        val fullList = if (isPo) d.purchaseHistory else d.orderHistory
+        if (fullList.isEmpty()) {
             binding.llSectionTabContent.addView(
                 makeEmptyState(if (isPo) "No purchase order history found." else "No sales order history found.")
             )
             return
         }
-        for (o in list) {
-            val card = makeCard()
-            val col = makeCol(12)
-            val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-            top.addView(makeBold("${o.orderNumber}  •  ${o.orderDate}", if (isPo) "#6D4C2B" else "#0A6C62", 13f).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-            })
-            top.addView(makeBold(o.status, "#475569", 11.5f))
-            col.addView(top)
-            col.addView(makeBold(o.partyName.ifBlank { "—" }, "#0F172A", 13f).apply { layoutParams = lpWrap(top = 4) })
-            col.addView(makeMuted("Qty: ${numFmt.format(o.quantity)} ${o.uom}  •  Total: $${moneyFmt.format(o.totalAmount)}", 12f).apply {
-                layoutParams = lpWrap(top = 4)
-            })
-            card.addView(col)
-            card.setOnClickListener {
-                if (isPo) {
-                    startActivity(
-                        Intent(this, PurchaseOrderDetailActivity::class.java)
-                            .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_ID, o.orderId)
-                            .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_NUMBER, o.orderNumber)
-                    )
-                } else {
-                    startActivity(
-                        Intent(this, SalesOrderDetailActivity::class.java)
-                            .putExtra(SalesOrderDetailActivity.EXTRA_ORDER_ID, o.orderId)
-                    )
+
+        val searchBox = EditText(this).apply {
+            hint = if (isPo) "Search vendor, phone, or PO #..." else "Search customer, phone, or SO #..."
+            isSingleLine = true
+            setBackgroundResource(R.drawable.bg_search_box_clean)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+            setTextColor(ContextCompat.getColor(this@ProductDetailActivity, R.color.text_primary))
+            setHintTextColor(ContextCompat.getColor(this@ProductDetailActivity, R.color.text_muted))
+            textSize = 13f
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+        }
+        val tvSummary = TextView(this).apply {
+            setTextColor(ContextCompat.getColor(this@ProductDetailActivity, R.color.text_secondary))
+            textSize = 11.5f
+            setTypeface(null, android.graphics.Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { bottomMargin = dp(8) }
+        }
+        val listHost = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+
+        binding.llSectionTabContent.addView(searchBox)
+        binding.llSectionTabContent.addView(tvSummary)
+        binding.llSectionTabContent.addView(listHost)
+
+        val primaryColor = ContextCompat.getColor(this, R.color.text_primary)
+        val secondaryColor = ContextCompat.getColor(this, R.color.text_secondary)
+
+        fun renderFiltered(queryRaw: String) {
+            val q = queryRaw.trim().lowercase(Locale.US)
+            val filtered = if (q.isEmpty()) {
+                fullList
+            } else {
+                fullList.filter { o ->
+                    o.partyName.lowercase(Locale.US).contains(q) ||
+                        o.partyPhone.lowercase(Locale.US).contains(q) ||
+                        o.orderNumber.lowercase(Locale.US).contains(q) ||
+                        o.status.lowercase(Locale.US).contains(q)
                 }
             }
-            binding.llSectionTabContent.addView(card)
+            val sumQty = filtered.sumOf { it.quantity }
+            val sumAmt = filtered.sumOf { it.totalAmount }
+            tvSummary.text = if (q.isEmpty()) {
+                "All ${fullList.size} orders  •  Qty: ${numFmt.format(sumQty)}  •  $${moneyFmt.format(sumAmt)}"
+            } else {
+                "Showing ${filtered.size} of ${fullList.size} orders  •  Qty: ${numFmt.format(sumQty)}  •  $${moneyFmt.format(sumAmt)}"
+            }
+
+            listHost.removeAllViews()
+            if (filtered.isEmpty()) {
+                listHost.addView(makeEmptyState("No orders match \"$queryRaw\"."))
+                return
+            }
+            for (o in filtered) {
+                val card = makeCard()
+                val col = makeCol(12)
+                val top = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                top.addView(makeBold("${o.orderNumber}  •  ${o.orderDate}", if (isPo) "#B45309" else "#0A6C62", 13f).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                })
+                top.addView(TextView(this).apply {
+                    text = o.status
+                    setTextColor(secondaryColor)
+                    textSize = 11.5f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                })
+                col.addView(top)
+                val partyLabel = buildString {
+                    append(o.partyName.ifBlank { "—" })
+                    if (o.partyPhone.isNotBlank()) append("  •  ${o.partyPhone}")
+                }
+                col.addView(TextView(this).apply {
+                    text = partyLabel
+                    setTextColor(primaryColor)
+                    textSize = 13f
+                    setTypeface(null, android.graphics.Typeface.BOLD)
+                    layoutParams = lpWrap(top = 4)
+                })
+                col.addView(makeMuted("Qty: ${numFmt.format(o.quantity)} ${o.uom}  •  Total: $${moneyFmt.format(o.totalAmount)}", 12f).apply {
+                    layoutParams = lpWrap(top = 4)
+                })
+                card.addView(col)
+                card.setOnClickListener {
+                    if (isPo) {
+                        startActivity(
+                            Intent(this, PurchaseOrderDetailActivity::class.java)
+                                .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_ID, o.orderId)
+                                .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_NUMBER, o.orderNumber)
+                        )
+                    } else {
+                        startActivity(
+                            Intent(this, SalesOrderDetailActivity::class.java)
+                                .putExtra(SalesOrderDetailActivity.EXTRA_ORDER_ID, o.orderId)
+                        )
+                    }
+                }
+                listHost.addView(card)
+            }
         }
+
+        searchBox.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                renderFiltered(s?.toString().orEmpty())
+            }
+        })
+
+        renderFiltered("")
     }
 
     private fun renderMovementsTab(d: ProductDetail) {
@@ -663,10 +779,10 @@ class ProductDetailActivity : AppCompatActivity() {
         LinearLayout.LayoutParams.WRAP_CONTENT
     ).apply { topMargin = dp(top) }
     private fun makeCard() = MaterialCardView(this).apply {
-        setCardBackgroundColor(Color.WHITE)
+        setCardBackgroundColor(ContextCompat.getColor(this@ProductDetailActivity, R.color.surface_card))
         radius = dp(14).toFloat()
         cardElevation = dp(1).toFloat()
-        strokeColor = Color.parseColor("#E2E8F0")
+        strokeColor = ContextCompat.getColor(this@ProductDetailActivity, R.color.surface_stroke)
         strokeWidth = dp(1)
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
@@ -685,13 +801,13 @@ class ProductDetailActivity : AppCompatActivity() {
     }
     private fun makeMuted(txt: String, sp: Float) = TextView(this).apply {
         text = txt
-        setTextColor(Color.parseColor("#64748B"))
+        setTextColor(ContextCompat.getColor(this@ProductDetailActivity, R.color.text_secondary))
         textSize = sp
     }
     private fun makeEmptyState(msg: String) = TextView(this).apply {
         text = msg
         gravity = Gravity.CENTER
-        setTextColor(Color.parseColor("#64748B"))
+        setTextColor(ContextCompat.getColor(this@ProductDetailActivity, R.color.text_secondary))
         textSize = 13f
         setPadding(dp(16), dp(24), dp(16), dp(24))
     }

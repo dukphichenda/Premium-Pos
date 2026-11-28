@@ -1,5 +1,6 @@
 package com.inflow.premium.ui
 
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -140,33 +141,36 @@ class InvoicePrintActivity : AppCompatActivity() {
         val sendIntent = Intent(Intent.ACTION_SEND).apply {
             type = "image/jpeg"
             putExtra(Intent.EXTRA_STREAM, uri)
-            putExtra(Intent.EXTRA_SUBJECT, "Sales Order $orderNumber")
-            if (shareCaption.isNotBlank()) {
-                putExtra(Intent.EXTRA_TEXT, shareCaption)
-            }
+            clipData = ClipData.newRawUri("Invoice Image", uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        startActivity(Intent.createChooser(sendIntent, "Share $orderNumber"))
+        val chooser = Intent.createChooser(sendIntent, null).apply {
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(chooser)
     }
 
     private fun shareInvoice() {
-        val text = buildString {
-            if (shareCaption.isNotBlank()) {
-                append(shareCaption)
-            } else {
-                append("Invoice $orderNumber")
-            }
-            if (printUrl.isNotBlank()) {
-                append("\n")
-                append(printUrl.replace("&autojpg=1", "").replace("?autojpg=1", ""))
+        autoShareJpg = true
+        Toast.makeText(this, "Preparing invoice image to share...", Toast.LENGTH_SHORT).show()
+        binding.webInvoice.evaluateJavascript(
+            """
+            (function() {
+                if (typeof exportInvoiceAsJpg === 'function') { exportInvoiceAsJpg(); return 'fn'; }
+                var btn = document.querySelector('[onclick*="exportInvoiceAsJpg"], #btnExportJpg, .btn-export-jpg');
+                if (btn) { btn.click(); return 'btn'; }
+                return 'none';
+            })();
+            """.trimIndent()
+        ) { result ->
+            if (result == "\"none\"" || result == "null") {
+                val base = printUrl.replace("&autojpg=1", "").replace("?autojpg=1", "")
+                if (base.isNotBlank()) {
+                    val reloadUrl = if (base.contains("?")) "$base&autojpg=1" else "$base?autojpg=1"
+                    binding.webInvoice.loadUrl(reloadUrl)
+                }
             }
         }
-        val sendIntent = Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_SUBJECT, "Sales Order $orderNumber")
-            putExtra(Intent.EXTRA_TEXT, text)
-        }
-        startActivity(Intent.createChooser(sendIntent, "Share Invoice"))
     }
 
     private fun printWebPage() {

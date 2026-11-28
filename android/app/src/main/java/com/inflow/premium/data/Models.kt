@@ -170,6 +170,12 @@ data class ProductPricingTier(
     val marginPct: Double
 )
 
+data class ProductPriceSpecRow(
+    val main: String,
+    val sub: String = "",
+    val icon: String = "size"
+)
+
 data class ProductPriceTable(
     val catColor: String,
     val dimStr: String,
@@ -182,7 +188,11 @@ data class ProductPriceTable(
     val uPrice3: Double,
     val totPrice1: Double,
     val totPrice2: Double,
-    val totPrice3: Double
+    val totPrice3: Double,
+    val cardUnit: String = "ប្រអប់",
+    val stdUomDisplay: String = "PCS",
+    val notes: String = "",
+    val specRows: List<ProductPriceSpecRow> = emptyList()
 )
 
 data class ProductBomComponent(
@@ -211,7 +221,8 @@ data class ProductOrderHistoryRow(
     val partyName: String,
     val quantity: Double,
     val uom: String,
-    val totalAmount: Double
+    val totalAmount: Double,
+    val partyPhone: String = ""
 )
 
 data class ProductMovementRow(
