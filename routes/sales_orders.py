@@ -284,6 +284,7 @@ def _get_product_components_map():
             'stock_on_hand': float(row['stock_on_hand'] or 0.0),
             'stock_reserved': float(row['stock_reserved'] or 0.0),
             'stock_available': float(row['stock_available'] or 0.0),
+            'is_bom': True,
         })
 
     # 2. From product_combine_options
@@ -323,9 +324,86 @@ def _get_product_components_map():
                 'stock_on_hand': float(row['stock_on_hand'] or 0.0),
                 'stock_reserved': float(row['stock_reserved'] or 0.0),
                 'stock_available': float(row['stock_available'] or 0.0),
+                'is_bom': False,
             })
 
     return comp_map
+
+def _order_holds_stock_reservation(order):
+    """Matches sync_inventory_reserved_quantities: unfulfilled/unpaid orders hold inventory reservations."""
+    if not order or not order.get('id'):
+        return False
+    st = str(order.get('status') or '').strip().upper()
+    pst = str(order.get('payment_status') or '').strip().upper()
+    return st not in ('PAID', 'SHIPPED', 'CANCELLED', 'INVOICED') and pst != 'PAID'
+
+def _apply_order_backorder_flags(lines, components_map, order=None):
+    """
+    Populates line components, max_kits_buildable, and is_backordered without
+    double-counting quantities already reserved by this saved open order.
+    Returns (holds_reservation, saved_reserves_by_pid_str).
+    """
+    holds_res = _order_holds_stock_reservation(order)
+    order_reserves = {}
+
+    if holds_res and lines:
+        for l in lines:
+            pid = l.get('product_id')
+            qty = float(l.get('quantity') or 0.0)
+            if not pid or qty <= 0:
+                continue
+            key = str(int(pid))
+            order_reserves[key] = order_reserves.get(key, 0.0) + qty
+
+            addon_pid = l.get('addon_product_id')
+            if addon_pid:
+                addon_qty = qty * float(l.get('addon_quantity') or 1.0)
+                a_key = str(int(addon_pid))
+                order_reserves[a_key] = order_reserves.get(a_key, 0.0) + addon_qty
+
+            for c in (components_map.get(pid, []) or []):
+                if not c.get('is_bom'):
+                    continue
+                c_pid = c.get('component_id')
+                if not c_pid:
+                    continue
+                c_qty = qty * float(c.get('quantity') or 1.0)
+                c_key = str(int(c_pid))
+                order_reserves[c_key] = order_reserves.get(c_key, 0.0) + c_qty
+
+    for l in lines:
+        pid = l['product_id']
+        qty = float(l.get('quantity') or 0.0)
+        raw_comps = components_map.get(pid, [])
+        if raw_comps:
+            line_comps = []
+            min_buildable = 999999999
+            for c in raw_comps:
+                c_copy = dict(c)
+                c_ratio = float(c_copy.get('quantity') or 1.0)
+                c_on_hand = float(c_copy.get('stock_on_hand') or 0.0)
+                c_reserved = float(c_copy.get('stock_reserved') or 0.0)
+                # Exclude only this saved line's own BOM reservation; keep other orders & other lines reserved.
+                if holds_res and c_copy.get('is_bom') and qty > 0:
+                    c_reserved = max(0.0, c_reserved - (qty * c_ratio))
+                c_avail = max(0.0, c_on_hand - c_reserved)
+                c_copy['stock_reserved'] = c_reserved
+                c_copy['stock_available'] = c_avail
+                line_comps.append(c_copy)
+
+                b = int(c_avail // c_ratio) if c_ratio > 0 else 0
+                if b < min_buildable:
+                    min_buildable = b
+            l['components'] = line_comps
+            max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
+            l['max_kits_buildable'] = max_kits
+            l['is_backordered'] = (float(max_kits) < qty)
+        else:
+            l['components'] = []
+            l['max_kits_buildable'] = 0
+            l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < qty)
+
+    return holds_res, order_reserves
 
 def _reserve_order_stock(cur, location_id, product_id, qty):
     """Reserves inventory: if combined kit, reserves all components; otherwise reserves product."""
@@ -2397,24 +2475,9 @@ def new_order():
     drawer_data = _get_drawer_and_metadata(date_filter, status_filter, customer_search, customer_filter, scheme_id=scheme_id, branch_id=req_branch, search_query=search_query)
 
     components_map = drawer_data.get('components_map') or _get_product_components_map()
+    saved_order_holds_res, saved_order_reserves = _apply_order_backorder_flags(lines, components_map, order=None)
     for l in lines:
         pid = l['product_id']
-        comps = components_map.get(pid, [])
-        l['components'] = comps
-        if comps:
-            min_buildable = 999999999
-            for c in comps:
-                c_qty = float(c.get('quantity') or 1.0)
-                c_avail = max(0.0, float(c.get('stock_available') or 0.0))
-                b = int(c_avail // c_qty) if c_qty > 0 else 0
-                if b < min_buildable:
-                    min_buildable = b
-            max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
-            l['max_kits_buildable'] = max_kits
-            l['is_backordered'] = (float(max_kits) < float(l.get('quantity') or 0))
-        else:
-            l['max_kits_buildable'] = 0
-            l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
         if 'display_qty' in l:
@@ -2426,6 +2489,8 @@ def new_order():
     return render_template('sales/detail.html',
                            order=order,
                            lines=lines,
+                           saved_order_holds_res=saved_order_holds_res,
+                           saved_order_reserves=saved_order_reserves,
                            sidebar_orders=drawer_data['sidebar_orders'],
                            preview_map=drawer_data.get('preview_map', {}),
                            status_counts=drawer_data.get('status_counts', {}),
@@ -2708,24 +2773,8 @@ def detail_order(id):
 
         scheme_id = order.get('pricing_scheme_id') or 100
         components_map = _get_product_components_map()
+        saved_order_holds_res, saved_order_reserves = _apply_order_backorder_flags(lines, components_map, order=order)
         for l in lines:
-            pid = l['product_id']
-            comps = components_map.get(pid, [])
-            l['components'] = comps
-            if comps:
-                min_buildable = 999999999
-                for c in comps:
-                    c_qty = float(c.get('quantity') or 1.0)
-                    c_avail = max(0.0, float(c.get('stock_available') or 0.0))
-                    b = int(c_avail // c_qty) if c_qty > 0 else 0
-                    if b < min_buildable:
-                        min_buildable = b
-                max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
-                l['max_kits_buildable'] = max_kits
-                l['is_backordered'] = (float(max_kits) < float(l.get('quantity') or 0))
-            else:
-                l['max_kits_buildable'] = 0
-                l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
             l['case_price'] = float(l.get('unit_price') or 0)
             suom = (l.get('sales_uom') or '').strip()
             curr_uom = (l.get('display_uom') or '').strip()
@@ -2780,6 +2829,8 @@ def detail_order(id):
         return render_template('sales/_detail_canvas.html',
                                order=order,
                                lines=lines,
+                               saved_order_holds_res=saved_order_holds_res,
+                               saved_order_reserves=saved_order_reserves,
                                all_branches=all_branches,
                                all_locations=all_locations,
                                pricing_schemes=pricing_schemes,
@@ -2826,24 +2877,9 @@ def detail_order(id):
 
     # Mark backorder flag if stock is insufficient and resolve case price / display UOM
     components_map = drawer_data.get('components_map') or _get_product_components_map()
+    saved_order_holds_res, saved_order_reserves = _apply_order_backorder_flags(lines, components_map, order=order)
     for l in lines:
         pid = l['product_id']
-        comps = components_map.get(pid, [])
-        l['components'] = comps
-        if comps:
-            min_buildable = 999999999
-            for c in comps:
-                c_qty = float(c.get('quantity') or 1.0)
-                c_avail = max(0.0, float(c.get('stock_available') or 0.0))
-                b = int(c_avail // c_qty) if c_qty > 0 else 0
-                if b < min_buildable:
-                    min_buildable = b
-            max_kits = max(0, min_buildable) if min_buildable != 999999999 else 0
-            l['max_kits_buildable'] = max_kits
-            l['is_backordered'] = (float(max_kits) < float(l.get('quantity') or 0))
-        else:
-            l['max_kits_buildable'] = 0
-            l['is_backordered'] = (float(l.get('stock_on_hand') or 0) < float(l.get('quantity') or 0))
         ps_id = l.get('pricing_scheme_id') or scheme_id or 100
         l['case_price'] = drawer_data['product_prices_map'].get(pid, {}).get(ps_id, float(l['unit_price'] or 0))
 
@@ -2880,6 +2916,8 @@ def detail_order(id):
     return render_template('sales/detail.html',
                            order=order,
                            lines=lines,
+                           saved_order_holds_res=saved_order_holds_res,
+                           saved_order_reserves=saved_order_reserves,
                            sidebar_orders=drawer_data['sidebar_orders'],
                            preview_map=drawer_data.get('preview_map', {}),
                            status_counts=drawer_data.get('status_counts', {}),

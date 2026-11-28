@@ -4879,6 +4879,7 @@ function onMasterPricingSchemeChange(masterSchemeId) {
     });
 
     recalculateTotals();
+    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
     markDirty();
 }
 window.onMasterPricingSchemeChange = onMasterPricingSchemeChange;
@@ -4908,6 +4909,7 @@ function onLinePricingSchemeChange(selectEl) {
         tierBadge.textContent = selectEl.options[selectEl.selectedIndex].text;
     }
     recalculateTotals();
+    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
     markDirty();
 }
 window.onLinePricingSchemeChange = onLinePricingSchemeChange;
@@ -5069,7 +5071,8 @@ function openQtyDropdown(event, btnEl) {
 
     // Populate Stock panel (Matching inFlow Screenshot: Qty On Hand, Qty Available, Qty Reserved)
     const onHand = prod ? (prod.stock_on_hand || 0) : 0;
-    const reserved = prod ? (prod.stock_reserved || 0) : 0;
+    const rawReserved = prod ? (prod.stock_reserved || 0) : 0;
+    const reserved = prod ? getEffectiveReservedForRow(pid, rawReserved, row) : 0;
     const avail = onHand - reserved;
     const onOrder = prod ? (prod.stock_on_order || 0) : 0;
     const hasComponents = !!(prod && prod.components && prod.components.length > 0);
@@ -5091,7 +5094,7 @@ function openQtyDropdown(event, btnEl) {
         prod.components.forEach(c => {
             const cRatio = parseFloat(c.quantity) || 1.0;
             const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-            const cReserved = parseFloat(c.stock_reserved) || 0.0;
+            const cReserved = getEffectiveReservedForRow(parseInt(c.component_id), c.stock_reserved, row);
             const cAvail = Math.max(0, cOnHand - cReserved);
             const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
             if (buildable < minBuildable) minBuildable = buildable;
@@ -5215,85 +5218,116 @@ function selectUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
             priceInput.value = formatPriceValue(newPrice, prod.price_decimals);
         }
 
-        // Check backorder warning icon
-        const stdQty = currentQty * (targetRatio || 1.0);
-        let effectiveStock = prod.stock_on_hand || 0;
-        if (prod.components && prod.components.length > 0) {
-            let minBuildable = 999999999;
-            prod.components.forEach(c => {
-                const cRatio = parseFloat(c.quantity) || 1.0;
-                const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-                const cReserved = parseFloat(c.stock_reserved) || 0.0;
-                const cAvail = Math.max(0, cOnHand - cReserved);
-                const b = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
-                if (b < minBuildable) minBuildable = b;
+function getSavedOrderReservesMap() {
+    const meta = document.getElementById('soPartialMeta');
+    if (!meta || meta.getAttribute('data-holds-res') !== '1') return {};
+    try {
+        return JSON.parse(meta.getAttribute('data-saved-order-reserves') || '{}') || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function getRowStdQty(row, prod) {
+    if (!row || !prod) return 0;
+    const qtyInput = row.querySelector('.line-qty') || row.querySelector('input[name*="[quantity]"]');
+    const qty = parseFloat(qtyInput ? qtyInput.value : 0) || 0;
+    const uom = (row.querySelector('.line-uom')?.value || prod.base_uom || 'pcs.').trim();
+    let ratio = 1.0;
+    if (prod.sales_uom && uom.toLowerCase() === prod.sales_uom.toLowerCase()) {
+        ratio = prod.sales_ratio || 1.0;
+    } else if (prod.purchasing_uom && uom.toLowerCase() === prod.purchasing_uom.toLowerCase()) {
+        ratio = prod.purchasing_ratio || 1.0;
+    }
+    return qty * ratio;
+}
+
+function getEffectiveReservedForRow(targetPid, dbReserved, excludeRow) {
+    const savedMap = getSavedOrderReservesMap();
+    const savedByOrder = parseFloat(savedMap[String(targetPid)]) || 0.0;
+    const otherOrdersReserved = Math.max(0.0, (parseFloat(dbReserved) || 0.0) - savedByOrder);
+
+    let otherRowsDemand = 0.0;
+    document.querySelectorAll('#lineItemsBody tr[data-line-index]').forEach(r => {
+        if (excludeRow && r === excludeRow) return;
+        const rPidInput = r.querySelector('input[name*="[product_id]"]');
+        const rPid = rPidInput ? parseInt(rPidInput.value) : (parseInt(r.getAttribute('data-product-id')) || 0);
+        const rProd = (rPid && window.productsCatalog) ? window.productsCatalog[rPid] : null;
+        if (!rProd) return;
+        const rStdQty = getRowStdQty(r, rProd);
+        if (rStdQty <= 0) return;
+
+        if (rPid === targetPid) {
+            otherRowsDemand += rStdQty;
+        }
+        if (rProd.components && rProd.components.length > 0) {
+            rProd.components.forEach(c => {
+                if (parseInt(c.component_id) === targetPid && c.is_bom !== false) {
+                    otherRowsDemand += rStdQty * (parseFloat(c.quantity) || 1.0);
+                }
             });
-            effectiveStock = minBuildable !== 999999999 ? minBuildable : 0;
         }
-        let badge = row.querySelector('.inflow-backorder-badge');
-        if (effectiveStock < stdQty) {
-            if (!badge) {
-                badge = document.createElement('span');
-                badge.className = 'inflow-backorder-badge';
-                badge.title = 'Insufficient Stock - Click to view component stock details';
-                badge.innerText = '!';
-                badge.onclick = function(e) { showBackorderNotice(this, e); };
-                badge.onmouseenter = function(e) { showBackorderNotice(this, e); };
-                row.querySelector('.inflow-qty-cell-wrapper')?.prepend(badge);
-            }
-        } else {
-            if (badge) badge.remove();
+    });
+    return otherOrdersReserved + otherRowsDemand;
+}
+
+function refreshRowBackorderBadge(row) {
+    if (!row) return;
+    const pidInput = row.querySelector('input[name*="[product_id]"]');
+    const pid = pidInput ? parseInt(pidInput.value) : (parseInt(row.getAttribute('data-product-id')) || 0);
+    const prod = (pid && window.productsCatalog) ? window.productsCatalog[pid] : null;
+    let badge = row.querySelector('.inflow-backorder-badge');
+    if (!prod) {
+        if (badge) badge.remove();
+        return;
+    }
+    const stdQty = getRowStdQty(row, prod);
+    let effectiveStock = prod.stock_on_hand || 0;
+    if (prod.components && prod.components.length > 0) {
+        let minBuildable = 999999999;
+        prod.components.forEach(c => {
+            const cRatio = parseFloat(c.quantity) || 1.0;
+            const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
+            const cReserved = getEffectiveReservedForRow(parseInt(c.component_id), c.stock_reserved, row);
+            const cAvail = Math.max(0, cOnHand - cReserved);
+            const b = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
+            if (b < minBuildable) minBuildable = b;
+        });
+        effectiveStock = minBuildable !== 999999999 ? minBuildable : 0;
+    }
+    if (effectiveStock < stdQty) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.className = 'inflow-backorder-badge';
+            badge.title = 'Insufficient Stock - Click to view component stock details';
+            badge.innerText = '!';
+            badge.onclick = function(e) { showBackorderNotice(this, e); };
+            badge.onmouseenter = function(e) { showBackorderNotice(this, e); };
+            const host = row.querySelector('.so-mob-stepper-box') || row.querySelector('.inflow-qty-cell-wrapper');
+            if (host) host.prepend(badge);
         }
+    } else {
+        if (badge) badge.remove();
+    }
+}
+
+function refreshAllRowBackorderBadges() {
+    document.querySelectorAll('#lineItemsBody tr[data-line-index]').forEach(r => refreshRowBackorderBadge(r));
+}
+
+        // Check backorder warning icon across all rows (since shared components affect sibling rows)
+        refreshAllRowBackorderBadges();
     }
 
     recalculateTotals();
+    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
     markDirty();
 }
 
 function onQtyNumberChange(inputEl) {
     const row = inputEl.closest('tr');
     if (!row) return;
-    const pidInput = row.querySelector('input[name*="[product_id]"]');
-    const pid = pidInput ? parseInt(pidInput.value) : 0;
-    if (pid && window.productsCatalog[pid]) {
-        const prod = window.productsCatalog[pid];
-        const uom = (row.querySelector('.line-uom')?.value || prod.base_uom || 'pcs.').trim();
-        let ratio = 1.0;
-        if (prod.sales_uom && uom.toLowerCase() === prod.sales_uom.toLowerCase()) {
-            ratio = prod.sales_ratio || 1.0;
-        } else if (prod.purchasing_uom && uom.toLowerCase() === prod.purchasing_uom.toLowerCase()) {
-            ratio = prod.purchasing_ratio || 1.0;
-        }
-        const qty = parseFloat(inputEl.value) || 0;
-        const stdQty = qty * ratio;
-        let effectiveStock = prod.stock_on_hand || 0;
-        if (prod.components && prod.components.length > 0) {
-            let minBuildable = 999999999;
-            prod.components.forEach(c => {
-                const cRatio = parseFloat(c.quantity) || 1.0;
-                const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-                const cReserved = parseFloat(c.stock_reserved) || 0.0;
-                const cAvail = Math.max(0, cOnHand - cReserved);
-                const b = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
-                if (b < minBuildable) minBuildable = b;
-            });
-            effectiveStock = minBuildable !== 999999999 ? minBuildable : 0;
-        }
-        let badge = row.querySelector('.inflow-backorder-badge');
-        if (effectiveStock < stdQty) {
-            if (!badge) {
-                badge = document.createElement('span');
-                badge.className = 'inflow-backorder-badge';
-                badge.title = 'Insufficient Stock - Click to view component stock details';
-                badge.innerText = '!';
-                badge.onclick = function(e) { showBackorderNotice(this, e); };
-                badge.onmouseenter = function(e) { showBackorderNotice(this, e); };
-                row.querySelector('.inflow-qty-cell-wrapper')?.prepend(badge);
-            }
-        } else {
-            if (badge) badge.remove();
-        }
-    }
+    refreshAllRowBackorderBadges();
 }
 
 // Expand / Collapse Drawer Toggle (Matching F:\sale step 03 screenshot0004 vs 0005)
@@ -6131,6 +6165,8 @@ function executeAnimatedOrderNavigation(targetUrl, clickedEl, skipHistoryPush) {
 
         // Re-initialize UI widgets for new canvas
         if (typeof recalculateTotals === 'function') recalculateTotals();
+        if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
+        if (typeof initBackorderNotices === 'function') initBackorderNotices();
         if (typeof initPreviewToolbar === 'function') initPreviewToolbar();
         if (typeof initDeliverySelection === 'function') initDeliverySelection();
         if (window.GoogleSheetDatePicker && typeof window.GoogleSheetDatePicker.initAll === 'function') {
@@ -7078,7 +7114,7 @@ function showBackorderNotice(badgeEl, event) {
                 const cRatio = parseFloat(c.quantity) || 1.0;
                 const reqQty = stdQty * cRatio;
                 const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-                const cReserved = parseFloat(c.stock_reserved) || 0.0;
+                const cReserved = getEffectiveReservedForRow(parseInt(c.component_id), c.stock_reserved, row);
                 const cAvail = Math.max(0, cOnHand - cReserved);
                 const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
                 if (buildable < minBuildable) minBuildable = buildable;
@@ -7133,7 +7169,8 @@ function showBackorderNotice(badgeEl, event) {
     } else {
         // Single Product
         const onHand = prod ? (parseFloat(prod.stock_on_hand) || 0) : 0;
-        const reserved = prod ? (parseFloat(prod.stock_reserved) || 0) : 0;
+        const rawReserved = prod ? (parseFloat(prod.stock_reserved) || 0) : 0;
+        const reserved = prod ? getEffectiveReservedForRow(pid, rawReserved, row) : 0;
         const avail = onHand - reserved;
         const uom = prod ? prod.base_uom : lineUom;
 
@@ -7363,7 +7400,8 @@ function updateItemDropdownPreview(pid) {
 
     const uom = prod.base_uom || 'pcs.';
     const onHand = parseFloat(prod.stock_on_hand) || 0;
-    const reserved = parseFloat(prod.stock_reserved) || 0;
+    const activeRowForPreview = (activeGridRowEl && activeGridRowEl.id !== 'newRowEntry') ? activeGridRowEl : null;
+    const reserved = getEffectiveReservedForRow(pid, parseFloat(prod.stock_reserved) || 0, activeRowForPreview);
     const available = onHand - reserved;
     const onOrder = parseFloat(prod.stock_on_order) || 0;
 
@@ -7441,7 +7479,7 @@ function updateItemDropdownPreview(pid) {
             prod.components.forEach(c => {
                 const cRatio = parseFloat(c.quantity) || 1.0;
                 const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-                const cReserved = parseFloat(c.stock_reserved) || 0.0;
+                const cReserved = getEffectiveReservedForRow(parseInt(c.component_id), c.stock_reserved, activeRowForPreview);
                 const cAvail = Math.max(0, cOnHand - cReserved);
                 const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
                 if (buildable < minBuildable) minBuildable = buildable;
@@ -7823,6 +7861,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
 
         const newRowEntry = document.getElementById('newRowEntry');
         tbody.insertBefore(tr, newRowEntry);
+        if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
         document.getElementById('newItemTextInput').value = '';
         const newDescInput = document.getElementById('newItemDescInput');
         if (newDescInput) newDescInput.value = '';
@@ -7882,6 +7921,7 @@ function selectItemForActiveRow(pid, sku, name, desc, price, uom) {
     }
 
     recalculateTotals();
+    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
     markDirty();
 }
 
@@ -7954,6 +7994,7 @@ function deleteSpecificSoLine(btn, event) {
     row.remove();
     resequenceSoLineIndices();
     recalculateTotals();
+    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
     markDirty();
     syncSoSelectAllCheckbox();
 }
@@ -11400,6 +11441,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initPreviewToolbar();
     initSoOrderHoverPreview();
     initBackorderNotices();
+    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
     const activeRow = document.querySelector('.so-sidebar-card.active, #drawerOrdersListBody .inflow-drawer-row.active, .inflow-expanded-table tbody tr.inflow-expanded-row.active');
     if (activeRow && activeRow.scrollIntoView) {
         activeRow.scrollIntoView({ block: 'nearest', behavior: 'auto' });

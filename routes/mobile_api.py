@@ -2719,8 +2719,8 @@ def mobile_transfer_save():
                 if existing and (existing.get('status') or '').upper() == 'COMPLETED':
                     return jsonify({'success': False, 'error': 'This transfer has already been completed.'}), 400
 
+            insufficient = []
             if status == 'COMPLETED':
-                insufficient = []
                 for l in lines:
                     pid = int(l['product_id'])
                     qty = float(l.get('quantity') or 0)
@@ -2729,19 +2729,19 @@ def mobile_transfer_save():
                     if qty <= 0:
                         return jsonify({'success': False, 'error': f'Invalid transfer quantity ({qty}).'}), 400
                     cur.execute("""
-                        SELECT COALESCE(quantity, 0) as qty
+                        SELECT COALESCE(quantity, 0) as qty, COALESCE(reserved_quantity, 0) as reserved
                         FROM inventory
                         WHERE product_id = %s AND location_id = %s
                         FOR UPDATE
                     """, (pid, from_location_id))
                     inv_row = cur.fetchone()
                     src_on_hand = float(inv_row['qty']) if inv_row else 0.0
-                    if src_on_hand < base_qty:
+                    src_reserved = float(inv_row['reserved']) if inv_row else 0.0
+                    src_avail = src_on_hand - src_reserved
+                    if src_avail < base_qty:
                         cur.execute("SELECT sku, name FROM products WHERE id = %s", (pid,))
                         p_info = cur.fetchone() or {'sku': '', 'name': f'Product #{pid}'}
-                        insufficient.append(f"{p_info['sku']} (Avail: {src_on_hand:g}, Need: {base_qty:g})")
-                if insufficient:
-                    return jsonify({'success': False, 'error': 'Insufficient source stock: ' + '; '.join(insufficient)}), 400
+                        insufficient.append(f"{p_info['sku']} (Avail: {src_avail:g}, Need: {base_qty:g})")
 
             if transfer_id:
                 cur.execute("""
@@ -2779,15 +2779,27 @@ def mobile_transfer_save():
                     qty = float(l.get('quantity') or 0)
                     factor = float(l.get('uom_factor') or 1.0)
                     base_qty = qty * factor
-                    cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s", (pid, from_location_id))
+                    cur.execute("""
+                        SELECT id, COALESCE(quantity, 0) as qty
+                        FROM inventory
+                        WHERE product_id = %s AND location_id = %s
+                        ORDER BY (sublocation = '') DESC, id ASC
+                        LIMIT 1
+                    """, (pid, from_location_id))
                     src_row = cur.fetchone()
                     qty_before_src = float(src_row['qty']) if src_row else 0.0
 
-                    cur.execute("""
-                        UPDATE inventory
-                        SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE product_id = %s AND location_id = %s;
-                    """, (base_qty, pid, from_location_id))
+                    if src_row:
+                        cur.execute("""
+                            UPDATE inventory
+                            SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (base_qty, src_row['id']))
+                    else:
+                        cur.execute("""
+                            INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                            VALUES (%s, %s, '', -%s);
+                        """, (pid, from_location_id, base_qty))
 
                     cur.execute("""
                         INSERT INTO inventory (product_id, location_id, sublocation, quantity)
@@ -2803,12 +2815,16 @@ def mobile_transfer_save():
                         ) VALUES (%s, 'TRANSFER', 'TRANSFER', %s, %s, %s, %s, %s, %s, 'Warehouse Transfer Out', %s);
                     """, (pid, transfer_number, from_location_id, to_location_id, -base_qty, qty_before_src, qty_before_src - base_qty, notes))
 
+        msg = f"Transfer {transfer_number} completed!" if status == 'COMPLETED' else f"Saved {transfer_number} as Draft."
+        if status == 'COMPLETED' and insufficient:
+            msg = f"Transfer {transfer_number} completed (with negative source stock warning)."
         return jsonify({
             'success': True,
             'transfer_id': trf_id,
             'transfer_number': transfer_number,
             'status': status,
-            'message': f"Transfer {transfer_number} completed!" if status == 'COMPLETED' else f"Saved {transfer_number} as Draft."
+            'warnings': insufficient,
+            'message': msg
         })
     except Exception as e:
         logger.error(f"Mobile transfer save error: {e}", exc_info=True)

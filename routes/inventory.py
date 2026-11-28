@@ -847,7 +847,8 @@ def save_transfer():
             transfer_number = _get_next_trf_number()
 
         with get_db_cursor(commit=True) as cur:
-            # 1. If completing, validate stock availability in source location
+            # 1. If completing, check stock availability in source location (warn in response if negative, never block)
+            insufficient_items = []
             if status == 'COMPLETED':
                 if transfer_id:
                     cur.execute("SELECT status FROM stock_transfers WHERE id = %s", (transfer_id,))
@@ -855,7 +856,6 @@ def save_transfer():
                     if existing and existing['status'] == 'COMPLETED':
                         return jsonify({'success': False, 'message': 'This transfer has already been completed.'}), 400
 
-                insufficient_items = []
                 for l in lines:
                     pid = int(l['product_id'])
                     qty = float(l.get('quantity') or 0)
@@ -874,17 +874,13 @@ def save_transfer():
                     """, (pid, from_location_id))
                     inv_row = cur.fetchone()
                     src_on_hand = float(inv_row['qty']) if inv_row else 0.0
+                    src_reserved = float(inv_row['reserved']) if inv_row else 0.0
+                    src_avail = src_on_hand - src_reserved
 
-                    if src_on_hand < base_qty:
+                    if src_avail < base_qty:
                         cur.execute("SELECT sku, name FROM products WHERE id = %s", (pid,))
                         p_info = cur.fetchone() or {'sku': '', 'name': f'Product #{pid}'}
-                        insufficient_items.append(f"{p_info['sku']} {p_info['name']} (Available: {src_on_hand:g}, Required: {base_qty:g})")
-
-                if insufficient_items:
-                    return jsonify({
-                        'success': False,
-                        'message': "Cannot complete transfer due to insufficient stock in source warehouse:<br>• " + "<br>• ".join(insufficient_items)
-                    }), 400
+                        insufficient_items.append(f"{p_info['sku']} {p_info['name']} (Available: {src_avail:g}, Required: {base_qty:g})")
 
             # 2. Insert or update header in stock_transfers
             if transfer_id:
@@ -927,16 +923,28 @@ def save_transfer():
                     factor = float(l.get('uom_factor') or 1.0)
                     base_qty = qty * factor
 
-                    cur.execute("SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s", (pid, from_location_id))
+                    cur.execute("""
+                        SELECT id, COALESCE(quantity, 0) as qty
+                        FROM inventory
+                        WHERE product_id = %s AND location_id = %s
+                        ORDER BY (sublocation = '') DESC, id ASC
+                        LIMIT 1
+                    """, (pid, from_location_id))
                     src_row = cur.fetchone()
                     qty_before_src = float(src_row['qty']) if src_row else 0.0
 
-                    # Deduct from source warehouse
-                    cur.execute("""
-                        UPDATE inventory 
-                        SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
-                        WHERE product_id = %s AND location_id = %s;
-                    """, (base_qty, pid, from_location_id))
+                    # Deduct from source warehouse (create negative row if source had no row yet)
+                    if src_row:
+                        cur.execute("""
+                            UPDATE inventory 
+                            SET quantity = quantity - %s, updated_at = CURRENT_TIMESTAMP
+                            WHERE id = %s;
+                        """, (base_qty, src_row['id']))
+                    else:
+                        cur.execute("""
+                            INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                            VALUES (%s, %s, '', -%s);
+                        """, (pid, from_location_id, base_qty))
 
                     # Add to destination warehouse (upsert)
                     cur.execute("""
@@ -955,11 +963,14 @@ def save_transfer():
                     """, (pid, transfer_number, from_location_id, to_location_id, -base_qty, qty_before_src, qty_before_src - base_qty, notes))
 
         msg = f"Stock Transfer {transfer_number} completed successfully!" if status == 'COMPLETED' else f"Transfer request {transfer_number} saved as Draft."
+        if status == 'COMPLETED' and insufficient_items:
+            msg = f"Stock Transfer {transfer_number} completed with negative source stock warning."
         return jsonify({
             'success': True,
             'transfer_id': trf_id,
             'transfer_number': transfer_number,
             'status': status,
+            'warnings': insufficient_items,
             'message': msg
         })
 

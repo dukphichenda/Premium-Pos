@@ -550,6 +550,26 @@ class StockTransferDetailActivity : AppCompatActivity() {
             return
         }
 
+        if (targetStatus == "COMPLETED") {
+            val hasInsufficient = lines.any { ln ->
+                (ln.quantity * ln.uomFactor) > ln.sourceAvailable
+            }
+            if (hasInsufficient) {
+                LiquidGlassDialog.builder(this)
+                    .setTitle("Insufficient Source Stock")
+                    .setMessage("Warning: One or more items have insufficient available stock in the source warehouse. Completing this transfer may cause negative inventory. Proceed anyway?")
+                    .setPositiveButton("Proceed Anyway") { _, _ ->
+                        executeSubmitTransfer(targetStatus)
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
+                return
+            }
+        }
+        executeSubmitTransfer(targetStatus)
+    }
+
+    private fun executeSubmitTransfer(targetStatus: String) {
         binding.progressTrfDetail.visibility = View.VISIBLE
         binding.btnTrfSaveDraft.isEnabled = false
         binding.btnTrfComplete.isEnabled = false
