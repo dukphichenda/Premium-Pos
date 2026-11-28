@@ -245,12 +245,16 @@ class ProductsActivity : AppCompatActivity() {
                     3 -> showLocationPicker()
                 }
             }
-            .setNeutralButton("Reset All") { d, _ ->
+            .setNeutralButton("Reset") { d, _ ->
                 selectedCategoryId = 0
                 selectedStockLevel = "all"
                 selectedSchemeId = session.getPricingSchemes().firstOrNull()?.id ?: 100
                 selectedLocationId = session.getLocations().firstOrNull()?.id ?: 100
                 updateFilterBadge()
+                d.dismiss()
+                loadProducts()
+            }
+            .setPositiveButton("Apply Filters") { d, _ ->
                 d.dismiss()
                 loadProducts()
             }
@@ -432,6 +436,7 @@ class ProductsActivity : AppCompatActivity() {
             val b = holder.binding
             b.tvProdName.text = p.name.ifBlank { p.sku }
             b.tvProdSku.text = p.sku
+            b.tvProdKitBadge.visibility = if (p.isKit) View.VISIBLE else View.GONE
 
             ImageLoader.load(scope, baseUrl, p.imageUrl, b.ivProdThumb, b.ivProdIcon)
 

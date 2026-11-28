@@ -19,6 +19,7 @@ import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.EditText
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.PopupMenu
 import android.widget.TextView
@@ -265,6 +266,12 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
             lb.tvPoLineUnitCost.text = "@ $${moneyFmt.format(line.unitPrice)} / ${line.uom}"
             ImageLoader.load(uiScope, session.baseUrl, line.imageUrl, lb.ivPoLineThumb, lb.ivPoLineIcon)
             lb.root.setOnClickListener { showEditLineDialog(idx) }
+            lb.btnPoLineRemove.setOnClickListener {
+                val removedName = line.sku.ifBlank { line.productName }
+                lines.removeAt(idx)
+                renderLinesAndTotals()
+                Toast.makeText(this, "Removed $removedName", Toast.LENGTH_SHORT).show()
+            }
             binding.llPoLines.addView(lb.root)
         }
     }
@@ -357,14 +364,46 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showEditLineDialog(index: Int) {
+    private fun buildUomChoices(
+        currentUom: String,
+        baseUom: String,
+        salesUom: String,
+        purchasingUom: String
+    ): List<String> {
+        val out = linkedSetOf<String>()
+        listOf(currentUom, purchasingUom, salesUom, baseUom, "cases", "packs", "pcs.").forEach { u ->
+            val t = u.trim()
+            if (t.isNotBlank()) out.add(t)
+        }
+        return out.toList()
+    }
+
+    private fun estimateCostForUom(
+        uom: String,
+        baseUom: String,
+        salesUom: String,
+        purchasingUom: String,
+        salesRatio: Double,
+        purchasingRatio: Double,
+        stdCost: Double
+    ): Double {
+        if (stdCost <= 0.0) return 0.0
+        return when {
+            uom.equals(purchasingUom, true) && purchasingRatio > 1.0 -> stdCost * purchasingRatio
+            uom.equals(salesUom, true) && salesRatio > 1.0 -> stdCost * salesRatio
+            uom.equals("cases", true) && maxOf(purchasingRatio, salesRatio) > 1.0 -> stdCost * maxOf(purchasingRatio, salesRatio)
+            else -> stdCost
+        }
+    }
+
+    private fun showEditLineDialog(index: Int, isNewAdd: Boolean = false) {
         if (index !in lines.indices) return
         val ln = lines[index]
         val dp = resources.displayMetrics.density
-        val pad = (18 * dp).toInt()
+        val pad = (4 * dp).toInt()
         val box = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(pad, (10 * dp).toInt(), pad, 0)
+            setPadding(pad, (4 * dp).toInt(), pad, 0)
         }
         val etQty = EditText(this).apply {
             hint = "Quantity"
@@ -376,22 +415,75 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
             setText(String.format(Locale.US, "%.4f", ln.unitPrice).trimEnd('0').trimEnd('.'))
         }
-        val etUom = EditText(this).apply {
-            hint = "UOM (e.g. pcs., cases)"
-            setText(ln.uom)
-            isSingleLine = true
+
+        // Tappable UOM pill selector (product's own purchasing/sales/base UOM + common options)
+        val uomOptions = buildUomChoices(ln.uom, ln.baseUom, ln.salesUom, ln.purchasingUom)
+        var selectedUom = ln.uom.ifBlank { uomOptions.firstOrNull() ?: "pcs." }
+        val uomScroll = HorizontalScrollView(this).apply {
+            isHorizontalScrollBarEnabled = false
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = (6 * dp).toInt(); bottomMargin = (8 * dp).toInt() }
         }
+        val uomRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        val uomViews = mutableListOf<Pair<String, TextView>>()
+        val primaryColor = ContextCompat.getColor(this, R.color.text_primary)
+        val subtleBg = ContextCompat.getColor(this, R.color.surface_subtle)
+        fun refreshUomChips() {
+            for ((u, tv) in uomViews) {
+                val active = u.equals(selectedUom, ignoreCase = true)
+                tv.setBackgroundResource(R.drawable.bg_pill_teal_solid)
+                tv.backgroundTintList = ColorStateList.valueOf(if (active) Color.parseColor("#0A6C62") else subtleBg)
+                tv.setTextColor(if (active) Color.WHITE else primaryColor)
+            }
+        }
+        for (u in uomOptions) {
+            val chip = TextView(this).apply {
+                text = u
+                textSize = 12.5f
+                setTypeface(null, Typeface.BOLD)
+                setPadding((14 * dp).toInt(), (7 * dp).toInt(), (14 * dp).toInt(), (7 * dp).toInt())
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { marginEnd = (8 * dp).toInt() }
+                isClickable = true
+                isFocusable = true
+                setOnClickListener {
+                    selectedUom = u
+                    refreshUomChips()
+                    val est = estimateCostForUom(
+                        uom = u,
+                        baseUom = ln.baseUom,
+                        salesUom = ln.salesUom,
+                        purchasingUom = ln.purchasingUom,
+                        salesRatio = ln.salesRatio,
+                        purchasingRatio = ln.purchasingRatio,
+                        stdCost = ln.standardCost
+                    )
+                    if (est > 0.0) {
+                        etCost.setText(String.format(Locale.US, "%.4f", est).trimEnd('0').trimEnd('.'))
+                    }
+                }
+            }
+            uomViews.add(u to chip)
+            uomRow.addView(chip)
+        }
+        refreshUomChips()
+        uomScroll.addView(uomRow)
+
+        box.addView(TextView(this).apply { text = "Select Unit (UOM)"; textSize = 11.5f; setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_secondary)) })
+        box.addView(uomScroll)
         box.addView(TextView(this).apply { text = "Quantity"; textSize = 11.5f; setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_secondary)) })
         box.addView(etQty)
         box.addView(TextView(this).apply { text = "Unit Cost ($)"; textSize = 11.5f; setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_secondary)) })
         box.addView(etCost)
-        box.addView(TextView(this).apply { text = "Unit (UOM)"; textSize = 11.5f; setTextColor(ContextCompat.getColor(this@PurchaseOrderDetailActivity, R.color.text_secondary)) })
-        box.addView(etUom)
 
-        LiquidGlassDialog.builder(this)
+        val builder = LiquidGlassDialog.builder(this)
             .setTitle(ln.productName.ifBlank { ln.sku })
             .setView(box)
-            .setPositiveButton("Update") { _, _ ->
+            .setPositiveButton(if (isNewAdd) "Add to PO" else "Update") { _, _ ->
                 val q = etQty.text.toString().trim().toDoubleOrNull()
                 val c = etCost.text.toString().trim().toDoubleOrNull()
                 if (q == null || q <= 0.0 || c == null || c < 0.0) {
@@ -400,16 +492,23 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
                 }
                 ln.quantity = q
                 ln.unitPrice = c
-                ln.uom = etUom.text.toString().trim().ifBlank { ln.uom }
+                ln.uom = selectedUom
                 ln.subtotal = q * c
                 renderLinesAndTotals()
             }
-            .setNeutralButton("Remove") { _, _ ->
+            .setNegativeButton("Cancel") { _, _ ->
+                if (isNewAdd && index in lines.indices) {
+                    lines.removeAt(index)
+                    renderLinesAndTotals()
+                }
+            }
+        if (!isNewAdd) {
+            builder.setNeutralButton("Remove") { _, _ ->
                 lines.removeAt(index)
                 renderLinesAndTotals()
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+        }
+        builder.show()
     }
 
     private fun showExportPoDialog() {
@@ -649,12 +748,18 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
         card.setOnClickListener {
             val existingIdx = lines.indexOfFirst { it.productId == p.id && p.id > 0 }
             if (existingIdx >= 0) {
-                lines[existingIdx].quantity += 1.0
-                lines[existingIdx].subtotal = lines[existingIdx].quantity * lines[existingIdx].unitPrice
-                renderLinesAndTotals()
-                syncBadge()
-                Toast.makeText(this, "${p.sku} qty → ${qtyFmt.format(lines[existingIdx].quantity)}", Toast.LENGTH_SHORT).show()
+                showEditLineDialog(existingIdx, isNewAdd = false)
             } else {
+                val defaultUom = p.purchasingUom.ifBlank { p.salesUom.ifBlank { p.uom.ifBlank { "pcs." } } }
+                val estCost = estimateCostForUom(
+                    uom = defaultUom,
+                    baseUom = p.uom.ifBlank { "pcs." },
+                    salesUom = p.salesUom,
+                    purchasingUom = p.purchasingUom,
+                    salesRatio = p.salesUomRatioStd,
+                    purchasingRatio = p.purchasingUomRatioStd,
+                    stdCost = p.standardCost
+                )
                 lines.add(
                     PurchaseOrderLine(
                         id = 0,
@@ -663,14 +768,20 @@ class PurchaseOrderDetailActivity : AppCompatActivity() {
                         productName = p.name,
                         imageUrl = p.imageUrl,
                         quantity = 1.0,
-                        uom = p.uom.ifBlank { "pcs." },
-                        unitPrice = p.defaultPrice,
-                        subtotal = p.defaultPrice
+                        uom = defaultUom,
+                        unitPrice = estCost,
+                        subtotal = estCost,
+                        baseUom = p.uom.ifBlank { "pcs." },
+                        salesUom = p.salesUom,
+                        purchasingUom = p.purchasingUom,
+                        salesRatio = p.salesUomRatioStd,
+                        purchasingRatio = p.purchasingUomRatioStd,
+                        standardCost = p.standardCost
                     )
                 )
                 renderLinesAndTotals()
                 syncBadge()
-                Toast.makeText(this, "Added ${p.sku} to PO", Toast.LENGTH_SHORT).show()
+                showEditLineDialog(lines.lastIndex, isNewAdd = true)
             }
         }
         return card

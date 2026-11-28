@@ -333,7 +333,12 @@ class ApiClient(private val session: SessionManager) {
                     imageUrl = p.optString("image_url", ""),
                     barcode = p.optString("barcode", ""),
                     categoryName = p.optString("category_name", ""),
-                    pricePerPcs = p.optDouble("price_per_pcs", p.optDouble("unit_price", 0.0))
+                    pricePerPcs = p.optDouble("price_per_pcs", p.optDouble("unit_price", 0.0)),
+                    isKit = p.optBoolean("is_kit", false),
+                    bomCount = p.optInt("bom_count", 0),
+                    purchasingUom = p.optString("purchasing_uom", ""),
+                    purchasingUomRatioStd = p.optDouble("purchasing_uom_ratio_std", p.optDouble("sales_uom_ratio_std", 1.0)),
+                    standardCost = p.optDouble("standard_cost", 0.0)
                 )
             )
         }
@@ -359,7 +364,8 @@ class ApiClient(private val session: SessionManager) {
                     locationId = row.optInt("location_id"),
                     locationName = row.optString("location_name", "Warehouse"),
                     available = row.optDouble("available", 0.0),
-                    onHand = row.optDouble("on_hand", 0.0)
+                    onHand = row.optDouble("on_hand", 0.0),
+                    reserved = row.optDouble("reserved", 0.0)
                 )
             )
         }
@@ -475,6 +481,10 @@ class ApiClient(private val session: SessionManager) {
             width = p.optDouble("width", 0.0),
             height = p.optDouble("height", 0.0),
             totalOnHand = p.optDouble("total_on_hand", 0.0),
+            totalReserved = p.optDouble("total_reserved", 0.0),
+            totalAvailable = p.optDouble("total_available", p.optDouble("total_on_hand", 0.0)),
+            isKit = p.optBoolean("is_kit", false),
+            buildableQty = p.optDouble("buildable_qty", 0.0),
             inventory = invList,
             pricingTiers = tierList,
             priceTable = priceTable,
@@ -530,7 +540,13 @@ class ApiClient(private val session: SessionManager) {
                     quantity = l.optDouble("quantity", 0.0),
                     uom = l.optString("uom", "pcs."),
                     unitPrice = l.optDouble("unit_price", 0.0),
-                    subtotal = l.optDouble("subtotal", 0.0)
+                    subtotal = l.optDouble("subtotal", 0.0),
+                    baseUom = l.optString("base_uom", "pcs."),
+                    salesUom = l.optString("sales_uom", ""),
+                    purchasingUom = l.optString("purchasing_uom", ""),
+                    salesRatio = l.optDouble("sales_ratio", 1.0),
+                    purchasingRatio = l.optDouble("purchasing_ratio", 1.0),
+                    standardCost = l.optDouble("standard_cost", 0.0)
                 )
             )
         }

@@ -895,7 +895,12 @@ def mobile_purchase_detail(pid):
                COALESCE(p.sku, '') as sku,
                COALESCE(p.name, pol.description, '') as product_name,
                COALESCE(p.image_url, '') as image_url,
-               COALESCE(p.uom, 'pcs.') as std_uom
+               COALESCE(p.uom, 'pcs.') as std_uom,
+               COALESCE(p.sales_uom, '') as sales_uom,
+               COALESCE(p.sales_uom_ratio_std, 1.0) as sales_ratio,
+               COALESCE(p.purchasing_uom, '') as purchasing_uom,
+               COALESCE(p.purchasing_uom_ratio_std, p.sales_uom_ratio_std, 1.0) as purchasing_ratio,
+               COALESCE(p.standard_cost, p.average_cost, p.cost, 0) as standard_cost
         FROM purchase_order_lines pol
         LEFT JOIN products p ON pol.product_id = p.id
         WHERE pol.purchase_order_id = %s
@@ -938,6 +943,12 @@ def mobile_purchase_detail(pid):
                     'image_url': l.get('image_url') or '',
                     'quantity': float(l.get('quantity') or 0),
                     'uom': l.get('uom') or l.get('std_uom') or 'pcs.',
+                    'base_uom': l.get('std_uom') or 'pcs.',
+                    'sales_uom': l.get('sales_uom') or '',
+                    'purchasing_uom': l.get('purchasing_uom') or '',
+                    'sales_ratio': float(l.get('sales_ratio') or 1.0),
+                    'purchasing_ratio': float(l.get('purchasing_ratio') or 1.0),
+                    'standard_cost': float(l.get('standard_cost') or 0),
                     'unit_price': float(l.get('unit_cost') or l.get('unit_price') or 0),
                     'subtotal': float(l.get('subtotal') or 0),
                 }
@@ -1249,7 +1260,7 @@ def mobile_products_search():
     limit = min(100, max(10, int(request.args.get('limit', 40) or 40)))
 
     where = ["p.is_active = TRUE"]
-    params = [location_id]
+    params = [location_id, location_id]
 
     if q:
         sp = f"%{q}%"
@@ -1260,12 +1271,14 @@ def mobile_products_search():
         where.append("p.category_id = %s")
         params.append(category_id)
 
+    eff_avail_expr = "CASE WHEN COALESCE(kit.bom_count, 0) > 0 THEN COALESCE(kit.buildable_qty, 0) ELSE COALESCE(inv.avail, 0) END"
+
     if stock_level == 'in_stock':
-        where.append("COALESCE(inv.avail, 0) > 0")
+        where.append(f"{eff_avail_expr} > 0")
     elif stock_level == 'low_stock':
-        where.append("COALESCE(inv.avail, 0) > 0 AND COALESCE(inv.avail, 0) <= GREATEST(COALESCE(p.reorder_point, 0), 10)")
+        where.append(f"{eff_avail_expr} > 0 AND {eff_avail_expr} <= GREATEST(COALESCE(p.reorder_point, 0), 10)")
     elif stock_level == 'out_of_stock':
-        where.append("COALESCE(inv.avail, 0) <= 0")
+        where.append(f"{eff_avail_expr} <= 0")
 
     inv_join_sql = """
         LEFT JOIN (
@@ -1274,6 +1287,26 @@ def mobile_products_search():
             WHERE location_id = %s
             GROUP BY product_id
         ) inv ON p.id = inv.product_id
+        LEFT JOIN (
+            SELECT
+                pb.product_id,
+                COUNT(*) as bom_count,
+                MIN(
+                    CASE
+                        WHEN COALESCE(pb.quantity, 0) > 0
+                        THEN FLOOR(GREATEST(0, COALESCE(ci.avail, 0)) / pb.quantity)
+                        ELSE 0
+                    END
+                ) as buildable_qty
+            FROM product_boms pb
+            LEFT JOIN (
+                SELECT product_id, SUM(COALESCE(quantity, 0) - COALESCE(reserved_quantity, 0)) as avail
+                FROM inventory
+                WHERE location_id = %s
+                GROUP BY product_id
+            ) ci ON pb.component_product_id = ci.product_id
+            GROUP BY pb.product_id
+        ) kit ON p.id = kit.product_id
     """
 
     rows = query_all(f"""
@@ -1282,11 +1315,15 @@ def mobile_products_search():
             COALESCE(p.uom, 'pcs.') as uom,
             COALESCE(p.sales_uom, '') as sales_uom,
             COALESCE(p.sales_uom_ratio_std, 1.0) as sales_uom_ratio_std,
+            COALESCE(p.purchasing_uom, '') as purchasing_uom,
+            COALESCE(p.purchasing_uom_ratio_std, p.sales_uom_ratio_std, 1.0) as purchasing_uom_ratio_std,
+            COALESCE(p.standard_cost, p.average_cost, p.cost, 0) as standard_cost,
             COALESCE(p.default_price, 0) as default_price,
             COALESCE(p.image_url, '') as image_url,
             COALESCE(p.barcode, '') as barcode,
             COALESCE(c.name, '') as category_name,
-            COALESCE(inv.avail, 0) as stock_available
+            COALESCE(kit.bom_count, 0) as bom_count,
+            {eff_avail_expr} as stock_available
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
         {inv_join_sql}
@@ -1338,6 +1375,9 @@ def mobile_products_search():
             'uom': std_uom,
             'sales_uom': sales_uom,
             'sales_uom_ratio_std': ratio,
+            'purchasing_uom': (r.get('purchasing_uom') or '').strip(),
+            'purchasing_uom_ratio_std': float(r.get('purchasing_uom_ratio_std') or ratio or 1.0),
+            'standard_cost': float(r.get('standard_cost') or 0),
             'unit_price': raw_price,
             'price_per_pcs': round(price_per_pcs, 4),
             'default_price': float(r.get('default_price') or 0),
@@ -1347,6 +1387,8 @@ def mobile_products_search():
             'barcode': r.get('barcode') or '',
             'category_name': r.get('category_name') or '',
             'stock_available': float(r.get('stock_available') or 0),
+            'is_kit': int(r.get('bom_count') or 0) > 0,
+            'bom_count': int(r.get('bom_count') or 0),
         })
 
     return jsonify({
@@ -1383,6 +1425,7 @@ def mobile_product_detail(pid):
             l.id as location_id,
             l.name as location_name,
             COALESCE(SUM(COALESCE(i.quantity, 0) - COALESCE(i.reserved_quantity, 0)), 0) as available,
+            COALESCE(SUM(COALESCE(i.reserved_quantity, 0)), 0) as reserved,
             COALESCE(SUM(COALESCE(i.quantity, 0)), 0) as on_hand
         FROM inventory i
         JOIN locations l ON i.location_id = l.id
@@ -1505,6 +1548,53 @@ def mobile_product_detail(pid):
     """, (pid,))
 
     total_on_hand = sum(float(r.get('on_hand') or 0) for r in inv_rows)
+    total_reserved = sum(float(r.get('reserved') or 0) for r in inv_rows)
+    total_available = sum(float(r.get('available') or 0) for r in inv_rows)
+
+    is_kit = len(boms) > 0
+    buildable_qty = 0.0
+    if is_kit:
+        comp_ids = [int(b['component_product_id']) for b in boms if b.get('component_product_id')]
+        comp_avail_all = {}
+        comp_avail_by_loc = {}
+        if comp_ids:
+            c_rows = query_all("""
+                SELECT product_id, location_id,
+                       SUM(COALESCE(quantity, 0) - COALESCE(reserved_quantity, 0)) as avail
+                FROM inventory
+                WHERE product_id = ANY(%s)
+                GROUP BY product_id, location_id
+            """, (comp_ids,))
+            for cr in c_rows:
+                cpid = int(cr['product_id'])
+                loc_id = int(cr['location_id'])
+                av = float(cr['avail'] or 0)
+                comp_avail_all[cpid] = comp_avail_all.get(cpid, 0.0) + av
+                comp_avail_by_loc.setdefault(loc_id, {})[cpid] = av
+
+        min_possible = None
+        for b in boms:
+            cpid = int(b.get('component_product_id') or 0)
+            bqty = float(b.get('quantity') or 0)
+            if bqty > 0:
+                possible = int(max(0.0, comp_avail_all.get(cpid, 0.0)) // bqty)
+            else:
+                possible = 0
+            min_possible = possible if min_possible is None else min(min_possible, possible)
+        buildable_qty = float(max(0, min_possible or 0))
+
+        # For kit products, update per-location available to show buildable amount at each warehouse
+        for r in inv_rows:
+            loc_id = int(r['location_id'])
+            loc_map = comp_avail_by_loc.get(loc_id, {})
+            loc_min = None
+            for b in boms:
+                cpid = int(b.get('component_product_id') or 0)
+                bqty = float(b.get('quantity') or 0)
+                possible = int(max(0.0, loc_map.get(cpid, 0.0)) // bqty) if bqty > 0 else 0
+                loc_min = possible if loc_min is None else min(loc_min, possible)
+            r['available'] = float(max(0, loc_min or 0))
+        total_available = buildable_qty
 
     raw_detail_text = (
         (price_card.get('custom_detail') or '').strip()
@@ -1538,11 +1628,16 @@ def mobile_product_detail(pid):
             'width': float(p.get('width') or 0),
             'height': float(p.get('height') or 0),
             'total_on_hand': total_on_hand,
+            'total_reserved': total_reserved,
+            'total_available': total_available,
+            'is_kit': is_kit,
+            'buildable_qty': buildable_qty,
             'inventory': [
                 {
                     'location_id': r['location_id'],
                     'location_name': r['location_name'],
                     'available': float(r['available'] or 0),
+                    'reserved': float(r.get('reserved') or 0),
                     'on_hand': float(r['on_hand'] or 0),
                 }
                 for r in inv_rows
@@ -4259,7 +4354,7 @@ def mobile_app_update_check():
     apk_size_bytes = os.path.getsize(apk_path) if apk_available else 0
     apk_size_mb = f"{apk_size_bytes / (1024 * 1024):.1f} MB" if apk_size_bytes > 0 else "0.0 MB"
 
-    notes = "v3.7.1: Fixed HQ & branch logos with fast server-side 256px thumbnails (~25KB), fixed rounded frosted pill clipping on bottom nav bar, plus v3.7.0 PO PDF/Excel export, Product Price Table specs & full searchable Order History."
+    notes = "v3.8.0: Telegram Android frosted nav bar, floating rounded popups with full-page GPU blur, Combine/Kit badge & buildable qty, Product Detail In Hand / Reserved / Available, and PO UOM chip picker + inline line remove button."
     try:
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
         if row and row.get('setting_value'):

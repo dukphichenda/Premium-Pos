@@ -1,8 +1,12 @@
 package com.inflow.premium.ui
 
+import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.DialogInterface
 import android.graphics.Color
+import android.graphics.RenderEffect
+import android.graphics.Shader
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Build
@@ -18,9 +22,52 @@ import androidx.core.content.ContextCompat
 import androidx.core.widget.NestedScrollView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.inflow.premium.R
+import java.util.Locale
+import java.util.WeakHashMap
 
 object LiquidGlassDialog {
+    private val blurRefCounts = WeakHashMap<Activity, Int>()
+
     fun builder(context: Context): MaterialAlertDialogBuilder = ModernSheetDialogBuilder(context)
+
+    internal fun acquireBackgroundBlur(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val act = findActivity(context) ?: return
+        val next = (blurRefCounts[act] ?: 0) + 1
+        blurRefCounts[act] = next
+        if (next == 1) {
+            try {
+                act.window?.decorView?.setRenderEffect(
+                    RenderEffect.createBlurEffect(26f, 26f, Shader.TileMode.CLAMP)
+                )
+            } catch (_: Throwable) {
+            }
+        }
+    }
+
+    internal fun releaseBackgroundBlur(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        val act = findActivity(context) ?: return
+        val next = ((blurRefCounts[act] ?: 1) - 1).coerceAtLeast(0)
+        if (next == 0) {
+            blurRefCounts.remove(act)
+            try {
+                act.window?.decorView?.setRenderEffect(null)
+            } catch (_: Throwable) {
+            }
+        } else {
+            blurRefCounts[act] = next
+        }
+    }
+
+    private fun findActivity(context: Context): Activity? {
+        var c: Context? = context
+        while (c is ContextWrapper) {
+            if (c is Activity) return c
+            c = c.baseContext
+        }
+        return c as? Activity
+    }
 }
 
 /**
@@ -181,7 +228,11 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
 
         var createdDialog: AlertDialog? = null
 
-        // Header Row: Bold Title + Circular Close (×) Button
+        val isHeaderNeutralAction = !neuText.isNullOrBlank() &&
+            (neuText.toString().contains("reset", ignoreCase = true) ||
+                neuText.toString().contains("clear", ignoreCase = true))
+
+        // Header Row: Bold Title + Optional Header Action (e.g. Reset) + Circular Close (×) Button
         if (!sheetTitle.isNullOrBlank()) {
             val headerRow = LinearLayout(ctx).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -189,21 +240,39 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = 14.dp() }
+                ).apply { bottomMargin = 16.dp() }
             }
             val tvTitle = TextView(ctx).apply {
                 layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
                 text = sheetTitle
                 setTextColor(textPrimary)
-                textSize = 18f
+                textSize = 19f
                 setTypeface(null, Typeface.BOLD)
             }
+            headerRow.addView(tvTitle)
+            if (isHeaderNeutralAction) {
+                val tvReset = TextView(ctx).apply {
+                    text = neuText
+                    setTextColor(tealAccent)
+                    textSize = 13.5f
+                    setTypeface(null, Typeface.BOLD)
+                    setPadding(8.dp(), 6.dp(), 10.dp(), 6.dp())
+                    isClickable = true
+                    isFocusable = true
+                    setOnClickListener {
+                        val d = createdDialog ?: return@setOnClickListener
+                        neuListener?.onClick(d, DialogInterface.BUTTON_NEUTRAL)
+                        if (d.isShowing) d.dismiss()
+                    }
+                }
+                headerRow.addView(tvReset)
+            }
             val btnClose = TextView(ctx).apply {
-                layoutParams = LinearLayout.LayoutParams(32.dp(), 32.dp()).apply { marginStart = 10.dp() }
+                layoutParams = LinearLayout.LayoutParams(34.dp(), 34.dp()).apply { marginStart = 6.dp() }
                 gravity = Gravity.CENTER
                 text = "✕"
                 setTextColor(textSecondary)
-                textSize = 13f
+                textSize = 13.5f
                 setTypeface(null, Typeface.BOLD)
                 background = GradientDrawable().apply {
                     shape = GradientDrawable.OVAL
@@ -219,7 +288,6 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
                     }
                 }
             }
-            headerRow.addView(tvTitle)
             headerRow.addView(btnClose)
             root.addView(headerRow)
         }
@@ -328,47 +396,142 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
             refreshRadioStates()
         }
 
-        // 2. Plain Action Cards (e.g., Product Filters)
+        // 2. Plain Action / Field-Dropdown Cards (e.g., Product Filters matching floating card UI)
+        val badgeCircleBg = if (isDark) Color.parseColor("#103235") else Color.parseColor("#E6F4F1")
+        fun iconForField(labelLower: String): String = when {
+            labelLower.contains("price") || labelLower.contains("tier") || labelLower.contains("scheme") -> "🏷"
+            labelLower.contains("warehouse") || labelLower.contains("location") || labelLower.contains("branch") -> "🏬"
+            labelLower.contains("category") -> "🗂"
+            labelLower.contains("stock") -> "📦"
+            labelLower.contains("status") -> "✓"
+            labelLower.contains("pdf") -> "📄"
+            labelLower.contains("excel") || labelLower.contains("xlsx") -> "📊"
+            labelLower.contains("date") -> "📅"
+            else -> "•"
+        }
+
         plainItems?.let { items ->
             hasScrollBody = true
             items.forEachIndexed { idx, label ->
-                val row = LinearLayout(ctx).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    setPadding(16.dp(), 14.dp(), 16.dp(), 14.dp())
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply { bottomMargin = 10.dp() }
-                    background = makeOptionCardBg(false)
-                    isClickable = true
-                    isFocusable = true
-                }
-                val tv = TextView(ctx).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                    text = label
-                    setTextColor(textPrimary)
-                    textSize = 14.5f
-                    setTypeface(null, Typeface.BOLD)
-                }
-                val chev = TextView(ctx).apply {
-                    text = "›"
-                    setTextColor(textSecondary)
-                    textSize = 18f
-                    setTypeface(null, Typeface.BOLD)
-                    layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
-                        marginStart = 10.dp()
+                val raw = label.toString()
+                val colonIdx = raw.indexOf(':')
+                val isKeyValue = colonIdx in 1..(raw.length - 2)
+
+                if (isKeyValue) {
+                    val fieldKey = raw.substring(0, colonIdx).trim()
+                    val fieldVal = raw.substring(colonIdx + 1).trim()
+                    val card = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.VERTICAL
+                        setPadding(16.dp(), 12.dp(), 16.dp(), 12.dp())
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = 12.dp() }
+                        background = GradientDrawable().apply {
+                            cornerRadius = 16.dp().toFloat()
+                            setColor(cardBg)
+                            setStroke(1.dp(), cardStroke)
+                        }
+                        isClickable = true
+                        isFocusable = true
                     }
-                }
-                row.addView(tv)
-                row.addView(chev)
-                row.setOnClickListener {
-                    createdDialog?.let { d ->
-                        plainListener?.onClick(d, idx)
-                        if (d.isShowing) d.dismiss()
+                    card.addView(TextView(ctx).apply {
+                        text = fieldKey.uppercase(Locale.US)
+                        setTextColor(textSecondary)
+                        textSize = 10.5f
+                        letterSpacing = 0.06f
+                        setTypeface(null, Typeface.BOLD)
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = 8.dp() }
+                    })
+                    val valRow = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
                     }
+                    val iconCircle = TextView(ctx).apply {
+                        layoutParams = LinearLayout.LayoutParams(34.dp(), 34.dp()).apply { marginEnd = 12.dp() }
+                        gravity = Gravity.CENTER
+                        text = iconForField(fieldKey.lowercase(Locale.US))
+                        setTextColor(tealAccent)
+                        textSize = 14f
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(badgeCircleBg)
+                        }
+                    }
+                    val tvVal = TextView(ctx).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                        text = fieldVal
+                        setTextColor(textPrimary)
+                        textSize = 15f
+                        setTypeface(null, Typeface.BOLD)
+                    }
+                    val chev = TextView(ctx).apply {
+                        text = "⌄"
+                        setTextColor(textSecondary)
+                        textSize = 18f
+                        setTypeface(null, Typeface.BOLD)
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply { marginStart = 8.dp() }
+                    }
+                    valRow.addView(iconCircle)
+                    valRow.addView(tvVal)
+                    valRow.addView(chev)
+                    card.addView(valRow)
+                    card.setOnClickListener {
+                        createdDialog?.let { d ->
+                            plainListener?.onClick(d, idx)
+                            if (d.isShowing) d.dismiss()
+                        }
+                    }
+                    bodyList.addView(card)
+                } else {
+                    val row = LinearLayout(ctx).apply {
+                        orientation = LinearLayout.HORIZONTAL
+                        gravity = Gravity.CENTER_VERTICAL
+                        setPadding(16.dp(), 14.dp(), 16.dp(), 14.dp())
+                        layoutParams = LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                        ).apply { bottomMargin = 10.dp() }
+                        background = GradientDrawable().apply {
+                            cornerRadius = 16.dp().toFloat()
+                            setColor(cardBg)
+                            setStroke(1.dp(), cardStroke)
+                        }
+                        isClickable = true
+                        isFocusable = true
+                    }
+                    val tv = TextView(ctx).apply {
+                        layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                        text = label
+                        setTextColor(textPrimary)
+                        textSize = 14.5f
+                        setTypeface(null, Typeface.BOLD)
+                    }
+                    val chev = TextView(ctx).apply {
+                        text = "›"
+                        setTextColor(textSecondary)
+                        textSize = 18f
+                        setTypeface(null, Typeface.BOLD)
+                        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                            marginStart = 10.dp()
+                        }
+                    }
+                    row.addView(tv)
+                    row.addView(chev)
+                    row.setOnClickListener {
+                        createdDialog?.let { d ->
+                            plainListener?.onClick(d, idx)
+                            if (d.isShowing) d.dismiss()
+                        }
+                    }
+                    bodyList.addView(row)
                 }
-                bodyList.addView(row)
             }
         }
 
@@ -480,7 +643,7 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
                 root.addView(btnPrimary)
             }
 
-            if (!neuText.isNullOrBlank()) {
+            if (!neuText.isNullOrBlank() && !isHeaderNeutralAction) {
                 val btnNeutral = TextView(ctx).apply {
                     layoutParams = LinearLayout.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT,
@@ -523,8 +686,11 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
         root.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) {
                 applyBottomSheetWindow(dialog, surfaceBg)
+                LiquidGlassDialog.acquireBackgroundBlur(ctx)
             }
-            override fun onViewDetachedFromWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                LiquidGlassDialog.releaseBackgroundBlur(ctx)
+            }
         })
         applyBottomSheetWindow(dialog, surfaceBg)
         return dialog
@@ -543,11 +709,11 @@ private class ModernSheetDialogBuilder(private val ctx: Context) :
             win.setGravity(Gravity.BOTTOM)
             win.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             win.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-            win.setDimAmount(0.36f)
+            win.setDimAmount(0.28f)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 win.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
                 win.attributes = win.attributes.apply {
-                    blurBehindRadius = (26 * dp).toInt()
+                    blurBehindRadius = (24 * dp).toInt()
                 }
             }
         }

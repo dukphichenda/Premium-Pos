@@ -224,7 +224,11 @@ class ProductDetailActivity : AppCompatActivity() {
         binding.tabOrderHistory.text = "Order history (${d.orderHistory.size})"
         binding.tabPurchaseHistory.text = "Purchase history (${d.purchaseHistory.size})"
 
-        if (d.isActive) {
+        if (d.isKit) {
+            binding.tvProdActiveBadge.text = "🧩 KIT • ${if (d.isActive) "ACTIVE" else "INACTIVE"}"
+            binding.tvProdActiveBadge.setTextColor(Color.parseColor("#6D28D9"))
+            binding.tvProdActiveBadge.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#EDE9FE"))
+        } else if (d.isActive) {
             binding.tvProdActiveBadge.text = "ACTIVE ITEM"
             binding.tvProdActiveBadge.setTextColor(Color.parseColor("#059669"))
             binding.tvProdActiveBadge.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#DCFCE7"))
@@ -237,16 +241,27 @@ class ProductDetailActivity : AppCompatActivity() {
         ImageLoader.load(uiScope, session.baseUrl, d.imageUrl, binding.ivProdHero, binding.ivProdHeroPlaceholder)
 
         binding.tvTotalOnHand.text = numFmt.format(d.totalOnHand)
-        binding.tvTotalOnHandUnit.text = "${d.uom} on hand"
+        binding.tvTotalOnHandUnit.text = d.uom
+        binding.tvTotalReserved.text = numFmt.format(d.totalReserved)
+        binding.tvTotalReservedUnit.text = d.uom
+        val displayAvail = if (d.isKit) d.buildableQty else d.totalAvailable
+        binding.tvTotalAvailLabel.text = if (d.isKit) "AVAILABLE (KIT)" else "AVAILABLE"
+        binding.tvTotalAvailable.text = numFmt.format(displayAvail)
+        binding.tvTotalAvailable.setTextColor(
+            Color.parseColor(if (displayAvail > 0) "#059669" else "#DC2626")
+        )
+        binding.tvTotalAvailUnit.text = if (d.isKit) "${d.uom} buildable" else d.uom
 
         val density = resources.displayMetrics.density
         fun dp(v: Int) = (v * density).toInt()
+        val primaryTextColor = ContextCompat.getColor(this, R.color.text_primary)
+        val secondaryTextColor = ContextCompat.getColor(this, R.color.text_secondary)
 
         binding.llInventoryList.removeAllViews()
         val invList = d.inventory.ifEmpty {
-            listOf(com.inflow.premium.data.ProductInventoryLocation(100, d.defaultLocationName, 0.0, 0.0))
+            listOf(com.inflow.premium.data.ProductInventoryLocation(100, d.defaultLocationName, displayAvail, 0.0, 0.0))
         }
-        val maxStock = invList.maxOf { it.onHand }.coerceAtLeast(1.0)
+        val maxStock = invList.maxOf { maxOf(it.onHand, it.available) }.coerceAtLeast(1.0)
         for (loc in invList) {
             val box = LinearLayout(this).apply {
                 orientation = LinearLayout.VERTICAL
@@ -263,14 +278,14 @@ class ProductDetailActivity : AppCompatActivity() {
             }
             val tvLoc = TextView(this).apply {
                 text = loc.locationName
-                setTextColor(Color.parseColor("#0F172A"))
+                setTextColor(primaryTextColor)
                 textSize = 12.5f
                 setTypeface(null, android.graphics.Typeface.BOLD)
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val tvQty = TextView(this).apply {
-                text = "${numFmt.format(loc.onHand)} ${d.uom}"
-                setTextColor(Color.parseColor("#0F172A"))
+                text = "Avail: ${numFmt.format(loc.available)} ${d.uom}"
+                setTextColor(Color.parseColor(if (loc.available > 0) "#059669" else "#DC2626"))
                 textSize = 12.5f
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }
@@ -278,15 +293,27 @@ class ProductDetailActivity : AppCompatActivity() {
             topRow.addView(tvQty)
             box.addView(topRow)
 
+            val metricsLine = TextView(this).apply {
+                text = "In Hand: ${numFmt.format(loc.onHand)}  •  Reserve: ${numFmt.format(loc.reserved)}  •  Available: ${numFmt.format(loc.available)} ${d.uom}"
+                setTextColor(secondaryTextColor)
+                textSize = 11f
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dp(3) }
+            }
+            box.addView(metricsLine)
+
+            val barVal = if (d.isKit) loc.available else loc.onHand
             val pb = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
                 max = 100
-                progress = ((loc.onHand / maxStock) * 100).toInt().coerceIn(5, 100)
+                progress = ((barVal / maxStock) * 100).toInt().coerceIn(5, 100)
                 progressTintList = ColorStateList.valueOf(
-                    if (loc.onHand > d.reorderPoint) Color.parseColor("#F59E0B") else Color.parseColor("#EF4444")
+                    if (loc.available > d.reorderPoint) Color.parseColor("#059669") else Color.parseColor("#EF4444")
                 )
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(8)
+                    dp(7)
                 ).apply { topMargin = dp(6) }
             }
             box.addView(pb)
@@ -300,13 +327,13 @@ class ProductDetailActivity : AppCompatActivity() {
             }
             val tvReorder = TextView(this).apply {
                 text = "Reorder Point: ${numFmt.format(d.reorderPoint)} ${d.uom}"
-                setTextColor(Color.parseColor("#64748B"))
+                setTextColor(secondaryTextColor)
                 textSize = 11f
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             }
             val tvHealth = TextView(this).apply {
-                text = if (loc.onHand > d.reorderPoint) "Healthy Stock" else "Low Stock"
-                setTextColor(if (loc.onHand > d.reorderPoint) Color.parseColor("#059669") else Color.parseColor("#DC2626"))
+                text = if (loc.available > d.reorderPoint) "Healthy Stock" else "Low Stock"
+                setTextColor(if (loc.available > d.reorderPoint) Color.parseColor("#059669") else Color.parseColor("#DC2626"))
                 textSize = 11f
                 setTypeface(null, android.graphics.Typeface.BOLD)
             }

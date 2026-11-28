@@ -243,13 +243,13 @@ object EdgeToEdgeHelper {
             // 2) Composite blurred backdrop strictly INSIDE the rounded pill (SRC_IN)
             outCanvas.drawBitmap(sb, 0f, 0f, filterPaint)
 
-            // 3) Overlay less-transparent frosted glaze strictly inside the pill (SRC_ATOP)
+            // 3) Overlay Telegram-style frosted glass glaze strictly inside the pill (SRC_ATOP)
             tintPaint.shader = if (isDark) {
                 LinearGradient(
                     0f, 0f, 0f, sh.toFloat(),
                     intArrayOf(
-                        Color.argb(228, 30, 41, 59),
-                        Color.argb(220, 15, 23, 42)
+                        Color.argb(232, 28, 36, 47),
+                        Color.argb(226, 22, 30, 40)
                     ),
                     null,
                     Shader.TileMode.CLAMP
@@ -258,8 +258,8 @@ object EdgeToEdgeHelper {
                 LinearGradient(
                     0f, 0f, 0f, sh.toFloat(),
                     intArrayOf(
-                        Color.argb(226, 255, 255, 255),
-                        Color.argb(214, 241, 245, 249)
+                        Color.argb(232, 255, 255, 255),
+                        Color.argb(222, 248, 250, 252)
                     ),
                     null,
                     Shader.TileMode.CLAMP

@@ -69,12 +69,11 @@ object BottomNavHelper {
                 glassPill.animate().cancel()
                 glassPill.translationX = animateFrom * tabW
                 val glide = AnimatorSet().apply {
-                    duration = 340L
-                    interpolator = OvershootInterpolator(1.05f)
+                    duration = 260L
+                    interpolator = OvershootInterpolator(0.75f)
                     playTogether(
                         ObjectAnimator.ofFloat(glassPill, View.TRANSLATION_X, animateFrom * tabW, targetX),
-                        ObjectAnimator.ofFloat(glassPill, View.SCALE_X, 1f, 1.15f, 0.96f, 1f),
-                        ObjectAnimator.ofFloat(glassPill, View.SCALE_Y, 1f, 0.90f, 1.04f, 1f)
+                        ObjectAnimator.ofFloat(glassPill, View.SCALE_X, 1f, 1.06f, 1f)
                     )
                 }
                 glide.start()
@@ -140,7 +139,7 @@ object BottomNavHelper {
             }
             iv.imageTintList = ColorStateList.valueOf(c)
             tv.setTextColor(c)
-            tv.setTypeface(null, Typeface.BOLD)
+            tv.setTypeface(null, if (isActive) Typeface.BOLD else Typeface.NORMAL)
         }
 
         styleItem(NavTab.SETTINGS, tabSettings, ivSettings, tvSettings, activeTab == NavTab.SETTINGS)

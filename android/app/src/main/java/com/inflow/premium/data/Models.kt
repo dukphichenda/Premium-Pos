@@ -146,7 +146,12 @@ data class ProductItem(
     val imageUrl: String = "",
     val barcode: String = "",
     val categoryName: String = "",
-    val pricePerPcs: Double = unitPrice
+    val pricePerPcs: Double = unitPrice,
+    val isKit: Boolean = false,
+    val bomCount: Int = 0,
+    val purchasingUom: String = "",
+    val purchasingUomRatioStd: Double = 1.0,
+    val standardCost: Double = 0.0
 )
 
 data class ProductCatalogResult(
@@ -159,7 +164,8 @@ data class ProductInventoryLocation(
     val locationId: Int,
     val locationName: String,
     val available: Double,
-    val onHand: Double
+    val onHand: Double,
+    val reserved: Double = 0.0
 )
 
 data class ProductPricingTier(
@@ -258,6 +264,10 @@ data class ProductDetail(
     val width: Double,
     val height: Double,
     val totalOnHand: Double,
+    val totalReserved: Double = 0.0,
+    val totalAvailable: Double = 0.0,
+    val isKit: Boolean = false,
+    val buildableQty: Double = 0.0,
     val inventory: List<ProductInventoryLocation>,
     val pricingTiers: List<ProductPricingTier>,
     val priceTable: ProductPriceTable? = null,
@@ -300,7 +310,13 @@ data class PurchaseOrderLine(
     var quantity: Double = 1.0,
     var uom: String = "pcs.",
     var unitPrice: Double = 0.0,
-    var subtotal: Double = 0.0
+    var subtotal: Double = 0.0,
+    val baseUom: String = "pcs.",
+    val salesUom: String = "",
+    val purchasingUom: String = "",
+    val salesRatio: Double = 1.0,
+    val purchasingRatio: Double = 1.0,
+    val standardCost: Double = 0.0
 )
 
 data class PurchaseOrderDetail(
