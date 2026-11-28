@@ -19,9 +19,23 @@ object ImageLoader {
     }
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(8, TimeUnit.SECONDS)
-        .readTimeout(12, TimeUnit.SECONDS)
+        .connectTimeout(10, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
         .build()
+
+    private fun decodeSampledBitmap(bytes: ByteArray, maxDim: Int = 512): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        var sample = 1
+        while (bounds.outWidth / sample > maxDim * 2 || bounds.outHeight / sample > maxDim * 2) {
+            sample *= 2
+        }
+        val opts = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
+    }
 
     fun load(
         scope: CoroutineScope,
@@ -62,7 +76,7 @@ object ImageLoader {
                     client.newCall(req).execute().use { resp ->
                         if (!resp.isSuccessful) return@withContext null
                         val bytes = resp.body?.bytes() ?: return@withContext null
-                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                        decodeSampledBitmap(bytes, maxDim = 512)
                     }
                 } catch (_: Exception) {
                     null

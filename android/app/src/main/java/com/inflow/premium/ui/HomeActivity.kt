@@ -79,13 +79,22 @@ class HomeActivity : AppCompatActivity() {
         binding.swipeRefresh.setOnRefreshListener { loadDashboard() }
 
         setupActions()
+        ImageLoader.load(
+            uiScope,
+            session.baseUrl,
+            session.getLogoUrlForBranch(session.selectedBranch),
+            binding.ivHomeBranchLogo,
+            binding.tvHomeBranchCode
+        )
         loadDashboard()
+        InAppUpdater.checkIfNeededOnce(this, session, api, uiScope)
     }
 
     override fun onResume() {
         super.onResume()
         if (::session.isInitialized) {
             loadDashboard()
+            InAppUpdater.resumePendingInstall(this)
         }
     }
 
@@ -103,7 +112,13 @@ class HomeActivity : AppCompatActivity() {
         binding.btnActionNewSo.setOnClickListener(openNewSo)
         binding.wfSalesOrder.setOnClickListener { switchToTab(SalesOrdersActivity::class.java) }
 
-        binding.btnActionNewPo.setOnClickListener { openWebPath("/purchases/new") }
+        binding.btnActionNewPo.setOnClickListener {
+            detailLauncher.launch(
+                Intent(this, PurchaseOrderDetailActivity::class.java)
+                    .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_ID, 0)
+                    .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_NUMBER, "New PO")
+            )
+        }
         binding.wfPo.setOnClickListener { startActivity(Intent(this, PurchaseOrdersActivity::class.java)) }
 
         binding.btnActionNewCustomer.setOnClickListener { openQuickAddCustomerDialog() }
@@ -159,7 +174,7 @@ class HomeActivity : AppCompatActivity() {
         val labels = options.map { it.second }.toTypedArray()
         val checkedIdx = options.indexOfFirst { it.first == session.selectedBranch }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Select Store / Branch")
             .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
                 session.selectedBranch = options[which].first
@@ -189,6 +204,11 @@ class HomeActivity : AppCompatActivity() {
                     else -> dash.storeName.trim().take(3).uppercase(Locale.US).ifBlank { "BR" }
                 }
                 binding.tvHomeBranchCode.text = shortCode
+                val logoUrl = dash.storeLogoUrl.ifBlank { session.getLogoUrlForBranch(session.selectedBranch) }
+                if (session.selectedBranch == "main" && dash.storeLogoUrl.isNotBlank()) {
+                    session.hqLogoUrl = dash.storeLogoUrl
+                }
+                ImageLoader.load(uiScope, session.baseUrl, logoUrl, binding.ivHomeBranchLogo, binding.tvHomeBranchCode)
                 val shortWh = dash.fulfillmentName.removePrefix("Main ").trim().ifBlank { dash.fulfillmentName }
                 binding.tvMetaFulfillment.text = "📍 $shortWh"
                 binding.tvMetaCatalog.text = "📦 ${dash.totalProducts} Items"
@@ -264,7 +284,7 @@ class HomeActivity : AppCompatActivity() {
 
     private fun openQuickAddCustomerDialog() {
         val qb = DialogQuickCustomerBinding.inflate(layoutInflater)
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Quick Add Customer")
             .setView(qb.root)
             .setPositiveButton("Create Customer", null)

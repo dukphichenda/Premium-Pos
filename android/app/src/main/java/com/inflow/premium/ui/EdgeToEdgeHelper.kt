@@ -47,9 +47,10 @@ object EdgeToEdgeHelper {
             window.isStatusBarContrastEnforced = false
         }
 
+        val isDark = ThemeHelper.isNightMode(activity)
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
         }
 
         val density = activity.resources.displayMetrics.density
@@ -202,8 +203,9 @@ object EdgeToEdgeHelper {
             val dx = (targetLoc[0] - scrimLoc[0]).toFloat()
             val dy = (targetLoc[1] - scrimLoc[1]).toFloat()
 
+            val isDark = ThemeHelper.isNightMode(topScrimView.context)
             val c = Canvas(sb)
-            c.drawColor(Color.parseColor("#F8FAFC"))
+            c.drawColor(Color.parseColor(if (isDark) "#0B1220" else "#F8FAFC"))
             c.save()
             c.scale(scale, scale)
             c.translate(dx, dy)
@@ -222,14 +224,17 @@ object EdgeToEdgeHelper {
             outCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
             outCanvas.drawBitmap(sb, 0f, 0f, filterPaint)
 
-            // Clean light frosted glaze so scrolled dark headers soften into pastel instead of dark soot
+            // Frosted glaze adapting cleanly to Light or Dark mode
+            val r = if (isDark) 11 else 248
+            val g = if (isDark) 18 else 250
+            val b = if (isDark) 32 else 252
             tintPaint.shader = LinearGradient(
                 0f, 0f, 0f, sh.toFloat(),
                 intArrayOf(
-                    Color.argb(216, 248, 250, 252),
-                    Color.argb(165, 248, 250, 252),
-                    Color.argb(72, 248, 250, 252),
-                    Color.argb(0, 248, 250, 252)
+                    Color.argb(216, r, g, b),
+                    Color.argb(165, r, g, b),
+                    Color.argb(72, r, g, b),
+                    Color.argb(0, r, g, b)
                 ),
                 floatArrayOf(0f, 0.42f, 0.76f, 1f),
                 Shader.TileMode.CLAMP
@@ -344,9 +349,10 @@ object EdgeToEdgeHelper {
             window.isNavigationBarContrastEnforced = false
             window.isStatusBarContrastEnforced = false
         }
+        val isDark = ThemeHelper.isNightMode(activity)
         WindowInsetsControllerCompat(window, window.decorView).apply {
-            isAppearanceLightStatusBars = true
-            isAppearanceLightNavigationBars = true
+            isAppearanceLightStatusBars = !isDark
+            isAppearanceLightNavigationBars = !isDark
         }
         ViewCompat.setOnApplyWindowInsetsListener(rootView) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())

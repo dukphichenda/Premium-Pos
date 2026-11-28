@@ -423,7 +423,7 @@ class MonthlyExpensesActivity : AppCompatActivity() {
         val tabs = currentData?.monthTabs ?: return
         val labels = tabs.map { it.label }.toTypedArray()
         val checked = tabs.indexOfFirst { it.key == selectedMonthKey }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Select Month")
             .setSingleChoiceItems(labels, checked) { dlg, which ->
                 selectedMonthKey = tabs[which].key
@@ -454,7 +454,7 @@ class MonthlyExpensesActivity : AppCompatActivity() {
         val d = currentData ?: return
         val opts = if (isPayer) d.payers else d.categories
         if (opts.isEmpty()) return
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle(if (isPayer) "Paid By" else "Expense Category")
             .setItems(opts.toTypedArray()) { _, which ->
                 if (isPayer) {
@@ -472,7 +472,7 @@ class MonthlyExpensesActivity : AppCompatActivity() {
         val d = currentData ?: return
         val opts = listOf("All") + d.payers
         val checked = opts.indexOf(selectedPayerFilter).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Filter by Payer")
             .setSingleChoiceItems(opts.toTypedArray(), checked) { dlg, which ->
                 selectedPayerFilter = opts[which]
@@ -537,7 +537,7 @@ class MonthlyExpensesActivity : AppCompatActivity() {
         val etCat = EditText(this).apply { setText(e.category); hint = "Category" }
         col.addView(etItem); col.addView(etPrice); col.addView(etQty); col.addView(etPayer); col.addView(etCat)
 
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Edit Expense")
             .setView(col)
             .setPositiveButton("Save") { _, _ ->
@@ -560,7 +560,7 @@ class MonthlyExpensesActivity : AppCompatActivity() {
     }
 
     private fun confirmDeleteExpense(e: ExpenseRow) {
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Delete Expense")
             .setMessage("Delete '${e.item}' ($${moneyFmt.format(e.totalPrice)})?")
             .setPositiveButton("Delete") { _, _ ->
@@ -596,7 +596,7 @@ class MonthlyExpensesActivity : AppCompatActivity() {
         }
         col.addView(etName); col.addView(etAmt)
 
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle(if (existing == null) "Add Cash/Bank Account" else "Edit ${existing.name}")
             .setView(col)
             .setPositiveButton("Save") { _, _ ->

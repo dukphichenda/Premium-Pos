@@ -107,14 +107,40 @@ def mobile_auth_required(f):
     return decorated
 
 
+def _extract_branch_logo_url(raw_settings):
+    import json as _json
+    if not raw_settings:
+        return ''
+    try:
+        d = _json.loads(raw_settings) if isinstance(raw_settings, str) else raw_settings
+        if isinstance(d, dict):
+            return (d.get('logo_url') or '').strip()
+    except Exception:
+        pass
+    return ''
+
+
+def _get_hq_logo_url():
+    try:
+        inv = query_one("SELECT logo_url FROM invoice_settings LIMIT 1")
+        if inv and (inv.get('logo_url') or '').strip():
+            return inv['logo_url'].strip()
+        comp = query_one("SELECT app_logo_url FROM companies LIMIT 1")
+        if comp and (comp.get('app_logo_url') or '').strip():
+            return comp['app_logo_url'].strip()
+    except Exception:
+        pass
+    return ''
+
+
 def _get_bootstrap_payload():
     from routes.sales_orders import _is_main_admin, _get_user_branch_id, _get_khr_rates_context
     is_main = _is_main_admin()
     user_bid = _get_user_branch_id()
 
     if is_main:
-        branches = query_all("""
-            SELECT id, code, name, color
+        raw_branches = query_all("""
+            SELECT id, code, name, color, settings_json
             FROM branches
             WHERE is_active = TRUE
               AND COALESCE(LOWER(code), '') NOT IN ('all', 'consolidated')
@@ -124,11 +150,25 @@ def _get_bootstrap_payload():
             ORDER BY id ASC
         """)
     else:
-        branches = query_all("SELECT id, code, name, color FROM branches WHERE id = %s", (user_bid,)) if user_bid else []
+        raw_branches = query_all("SELECT id, code, name, color, settings_json FROM branches WHERE id = %s", (user_bid,)) if user_bid else []
 
+    branches = []
+    for b in raw_branches:
+        bd = dict(b)
+        bd['logo_url'] = _extract_branch_logo_url(bd.pop('settings_json', None))
+        branches.append(bd)
+
+    hq_logo_url = _get_hq_logo_url()
     pricing_schemes = query_all("SELECT id, name FROM pricing_schemes ORDER BY id ASC")
     locations = query_all("SELECT id, name, is_default, is_central FROM locations WHERE is_active = TRUE AND name NOT LIKE '<%%>' ORDER BY is_central DESC, is_default DESC, name ASC")
     delivery_men = query_all("SELECT id, name, phone FROM delivery_men WHERE is_active = TRUE ORDER BY name ASC")
+    categories = query_all("""
+        SELECT c.id, c.name
+        FROM categories c
+        JOIN products p ON c.id = p.category_id AND p.is_active = TRUE
+        GROUP BY c.id, c.name
+        ORDER BY c.name ASC
+    """)
     khr_ctx = _get_khr_rates_context(user_bid if not is_main else None)
 
     return {
@@ -140,10 +180,12 @@ def _get_bootstrap_payload():
             'branch_id': session.get('branch_id'),
             'is_main_admin': is_main,
         },
-        'branches': [dict(b) for b in branches],
+        'hq_logo_url': hq_logo_url,
+        'branches': branches,
         'pricing_schemes': [dict(p) for p in pricing_schemes],
         'locations': [dict(l) for l in locations],
         'delivery_men': [dict(d) for d in delivery_men],
+        'categories': [{'id': c['id'], 'name': c['name']} for c in categories],
         'default_khr_rate': float(khr_ctx.get('default_khr_rate') or 4100),
         'branch_khr_rates': khr_ctx.get('branch_khr_rates') or {},
     }
@@ -735,10 +777,56 @@ def mobile_purchases_list():
     })
 
 
+def _next_po_number():
+    row = query_one("SELECT MAX(SUBSTRING(order_number FROM '[0-9]+')::bigint) as max_val FROM purchase_orders WHERE order_number ~ 'PO-[0-9]+'")
+    nxt = int((row or {}).get('max_val') or 0) + 1
+    return f"PO-{nxt:05d}"
+
+
 @mobile_api_bp.route('/api/mobile/purchases/<int:pid>', methods=['GET'])
 @mobile_auth_required
 def mobile_purchase_detail(pid):
-    """Read-only purchase order detail."""
+    """Purchase order detail or new-PO defaults (pid=0) with vendors & locations for in-app editing."""
+    vendors = query_all("SELECT id, name, COALESCE(phone, '') as phone FROM vendors WHERE COALESCE(is_active, TRUE) = TRUE ORDER BY name ASC")
+    locations = query_all("""
+        SELECT id, name, COALESCE(is_default, FALSE) as is_default
+        FROM locations
+        WHERE is_active = TRUE AND name NOT LIKE '<%%>'
+        ORDER BY is_central DESC, is_default DESC, name ASC
+    """)
+    vendors_payload = [{'id': v['id'], 'name': v['name'], 'phone': v.get('phone') or ''} for v in vendors]
+    locations_payload = [{'id': l['id'], 'name': l['name'], 'is_default': bool(l.get('is_default'))} for l in locations]
+
+    if pid == 0:
+        def_loc = locations[0] if locations else {'id': 100, 'name': 'Main Warehouse'}
+        def_ven = vendors[0] if vendors else {'id': 0, 'name': 'Select Vendor'}
+        now = datetime.now()
+        return jsonify({
+            'success': True,
+            'vendors': vendors_payload,
+            'locations': locations_payload,
+            'order': {
+                'id': 0,
+                'order_number': _next_po_number(),
+                'order_date': now.strftime('%b %d, %Y'),
+                'order_date_iso': now.strftime('%Y-%m-%d'),
+                'status': 'ISSUED',
+                'payment_status': 'UNPAID',
+                'is_fulfilled': False,
+                'is_paid': False,
+                'vendor_id': def_ven['id'],
+                'vendor_name': def_ven['name'],
+                'location_id': def_loc['id'],
+                'location_name': def_loc['name'],
+                'assigned_to': session.get('display_name') or session.get('username') or 'Admin',
+                'total_amount': 0.0,
+                'paid_amount': 0.0,
+                'balance_due': 0.0,
+                'notes': '',
+                'lines': [],
+            }
+        })
+
     po = query_one("""
         SELECT po.*,
                COALESCE(v.name, 'Unknown Vendor') as vendor_name,
@@ -767,18 +855,24 @@ def mobile_purchase_detail(pid):
     total = float(po.get('total_amount') or 0)
     paid = float(po.get('paid_amount') or 0)
     balance = max(0.0, total - paid)
+    od = po.get('order_date')
 
     return jsonify({
         'success': True,
+        'vendors': vendors_payload,
+        'locations': locations_payload,
         'order': {
             'id': po['id'],
             'order_number': po['order_number'],
-            'order_date': po['order_date'].strftime('%b %d, %Y') if po.get('order_date') else '',
+            'order_date': od.strftime('%b %d, %Y') if hasattr(od, 'strftime') else str(od or ''),
+            'order_date_iso': od.strftime('%Y-%m-%d') if hasattr(od, 'strftime') else str(od or ''),
             'status': po.get('status') or 'ISSUED',
             'payment_status': po.get('payment_status') or 'UNPAID',
             'is_fulfilled': (po.get('status') or '').upper() in ('RECEIVED', 'FULFILLED', 'COMPLETED'),
             'is_paid': (po.get('payment_status') or '').upper() == 'PAID',
+            'vendor_id': int(po.get('vendor_id') or 0),
             'vendor_name': po.get('vendor_name') or 'Unknown Vendor',
+            'location_id': int(po.get('location_id') or 100),
             'location_name': po.get('location_name') or 'Main Warehouse',
             'assigned_to': po.get('assigned_to') or 'Admin',
             'total_amount': total,
@@ -788,6 +882,7 @@ def mobile_purchase_detail(pid):
             'lines': [
                 {
                     'id': l['id'],
+                    'product_id': int(l.get('product_id') or 0),
                     'sku': l.get('sku') or '',
                     'product_name': l.get('product_name') or '',
                     'image_url': l.get('image_url') or '',
@@ -800,6 +895,155 @@ def mobile_purchase_detail(pid):
             ],
         }
     })
+
+
+@mobile_api_bp.route('/api/mobile/purchases/save', methods=['POST'])
+@mobile_auth_required
+def mobile_purchase_save():
+    """Create or update a Purchase Order directly from mobile (strictly zero product catalog mutations)."""
+    try:
+        data = request.get_json(silent=True) or {}
+        po_id = int(data.get('po_id') or 0) or None
+        vendor_id = int(data.get('vendor_id') or 0) or None
+        location_id = int(data.get('location_id') or 100)
+        order_date = (data.get('order_date') or datetime.now().strftime('%Y-%m-%d')).strip()
+        status = (data.get('status') or 'ISSUED').strip().upper()
+        if status not in ('DRAFT', 'ISSUED', 'PARTIAL_RECEIVED', 'RECEIVED', 'FULFILLED', 'COMPLETED', 'CANCELLED'):
+            status = 'ISSUED'
+        payment_status = (data.get('payment_status') or 'UNPAID').strip().upper()
+        if payment_status not in ('UNPAID', 'PARTIAL', 'PAID'):
+            payment_status = 'UNPAID'
+        notes = (data.get('notes') or '').strip()
+        raw_lines = data.get('lines') or []
+
+        if not vendor_id:
+            return jsonify({'success': False, 'error': 'Please select a vendor.'}), 400
+        if not raw_lines:
+            return jsonify({'success': False, 'error': 'Please add at least one item to the PO.'}), 400
+
+        parsed_lines = []
+        subtotal = 0.0
+        for idx, ln in enumerate(raw_lines, start=1):
+            qty = float(ln.get('quantity') or 0)
+            unit_cost = float(ln.get('unit_cost') if ln.get('unit_cost') is not None else (ln.get('unit_price') or 0))
+            if qty <= 0:
+                continue
+            line_sub = round(qty * unit_cost, 4)
+            subtotal += line_sub
+            pid_val = int(ln.get('product_id') or 0) or None
+            parsed_lines.append({
+                'line_num': idx,
+                'product_id': pid_val,
+                'description': (ln.get('product_name') or ln.get('description') or '').strip(),
+                'quantity': qty,
+                'unit_cost': unit_cost,
+                'subtotal': line_sub,
+                'uom': (ln.get('uom') or 'pcs.').strip(),
+            })
+
+        if not parsed_lines:
+            return jsonify({'success': False, 'error': 'All line quantities must be greater than zero.'}), 400
+
+        total_amount = round(subtotal, 2)
+        if payment_status == 'PAID':
+            paid_amount = total_amount
+        elif payment_status == 'UNPAID':
+            paid_amount = 0.0
+        else:
+            paid_amount = min(total_amount, max(0.0, float(data.get('paid_amount') or 0)))
+        balance_due = round(max(0.0, total_amount - paid_amount), 2)
+
+        is_now_received = status in ('RECEIVED', 'FULFILLED', 'COMPLETED')
+
+        with get_db_cursor(commit=True) as cur:
+            was_received = False
+            order_number = (data.get('order_number') or '').strip()
+
+            if po_id:
+                cur.execute("SELECT order_number, status FROM purchase_orders WHERE id = %s", (po_id,))
+                existing = cur.fetchone()
+                if not existing:
+                    return jsonify({'success': False, 'error': 'Purchase order not found.'}), 404
+                order_number = existing['order_number']
+                was_received = (existing.get('status') or '').upper() in ('RECEIVED', 'FULFILLED', 'COMPLETED')
+                cur.execute("""
+                    UPDATE purchase_orders SET
+                        vendor_id = %s,
+                        location_id = %s,
+                        order_date = %s,
+                        status = %s,
+                        payment_status = %s,
+                        subtotal = %s,
+                        total_amount = %s,
+                        paid_amount = %s,
+                        balance_due = %s,
+                        notes = %s,
+                        received_date = CASE WHEN %s AND received_date IS NULL THEN CURRENT_DATE ELSE received_date END,
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = %s
+                """, (
+                    vendor_id, location_id, order_date, status, payment_status,
+                    total_amount, total_amount, paid_amount, balance_due, notes,
+                    is_now_received, po_id
+                ))
+            else:
+                if not order_number:
+                    order_number = _next_po_number()
+                cur.execute("""
+                    INSERT INTO purchase_orders (
+                        order_number, vendor_id, location_id, order_date, status, payment_status,
+                        subtotal, total_amount, paid_amount, balance_due, notes, received_date
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, CASE WHEN %s THEN CURRENT_DATE ELSE NULL END)
+                    RETURNING id
+                """, (
+                    order_number, vendor_id, location_id, order_date, status, payment_status,
+                    total_amount, total_amount, paid_amount, balance_due, notes, is_now_received
+                ))
+                po_id = cur.fetchone()['id']
+
+            cur.execute("DELETE FROM purchase_order_lines WHERE purchase_order_id = %s", (po_id,))
+            for ln in parsed_lines:
+                rec_qty = ln['quantity'] if is_now_received else 0.0
+                cur.execute("""
+                    INSERT INTO purchase_order_lines (
+                        purchase_order_id, line_num, product_id, description, quantity, unit_cost, subtotal, received_qty, uom
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    po_id, ln['line_num'], ln['product_id'], ln['description'],
+                    ln['quantity'], ln['unit_cost'], ln['subtotal'], rec_qty, ln['uom']
+                ))
+
+                # If newly received, add stock to inventory (without mutating product catalog)
+                if is_now_received and not was_received and ln['product_id']:
+                    cur.execute(
+                        "SELECT COALESCE(quantity, 0) as qty FROM inventory WHERE product_id = %s AND location_id = %s AND sublocation = '' FOR UPDATE",
+                        (ln['product_id'], location_id)
+                    )
+                    inv_row = cur.fetchone()
+                    qty_before = float(inv_row['qty']) if inv_row else 0.0
+                    qty_after = qty_before + ln['quantity']
+                    cur.execute("""
+                        INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                        VALUES (%s, %s, '', %s)
+                        ON CONFLICT (product_id, location_id, sublocation)
+                        DO UPDATE SET quantity = inventory.quantity + EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP
+                    """, (ln['product_id'], location_id, ln['quantity']))
+                    cur.execute("""
+                        INSERT INTO inventory_logs (
+                            product_id, movement_type, reference_type, reference_id,
+                            to_location_id, quantity, qty_before, qty_after, unit_cost, reason, notes
+                        ) VALUES (%s, 'PURCHASE_RECEIVE', 'PO', %s, %s, %s, %s, %s, %s, 'PO Received (Mobile)', %s)
+                    """, (ln['product_id'], order_number, location_id, ln['quantity'], qty_before, qty_after, ln['unit_cost'], notes))
+
+        return jsonify({
+            'success': True,
+            'po_id': po_id,
+            'order_number': order_number,
+            'message': f"Saved {order_number} successfully",
+        })
+    except Exception as e:
+        logger.error(f"Mobile PO save error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @mobile_api_bp.route('/api/mobile/customers/quick-add', methods=['POST'])
@@ -848,11 +1092,13 @@ def mobile_customer_quick_add():
 @mobile_api_bp.route('/api/mobile/products', methods=['GET'])
 @mobile_auth_required
 def mobile_products_search():
-    """Read-only product catalog lookup for mobile SO line items (strictly zero product mutations)."""
+    """Read-only product catalog lookup for mobile SO line items & product filter (strictly zero product mutations)."""
     q = (request.args.get('q') or '').strip()
     scheme_id = int(request.args.get('scheme_id') or 100)
     location_id = int(request.args.get('location_id') or 100)
-    limit = min(80, max(10, int(request.args.get('limit', 40) or 40)))
+    category_id = int(request.args.get('category_id') or 0)
+    stock_level = (request.args.get('stock_level') or 'all').strip().lower()
+    limit = min(100, max(10, int(request.args.get('limit', 40) or 40)))
 
     where = ["p.is_active = TRUE"]
     params = [location_id]
@@ -861,6 +1107,26 @@ def mobile_products_search():
         sp = f"%{q}%"
         where.append("(p.sku ILIKE %s OR p.name ILIKE %s OR COALESCE(p.barcode,'') ILIKE %s)")
         params.extend([sp, sp, sp])
+
+    if category_id > 0:
+        where.append("p.category_id = %s")
+        params.append(category_id)
+
+    if stock_level == 'in_stock':
+        where.append("COALESCE(inv.avail, 0) > 0")
+    elif stock_level == 'low_stock':
+        where.append("COALESCE(inv.avail, 0) > 0 AND COALESCE(inv.avail, 0) <= GREATEST(COALESCE(p.reorder_point, 0), 10)")
+    elif stock_level == 'out_of_stock':
+        where.append("COALESCE(inv.avail, 0) <= 0")
+
+    inv_join_sql = """
+        LEFT JOIN (
+            SELECT product_id, SUM(COALESCE(quantity, 0) - COALESCE(reserved_quantity, 0)) as avail
+            FROM inventory
+            WHERE location_id = %s
+            GROUP BY product_id
+        ) inv ON p.id = inv.product_id
+    """
 
     rows = query_all(f"""
         SELECT
@@ -875,12 +1141,7 @@ def mobile_products_search():
             COALESCE(inv.avail, 0) as stock_available
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
-        LEFT JOIN (
-            SELECT product_id, SUM(COALESCE(quantity, 0) - COALESCE(reserved_quantity, 0)) as avail
-            FROM inventory
-            WHERE location_id = %s
-            GROUP BY product_id
-        ) inv ON p.id = inv.product_id
+        {inv_join_sql}
         WHERE {' AND '.join(where)}
         ORDER BY p.sku ASC
         LIMIT %s
@@ -889,9 +1150,18 @@ def mobile_products_search():
     total_row = query_one(f"""
         SELECT COUNT(*) as cnt
         FROM products p
+        {inv_join_sql}
         WHERE {' AND '.join(where)}
-    """, tuple(params[1:]))
+    """, tuple(params))
     total_count = int((total_row or {}).get('cnt') or len(rows))
+
+    categories_rows = query_all("""
+        SELECT c.id, c.name
+        FROM categories c
+        JOIN products p ON c.id = p.category_id AND p.is_active = TRUE
+        GROUP BY c.id, c.name
+        ORDER BY c.name ASC
+    """)
 
     pids = [r['id'] for r in rows]
     prices_map = {}
@@ -931,7 +1201,12 @@ def mobile_products_search():
             'stock_available': float(r.get('stock_available') or 0),
         })
 
-    return jsonify({'success': True, 'products': products, 'total_count': total_count})
+    return jsonify({
+        'success': True,
+        'products': products,
+        'total_count': total_count,
+        'categories': [{'id': c['id'], 'name': c['name']} for c in categories_rows],
+    })
 
 
 @mobile_api_bp.route('/api/mobile/products/<int:pid>', methods=['GET'])
@@ -1293,9 +1568,11 @@ def mobile_dashboard():
     store_name = 'Main Store (HQ)'
     store_badge = 'Enterprise HQ'
     fulfillment_name = 'Main Warehouse'
+    hq_logo_url = _get_hq_logo_url()
+    store_logo_url = hq_logo_url
     if eff_bid:
         b_row = query_one("""
-            SELECT b.name, b.code, l.name as location_name
+            SELECT b.name, b.code, b.settings_json, l.name as location_name
             FROM branches b LEFT JOIN locations l ON b.location_id = l.id
             WHERE b.id = %s
         """, (eff_bid,))
@@ -1303,6 +1580,7 @@ def mobile_dashboard():
             store_name = b_row['name']
             store_badge = b_row.get('code') or 'Branch Outlet'
             fulfillment_name = b_row.get('location_name') or 'Main Warehouse'
+            store_logo_url = _extract_branch_logo_url(b_row.get('settings_json')) or hq_logo_url
     elif is_main and raw_branch == 'all':
         store_name = 'All Outlets Combined'
         store_badge = 'ALL'
@@ -1424,6 +1702,7 @@ def mobile_dashboard():
         'success': True,
         'store_name': store_name,
         'store_badge': store_badge,
+        'store_logo_url': store_logo_url,
         'fulfillment_name': fulfillment_name,
         'active_branches_count': int(inv_kpis.get('active_branches_count') or 0),
         'inventory_valuation': float(inv_kpis.get('total_inventory_value') or 0),
@@ -1657,7 +1936,7 @@ def mobile_report_delivery():
         where.append(d_clause)
     if q:
         sp = f"%{q}%"
-        where.append("(so.order_number ILIKE %s OR COALESCE(c.name, '') ILIKE %s OR COALESCE(so.shipping_address, '') ILIKE %s)")
+        where.append("(so.order_number ILIKE %s OR COALESCE(c.name, '') ILIKE %s OR COALESCE(so.customer_address, c.shipping_address, '') ILIKE %s)")
         params.extend([sp, sp, sp])
 
     where_sql = " AND ".join(where)
@@ -1677,8 +1956,8 @@ def mobile_report_delivery():
                COALESCE(so.payment_method, '') as payment_method,
                COALESCE(so.total_amount, 0) as total_amount,
                COALESCE(so.delivery_man, '') as delivery_man,
-               COALESCE(so.phone, c.phone, '') as phone,
-               COALESCE(NULLIF(so.shipping_address, ''), c.shipping_address, '') as address,
+               COALESCE(NULLIF(so.customer_phone, ''), c.phone, '') as phone,
+               COALESCE(NULLIF(so.customer_address, ''), c.shipping_address, '') as address,
                COALESCE(c.name, 'Walk-in Customer') as customer_name
         FROM sales_orders so
         LEFT JOIN customers c ON so.customer_id = c.id
@@ -1737,6 +2016,12 @@ def mobile_report_branch_summary():
     date_filter = (request.args.get('date_filter') or 'This Month').strip()
     q = (request.args.get('q') or '').strip()
     mode = (request.args.get('mode') or 'branch').strip()
+
+    if mode == 'hq' and not is_main:
+        return jsonify({
+            'success': False,
+            'error': 'Access denied: HQ Branch Earnings is restricted to Headquarters administrators only.'
+        }), 403
 
     where = ["so.status != 'CANCELLED'"]
     params = []
@@ -1818,8 +2103,8 @@ def mobile_report_branch_summary():
         'total_sales': round(total_sales, 2),
         'total_branch_cost': round(total_branch_cost, 2),
         'total_branch_profit': round(total_branch_profit, 2),
-        'total_hq_cost': round(total_hq_cost, 2),
-        'total_hq_earning': round(total_hq_earning, 2),
+        'total_hq_cost': round(total_hq_cost, 2) if is_main else 0.0,
+        'total_hq_earning': round(total_hq_earning, 2) if is_main else 0.0,
         'total_qty': round(total_qty, 2),
         'items': [
             {
@@ -1834,8 +2119,8 @@ def mobile_report_branch_summary():
                 'sales_amount': float(r['sales_amount'] or 0),
                 'branch_cost': float(r['branch_cost'] or 0),
                 'branch_profit': float(r['branch_profit'] or 0),
-                'hq_cost': float(r['hq_cost'] or 0),
-                'hq_earning': float(r['hq_earning'] or 0),
+                'hq_cost': float(r['hq_cost'] or 0) if is_main else 0.0,
+                'hq_earning': float(r['hq_earning'] or 0) if is_main else 0.0,
             }
             for r in rows
         ],
@@ -2844,12 +3129,22 @@ def mobile_adjustment_save():
                 """, (adj_id, pid, old_qty, new_qty, diff_qty, unit_cost, subloc, line_uom, uom_factor))
 
                 if status == 'COMPLETED':
-                    cur.execute("""
-                        INSERT INTO inventory (product_id, location_id, sublocation, quantity)
-                        VALUES (%s, %s, %s, %s)
-                        ON CONFLICT (product_id, location_id, sublocation)
-                        DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
-                    """, (pid, location_id, subloc, new_qty))
+                    reserved_edited = bool(item.get('reserved_edited'))
+                    reserved_raw = item.get('reserved_qty')
+                    if reserved_edited and reserved_raw is not None:
+                        cur.execute("""
+                            INSERT INTO inventory (product_id, location_id, sublocation, quantity, reserved_quantity)
+                            VALUES (%s, %s, %s, %s, %s)
+                            ON CONFLICT (product_id, location_id, sublocation)
+                            DO UPDATE SET quantity = EXCLUDED.quantity, reserved_quantity = EXCLUDED.reserved_quantity, updated_at = CURRENT_TIMESTAMP;
+                        """, (pid, location_id, subloc, new_qty, float(reserved_raw)))
+                    else:
+                        cur.execute("""
+                            INSERT INTO inventory (product_id, location_id, sublocation, quantity)
+                            VALUES (%s, %s, %s, %s)
+                            ON CONFLICT (product_id, location_id, sublocation)
+                            DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = CURRENT_TIMESTAMP;
+                        """, (pid, location_id, subloc, new_qty))
                     cur.execute("""
                         INSERT INTO inventory_logs (
                             product_id, movement_type, reference_type, reference_id,
@@ -3785,7 +4080,7 @@ def mobile_app_update_check():
     apk_size_bytes = os.path.getsize(apk_path) if apk_available else 0
     apk_size_mb = f"{apk_size_bytes / (1024 * 1024):.1f} MB" if apk_size_bytes > 0 else "0.0 MB"
 
-    notes = "New updates, bug fixes & performance improvements."
+    notes = "v3.6.0: Dark/Light/Adaptive mode, iOS Liquid Glass nav bar & popups, in-app PO editing, Stock Adjustment direct Reserve/Available editing, Product filters & HQ/Branch store logos."
     try:
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
         if row and row.get('setting_value'):

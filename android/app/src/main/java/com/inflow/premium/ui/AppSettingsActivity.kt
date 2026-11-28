@@ -129,8 +129,18 @@ class AppSettingsActivity : AppCompatActivity() {
         }
 
         binding.btnOpenWebPortal.setOnClickListener { openWebPath("/") }
+        setupThemePicker()
+        binding.swAutoOtaUpdate.isChecked = session.autoOtaUpdate
+        binding.swAutoOtaUpdate.setOnCheckedChangeListener { _, isChecked ->
+            session.autoOtaUpdate = isChecked
+            Toast.makeText(
+                this,
+                if (isChecked) "OTA auto-check enabled" else "OTA auto-check disabled",
+                Toast.LENGTH_SHORT
+            ).show()
+        }
         binding.btnCheckUpdate.setOnClickListener {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("${session.baseUrl}/download-app")))
+            InAppUpdater.checkForUpdate(this, session, api, uiScope, quietIfLatest = false)
         }
         binding.btnSignOut.setOnClickListener { confirmSignOut() }
     }
@@ -140,6 +150,7 @@ class AppSettingsActivity : AppCompatActivity() {
         if (::session.isInitialized) {
             bindInfo()
             renderBranchesList()
+            InAppUpdater.resumePendingInstall(this)
         }
     }
 
@@ -154,6 +165,11 @@ class AppSettingsActivity : AppCompatActivity() {
     private fun prefetchOverview() {
         uiScope.launch {
             try {
+                if (session.hqLogoUrl.isBlank()) {
+                    api.bootstrap()
+                    bindInfo()
+                    renderBranchesList()
+                }
                 cachedOverview = api.getSettingsOverview()
             } catch (_: Exception) {}
         }
@@ -179,30 +195,78 @@ class AppSettingsActivity : AppCompatActivity() {
         binding.tvSettingServerRate.text = "$host • 1 USD = ${df.format(Math.round(session.defaultKhrRate))} KHR"
         binding.tvSettingRole.text = "• Active Store: $branchLabel"
         binding.tvActiveStoreChip.text = branchLabel
+        ImageLoader.load(
+            uiScope,
+            session.baseUrl,
+            session.getLogoUrlForBranch(branchKey),
+            binding.ivSettingStoreLogo,
+            binding.ivSettingFallbackLogo
+        )
         val verName = try {
-            packageManager.getPackageInfo(packageName, 0).versionName ?: "3.4.0"
+            packageManager.getPackageInfo(packageName, 0).versionName ?: "3.5.0"
         } catch (_: Exception) {
-            "3.4.0"
+            "3.5.0"
         }
-        binding.btnCheckUpdate.text = "App Version $verName • Check APK Updates"
+        binding.btnCheckUpdate.text = "v$verName • Check OTA Direct Update"
+        updateThemeSelectorUi()
+    }
+
+    private fun setupThemePicker() {
+        fun selectMode(mode: String) {
+            if (session.themeMode == mode) return
+            session.themeMode = mode
+            updateThemeSelectorUi()
+            ThemeHelper.apply(mode)
+            Toast.makeText(this, "Theme: ${ThemeHelper.labelFor(mode)}", Toast.LENGTH_SHORT).show()
+        }
+        binding.btnThemeLight.setOnClickListener { selectMode(ThemeHelper.MODE_LIGHT) }
+        binding.btnThemeDark.setOnClickListener { selectMode(ThemeHelper.MODE_DARK) }
+        binding.btnThemeSystem.setOnClickListener { selectMode(ThemeHelper.MODE_SYSTEM) }
+        updateThemeSelectorUi()
+    }
+
+    private fun updateThemeSelectorUi() {
+        val mode = session.themeMode.lowercase()
+        binding.tvThemeModeBadge.text = ThemeHelper.labelFor(mode)
+        val activeBg = androidx.core.content.ContextCompat.getColor(this, R.color.primary)
+        val inactiveText = androidx.core.content.ContextCompat.getColor(this, R.color.text_secondary)
+        val items = listOf(
+            ThemeHelper.MODE_LIGHT to binding.btnThemeLight,
+            ThemeHelper.MODE_DARK to binding.btnThemeDark,
+            ThemeHelper.MODE_SYSTEM to binding.btnThemeSystem
+        )
+        for ((key, tv) in items) {
+            if (mode == key || (key == ThemeHelper.MODE_SYSTEM && mode != ThemeHelper.MODE_LIGHT && mode != ThemeHelper.MODE_DARK)) {
+                tv.setBackgroundResource(R.drawable.bg_pill_teal_solid)
+                tv.backgroundTintList = ColorStateList.valueOf(activeBg)
+                tv.setTextColor(Color.WHITE)
+            } else {
+                tv.background = null
+                tv.setTextColor(inactiveText)
+            }
+        }
     }
 
     private fun renderBranchesList() {
         binding.llBranchSwitchList.removeAllViews()
         val inflater = LayoutInflater.from(this)
         val options = mutableListOf<Triple<String, String, String>>()
+        val logoMap = mutableMapOf<String, String>()
 
         if (session.isMainAdmin()) {
             options.add(Triple("main", "Main Store (HQ Enterprise)", "Active Primary Branch"))
+            logoMap["main"] = session.hqLogoUrl
             for (b in session.getBranches()) {
                 if (isRealBranch(b)) {
                     options.add(Triple(b.id, b.name, "Outlet Branch • Isolated Scope"))
+                    logoMap[b.id] = b.logoUrl.ifBlank { session.hqLogoUrl }
                 }
             }
         } else {
             val bid = session.getUserBranchId()?.toString() ?: session.selectedBranch
             val bName = session.getBranches().firstOrNull { it.id == bid }?.name ?: "Assigned Branch"
             options.add(Triple(bid, bName, "Assigned Store Context"))
+            logoMap[bid] = session.getLogoUrlForBranch(bid)
         }
 
         val current = session.selectedBranch
@@ -218,6 +282,14 @@ class AppSettingsActivity : AppCompatActivity() {
             rb.ivSetIcon.imageTintList = ColorStateList.valueOf(
                 Color.parseColor(if (id == "main") "#0284C7" else "#475569")
             )
+            val branchLogo = logoMap[id].orEmpty()
+            if (branchLogo.isNotBlank()) {
+                rb.flSetIconBg.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FFFFFF"))
+                ImageLoader.load(uiScope, session.baseUrl, branchLogo, rb.ivSetLogo, rb.ivSetIcon)
+            } else {
+                rb.ivSetLogo.visibility = View.GONE
+                rb.ivSetIcon.visibility = View.VISIBLE
+            }
             if (isSelected) {
                 rb.tvSetCheck.visibility = View.VISIBLE
                 rb.tvSetSubtitle.setTextColor(Color.parseColor("#059669"))
@@ -335,7 +407,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val etCountry = addField(col, "Country", c.country)
         val etTax = addField(col, "VAT / Tax Number", c.taxNumber)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Company Profile")
             .setView(scroll)
             .setPositiveButton("Save") { _, _ ->
@@ -392,7 +464,7 @@ class AppSettingsActivity : AppCompatActivity() {
             tvScheme.setOnClickListener {
                 val names = ov.pricingSchemes.map { it.name }.toTypedArray()
                 val idx = ov.pricingSchemes.indexOfFirst { it.id == selectedSchemeId }.coerceAtLeast(0)
-                MaterialAlertDialogBuilder(this)
+                LiquidGlassDialog.builder(this)
                     .setTitle("Default Pricing Scheme")
                     .setSingleChoiceItems(names, idx) { d, which ->
                         val s = ov.pricingSchemes[which]
@@ -405,7 +477,7 @@ class AppSettingsActivity : AppCompatActivity() {
             col.addView(tvScheme)
         }
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Pricing & Currency")
             .setView(scroll)
             .setPositiveButton("Save") { _, _ ->
@@ -444,7 +516,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val etTotal = addField(col, "Order Total Decimals", c.decimalPlacesTotal.toString(), InputType.TYPE_CLASS_NUMBER)
         val etMeas = addField(col, "Measurements Decimals", c.decimalPlacesMeasurement.toString(), InputType.TYPE_CLASS_NUMBER)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Decimal Precision")
             .setView(scroll)
             .setPositiveButton("Save") { _, _ ->
@@ -491,7 +563,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val swSig = SwitchCompat(this).apply { text = "Show Signatures"; isChecked = inv.showSignature }
         col.addView(swSku); col.addView(swTax); col.addView(swSig)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Invoice Customization")
             .setView(scroll)
             .setPositiveButton("Save") { _, _ ->
@@ -538,7 +610,7 @@ class AppSettingsActivity : AppCompatActivity() {
             "${u.displayName} (@${u.username}) • ${u.role} [$st]\n${u.branchName}"
         }.toTypedArray()
 
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Users & Permissions (Tap to Toggle)")
             .setItems(labels) { d, which ->
                 val u = ov.users[which]
@@ -564,7 +636,7 @@ class AppSettingsActivity : AppCompatActivity() {
             "• Customers: ${ov.customersCount}\n" +
             "• Sales Orders: ${ov.salesOrdersCount}\n" +
             "• Warehouses: ${ov.locationsCount}"
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Import & Export Data")
             .setMessage(summary)
             .setPositiveButton("Import Wizard") { _, _ -> openWebPath("/data/import") }
@@ -579,7 +651,7 @@ class AppSettingsActivity : AppCompatActivity() {
         } else {
             ov.backups.take(8).joinToString("\n") { "• ${it.filename} (${it.formattedSize})" }
         }
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Backup & Restore (.sql)")
             .setMessage(msg)
             .setPositiveButton("+ Create Backup Now") { _, _ ->
@@ -607,7 +679,7 @@ class AppSettingsActivity : AppCompatActivity() {
             }.joinToString(", ")
             if (tags.isNotEmpty()) "${l.name} ($tags)" else l.name
         }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Locations & Warehouses (${ov.locations.size})")
             .setItems(items, null)
             .setPositiveButton("Stock Transfers") { _, _ ->
@@ -622,7 +694,7 @@ class AppSettingsActivity : AppCompatActivity() {
 
     private fun showCategoriesDialog(ov: MobileSettingsOverview) {
         val items = ov.categories.map { "${it.name} (${it.productCount} items)" }.toTypedArray()
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Product Categories (${ov.categories.size})")
             .setItems(items) { _, _ ->
                 startActivity(Intent(this, PriceListActivity::class.java))
@@ -646,7 +718,7 @@ class AppSettingsActivity : AppCompatActivity() {
         val labels = options.map { it.second }.toTypedArray()
         val checkedIdx = options.indexOfFirst { it.first == session.selectedBranch }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Default Active Store / Branch")
             .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
                 session.selectedBranch = options[which].first
@@ -664,7 +736,7 @@ class AppSettingsActivity : AppCompatActivity() {
     }
 
     private fun confirmSignOut() {
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Sign Out")
             .setMessage("Sign out of ${session.getDisplayName().ifBlank { session.getUsername() }}?")
             .setPositiveButton("Sign Out") { _, _ -> redirectToLogin() }

@@ -151,7 +151,7 @@ class CustomersActivity : AppCompatActivity() {
     private fun showFilterDialog() {
         val opts = arrayOf("All", "With Open Balance")
         val idx = if (balanceFilter == "With Balance") 1 else 0
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Customer Filter")
             .setSingleChoiceItems(opts, idx) { d, which ->
                 balanceFilter = if (which == 1) "With Balance" else "All"

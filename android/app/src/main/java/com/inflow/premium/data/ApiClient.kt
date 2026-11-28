@@ -295,12 +295,22 @@ class ApiClient(private val session: SessionManager) {
         return searchProductsCatalog(query, schemeId, locationId).products
     }
 
-    suspend fun searchProductsCatalog(query: String, schemeId: Int, locationId: Int): ProductCatalogResult {
-        val json = requestJson(
-            "GET",
-            "/api/mobile/products",
-            mapOf("q" to query, "scheme_id" to schemeId.toString(), "location_id" to locationId.toString(), "limit" to "50")
+    suspend fun searchProductsCatalog(
+        query: String,
+        schemeId: Int,
+        locationId: Int,
+        categoryId: Int = 0,
+        stockLevel: String = "all"
+    ): ProductCatalogResult {
+        val params = mutableMapOf(
+            "q" to query,
+            "scheme_id" to schemeId.toString(),
+            "location_id" to locationId.toString(),
+            "limit" to "60"
         )
+        if (categoryId > 0) params["category_id"] = categoryId.toString()
+        if (stockLevel != "all" && stockLevel.isNotBlank()) params["stock_level"] = stockLevel
+        val json = requestJson("GET", "/api/mobile/products", params)
         val arr = json.optJSONArray("products") ?: JSONArray()
         val list = mutableListOf<ProductItem>()
         for (i in 0 until arr.length()) {
@@ -327,8 +337,14 @@ class ApiClient(private val session: SessionManager) {
                 )
             )
         }
+        val catArr = json.optJSONArray("categories") ?: JSONArray()
+        val cats = mutableListOf<ProductCategoryOption>()
+        for (i in 0 until catArr.length()) {
+            val c = catArr.getJSONObject(i)
+            cats.add(ProductCategoryOption(c.optInt("id"), c.optString("name", "")))
+        }
         val total = json.optInt("total_count", list.size)
-        return ProductCatalogResult(list, total)
+        return ProductCatalogResult(list, total, cats)
     }
 
     suspend fun getProductDetail(productId: Int): ProductDetail {
@@ -479,6 +495,7 @@ class ApiClient(private val session: SessionManager) {
             lines.add(
                 PurchaseOrderLine(
                     id = l.optInt("id"),
+                    productId = l.optInt("product_id", 0),
                     sku = l.optString("sku", ""),
                     productName = l.optString("product_name", ""),
                     imageUrl = l.optString("image_url", ""),
@@ -489,23 +506,80 @@ class ApiClient(private val session: SessionManager) {
                 )
             )
         }
+        val venArr = json.optJSONArray("vendors") ?: JSONArray()
+        val vendors = mutableListOf<VendorOption>()
+        for (i in 0 until venArr.length()) {
+            val v = venArr.getJSONObject(i)
+            vendors.add(VendorOption(v.optInt("id"), v.optString("name", "Vendor"), v.optString("phone", "")))
+        }
+        val locArr = json.optJSONArray("locations") ?: JSONArray()
+        val locations = mutableListOf<TransferLocationOption>()
+        for (i in 0 until locArr.length()) {
+            val l = locArr.getJSONObject(i)
+            locations.add(TransferLocationOption(l.optInt("id"), l.optString("name", "Warehouse"), l.optBoolean("is_default", false)))
+        }
         return PurchaseOrderDetail(
             id = o.optInt("id"),
             orderNumber = o.optString("order_number", ""),
             orderDate = o.optString("order_date", ""),
+            orderDateIso = o.optString("order_date_iso", ""),
             status = o.optString("status", "ISSUED"),
             paymentStatus = o.optString("payment_status", "UNPAID"),
             isFulfilled = o.optBoolean("is_fulfilled", false),
             isPaid = o.optBoolean("is_paid", false),
+            vendorId = o.optInt("vendor_id", 0),
             vendorName = o.optString("vendor_name", "Vendor"),
+            locationId = o.optInt("location_id", 100),
             locationName = o.optString("location_name", "Main Warehouse"),
             assignedTo = o.optString("assigned_to", "Admin"),
             totalAmount = o.optDouble("total_amount", 0.0),
             paidAmount = o.optDouble("paid_amount", 0.0),
             balanceDue = o.optDouble("balance_due", 0.0),
             notes = o.optString("notes", ""),
-            lines = lines
+            lines = lines,
+            vendors = vendors,
+            locations = locations
         )
+    }
+
+    suspend fun savePurchaseOrder(
+        poId: Int,
+        orderNumber: String,
+        vendorId: Int,
+        locationId: Int,
+        orderDateIso: String,
+        status: String,
+        paymentStatus: String,
+        paidAmount: Double,
+        notes: String,
+        lines: List<PurchaseOrderLine>
+    ): Pair<Int, String> {
+        val lineArr = JSONArray()
+        for (ln in lines) {
+            lineArr.put(
+                JSONObject().apply {
+                    put("product_id", ln.productId)
+                    put("product_name", ln.productName)
+                    put("quantity", ln.quantity)
+                    put("unit_cost", ln.unitPrice)
+                    put("uom", ln.uom)
+                }
+            )
+        }
+        val body = JSONObject().apply {
+            if (poId > 0) put("po_id", poId)
+            put("order_number", orderNumber)
+            put("vendor_id", vendorId)
+            put("location_id", locationId)
+            put("order_date", orderDateIso)
+            put("status", status)
+            put("payment_status", paymentStatus)
+            put("paid_amount", paidAmount)
+            put("notes", notes)
+            put("lines", lineArr)
+        }
+        val json = requestJson("POST", "/api/mobile/purchases/save", body = body)
+        return json.optInt("po_id", poId) to json.optString("message", "Purchase order saved")
     }
 
     suspend fun getCustomersCatalog(query: String, branchParam: String): CustomerCatalogResult {
@@ -757,6 +831,7 @@ class ApiClient(private val session: SessionManager) {
         return DashboardSummary(
             storeName = json.optString("store_name", "Main Store (HQ)"),
             storeBadge = json.optString("store_badge", "Enterprise HQ"),
+            storeLogoUrl = json.optString("store_logo_url", ""),
             fulfillmentName = json.optString("fulfillment_name", "Main Warehouse"),
             activeBranchesCount = json.optInt("active_branches_count", 0),
             inventoryValuation = json.optDouble("inventory_valuation", 0.0),
@@ -1212,6 +1287,8 @@ class ApiClient(private val session: SessionManager) {
                     put("sublocation", ln.sublocation)
                     put("change_qty", ln.diffQty)
                     put("final_qty", ln.newQty)
+                    put("reserved_qty", ln.reservedQty)
+                    put("reserved_edited", ln.reservedEdited)
                 }
             )
         }
@@ -1755,6 +1832,19 @@ class ApiClient(private val session: SessionManager) {
     suspend fun createCloudBackup(): String {
         val json = requestJson("POST", "/api/mobile/settings/backup/create", body = JSONObject())
         return json.optString("message", "Backup created")
+    }
+
+    suspend fun checkAppUpdate(): AppUpdateInfo {
+        val json = requestJson("GET", "/api/mobile/app-update")
+        return AppUpdateInfo(
+            versionCode = json.optInt("version_code", 1),
+            versionName = json.optString("version_name", "1.0.0"),
+            apkAvailable = json.optBoolean("apk_available", false),
+            apkUrl = json.optString("apk_url", "/static/downloads/inFlow-Premium.apk"),
+            apkSizeBytes = json.optLong("apk_size_bytes", 0L),
+            apkSizeMb = json.optString("apk_size_mb", "0.0 MB"),
+            releaseNotes = json.optString("release_notes", "")
+        )
     }
 
     fun buildWebPortalUrl(nextPath: String = "/"): String {

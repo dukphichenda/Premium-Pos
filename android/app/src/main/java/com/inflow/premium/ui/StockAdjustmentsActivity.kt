@@ -64,17 +64,16 @@ class StockAdjustmentsActivity : AppCompatActivity() {
         setContentView(binding.root)
         api = ApiClient(session)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
             topContentView = binding.topHeader,
             topScrimView = binding.topScrim,
-            bottomNavContainer = binding.bottomNav.root,
-            bottomScrimView = binding.bottomScrim,
+            bottomNavContainer = null,
+            bottomScrimView = null,
             scrollableView = binding.scrollAdjustments,
             extraTopDp = 6,
-            extraBottomScrollDp = 120
+            extraBottomScrollDp = 24
         )
 
         adapter = StockAdjustmentsAdapter(
@@ -160,7 +159,7 @@ class StockAdjustmentsActivity : AppCompatActivity() {
         val checkedIdx = if (selectedLocationId == null) 0 else {
             (locationOptions.indexOfFirst { it.id == selectedLocationId } + 1).coerceAtLeast(0)
         }
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Filter by Warehouse")
             .setSingleChoiceItems(names.toTypedArray(), checkedIdx) { dlg, which ->
                 if (which == 0) {
@@ -180,7 +179,7 @@ class StockAdjustmentsActivity : AppCompatActivity() {
     }
 
     private fun confirmDeleteDraft(adj: StockAdjustmentSummary) {
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Delete Draft Adjustment")
             .setMessage("Delete draft ${adj.adjustmentNumber}?")
             .setPositiveButton("Delete") { _, _ ->

@@ -101,7 +101,6 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         adjustmentId = intent.getIntExtra(EXTRA_ADJUSTMENT_ID, 0)
         fromHistory = intent.getBooleanExtra(EXTRA_FROM_HISTORY, false)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
@@ -111,7 +110,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
             bottomScrimView = binding.bottomScrim,
             scrollableView = binding.scrollAdjustmentDetail,
             extraTopDp = 6,
-            extraBottomScrollDp = 195
+            extraBottomScrollDp = 100
         )
 
         binding.btnAdjDetBack.setOnClickListener { finish() }
@@ -301,10 +300,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         }
     }
 
-    private fun renderLines() {
-        val completed = isCompleted()
-        binding.containerAdjLines.removeAllViews()
-
+    private fun updateAdjustmentSummary() {
         var netChange = 0.0
         var changedCount = 0
         for (ln in lines) {
@@ -331,6 +327,43 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
                 binding.tvAdjNetChange.setTextColor(Color.parseColor("#475569"))
             }
         }
+    }
+
+    private fun updateLineChangeVisuals(lb: ItemStockAdjustmentLineBinding, ln: StockAdjustmentLine, factor: Double) {
+        val chgDisp = ln.diffQty / factor
+        val diffSign = if (chgDisp > 0.0001) "+" else ""
+        lb.tvAdjLineChange.text = "$diffSign${numFmt.format(chgDisp)}"
+        when {
+            ln.diffQty > 0.0001 -> {
+                lb.boxAdjChange.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#ECFDF5"))
+                lb.tvAdjLineChange.setTextColor(Color.parseColor("#047857"))
+            }
+            ln.diffQty < -0.0001 -> {
+                lb.boxAdjChange.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FEF2F2"))
+                lb.tvAdjLineChange.setTextColor(Color.parseColor("#DC2626"))
+            }
+            else -> {
+                lb.boxAdjChange.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F1F5F9"))
+                lb.tvAdjLineChange.setTextColor(Color.parseColor("#475569"))
+            }
+        }
+    }
+
+    private fun updateLineFooter(lb: ItemStockAdjustmentLineBinding, ln: StockAdjustmentLine) {
+        val sublocDisp = ln.sublocation.ifBlank { "—" }
+        lb.tvAdjLineMetaFooter.text =
+            "On Hand: ${numFmt.format(ln.newQty)} ${ln.baseUom}   •   Subloc: $sublocDisp"
+    }
+
+    private fun formatEditableNumber(v: Double): String {
+        val formatted = numFmt.format(if (abs(v) < 0.0001) 0.0 else v)
+        return formatted.replace(",", "")
+    }
+
+    private fun renderLines() {
+        val completed = isCompleted()
+        binding.containerAdjLines.removeAllViews()
+        updateAdjustmentSummary()
 
         val fq = lineFilterQuery.lowercase(Locale.US)
         val filteredIndices = lines.indices.filter { idx ->
@@ -369,32 +402,17 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
 
             val factor = if (ln.uomFactor > 0.0) ln.uomFactor else 1.0
             val initDisp = ln.oldQty / factor
-            val chgDisp = ln.diffQty / factor
-            val finDisp = ln.newQty / factor
+            val resDisp = ln.reservedQty / factor
+            val availDisp = (ln.newQty - ln.reservedQty) / factor
 
             lb.tvAdjLineInitial.text = numFmt.format(initDisp)
-            val diffSign = if (chgDisp > 0.0001) "+" else ""
-            lb.tvAdjLineChange.text = "$diffSign${numFmt.format(chgDisp)}"
-            lb.tvAdjLineFinal.text = numFmt.format(finDisp)
+            updateLineChangeVisuals(lb, ln, factor)
+            updateLineFooter(lb, ln)
 
-            when {
-                ln.diffQty > 0.0001 -> {
-                    lb.boxAdjChange.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#ECFDF5"))
-                    lb.tvAdjLineChange.setTextColor(Color.parseColor("#047857"))
-                }
-                ln.diffQty < -0.0001 -> {
-                    lb.boxAdjChange.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#FEF2F2"))
-                    lb.tvAdjLineChange.setTextColor(Color.parseColor("#DC2626"))
-                }
-                else -> {
-                    lb.boxAdjChange.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F1F5F9"))
-                    lb.tvAdjLineChange.setTextColor(Color.parseColor("#475569"))
-                }
-            }
-
-            val sublocDisp = ln.sublocation.ifBlank { "—" }
-            lb.tvAdjLineMetaFooter.text =
-                "On Hand: ${numFmt.format(ln.onHandQty)} ${ln.baseUom}   •   Reserved: ${numFmt.format(ln.reservedQty)}   •   Subloc: $sublocDisp"
+            var isProgrammaticUpdate = true
+            lb.etAdjLineReserved.setText(formatEditableNumber(resDisp))
+            lb.etAdjLineAvailable.setText(formatEditableNumber(availDisp))
+            isProgrammaticUpdate = false
 
             if (!completed) {
                 lb.btnRemoveAdjLine.visibility = View.VISIBLE
@@ -421,11 +439,55 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
                 lb.btnStepPlus1.setOnClickListener { applyLineDelta(realIdx, 1.0 * factor) }
                 lb.btnStepPlus10.setOnClickListener { applyLineDelta(realIdx, 10.0 * factor) }
 
-                lb.boxAdjFinal.setOnClickListener { editLineQtyDialog(realIdx, editFinal = true) }
-                lb.boxAdjChange.setOnClickListener { editLineQtyDialog(realIdx, editFinal = false) }
+                lb.boxAdjChange.setOnClickListener { editLineQtyDialog(realIdx, editAvailable = false) }
+                lb.boxAdjReserved.setOnClickListener {
+                    lb.etAdjLineReserved.requestFocus()
+                    lb.etAdjLineReserved.setSelection(lb.etAdjLineReserved.text.length)
+                }
+                lb.boxAdjAvailable.setOnClickListener {
+                    lb.etAdjLineAvailable.requestFocus()
+                    lb.etAdjLineAvailable.setSelection(lb.etAdjLineAvailable.text.length)
+                }
+
+                lb.etAdjLineReserved.addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        if (isProgrammaticUpdate) return
+                        val v = s?.toString()?.trim()?.replace(",", "")?.toDoubleOrNull() ?: return
+                        ln.reservedQty = v * factor
+                        ln.reservedEdited = true
+                        isProgrammaticUpdate = true
+                        lb.etAdjLineAvailable.setText(formatEditableNumber((ln.newQty - ln.reservedQty) / factor))
+                        isProgrammaticUpdate = false
+                        updateLineFooter(lb, ln)
+                    }
+                })
+
+                lb.etAdjLineAvailable.addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+                    override fun afterTextChanged(s: Editable?) {
+                        if (isProgrammaticUpdate) return
+                        val v = s?.toString()?.trim()?.replace(",", "")?.toDoubleOrNull() ?: return
+                        ln.newQty = (v * factor) + ln.reservedQty
+                        ln.diffQty = ln.newQty - ln.oldQty
+                        updateLineChangeVisuals(lb, ln, factor)
+                        updateLineFooter(lb, ln)
+                        updateAdjustmentSummary()
+                    }
+                })
             } else {
                 lb.btnRemoveAdjLine.visibility = View.GONE
                 lb.rowAdjQuickSteps.visibility = View.GONE
+                lb.etAdjLineReserved.isEnabled = false
+                lb.etAdjLineReserved.isFocusable = false
+                lb.etAdjLineReserved.isFocusableInTouchMode = false
+                lb.etAdjLineReserved.isCursorVisible = false
+                lb.etAdjLineAvailable.isEnabled = false
+                lb.etAdjLineAvailable.isFocusable = false
+                lb.etAdjLineAvailable.isFocusableInTouchMode = false
+                lb.etAdjLineAvailable.isCursorVisible = false
             }
 
             binding.containerAdjLines.addView(lb.root)
@@ -440,7 +502,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         renderLines()
     }
 
-    private fun editLineQtyDialog(index: Int, editFinal: Boolean) {
+    private fun editLineQtyDialog(index: Int, editAvailable: Boolean) {
         val ln = lines[index]
         val factor = if (ln.uomFactor > 0.0) ln.uomFactor else 1.0
         val dp = resources.displayMetrics.density
@@ -450,23 +512,23 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
             setPadding(pad, (10 * dp).toInt(), pad, 0)
         }
         val infoTv = TextView(this).apply {
-            text = "${ln.name}\nInitial: ${numFmt.format(ln.oldQty / factor)} ${ln.uom}" +
+            text = "${ln.name}\nInitial: ${numFmt.format(ln.oldQty / factor)} ${ln.uom}  •  Reserved: ${numFmt.format(ln.reservedQty / factor)} ${ln.uom}" +
                 if (factor > 1.0) " (1 ${ln.uom} = ${numFmt.format(factor)} ${ln.baseUom})" else ""
             setTextColor(Color.parseColor("#475569"))
             textSize = 12.5f
         }
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
-            val initialVal = (if (editFinal) ln.newQty else ln.diffQty) / factor
+            val initialVal = if (editAvailable) (ln.newQty - ln.reservedQty) / factor else ln.diffQty / factor
             setText(numFmt.format(initialVal).replace(",", ""))
             setSelection(text.length)
-            hint = if (editFinal) "Enter final qty (${ln.uom})" else "Enter +/- change (${ln.uom})"
+            hint = if (editAvailable) "Enter available qty (${ln.uom})" else "Enter +/- change (${ln.uom})"
         }
         box.addView(infoTv)
         box.addView(input)
 
-        MaterialAlertDialogBuilder(this)
-            .setTitle(if (editFinal) "Set Final Quantity (${ln.uom})" else "Set Change (${ln.uom})")
+        LiquidGlassDialog.builder(this)
+            .setTitle(if (editAvailable) "Set Qty Available (${ln.uom})" else "Set Change (${ln.uom})")
             .setView(box)
             .setPositiveButton("Apply") { _, _ ->
                 val v = input.text.toString().trim().toDoubleOrNull()
@@ -475,9 +537,9 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
                     return@setPositiveButton
                 }
                 val baseVal = v * factor
-                if (editFinal) {
-                    ln.newQty = baseVal
-                    ln.diffQty = baseVal - ln.oldQty
+                if (editAvailable) {
+                    ln.newQty = baseVal + ln.reservedQty
+                    ln.diffQty = ln.newQty - ln.oldQty
                 } else {
                     ln.diffQty = baseVal
                     ln.newQty = ln.oldQty + baseVal
@@ -500,7 +562,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
             setPadding(pad, (8 * dp).toInt(), pad, 0)
             addView(input)
         }
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Stock Adjustment Number")
             .setView(wrap)
             .setPositiveButton("OK") { _, _ ->
@@ -521,7 +583,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         }
         val labels = categories.map { "${it.name} (${it.productCount})" }.toTypedArray()
         val checked = BooleanArray(categories.size)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Add Products by Category")
             .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
                 checked[which] = isChecked
@@ -540,7 +602,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
 
     private fun confirmAddAllProducts() {
         val countHint = if (totalActiveProducts > 0) "$totalActiveProducts active products" else "all active products"
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Add All Products")
             .setMessage("Load $countHint in $locationName into this adjustment list?")
             .setPositiveButton("Load All") { _, _ ->
@@ -603,7 +665,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         val opts = arrayOf("Name (A–Z)", "By Category", "Lowest Stock First", "Highest Stock First")
         val keys = arrayOf("name", "category", "lowest", "highest")
         val checked = keys.indexOf(currentSortKey).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Arrange Items By")
             .setSingleChoiceItems(opts, checked) { dlg, which ->
                 currentSortKey = keys[which]
@@ -635,7 +697,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
 
     private fun confirmClearAllLines() {
         if (lines.isEmpty()) return
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Clear All Items")
             .setMessage("Remove all ${lines.size} item(s) from this list?")
             .setPositiveButton("Clear All") { _, _ ->
@@ -650,7 +712,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         if (locations.isEmpty()) return
         val names = locations.map { it.name }.toTypedArray()
         val checked = locations.indexOfFirst { it.id == locationId }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Select Warehouse")
             .setSingleChoiceItems(names, checked) { dlg, which ->
                 val loc = locations[which]
@@ -685,7 +747,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
 
     private fun showReasonPicker() {
         val checked = reasons.indexOfFirst { it.equals(reason, ignoreCase = true) }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Adjustment Reason")
             .setSingleChoiceItems(reasons, checked) { dlg, which ->
                 reason = reasons[which]
@@ -702,7 +764,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
                     setPadding(pad, (8 * resources.displayMetrics.density).toInt(), pad, 0)
                     addView(input)
                 }
-                MaterialAlertDialogBuilder(this)
+                LiquidGlassDialog.builder(this)
                     .setTitle("Custom Reason")
                     .setView(wrap)
                     .setPositiveButton("OK") { _, _ ->
@@ -742,7 +804,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         box.addView(etRef)
         box.addView(etDept)
 
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Custom Fields")
             .setView(box)
             .setPositiveButton("Save") { _, _ ->
@@ -787,7 +849,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
     }
 
     private fun confirmDeleteDraft() {
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Delete Draft")
             .setMessage("Delete draft $adjustmentNumber?")
             .setPositiveButton("Delete") { _, _ ->
@@ -829,7 +891,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
         root.addView(etSearch)
         root.addView(resultsScroll)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Add Product ($locationName)")
             .setView(root)
             .setNegativeButton("Close", null)
@@ -904,7 +966,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
             val existing = lines.indexOfFirst { it.productId == p.id }
             if (existing >= 0) {
                 dlg.dismiss()
-                editLineQtyDialog(existing, editFinal = true)
+                editLineQtyDialog(existing, editAvailable = true)
             } else {
                 lines.add(
                     StockAdjustmentLine(
@@ -928,7 +990,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
                 )
                 renderLines()
                 dlg.dismiss()
-                editLineQtyDialog(lines.lastIndex, editFinal = true)
+                editLineQtyDialog(lines.lastIndex, editAvailable = true)
             }
         }
         return card
@@ -939,7 +1001,7 @@ class StockAdjustmentDetailActivity : AppCompatActivity() {
             Toast.makeText(this, "Add at least one product first", Toast.LENGTH_SHORT).show()
             return
         }
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Adjust Stock")
             .setMessage("Apply stock count changes in $locationName for $adjustmentNumber? Inventory quantities will be updated immediately.")
             .setPositiveButton("Adjust stock") { _, _ -> submitAdjustment("COMPLETED") }

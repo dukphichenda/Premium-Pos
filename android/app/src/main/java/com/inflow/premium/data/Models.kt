@@ -12,6 +12,12 @@ data class UserInfo(
 data class BranchItem(
     val id: String,
     val code: String,
+    val name: String,
+    val logoUrl: String = ""
+)
+
+data class ProductCategoryOption(
+    val id: Int,
     val name: String
 )
 
@@ -145,7 +151,8 @@ data class ProductItem(
 
 data class ProductCatalogResult(
     val products: List<ProductItem>,
-    val totalCount: Int
+    val totalCount: Int,
+    val categories: List<ProductCategoryOption> = emptyList()
 )
 
 data class ProductInventoryLocation(
@@ -267,33 +274,45 @@ data class PurchaseOrderListResult(
     val totalCount: Int
 )
 
-data class PurchaseOrderLine(
+data class VendorOption(
     val id: Int,
-    val sku: String,
-    val productName: String,
-    val imageUrl: String,
-    val quantity: Double,
-    val uom: String,
-    val unitPrice: Double,
-    val subtotal: Double
+    val name: String,
+    val phone: String = ""
+)
+
+data class PurchaseOrderLine(
+    val id: Int = 0,
+    val productId: Int = 0,
+    val sku: String = "",
+    val productName: String = "",
+    val imageUrl: String = "",
+    var quantity: Double = 1.0,
+    var uom: String = "pcs.",
+    var unitPrice: Double = 0.0,
+    var subtotal: Double = 0.0
 )
 
 data class PurchaseOrderDetail(
     val id: Int,
     val orderNumber: String,
     val orderDate: String,
+    val orderDateIso: String = "",
     val status: String,
     val paymentStatus: String,
     val isFulfilled: Boolean,
     val isPaid: Boolean,
+    val vendorId: Int = 0,
     val vendorName: String,
+    val locationId: Int = 100,
     val locationName: String,
     val assignedTo: String,
     val totalAmount: Double,
     val paidAmount: Double,
     val balanceDue: Double,
     val notes: String,
-    val lines: List<PurchaseOrderLine>
+    val lines: MutableList<PurchaseOrderLine>,
+    val vendors: List<VendorOption> = emptyList(),
+    val locations: List<TransferLocationOption> = emptyList()
 )
 
 data class CustomerCatalogItem(
@@ -431,6 +450,7 @@ data class CategoryStockSlice(
 data class DashboardSummary(
     val storeName: String,
     val storeBadge: String,
+    val storeLogoUrl: String = "",
     val fulfillmentName: String,
     val activeBranchesCount: Int,
     val inventoryValuation: Double,
@@ -783,8 +803,9 @@ data class StockAdjustmentLine(
     var diffQty: Double,
     var newQty: Double,
     val onHandQty: Double,
-    val reservedQty: Double,
-    val categoryName: String = "General"
+    var reservedQty: Double,
+    val categoryName: String = "General",
+    var reservedEdited: Boolean = false
 )
 
 data class AdjustmentCategoryOption(
@@ -908,4 +929,14 @@ data class MobileSettingsOverview(
     val customersCount: Int,
     val salesOrdersCount: Int,
     val locationsCount: Int
+)
+
+data class AppUpdateInfo(
+    val versionCode: Int,
+    val versionName: String,
+    val apkAvailable: Boolean,
+    val apkUrl: String,
+    val apkSizeBytes: Long,
+    val apkSizeMb: String,
+    val releaseNotes: String
 )

@@ -8,7 +8,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.TransitionDrawable
 import android.view.HapticFeedbackConstants
@@ -27,9 +26,8 @@ object BottomNavHelper {
         SETTINGS, REPORT, HOME, SO, PRODUCT
     }
 
-    private val ACTIVE_COLOR = Color.parseColor("#2E9E95")
-    private val INACTIVE_COLOR = Color.parseColor("#64748B")
     private var pendingAnimateTab: NavTab? = null
+    private var lastTabIndex: Int = NavTab.HOME.ordinal
 
     private fun outlineResFor(tab: NavTab): Int = when (tab) {
         NavTab.SETTINGS -> R.drawable.ic_nav_settings_outline
@@ -48,7 +46,45 @@ object BottomNavHelper {
     }
 
     fun setup(activity: Activity, navRoot: View, activeTab: NavTab) {
+        val activeColor = ContextCompat.getColor(activity, R.color.nav_active_tint)
+        val inactiveColor = ContextCompat.getColor(activity, R.color.nav_inactive_tint)
+
         val capsule = navRoot.findViewById<View>(R.id.navCapsulePill)
+        val tabsRow = navRoot.findViewById<View>(R.id.navTabsRow)
+        val glassPill = navRoot.findViewById<View>(R.id.navGlassPill)
+
+        fun positionGlassPill(index: Int, animateFrom: Int? = null) {
+            if (glassPill == null || tabsRow == null) return
+            val rowW = tabsRow.width
+            if (rowW <= 0) return
+            val tabW = rowW / 5f
+            val targetW = tabW.toInt().coerceAtLeast(1)
+            val lp = glassPill.layoutParams
+            if (lp.width != targetW) {
+                lp.width = targetW
+                glassPill.layoutParams = lp
+            }
+            val targetX = index * tabW
+            if (animateFrom != null && animateFrom != index) {
+                glassPill.animate().cancel()
+                glassPill.translationX = animateFrom * tabW
+                val glide = AnimatorSet().apply {
+                    duration = 340L
+                    interpolator = OvershootInterpolator(1.05f)
+                    playTogether(
+                        ObjectAnimator.ofFloat(glassPill, View.TRANSLATION_X, animateFrom * tabW, targetX),
+                        ObjectAnimator.ofFloat(glassPill, View.SCALE_X, 1f, 1.15f, 0.96f, 1f),
+                        ObjectAnimator.ofFloat(glassPill, View.SCALE_Y, 1f, 0.90f, 1.04f, 1f)
+                    )
+                }
+                glide.start()
+            } else {
+                glassPill.translationX = targetX
+                glassPill.scaleX = 1f
+                glassPill.scaleY = 1f
+            }
+        }
+
         fun syncLandscapeSize() {
             if (capsule == null) return
             val dm = activity.resources.displayMetrics
@@ -64,9 +100,15 @@ object BottomNavHelper {
                 lp.width = targetW
                 capsule.layoutParams = lp
             }
+            positionGlassPill(activeTab.ordinal)
         }
         syncLandscapeSize()
         navRoot.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> syncLandscapeSize() }
+        tabsRow?.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (pendingAnimateTab != activeTab) {
+                positionGlassPill(activeTab.ordinal)
+            }
+        }
 
         val tabSettings = navRoot.findViewById<View>(R.id.navTabSettings)
         val ivSettings = navRoot.findViewById<ImageView>(R.id.ivNavSettings)
@@ -89,12 +131,11 @@ object BottomNavHelper {
         val tvProduct = navRoot.findViewById<TextView>(R.id.tvNavProduct)
 
         fun styleItem(tab: NavTab, container: View, iv: ImageView, tv: TextView, isActive: Boolean) {
-            val c = if (isActive) ACTIVE_COLOR else INACTIVE_COLOR
+            val c = if (isActive) activeColor else inactiveColor
+            container.background = null
             if (isActive) {
-                container.setBackgroundResource(R.drawable.bg_nav_active_pill)
                 iv.setImageResource(filledResFor(tab))
             } else {
-                container.background = null
                 iv.setImageResource(outlineResFor(tab))
             }
             iv.imageTintList = ColorStateList.valueOf(c)
@@ -118,9 +159,15 @@ object BottomNavHelper {
 
         fun playArrivalIfPending() {
             if (pendingAnimateTab == activeTab) {
+                val fromIdx = lastTabIndex
                 pendingAnimateTab = null
+                lastTabIndex = activeTab.ordinal
+                positionGlassPill(activeTab.ordinal, animateFrom = fromIdx)
                 val (c, iv, tv) = targetViewsFor(activeTab)
-                animateTabFillAndBounce(activity, c, iv, tv, activeTab)
+                animateTabFillAndBounce(activity, c, iv, tv, activeTab, activeColor, inactiveColor)
+            } else {
+                lastTabIndex = activeTab.ordinal
+                positionGlassPill(activeTab.ordinal)
             }
         }
 
@@ -134,22 +181,35 @@ object BottomNavHelper {
         fun navigateTo(tab: NavTab, cls: Class<*>, container: View, iv: ImageView, tv: TextView) {
             container.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
             if (activeTab == tab) {
-                animateTabFillAndBounce(activity, container, iv, tv, tab)
+                // Liquid droplet ripple when tapping current tab
+                glassPill?.let { gp ->
+                    AnimatorSet().apply {
+                        duration = 280L
+                        interpolator = OvershootInterpolator(1.6f)
+                        playTogether(
+                            ObjectAnimator.ofFloat(gp, View.SCALE_X, 1f, 1.12f, 0.96f, 1f),
+                            ObjectAnimator.ofFloat(gp, View.SCALE_Y, 1f, 0.90f, 1.04f, 1f)
+                        )
+                    }.start()
+                }
+                animateTabFillAndBounce(activity, container, iv, tv, tab, activeColor, inactiveColor)
                 return
             }
+            lastTabIndex = activeTab.ordinal
             pendingAnimateTab = tab
             dismissKeyboardAndClearFocus(activity)
-            // Quick tactile press-in & teal tint before switching tabs
+            // Elastic liquid-glass glide preview before switching activity
+            positionGlassPill(tab.ordinal, animateFrom = activeTab.ordinal)
             iv.animate().cancel()
-            iv.imageTintList = ColorStateList.valueOf(ACTIVE_COLOR)
+            iv.imageTintList = ColorStateList.valueOf(activeColor)
             iv.animate()
-                .scaleX(0.82f)
-                .scaleY(0.82f)
-                .setDuration(75L)
+                .scaleX(0.84f)
+                .scaleY(0.84f)
+                .setDuration(85L)
                 .withEndAction {
                     iv.scaleX = 1f
                     iv.scaleY = 1f
-                    iv.imageTintList = ColorStateList.valueOf(INACTIVE_COLOR)
+                    iv.imageTintList = ColorStateList.valueOf(inactiveColor)
                     val intent = Intent(activity, cls).apply {
                         addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     }
@@ -183,12 +243,13 @@ object BottomNavHelper {
         container: View,
         iv: ImageView,
         tv: TextView,
-        tab: NavTab
+        tab: NavTab,
+        activeColor: Int,
+        inactiveColor: Int
     ) {
         iv.animate().cancel()
         container.animate().cancel()
 
-        // Crossfade wireframe outline -> solid filled icon
         val outline = ContextCompat.getDrawable(activity, outlineResFor(tab))?.mutate()
         val filled = ContextCompat.getDrawable(activity, filledResFor(tab))?.mutate()
         if (outline != null && filled != null) {
@@ -201,9 +262,8 @@ object BottomNavHelper {
             iv.setImageResource(filledResFor(tab))
         }
 
-        // Smooth animated fill color transition from gray (#64748B) to active teal (#2E9E95)
-        val colorAnim = ValueAnimator.ofArgb(INACTIVE_COLOR, ACTIVE_COLOR).apply {
-            duration = 280L
+        val colorAnim = ValueAnimator.ofArgb(inactiveColor, activeColor).apply {
+            duration = 260L
             addUpdateListener { va ->
                 val c = va.animatedValue as Int
                 iv.imageTintList = ColorStateList.valueOf(c)
@@ -212,27 +272,24 @@ object BottomNavHelper {
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: android.animation.Animator) {
                     iv.setImageResource(filledResFor(tab))
-                    iv.imageTintList = ColorStateList.valueOf(ACTIVE_COLOR)
-                    tv.setTextColor(ACTIVE_COLOR)
+                    iv.imageTintList = ColorStateList.valueOf(activeColor)
+                    tv.setTextColor(activeColor)
                 }
             })
         }
         colorAnim.start()
 
-        iv.scaleX = 0.78f
-        iv.scaleY = 0.78f
-        iv.translationY = 4f
-        container.scaleX = 0.93f
-        container.scaleY = 0.93f
-
-        val overshoot = OvershootInterpolator(2.3f)
+        iv.scaleX = 0.80f
+        iv.scaleY = 0.80f
+        iv.translationY = 3f
+        val overshoot = OvershootInterpolator(2.2f)
         val iconSet = AnimatorSet().apply {
             duration = 320L
             interpolator = overshoot
             val anims = mutableListOf<android.animation.Animator>(
-                ObjectAnimator.ofFloat(iv, View.SCALE_X, 0.78f, 1.16f, 1f),
-                ObjectAnimator.ofFloat(iv, View.SCALE_Y, 0.78f, 1.16f, 1f),
-                ObjectAnimator.ofFloat(iv, View.TRANSLATION_Y, 4f, -4f, 0f)
+                ObjectAnimator.ofFloat(iv, View.SCALE_X, 0.80f, 1.16f, 1f),
+                ObjectAnimator.ofFloat(iv, View.SCALE_Y, 0.80f, 1.16f, 1f),
+                ObjectAnimator.ofFloat(iv, View.TRANSLATION_Y, 3f, -3.5f, 0f)
             )
             when (tab) {
                 NavTab.SETTINGS -> anims.add(ObjectAnimator.ofFloat(iv, View.ROTATION, -35f, 8f, 0f))
@@ -242,12 +299,5 @@ object BottomNavHelper {
             playTogether(anims)
         }
         iconSet.start()
-
-        container.animate()
-            .scaleX(1f)
-            .scaleY(1f)
-            .setDuration(240L)
-            .setInterpolator(overshoot)
-            .start()
     }
 }

@@ -25,6 +25,10 @@ class SessionManager(context: Context) {
         get() = prefs.getFloat("default_khr_rate", 4100f).toDouble()
         set(value) = prefs.edit().putFloat("default_khr_rate", value.toFloat()).apply()
 
+    var hqLogoUrl: String
+        get() = prefs.getString("hq_logo_url", "") ?: ""
+        set(value) = prefs.edit().putString("hq_logo_url", value).apply()
+
     fun isLoggedIn(): Boolean = token.isNotBlank()
 
     fun saveBootstrap(json: JSONObject) {
@@ -42,6 +46,9 @@ class SessionManager(context: Context) {
                 selectedBranch = u.optInt("branch_id").toString()
             }
         }
+        if (json.has("hq_logo_url")) {
+            hqLogoUrl = json.optString("hq_logo_url", "")
+        }
         if (json.has("default_khr_rate")) {
             defaultKhrRate = json.optDouble("default_khr_rate", 4100.0)
         }
@@ -49,6 +56,7 @@ class SessionManager(context: Context) {
         json.optJSONArray("pricing_schemes")?.let { prefs.edit().putString("schemes_json", it.toString()).apply() }
         json.optJSONArray("locations")?.let { prefs.edit().putString("locations_json", it.toString()).apply() }
         json.optJSONArray("delivery_men")?.let { prefs.edit().putString("delivery_men_json", it.toString()).apply() }
+        json.optJSONArray("categories")?.let { prefs.edit().putString("categories_json", it.toString()).apply() }
     }
 
     fun isMainAdmin(): Boolean = prefs.getBoolean("is_main_admin", false)
@@ -62,14 +70,40 @@ class SessionManager(context: Context) {
     fun getBranches(): List<BranchItem> {
         val list = mutableListOf<BranchItem>()
         if (isMainAdmin()) {
-            list.add(BranchItem("main", "HQ", "Main Store (HQ)"))
-            list.add(BranchItem("all", "ALL", "All Stores Combined"))
+            list.add(BranchItem("main", "HQ", "Main Store (HQ)", hqLogoUrl))
+            list.add(BranchItem("all", "ALL", "All Stores Combined", hqLogoUrl))
         }
         val raw = prefs.getString("branches_json", "[]") ?: "[]"
         val arr = JSONArray(raw)
         for (i in 0 until arr.length()) {
             val o = arr.getJSONObject(i)
-            list.add(BranchItem(o.optInt("id").toString(), o.optString("code", ""), o.optString("name", "")))
+            list.add(
+                BranchItem(
+                    id = o.optInt("id").toString(),
+                    code = o.optString("code", ""),
+                    name = o.optString("name", ""),
+                    logoUrl = o.optString("logo_url", "")
+                )
+            )
+        }
+        return list
+    }
+
+    fun getLogoUrlForBranch(branchKey: String): String {
+        if (branchKey == "main" || branchKey == "0" || branchKey == "all" || branchKey.isBlank()) {
+            return hqLogoUrl
+        }
+        val match = getBranches().firstOrNull { it.id == branchKey }?.logoUrl?.trim().orEmpty()
+        return match.ifBlank { hqLogoUrl }
+    }
+
+    fun getProductCategories(): List<ProductCategoryOption> {
+        val list = mutableListOf<ProductCategoryOption>()
+        val raw = prefs.getString("categories_json", "[]") ?: "[]"
+        val arr = JSONArray(raw)
+        for (i in 0 until arr.length()) {
+            val o = arr.getJSONObject(i)
+            list.add(ProductCategoryOption(o.optInt("id", 0), o.optString("name", "")))
         }
         return list
     }
@@ -109,8 +143,21 @@ class SessionManager(context: Context) {
         return list
     }
 
+    var dismissedOtaVersionCode: Int
+        get() = prefs.getInt("dismissed_ota_vc", 0)
+        set(value) = prefs.edit().putInt("dismissed_ota_vc", value).apply()
+
+    var autoOtaUpdate: Boolean
+        get() = prefs.getBoolean("auto_ota_update", true)
+        set(value) = prefs.edit().putBoolean("auto_ota_update", value).apply()
+
+    var themeMode: String
+        get() = prefs.getString("theme_mode", "system") ?: "system"
+        set(value) = prefs.edit().putString("theme_mode", value).apply()
+
     fun logout() {
         val savedUrl = baseUrl
-        prefs.edit().clear().putString("base_url", savedUrl).apply()
+        val savedTheme = themeMode
+        prefs.edit().clear().putString("base_url", savedUrl).putString("theme_mode", savedTheme).apply()
     }
 }

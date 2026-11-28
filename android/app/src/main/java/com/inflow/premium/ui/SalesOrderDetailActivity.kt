@@ -584,7 +584,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         val labels = opts.map { it.second }.toTypedArray()
         val checked = opts.indexOfFirst { it.first == branchId }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Store / Branch")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 branchId = opts[which].first
@@ -620,7 +620,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         }.toTypedArray()
         val checked = schemes.indexOfFirst { it.id == line.pricingSchemeId }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Price Tier • ${line.sku.ifBlank { line.productName }}")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 val chosen = schemes[which]
@@ -649,7 +649,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         val labels = schemes.map { it.name }.toTypedArray()
         val checked = schemes.indexOfFirst { it.id == pricingSchemeId }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Price Group")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 pricingSchemeId = schemes[which].id
@@ -672,7 +672,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
             if (deliveryMan.isBlank()) it == "Unassigned" else it.equals(deliveryMan, ignoreCase = true)
         }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Delivery Courier / Rider")
             .setSingleChoiceItems(names.toTypedArray(), checked) { d, which ->
                 deliveryMan = if (which == 0) "" else names[which]
@@ -788,7 +788,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
     private fun openQuickAddCustomerDialog(onCreated: (CustomerItem) -> Unit) {
         val qb = DialogQuickCustomerBinding.inflate(layoutInflater)
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Quick Add Customer")
             .setView(qb.root)
             .setPositiveButton("Create Customer", null)
@@ -947,7 +947,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
         val methods = arrayOf("ABA Bank", "Cash", "ACLEDA", "KB PRASAC")
         var selectedIdx = methods.indexOfFirst { it.equals(paymentMethod, ignoreCase = true) }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Complete & Pay")
             .setSingleChoiceItems(methods, selectedIdx) { _, which ->
                 selectedIdx = which
@@ -1031,7 +1031,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
     private fun confirmReopenOrder() {
         if (orderId <= 0) return
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Reopen Order")
             .setMessage("Reopen $orderNumber back to OPEN status for editing?")
             .setPositiveButton("Reopen") { _, _ ->
@@ -1060,7 +1060,7 @@ class SalesOrderDetailActivity : AppCompatActivity() {
 
     private fun confirmCancelOrder() {
         if (orderId <= 0) return
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Cancel Order")
             .setMessage("Are you sure you want to cancel $orderNumber?")
             .setPositiveButton("Cancel Order") { _, _ ->

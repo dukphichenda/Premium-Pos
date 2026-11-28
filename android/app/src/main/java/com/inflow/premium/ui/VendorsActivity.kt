@@ -192,7 +192,7 @@ class VendorsActivity : AppCompatActivity() {
         val etCity = EditText(this).apply { hint = "City" }
         col.addView(etName); col.addView(etContact); col.addView(etPhone); col.addView(etCountry); col.addView(etCity)
 
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Add New Vendor")
             .setView(col)
             .setPositiveButton("Create") { _, _ ->

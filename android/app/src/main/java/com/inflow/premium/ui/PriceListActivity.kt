@@ -70,17 +70,16 @@ class PriceListActivity : AppCompatActivity() {
         setContentView(binding.root)
         api = ApiClient(session)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
             topContentView = binding.topHeader,
             topScrimView = binding.topScrim,
-            bottomNavContainer = binding.bottomNav.root,
-            bottomScrimView = binding.bottomScrim,
+            bottomNavContainer = null,
+            bottomScrimView = null,
             scrollableView = binding.scrollPriceList,
             extraTopDp = 6,
-            extraBottomScrollDp = 120
+            extraBottomScrollDp = 24
         )
 
         adapter = PriceListAdapter(
@@ -250,7 +249,7 @@ class PriceListActivity : AppCompatActivity() {
         if (schemes.isEmpty()) return
         val names = schemes.map { it.name }.toTypedArray()
         val checked = schemes.indexOfFirst { it.id == selectedSchemeId }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Pricing Scheme")
             .setSingleChoiceItems(names, checked) { dlg, which ->
                 val chosen = schemes[which]

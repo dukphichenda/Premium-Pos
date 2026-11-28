@@ -62,17 +62,16 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
         setContentView(binding.root)
         api = ApiClient(session)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.REPORT)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
             topContentView = binding.topHeader,
             topScrimView = binding.topScrim,
-            bottomNavContainer = binding.bottomNav.root,
-            bottomScrimView = binding.bottomScrim,
+            bottomNavContainer = null,
+            bottomScrimView = null,
             scrollableView = binding.scrollCustOrderHistory,
             extraTopDp = 4,
-            extraBottomScrollDp = 120
+            extraBottomScrollDp = 24
         )
         binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
             val topH = v.height
@@ -163,7 +162,7 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
     private fun pickStatus() {
         val opts = arrayOf("All", "Open", "Paid")
         val idx = opts.indexOf(statusFilter).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Order Status")
             .setSingleChoiceItems(opts, idx) { dlg, which ->
                 statusFilter = opts[which]
@@ -178,7 +177,7 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
     private fun pickPaidBy() {
         val opts = listOf("All") + paymentMethods
         val idx = opts.indexOf(paidByFilter).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Payment Method")
             .setSingleChoiceItems(opts.toTypedArray(), idx) { dlg, which ->
                 paidByFilter = opts[which]
@@ -193,7 +192,7 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
     private fun pickPeriod() {
         val opts = arrayOf("Today", "Yesterday", "This Week", "This Month", "Last 30 Days", "All")
         val idx = opts.indexOf(period).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Report Period")
             .setSingleChoiceItems(opts, idx) { dlg, which ->
                 period = opts[which]
@@ -213,7 +212,7 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
         options.add("all" to "All Branches")
         val labels = options.map { it.second }.toTypedArray()
         val idx = options.indexOfFirst { it.first == session.selectedBranch }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Store / Branch")
             .setSingleChoiceItems(labels, idx) { dlg, which ->
                 session.selectedBranch = options[which].first
@@ -248,7 +247,7 @@ class CustomerOrderHistoryActivity : AppCompatActivity() {
         col.addView(et)
         col.addView(scroll)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Select Customer")
             .setView(col)
             .setNeutralButton("All Customers") { _, _ ->

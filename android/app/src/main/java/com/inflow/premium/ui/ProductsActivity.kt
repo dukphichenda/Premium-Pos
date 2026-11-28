@@ -22,6 +22,7 @@ import com.inflow.premium.MainActivity
 import com.inflow.premium.R
 import com.inflow.premium.data.ApiClient
 import com.inflow.premium.data.ApiException
+import com.inflow.premium.data.ProductCategoryOption
 import com.inflow.premium.data.ProductItem
 import com.inflow.premium.data.SessionManager
 import com.inflow.premium.databinding.ActivityProductsBinding
@@ -46,10 +47,13 @@ class ProductsActivity : AppCompatActivity() {
 
     private var selectedSchemeId = 100
     private var selectedLocationId = 100
+    private var selectedCategoryId = 0
+    private var selectedStockLevel = "all"
     private var currentQuery = ""
     private var sortAsc = true
     private var searchJob: Job? = null
     private val loadedItems = mutableListOf<ProductItem>()
+    private val productCategories = mutableListOf<ProductCategoryOption>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,6 +93,7 @@ class ProductsActivity : AppCompatActivity() {
 
         selectedSchemeId = session.getPricingSchemes().firstOrNull()?.id ?: 100
         selectedLocationId = session.getLocations().firstOrNull()?.id ?: 100
+        productCategories.addAll(session.getProductCategories())
         updateFilterBadge()
 
         adapter = ProductCatalogAdapter(uiScope, session.baseUrl) { item ->
@@ -194,25 +199,107 @@ class ProductsActivity : AppCompatActivity() {
     private fun updateFilterBadge() {
         val defaultScheme = session.getPricingSchemes().firstOrNull()?.id ?: 100
         val defaultLoc = session.getLocations().firstOrNull()?.id ?: 100
-        var active = 1
+        var active = 0
+        if (selectedCategoryId > 0) active++
+        if (selectedStockLevel != "all") active++
         if (selectedSchemeId != defaultScheme) active++
         if (selectedLocationId != defaultLoc) active++
-        binding.tvFilterCount.text = active.toString()
+        if (active > 0) {
+            binding.tvFilterCount.visibility = View.VISIBLE
+            binding.tvFilterCount.text = active.toString()
+        } else {
+            binding.tvFilterCount.visibility = View.GONE
+        }
+    }
+
+    private fun stockLevelLabel(key: String): String = when (key) {
+        "in_stock" -> "In Stock (> 0)"
+        "low_stock" -> "Low Stock"
+        "out_of_stock" -> "Out of Stock (≤ 0)"
+        else -> "All Levels"
     }
 
     private fun showFilterMenu() {
+        val catName = if (selectedCategoryId > 0) {
+            productCategories.firstOrNull { it.id == selectedCategoryId }?.name ?: "Selected"
+        } else {
+            "All Categories"
+        }
+        val stockName = stockLevelLabel(selectedStockLevel)
         val schemeName = session.getPricingSchemes().firstOrNull { it.id == selectedSchemeId }?.name ?: "Retail 1"
         val locName = session.getLocations().firstOrNull { it.id == selectedLocationId }?.name ?: "Main Warehouse"
-        val options = arrayOf("Price Group: $schemeName", "Warehouse: $locName")
-        val dlg = MaterialAlertDialogBuilder(this)
+        val options = arrayOf(
+            "Category: $catName",
+            "Stock Level: $stockName",
+            "Price Group: $schemeName",
+            "Warehouse: $locName"
+        )
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Product Filters")
             .setItems(options) { d, which ->
                 d.dismiss()
-                if (which == 0) showSchemePicker() else showLocationPicker()
+                when (which) {
+                    0 -> showCategoryPicker()
+                    1 -> showStockLevelPicker()
+                    2 -> showSchemePicker()
+                    3 -> showLocationPicker()
+                }
+            }
+            .setNeutralButton("Reset All") { d, _ ->
+                selectedCategoryId = 0
+                selectedStockLevel = "all"
+                selectedSchemeId = session.getPricingSchemes().firstOrNull()?.id ?: 100
+                selectedLocationId = session.getLocations().firstOrNull()?.id ?: 100
+                updateFilterBadge()
+                d.dismiss()
+                loadProducts()
             }
             .setNegativeButton("Close") { d, _ -> d.dismiss() }
             .create()
         attachEscClose(dlg)
+        dlg.show()
+    }
+
+    private fun showCategoryPicker() {
+        val opts = mutableListOf(ProductCategoryOption(0, "All Categories"))
+        opts.addAll(productCategories)
+        val labels = opts.map { it.name }.toTypedArray()
+        val checked = opts.indexOfFirst { it.id == selectedCategoryId }.coerceAtLeast(0)
+
+        val dlg = LiquidGlassDialog.builder(this)
+            .setTitle("Category")
+            .setSingleChoiceItems(labels, checked) { d, which ->
+                selectedCategoryId = opts[which].id
+                updateFilterBadge()
+                d.dismiss()
+                loadProducts()
+            }
+            .setNegativeButton("Close") { d, _ -> d.dismiss() }
+            .setCancelable(false)
+            .create()
+        attachEscClose(dlg)
+        dlg.setCanceledOnTouchOutside(false)
+        dlg.show()
+    }
+
+    private fun showStockLevelPicker() {
+        val keys = arrayOf("all", "in_stock", "low_stock", "out_of_stock")
+        val labels = arrayOf("All Stock Levels", "In Stock (> 0)", "Low Stock", "Out of Stock (≤ 0)")
+        val checked = keys.indexOf(selectedStockLevel).coerceAtLeast(0)
+
+        val dlg = LiquidGlassDialog.builder(this)
+            .setTitle("Stock Level (Qty Available)")
+            .setSingleChoiceItems(labels, checked) { d, which ->
+                selectedStockLevel = keys[which]
+                updateFilterBadge()
+                d.dismiss()
+                loadProducts()
+            }
+            .setNegativeButton("Close") { d, _ -> d.dismiss() }
+            .setCancelable(false)
+            .create()
+        attachEscClose(dlg)
+        dlg.setCanceledOnTouchOutside(false)
         dlg.show()
     }
 
@@ -222,7 +309,7 @@ class ProductsActivity : AppCompatActivity() {
         val labels = schemes.map { it.name }.toTypedArray()
         val checked = schemes.indexOfFirst { it.id == selectedSchemeId }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Price Group")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 selectedSchemeId = schemes[which].id
@@ -244,7 +331,7 @@ class ProductsActivity : AppCompatActivity() {
         val labels = locs.map { it.name }.toTypedArray()
         val checked = locs.indexOfFirst { it.id == selectedLocationId }.coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Warehouse / Location")
             .setSingleChoiceItems(labels, checked) { d, which ->
                 selectedLocationId = locs[which].id
@@ -264,7 +351,17 @@ class ProductsActivity : AppCompatActivity() {
         binding.swipeRefresh.isRefreshing = true
         uiScope.launch {
             try {
-                val res = api.searchProductsCatalog(currentQuery, selectedSchemeId, selectedLocationId)
+                val res = api.searchProductsCatalog(
+                    query = currentQuery,
+                    schemeId = selectedSchemeId,
+                    locationId = selectedLocationId,
+                    categoryId = selectedCategoryId,
+                    stockLevel = selectedStockLevel
+                )
+                if (res.categories.isNotEmpty()) {
+                    productCategories.clear()
+                    productCategories.addAll(res.categories)
+                }
                 loadedItems.clear()
                 loadedItems.addAll(res.products)
                 applySortedList()
@@ -343,7 +440,7 @@ class ProductsActivity : AppCompatActivity() {
             } else {
                 String.format(Locale.US, "%.2f", p.stockAvailable)
             }
-            b.tvProdStock.text = "Stock: $stockStr ${p.uom}"
+            b.tvProdStock.text = "Available: $stockStr ${p.uom}"
             if (p.stockAvailable > 0) {
                 b.tvProdStock.setTextColor(Color.parseColor("#059669"))
                 b.tvProdStock.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#DCFCE7"))

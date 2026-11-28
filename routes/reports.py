@@ -472,7 +472,7 @@ def reports_center():
     user_role = session.get('role')
     user_bid = session.get('branch_id')
     active_bid = session.get('active_branch_id')
-    is_branch_user = (user_role in ('branch_admin', 'branch_cashier') and user_bid)
+    is_branch_user = bool(user_bid and user_role != 'main_admin')
 
     req_branch = request.args.get('branch', '').strip().lower()
     if is_branch_user:
@@ -537,7 +537,7 @@ def view_report(report_key):
     user_role = session.get('role')
     user_bid = session.get('branch_id')
     active_bid = session.get('active_branch_id')
-    is_branch_user = (user_role in ('branch_admin', 'branch_cashier') and user_bid)
+    is_branch_user = bool(user_bid and user_role != 'main_admin')
     is_main_admin = (user_role == 'main_admin') or (not user_role and not user_bid and not active_bid)
 
     req_branch = request.args.get('branch', '').strip().lower()
@@ -2519,7 +2519,7 @@ def export_report(report_key):
     user_role = session.get('role')
     user_bid = session.get('branch_id')
     active_bid = session.get('active_branch_id')
-    is_branch_user = (user_role in ('branch_admin', 'branch_cashier') and user_bid)
+    is_branch_user = bool(user_bid and user_role != 'main_admin')
 
     req_branch = request.args.get('branch', '').strip().lower()
     if is_branch_user:

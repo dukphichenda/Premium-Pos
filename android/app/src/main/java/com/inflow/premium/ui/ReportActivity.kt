@@ -45,6 +45,7 @@ class ReportActivity : AppCompatActivity() {
         val iconRes: Int,
         val iconBgHex: String,
         val iconTintHex: String,
+        val hqOnly: Boolean = false,
         val onOpen: () -> Unit
     )
 
@@ -118,6 +119,7 @@ class ReportActivity : AppCompatActivity() {
             iconRes = R.drawable.ic_nav_home,
             iconBgHex = "#FAF5FF",
             iconTintHex = "#7C3AED",
+            hqOnly = true,
             onOpen = { openReportDetail(ReportDetailActivity.MODE_HQ) }
         )
     )
@@ -177,15 +179,6 @@ class ReportActivity : AppCompatActivity() {
             popup.show()
         }
 
-        binding.etReportSearch.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-            override fun afterTextChanged(s: Editable?) {
-                currentQuery = s?.toString()?.trim().orEmpty()
-                renderModules()
-            }
-        })
-
         renderModules()
         loadSummary()
     }
@@ -208,7 +201,7 @@ class ReportActivity : AppCompatActivity() {
     private fun showPeriodPicker() {
         val opts = arrayOf("Today", "Yesterday", "This Week", "This Month", "Last 30 Days", "All")
         val idx = opts.indexOf(currentDateFilter).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Executive Overview Period")
             .setSingleChoiceItems(opts, idx) { d, which ->
                 currentDateFilter = opts[which]
@@ -253,8 +246,20 @@ class ReportActivity : AppCompatActivity() {
         }
     }
 
+    private fun isBranchLogin(): Boolean =
+        !session.isMainAdmin() || session.getUserBranchId() != null
+
+    override fun onResume() {
+        super.onResume()
+        if (::session.isInitialized) {
+            renderModules()
+        }
+    }
+
     private fun renderModules() {
+        val branchRestricted = isBranchLogin()
         val filtered = modules.filter { m ->
+            if (m.hqOnly && branchRestricted) return@filter false
             currentQuery.isBlank() ||
                 m.title.contains(currentQuery, ignoreCase = true) ||
                 m.desc.contains(currentQuery, ignoreCase = true) ||

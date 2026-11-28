@@ -65,17 +65,16 @@ class StockTransfersActivity : AppCompatActivity() {
         setContentView(binding.root)
         api = ApiClient(session)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
             topContentView = binding.topHeader,
             topScrimView = binding.topScrim,
-            bottomNavContainer = binding.bottomNav.root,
-            bottomScrimView = binding.bottomScrim,
+            bottomNavContainer = null,
+            bottomScrimView = null,
             scrollableView = binding.scrollTransfers,
             extraTopDp = 6,
-            extraBottomScrollDp = 120
+            extraBottomScrollDp = 24
         )
 
         adapter = StockTransfersAdapter(
@@ -155,7 +154,7 @@ class StockTransfersActivity : AppCompatActivity() {
         val checkedIdx = if (selectedWarehouseId == null) 0 else {
             (locationOptions.indexOfFirst { it.id == selectedWarehouseId } + 1).coerceAtLeast(0)
         }
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Warehouse Route")
             .setSingleChoiceItems(names.toTypedArray(), checkedIdx) { dlg, which ->
                 if (which == 0) {
@@ -174,7 +173,7 @@ class StockTransfersActivity : AppCompatActivity() {
     }
 
     private fun confirmDeleteDraft(trf: StockTransferSummary) {
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Delete Draft Transfer")
             .setMessage("Delete draft ${trf.transferNumber}?")
             .setPositiveButton("Delete") { _, _ ->

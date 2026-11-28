@@ -274,7 +274,7 @@ class SalesOrdersActivity : AppCompatActivity() {
         val labels = arrayOf("All Dates", "Today", "Yesterday", "This Week", "This Month", "Last 30 Days")
         val checkedIdx = keys.indexOf(currentDateFilter).coerceAtLeast(0)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Date Filter")
             .setSingleChoiceItems(labels, checkedIdx) { dialog, which ->
                 currentDateFilter = keys[which]

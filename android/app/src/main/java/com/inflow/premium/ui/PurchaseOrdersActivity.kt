@@ -99,7 +99,9 @@ class PurchaseOrdersActivity : AppCompatActivity() {
         binding.tvPoFiltersBtn.setOnClickListener { showStatusDialog() }
         binding.btnPoAdd.setOnClickListener {
             startActivity(
-                Intent(this, MainActivity::class.java).putExtra("extra_url", "${session.baseUrl}/purchases/new")
+                Intent(this, PurchaseOrderDetailActivity::class.java)
+                    .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_ID, 0)
+                    .putExtra(PurchaseOrderDetailActivity.EXTRA_PO_NUMBER, "New PO")
             )
         }
         binding.btnPoRefresh.setOnClickListener { loadPurchaseOrders() }
@@ -148,10 +150,17 @@ class PurchaseOrdersActivity : AppCompatActivity() {
         loadPurchaseOrders()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (::api.isInitialized) {
+            loadPurchaseOrders()
+        }
+    }
+
     private fun showStatusDialog() {
         val opts = arrayOf("All", "Unfulfilled", "Fulfilled")
         val idx = opts.indexOf(currentStatus).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Purchase Order Status")
             .setSingleChoiceItems(opts, idx) { d, which ->
                 currentStatus = opts[which]

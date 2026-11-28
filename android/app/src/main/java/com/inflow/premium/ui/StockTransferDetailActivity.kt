@@ -68,7 +68,6 @@ class StockTransferDetailActivity : AppCompatActivity() {
 
         transferId = intent.getIntExtra(EXTRA_TRANSFER_ID, 0)
 
-        BottomNavHelper.setup(this, binding.bottomNav.root, BottomNavHelper.NavTab.HOME)
         EdgeToEdgeHelper.apply(
             activity = this,
             rootView = binding.root,
@@ -78,7 +77,7 @@ class StockTransferDetailActivity : AppCompatActivity() {
             bottomScrimView = binding.bottomScrim,
             scrollableView = binding.scrollTransferDetail,
             extraTopDp = 4,
-            extraBottomScrollDp = 190
+            extraBottomScrollDp = 100
         )
         binding.topHeader.addOnLayoutChangeListener { v, _, _, _, _, _, _, _, _ ->
             val topH = v.height
@@ -128,7 +127,7 @@ class StockTransferDetailActivity : AppCompatActivity() {
 
         binding.btnTrfSaveDraft.setOnClickListener { submitTransfer("DRAFT") }
         binding.btnTrfComplete.setOnClickListener {
-            MaterialAlertDialogBuilder(this)
+            LiquidGlassDialog.builder(this)
                 .setTitle("Complete Stock Transfer")
                 .setMessage("Move ${lines.size} item(s) immediately from ${locName(fromLocId)} to ${locName(toLocId)}?")
                 .setPositiveButton("Complete Transfer") { _, _ -> submitTransfer("COMPLETED") }
@@ -227,7 +226,7 @@ class StockTransferDetailActivity : AppCompatActivity() {
         val names = locations.map { if (it.isDefault) "${it.name} (Default)" else it.name }.toTypedArray()
         val curId = if (isSource) fromLocId else toLocId
         val checked = locations.indexOfFirst { it.id == curId }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle(if (isSource) "From Warehouse (Source)" else "To Warehouse (Destination)")
             .setSingleChoiceItems(names, checked) { dlg, which ->
                 val picked = locations[which].id
@@ -262,7 +261,7 @@ class StockTransferDetailActivity : AppCompatActivity() {
         container.addView(et)
         container.addView(scroll)
 
-        val dlg = MaterialAlertDialogBuilder(this)
+        val dlg = LiquidGlassDialog.builder(this)
             .setTitle("Add Item From Catalog")
             .setView(container)
             .setNegativeButton("Close", null)
@@ -527,7 +526,7 @@ class StockTransferDetailActivity : AppCompatActivity() {
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setSelectAllOnFocus(true)
         }
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Enter Transfer Qty")
             .setView(et)
             .setPositiveButton("OK") { _, _ ->

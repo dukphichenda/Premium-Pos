@@ -60,6 +60,12 @@ class ReportDetailActivity : AppCompatActivity() {
         mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_PROFIT
         period = intent.getStringExtra(EXTRA_PERIOD) ?: "This Month"
 
+        if (mode == MODE_HQ && (!session.isMainAdmin() || session.getUserBranchId() != null)) {
+            Toast.makeText(this, "Restricted to Headquarters only", Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
         binding.tvRepDetTitle.text = when (mode) {
             MODE_DELIVERY -> "Delivery Assign"
             MODE_BRANCH -> "Sales Summary"
@@ -140,7 +146,7 @@ class ReportDetailActivity : AppCompatActivity() {
     private fun showPeriodPicker() {
         val opts = arrayOf("Today", "Yesterday", "This Week", "This Month", "Last 30 Days", "All")
         val idx = opts.indexOf(period).coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Report Period")
             .setSingleChoiceItems(opts, idx) { d, which ->
                 period = opts[which]
@@ -258,7 +264,7 @@ class ReportDetailActivity : AppCompatActivity() {
         val idx = drivers.indexOfFirst {
             if (order.deliveryMan.isBlank()) it == "Unassigned" else it.equals(order.deliveryMan, true)
         }.coerceAtLeast(0)
-        MaterialAlertDialogBuilder(this)
+        LiquidGlassDialog.builder(this)
             .setTitle("Assign Driver • ${order.orderNumber}")
             .setSingleChoiceItems(drivers.toTypedArray(), idx) { d, which ->
                 val chosen = if (which == 0) "" else drivers[which]
