@@ -5218,6 +5218,14 @@ function selectUnitForLine(row, prod, targetUom, targetRatio, currentQty) {
             priceInput.value = formatPriceValue(newPrice, prod.price_decimals);
         }
 
+        // Check backorder warning icon across all rows (since shared components affect sibling rows)
+        refreshAllRowBackorderBadges();
+    }
+
+    recalculateTotals();
+    markDirty();
+}
+
 function getSavedOrderReservesMap() {
     const meta = document.getElementById('soPartialMeta');
     if (!meta || meta.getAttribute('data-holds-res') !== '1') return {};
@@ -5313,15 +5321,6 @@ function refreshRowBackorderBadge(row) {
 
 function refreshAllRowBackorderBadges() {
     document.querySelectorAll('#lineItemsBody tr[data-line-index]').forEach(r => refreshRowBackorderBadge(r));
-}
-
-        // Check backorder warning icon across all rows (since shared components affect sibling rows)
-        refreshAllRowBackorderBadges();
-    }
-
-    recalculateTotals();
-    if (typeof refreshAllRowBackorderBadges === 'function') refreshAllRowBackorderBadges();
-    markDirty();
 }
 
 function onQtyNumberChange(inputEl) {

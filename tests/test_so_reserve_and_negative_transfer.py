@@ -348,6 +348,48 @@ class SalesOrderReservationAndTransferTest(unittest.TestCase):
         self.assertEqual(proc.returncode, 0, f"Node harness failed:\nSTDOUT:{proc.stdout}\nSTDERR:{proc.stderr}")
         self.assertIn('JS_HARNESS_OK', proc.stdout)
 
+        # Ensure helper functions are declared at top-level (not nested inside selectUnitForLine/if blocks)
+        scope_check = """
+        const fs = require('fs');
+        const html = fs.readFileSync(process.argv[1], 'utf8');
+        const scriptBlock = html.slice(html.indexOf('function openQtyDropdown('), html.indexOf('function initBackorderNotices()'));
+        let depth = 0;
+        const lines = scriptBlock.split(/\\r?\\n/);
+        const found = {};
+        const targets = [
+            'function openQtyDropdown(',
+            'function selectUnitForLine(',
+            'function getSavedOrderReservesMap(',
+            'function getRowStdQty(',
+            'function getEffectiveReservedForRow(',
+            'function refreshRowBackorderBadge(',
+            'function refreshAllRowBackorderBadges(',
+            'function onQtyNumberChange(',
+            'function showBackorderNotice('
+        ];
+        for (const line of lines) {
+            const trimmed = line.trim();
+            for (const t of targets) {
+                if (trimmed.startsWith(t)) found[t] = depth;
+            }
+            const clean = line.replace(/'(?:\\\\.|[^'\\\\])*'|"(?:\\\\.|[^"\\\\])*"|`(?:\\\\.|[^`\\\\])*`/g, '').replace(/\\/\\/.*$/, '');
+            for (const ch of clean) {
+                if (ch === '{') depth++;
+                else if (ch === '}') depth--;
+            }
+        }
+        for (const t of targets) {
+            if (found[t] !== 0) {
+                console.error('Bad top-level depth for', t, 'got:', found[t]);
+                process.exit(1);
+            }
+        }
+        console.log('TOP_LEVEL_SCOPE_OK');
+        """
+        scope_proc = subprocess.run([node_bin, '-e', scope_check, detail_path], capture_output=True, text=True)
+        self.assertEqual(scope_proc.returncode, 0, f"Top-level scope check failed:\nSTDOUT:{scope_proc.stdout}\nSTDERR:{scope_proc.stderr}")
+        self.assertIn('TOP_LEVEL_SCOPE_OK', scope_proc.stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
