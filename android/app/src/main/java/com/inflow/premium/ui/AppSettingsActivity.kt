@@ -165,11 +165,9 @@ class AppSettingsActivity : AppCompatActivity() {
     private fun prefetchOverview() {
         uiScope.launch {
             try {
-                if (session.hqLogoUrl.isBlank()) {
-                    api.bootstrap()
-                    bindInfo()
-                    renderBranchesList()
-                }
+                api.bootstrap()
+                bindInfo()
+                renderBranchesList()
                 cachedOverview = api.getSettingsOverview()
             } catch (_: Exception) {}
         }

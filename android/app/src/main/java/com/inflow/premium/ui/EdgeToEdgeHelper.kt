@@ -171,11 +171,15 @@ object EdgeToEdgeHelper {
         var smallPixels: IntArray? = null
         var tempPixels: IntArray? = null
 
-        val filterPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        val tintPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-        val maskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        val shapeMaskPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.BLACK
-            xfermode = PorterDuffXfermode(PorterDuff.Mode.DST_IN)
+            style = Paint.Style.FILL
+        }
+        val filterPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        }
+        val tintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_ATOP)
         }
         val pillRect = RectF()
         val backdropLoc = IntArray(2)
@@ -196,8 +200,8 @@ object EdgeToEdgeHelper {
             val h = blurBackdrop.height
             if (w <= 0 || h <= 0 || scrollableView.width <= 0 || scrollableView.height <= 0) return
 
-            val sw = max(8, (w * scale).toInt())
-            val sh = max(8, (h * scale).toInt())
+            val sw = max(12, (w * scale).toInt())
+            val sh = max(12, (h * scale).toInt())
 
             val sb = smallBmp?.takeIf { it.width == sw && it.height == sh }
                 ?: Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888).also { smallBmp = it }
@@ -230,9 +234,16 @@ object EdgeToEdgeHelper {
 
             val outCanvas = Canvas(ob)
             outCanvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+
+            // 1) Draw clean anti-aliased capsule pill alpha mask FIRST (4 outer corners stay 100% transparent)
+            pillRect.set(0f, 0f, sw.toFloat(), sh.toFloat())
+            val pillRadius = sh / 2f
+            outCanvas.drawRoundRect(pillRect, pillRadius, pillRadius, shapeMaskPaint)
+
+            // 2) Composite blurred backdrop strictly INSIDE the rounded pill (SRC_IN)
             outCanvas.drawBitmap(sb, 0f, 0f, filterPaint)
 
-            // Less-transparent frosted glaze over the blurred backdrop
+            // 3) Overlay less-transparent frosted glaze strictly inside the pill (SRC_ATOP)
             tintPaint.shader = if (isDark) {
                 LinearGradient(
                     0f, 0f, 0f, sh.toFloat(),
@@ -255,11 +266,6 @@ object EdgeToEdgeHelper {
                 )
             }
             outCanvas.drawRect(0f, 0f, sw.toFloat(), sh.toFloat(), tintPaint)
-
-            // Clip softly into capsule pill corners
-            pillRect.set(0f, 0f, sw.toFloat(), sh.toFloat())
-            val pillRadius = sh / 2f
-            outCanvas.drawRoundRect(pillRect, pillRadius, pillRadius, maskPaint)
 
             blurBackdrop.background = BitmapDrawable(blurBackdrop.resources, ob)
         }

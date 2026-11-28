@@ -78,7 +78,7 @@ object ImageLoader {
                         val bytes = resp.body?.bytes() ?: return@withContext null
                         decodeSampledBitmap(bytes, maxDim = 512)
                     }
-                } catch (_: Exception) {
+                } catch (_: Throwable) {
                     null
                 }
             }

@@ -107,6 +107,16 @@ def mobile_auth_required(f):
     return decorated
 
 
+def _to_mobile_logo_thumb_url(raw_url):
+    u = (raw_url or '').strip()
+    if not u:
+        return ''
+    if u.startswith('/static/uploads/'):
+        from urllib.parse import quote
+        return f"/api/mobile/logo-thumb?path={quote(u, safe='/')}&size=256"
+    return u
+
+
 def _extract_branch_logo_url(raw_settings):
     import json as _json
     if not raw_settings:
@@ -114,7 +124,7 @@ def _extract_branch_logo_url(raw_settings):
     try:
         d = _json.loads(raw_settings) if isinstance(raw_settings, str) else raw_settings
         if isinstance(d, dict):
-            return (d.get('logo_url') or '').strip()
+            return _to_mobile_logo_thumb_url((d.get('logo_url') or '').strip())
     except Exception:
         pass
     return ''
@@ -124,13 +134,53 @@ def _get_hq_logo_url():
     try:
         inv = query_one("SELECT logo_url FROM invoice_settings LIMIT 1")
         if inv and (inv.get('logo_url') or '').strip():
-            return inv['logo_url'].strip()
+            return _to_mobile_logo_thumb_url(inv['logo_url'].strip())
         comp = query_one("SELECT app_logo_url FROM companies LIMIT 1")
         if comp and (comp.get('app_logo_url') or '').strip():
-            return comp['app_logo_url'].strip()
+            return _to_mobile_logo_thumb_url(comp['app_logo_url'].strip())
     except Exception:
         pass
     return ''
+
+
+@mobile_api_bp.route('/api/mobile/logo-thumb', methods=['GET'])
+def mobile_logo_thumb():
+    """Serve a fast, cached resized PNG thumbnail for HQ/branch logos (shrinks 9-16 MB PNGs to ~25 KB)."""
+    from flask import current_app
+    from PIL import Image
+
+    rel_path = (request.args.get('path') or '').strip()
+    if not rel_path.startswith('/static/uploads/') or '..' in rel_path:
+        return jsonify({'success': False, 'error': 'Invalid logo path'}), 400
+
+    try:
+        size = int(request.args.get('size') or 256)
+    except Exception:
+        size = 256
+    size = max(64, min(size, 512))
+
+    uploads_root = os.path.realpath(os.path.join(current_app.root_path, 'static', 'uploads'))
+    sub_rel = rel_path[len('/static/uploads/'):].lstrip('/')
+    src_path = os.path.realpath(os.path.join(uploads_root, sub_rel))
+    if not src_path.startswith(uploads_root + os.sep) or not os.path.isfile(src_path):
+        return jsonify({'success': False, 'error': 'Logo not found'}), 404
+
+    thumb_dir = os.path.join(uploads_root, '.mobile_thumbs')
+    os.makedirs(thumb_dir, exist_ok=True)
+    key = hashlib.sha1(f"{sub_rel}:{size}".encode('utf-8')).hexdigest()
+    thumb_path = os.path.join(thumb_dir, f"{key}_{size}.png")
+
+    try:
+        need_gen = (not os.path.exists(thumb_path)) or (os.path.getmtime(src_path) > os.path.getmtime(thumb_path))
+        if need_gen:
+            with Image.open(src_path) as im:
+                im = im.convert('RGBA')
+                im.thumbnail((size, size), Image.LANCZOS)
+                im.save(thumb_path, format='PNG', optimize=True)
+        return send_file(thumb_path, mimetype='image/png', max_age=86400)
+    except Exception as e:
+        logger.warning(f"Logo thumb fallback for {rel_path}: {e}")
+        return send_file(src_path, max_age=86400)
 
 
 def _get_bootstrap_payload():
@@ -4193,7 +4243,7 @@ def mobile_app_update_check():
     apk_size_bytes = os.path.getsize(apk_path) if apk_available else 0
     apk_size_mb = f"{apk_size_bytes / (1024 * 1024):.1f} MB" if apk_size_bytes > 0 else "0.0 MB"
 
-    notes = "v3.7.0: Pure image-only Android share (ABA style), modern blurred bottom-sheet popups, frosted #0A6E80 liquid-glass nav bar, PO multi-product add + PDF/Excel export, fixed Product Detail Price Table specs, and full Order History with customer search."
+    notes = "v3.7.1: Fixed HQ & branch logos with fast server-side 256px thumbnails (~25KB), fixed rounded frosted pill clipping on bottom nav bar, plus v3.7.0 PO PDF/Excel export, Product Price Table specs & full searchable Order History."
     try:
         row = query_one("SELECT setting_value FROM app_settings WHERE setting_key = 'mobile_app_config'")
         if row and row.get('setting_value'):
