@@ -5070,9 +5070,9 @@ function openQtyDropdown(event, btnEl) {
     });
 
     // Populate Stock panel (Matching inFlow Screenshot: Qty On Hand, Qty Available, Qty Reserved)
+    // Always display true live warehouse totals (including this saved SO's reserved qty)
     const onHand = prod ? (prod.stock_on_hand || 0) : 0;
-    const rawReserved = prod ? (prod.stock_reserved || 0) : 0;
-    const reserved = prod ? getEffectiveReservedForRow(pid, rawReserved, row) : 0;
+    const reserved = prod ? (prod.stock_reserved || 0) : 0;
     const avail = onHand - reserved;
     const onOrder = prod ? (prod.stock_on_order || 0) : 0;
     const hasComponents = !!(prod && prod.components && prod.components.length > 0);
@@ -5094,7 +5094,7 @@ function openQtyDropdown(event, btnEl) {
         prod.components.forEach(c => {
             const cRatio = parseFloat(c.quantity) || 1.0;
             const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-            const cReserved = getEffectiveReservedForRow(parseInt(c.component_id), c.stock_reserved, row);
+            const cReserved = parseFloat(c.stock_reserved) || 0.0;
             const cAvail = Math.max(0, cOnHand - cReserved);
             const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
             if (buildable < minBuildable) minBuildable = buildable;
@@ -7399,8 +7399,7 @@ function updateItemDropdownPreview(pid) {
 
     const uom = prod.base_uom || 'pcs.';
     const onHand = parseFloat(prod.stock_on_hand) || 0;
-    const activeRowForPreview = (activeGridRowEl && activeGridRowEl.id !== 'newRowEntry') ? activeGridRowEl : null;
-    const reserved = getEffectiveReservedForRow(pid, parseFloat(prod.stock_reserved) || 0, activeRowForPreview);
+    const reserved = parseFloat(prod.stock_reserved) || 0;
     const available = onHand - reserved;
     const onOrder = parseFloat(prod.stock_on_order) || 0;
 
@@ -7478,7 +7477,7 @@ function updateItemDropdownPreview(pid) {
             prod.components.forEach(c => {
                 const cRatio = parseFloat(c.quantity) || 1.0;
                 const cOnHand = parseFloat(c.stock_on_hand) || 0.0;
-                const cReserved = getEffectiveReservedForRow(parseInt(c.component_id), c.stock_reserved, activeRowForPreview);
+                const cReserved = parseFloat(c.stock_reserved) || 0.0;
                 const cAvail = Math.max(0, cOnHand - cReserved);
                 const buildable = cRatio > 0 ? Math.floor(cAvail / cRatio) : 0;
                 if (buildable < minBuildable) minBuildable = buildable;
