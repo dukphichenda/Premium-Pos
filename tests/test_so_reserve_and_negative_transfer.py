@@ -390,6 +390,30 @@ class SalesOrderReservationAndTransferTest(unittest.TestCase):
         self.assertEqual(scope_proc.returncode, 0, f"Top-level scope check failed:\nSTDOUT:{scope_proc.stdout}\nSTDERR:{scope_proc.stderr}")
         self.assertIn('TOP_LEVEL_SCOPE_OK', scope_proc.stdout)
 
+    def test_canvas_saved_order_reserves_attribute_is_properly_escaped(self):
+        """Ensures data-saved-order-reserves uses |tojson|forceescape so double quotes do not break HTML."""
+        import html as html_mod
+        import re
+        from flask import render_template_string
+
+        canvas_path = os.path.join(ROOT_DIR, 'templates', 'sales', '_detail_canvas.html')
+        with open(canvas_path, 'r', encoding='utf-8') as f:
+            canvas_tpl = f.read()
+
+        self.assertNotIn('|tojson|e', canvas_tpl)
+        self.assertIn('data-saved-order-reserves="{{ (saved_order_reserves or {})|tojson|forceescape }}"', canvas_tpl)
+
+        app = Flask(__name__)
+        with app.app_context():
+            rendered = render_template_string(
+                '<div id="soPartialMeta" data-holds-res="1" data-saved-order-reserves="{{ (saved_order_reserves or {})|tojson|forceescape }}"></div>',
+                saved_order_reserves={'301': 400.0, '492': 400.0, '577': 400.0},
+            )
+        m = re.search(r'data-saved-order-reserves="([^"]+)"', rendered)
+        self.assertIsNotNone(m, f"Attribute broken in rendered HTML: {rendered}")
+        parsed = json.loads(html_mod.unescape(m.group(1)))
+        self.assertEqual(parsed, {'301': 400.0, '492': 400.0, '577': 400.0})
+
 
 if __name__ == '__main__':
     unittest.main()
